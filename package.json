@@ -177,7 +177,8 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "package": "npx @vscode/vsce package --no-yarn"
   },
   "devDependencies": {
     "@types/lodash": "^4.14.175",
