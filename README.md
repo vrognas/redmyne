@@ -1,6 +1,8 @@
-# `vscode-redmine`
+# Redmine for Positron
 
-Redmine extension for Visual Studio Code.
+Redmine project management integration for Positron IDE and VS Code.
+
+> **Attribution**: This is a Positron-focused fork of [vscode-redmine](https://github.com/rozpuszczalny/vscode-redmine) by Tomasz Domański, originally licensed under MIT.
 
 ## Features
 
@@ -31,6 +33,10 @@ _Missing a feature? Open an issue and let me know!_
 
 ![Change server to other workspace folder in sidebar panel GIF showcase](./resources/redmine-change-sidebar-server.gif)
 
+## Compatibility
+
+This extension works with both **Positron IDE** and **VS Code**.
+
 ## Requirements
 
 It's required to enable REST web services in `/settings?tab=api` of your redmine (you have to be administrator of redmine server).
@@ -60,7 +66,20 @@ No known issues yet. If you found one, feel free to open an issue!
 
 See [change log](./CHANGELOG.md)
 
+## Contributors
+
+This extension builds upon the excellent work of:
+- **Tomasz Domański** ([@rozpuszczalny](https://github.com/rozpuszczalny)) - Original author
+- **Doğan Özdoğan** - Tree view feature
+- **Markus Amshove** - Quick update feature
+
 ## Attributions
+
+### Original Project
+
+This extension is a fork of [vscode-redmine](https://github.com/rozpuszczalny/vscode-redmine) by Tomasz Domański.
+
+Copyright 2018 Tomasz Domański. Licensed under the MIT License.
 
 ### Logo
 
@@ -68,5 +87,3 @@ Logo is remixed version of original Redmine Logo.
 
 Redmine Logo is Copyright (C) 2009 Martin Herr and is licensed under the Creative Commons Attribution-Share Alike 2.5 Generic license.
 See http://creativecommons.org/licenses/by-sa/2.5/ for more details.
-
-Made with ❤️ by [@rozpuszczalny](https://tomaszdomanski.com/?utm_source=github&utm_campaign=vscode-redmine)

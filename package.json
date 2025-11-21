@@ -1,17 +1,18 @@
 {
-  "name": "vscode-redmine",
-  "displayName": "Redmine",
-  "description": "Integration with VSCode and Redmine",
-  "version": "1.1.1",
-  "publisher": "rozpuszczalny",
+  "name": "positron-redmine",
+  "displayName": "Redmine for Positron",
+  "description": "Redmine project management integration for Positron IDE and VS Code",
+  "version": "2.0.0",
+  "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/rozpuszczalny/vscode-redmine.git"
+    "url": "https://github.com/vrognas/positron-redmine.git"
   },
   "engines": {
-    "vscode": "^1.31.0"
+    "vscode": "^1.31.0",
+    "positron": "^2025.06.0"
   },
   "categories": [
     "Other"
