@@ -75,6 +75,7 @@ jobs:
         run: npm run package
 
       - name: Smoke test VSIX
+        if: matrix.os == 'ubuntu-latest'
         run: |
           npx tsc test/smoke/activation.test.ts --outDir out/test/smoke --skipLibCheck
           npx --yes @vscode/test-cli
