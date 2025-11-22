@@ -2,7 +2,8 @@ import * as vscode from "vscode";
 import { IssueController } from "../controllers/issue-controller";
 import { ActionProperties } from "./action-properties";
 
-export default async ({ server }: ActionProperties, issueId?: string) => {
+export default async ({ server }: ActionProperties, ...args: unknown[]) => {
+  let issueId = args[0] as string | undefined;
   if (!issueId) {
     issueId = await vscode.window.showInputBox({
       placeHolder: `Type in issue id`,
