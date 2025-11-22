@@ -8,7 +8,6 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ### Added
 - Configure icon in view title (always visible)
-- Server URL display in tree views (globe icon)
 - Config change listener: auto-update when URL/API key removed
 
 ### Fixed

@@ -151,14 +151,6 @@
 - Re-run `updateConfiguredContext()` to sync state
 - Automatically clear/set servers in trees
 
-### Server Status Display
-
-**TreeView Limitations**
-- View container titles static (can't be changed dynamically)
-- View names static (defined in package.json)
-- Solution: Add ServerStatus node as first item in tree
-- Use `ThemeIcon('globe')` for consistency with VS Code
-
 ## Key Takeaways
 
 1. **TDD works**: Write tests first caught URL edge cases early
@@ -170,4 +162,3 @@
 7. **Vitest fast**: 46 tests in 1.17s
 8. **Parallel agents**: 5 phases in 2 hours (vs 3 weeks estimate)
 9. **Guard tree refreshes**: Check server exists before firing events
-10. **VS Code limits**: View container/view titles static, use tree items for dynamic content
