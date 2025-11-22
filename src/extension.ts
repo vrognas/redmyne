@@ -51,8 +51,27 @@ export function activate(context: vscode.ExtensionContext): void {
     const config = vscode.workspace.getConfiguration("redmine", folder.uri);
     const hasUrl = !!config.get<string>("url");
     const hasApiKey = !!(await secretManager.getApiKey(folder.uri));
+    const isConfigured = hasUrl && hasApiKey;
 
-    await vscode.commands.executeCommand("setContext", "redmine:configured", hasUrl && hasApiKey);
+    await vscode.commands.executeCommand("setContext", "redmine:configured", isConfigured);
+
+    // If configured, initialize server for trees
+    if (isConfigured) {
+      try {
+        const server = new RedmineServer({
+          address: config.get<string>("url")!,
+          key: (await secretManager.getApiKey(folder.uri))!,
+          additionalHeaders: config.get("additionalHeaders"),
+          rejectUnauthorized: config.get("rejectUnauthorized"),
+        });
+
+        myIssuesTree.setServer(server);
+        projectsTree.setServer(server);
+      } catch (error) {
+        console.error('Failed to initialize Redmine server:', error);
+        vscode.window.showErrorMessage(`Failed to connect to Redmine: ${error}`);
+      }
+    }
   };
 
   // Initial check
