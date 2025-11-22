@@ -1,0 +1,30 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+    open-pull-requests-limit: 3
+    groups:
+      typescript-ecosystem:
+        patterns:
+          - "typescript"
+          - "@types/*"
+          - "@typescript-eslint/*"
+      testing:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+      vscode:
+        patterns:
+          - "@vscode/*"
+      build-tools:
+        patterns:
+          - "esbuild"
+          - "prettier"
+          - "eslint*"
+    labels:
+      - dependencies
+      - automated
