@@ -1,6 +1,6 @@
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
-import prettierRecommended from "eslint-plugin-prettier/recommended";
+import eslintConfigPrettier from "eslint-config-prettier";
 
 export default [
   // Apply to all TypeScript files
@@ -44,5 +44,5 @@ export default [
   },
 
   // Prettier integration (must be last to override conflicting rules)
-  prettierRecommended,
+  eslintConfigPrettier,
 ];
