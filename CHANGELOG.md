@@ -4,6 +4,30 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ## [Unreleased]
 
+## [3.0.0] - 2025-11-22
+
+### BREAKING CHANGES
+
+- **API keys in Secrets**: Machine-local, encrypted storage
+- **VS Code 1.85+ required**: For Secrets API support
+- **TypeScript 5.7**: Modern language features
+- **Bundle size reduced**: 80KB smaller (lodash removed)
+
+### Migration
+See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md)
+
+### Added
+- `redmine.setApiKey` command
+- Comprehensive test suite (60% coverage)
+
+### Removed
+- lodash dependency
+- Deprecated VS Code APIs
+
+### Fixed
+- Memory leaks (EventEmitter disposal)
+- URL parsing edge cases
+
 ## 1.1.1 - 17.08.2022
 
 ### Fixed
