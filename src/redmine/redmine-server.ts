@@ -1,4 +1,3 @@
-import { Url, parse } from "url";
 import * as http from "http";
 import * as https from "https";
 import { RedmineProject } from "./redmine-project";
@@ -42,7 +41,7 @@ export interface RedmineServerConnectionOptions {
 }
 
 interface RedmineServerOptions extends RedmineServerConnectionOptions {
-  url: Url;
+  url: URL;
 }
 
 export class RedmineOptionsError extends Error {
@@ -67,18 +66,21 @@ export class RedmineServer {
     if (!options.key) {
       throw new RedmineOptionsError("Key cannot be empty!");
     }
-    const url = parse(options.address);
-    if (["https:", "http:"].indexOf(url.protocol ?? "") === -1) {
-      throw new RedmineOptionsError(
-        "Address must have supported protocol (http/https)"
-      );
+    let url: URL;
+    try {
+      url = new URL(options.address);
+    } catch {
+      throw new RedmineOptionsError(`Invalid URL: ${options.address}`);
+    }
+    if (!["https:", "http:"].includes(url.protocol)) {
+      throw new RedmineOptionsError("Protocol must be http/https");
     }
   }
 
   private setOptions(options: RedmineServerConnectionOptions) {
     this.options = {
       ...options,
-      url: parse(options.address),
+      url: new URL(options.address),
     };
     if (
       this.options.additionalHeaders === null ||
@@ -97,7 +99,7 @@ export class RedmineServer {
     const { url, key, additionalHeaders, rejectUnauthorized } = this.options;
     const options: https.RequestOptions = {
       hostname: url.hostname,
-      port: url.port,
+      port: url.port ? parseInt(url.port, 10) : undefined,
       headers: {
         [REDMINE_API_KEY_HEADER_NAME]: key,
         ...additionalHeaders,

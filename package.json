@@ -185,8 +185,8 @@
   },
   "devDependencies": {
     "@types/mocha": "^2.2.42",
-    "@types/node": "^7.0.43",
-    "@types/vscode": "^1.31.0",
+    "@types/node": "^22.19.1",
+    "@types/vscode": "^1.106.1",
     "@typescript-eslint/eslint-plugin": "^5.0.0",
     "@typescript-eslint/parser": "^5.0.0",
     "@vitest/coverage-v8": "^2.1.9",
@@ -196,7 +196,7 @@
     "eslint-plugin-prettier": "^4.0.0",
     "msw": "^2.12.2",
     "prettier": "^2.0.5",
-    "typescript": "^3.9.7",
+    "typescript": "^5.9.3",
     "vitest": "^2.1.9"
   }
 }

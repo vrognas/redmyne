@@ -33,7 +33,7 @@ export default async ({ server }: ActionProperties) => {
     },
     (progress) => {
       progress.report({
-        message: `Waiting for response from ${server.options.url.host}...`,
+        message: `Waiting for response from ${server.options.url.hostname}...`,
       });
       return promise;
     }
