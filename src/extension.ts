@@ -118,10 +118,24 @@ export function activate(context: vscode.ExtensionContext): void {
         shouldUpdateApiKey = true;
 
       } else if (!existingUrl && existingApiKey) {
-        // Rare: API key exists but no URL
+        // Invalid state: API key exists but no URL - API key is server-specific
+        const action = await vscode.window.showWarningMessage(
+          'Invalid configuration detected',
+          { modal: true, detail: 'An API key exists but no Redmine URL is configured. API keys are specific to a Redmine server.\n\nWould you like to reconfigure from scratch?' },
+          'Reconfigure',
+          'Cancel'
+        );
+
+        if (action !== 'Reconfigure') return;
+
+        // Delete orphaned API key
+        await secretManager.deleteApiKey(folder.uri);
+
+        // Start fresh
         url = await promptForUrl();
         if (!url) return;
         await config.update("url", url, vscode.ConfigurationTarget.WorkspaceFolder);
+        shouldUpdateApiKey = true;
 
       } else {
         // Nothing configured - full flow
