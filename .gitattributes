@@ -1,0 +1,14 @@
+# Ensure text files use LF in repo and on checkout
+* text=auto eol=lf
+
+# Ensure common text files have LF (explicit)
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.svg text eol=lf
