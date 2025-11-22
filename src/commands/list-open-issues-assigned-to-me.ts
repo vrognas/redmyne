@@ -50,7 +50,7 @@ export default async ({ server }: ActionProperties) => {
 
     const controller = new IssueController(issue.fullIssue, server);
 
-    controller.listActions();
+    return controller.listActions();
   } catch (error) {
     vscode.window.showErrorMessage(errorToString(error));
   }

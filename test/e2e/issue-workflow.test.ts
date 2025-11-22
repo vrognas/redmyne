@@ -109,9 +109,6 @@ describe("Issue Workflow E2E", () => {
 
     await listOpenIssuesAssignedToMe({ server, config: {} });
 
-    // Wait for async promise chains to complete
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
     expect(vscode.window.showQuickPick).toHaveBeenCalledTimes(3);
     expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
       "Issue #123 status changed to Resolved"
@@ -154,10 +151,7 @@ describe("Issue Workflow E2E", () => {
     vi.mocked(vscode.window.showInputBox).mockResolvedValueOnce("2.5|Fixed bug");
 
     const activities = await server.getTimeEntryActivities();
-    controller.chooseTimeEntryType(activities.time_entry_activities);
-
-    // Wait for async promise chains to complete
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await controller.chooseTimeEntryType(activities.time_entry_activities);
 
     expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
       "Time entry for issue #456 has been added."

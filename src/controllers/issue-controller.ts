@@ -5,10 +5,6 @@ import { Issue } from "../redmine/models/issue";
 import { IssueStatus as RedmineIssueStatus } from "../redmine/models/issue-status";
 import { TimeEntryActivity } from "../redmine/models/time-entry-activity";
 
-interface TimeEntryActivityItem extends vscode.QuickPickItem {
-  activity: TimeEntryActivity;
-}
-
 export class IssueController {
   constructor(
     private issue: Issue,
@@ -33,11 +29,11 @@ export class IssueController {
       .then((act) => {
         if (!act) return;
 
-        this.setTimeEntryMessage(act);
+        return this.setTimeEntryMessage(act.activity);
       });
   }
 
-  setTimeEntryMessage(activity: TimeEntryActivityItem) {
+  setTimeEntryMessage(activity: TimeEntryActivity) {
     return vscode.window
       .showInputBox({
         placeHolder: `"hours spent|additional message" or "hours spent|"`,
@@ -62,8 +58,8 @@ export class IssueController {
         const hours = input.substring(0, indexOf);
         const message = input.substring(indexOf + 1);
 
-        this.redmine
-          .addTimeEntry(this.issue.id, activity.activity.id, hours, message)
+        return this.redmine
+          .addTimeEntry(this.issue.id, activity.id, hours, message)
           .then(
             () => {
               vscode.window.showInformationMessage(
@@ -95,7 +91,7 @@ export class IssueController {
       .then((stat) => {
         if (!stat) return;
 
-        this.redmine.setIssueStatus(this.issue, stat.fullIssue.id).then(
+        return this.redmine.setIssueStatus(this.issue, stat.fullIssue.id).then(
           () => {
             vscode.window.showInformationMessage(
               `Issue #${this.issue.id} status changed to ${stat.fullIssue.name}`
@@ -123,13 +119,13 @@ export class IssueController {
 
   private changeStatus() {
     return this.redmine.getIssueStatuses().then((statuses) => {
-      this.changeIssueStatus(statuses.issue_statuses);
+      return this.changeIssueStatus(statuses.issue_statuses);
     });
   }
 
   private addTimeEntry() {
     return this.redmine.getTimeEntryActivities().then((activities) => {
-      this.chooseTimeEntryType(activities.time_entry_activities);
+      return this.chooseTimeEntryType(activities.time_entry_activities);
     });
   }
 
@@ -263,16 +259,16 @@ export class IssueController {
         (option) => {
           if (!option) return;
           if (option.action === "openInBrowser") {
-            this.openInBrowser();
+            return this.openInBrowser();
           }
           if (option.action === "changeStatus") {
-            this.changeStatus();
+            return this.changeStatus();
           }
           if (option.action === "addTimeEntry") {
-            this.addTimeEntry();
+            return this.addTimeEntry();
           }
           if (option.action === "quickUpdate") {
-            this.quickUpdate();
+            return this.quickUpdate();
           }
         },
         (_error) => {

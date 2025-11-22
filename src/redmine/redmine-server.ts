@@ -291,12 +291,12 @@ export class RedmineServer {
         "/issue_statuses.json",
         "GET"
       ).then((obj) => {
-        if (obj) {
+        if (obj && obj.issue_statuses) {
           // Shouldn't change much; cache it.
           this.issueStatuses = obj;
+          return obj;
         }
-
-        return obj;
+        return { issue_statuses: [] };
       });
     } else {
       return Promise.resolve(this.issueStatuses);
