@@ -72,7 +72,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
       // Step 1: Set Redmine URL
       const url = await vscode.window.showInputBox({
-        prompt: 'Enter your Redmine server URL',
+        prompt: 'Step 1/2: Enter your Redmine server URL',
         placeHolder: 'https://redmine.example.com',
         validateInput: (value) => {
           if (!value) return 'URL cannot be empty';
@@ -91,8 +91,44 @@ export function activate(context: vscode.ExtensionContext): void {
       const config = vscode.workspace.getConfiguration("redmine", folder.uri);
       await config.update("url", url, vscode.ConfigurationTarget.WorkspaceFolder);
 
-      // Step 2: Set API Key
-      await vscode.commands.executeCommand('redmine.setApiKey');
+      // Step 2: Explain how to get API key
+      const action = await vscode.window.showInformationMessage(
+        'Step 2/2: You need your Redmine API key',
+        { modal: true, detail: 'Your API key can be found in your Redmine account settings.\n\nClick "Open Redmine" to open your account page, then copy your API key and paste it in the next step.' },
+        'Open Redmine Account',
+        'I Have My Key'
+      );
+
+      if (!action) return;
+
+      if (action === 'Open Redmine Account') {
+        // Open user's Redmine account page
+        await vscode.env.openExternal(vscode.Uri.parse(`${url}/my/account`));
+
+        // Give them time to get the key
+        await vscode.window.showInformationMessage(
+          'Copy your API key from the "API access key" section on the right side of the page.',
+          { modal: false },
+          'Got It'
+        );
+      }
+
+      // Prompt for API Key
+      const apiKey = await vscode.window.showInputBox({
+        prompt: 'Paste your Redmine API key',
+        placeHolder: 'e.g., a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0',
+        password: true,
+        validateInput: (value) => {
+          if (!value) return 'API key cannot be empty';
+          if (value.length < 20) return 'API key appears too short';
+          return null;
+        }
+      });
+
+      if (!apiKey) return;
+
+      // Save API key to secrets
+      await secretManager.setApiKey(folder.uri, apiKey);
 
       // Update context and refresh trees
       await updateConfiguredContext();

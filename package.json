@@ -150,7 +150,7 @@
       "properties": {
         "redmine.url": {
           "type": "string",
-          "description": "URL of Redmine",
+          "description": "URL of Redmine server",
           "examples": [
             "https://example.com",
             "http://example.com:8080",
