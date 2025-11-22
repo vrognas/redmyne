@@ -73,11 +73,9 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.window.showErrorMessage(`Failed to connect to Redmine: ${error}`);
       }
     } else {
-      // Clear servers when not configured
+      // Clear servers when not configured (don't refresh - let welcome view show)
       myIssuesTree.setServer(undefined);
       projectsTree.setServer(undefined);
-      projectsTree.onDidChangeTreeData$.fire();
-      myIssuesTree.onDidChangeTreeData$.fire();
     }
   };
 
@@ -200,8 +198,6 @@ export function activate(context: vscode.ExtensionContext): void {
 
       // Update context and refresh trees
       await updateConfiguredContext();
-      projectsTree.onDidChangeTreeData$.fire();
-      myIssuesTree.onDidChangeTreeData$.fire();
 
       vscode.window.showInformationMessage('Redmine configured successfully! 🎉');
     })
@@ -271,8 +267,6 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('redmine.setApiKey', async () => {
       await setApiKey(context);
       await updateConfiguredContext();
-      projectsTree.onDidChangeTreeData$.fire();
-      myIssuesTree.onDidChangeTreeData$.fire();
     })
   );
 
