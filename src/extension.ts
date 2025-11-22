@@ -43,7 +43,11 @@ export function activate(context: vscode.ExtensionContext): void {
     const folder = folders[0];
 
     if (!folder) {
-      await vscode.commands.executeCommand("setContext", "redmine:configured", false);
+      await vscode.commands.executeCommand(
+        "setContext",
+        "redmine:configured",
+        false
+      );
       return;
     }
 
@@ -52,7 +56,11 @@ export function activate(context: vscode.ExtensionContext): void {
     const hasApiKey = !!(await secretManager.getApiKey(folder.uri));
     const isConfigured = hasUrl && hasApiKey;
 
-    await vscode.commands.executeCommand("setContext", "redmine:configured", isConfigured);
+    await vscode.commands.executeCommand(
+      "setContext",
+      "redmine:configured",
+      isConfigured
+    );
 
     // If configured, initialize server for trees
     if (isConfigured) {
@@ -69,8 +77,10 @@ export function activate(context: vscode.ExtensionContext): void {
         projectsTree.onDidChangeTreeData$.fire();
         myIssuesTree.onDidChangeTreeData$.fire();
       } catch (error) {
-        console.error('Failed to initialize Redmine server:', error);
-        vscode.window.showErrorMessage(`Failed to connect to Redmine: ${error}`);
+        console.error("Failed to initialize Redmine server:", error);
+        vscode.window.showErrorMessage(
+          `Failed to connect to Redmine: ${error}`
+        );
       }
     } else {
       // Clear servers when not configured (don't refresh - let welcome view show)
@@ -85,7 +95,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Listen for configuration changes
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration(async (event) => {
-      if (event.affectsConfiguration('redmine')) {
+      if (event.affectsConfiguration("redmine")) {
         await updateConfiguredContext();
       }
     })
@@ -93,14 +103,17 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Register configure command
   context.subscriptions.push(
-    vscode.commands.registerCommand('redmine.configure', async () => {
+    vscode.commands.registerCommand("redmine.configure", async () => {
       const folders = vscode.workspace.workspaceFolders;
       if (!folders || folders.length === 0) {
-        vscode.window.showErrorMessage('Please open a workspace folder first');
+        vscode.window.showErrorMessage("Please open a workspace folder first");
         return;
       }
 
-      const folder = folders.length === 1 ? folders[0] : await vscode.window.showWorkspaceFolderPick();
+      const folder =
+        folders.length === 1
+          ? folders[0]
+          : await vscode.window.showWorkspaceFolderPick();
       if (!folder) return;
 
       const config = vscode.workspace.getConfiguration("redmine", folder.uri);
@@ -113,53 +126,75 @@ export function activate(context: vscode.ExtensionContext): void {
       // Determine what needs to be configured
       if (existingUrl && existingApiKey) {
         // Both exist - ask what to update
-        const choice = await vscode.window.showQuickPick([
-          { label: '$(link) Update Redmine URL', description: `Current: ${existingUrl}`, value: 'url' },
-          { label: '$(key) Update API Key', description: 'Stored securely in secrets', value: 'apiKey' },
-          { label: '$(settings-gear) Reconfigure Both', value: 'both' }
-        ], {
-          placeHolder: 'What would you like to update?'
-        });
+        const choice = await vscode.window.showQuickPick(
+          [
+            {
+              label: "$(link) Update Redmine URL",
+              description: `Current: ${existingUrl}`,
+              value: "url",
+            },
+            {
+              label: "$(key) Update API Key",
+              description: "Stored securely in secrets",
+              value: "apiKey",
+            },
+            { label: "$(settings-gear) Reconfigure Both", value: "both" },
+          ],
+          {
+            placeHolder: "What would you like to update?",
+          }
+        );
 
         if (!choice) return;
 
-        if (choice.value === 'url' || choice.value === 'both') {
+        if (choice.value === "url" || choice.value === "both") {
           url = await promptForUrl(existingUrl);
           if (!url) return;
           await config.update("url", url, vscode.ConfigurationTarget.Global);
         }
 
-        shouldUpdateApiKey = choice.value === 'apiKey' || choice.value === 'both';
-
+        shouldUpdateApiKey =
+          choice.value === "apiKey" || choice.value === "both";
       } else if (existingUrl && !existingApiKey) {
         // URL exists, just need API key - but let them update URL too
-        const choice = await vscode.window.showQuickPick([
-          { label: '$(check) Keep Current URL', description: existingUrl, value: 'keep' },
-          { label: '$(link) Change URL', value: 'change' }
-        ], {
-          placeHolder: 'Your Redmine URL is configured. Do you want to change it?'
-        });
+        const choice = await vscode.window.showQuickPick(
+          [
+            {
+              label: "$(check) Keep Current URL",
+              description: existingUrl,
+              value: "keep",
+            },
+            { label: "$(link) Change URL", value: "change" },
+          ],
+          {
+            placeHolder:
+              "Your Redmine URL is configured. Do you want to change it?",
+          }
+        );
 
         if (!choice) return;
 
-        if (choice.value === 'change') {
+        if (choice.value === "change") {
           url = await promptForUrl(existingUrl);
           if (!url) return;
           await config.update("url", url, vscode.ConfigurationTarget.Global);
         }
 
         shouldUpdateApiKey = true;
-
       } else if (!existingUrl && existingApiKey) {
         // Invalid state: API key exists but no URL - API key is server-specific
         const action = await vscode.window.showWarningMessage(
-          'Invalid configuration detected',
-          { modal: true, detail: 'An API key exists but no Redmine URL is configured. API keys are specific to a Redmine server.\n\nWould you like to reconfigure from scratch?' },
-          'Reconfigure',
-          'Cancel'
+          "Invalid configuration detected",
+          {
+            modal: true,
+            detail:
+              "An API key exists but no Redmine URL is configured. API keys are specific to a Redmine server.\n\nWould you like to reconfigure from scratch?",
+          },
+          "Reconfigure",
+          "Cancel"
         );
 
-        if (action !== 'Reconfigure') return;
+        if (action !== "Reconfigure") return;
 
         // Delete orphaned API key
         await secretManager.deleteApiKey(folder.uri);
@@ -169,20 +204,20 @@ export function activate(context: vscode.ExtensionContext): void {
         if (!url) return;
         await config.update("url", url, vscode.ConfigurationTarget.Global);
         shouldUpdateApiKey = true;
-
       } else {
         // Nothing configured - full flow, show security info
         const proceed = await vscode.window.showInformationMessage(
-          'Secure Configuration',
+          "Secure Configuration",
           {
             modal: true,
-            detail: 'How your credentials are stored:\n\n• URL: User settings (settings.json)\n• API Key: Encrypted secrets storage\n  - Windows: Credential Manager\n  - macOS: Keychain\n  - Linux: libsecret\n\nAPI keys are machine-local and never synced to the cloud.'
+            detail:
+              "How your credentials are stored:\n\n• URL: User settings (settings.json)\n• API Key: Encrypted secrets storage\n  - Windows: Credential Manager\n  - macOS: Keychain\n  - Linux: libsecret\n\nAPI keys are machine-local and never synced to the cloud.",
           },
-          'Continue',
-          'Cancel'
+          "Continue",
+          "Cancel"
         );
 
-        if (proceed !== 'Continue') return;
+        if (proceed !== "Continue") return;
 
         url = await promptForUrl();
         if (!url) return;
@@ -199,61 +234,73 @@ export function activate(context: vscode.ExtensionContext): void {
       // Update context and refresh trees
       await updateConfiguredContext();
 
-      vscode.window.showInformationMessage('Redmine configured successfully! 🎉');
+      vscode.window.showInformationMessage(
+        "Redmine configured successfully! 🎉"
+      );
     })
   );
 
-  async function promptForUrl(currentUrl?: string): Promise<string | undefined> {
+  async function promptForUrl(
+    currentUrl?: string
+  ): Promise<string | undefined> {
     const prompt = currentUrl
-      ? 'Update your Redmine server URL (changing URL will require new API key)'
-      : 'Step 1/2: Enter your Redmine server URL';
+      ? "Update your Redmine server URL (changing URL will require new API key)"
+      : "Step 1/2: Enter your Redmine server URL";
 
     return await vscode.window.showInputBox({
       prompt,
       value: currentUrl,
-      placeHolder: 'https://redmine.example.com',
+      placeHolder: "https://redmine.example.com",
       validateInput: (value) => {
-        if (!value) return 'URL cannot be empty';
+        if (!value) return "URL cannot be empty";
         try {
           new URL(value);
           return null;
         } catch {
-          return 'Invalid URL format';
+          return "Invalid URL format";
         }
-      }
+      },
     });
   }
 
-  async function promptForApiKey(manager: RedmineSecretManager, folderUri: vscode.Uri, url: string): Promise<boolean> {
+  async function promptForApiKey(
+    manager: RedmineSecretManager,
+    folderUri: vscode.Uri,
+    url: string
+  ): Promise<boolean> {
     // Explain how to get API key
     const action = await vscode.window.showInformationMessage(
-      'You need your Redmine API key',
-      { modal: true, detail: 'Your API key can be found in your Redmine account settings.\n\nClick "Open Redmine" to open your account page, then copy your API key and paste it in the next step.' },
-      'Open Redmine Account',
-      'I Have My Key'
+      "You need your Redmine API key",
+      {
+        modal: true,
+        detail:
+          'Your API key can be found in your Redmine account settings.\n\nClick "Open Redmine" to open your account page, then copy your API key and paste it in the next step.',
+      },
+      "Open Redmine Account",
+      "I Have My Key"
     );
 
     if (!action) return false;
 
-    if (action === 'Open Redmine Account') {
+    if (action === "Open Redmine Account") {
       await vscode.env.openExternal(vscode.Uri.parse(`${url}/my/account`));
       await vscode.window.showInformationMessage(
         'Copy your API key from the "API access key" section on the right side of the page.',
         { modal: false },
-        'Got It'
+        "Got It"
       );
     }
 
     // Prompt for API Key
     const apiKey = await vscode.window.showInputBox({
-      prompt: 'Paste your Redmine API key',
-      placeHolder: 'e.g., a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0',
+      prompt: "Paste your Redmine API key",
+      placeHolder: "e.g., a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0",
       password: true,
       validateInput: (value) => {
-        if (!value) return 'API key cannot be empty';
-        if (value.length < 20) return 'API key appears too short';
+        if (!value) return "API key cannot be empty";
+        if (value.length < 20) return "API key appears too short";
         return null;
-      }
+      },
     });
 
     if (!apiKey) return false;
@@ -264,7 +311,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Register set API key command
   context.subscriptions.push(
-    vscode.commands.registerCommand('redmine.setApiKey', async () => {
+    vscode.commands.registerCommand("redmine.setApiKey", async () => {
       await setApiKey(context);
       await updateConfiguredContext();
     })
@@ -318,7 +365,9 @@ export function activate(context: vscode.ExtensionContext): void {
     const apiKey = await secretManager.getApiKey(pickedFolder.uri);
 
     if (!apiKey) {
-      vscode.window.showErrorMessage('No API key configured. Run "Redmine: Set API Key"');
+      vscode.window.showErrorMessage(
+        'No API key configured. Run "Redmine: Set API Key"'
+      );
       return Promise.resolve({ props: undefined, args: [] });
     }
 

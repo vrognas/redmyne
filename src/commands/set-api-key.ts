@@ -1,18 +1,21 @@
-import * as vscode from 'vscode';
-import { RedmineSecretManager } from '../utilities/secret-manager';
+import * as vscode from "vscode";
+import { RedmineSecretManager } from "../utilities/secret-manager";
 
-export async function setApiKey(context: vscode.ExtensionContext): Promise<void> {
+export async function setApiKey(
+  context: vscode.ExtensionContext
+): Promise<void> {
   const secretManager = new RedmineSecretManager(context);
 
   const folders = vscode.workspace.workspaceFolders;
   if (!folders || folders.length === 0) {
-    vscode.window.showErrorMessage('No workspace folder open');
+    vscode.window.showErrorMessage("No workspace folder open");
     return;
   }
 
-  const folder = folders.length === 1
-    ? folders[0]
-    : await vscode.window.showWorkspaceFolderPick();
+  const folder =
+    folders.length === 1
+      ? folders[0]
+      : await vscode.window.showWorkspaceFolderPick();
 
   if (!folder) return;
 
@@ -20,14 +23,16 @@ export async function setApiKey(context: vscode.ExtensionContext): Promise<void>
     prompt: `Enter Redmine API Key for ${folder.name}`,
     password: true,
     validateInput: (value) => {
-      if (!value) return 'API key cannot be empty';
-      if (value.length < 20) return 'API key appears invalid';
+      if (!value) return "API key cannot be empty";
+      if (value.length < 20) return "API key appears invalid";
       return null;
-    }
+    },
   });
 
   if (!apiKey) return;
 
   await secretManager.setApiKey(folder.uri, apiKey);
-  vscode.window.showInformationMessage(`API key for ${folder.name} stored securely`);
+  vscode.window.showInformationMessage(
+    `API key for ${folder.name} stored securely`
+  );
 }

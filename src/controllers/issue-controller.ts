@@ -53,7 +53,7 @@ export class IssueController {
           return;
         }
         if (!input) {
-          vscode.window.showErrorMessage('Time entry input required');
+          vscode.window.showErrorMessage("Time entry input required");
           return;
         }
         const hours = input.substring(0, indexOf);
