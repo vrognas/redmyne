@@ -151,6 +151,23 @@
 - Re-run `updateConfiguredContext()` to sync state
 - Automatically clear/set servers in trees
 
+### SVG External DTD Fetch Spam
+
+**Problem**: 50+ simultaneous `GET "<URL>"` fetches when extension loads
+**Root Cause**: `logo.svg` contained external DTD/entity references
+```xml
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd" [
+  <!ENTITY ns_svg "http://www.w3.org/2000/svg">
+  <!ENTITY ns_xlink "http://www.w3.org/1999/xlink">
+]>
+```
+**Solution**: Removed XML declaration, DOCTYPE, and entity declarations
+- Replaced `xmlns="&ns_svg;"` with direct URI
+- Replaced `xmlns:xlink="&ns_xlink;"` with direct URI
+- Reduced size from 2.28 KB to 1.98 KB
+**Investigation**: Subagent traced fetches to browser attempting DTD resolution on every SVG parse
+**Note**: Fetches persisted with extension disabled → Positron/browser cache issue, not extension bug
+
 ## Key Takeaways
 
 1. **TDD works**: Write tests first caught URL edge cases early
@@ -162,3 +179,5 @@
 7. **Vitest fast**: 46 tests in 1.17s
 8. **Parallel agents**: 5 phases in 2 hours (vs 3 weeks estimate)
 9. **Guard tree refreshes**: Check server exists before firing events
+10. **SVG DTD spam**: External entity refs in SVG cause browser fetch spam - use inline namespaces
+11. **Isolate issues**: Disable extension to prove source - if persists, not extension's bug
