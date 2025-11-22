@@ -1,13 +1,16 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
-    "target": "ES2020",
-    "outDir": "out",
-    "lib": ["ES2020"],
-    "sourceMap": true,
-    "rootDir": "src",
+    "module": "ES2022",
+    "target": "ES2022",
+    "lib": ["ES2022"],
     "strict": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "bundler",
+    "outDir": "out",
+    "rootDir": "src",
+    "sourceMap": true
   },
-  "exclude": ["node_modules", ".vscode-test"]
+  "exclude": ["node_modules", ".vscode-test", "test", "*.config.ts", "*.cjs"]
 }

@@ -10,8 +10,7 @@ export const errorToString = (error: unknown): string => {
   }
   if (typeof error === "object") {
     return (
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (error as any)?.message ??
+      (error as { message?: string })?.message ??
       `Unknown error object (keys: ${Object.keys(error ?? {})}`
     );
   }

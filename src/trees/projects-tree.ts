@@ -3,7 +3,6 @@ import { RedmineServer } from "../redmine/redmine-server";
 import { RedmineConfig } from "../definitions/redmine-config";
 import { RedmineProject } from "../redmine/redmine-project";
 import { Issue } from "../redmine/models/issue";
-import isNil from "lodash/isNil";
 
 export enum ProjectsViewStyle {
   LIST = 0,
@@ -12,24 +11,16 @@ export enum ProjectsViewStyle {
 
 export class ProjectsTree
   implements vscode.TreeDataProvider<RedmineProject | Issue> {
-  server: RedmineServer;
+  server?: RedmineServer;
   viewStyle: ProjectsViewStyle;
   projects: RedmineProject[] | null = null;
   constructor() {
-    const config = vscode.workspace.getConfiguration(
-      "redmine"
-    ) as RedmineConfig;
-    this.server = new RedmineServer({
-      address: config.url,
-      key: config.apiKey,
-      additionalHeaders: config.additionalHeaders,
-      rejectUnauthorized: config.rejectUnauthorized,
-    });
+    // Don't initialize server here - will be set via setServer() when config is ready
     this.viewStyle = ProjectsViewStyle.LIST;
   }
 
-  onDidChangeTreeData$ = new vscode.EventEmitter<RedmineProject | Issue>();
-  onDidChangeTreeData: vscode.Event<RedmineProject | Issue> = this
+  onDidChangeTreeData$ = new vscode.EventEmitter<void>();
+  onDidChangeTreeData: vscode.Event<void> = this
     .onDidChangeTreeData$.event;
   getTreeItem(
     projectOrIssue: RedmineProject | Issue
@@ -57,9 +48,17 @@ export class ProjectsTree
   async getChildren(
     projectOrIssue?: RedmineProject | Issue
   ): Promise<(RedmineProject | Issue)[]> {
-    if (!isNil(projectOrIssue) && projectOrIssue instanceof RedmineProject) {
+    if (!this.server) {
+      return [];
+    }
+
+    if (
+      projectOrIssue !== null &&
+      projectOrIssue !== undefined &&
+      projectOrIssue instanceof RedmineProject
+    ) {
       if (this.viewStyle === ProjectsViewStyle.TREE) {
-        const subprojects: (RedmineProject | Issue)[] = this.projects!.filter(
+        const subprojects: (RedmineProject | Issue)[] = (this.projects ?? []).filter(
           (project) => project.parent && project.parent.id === projectOrIssue.id
         );
         return subprojects.concat(
@@ -91,7 +90,7 @@ export class ProjectsTree
     this.onDidChangeTreeData$.fire();
   }
 
-  setServer(server: RedmineServer) {
+  setServer(server: RedmineServer | undefined) {
     this.server = server;
   }
 }

@@ -15,11 +15,11 @@ export default async (
 
   vscode.window.withProgress(
     {
-      location: vscode.ProgressLocation.Window,
+      location: vscode.ProgressLocation.Notification,
     },
     (progress) => {
       progress.report({
-        message: `Waiting for response from ${server.options.url.host}...`,
+        message: `Waiting for response from ${server.options.url.hostname}...`,
       });
       return promise;
     }

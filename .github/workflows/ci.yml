@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npx tsc --noEmit
+
+      - run: npm run test:coverage
+
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=$(npm run test:coverage --silent 2>&1 | grep -A1 "All files" | tail -1 | awk '{print $2}' | sed 's/%//')
+          if (( $(echo "$COVERAGE < 60" | bc -l) )); then
+            echo "Coverage ($COVERAGE%) is below 60% threshold"
+            exit 1
+          fi
+          echo "Coverage check passed: $COVERAGE%"
+
+      - uses: codecov/codecov-action@v4
+        if: always()

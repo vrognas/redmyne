@@ -39,7 +39,24 @@ This extension works with both **Positron IDE** and **VS Code**.
 
 ## Requirements
 
-It's required to enable REST web services in `/settings?tab=api` of your redmine (you have to be administrator of redmine server).
+- VS Code 1.106.0+
+- Redmine with REST API enabled (`/settings?tab=api`, requires admin)
+- API key from Redmine account (`/my/account`)
+
+## Quick Start
+
+1. Install extension
+2. Run: `Redmine: Set API Key`
+3. Enter URL and API key
+4. Done!
+
+## Security
+
+API keys stored in VS Code Secrets (encrypted, machine-local).
+
+## Migrating from v2.x
+
+See [Migration Guide](./MIGRATION_GUIDE.md).
 
 ## Extension Settings
 

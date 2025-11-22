@@ -1,4 +1,3 @@
-import { Url, parse } from "url";
 import * as http from "http";
 import * as https from "https";
 import { RedmineProject } from "./redmine-project";
@@ -14,8 +13,6 @@ import { TimeEntry } from "./models/time-entry";
 import { Issue } from "./models/issue";
 import { IssueStatus as RedmineIssueStatus } from "./models/issue-status";
 import { Membership as RedmineMembership } from "./models/membership";
-import isNil from "lodash/isNil";
-import isEqual from "lodash/isEqual";
 
 type HttpMethods = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
@@ -44,7 +41,7 @@ export interface RedmineServerConnectionOptions {
 }
 
 interface RedmineServerOptions extends RedmineServerConnectionOptions {
-  url: Url;
+  url: URL;
 }
 
 export class RedmineOptionsError extends Error {
@@ -52,7 +49,7 @@ export class RedmineOptionsError extends Error {
 }
 
 export class RedmineServer {
-  options!: RedmineServerOptions;
+  options: RedmineServerOptions = {} as RedmineServerOptions;
 
   private timeEntryActivities: TimeEntryActivity[] | null = null;
 
@@ -69,20 +66,26 @@ export class RedmineServer {
     if (!options.key) {
       throw new RedmineOptionsError("Key cannot be empty!");
     }
-    const url = parse(options.address);
-    if (["https:", "http:"].indexOf(url.protocol ?? "") === -1) {
-      throw new RedmineOptionsError(
-        "Address must have supported protocol (http/https)"
-      );
+    let url: URL;
+    try {
+      url = new URL(options.address);
+    } catch {
+      throw new RedmineOptionsError(`Invalid URL: ${options.address}`);
+    }
+    if (!["https:", "http:"].includes(url.protocol)) {
+      throw new RedmineOptionsError("Protocol must be http/https");
     }
   }
 
   private setOptions(options: RedmineServerConnectionOptions) {
     this.options = {
       ...options,
-      url: parse(options.address),
+      url: new URL(options.address),
     };
-    if (isNil(this.options.additionalHeaders)) {
+    if (
+      this.options.additionalHeaders === null ||
+      this.options.additionalHeaders === undefined
+    ) {
       this.options.additionalHeaders = {};
     }
   }
@@ -96,7 +99,7 @@ export class RedmineServer {
     const { url, key, additionalHeaders, rejectUnauthorized } = this.options;
     const options: https.RequestOptions = {
       hostname: url.hostname,
-      port: url.port,
+      port: url.port ? parseInt(url.port, 10) : undefined,
       headers: {
         [REDMINE_API_KEY_HEADER_NAME]: key,
         ...additionalHeaders,
@@ -106,8 +109,9 @@ export class RedmineServer {
       method,
     };
     if (data) {
-      options.headers!["Content-Length"] = data.length;
-      options.headers!["Content-Type"] = "application/json";
+      const headers = options.headers as http.OutgoingHttpHeaders;
+      headers["Content-Length"] = data.length;
+      headers["Content-Type"] = "application/json";
     }
 
     return new Promise((resolve, reject) => {
@@ -140,7 +144,7 @@ export class RedmineServer {
         }
 
         // TODO: Other errors handle
-        if (statusCode! >= 400) {
+        if (statusCode && statusCode >= 400) {
           reject(new Error(`Server returned ${statusMessage}`));
           return;
         }
@@ -284,7 +288,7 @@ export class RedmineServer {
    * Returns promise, that resolves to list of issue statuses in provided redmine server
    */
   getIssueStatuses(): Promise<{ issue_statuses: RedmineIssueStatus[] }> {
-    if (isNil(this.issueStatuses)) {
+    if (this.issueStatuses === null || this.issueStatuses === undefined) {
       return this.doRequest<{ issue_statuses: RedmineIssueStatus[] }>(
         "/issue_statuses.json",
         "GET"
@@ -378,7 +382,8 @@ export class RedmineServer {
       this.options.address === other.options.address &&
       this.options.key === other.options.key &&
       this.options.rejectUnauthorized === other.options.rejectUnauthorized &&
-      isEqual(this.options.additionalHeaders, other.options.additionalHeaders)
+      JSON.stringify(this.options.additionalHeaders) ===
+        JSON.stringify(other.options.additionalHeaders)
     );
   }
 }

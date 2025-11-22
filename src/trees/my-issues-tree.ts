@@ -4,21 +4,13 @@ import { RedmineServer } from "../redmine/redmine-server";
 import { RedmineConfig } from "../definitions/redmine-config";
 
 export class MyIssuesTree implements vscode.TreeDataProvider<Issue> {
-  server: RedmineServer;
+  server?: RedmineServer;
   constructor() {
-    const config = vscode.workspace.getConfiguration(
-      "redmine"
-    ) as RedmineConfig;
-    this.server = new RedmineServer({
-      address: config.url,
-      key: config.apiKey,
-      additionalHeaders: config.additionalHeaders,
-      rejectUnauthorized: config.rejectUnauthorized,
-    });
+    // Don't initialize server here - will be set via setServer() when config is ready
   }
 
-  onDidChangeTreeData$ = new vscode.EventEmitter<Issue>();
-  onDidChangeTreeData: vscode.Event<Issue> = this.onDidChangeTreeData$.event;
+  onDidChangeTreeData$ = new vscode.EventEmitter<void>();
+  onDidChangeTreeData: vscode.Event<void> = this.onDidChangeTreeData$.event;
   getTreeItem(issue: Issue): vscode.TreeItem | Thenable<vscode.TreeItem> {
     const item = new vscode.TreeItem(
       `#${issue.id} [${issue.tracker.name}] (${issue.status.name}) ${issue.subject} by ${issue.author.name}`,
@@ -34,10 +26,13 @@ export class MyIssuesTree implements vscode.TreeDataProvider<Issue> {
     return item;
   }
   async getChildren(_element?: Issue): Promise<Issue[]> {
+    if (!this.server) {
+      return [];
+    }
     return (await this.server.getIssuesAssignedToMe()).issues;
   }
 
-  setServer(server: RedmineServer) {
+  setServer(server: RedmineServer | undefined) {
     this.server = server;
   }
 }

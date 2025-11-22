@@ -2,7 +2,7 @@
   "name": "positron-redmine",
   "displayName": "Redmine for Positron",
   "description": "Redmine project management integration for Positron IDE and VS Code",
-  "version": "2.0.0",
+  "version": "3.0.1",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -11,25 +11,25 @@
     "url": "https://github.com/vrognas/positron-redmine.git"
   },
   "engines": {
-    "vscode": "^1.74.0",
-    "positron": "^2025.06.0"
+    "vscode": "^1.106.0",
+    "positron": "^2025.06.0",
+    "node": ">=20.0.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [
-    "onCommand:redmine.listOpenIssuesAssignedToMe",
-    "onCommand:redmine.openActionsForIssue",
-    "onCommand:redmine.newIssue",
-    "onCommand:redmine.openActionsForIssueUnderCursor",
-    "onCommand:redmine.changeDefaultServer",
-    "onView:redmine-explorer",
-    "onView:redmine-explorer-my-issues",
-    "onView:redmine-explorer-projects"
-  ],
-  "main": "./out/extension",
+  "main": "./out/extension.js",
   "contributes": {
     "commands": [
+      {
+        "command": "redmine.configure",
+        "title": "Redmine: Configure",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "redmine.setApiKey",
+        "title": "Redmine: Set API Key"
+      },
       {
         "command": "redmine.listOpenIssuesAssignedToMe",
         "title": "Redmine: List open issues assigned to me"
@@ -78,6 +78,18 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "redmine-explorer-my-issues",
+        "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmine.configure)\nSet up your Redmine server URL and API key to get started.",
+        "when": "!redmine:configured"
+      },
+      {
+        "view": "redmine-explorer-projects",
+        "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmine.configure)\nSet up your Redmine server URL and API key to get started.",
+        "when": "!redmine:configured"
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {
@@ -109,6 +121,16 @@
       ],
       "view/title": [
         {
+          "command": "redmine.configure",
+          "when": "view == 'redmine-explorer-my-issues'",
+          "group": "navigation"
+        },
+        {
+          "command": "redmine.configure",
+          "when": "view == 'redmine-explorer-projects'",
+          "group": "navigation"
+        },
+        {
           "command": "redmine.changeDefaultServer",
           "when": "view == 'redmine-explorer-my-issues' && !hasSingleConfig"
         },
@@ -138,63 +160,66 @@
       "properties": {
         "redmine.url": {
           "type": "string",
-          "description": "URL of Redmine",
+          "markdownDescription": "**Redmine server URL**\n\n⚠️ Changing/removing this requires reconfiguring API key\n\n**Storage:**\n- URL: User settings (`settings.json`)\n- API Key: Encrypted secrets (Windows Credential Manager / macOS Keychain / Linux libsecret)\n- API keys are machine-local and never synced",
           "examples": [
             "https://example.com",
             "http://example.com:8080",
             "https://example.com:8443/redmine",
             "http://example.com/redmine"
           ],
-          "scope": "resource"
+          "scope": "machine"
         },
         "redmine.apiKey": {
           "type": "string",
-          "description": "API Key",
-          "scope": "resource"
+          "description": "DEPRECATED: Use 'Redmine: Set API Key' command instead",
+          "deprecationMessage": "API keys now stored in VS Code secrets. Run 'Redmine: Set API Key'",
+          "scope": "machine"
         },
         "redmine.rejectUnauthorized": {
           "type": "boolean",
           "description": "Pass rejectUnauthorized to https request options. Use only if your redmine instance has self-signed certificate!",
           "default": "false",
-          "scope": "resource"
+          "scope": "machine"
         },
         "redmine.identifier": {
           "type": "string",
           "description": "Project identifier in Redmine",
           "default": "",
-          "scope": "resource"
+          "scope": "machine"
         },
         "redmine.additionalHeaders": {
           "type": "object",
           "description": "Additional headers",
           "default": {},
-          "scope": "resource"
+          "scope": "machine"
         }
       }
     }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "node esbuild.js --production",
-    "watch": "node esbuild.js --watch",
+    "compile": "node esbuild.cjs --production",
+    "watch": "node esbuild.cjs --watch",
     "lint": "eslint .",
-    "package": "npx @vscode/vsce package"
+    "package": "npx @vscode/vsce package",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
-    "@types/lodash": "^4.14.175",
     "@types/mocha": "^2.2.42",
-    "@types/node": "^7.0.43",
-    "@types/vscode": "^1.31.0",
+    "@types/node": "^22.19.1",
+    "@types/vscode": "^1.106.1",
     "@typescript-eslint/eslint-plugin": "^5.0.0",
     "@typescript-eslint/parser": "^5.0.0",
+    "@vitest/coverage-v8": "^2.1.9",
     "esbuild": "^0.27.0",
     "eslint": "^8.0.0",
     "eslint-config-prettier": "^8.3.0",
     "eslint-plugin-prettier": "^4.0.0",
+    "msw": "^2.12.2",
     "prettier": "^2.0.5",
-    "typescript": "^3.9.7"
-  },
-  "dependencies": {
-    "lodash": "^4.17.21"
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
   }
 }

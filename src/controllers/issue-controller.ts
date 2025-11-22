@@ -52,8 +52,12 @@ export class IssueController {
             );
           return;
         }
-        const hours = input!.substring(0, indexOf);
-        const message = input!.substring(indexOf + 1);
+        if (!input) {
+          vscode.window.showErrorMessage('Time entry input required');
+          return;
+        }
+        const hours = input.substring(0, indexOf);
+        const message = input.substring(indexOf + 1);
 
         this.redmine
           .addTimeEntry(this.issue.id, activity.activity.id, hours, message)
