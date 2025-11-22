@@ -38,9 +38,79 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  // Check if configured and update context
+  const updateConfiguredContext = async () => {
+    const folders = vscode.workspace.workspaceFolders || [];
+    const folder = folders[0];
+
+    if (!folder) {
+      await vscode.commands.executeCommand("setContext", "redmine:configured", false);
+      return;
+    }
+
+    const config = vscode.workspace.getConfiguration("redmine", folder.uri);
+    const hasUrl = !!config.get<string>("url");
+    const hasApiKey = !!(await secretManager.getApiKey(folder.uri));
+
+    await vscode.commands.executeCommand("setContext", "redmine:configured", hasUrl && hasApiKey);
+  };
+
+  // Initial check
+  updateConfiguredContext();
+
+  // Register configure command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('redmine.configure', async () => {
+      const folders = vscode.workspace.workspaceFolders;
+      if (!folders || folders.length === 0) {
+        vscode.window.showErrorMessage('Please open a workspace folder first');
+        return;
+      }
+
+      const folder = folders.length === 1 ? folders[0] : await vscode.window.showWorkspaceFolderPick();
+      if (!folder) return;
+
+      // Step 1: Set Redmine URL
+      const url = await vscode.window.showInputBox({
+        prompt: 'Enter your Redmine server URL',
+        placeHolder: 'https://redmine.example.com',
+        validateInput: (value) => {
+          if (!value) return 'URL cannot be empty';
+          try {
+            new URL(value);
+            return null;
+          } catch {
+            return 'Invalid URL format';
+          }
+        }
+      });
+
+      if (!url) return;
+
+      // Save URL to workspace config
+      const config = vscode.workspace.getConfiguration("redmine", folder.uri);
+      await config.update("url", url, vscode.ConfigurationTarget.WorkspaceFolder);
+
+      // Step 2: Set API Key
+      await vscode.commands.executeCommand('redmine.setApiKey');
+
+      // Update context and refresh trees
+      await updateConfiguredContext();
+      projectsTree.onDidChangeTreeData$.fire();
+      myIssuesTree.onDidChangeTreeData$.fire();
+
+      vscode.window.showInformationMessage('Redmine configured successfully! 🎉');
+    })
+  );
+
   // Register set API key command
   context.subscriptions.push(
-    vscode.commands.registerCommand('redmine.setApiKey', () => setApiKey(context))
+    vscode.commands.registerCommand('redmine.setApiKey', async () => {
+      await setApiKey(context);
+      await updateConfiguredContext();
+      projectsTree.onDidChangeTreeData$.fire();
+      myIssuesTree.onDidChangeTreeData$.fire();
+    })
   );
 
   vscode.commands.executeCommand(

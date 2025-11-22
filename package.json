@@ -22,6 +22,11 @@
   "contributes": {
     "commands": [
       {
+        "command": "redmine.configure",
+        "title": "Redmine: Configure",
+        "icon": "$(settings-gear)"
+      },
+      {
         "command": "redmine.setApiKey",
         "title": "Redmine: Set API Key"
       },
@@ -73,6 +78,18 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "redmine-explorer-my-issues",
+        "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmine.configure)\nSet up your Redmine server URL and API key to get started.",
+        "when": "!redmine:configured"
+      },
+      {
+        "view": "redmine-explorer-projects",
+        "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmine.configure)\nSet up your Redmine server URL and API key to get started.",
+        "when": "!redmine:configured"
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {
