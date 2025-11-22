@@ -338,8 +338,14 @@ export class RedmineServer {
       )
     );
     const issueRequest = await this.getIssueById(quickUpdate.issueId);
-    const issue = issueRequest.issue;
     const updateResult = new QuickUpdateResult();
+
+    if (!issueRequest?.issue) {
+      updateResult.addDifference("Couldn't fetch updated issue");
+      return updateResult;
+    }
+
+    const issue = issueRequest.issue;
     if (issue.assigned_to?.id !== quickUpdate.assignee.id) {
       updateResult.addDifference("Couldn't assign user");
     }

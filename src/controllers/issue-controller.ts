@@ -16,7 +16,7 @@ export class IssueController {
   ) {}
 
   chooseTimeEntryType(activities: TimeEntryActivity[]) {
-    vscode.window
+    return vscode.window
       .showQuickPick(
         activities.map((activity) => {
           return {
@@ -38,7 +38,7 @@ export class IssueController {
   }
 
   setTimeEntryMessage(activity: TimeEntryActivityItem) {
-    vscode.window
+    return vscode.window
       .showInputBox({
         placeHolder: `"hours spent|additional message" or "hours spent|"`,
       })
@@ -78,7 +78,7 @@ export class IssueController {
   }
 
   changeIssueStatus(statuses: RedmineIssueStatus[]) {
-    vscode.window
+    return vscode.window
       .showQuickPick(
         statuses.map((status) => {
           return {
@@ -109,7 +109,7 @@ export class IssueController {
   }
 
   private openInBrowser() {
-    vscode.commands
+    return vscode.commands
       .executeCommand(
         "vscode.open",
         vscode.Uri.parse(
@@ -122,13 +122,13 @@ export class IssueController {
   }
 
   private changeStatus() {
-    this.redmine.getIssueStatuses().then((statuses) => {
+    return this.redmine.getIssueStatuses().then((statuses) => {
       this.changeIssueStatus(statuses.issue_statuses);
     });
   }
 
   private addTimeEntry() {
-    this.redmine.getTimeEntryActivities().then((activities) => {
+    return this.redmine.getTimeEntryActivities().then((activities) => {
       this.chooseTimeEntryType(activities.time_entry_activities);
     });
   }
@@ -225,7 +225,7 @@ export class IssueController {
     const issueDetails = `Issue #${this.issue.id} assigned to ${
       this.issue.assigned_to ? this.issue.assigned_to.name : "no one"
     }`;
-    vscode.window
+    return vscode.window
       .showQuickPick(
         [
           {

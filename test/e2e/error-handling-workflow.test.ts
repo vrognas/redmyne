@@ -118,7 +118,7 @@ describe("Error Handling Workflow E2E", () => {
         expected:
           "Server returned 401 (perhaps your API Key is not valid, or your server has additional authentication methods?)",
       },
-      { behavior: "403", expected: "Server returned 403" },
+      { behavior: "403", expected: "Server returned 403 (perhaps you haven't got permissions?)" },
       { behavior: "404", expected: "Resource doesn't exist" },
     ];
 
@@ -142,7 +142,7 @@ describe("Error Handling Workflow E2E", () => {
     });
 
     await expect(server.getIssuesAssignedToMe()).rejects.toThrow(
-      "Couldn't parse Redmine response as JSON"
+      "Couldn't parse Redmine response as JSON..."
     );
   });
 

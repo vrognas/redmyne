@@ -17,27 +17,38 @@ vi.mock("http", async () => {
   return {
     ...actual,
     request: vi.fn((options, callback) => {
-      const request = new EventEmitter() as unknown as http.ClientRequest;
-      request.end = function () {
-        const response = new EventEmitter() as unknown as http.IncomingMessage;
+      const request = new EventEmitter() as http.ClientRequest;
+
+      type MockRequest = http.ClientRequest & {
+        end: (data?: Buffer) => http.ClientRequest;
+        write: () => boolean;
+        abort: () => void;
+      };
+
+      (request as MockRequest).end = function (this: http.ClientRequest, _data?: Buffer) {
+        const response = new EventEmitter() as http.IncomingMessage;
         response.statusCode = 200;
         response.statusMessage = "OK";
 
         setTimeout(() => {
           const responseData = mockHttpResponses[mockHttpResponseIndex] || null;
           mockHttpResponseIndex++;
+
           if (responseData) {
             response.emit("data", Buffer.from(JSON.stringify(responseData)));
           }
           response.emit("end");
         }, 0);
 
-        callback(response);
-      };
-      request.on = function (event: string, handler: (...args: unknown[]) => void) {
-        EventEmitter.prototype.on.call(this, event, handler);
+        if (callback) {
+          callback(response);
+        }
         return this;
       };
+
+      (request as MockRequest).write = vi.fn().mockReturnValue(true);
+      (request as MockRequest).abort = vi.fn();
+
       return request;
     }),
   };
