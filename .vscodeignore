@@ -7,6 +7,8 @@ node_modules/**
 .gitignore
 tsconfig.json
 esbuild.js
+esbuild.cjs
+vitest.config.ts
 vsc-extension-quickstart.md
 .claude/**
 .github/**
@@ -15,6 +17,12 @@ resources/**
 .eslintignore
 .eslintrc*
 .prettierrc*
+
+# Tests & Coverage
+test/**
+coverage/**
+
+# Keep only essential docs
 *.md
 !readme.md
 !changelog.md
