@@ -160,7 +160,7 @@
       "properties": {
         "redmine.url": {
           "type": "string",
-          "description": "URL of Redmine server (changing/removing this will require reconfiguring API key)",
+          "markdownDescription": "**Redmine server URL**\n\n⚠️ Changing/removing this requires reconfiguring API key\n\n**Storage:**\n- URL: Workspace settings (`.vscode/settings.json`)\n- API Key: Encrypted secrets (Windows Credential Manager / macOS Keychain / Linux libsecret)\n- API keys are machine-local and never synced",
           "examples": [
             "https://example.com",
             "http://example.com:8080",

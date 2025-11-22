@@ -173,7 +173,19 @@ export function activate(context: vscode.ExtensionContext): void {
         shouldUpdateApiKey = true;
 
       } else {
-        // Nothing configured - full flow
+        // Nothing configured - full flow, show security info
+        const proceed = await vscode.window.showInformationMessage(
+          'Secure Configuration',
+          {
+            modal: true,
+            detail: 'How your credentials are stored:\n\n• URL: Workspace settings (.vscode/settings.json)\n• API Key: Encrypted secrets storage\n  - Windows: Credential Manager\n  - macOS: Keychain\n  - Linux: libsecret\n\nAPI keys are machine-local and never synced to the cloud.'
+          },
+          'Continue',
+          'Cancel'
+        );
+
+        if (proceed !== 'Continue') return;
+
         url = await promptForUrl();
         if (!url) return;
         await config.update("url", url, vscode.ConfigurationTarget.WorkspaceFolder);
