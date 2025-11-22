@@ -9,12 +9,16 @@ import { RedmineConfig } from "./definitions/redmine-config";
 import { ActionProperties } from "./commands/action-properties";
 import { MyIssuesTree } from "./trees/my-issues-tree";
 import { ProjectsTree, ProjectsViewStyle } from "./trees/projects-tree";
+import { RedmineSecretManager } from "./utilities/secret-manager";
+import { setApiKey } from "./commands/set-api-key";
 
 export function activate(context: vscode.ExtensionContext): void {
   const bucket = {
     servers: [] as RedmineServer[],
     projects: [] as RedmineProject[],
   };
+
+  const secretManager = new RedmineSecretManager(context);
 
   const myIssuesTree = new MyIssuesTree();
   const projectsTree = new ProjectsTree();
@@ -25,6 +29,19 @@ export function activate(context: vscode.ExtensionContext): void {
   vscode.window.createTreeView("redmine-explorer-projects", {
     treeDataProvider: projectsTree,
   });
+
+  // Listen for secret changes
+  context.subscriptions.push(
+    secretManager.onSecretChanged(() => {
+      projectsTree.onDidChangeTreeData$.fire();
+      myIssuesTree.onDidChangeTreeData$.fire();
+    })
+  );
+
+  // Register set API key command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('redmine.setApiKey', () => setApiKey(context))
+  );
 
   vscode.commands.executeCommand(
     "setContext",
@@ -55,6 +72,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
     const pickedFolder = await vscode.window.showWorkspaceFolderPick();
 
+    if (!pickedFolder) {
+      return Promise.resolve({ props: undefined, args: [] });
+    }
+
     vscode.commands.executeCommand(
       "setContext",
       "redmine:hasSingleConfig",
@@ -63,12 +84,20 @@ export function activate(context: vscode.ExtensionContext): void {
 
     const config = vscode.workspace.getConfiguration(
       "redmine",
-      pickedFolder?.uri
+      pickedFolder.uri
     ) as RedmineConfig;
+
+    // Get API key from secrets - NO auto-migration
+    const apiKey = await secretManager.getApiKey(pickedFolder.uri);
+
+    if (!apiKey) {
+      vscode.window.showErrorMessage('No API key configured. Run "Redmine: Set API Key"');
+      return Promise.resolve({ props: undefined, args: [] });
+    }
 
     const redmineServer = new RedmineServer({
       address: config.url,
-      key: config.apiKey,
+      key: apiKey,
       additionalHeaders: config.additionalHeaders,
       rejectUnauthorized: config.rejectUnauthorized,
     });
