@@ -20,10 +20,6 @@ suite("Extension Activation", () => {
       await ext.activate();
     }
 
-    assert.strictEqual(
-      ext.isActive,
-      true,
-      "Extension failed to activate"
-    );
+    assert.strictEqual(ext.isActive, true, "Extension failed to activate");
   });
 });
