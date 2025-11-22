@@ -17,6 +17,11 @@ jobs:
     name: Test on ${{ matrix.os }}
 
     steps:
+      - name: Configure Git line endings
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+
       - uses: actions/checkout@v4
 
       - name: Setup Node
@@ -26,8 +31,6 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        env:
-          npm_config_optional: false
         run: npm ci
 
       - name: Run lint
