@@ -168,9 +168,9 @@ export class RedmineServer {
         incoming.on("end", handleEnd(incoming));
       });
 
-      const handleError = (error: Error) => {
+      const handleError = (error: NodeJS.ErrnoException) => {
         reject(
-          new Error(`NodeJS Request Error (${error.name}): ${error.message}`)
+          new Error(`NodeJS Request Error (${error.code || error.name}): ${error.message}`)
         );
       };
 
@@ -224,11 +224,11 @@ export class RedmineServer {
     return this.doRequest<{
       time_entry_activities: TimeEntryActivity[];
     }>(`/enumerations/time_entry_activities.json`, "GET").then((response) => {
-      if (response) {
+      if (response && response.time_entry_activities) {
         this.timeEntryActivities = response.time_entry_activities;
+        return response;
       }
-
-      return response;
+      return { time_entry_activities: [] };
     });
   }
 
@@ -312,6 +312,10 @@ export class RedmineServer {
       memberships: RedmineMembership[];
     }>(`/projects/${projectId}/memberships.json`, "GET");
 
+    if (!membershipsResponse?.memberships) {
+      return [];
+    }
+
     return membershipsResponse.memberships.map((m) =>
       "user" in m
         ? new Membership(m.user.id, m.user.name)
@@ -336,10 +340,10 @@ export class RedmineServer {
     const issueRequest = await this.getIssueById(quickUpdate.issueId);
     const issue = issueRequest.issue;
     const updateResult = new QuickUpdateResult();
-    if (issue.assigned_to.id !== quickUpdate.assignee.id) {
+    if (issue.assigned_to?.id !== quickUpdate.assignee.id) {
       updateResult.addDifference("Couldn't assign user");
     }
-    if (issue.status.id !== quickUpdate.status.statusId) {
+    if (issue.status?.id !== quickUpdate.status.statusId) {
       updateResult.addDifference("Couldn't update status");
     }
     return updateResult;

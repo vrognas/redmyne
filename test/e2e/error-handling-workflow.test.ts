@@ -16,12 +16,14 @@ vi.mock("http", async () => {
     ...actual,
     request: vi.fn((options, callback) => {
       const request = new EventEmitter() as http.ClientRequest;
-      request.end = function () {
+
+      type MockRequest = http.ClientRequest & { end: (data?: Buffer) => http.ClientRequest; write: () => boolean; abort: () => void };
+      (request as MockRequest).end = function (this: http.ClientRequest) {
         if (mockHttpBehavior === "network-error") {
-          const error = new Error("connect ECONNREFUSED");
-          error.name = "ECONNREFUSED";
-          setTimeout(() => request.emit("error", error), 0);
-          return;
+          const error = new Error("connect ECONNREFUSED") as NodeJS.ErrnoException;
+          error.code = "ECONNREFUSED";
+          setTimeout(() => this.emit("error", error), 0);
+          return this;
         }
 
         const response = new EventEmitter() as http.IncomingMessage;
@@ -58,7 +60,7 @@ vi.mock("http", async () => {
               },
             };
             response.emit("data", Buffer.from(JSON.stringify(data)));
-          } else if (response.statusCode < 400) {
+          } else if (response.statusCode! < 400) {
             response.emit("data", Buffer.from(JSON.stringify({ issues: [] })));
           } else {
             response.emit("data", Buffer.from(JSON.stringify({ error: "Error" })));
@@ -66,12 +68,15 @@ vi.mock("http", async () => {
           response.emit("end");
         }, 0);
 
-        callback(response);
-      };
-      request.on = function (event: string, handler: (...args: unknown[]) => void) {
-        EventEmitter.prototype.on.call(this, event, handler);
+        if (callback) {
+          callback(response);
+        }
         return this;
       };
+
+      (request as MockRequest).write = vi.fn().mockReturnValue(true);
+      (request as MockRequest).abort = vi.fn();
+
       return request;
     }),
   };

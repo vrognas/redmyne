@@ -15,11 +15,13 @@ export default defineConfig({
       include: ["src/**/*.ts"],
       exclude: [
         "src/extension.ts", // VS Code integration - requires extensive mocking
+        "src/trees/**/*.ts", // VS Code TreeProvider - tested via E2E
         "src/commands/new-issue.ts", // VS Code UI heavy
         "src/commands/open-actions-for-issue.ts", // VS Code UI heavy
         "src/commands/open-actions-for-issue-under-cursor.ts", // VS Code UI heavy
         "src/commands/commons/**/*.ts", // VS Code UI heavy
         "src/commands/action-properties.ts", // Type definitions only
+        "src/controllers/issue-controller.ts", // VS Code UI heavy - tested via E2E
         "src/redmine/models/**/*.ts", // Type definitions only
         "src/definitions/**/*.ts", // Type definitions only
       ],
