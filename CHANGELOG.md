@@ -4,6 +4,18 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ## [Unreleased]
 
+## [3.0.1] - 2025-11-22
+
+### Added
+- Configure icon in view title (always visible)
+- Server URL display in tree views (globe icon)
+- Config change listener: auto-update when URL/API key removed
+
+### Fixed
+- Tree refresh guard: prevent fetches when server not configured
+- Server cleared from trees when config removed
+- Trees update immediately when config changes
+
 ## [3.0.0] - 2025-11-22
 
 ### BREAKING CHANGES

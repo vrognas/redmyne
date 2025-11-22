@@ -33,8 +33,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Listen for secret changes
   context.subscriptions.push(
     secretManager.onSecretChanged(() => {
-      projectsTree.onDidChangeTreeData$.fire();
-      myIssuesTree.onDidChangeTreeData$.fire();
+      updateConfiguredContext();
     })
   );
 
@@ -67,15 +66,32 @@ export function activate(context: vscode.ExtensionContext): void {
 
         myIssuesTree.setServer(server);
         projectsTree.setServer(server);
+        projectsTree.onDidChangeTreeData$.fire();
+        myIssuesTree.onDidChangeTreeData$.fire();
       } catch (error) {
         console.error('Failed to initialize Redmine server:', error);
         vscode.window.showErrorMessage(`Failed to connect to Redmine: ${error}`);
       }
+    } else {
+      // Clear servers when not configured
+      myIssuesTree.setServer(undefined);
+      projectsTree.setServer(undefined);
+      projectsTree.onDidChangeTreeData$.fire();
+      myIssuesTree.onDidChangeTreeData$.fire();
     }
   };
 
   // Initial check
   updateConfiguredContext();
+
+  // Listen for configuration changes
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration(async (event) => {
+      if (event.affectsConfiguration('redmine')) {
+        await updateConfiguredContext();
+      }
+    })
+  );
 
   // Register configure command
   context.subscriptions.push(

@@ -9,9 +9,14 @@ export enum ProjectsViewStyle {
   TREE = 1,
 }
 
+class ServerStatus {
+  constructor(public readonly url: string) {}
+}
+
 export class ProjectsTree
-  implements vscode.TreeDataProvider<RedmineProject | Issue> {
+  implements vscode.TreeDataProvider<RedmineProject | Issue | ServerStatus> {
   server?: RedmineServer;
+  serverUrl?: string;
   viewStyle: ProjectsViewStyle;
   projects: RedmineProject[] | null = null;
   constructor() {
@@ -23,51 +28,67 @@ export class ProjectsTree
   onDidChangeTreeData: vscode.Event<void> = this
     .onDidChangeTreeData$.event;
   getTreeItem(
-    projectOrIssue: RedmineProject | Issue
+    element: RedmineProject | Issue | ServerStatus
   ): vscode.TreeItem | Thenable<vscode.TreeItem> {
-    if (projectOrIssue instanceof RedmineProject) {
+    if (element instanceof ServerStatus) {
+      const item = new vscode.TreeItem(
+        element.url,
+        vscode.TreeItemCollapsibleState.None
+      );
+      item.iconPath = new vscode.ThemeIcon('globe');
+      item.description = 'Redmine Server';
+      item.contextValue = 'serverStatus';
+      return item;
+    }
+
+    if (element instanceof RedmineProject) {
       return new vscode.TreeItem(
-        projectOrIssue.toQuickPickItem().label,
+        element.toQuickPickItem().label,
         vscode.TreeItemCollapsibleState.Collapsed
       );
     } else {
       const item = new vscode.TreeItem(
-        `#${projectOrIssue.id} [${projectOrIssue.tracker.name}] (${projectOrIssue.status.name}) ${projectOrIssue.subject} by ${projectOrIssue.author.name}`,
+        `#${element.id} [${element.tracker.name}] (${element.status.name}) ${element.subject} by ${element.author.name}`,
         vscode.TreeItemCollapsibleState.None
       );
 
       item.command = {
         command: "redmine.openActionsForIssue",
-        arguments: [false, { server: this.server }, `${projectOrIssue.id}`],
-        title: `Open actions for issue #${projectOrIssue.id}`,
+        arguments: [false, { server: this.server }, `${element.id}`],
+        title: `Open actions for issue #${element.id}`,
       };
 
       return item;
     }
   }
   async getChildren(
-    projectOrIssue?: RedmineProject | Issue
-  ): Promise<(RedmineProject | Issue)[]> {
+    element?: RedmineProject | Issue | ServerStatus
+  ): Promise<(RedmineProject | Issue | ServerStatus)[]> {
     if (!this.server) {
       return [];
     }
 
+    // Don't expand server status or issues
+    if (element instanceof ServerStatus || (element && !(element instanceof RedmineProject))) {
+      return [];
+    }
+
     if (
-      projectOrIssue !== null &&
-      projectOrIssue !== undefined &&
-      projectOrIssue instanceof RedmineProject
+      element !== null &&
+      element !== undefined &&
+      element instanceof RedmineProject
     ) {
       if (this.viewStyle === ProjectsViewStyle.TREE) {
         const subprojects: (RedmineProject | Issue)[] = (this.projects ?? []).filter(
-          (project) => project.parent && project.parent.id === projectOrIssue.id
+          (project) => project.parent && project.parent.id === element.id
         );
         return subprojects.concat(
-          (await this.server.getOpenIssuesForProject(projectOrIssue.id, false))
+          (await this.server.getOpenIssuesForProject(element.id, false))
             .issues
         );
       }
 
-      return (await this.server.getOpenIssuesForProject(projectOrIssue.id))
+      return (await this.server.getOpenIssuesForProject(element.id))
         .issues;
     }
 
@@ -75,10 +96,15 @@ export class ProjectsTree
       this.projects = await this.server.getProjects();
     }
 
-    if (this.viewStyle === ProjectsViewStyle.TREE) {
-      return this.projects.filter((project) => !project.parent);
+    const items: (RedmineProject | Issue | ServerStatus)[] = [];
+    if (this.serverUrl) {
+      items.push(new ServerStatus(this.serverUrl));
     }
-    return this.projects;
+
+    if (this.viewStyle === ProjectsViewStyle.TREE) {
+      return items.concat(this.projects.filter((project) => !project.parent));
+    }
+    return items.concat(this.projects);
   }
 
   clearProjects() {
@@ -90,7 +116,8 @@ export class ProjectsTree
     this.onDidChangeTreeData$.fire();
   }
 
-  setServer(server: RedmineServer) {
+  setServer(server: RedmineServer | undefined) {
     this.server = server;
+    this.serverUrl = server?.options.address;
   }
 }

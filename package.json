@@ -2,7 +2,7 @@
   "name": "positron-redmine",
   "displayName": "Redmine for Positron",
   "description": "Redmine project management integration for Positron IDE and VS Code",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -120,6 +120,16 @@
         }
       ],
       "view/title": [
+        {
+          "command": "redmine.configure",
+          "when": "view == 'redmine-explorer-my-issues'",
+          "group": "navigation"
+        },
+        {
+          "command": "redmine.configure",
+          "when": "view == 'redmine-explorer-projects'",
+          "group": "navigation"
+        },
         {
           "command": "redmine.changeDefaultServer",
           "when": "view == 'redmine-explorer-my-issues' && !hasSingleConfig"

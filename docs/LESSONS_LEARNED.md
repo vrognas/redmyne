@@ -9,7 +9,7 @@
 - Calling `fire()` without args requires `void` type, not `T | undefined`
 - VS Code TreeDataProvider refresh events typically use `void`
 
-**URL Migration (url.parse ’ new URL)**
+**URL Migration (url.parse ï¿½ new URL)**
 - `new URL()` throws on invalid URLs - wrap in try/catch
 - `url.port` returns string, not number - use `parseInt(url.port, 10)`
 - `url.host` includes port, use `url.hostname` for host only
@@ -40,7 +40,7 @@
 ### Build Configuration
 
 **esbuild + TypeScript 5.7**
-- Rename esbuild.js ’ esbuild.cjs for CJS compatibility
+- Rename esbuild.js ï¿½ esbuild.cjs for CJS compatibility
 - tsconfig: exclude test/, *.config.ts, *.cjs from rootDir
 - Keep bundled output as CJS (`format: 'cjs'`) for VS Code compatibility
 - ES2022 modules in source, CJS in bundle works fine
@@ -75,14 +75,14 @@
 ### Dependencies
 
 **Removed**
-- lodash ’ native JS (`isNil` ’ `!= null`, `isEqual` ’ `JSON.stringify`)
+- lodash ï¿½ native JS (`isNil` ï¿½ `!= null`, `isEqual` ï¿½ `JSON.stringify`)
 - Bundle size reduced ~80KB
 - No behavioral changes
 
 **Updated**
-- TypeScript 3.9.7 ’ 5.7.2 (5-year jump)
-- @types/vscode 1.x ’ 1.96.0
-- @types/node 12.x ’ 22.17.10
+- TypeScript 3.9.7 ï¿½ 5.7.2 (5-year jump)
+- @types/vscode 1.x ï¿½ 1.96.0
+- @types/node 12.x ï¿½ 22.17.10
 
 **Added**
 - vitest, @vitest/coverage-v8, msw (dev only)
@@ -116,7 +116,7 @@
 ### CI/CD
 
 **GitHub Actions**
-- lint ’ typecheck ’ test ’ coverage check ’ codecov
+- lint ï¿½ typecheck ï¿½ test ï¿½ coverage check ï¿½ codecov
 - Fail on <60% coverage
 - Node 20.x only (no matrix)
 - Cache npm for speed
@@ -130,9 +130,34 @@
 - Breaking changes summary
 
 **No Auto-Migration**
-- Security risk (plaintext config ’ encrypted secrets)
+- Security risk (plaintext config ï¿½ encrypted secrets)
 - Force explicit user action
 - Clear error messages pointing to command
+
+## v3.0.1 UX Improvements (2025-11-22)
+
+### Tree Refresh Guards
+
+**Problem**: Dozens of fetch requests when extension not configured
+**Solution**: Guard tree refresh with server existence check
+- Only fire `onDidChangeTreeData` when server set
+- Clear server from trees when config removed
+- Call `updateConfiguredContext()` from event listeners instead of direct refresh
+
+### Configuration Change Handling
+
+**onDidChangeConfiguration**
+- Listen for `affectsConfiguration('redmine')` events
+- Re-run `updateConfiguredContext()` to sync state
+- Automatically clear/set servers in trees
+
+### Server Status Display
+
+**TreeView Limitations**
+- View container titles static (can't be changed dynamically)
+- View names static (defined in package.json)
+- Solution: Add ServerStatus node as first item in tree
+- Use `ThemeIcon('globe')` for consistency with VS Code
 
 ## Key Takeaways
 
@@ -144,3 +169,5 @@
 6. **No auto-migration**: Explicit user action better for security
 7. **Vitest fast**: 46 tests in 1.17s
 8. **Parallel agents**: 5 phases in 2 hours (vs 3 weeks estimate)
+9. **Guard tree refreshes**: Check server exists before firing events
+10. **VS Code limits**: View container/view titles static, use tree items for dynamic content
