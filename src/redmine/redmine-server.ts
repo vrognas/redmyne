@@ -153,7 +153,7 @@ export class RedmineServer {
           try {
             const object = JSON.parse(incomingBuffer.toString("utf8"));
             resolve(object);
-          } catch (e) {
+          } catch (_e) {
             reject(new Error("Couldn't parse Redmine response as JSON..."));
           }
           return;

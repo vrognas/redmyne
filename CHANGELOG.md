@@ -4,6 +4,22 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ## [Unreleased]
 
+## [3.0.2] - 2025-11-22
+
+### Changed
+
+- Updated Vitest from 2.1.9 to 4.0.13
+- Updated @vitest/coverage-v8 from 2.1.9 to 4.0.13
+- Updated ESLint from 8.x to 9.39.1 (flat config)
+- Updated eslint-config-prettier from 8.x to 10.1.8
+- Updated eslint-plugin-prettier from 4.x to 5.5.4
+- Updated Prettier from 2.x to 3.6.2
+- Migrated from legacy .eslintrc to ESLint 9 flat config (eslint.config.js)
+
+### Fixed
+
+- Catch clause error variables now properly ignored with underscore prefix
+
 ## [3.0.1] - 2025-11-22
 
 ### Added
