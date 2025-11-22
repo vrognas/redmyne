@@ -80,7 +80,10 @@ export class RedmineServer {
       ...options,
       url: parse(options.address),
     };
-    if (this.options.additionalHeaders == null) {
+    if (
+      this.options.additionalHeaders === null ||
+      this.options.additionalHeaders === undefined
+    ) {
       this.options.additionalHeaders = {};
     }
   }
@@ -282,7 +285,7 @@ export class RedmineServer {
    * Returns promise, that resolves to list of issue statuses in provided redmine server
    */
   getIssueStatuses(): Promise<{ issue_statuses: RedmineIssueStatus[] }> {
-    if (this.issueStatuses == null) {
+    if (this.issueStatuses === null || this.issueStatuses === undefined) {
       return this.doRequest<{ issue_statuses: RedmineIssueStatus[] }>(
         "/issue_statuses.json",
         "GET"
@@ -376,7 +379,8 @@ export class RedmineServer {
       this.options.address === other.options.address &&
       this.options.key === other.options.key &&
       this.options.rejectUnauthorized === other.options.rejectUnauthorized &&
-      JSON.stringify(this.options.additionalHeaders) === JSON.stringify(other.options.additionalHeaders)
+      JSON.stringify(this.options.additionalHeaders) ===
+        JSON.stringify(other.options.additionalHeaders)
     );
   }
 }

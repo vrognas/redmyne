@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from "vitest";
 
 interface BuildError {
   text: string;
@@ -12,20 +12,20 @@ function formatError(error: BuildError): string {
   return error.text;
 }
 
-describe('esbuild error handling', () => {
-  it('should handle error with location', () => {
+describe("esbuild error handling", () => {
+  it("should handle error with location", () => {
     const error: BuildError = {
-      text: 'Error',
-      location: { file: 'a.ts', line: 1, column: 5 }
+      text: "Error",
+      location: { file: "a.ts", line: 1, column: 5 },
     };
-    expect(formatError(error)).toBe('a.ts:1:5: Error');
+    expect(formatError(error)).toBe("a.ts:1:5: Error");
   });
 
-  it('should handle error without location', () => {
+  it("should handle error without location", () => {
     const error: BuildError = {
-      text: 'Error',
-      location: null
+      text: "Error",
+      location: null,
     };
-    expect(formatError(error)).toBe('Error');
+    expect(formatError(error)).toBe("Error");
   });
 });

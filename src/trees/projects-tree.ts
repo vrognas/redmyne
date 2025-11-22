@@ -56,7 +56,11 @@ export class ProjectsTree
   async getChildren(
     projectOrIssue?: RedmineProject | Issue
   ): Promise<(RedmineProject | Issue)[]> {
-    if (projectOrIssue != null && projectOrIssue instanceof RedmineProject) {
+    if (
+      projectOrIssue !== null &&
+      projectOrIssue !== undefined &&
+      projectOrIssue instanceof RedmineProject
+    ) {
       if (this.viewStyle === ProjectsViewStyle.TREE) {
         const subprojects: (RedmineProject | Issue)[] = this.projects!.filter(
           (project) => project.parent && project.parent.id === projectOrIssue.id
