@@ -4,6 +4,11 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ## [Unreleased]
 
+### Changed
+
+- eslint.config.js → eslint.config.mjs (eliminates Node.js warning)
+- tsconfig.json: added *.mjs to exclude list
+
 ## [3.0.7] - 2025-11-23
 
 ### Fixed
