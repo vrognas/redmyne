@@ -10,20 +10,22 @@
 
 | MVP | Priority | Value | Complexity | API Changes |
 |-----|----------|-------|------------|-------------|
-| **MVP-1: Flexibility Score & Timeline** | P0 | HIGH | MEDIUM | None (uses existing fields) |
-| **MVP-2: Spent Hours Display** | P0 | HIGH | LOW | None (field included by default) |
-| **MVP-3: Time Entry Viewing** | P1 | HIGH | MEDIUM | New endpoint |
-| **MVP-4: Quick Time Logging** | P1 | MEDIUM | LOW | None (uses existing) |
+| **MVP-1: Timeline & Progress Display** | P0 | HIGH | MEDIUM | None (uses existing fields) |
+| **MVP-2: Time Entry Viewing** | P0 | HIGH | MEDIUM | New endpoint |
+| **MVP-3: Quick Time Logging** | P1 | MEDIUM | LOW | None (uses existing) |
+| **MVP-4: Workload Overview** | P1 | HIGH | MEDIUM | None (aggregates existing) |
 
 ---
 
-## MVP-1: Flexibility Score & Timeline
+## MVP-1: Timeline & Progress Display
 
 ### Problem
-Cannot see planning quality or deadline urgency. Issues with tight timelines or approaching deadlines invisible in UI.
+Cannot see planning quality or current deadline risk. No visibility into progress or remaining work.
 
 ### Solution
-Calculate "flexibility score" showing buffer percentage based on working hours configuration. Displays both estimated hours and flexibility to enable daily work prioritization.
+Calculate TWO flexibility scores: **initial** (planning quality - static) and **remaining** (current risk - dynamic). Merges spent/estimated hours display with dual flexibility calculation to show both "how well was this planned?" and "can I finish on time given current progress?"
+
+**Merged**: Combines original MVP-1 (Flexibility) + MVP-2 (Spent Hours) into single integrated feature.
 
 ### Redmine API Reference
 
@@ -35,35 +37,55 @@ Calculate "flexibility score" showing buffer percentage based on working hours c
     "due_date": "2025-11-26",      // ✅ Already fetched
     "start_date": "2025-11-20",    // ✅ Already fetched
     "estimated_hours": 16.0,       // ✅ Already fetched
+    "spent_hours": 3.5,            // ✅ Included by default (Redmine 3.3+)
     "created_on": "2025-11-18"     // ✅ Fallback if no start_date
   }
 }
 ```
 
-Source: [Rest Issues API](https://www.redmine.org/projects/redmine/wiki/Rest_Issues)
+**Note**: `spent_hours` automatically included in Redmine 3.3+ (2016-09-25). No explicit `include` parameter needed.
 
-### Flexibility Formula
+Source: [Rest Issues API](https://www.redmine.org/projects/redmine/wiki/Rest_Issues), [Feature #21757](https://www.redmine.org/issues/21757)
 
+### Dual Flexibility Formula
+
+**1. Initial Flexibility (Planning Quality - Static)**
 ```typescript
-flexibility = (available_time / estimated_time - 1) * 100
+initial_flexibility = (available_time_total / estimated_hours - 1) * 100
 
 where:
-  available_time = working_days * hours_per_day
-  working_days = count_working_days(start_date, due_date, working_days_config)
-  estimated_time = estimated_hours
+  available_time_total = working_days_total * hours_per_day
+  working_days_total = count_working_days(start_date, due_date, working_days_config)
 ```
+
+Shows: How well was this issue planned? Did we build in enough buffer?
+
+**2. Remaining Flexibility (Current Risk - Dynamic)**
+```typescript
+remaining_flexibility = (available_time_remaining / work_remaining - 1) * 100
+
+where:
+  available_time_remaining = working_days_remaining * hours_per_day
+  working_days_remaining = count_working_days(TODAY, due_date, working_days_config)
+  work_remaining = max(estimated_hours - spent_hours, 0)
+```
+
+Shows: Can I finish on time given current progress? What's the risk TODAY?
 
 **Interpretation**:
-- **0%** = No buffer (perfectly tight planning)
-- **+60%** = 60% extra time (comfortable buffer)
+- **0%** = No buffer (perfectly tight)
+- **+60%** = 60% extra time (comfortable)
 - **-20%** = Need 20% more time (overbooked)
 
-**Examples**:
+**Example**:
 ```
-Available: 8h,  Estimated: 5h  → (8/5 - 1) = 0.6 = +60% buffer
-Available: 40h, Estimated: 16h → (40/16 - 1) = 1.5 = +150% buffer
-Available: 8h,  Estimated: 8h  → (8/8 - 1) = 0.0 = 0% buffer (tight)
-Available: 16h, Estimated: 20h → (16/20 - 1) = -0.2 = -20% (overbooked)
+Issue planned with 5 working days (40h), 16h estimated:
+  Initial: (40h / 16h - 1) = +150% (planned with 2.5× time needed)
+
+Today (3 days elapsed), 8h spent, 2 days left (16h):
+  Remaining: (16h / 8h - 1) = +100% (still 2× time for remaining work)
+
+Conclusion: Well-planned (+150%) and on track (+100%) ✅
 ```
 
 ### Configuration
@@ -112,45 +134,60 @@ Fix authentication bug                 #123
 
 **New display:**
 ```
-Fix auth bug              16h +150% 🟢  #123
-Add reporting             8h  +0%   🟡  #456
-Database optimization     20h -20%  🔴  #789
-Client docs                            #999  (no estimate/due date)
+Fix auth bug              3.5/8h 2d +100%→+60% 🟢  #123
+Add reporting             0/16h 7d +150%→+150% 🟢  #456
+Database optimization     8/4h! 1d 0%→-50% 🔴     #789
+Client docs                                       #999  (no estimate)
 ```
 
-**Format**: `{estimated}h {+/-}{flexibility}% {icon}`
+**Format**: `{spent}/{est}h {days}d {initial}%→{remaining}% {icon}`
+
+**Components**:
+- `3.5/8h` = spent/estimated hours
+- `2d` = working days remaining
+- `+100%→+60%` = initial → remaining flexibility
+- `🟢` = risk icon (based on remaining flexibility)
+- `!` = over-budget indicator (if spent > estimated)
 
 **Tooltip on hover:**
 ```
 Issue #123: Fix auth bug
 ────────────────────────────────
-Timeline: Mon Nov 20 → Fri Nov 24 (5 calendar days)
-Working days: 4 (Mon, Tue, Wed, Thu)
-Available: 32h (4 days × 8h/day)
-Estimated: 16h
+Progress: 3.5h spent / 8h estimated (44% complete)
 
-Flexibility: +100% buffer (2× effective time)
-Planning: Comfortable 🟢
+Initial Plan:
+  Timeline: Mon Nov 20 → Fri Nov 24 (5 calendar days)
+  Working days: 4 (Mon, Tue, Wed, Thu)
+  Available: 32h (4 days × 8h/day)
+  Flexibility: +100% (2× effective time) 🟢
+
+Current Status (as of Wed Nov 22):
+  Days remaining: 2 working days (16h available)
+  Work remaining: 4.5h (8h - 3.5h)
+  Flexibility: +256% (3.5× time for remaining work) 🟢
+
+Assessment: Well-planned, ahead of schedule ✅
 ```
 
-### Risk Levels
+### Risk Levels (Based on Remaining Flexibility)
 
 ```typescript
-flexibility < 0%      → 🔴 OVERBOOKED (impossible timeline)
-flexibility = 0%      → 🟡 TIGHT (no buffer, need every minute)
-flexibility < 20%     → 🟡 LIMITED (minimal buffer)
-flexibility < 50%     → 🟢 SOME (decent buffer)
-flexibility >= 50%    → 🟢 COMFORTABLE (healthy buffer)
+remaining_flexibility < 0%   → 🔴 OVERBOOKED (impossible - need more time than available)
+remaining_flexibility = 0%   → 🔴 CRITICAL (no buffer - need every working minute)
+remaining_flexibility < 20%  → 🟡 TIGHT (minimal buffer - little room for error)
+remaining_flexibility < 50%  → 🟡 LIMITED (some buffer - manageable)
+remaining_flexibility >= 50% → 🟢 COMFORTABLE (healthy buffer)
 ```
 
 **Color coding examples**:
 ```
-20h -20% 🔴  (need 20% more time - impossible)
-8h  +0%  🟡  (need every working minute)
-8h  +15% 🟡  (15% buffer - tight)
-16h +45% 🟢  (45% buffer - some)
-16h +150% 🟢 (150% buffer - very comfortable)
+8/4h! 1d 0%→-50% 🔴      (over budget, need 50% more time)
+6/8h 1d +100%→+0% 🔴     (planned well but fell behind)
+3/8h 2d +100%→+15% 🟡    (planned well, slightly behind)
+2/8h 3d +150%→+200% 🟢   (planned conservatively, ahead)
 ```
+
+**Note**: Risk uses **remaining flexibility** (dynamic) to reflect current status, not initial (static).
 
 ### Working Days Calculation
 
@@ -255,10 +292,11 @@ function countWorkingDays(
 
 ### Estimated Effort
 - Configuration: ~20 LOC
-- Flexibility calculator: ~60 LOC
-- Tree item integration: ~40 LOC
-- Tests: ~120 LOC
-- Total: **4-5 hours**
+- Issue model update: ~5 LOC
+- Flexibility calculator (dual formula): ~100 LOC
+- Tree item integration: ~60 LOC
+- Tests: ~180 LOC
+- Total: **6-8 hours**
 
 ---
 
@@ -915,27 +953,46 @@ async function pickIssueAndActivity(server: RedmineServer): Promise<{
 
 ## Implementation Sequence
 
-### Phase 1: Flexibility & Hours (Week 1)
-1. **MVP-1**: Flexibility Score & Timeline (4-5h)
-2. **MVP-2**: Spent Hours Display (1-2h)
+### Phase 1: P0 Features (Week 1) - 10-14h
+1. **MVP-1**: Timeline & Progress Display (6-8h)
+   - Dual flexibility formula (initial + remaining)
+   - Spent/estimated hours display
+   - Days remaining calculation
+   - Risk indicators based on current status
+2. **MVP-2**: Time Entry Viewing (4-6h)
+   - View logged time (Today, This Week)
+   - Verify totals for billing accuracy
+   - Auto-refresh after logging
 3. Testing + documentation (2h)
 4. **Release**: v3.2.0
 
-**Value**: Immediate daily work prioritization with planning quality insights
+**Value**: Core billing workflow enabled - work prioritization + time verification
 
-### Phase 2: Time Tracking (Week 2)
-1. **MVP-3**: Time Entry Viewing (4-6h)
-2. **MVP-4**: Quick Time Logging (3-4h)
-3. Testing + documentation (3h)
+### Phase 2: P1 Features (Week 2) - 7-10h
+1. **MVP-3**: Quick Time Logging (3-4h)
+   - `Ctrl+K Ctrl+T` keybinding
+   - 5-issue LRU cache
+   - Activity defaulting
+2. **MVP-4**: Workload Overview (4-6h)
+   - Total remaining work across all issues
+   - Available capacity this week
+   - Top 3 urgent issues
+3. Testing + documentation (2h)
 4. **Release**: v3.3.0
 
-**Value**: Complete time tracking workflow in IDE
+**Value**: Workflow efficiency - rapid logging + capacity planning
 
 ### Total Estimated Effort
-- Implementation: ~17-20 hours
-- Testing: ~5-7 hours
-- Documentation: ~2-3 hours
-- **Total**: ~24-30 hours (3-4 days)
+- Phase 1 (P0): 10-14h
+- Phase 2 (P1): 7-10h
+- Testing: ~6-8 hours
+- Documentation: ~3-4 hours
+- **Total**: ~26-36 hours (3-5 days)
+
+### Expected Impact
+- **After P0 (MVP-1+2)**: 60-65% workflow coverage, ~5 browser visits/day
+- **After P1 (MVP-3+4)**: 75-80% workflow coverage, ~2-3 browser visits/day
+- **Browser visits reduced**: 10/day → 2-3/day (70-80% reduction)
 
 ---
 
