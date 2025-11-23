@@ -1,6 +1,6 @@
 {
   "permissions": {
-    "allow": ["Bash(npm install:*)", "Bash(npm run compile:*)"],
+    "allow": ["Bash(npm install:*)", "Bash(npm run compile:*)", "Bash(gh:*)"],
     "deny": [],
     "ask": []
   }
