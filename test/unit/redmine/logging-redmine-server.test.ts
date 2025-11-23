@@ -76,6 +76,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).toHaveBeenCalledWith(
       expect.stringContaining("200")
     );
+
+    server.dispose();
   });
 
   it("silent when disabled", async () => {
@@ -93,6 +95,8 @@ describe("LoggingRedmineServer", () => {
     await server.getIssuesAssignedToMe();
 
     expect(mockChannel.appendLine).not.toHaveBeenCalled();
+
+    server.dispose();
   });
 
   it("logs network errors", async () => {
@@ -144,6 +148,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).toHaveBeenCalledWith(
       expect.stringContaining("ERROR")
     );
+
+    server.dispose();
   });
 
   // Phase 1: Status Code Tests
@@ -200,6 +206,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).toHaveBeenCalledWith(
       expect.stringContaining("201")
     );
+
+    server.dispose();
   });
 
   it("logs 204 No Content status", async () => {
@@ -254,6 +262,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).toHaveBeenCalledWith(
       expect.stringContaining("204")
     );
+
+    server.dispose();
   });
 
   it("logs 401 Unauthorized status", async () => {
@@ -308,6 +318,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).toHaveBeenCalledWith(
       expect.stringContaining("401")
     );
+
+    server.dispose();
   });
 
   it("logs 403 Forbidden status", async () => {
@@ -362,6 +374,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).toHaveBeenCalledWith(
       expect.stringContaining("403")
     );
+
+    server.dispose();
   });
 
   it("logs 404 Not Found status", async () => {
@@ -416,6 +430,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).toHaveBeenCalledWith(
       expect.stringContaining("404")
     );
+
+    server.dispose();
   });
 
   it("logs 500 Internal Server Error status", async () => {
@@ -470,6 +486,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).toHaveBeenCalledWith(
       expect.stringContaining("500")
     );
+
+    server.dispose();
   });
 
   // Phase 2: Request/Response Detail Tests
@@ -491,6 +509,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).toHaveBeenCalledWith(
       expect.stringMatching(/Body: .{200}\.\.\.$/)
     );
+
+    server.dispose();
   });
 
   it("logs response size in bytes", async () => {
@@ -510,6 +530,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).toHaveBeenCalledWith(
       expect.stringMatching(/\d+B/)
     );
+
+    server.dispose();
   });
 
   it("logs query parameters", async () => {
@@ -529,6 +551,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).toHaveBeenCalledWith(
       expect.stringContaining("?status_id=open&limit=25")
     );
+
+    server.dispose();
   });
 
   it("logs truncated query params when >100 chars", async () => {
@@ -549,6 +573,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).toHaveBeenCalledWith(
       expect.stringContaining("aaaaaaaaa...")
     );
+
+    server.dispose();
   });
 
   it("skips binary content (image/png)", async () => {
@@ -607,6 +633,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).toHaveBeenCalledWith(
       expect.stringContaining("[binary]")
     );
+
+    server.dispose();
   });
 
   it("logs response body on error", async () => {
@@ -665,6 +693,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).toHaveBeenCalledWith(
       expect.stringContaining('{"errors":["Invalid field"]}')
     );
+
+    server.dispose();
   });
 
   // Phase 3: Redaction Tests
@@ -691,6 +721,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).not.toHaveBeenCalledWith(
       expect.stringContaining("secret123")
     );
+
+    server.dispose();
   });
 
   it("redacts api_key in request body", async () => {
@@ -714,6 +746,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).not.toHaveBeenCalledWith(
       expect.stringContaining("abc123xyz")
     );
+
+    server.dispose();
   });
 
   it("redacts token in request body", async () => {
@@ -737,6 +771,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).not.toHaveBeenCalledWith(
       expect.stringContaining("bearer-token-123")
     );
+
+    server.dispose();
   });
 
   it("redacts password in error response body", async () => {
@@ -798,6 +834,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).not.toHaveBeenCalledWith(
       expect.stringContaining("leaked123")
     );
+
+    server.dispose();
   });
 
   it("preserves non-sensitive fields", async () => {
@@ -823,6 +861,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).toHaveBeenCalledWith(
       expect.stringContaining("admin@example.com")
     );
+
+    server.dispose();
   });
 
   it("redacts api_key in query params", async () => {
@@ -845,6 +885,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).not.toHaveBeenCalledWith(
       expect.stringContaining("secret123")
     );
+
+    server.dispose();
   });
 
   it("redacts token in query params", async () => {
@@ -867,6 +909,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).not.toHaveBeenCalledWith(
       expect.stringContaining("bearer-abc123")
     );
+
+    server.dispose();
   });
 
   it("redacts multiple sensitive query params", async () => {
@@ -898,6 +942,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).not.toHaveBeenCalledWith(
       expect.stringContaining("pass123")
     );
+
+    server.dispose();
   });
 
   it("preserves non-sensitive query params", async () => {
@@ -920,6 +966,8 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).toHaveBeenCalledWith(
       expect.stringContaining("project_id=42")
     );
+
+    server.dispose();
   });
 
   it("handles concurrent requests correctly", async () => {
@@ -964,5 +1012,7 @@ describe("LoggingRedmineServer", () => {
     expect(mockChannel.appendLine).toHaveBeenCalledWith(
       expect.stringContaining("[3] → 200")
     );
+
+    server.dispose();
   });
 });

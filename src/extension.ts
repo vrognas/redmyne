@@ -16,11 +16,24 @@ import { ProjectsTree, ProjectsViewStyle } from "./trees/projects-tree";
 import { RedmineSecretManager } from "./utilities/secret-manager";
 import { setApiKey } from "./commands/set-api-key";
 
+// Module-level cleanup resources
+let cleanupResources: {
+  myIssuesTree?: MyIssuesTree;
+  projectsTree?: ProjectsTree;
+  myIssuesTreeView?: vscode.TreeView<unknown>;
+  projectsTreeView?: vscode.TreeView<unknown>;
+  bucket?: {
+    servers: RedmineServer[];
+    projects: RedmineProject[];
+  };
+} = {};
+
 export function activate(context: vscode.ExtensionContext): void {
   const bucket = {
     servers: [] as RedmineServer[],
     projects: [] as RedmineProject[],
   };
+  cleanupResources.bucket = bucket;
 
   const secretManager = new RedmineSecretManager(context);
   const outputChannel = vscode.window.createOutputChannel("Redmine API");
@@ -45,11 +58,13 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const myIssuesTree = new MyIssuesTree();
   const projectsTree = new ProjectsTree();
+  cleanupResources.myIssuesTree = myIssuesTree;
+  cleanupResources.projectsTree = projectsTree;
 
-  vscode.window.createTreeView("redmine-explorer-my-issues", {
+  cleanupResources.myIssuesTreeView = vscode.window.createTreeView("redmine-explorer-my-issues", {
     treeDataProvider: myIssuesTree,
   });
-  vscode.window.createTreeView("redmine-explorer-projects", {
+  cleanupResources.projectsTreeView = vscode.window.createTreeView("redmine-explorer-projects", {
     treeDataProvider: projectsTree,
   });
 
@@ -404,7 +419,22 @@ export function activate(context: vscode.ExtensionContext): void {
     const server = fromBucket || redmineServer;
 
     if (!fromBucket) {
+      // LRU cache: max 3 servers
+      if (bucket.servers.length >= 3) {
+        const removed = bucket.servers.shift(); // Remove oldest server
+        // Dispose if it's a LoggingRedmineServer
+        if (removed && removed instanceof LoggingRedmineServer) {
+          removed.dispose();
+        }
+      }
       bucket.servers.push(server);
+    } else {
+      // Move to end (most recently used)
+      const index = bucket.servers.indexOf(fromBucket);
+      if (index > -1) {
+        bucket.servers.splice(index, 1);
+        bucket.servers.push(fromBucket);
+      }
     }
 
     return {
@@ -540,5 +570,33 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 export function deactivate(): void {
-  // Cleanup resources
+  // Dispose EventEmitters in tree providers
+  if (cleanupResources.myIssuesTree) {
+    cleanupResources.myIssuesTree.onDidChangeTreeData$.dispose();
+  }
+  if (cleanupResources.projectsTree) {
+    cleanupResources.projectsTree.onDidChangeTreeData$.dispose();
+  }
+
+  // Dispose tree view instances
+  if (cleanupResources.myIssuesTreeView) {
+    cleanupResources.myIssuesTreeView.dispose();
+  }
+  if (cleanupResources.projectsTreeView) {
+    cleanupResources.projectsTreeView.dispose();
+  }
+
+  // Dispose and clear bucket servers
+  if (cleanupResources.bucket) {
+    for (const server of cleanupResources.bucket.servers) {
+      if (server instanceof LoggingRedmineServer) {
+        server.dispose();
+      }
+    }
+    cleanupResources.bucket.servers.length = 0;
+    cleanupResources.bucket.projects.length = 0;
+  }
+
+  // Clear cleanup resources
+  cleanupResources = {};
 }

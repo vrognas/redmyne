@@ -4,6 +4,35 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ## [Unreleased]
 
+### Changed
+
+- eslint.config.js → eslint.config.mjs (eliminates Node.js warning)
+- tsconfig.json: added *.mjs to exclude list
+
+## [3.0.7] - 2025-11-23
+
+### Fixed
+
+- Memory leaks: server bucket now LRU cache (max 3 instances)
+- Memory leaks: cleanup timer in LoggingRedmineServer
+- Memory leaks: deactivate() now disposes all resources
+- Data truncation: pagination for getIssuesAssignedToMe()
+- Data truncation: pagination for getOpenIssuesForProject()
+- N+1 query in applyQuickUpdate() (removed redundant GET)
+- Pagination edge case: handle total_count=0 correctly
+
+### Added
+
+- Loading indicators for tree views (MyIssuesTree, ProjectsTree)
+- Resource disposal in deactivate()
+- LRU cache for server instances (prevents unbounded growth)
+
+### Changed
+
+- Quick update API calls now parallel (2-3s faster)
+- Tree operations show "⏳ Loading..." during fetch
+- Server instances auto-disposed when evicted from cache
+
 ## [3.0.6] - 2025-11-23
 
 ### Added

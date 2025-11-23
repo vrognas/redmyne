@@ -235,7 +235,7 @@ export class RedmineServer {
       count: number | null = null,
       accumulator: RedmineProject[] = []
     ): Promise<RedmineProject[]> => {
-      if (count && count <= offset) {
+      if (count !== null && count <= offset) {
         return accumulator;
       }
 
@@ -366,7 +366,7 @@ export class RedmineServer {
     );
   }
   async applyQuickUpdate(quickUpdate: QuickUpdate): Promise<QuickUpdateResult> {
-    await this.doRequest<void>(
+    const issueRequest = await this.doRequest<{ issue: Issue }>(
       `/issues/${quickUpdate.issueId}.json`,
       "PUT",
       Buffer.from(
@@ -380,7 +380,6 @@ export class RedmineServer {
         "utf8"
       )
     );
-    const issueRequest = await this.getIssueById(quickUpdate.issueId);
     const issue = issueRequest.issue;
     const updateResult = new QuickUpdateResult();
     if (issue.assigned_to.id !== quickUpdate.assignee.id) {
@@ -395,31 +394,73 @@ export class RedmineServer {
   /**
    * Returns promise, that resolves to list of issues assigned to api key owner
    */
-  getIssuesAssignedToMe(): Promise<{ issues: Issue[] }> {
-    return this.doRequest<{ issues: Issue[] }>(
-      "/issues.json?status_id=open&assigned_to_id=me",
-      "GET"
-    );
+  async getIssuesAssignedToMe(): Promise<{ issues: Issue[] }> {
+    const req = async (
+      offset = 0,
+      limit = 50,
+      count: number | null = null,
+      accumulator: Issue[] = []
+    ): Promise<Issue[]> => {
+      if (count !== null && count <= offset) {
+        return accumulator;
+      }
+
+      const response = await this.doRequest<{
+        issues: Issue[];
+        total_count: number;
+      }>(
+        `/issues.json?status_id=open&assigned_to_id=me&limit=${limit}&offset=${offset}`,
+        "GET"
+      );
+
+      const [totalCount, result]: [number, Issue[]] = [
+        response.total_count,
+        response.issues,
+      ];
+
+      return req(offset + limit, limit, totalCount, accumulator.concat(result));
+    };
+
+    const issues = await req();
+    return { issues };
   }
 
   /**
    * Returns promise, that resolves to list of open issues for project
    */
-  getOpenIssuesForProject(
+  async getOpenIssuesForProject(
     project_id: number | string,
     include_subproject = true
   ): Promise<{ issues: Issue[] }> {
-    if (include_subproject) {
-      return this.doRequest<{ issues: Issue[] }>(
-        `/issues.json?status_id=open&project_id=${project_id}&subproject_id=!*`,
-        "GET"
-      );
-    } else {
-      return this.doRequest<{ issues: Issue[] }>(
-        `/issues.json?status_id=open&project_id=${project_id}`,
-        "GET"
-      );
-    }
+    const req = async (
+      offset = 0,
+      limit = 50,
+      count: number | null = null,
+      accumulator: Issue[] = []
+    ): Promise<Issue[]> => {
+      if (count !== null && count <= offset) {
+        return accumulator;
+      }
+
+      const baseUrl = include_subproject
+        ? `/issues.json?status_id=open&project_id=${project_id}&subproject_id=!*`
+        : `/issues.json?status_id=open&project_id=${project_id}`;
+
+      const response = await this.doRequest<{
+        issues: Issue[];
+        total_count: number;
+      }>(`${baseUrl}&limit=${limit}&offset=${offset}`, "GET");
+
+      const [totalCount, result]: [number, Issue[]] = [
+        response.total_count,
+        response.issues,
+      ];
+
+      return req(offset + limit, limit, totalCount, accumulator.concat(result));
+    };
+
+    const issues = await req();
+    return { issues };
   }
 
   compare(other: RedmineServer) {

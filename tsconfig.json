@@ -15,5 +15,5 @@
     "noUnusedParameters": true,
     "noImplicitReturns": true
   },
-  "exclude": ["node_modules", ".vscode-test", "test", "*.config.ts", "*.cjs"]
+  "exclude": ["node_modules", ".vscode-test", "test", "*.config.ts", "*.cjs", "*.mjs"]
 }

@@ -119,20 +119,16 @@ export class IssueController {
 
   private async quickUpdate() {
     let memberships: Membership[];
-    try {
-      memberships = await this.redmine.getMemberships(this.issue.project.id);
-    } catch (_error) {
-      vscode.window.showErrorMessage(
-        `Could not get memberships of project ${this.issue.project.name}`
-      );
-      return;
-    }
-
     let possibleStatuses: IssueStatus[];
     try {
-      possibleStatuses = await this.redmine.getIssueStatusesTyped();
+      [memberships, possibleStatuses] = await Promise.all([
+        this.redmine.getMemberships(this.issue.project.id),
+        this.redmine.getIssueStatusesTyped(),
+      ]);
     } catch (_error) {
-      vscode.window.showErrorMessage("Could not get possible issue statuses");
+      vscode.window.showErrorMessage(
+        "Could not fetch required data for quick update"
+      );
       return;
     }
 

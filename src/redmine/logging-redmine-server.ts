@@ -17,6 +17,7 @@ export class LoggingRedmineServer extends RedmineServer {
   private loggingConfig: LoggingConfig;
   private pendingByPath = new Map<string, Array<{ startTime: number; displayId: number }>>();
   private pendingBySymbol = new Map<symbol, { startTime: number; displayId: number }>();
+  private cleanupTimer?: NodeJS.Timeout;
 
   constructor(
     options: RedmineServerConnectionOptions,
@@ -26,6 +27,42 @@ export class LoggingRedmineServer extends RedmineServer {
     super(options);
     this.logger = new ApiLogger(outputChannel);
     this.loggingConfig = loggingConfig;
+
+    // Start periodic cleanup of stale entries (every 30s)
+    this.cleanupTimer = setInterval(() => {
+      this.cleanupStaleRequests();
+    }, 30000);
+  }
+
+  private cleanupStaleRequests(): void {
+    const now = Date.now();
+    const timeout = 60000; // 60s timeout
+
+    // Clean up stale entries in pendingByPath
+    for (const [key, queue] of this.pendingByPath.entries()) {
+      const filtered = queue.filter(entry => now - entry.startTime < timeout);
+      if (filtered.length === 0) {
+        this.pendingByPath.delete(key);
+      } else if (filtered.length !== queue.length) {
+        this.pendingByPath.set(key, filtered);
+      }
+    }
+
+    // Clean up stale entries in pendingBySymbol
+    for (const [symbol, metadata] of this.pendingBySymbol.entries()) {
+      if (now - metadata.startTime >= timeout) {
+        this.pendingBySymbol.delete(symbol);
+      }
+    }
+  }
+
+  dispose(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = undefined;
+    }
+    this.pendingByPath.clear();
+    this.pendingBySymbol.clear();
   }
 
   override doRequest<T>(
