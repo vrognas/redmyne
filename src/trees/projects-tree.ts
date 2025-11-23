@@ -14,6 +14,9 @@ export class ProjectsTree
   server?: RedmineServer;
   viewStyle: ProjectsViewStyle;
   projects: RedmineProject[] | null = null;
+  private isLoadingProjects = false;
+  private loadingIssuesForProject = new Set<number>();
+
   constructor() {
     // Don't initialize server here - will be set via setServer() when config is ready
     this.viewStyle = ProjectsViewStyle.LIST;
@@ -22,8 +25,15 @@ export class ProjectsTree
   onDidChangeTreeData$ = new vscode.EventEmitter<void>();
   onDidChangeTreeData: vscode.Event<void> = this.onDidChangeTreeData$.event;
   getTreeItem(
-    projectOrIssue: RedmineProject | Issue
+    projectOrIssue: RedmineProject | Issue | any
   ): vscode.TreeItem | Thenable<vscode.TreeItem> {
+    if (projectOrIssue.isLoadingPlaceholder) {
+      return new vscode.TreeItem(
+        projectOrIssue.message || "⏳ Loading...",
+        vscode.TreeItemCollapsibleState.None
+      );
+    }
+
     if (projectOrIssue instanceof RedmineProject) {
       return new vscode.TreeItem(
         projectOrIssue.toQuickPickItem().label,
@@ -46,7 +56,7 @@ export class ProjectsTree
   }
   async getChildren(
     projectOrIssue?: RedmineProject | Issue
-  ): Promise<(RedmineProject | Issue)[]> {
+  ): Promise<(RedmineProject | Issue | any)[]> {
     if (!this.server) {
       return [];
     }
@@ -56,24 +66,42 @@ export class ProjectsTree
       projectOrIssue !== undefined &&
       projectOrIssue instanceof RedmineProject
     ) {
-      if (this.viewStyle === ProjectsViewStyle.TREE) {
-        const subprojects: (RedmineProject | Issue)[] = (
-          this.projects ?? []
-        ).filter(
-          (project) => project.parent && project.parent.id === projectOrIssue.id
-        );
-        return subprojects.concat(
-          (await this.server.getOpenIssuesForProject(projectOrIssue.id, false))
-            .issues
-        );
+      if (this.loadingIssuesForProject.has(projectOrIssue.id)) {
+        return [{ isLoadingPlaceholder: true, message: "⏳ Loading issues..." }];
       }
 
-      return (await this.server.getOpenIssuesForProject(projectOrIssue.id))
-        .issues;
+      this.loadingIssuesForProject.add(projectOrIssue.id);
+      try {
+        if (this.viewStyle === ProjectsViewStyle.TREE) {
+          const subprojects: (RedmineProject | Issue)[] = (
+            this.projects ?? []
+          ).filter(
+            (project) => project.parent && project.parent.id === projectOrIssue.id
+          );
+          return subprojects.concat(
+            (await this.server.getOpenIssuesForProject(projectOrIssue.id, false))
+              .issues
+          );
+        }
+
+        return (await this.server.getOpenIssuesForProject(projectOrIssue.id))
+          .issues;
+      } finally {
+        this.loadingIssuesForProject.delete(projectOrIssue.id);
+      }
+    }
+
+    if (this.isLoadingProjects) {
+      return [{ isLoadingPlaceholder: true, message: "⏳ Loading projects..." }];
     }
 
     if (!this.projects || this.projects.length === 0) {
-      this.projects = await this.server.getProjects();
+      this.isLoadingProjects = true;
+      try {
+        this.projects = await this.server.getProjects();
+      } finally {
+        this.isLoadingProjects = false;
+      }
     }
 
     if (this.viewStyle === ProjectsViewStyle.TREE) {
