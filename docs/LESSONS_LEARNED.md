@@ -281,3 +281,45 @@
 2. **Match type to bundle format**: CJS bundle = no type field (or `"type": "commonjs"`)
 3. **Source ≠ output format**: TypeScript source can be ESM even with CJS output
 4. **Verify extension loads**: Test activation after package.json changes
+
+## v3.0.6 Git Hooks (2025-11-23)
+
+### Commit Message Validation Hook
+
+**Problem**: CI checks commit messages but gives no immediate feedback to agentic AI
+
+**Solution**: Pre-commit hook validates before commit completes
+
+**Implementation**:
+- `scripts/commit-msg`: Bash hook validates subject ≤ 50 chars, body ≤ 72 chars
+- `scripts/install-hooks.sh`: Copies hook to `.git/hooks/`
+- Tested with Vitest (7 tests, executes hook script)
+- Exception handling for merge/revert commits
+
+**Shell Script Gotchas**:
+- `#!/bin/sh` vs `#!/usr/bin/env bash`: Process substitution `< <(...)` requires bash
+- `wc -l` counts newlines, not lines: Use `grep -c ^` for reliable line counting
+- `read -r` without newline: Use `while read -r line || [ -n "$line" ]` pattern
+- Pipeline subshell: `tail | while` creates subshell, exit codes lost - use `< <(tail)`
+
+**Testing Strategy**:
+- Node.js tests (Vitest) execute bash script via `execSync`
+- Test both success (exit 0) and failure (exit 1) cases
+- Files without trailing newlines handled correctly
+- 98 total tests pass (91 existing + 7 new)
+
+**Benefits**:
+- Immediate feedback (< 1s vs CI ~30s)
+- Agentic AI learns from errors before push
+- Reduces CI failures
+- Enforces team conventions automatically
+
+### Lessons
+
+1. **Bash != POSIX sh**: Process substitution, arrays need `#!/usr/bin/env bash`
+2. **wc -l misleading**: Counts newlines, fails on files without trailing newline
+3. **read -r edge case**: Returns false on last line without newline - use `|| [ -n "$var" ]`
+4. **Pipeline exit codes**: Subshell in `pipe | while` loses exit status - use process substitution
+5. **Git hooks in repo**: Store in `scripts/`, install via script - can't track `.git/hooks/`
+6. **Test shell scripts from Node**: `execSync` throws on non-zero exit - wrap in `expect(() => ...).toThrow()`
+7. **Pre-commit > CI**: Hooks give faster feedback than CI checks (1s vs 30s)

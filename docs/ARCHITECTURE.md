@@ -377,8 +377,31 @@ User changes config or workspace folder
 - `compile`: Production build
 - `watch`: Development mode with auto-rebuild
 - `package`: Create VSIX file via `@vscode/vsce`
+- `typecheck`: TypeScript validation
+- `clean`: Remove build artifacts
+- `ci`: Full validation pipeline
 
 **TypeScript**: Configured via `tsconfig.json`, targets ES6.
+
+## Git Hooks
+
+**Location**: `scripts/` (tracked in repo), installed to `.git/hooks/`
+
+**Installation**: Run `scripts/install-hooks.sh` after clone
+
+**commit-msg Hook** (`scripts/commit-msg`):
+- Validates subject line ≤ 50 chars
+- Enforces blank line between subject and body
+- Validates body lines ≤ 72 chars
+- Exceptions: merge commits, revert commits
+- Provides immediate feedback before commit completes
+- Prevents CI failures due to commit message format
+
+**Benefits**:
+- Fast feedback (pre-commit vs CI)
+- Agentic AI-friendly (immediate validation)
+- Enforces conventional commit style
+- Reduces CI build failures
 
 ## Error Handling
 
