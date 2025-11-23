@@ -29,32 +29,34 @@ export class ProjectsTree implements vscode.TreeDataProvider<TreeItem> {
 
   onDidChangeTreeData$ = new vscode.EventEmitter<void>();
   onDidChangeTreeData: vscode.Event<void> = this.onDidChangeTreeData$.event;
-  getTreeItem(projectOrIssue: TreeItem): vscode.TreeItem | Thenable<vscode.TreeItem> {
-    if ("isLoadingPlaceholder" in projectOrIssue && projectOrIssue.isLoadingPlaceholder) {
+  getTreeItem(item: TreeItem): vscode.TreeItem | Thenable<vscode.TreeItem> {
+    if ("isLoadingPlaceholder" in item && item.isLoadingPlaceholder) {
       return new vscode.TreeItem(
-        projectOrIssue.message || "⏳ Loading...",
+        item.message || "⏳ Loading...",
         vscode.TreeItemCollapsibleState.None
       );
     }
 
-    if (projectOrIssue instanceof RedmineProject) {
+    if (item instanceof RedmineProject) {
       return new vscode.TreeItem(
-        projectOrIssue.toQuickPickItem().label,
+        item.toQuickPickItem().label,
         vscode.TreeItemCollapsibleState.Collapsed
       );
     } else {
-      const item = new vscode.TreeItem(
-        `#${projectOrIssue.id} [${projectOrIssue.tracker.name}] (${projectOrIssue.status.name}) ${projectOrIssue.subject} by ${projectOrIssue.author.name}`,
+      // Type narrowed to Issue here
+      const issue = item as Issue;
+      const treeItem = new vscode.TreeItem(
+        `#${issue.id} [${issue.tracker.name}] (${issue.status.name}) ${issue.subject} by ${issue.author.name}`,
         vscode.TreeItemCollapsibleState.None
       );
 
-      item.command = {
+      treeItem.command = {
         command: "redmine.openActionsForIssue",
-        arguments: [false, { server: this.server }, `${projectOrIssue.id}`],
-        title: `Open actions for issue #${projectOrIssue.id}`,
+        arguments: [false, { server: this.server }, `${issue.id}`],
+        title: `Open actions for issue #${issue.id}`,
       };
 
-      return item;
+      return treeItem;
     }
   }
   async getChildren(projectOrIssue?: TreeItem): Promise<TreeItem[]> {

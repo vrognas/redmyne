@@ -18,26 +18,28 @@ export class MyIssuesTree implements vscode.TreeDataProvider<TreeItem> {
 
   onDidChangeTreeData$ = new vscode.EventEmitter<void>();
   onDidChangeTreeData: vscode.Event<void> = this.onDidChangeTreeData$.event;
-  getTreeItem(issue: TreeItem): vscode.TreeItem | Thenable<vscode.TreeItem> {
-    if ("isLoadingPlaceholder" in issue && issue.isLoadingPlaceholder) {
+  getTreeItem(item: TreeItem): vscode.TreeItem | Thenable<vscode.TreeItem> {
+    if ("isLoadingPlaceholder" in item && item.isLoadingPlaceholder) {
       return new vscode.TreeItem(
         "⏳ Loading issues...",
         vscode.TreeItemCollapsibleState.None
       );
     }
 
-    const item = new vscode.TreeItem(
+    // Type narrowed to Issue here
+    const issue = item as Issue;
+    const treeItem = new vscode.TreeItem(
       `#${issue.id} [${issue.tracker.name}] (${issue.status.name}) ${issue.subject} by ${issue.author.name}`,
       vscode.TreeItemCollapsibleState.None
     );
 
-    item.command = {
+    treeItem.command = {
       command: "redmine.openActionsForIssue",
       arguments: [false, { server: this.server }, `${issue.id}`],
       title: `Open actions for issue #${issue.id}`,
     };
 
-    return item;
+    return treeItem;
   }
   async getChildren(_element?: TreeItem): Promise<TreeItem[]> {
     if (!this.server) {
