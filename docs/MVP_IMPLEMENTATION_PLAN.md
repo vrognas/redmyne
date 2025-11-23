@@ -10,20 +10,20 @@
 
 | MVP | Priority | Value | Complexity | API Changes |
 |-----|----------|-------|------------|-------------|
-| **MVP-1: Timeline Risk Indicators** | P0 | HIGH | LOW | None (uses existing due_date) |
-| **MVP-2: Spent Hours Display** | P0 | HIGH | LOW | Query param only |
+| **MVP-1: Flexibility Score & Timeline** | P0 | HIGH | MEDIUM | None (uses existing fields) |
+| **MVP-2: Spent Hours Display** | P0 | HIGH | LOW | None (field included by default) |
 | **MVP-3: Time Entry Viewing** | P1 | HIGH | MEDIUM | New endpoint |
 | **MVP-4: Quick Time Logging** | P1 | MEDIUM | LOW | None (uses existing) |
 
 ---
 
-## MVP-1: Timeline Risk Indicators
+## MVP-1: Flexibility Score & Timeline
 
 ### Problem
-Cannot see deadline urgency or prioritize daily work. Issues with approaching deadlines invisible in UI.
+Cannot see planning quality or deadline urgency. Issues with tight timelines or approaching deadlines invisible in UI.
 
 ### Solution
-Visual risk indicators showing days remaining until due_date in issue tree items.
+Calculate "flexibility score" showing buffer percentage based on working hours configuration. Displays both estimated hours and flexibility to enable daily work prioritization.
 
 ### Redmine API Reference
 
@@ -32,13 +32,76 @@ Visual risk indicators showing days remaining until due_date in issue tree items
 {
   "issue": {
     "id": 123,
-    "due_date": "2025-11-26",  // ✅ Already fetched
-    "start_date": "2025-11-20" // ✅ Already fetched
+    "due_date": "2025-11-26",      // ✅ Already fetched
+    "start_date": "2025-11-20",    // ✅ Already fetched
+    "estimated_hours": 16.0,       // ✅ Already fetched
+    "created_on": "2025-11-18"     // ✅ Fallback if no start_date
   }
 }
 ```
 
 Source: [Rest Issues API](https://www.redmine.org/projects/redmine/wiki/Rest_Issues)
+
+### Flexibility Formula
+
+```typescript
+flexibility = (available_time / estimated_time - 1) * 100
+
+where:
+  available_time = working_days * hours_per_day
+  working_days = count_working_days(start_date, due_date, working_days_config)
+  estimated_time = estimated_hours
+```
+
+**Interpretation**:
+- **0%** = No buffer (perfectly tight planning)
+- **+60%** = 60% extra time (comfortable buffer)
+- **-20%** = Need 20% more time (overbooked)
+
+**Examples**:
+```
+Available: 8h,  Estimated: 5h  → (8/5 - 1) = 0.6 = +60% buffer
+Available: 40h, Estimated: 16h → (40/16 - 1) = 1.5 = +150% buffer
+Available: 8h,  Estimated: 8h  → (8/8 - 1) = 0.0 = 0% buffer (tight)
+Available: 16h, Estimated: 20h → (16/20 - 1) = -0.2 = -20% (overbooked)
+```
+
+### Configuration
+
+**New settings** (package.json contributions):
+```jsonc
+{
+  "redmine.workingHours.hoursPerDay": {
+    "type": "number",
+    "default": 8,
+    "minimum": 1,
+    "maximum": 24,
+    "description": "Working hours per day for flexibility calculation"
+  },
+  "redmine.workingHours.workingDays": {
+    "type": "array",
+    "items": {
+      "type": "string",
+      "enum": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    },
+    "default": ["Mon", "Tue", "Wed", "Thu", "Fri"],
+    "description": "Working days of the week (excludes weekends/off-days)"
+  },
+  "redmine.timeline.enabled": {
+    "type": "boolean",
+    "default": true,
+    "description": "Show flexibility score and timeline indicators"
+  }
+}
+```
+
+**Consultant config example**:
+```json
+{
+  "redmine.workingHours.hoursPerDay": 8,
+  "redmine.workingHours.workingDays": ["Mon", "Tue", "Wed", "Thu"]
+}
+```
 
 ### UI Design
 
@@ -49,61 +112,126 @@ Fix authentication bug                 #123
 
 **New display:**
 ```
-Fix authentication bug          🔴 3d  #123
-Add reporting feature           🟡 7d  #456
-Database optimization          🟢 21d  #789
-Client documentation                   #999  (no due date)
+Fix auth bug              16h +150% 🟢  #123
+Add reporting             8h  +0%   🟡  #456
+Database optimization     20h -20%  🔴  #789
+Client docs                            #999  (no estimate/due date)
 ```
+
+**Format**: `{estimated}h {+/-}{flexibility}% {icon}`
 
 **Tooltip on hover:**
 ```
-Due: 2025-11-26 (3 days remaining)
-Status: Urgent
+Issue #123: Fix auth bug
+────────────────────────────────
+Timeline: Mon Nov 20 → Fri Nov 24 (5 calendar days)
+Working days: 4 (Mon, Tue, Wed, Thu)
+Available: 32h (4 days × 8h/day)
+Estimated: 16h
+
+Flexibility: +100% buffer (2× effective time)
+Planning: Comfortable 🟢
 ```
 
-### Risk Algorithm
+### Risk Levels
 
 ```typescript
-function getRiskLevel(issue: Issue): { level: RiskLevel; days: number | null } {
-  if (!issue.due_date) return { level: 'none', days: null };
-
-  const daysRemaining = Math.ceil(
-    (new Date(issue.due_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-  );
-
-  let level: RiskLevel;
-  if (daysRemaining < 0) level = 'overdue';      // 🔴 red
-  else if (daysRemaining <= 3) level = 'urgent'; // 🔴 red
-  else if (daysRemaining <= 7) level = 'warning';// 🟡 yellow
-  else level = 'ok';                              // 🟢 green
-
-  return { level, days: daysRemaining };
-}
+flexibility < 0%      → 🔴 OVERBOOKED (impossible timeline)
+flexibility = 0%      → 🟡 TIGHT (no buffer, need every minute)
+flexibility < 20%     → 🟡 LIMITED (minimal buffer)
+flexibility < 50%     → 🟢 SOME (decent buffer)
+flexibility >= 50%    → 🟢 COMFORTABLE (healthy buffer)
 ```
 
-**Thresholds (hardcoded in MVP):**
-- Overdue: < 0 days
-- Urgent: ≤ 3 days
-- Warning: ≤ 7 days
-- OK: > 7 days
+**Color coding examples**:
+```
+20h -20% 🔴  (need 20% more time - impossible)
+8h  +0%  🟡  (need every working minute)
+8h  +15% 🟡  (15% buffer - tight)
+16h +45% 🟢  (45% buffer - some)
+16h +150% 🟢 (150% buffer - very comfortable)
+```
+
+### Working Days Calculation
+
+```typescript
+function countWorkingDays(
+  start: Date,
+  end: Date,
+  workingDays: string[]  // ["Mon", "Tue", "Wed", "Thu"]
+): number {
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  let count = 0;
+  const current = new Date(start);
+
+  while (current <= end) {
+    const dayName = dayNames[current.getDay()];
+    if (workingDays.includes(dayName)) {
+      count++;
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  return count;
+}
+
+// Example: Mon Nov 20 → Sun Nov 26, working ["Mon","Tue","Wed","Thu"]
+// Counts: Mon(20)✓, Tue(21)✓, Wed(22)✓, Thu(23)✓, Fri(24)✗, Sat(25)✗, Sun(26)✗
+// Result: 4 working days
+```
 
 ### Implementation Plan
 
-1. **Modify**: `/src/utilities/tree-item-factory.ts`
-   - Add `getRiskIndicator(issue: Issue): string` helper
-   - Update `createIssueTreeItem()` to append risk to description
-   - Add tooltip with full details
+1. **Add configuration types**: `/src/definitions/redmine-config.ts`
+   ```typescript
+   export interface WorkingHoursConfig {
+     hoursPerDay: number;
+     workingDays: string[];
+   }
+   ```
 
-2. **Test**: `/test/unit/utilities/tree-item-factory.test.ts`
-   - Test 1: No due_date → no indicator
-   - Test 2: Overdue (-2d) → 🔴 -2d
-   - Test 3: Urgent (3d) → 🔴 3d
-   - Test 4: Warning (7d) → 🟡 7d
-   - Test 5: OK (21d) → 🟢 21d
+2. **Add helpers**: `/src/utilities/flexibility-calculator.ts` (new file)
+   ```typescript
+   export function countWorkingDays(start: Date, end: Date, workingDays: string[]): number
+   export function calculateFlexibility(issue: Issue, config: WorkingHoursConfig): FlexibilityScore | null
+   export interface FlexibilityScore {
+     flexibility: number;      // Percentage (-20, 0, 60, 150, etc.)
+     available: number;        // Available hours
+     estimated: number;        // Estimated hours
+     workingDays: number;      // Working days count
+     level: 'overbooked' | 'tight' | 'limited' | 'some' | 'comfortable';
+   }
+   ```
 
-3. **Update docs**:
-   - CHANGELOG.md: "feat: timeline risk indicators"
-   - README.md: Add screenshot + description
+3. **Modify**: `/src/utilities/tree-item-factory.ts`
+   - Accept `WorkingHoursConfig` parameter
+   - Call `calculateFlexibility(issue, config)`
+   - Update description format: `{est}h {+/-}{flex}%`
+   - Add icon based on risk level
+   - Add detailed tooltip
+
+4. **Update tree providers**: `/src/trees/my-issues-tree.ts`, `/src/trees/projects-tree.ts`
+   - Read configuration from workspace settings
+   - Pass config to `createIssueTreeItem()`
+
+5. **Add to package.json**: Configuration schema (see Configuration section above)
+
+6. **Write tests**: `/test/unit/utilities/flexibility-calculator.test.ts` (new file)
+   - Test 1: Count working days (exclude weekends)
+   - Test 2: Positive flexibility (+60%)
+   - Test 3: Zero flexibility (0%)
+   - Test 4: Negative flexibility (-20%)
+   - Test 5: No due_date/estimated_hours → null
+   - Test 6: Risk level assignment
+
+7. **Update tree-item-factory tests**: `/test/unit/utilities/tree-item-factory.test.ts`
+   - Test flexibility display formatting
+   - Test icon selection
+   - Test tooltip content
+
+8. **Update docs**:
+   - CHANGELOG.md: "feat: flexibility score and timeline indicators"
+   - README.md: Add configuration section + screenshots
    - Bump version: 3.2.0 (minor)
 
 ### Edge Cases
@@ -111,21 +239,26 @@ function getRiskLevel(issue: Issue): { level: RiskLevel; days: number | null } {
 | Scenario | Behavior |
 |----------|----------|
 | No due_date | No indicator (preserve current display) |
+| No estimated_hours | No indicator (can't calculate) |
+| No start_date | Use created_on as fallback |
+| Zero working days | Display "🔴 -100%" (weekend-only timeline) |
 | Invalid date | No indicator (fail gracefully) |
-| Due today | 🔴 0d |
-| Far future (>365d) | 🟢 365d |
+| estimated_hours = 0 | Invalid data, skip (instantaneous work impossible) |
 
-### Out of Scope (Future v2)
+### Out of Scope (Future v2+)
 
-- Configurable thresholds
-- Sorting by urgency
-- Workload calculation (requires spent_hours)
-- Buffer visualization (due_date - start_date - work_remaining)
+- Progress tracking with spent_hours (separate feature)
+- Configurable risk thresholds
+- Sorting by flexibility/urgency
+- Remaining flexibility (current vs initial)
+- Target flexibility comparison
 
 ### Estimated Effort
-- Implementation: ~50 LOC
-- Tests: ~80 LOC
-- Total: 2-3 hours
+- Configuration: ~20 LOC
+- Flexibility calculator: ~60 LOC
+- Tree item integration: ~40 LOC
+- Tests: ~120 LOC
+- Total: **4-5 hours**
 
 ---
 
@@ -583,7 +716,7 @@ Source: [Rest TimeEntries](https://www.redmine.org/projects/redmine/wiki/Rest_Ti
 2. Input prompt shows: "Log time to #123: Fix auth bug (2.5|comment)"
 
 **Flow (power user with keybinding - 1-2 steps)**:
-1. Press `Ctrl+Alt+T` → prompt appears
+1. Press `Ctrl+K Ctrl+T` (chord) → prompt appears
 2. Enter "2.5|Fixed bug" → done
 
 ### Smart Defaults
@@ -696,8 +829,8 @@ interface RecentTimeLog {
      "keybindings": [
        {
          "command": "redmine.quickLogTime",
-         "key": "ctrl+alt+t",
-         "mac": "cmd+alt+t"
+         "key": "ctrl+k ctrl+t",
+         "mac": "cmd+k cmd+t"
        }
      ]
    }
@@ -782,13 +915,13 @@ async function pickIssueAndActivity(server: RedmineServer): Promise<{
 
 ## Implementation Sequence
 
-### Phase 1: Timeline & Hours (Week 1)
-1. **MVP-1**: Timeline Risk Indicators (2-3h)
+### Phase 1: Flexibility & Hours (Week 1)
+1. **MVP-1**: Flexibility Score & Timeline (4-5h)
 2. **MVP-2**: Spent Hours Display (1-2h)
 3. Testing + documentation (2h)
 4. **Release**: v3.2.0
 
-**Value**: Immediate daily work prioritization
+**Value**: Immediate daily work prioritization with planning quality insights
 
 ### Phase 2: Time Tracking (Week 2)
 1. **MVP-3**: Time Entry Viewing (4-6h)
@@ -799,10 +932,10 @@ async function pickIssueAndActivity(server: RedmineServer): Promise<{
 **Value**: Complete time tracking workflow in IDE
 
 ### Total Estimated Effort
-- Implementation: ~15-17 hours
-- Testing: ~5-6 hours
+- Implementation: ~17-20 hours
+- Testing: ~5-7 hours
 - Documentation: ~2-3 hours
-- **Total**: ~22-26 hours (3-4 days)
+- **Total**: ~24-30 hours (3-4 days)
 
 ---
 
@@ -875,27 +1008,39 @@ async function pickIssueAndActivity(server: RedmineServer): Promise<{
 
 ---
 
-## Unresolved Questions
+## Decisions Made
 
-### MVP-1: Timeline Risk
-1. Should overdue issues sort to top automatically?
-2. Include start_date in tooltip?
-3. Configuration for thresholds in v2?
+### MVP-1: Flexibility Score ✅
+- Formula: `(available_time / estimated_time - 1) * 100`
+- Shows buffer percentage directly (0% = tight, +60% = 60% buffer, -20% = overbooked)
+- Working hours config: 8h/day, Mon-Thu for consultant
+- Excludes weekends from working days calculation
 
-### MVP-2: Spent Hours
-1. Use total_spent_hours (with subtasks) or spent_hours (issue only)?
-2. Display format preference: "3.5/8h" vs "3.5h/8h" vs "44%"?
-3. Color coding for over-budget?
+### MVP-2: Spent Hours ✅
+- Use `spent_hours` (issue only, not subtasks)
+- Display format: "3.5/8h" (spent/estimated)
+- Color coding for over-budget: Yes (append `!` if spent > estimated)
+
+### MVP-3: Time Entries ✅
+- Empty state: "No time logged today" placeholder
+- Refresh strategy: Auto-refresh after logging
+- Max entries: 100 per group initially
+
+### MVP-4: Quick Logging ✅
+- Keyboard shortcut: `Ctrl+K Ctrl+T` (chord, avoids GlazeWM conflict)
+- State scope: globalState (cross-workspace)
+- Recent issue limit: 5 (LRU cache)
+
+## Remaining Questions
+
+### MVP-1: Flexibility Score
+1. Should issues without flexibility score (no due_date/estimate) appear at bottom of list?
+2. Include start_date in tooltip or just working days calculation?
+3. Default working hours for users without config?
 
 ### MVP-3: Time Entries
-1. Empty state message: "No time logged" or "Click to log time"?
-2. Refresh strategy: manual only or auto-refresh after logging?
-3. Max entries per group: 100 or unlimited with pagination?
-
-### MVP-4: Quick Logging
-1. Keyboard shortcut: Ctrl+Alt+T or different binding?
-2. State scope: globalState (cross-workspace) or workspaceState?
-3. Recent issue limit: 1 (MVP) or 5 (more useful)?
+1. Grouping preference: by date only, or add "by project" option?
+2. Click action on time entry: open issue or dedicated time entry menu?
 
 ---
 
