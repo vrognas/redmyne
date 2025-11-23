@@ -71,6 +71,17 @@ This extension contributes the following settings:
 
 - `redmine.additionalHeaders`: Object of additional headers to be sent along with every request to redmine server
 
+## Development Setup
+
+After cloning:
+
+```bash
+npm install
+npm run install-hooks
+```
+
+Git hooks validate commit messages (subject ≤50 chars, body ≤72 chars).
+
 ## Contribution
 
 If you want to contribute to the project, please read [contributing guide](./CONTRIBUTING.md) guide.

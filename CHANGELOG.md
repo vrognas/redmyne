@@ -4,6 +4,21 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ## [Unreleased]
 
+## [3.0.6] - 2025-11-23
+
+### Added
+
+- Commit message validation hook (scripts/commit-msg)
+- Hook installation script (scripts/install-hooks.sh)
+- Commit message tests (7 new tests, 98 total)
+
+### Changed
+
+- Subject line limited to 50 chars
+- Body lines limited to 72 chars
+- Blank line enforced between subject and body
+- Exceptions for merge and revert commits
+
 ## [3.0.5] - 2025-11-23
 
 ### Added

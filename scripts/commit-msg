@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+#
+# Commit message validation hook
+# Validates:
+# - Subject line <= 50 chars
+# - Blank line between subject and body
+# - Body lines <= 72 chars
+# - Exceptions: merge commits, revert commits
+
+commit_msg_file="$1"
+
+# Read first line (subject)
+subject=$(head -n 1 "$commit_msg_file")
+
+# Allow merge commits
+if echo "$subject" | grep -q "^Merge"; then
+  exit 0
+fi
+
+# Allow revert commits
+if echo "$subject" | grep -q "^Revert"; then
+  exit 0
+fi
+
+# Validate subject length (≤ 50)
+subject_len=$(echo -n "$subject" | wc -c)
+if [ "$subject_len" -gt 50 ]; then
+  echo >&2 "ERROR: Commit subject exceeds 50 characters ($subject_len)"
+  echo >&2 "Subject: $subject"
+  exit 1
+fi
+
+# Count lines more reliably (handles files with/without trailing newline)
+line_count=$(grep -c ^ "$commit_msg_file" || true)
+
+# Check for blank line between subject and body (if body exists)
+if [ "$line_count" -gt 1 ]; then
+  second_line=$(sed -n '2p' "$commit_msg_file")
+  if [ -n "$second_line" ]; then
+    echo >&2 "ERROR: Missing blank line between subject and body"
+    echo >&2 "Second line should be empty, found: $second_line"
+    exit 1
+  fi
+fi
+
+# Validate body lines (≤ 72 chars), starting from line 3
+if [ "$line_count" -gt 2 ]; then
+  # Use process substitution to avoid subshell issue with while loop
+  # The || [ -n "$line" ] handles files without trailing newline
+  while IFS= read -r line || [ -n "$line" ]; do
+    line_len=$(echo -n "$line" | wc -c)
+    if [ "$line_len" -gt 72 ]; then
+      echo >&2 "ERROR: Body line exceeds 72 characters ($line_len)"
+      echo >&2 "Line: $line"
+      exit 1
+    fi
+  done < <(tail -n +3 "$commit_msg_file")
+fi
+
+exit 0

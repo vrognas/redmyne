@@ -2,7 +2,7 @@
   "name": "positron-redmine",
   "displayName": "Redmine for Positron",
   "description": "Redmine project management integration for Positron IDE and VS Code",
-  "version": "3.0.5",
+  "version": "3.0.6",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -225,7 +225,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "ci": "npm run lint && npm run typecheck && npm run test:coverage"
+    "ci": "npm run lint && npm run typecheck && npm run test:coverage",
+    "install-hooks": "bash scripts/install-hooks.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
