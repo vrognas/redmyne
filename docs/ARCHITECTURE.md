@@ -223,20 +223,17 @@ getChildren(project) → Subprojects + issues for that project
 **Actions**:
 
 1. **changeStatus()**:
-
    - Fetches available statuses
    - Shows quick pick
    - Calls `RedmineServer.setIssueStatus()`
 
 2. **addTimeEntry()**:
-
    - Fetches activity types (Development, Testing, etc.)
    - Prompts for activity via `chooseTimeEntryType()`
    - Prompts for `hours|message` format via `setTimeEntryMessage()`
    - Calls `RedmineServer.addTimeEntry()`
 
 3. **openInBrowser()**:
-
    - Constructs issue URL: `{server}/issues/{id}`
    - Opens via `vscode.open` command
 
@@ -439,11 +436,12 @@ Migration handled in `src/extension.ts:96-129`.
 - Request body logging (200 char truncation, redacted)
 - Response size tracking in bytes
 - Query parameter truncation (>100 chars)
-- Binary content detection (image/*, application/pdf)
+- Binary content detection (image/\*, application/pdf)
 - Error response body logging (always shown, redacted)
 - Sensitive data redaction (password, api_key, token, secret, auth)
 
 **Example**:
+
 ```
 [14:23:45.123] [1] POST /users.json
   Body: {"user":{"login":"admin","password":"***"}}
@@ -453,6 +451,7 @@ Migration handled in `src/extension.ts:96-129`.
 ```
 
 **Commands**:
+
 - `redmine.showApiOutput` - Reveal output channel
 - `redmine.clearApiOutput` - Clear logs
 - `redmine.toggleApiLogging` - Enable/disable at runtime
@@ -487,6 +486,7 @@ Migration handled in `src/extension.ts:96-129`.
 **Test Framework**: Vitest with MSW (Mock Service Worker) for HTTP mocking.
 
 **Coverage**:
+
 - Unit tests for `RedmineServer` methods (HTTP mocked via MSW)
 - Unit tests for commands (`setApiKey`, domain utilities)
 - Unit tests for utilities (`RedmineSecretManager`, error handling)
