@@ -95,6 +95,39 @@ export class RedmineServer {
     this.setOptions(options);
   }
 
+  /**
+   * Hook called before successful response resolution.
+   * Override in subclasses to capture response metadata for logging.
+   */
+  protected onResponseSuccess(
+    _statusCode: number | undefined,
+    _statusMessage: string | undefined,
+    _path: string,
+    _method: HttpMethods,
+    _requestBody?: Buffer,
+    _responseBody?: Buffer,
+    _contentType?: string
+  ): void {
+    // No-op by default, child classes can override
+  }
+
+  /**
+   * Hook called before error rejection.
+   * Override in subclasses to capture error metadata for logging.
+   */
+  protected onResponseError(
+    _statusCode: number | undefined,
+    _statusMessage: string | undefined,
+    _error: Error,
+    _path: string,
+    _method: HttpMethods,
+    _requestBody?: Buffer,
+    _responseBody?: Buffer,
+    _contentType?: string
+  ): void {
+    // No-op by default, child classes can override
+  }
+
   doRequest<T>(path: string, method: HttpMethods, data?: Buffer): Promise<T> {
     const { url, key, additionalHeaders, rejectUnauthorized } = this.options;
     const options: https.RequestOptions = {
@@ -122,44 +155,54 @@ export class RedmineServer {
 
       const handleEnd = (clientResponse: http.IncomingMessage) => () => {
         const { statusCode, statusMessage } = clientResponse;
+        const contentType = clientResponse.headers?.["content-type"];
+
         if (statusCode === 401) {
-          reject(
-            new Error(
-              "Server returned 401 (perhaps your API Key is not valid, or your server has additional authentication methods?)"
-            )
+          const error = new Error(
+            "Server returned 401 (perhaps your API Key is not valid, or your server has additional authentication methods?)"
           );
+          this.onResponseError(statusCode, statusMessage, error, path, method, data, incomingBuffer, contentType);
+          reject(error);
           return;
         }
         if (statusCode === 403) {
-          reject(
-            new Error(
-              "Server returned 403 (perhaps you haven't got permissions?)"
-            )
+          const error = new Error(
+            "Server returned 403 (perhaps you haven't got permissions?)"
           );
+          this.onResponseError(statusCode, statusMessage, error, path, method, data, incomingBuffer, contentType);
+          reject(error);
           return;
         }
         if (statusCode === 404) {
-          reject(new Error("Resource doesn't exist"));
+          const error = new Error("Resource doesn't exist");
+          this.onResponseError(statusCode, statusMessage, error, path, method, data, incomingBuffer, contentType);
+          reject(error);
           return;
         }
 
         // TODO: Other errors handle
         if (statusCode && statusCode >= 400) {
-          reject(new Error(`Server returned ${statusMessage}`));
+          const error = new Error(`Server returned ${statusMessage}`);
+          this.onResponseError(statusCode, statusMessage, error, path, method, data, incomingBuffer, contentType);
+          reject(error);
           return;
         }
 
         if (incomingBuffer.length > 0) {
           try {
             const object = JSON.parse(incomingBuffer.toString("utf8"));
+            this.onResponseSuccess(statusCode, statusMessage, path, method, data, incomingBuffer, contentType);
             resolve(object);
           } catch (_e) {
-            reject(new Error("Couldn't parse Redmine response as JSON..."));
+            const error = new Error("Couldn't parse Redmine response as JSON...");
+            this.onResponseError(statusCode, statusMessage, error, path, method, data, incomingBuffer, contentType);
+            reject(error);
           }
           return;
         }
 
         // Using `doRequest` on the endpoints that return 204 should type as void/null
+        this.onResponseSuccess(statusCode, statusMessage, path, method, data, incomingBuffer, contentType);
         resolve(null as unknown as T);
       };
 
@@ -169,9 +212,11 @@ export class RedmineServer {
       });
 
       const handleError = (error: Error) => {
-        reject(
-          new Error(`NodeJS Request Error (${error.name}): ${error.message}`)
+        const wrappedError = new Error(
+          `NodeJS Request Error (${error.name}): ${error.message}`
         );
+        this.onResponseError(undefined, undefined, wrappedError, path, method, data);
+        reject(wrappedError);
       };
 
       clientRequest.on("error", handleError);

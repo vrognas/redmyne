@@ -420,21 +420,36 @@ Migration handled in `src/extension.ts:96-129`.
 
 **Purpose**: Debug API interactions via VS Code output channel.
 
-**Architecture**: Decorator pattern wraps `RedmineServer.doRequest()`.
+**Architecture**: Decorator pattern with protected hooks in `RedmineServer`.
 
 **Components**:
-- `ApiLogger` (`src/utilities/api-logger.ts`): Formats log entries
+
+- `ApiLogger` (`src/utilities/api-logger.ts`): Formats log entries, redacts sensitive data
 - `LoggingRedmineServer` (`src/redmine/logging-redmine-server.ts`): Decorator extending `RedmineServer`
+- `redaction.ts` (`src/utilities/redaction.ts`): Redacts sensitive fields from JSON
+- Protected hooks in `RedmineServer`: `onResponseSuccess()`, `onResponseError()`
 - Output channel: "Redmine API" (created in `extension.ts:26`)
 
 **Configuration**: `redmine.logging.enabled` (boolean, default: true)
 
-**Log Format**: `[HH:MM:SS.mmm] [counter] METHOD path → status (duration)`
+**Log Format**: `[HH:MM:SS.mmm] [counter] METHOD path → status (duration) sizeB [binary]`
+
+**Features**:
+
+- Request body logging (200 char truncation, redacted)
+- Response size tracking in bytes
+- Query parameter truncation (>100 chars)
+- Binary content detection (image/*, application/pdf)
+- Error response body logging (always shown, redacted)
+- Sensitive data redaction (password, api_key, token, secret, auth)
 
 **Example**:
 ```
-[14:23:45.123] [1] GET /issues/123.json
-[14:23:45.265] [1] → 200 (142ms)
+[14:23:45.123] [1] POST /users.json
+  Body: {"user":{"login":"admin","password":"***"}}
+[14:23:45.265] [1] → 201 (142ms) 85B
+[14:23:46.100] [2] GET /avatar.png
+[14:23:46.234] [2] → 200 (134ms) 2048B [binary]
 ```
 
 **Commands**:
@@ -442,7 +457,7 @@ Migration handled in `src/extension.ts:96-129`.
 - `redmine.clearApiOutput` - Clear logs
 - `redmine.toggleApiLogging` - Enable/disable at runtime
 
-**Implementation**: When logging enabled, `createServer()` returns `LoggingRedmineServer` instead of `RedmineServer` (extension.ts:30-44). Zero overhead when disabled.
+**Implementation**: When logging enabled, `createServer()` returns `LoggingRedmineServer` instead of `RedmineServer` (extension.ts:30-44). Protected hooks allow child class to capture response metadata without modifying return values. Zero overhead when disabled.
 
 ## Dependencies
 
