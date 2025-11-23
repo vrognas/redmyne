@@ -34,16 +34,33 @@ Calculate TWO flexibility scores: **initial** (planning quality - static) and **
 {
   "issue": {
     "id": 123,
-    "due_date": "2025-11-26",      // ✅ Already fetched
-    "start_date": "2025-11-20",    // ✅ Already fetched
-    "estimated_hours": 16.0,       // ✅ Already fetched
-    "spent_hours": 3.5,            // ✅ Included by default (Redmine 3.3+)
-    "created_on": "2025-11-18"     // ✅ Fallback if no start_date
+    "due_date": "2025-11-26",           // ✅ Already fetched
+    "start_date": "2025-11-20",         // ✅ Already fetched
+    "estimated_hours": 16.0,            // ✅ Issue only
+    "spent_hours": 3.5,                 // ✅ Issue only
+    "total_estimated_hours": 20.0,      // ✅ Includes subtasks (Redmine 3.3+)
+    "total_spent_hours": 4.5,           // ✅ Includes subtasks (Redmine 3.3+)
+    "created_on": "2025-11-18",         // ✅ Fallback if no start_date
+    "status": { "id": 1, "name": "New", "is_closed": false }  // ✅ For filtering
   }
 }
 ```
 
-**Note**: `spent_hours` automatically included in Redmine 3.3+ (2016-09-25). No explicit `include` parameter needed.
+**CRITICAL DISTINCTIONS** (from API analysis):
+- **`spent_hours`**: Time logged on THIS issue only (excludes subtasks)
+- **`total_spent_hours`**: Time on issue + all subtasks (Redmine 3.3+)
+- **Use `total_spent_hours`** for accurate progress tracking
+- **Automatically included** in Redmine 3.3+ (2016-09-25), no `include` param needed
+- **List endpoint** (`GET /issues.json`): Returns both fields
+- **Single endpoint** (`GET /issues/123.json`): Returns both fields
+
+**GROUP ASSIGNMENTS** (affects "assigned to me" filtering):
+- Issues assigned to groups appear in "assigned to me" for group members
+- Use `assigned_to_id=me` to include both direct + group assignments
+
+**CLOSED ISSUES** (critical for workload):
+- Use `status.is_closed` flag to exclude from capacity calculations
+- Fetch statuses: `GET /issue_statuses.json` (cached)
 
 Source: [Rest Issues API](https://www.redmine.org/projects/redmine/wiki/Rest_Issues), [Feature #21757](https://www.redmine.org/issues/21757)
 
@@ -51,11 +68,12 @@ Source: [Rest Issues API](https://www.redmine.org/projects/redmine/wiki/Rest_Iss
 
 **1. Initial Flexibility (Planning Quality - Static)**
 ```typescript
-initial_flexibility = (available_time_total / estimated_hours - 1) * 100
+initial_flexibility = (available_time_total / total_estimated_hours - 1) * 100
 
 where:
   available_time_total = working_days_total * hours_per_day
   working_days_total = count_working_days(start_date, due_date, working_days_config)
+  total_estimated_hours = issue.total_estimated_hours || issue.estimated_hours || 0
 ```
 
 Shows: How well was this issue planned? Did we build in enough buffer?
@@ -67,7 +85,9 @@ remaining_flexibility = (available_time_remaining / work_remaining - 1) * 100
 where:
   available_time_remaining = working_days_remaining * hours_per_day
   working_days_remaining = count_working_days(TODAY, due_date, working_days_config)
-  work_remaining = max(estimated_hours - spent_hours, 0)
+  work_remaining = max(total_estimated_hours - total_spent_hours, 0)
+  total_estimated_hours = issue.total_estimated_hours || issue.estimated_hours || 0
+  total_spent_hours = issue.total_spent_hours || issue.spent_hours || 0
 ```
 
 Shows: Can I finish on time given current progress? What's the risk TODAY?
@@ -416,7 +436,7 @@ Client documentation               🟢 5d  #999  (no estimate)
 
 ---
 
-## MVP-3: Time Entry Viewing
+## MVP-2: Time Entry Viewing
 
 ### Problem
 Cannot verify logged time entries for billing accuracy. Must open browser to generate timesheets.
@@ -427,6 +447,11 @@ New tree view "My Time Entries" showing logged time grouped by date with totals.
 ### Redmine API Reference
 
 **New endpoint**: `GET /time_entries.json`
+
+**CRITICAL FINDING** (from API analysis):
+- **No server-side grouping**: Time entries returned as flat list
+- **Must group client-side**: By date, project, or activity
+- **Pagination required**: Max 100 entries per request (default 25)
 
 **Query parameters**:
 ```
@@ -724,21 +749,41 @@ Command palette shortcut that remembers last issue and activity for rapid re-log
 
 **Uses existing endpoint**: `POST /time_entries.json`
 
+**CRITICAL FINDINGS** (from API analysis):
+- **`activity_id` REQUIRED** unless server has default activity configured
+- **Fetch activities**: `GET /enumerations/time_entry_activities.json`
+- **Activity response**: `[{id, name, is_default}]`
+- **Comments max length**: 255 characters (truncate if longer)
+- **Date format**: YYYY-MM-DD for `spent_on` field
+- **Either issue_id OR project_id** required (not both)
+
 Request body:
 ```json
 {
   "time_entry": {
-    "issue_id": 123,
-    "hours": 2.5,
-    "activity_id": 8,
-    "comments": "Implemented login feature"
+    "issue_id": 123,              // REQUIRED (or project_id)
+    "hours": 2.5,                 // REQUIRED (decimal supported)
+    "activity_id": 8,             // REQUIRED (unless default exists)
+    "comments": "Implemented...", // OPTIONAL (max 255 chars)
+    "spent_on": "2025-11-23"      // OPTIONAL (defaults to today)
   }
+}
+```
+
+**Activity Fetch Example**:
+```json
+GET /enumerations/time_entry_activities.json
+Response: {
+  "time_entry_activities": [
+    {"id": 8, "name": "Development", "is_default": true},
+    {"id": 9, "name": "Testing", "is_default": false}
+  ]
 }
 ```
 
 No API changes needed.
 
-Source: [Rest TimeEntries](https://www.redmine.org/projects/redmine/wiki/Rest_TimeEntries)
+Source: [Rest TimeEntries](https://www.redmine.org/projects/redmine/wiki/Rest_TimeEntries), [Rest Enumerations](https://www.redmine.org/projects/redmine/wiki/Rest_Enumerations)
 
 ### UX Design
 
@@ -1101,12 +1146,90 @@ async function pickIssueAndActivity(server: RedmineServer): Promise<{
 
 ---
 
+## Future API Considerations
+
+Based on comprehensive analysis of all 22 Redmine REST API endpoints:
+
+### P2 Priority - Future MVPs
+
+**1. Issue Relations** (`GET /issues/{id}/relations.json`)
+- **Use case**: Show blocking/blocked issues in timeline view
+- **Impact on capacity**: Blocked issues shouldn't count as "available work"
+- **Display**: Add "🔴 BLOCKED by #456" indicator
+- **Effort**: 8-11h (MVP-5 candidate)
+- **Example**: `#123 Fix auth | 3.5/8h 2d +60% 🔴 BLOCKED by #456`
+
+**2. Saved Queries** (`GET /queries.json`, `GET /issues.json?query_id=X`)
+- **Use case**: Show user's custom saved queries as tree views
+- **Benefit**: Leverage existing Redmine filters without rebuilding
+- **Read-only**: Can't create queries via API (must use web)
+- **Effort**: 4-6h (MVP-6 candidate)
+
+**3. Custom Fields** (`GET /custom_fields.json`)
+- **Use case**: Support organization-specific time tracking fields
+- **Examples**:
+  - "Budget Hours" (override estimated_hours)
+  - "Target Completion Date" (more reliable than due_date)
+  - "Billable Category" (billing workflow)
+- **Configuration**: Map field names in settings
+- **Limitation**: Requires admin access to fetch definitions
+- **Effort**: 6-8h (MVP-7 candidate)
+
+**4. Issue Picker with Search** (`GET /search.xml?q=<query>`)
+- **Use case**: Quick issue lookup in time logging UI
+- **Enhancement**: Add search box to issue picker
+- **Performance**: Max 100 results, client-side pagination
+- **Effort**: 2-3h (enhancement to MVP-3)
+
+**5. Version/Milestone Planning** (`GET /projects/{id}/versions`)
+- **Use case**: Group workload by version/milestone
+- **Timeline**: Show version due dates alongside issue deadlines
+- **Effort**: 3-4h (MVP-8 candidate)
+
+### Not Relevant for Extension
+
+Based on analysis, these APIs have **no connection** to time tracking or issue management:
+- News API - Project announcements
+- WikiPages API - Documentation management
+- Attachments API - File uploads
+- Files API - Project files
+- Issue Categories API - Taxonomic grouping only
+
+### Critical Constraints Identified
+
+**Closed Issues Filtering**:
+- **MUST use `status.is_closed` flag** to exclude from workload
+- Fetch statuses: `GET /issue_statuses.json` (cache result)
+- Filter pattern:
+  ```typescript
+  const closedIds = statuses.filter(s => s.is_closed).map(s => s.id);
+  const openIssues = issues.filter(i => !closedIds.includes(i.status.id));
+  ```
+
+**Group Assignments**:
+- Issues assigned to groups appear in "assigned to me" for group members
+- `assigned_to_id=me` includes both direct + group assignments
+- No additional filtering needed
+
+**Pagination Limits**:
+- Default: 25 items per request
+- Maximum: 100 items per request (hardcoded)
+- Large datasets require offset/limit loops
+
+**No Server-Side Aggregation**:
+- Time entry grouping: Client-side only
+- Workload totals: Must sum locally
+- Multi-project queries: Separate requests per project
+
+---
+
 ## Next Steps
 
 1. **Review this plan** with user
 2. **Answer unresolved questions**
 3. **Begin implementation** (MVP-1 first, TDD approach)
 4. **Iterate based on feedback** (each MVP can be released independently)
+5. **Consider P2 features** after v3.3.0 (Issue Relations, Saved Queries)
 
 ---
 
