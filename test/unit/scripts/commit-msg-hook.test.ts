@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { execSync } from "child_process";
-import { writeFileSync, unlinkSync, chmodSync } from "fs";
+import { writeFileSync, unlinkSync } from "fs";
 import { join } from "path";
 
 const HOOK_PATH = join(__dirname, "../../../scripts/commit-msg");
