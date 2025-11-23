@@ -32,3 +32,21 @@ export const EventEmitter = class {
 
 export const ProgressLocation = { Notification: 15 };
 export const ConfigurationTarget = { WorkspaceFolder: 3 };
+
+export const TreeItemCollapsibleState = {
+  None: 0,
+  Collapsed: 1,
+  Expanded: 2,
+};
+
+export class TreeItem {
+  label?: string;
+  description?: string;
+  command?: { command: string; arguments?: unknown[]; title: string };
+  collapsibleState?: number;
+
+  constructor(label: string, collapsibleState?: number) {
+    this.label = label;
+    this.collapsibleState = collapsibleState;
+  }
+}

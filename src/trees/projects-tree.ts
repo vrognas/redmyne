@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { RedmineServer } from "../redmine/redmine-server";
 import { RedmineProject } from "../redmine/redmine-project";
 import { Issue } from "../redmine/models/issue";
+import { createIssueTreeItem } from "../utilities/tree-item-factory";
 
 export enum ProjectsViewStyle {
   LIST = 0,
@@ -42,22 +43,11 @@ export class ProjectsTree implements vscode.TreeDataProvider<TreeItem> {
         item.toQuickPickItem().label,
         vscode.TreeItemCollapsibleState.Collapsed
       );
-    } else {
-      // Type narrowed to Issue here
-      const issue = item as Issue;
-      const treeItem = new vscode.TreeItem(
-        `#${issue.id} [${issue.tracker.name}] (${issue.status.name}) ${issue.subject} by ${issue.author.name}`,
-        vscode.TreeItemCollapsibleState.None
-      );
-
-      treeItem.command = {
-        command: "redmine.openActionsForIssue",
-        arguments: [false, { server: this.server }, `${issue.id}`],
-        title: `Open actions for issue #${issue.id}`,
-      };
-
-      return treeItem;
     }
+
+    // Type narrowed to Issue here
+    const issue = item as Issue;
+    return createIssueTreeItem(issue, this.server, "redmine.openActionsForIssue");
   }
   async getChildren(projectOrIssue?: TreeItem): Promise<TreeItem[]> {
     if (!this.server) {

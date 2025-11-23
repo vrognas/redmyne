@@ -4,10 +4,23 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ## [Unreleased]
 
+## [3.1.0] - 2025-11-23
+
 ### Changed
 
+- "Issues assigned to me" UI: simplified to "{Subject} #{id}"
+- "Projects" view issues: same simplified format as assigned issues
+- Issue number now rendered with reduced opacity (both views)
+- Refactored: shared `createIssueTreeItem()` utility (DRY)
 - eslint.config.js → eslint.config.mjs (eliminates Node.js warning)
 - tsconfig.json: added *.mjs to exclude list
+
+### Added
+
+- tree-item-factory utility for consistent issue display
+- MyIssuesTree tests (3 new tests)
+- ProjectsTree tests (4 new tests)
+- tree-item-factory tests (4 new tests, 109 total)
 
 ## [3.0.7] - 2025-11-23
 
