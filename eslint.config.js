@@ -23,7 +23,7 @@ export default [
   {
     files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {
-      ecmaVersion: 2020,
+      ecmaVersion: 2023,
       sourceType: "module",
     },
     rules: {

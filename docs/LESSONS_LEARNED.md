@@ -208,3 +208,47 @@
 9. **Guard tree refreshes**: Check server exists before firing events
 10. **SVG DTD spam**: External entity refs in SVG cause browser fetch spam - use inline namespaces
 11. **Isolate issues**: Disable extension to prove source - if persists, not extension's bug
+
+## v3.0.3 Modernization (2025-11-23)
+
+### Async/Await Refactoring
+
+**Pattern Consistency**
+- Replaced 10+ `.then()` chains with async/await in IssueController
+- Standardized promise handling in RedmineServer (3 methods)
+- Reduced code from 283→264 lines in issue-controller.ts (-19 lines)
+- Improved readability with linear flow vs nested callbacks
+
+**Subagent Coordination**
+- Used parallel subagents for complex refactoring tasks
+- Each subagent focused on single file/concern
+- Verified compilation after each change (npx tsc --noEmit)
+- All 46 tests passed - no behavior changes
+
+### TypeScript Strictness
+
+**noUnusedLocals/Parameters/ImplicitReturns**
+- Found unused `server` param in RedmineProject constructor
+- Removed unused code per CLAUDE.md (no backwards-compat hacks)
+- Breaking change acceptable for internal API
+- Constructor: `(server, options)` → `(options)` - simpler
+
+**ESLint ecmaVersion**
+- 2020→2023 for Node 20+ syntax (optional chaining, nullish coalescing, top-level await)
+- Aligned with package.json engine requirement
+
+### Build Scripts
+
+**Developer Experience**
+- Added `npm run typecheck` for explicit TS validation
+- Added `npm run clean` for artifact cleanup
+- Added `npm run ci` for full validation pipeline
+- Enables local pre-commit checks matching CI
+
+### Lessons
+
+1. **Delete unused code**: Don't prefix with `_` - remove entirely per CLAUDE.md
+2. **Async/await > .then()**: Easier to read, debug, maintain
+3. **Subagents scale**: Parallel refactoring faster than manual
+4. **Strict TS catches issues**: noUnusedLocals found dead code
+5. **Test coverage validates**: 75.56% coverage confirmed no regressions

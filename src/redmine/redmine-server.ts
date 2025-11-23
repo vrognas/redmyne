@@ -191,21 +191,20 @@ export class RedmineServer {
         return accumulator;
       }
 
-      const [totalCount, result]: [number, RedmineProject[]] =
-        await this.doRequest<{
-          projects: Project[];
-          total_count: number;
-        }>(`/projects.json?limit=${limit}&offset=${offset}`, "GET").then(
-          ({ total_count, projects }) => [
-            total_count,
-            projects.map(
-              (proj) =>
-                new RedmineProject(this, {
-                  ...proj,
-                })
-            ),
-          ]
-        );
+      const response = await this.doRequest<{
+        projects: Project[];
+        total_count: number;
+      }>(`/projects.json?limit=${limit}&offset=${offset}`, "GET");
+
+      const [totalCount, result]: [number, RedmineProject[]] = [
+        response.total_count,
+        response.projects.map(
+          (proj) =>
+            new RedmineProject({
+              ...proj,
+            })
+        ),
+      ];
 
       return req(offset + limit, limit, totalCount, accumulator.concat(result));
     };
@@ -213,23 +212,23 @@ export class RedmineServer {
     return req();
   }
 
-  getTimeEntryActivities(): Promise<{
+  async getTimeEntryActivities(): Promise<{
     time_entry_activities: TimeEntryActivity[];
   }> {
     if (this.timeEntryActivities) {
-      return Promise.resolve({
+      return {
         time_entry_activities: this.timeEntryActivities,
-      });
+      };
     }
-    return this.doRequest<{
+    const response = await this.doRequest<{
       time_entry_activities: TimeEntryActivity[];
-    }>(`/enumerations/time_entry_activities.json`, "GET").then((response) => {
-      if (response) {
-        this.timeEntryActivities = response.time_entry_activities;
-      }
+    }>(`/enumerations/time_entry_activities.json`, "GET");
 
-      return response;
-    });
+    if (response) {
+      this.timeEntryActivities = response.time_entry_activities;
+    }
+
+    return response;
   }
 
   addTimeEntry(
@@ -285,21 +284,21 @@ export class RedmineServer {
   /**
    * Returns promise, that resolves to list of issue statuses in provided redmine server
    */
-  getIssueStatuses(): Promise<{ issue_statuses: RedmineIssueStatus[] }> {
+  async getIssueStatuses(): Promise<{ issue_statuses: RedmineIssueStatus[] }> {
     if (this.issueStatuses === null || this.issueStatuses === undefined) {
-      return this.doRequest<{ issue_statuses: RedmineIssueStatus[] }>(
+      const obj = await this.doRequest<{ issue_statuses: RedmineIssueStatus[] }>(
         "/issue_statuses.json",
         "GET"
-      ).then((obj) => {
-        if (obj) {
-          // Shouldn't change much; cache it.
-          this.issueStatuses = obj;
-        }
+      );
 
-        return obj;
-      });
+      if (obj) {
+        // Shouldn't change much; cache it.
+        this.issueStatuses = obj;
+      }
+
+      return obj;
     } else {
-      return Promise.resolve(this.issueStatuses);
+      return this.issueStatuses;
     }
   }
 

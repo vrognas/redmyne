@@ -2,7 +2,7 @@
   "name": "positron-redmine",
   "displayName": "Redmine for Positron",
   "description": "Redmine project management integration for Positron IDE and VS Code",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "publisher": "vrognas",
   "license": "MIT",
   "type": "module",
@@ -201,11 +201,14 @@
     "vscode:prepublish": "npm run compile",
     "compile": "node esbuild.cjs --production",
     "watch": "node esbuild.cjs --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf out/ coverage/",
     "lint": "eslint .",
     "package": "npx @vscode/vsce package",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "ci": "npm run lint && npm run typecheck && npm run test:coverage"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

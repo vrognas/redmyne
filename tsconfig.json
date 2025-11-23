@@ -10,7 +10,10 @@
     "moduleResolution": "bundler",
     "outDir": "out",
     "rootDir": "src",
-    "sourceMap": true
+    "sourceMap": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true
   },
   "exclude": ["node_modules", ".vscode-test", "test", "*.config.ts", "*.cjs"]
 }

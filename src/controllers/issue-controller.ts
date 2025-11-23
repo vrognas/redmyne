@@ -15,122 +15,106 @@ export class IssueController {
     private redmine: RedmineServer
   ) {}
 
-  chooseTimeEntryType(activities: TimeEntryActivity[]) {
-    vscode.window
-      .showQuickPick(
-        activities.map((activity) => {
-          return {
-            label: activity.name,
-            description: "",
-            detail: "",
-            activity: activity,
-          };
-        }),
-        {
-          placeHolder: "Pick an activity type",
-        }
-      )
-      .then((act) => {
-        if (!act) return;
+  async chooseTimeEntryType(activities: TimeEntryActivity[]) {
+    const act = await vscode.window.showQuickPick(
+      activities.map((activity) => {
+        return {
+          label: activity.name,
+          description: "",
+          detail: "",
+          activity: activity,
+        };
+      }),
+      {
+        placeHolder: "Pick an activity type",
+      }
+    );
+    if (!act) return;
 
-        this.setTimeEntryMessage(act);
-      });
+    this.setTimeEntryMessage(act);
   }
 
-  setTimeEntryMessage(activity: TimeEntryActivityItem) {
-    vscode.window
-      .showInputBox({
-        placeHolder: `"hours spent|additional message" or "hours spent|"`,
-      })
-      .then((input) => {
-        const indexOf = input?.indexOf("|") ?? -1;
-        if (indexOf === -1) {
-          vscode.window
-            .showWarningMessage(
-              `Provide message in the following pattern: "hours spent|additional message" or "hours spent|", if you don't want to provide a message`
-            )
-            .then(
-              () => this.setTimeEntryMessage(activity),
-              () => this.setTimeEntryMessage(activity)
-            );
-          return;
-        }
-        if (!input) {
-          vscode.window.showErrorMessage("Time entry input required");
-          return;
-        }
-        const hours = input.substring(0, indexOf);
-        const message = input.substring(indexOf + 1);
+  async setTimeEntryMessage(activity: TimeEntryActivityItem) {
+    const input = await vscode.window.showInputBox({
+      placeHolder: `"hours spent|additional message" or "hours spent|"`,
+    });
+    const indexOf = input?.indexOf("|") ?? -1;
+    if (indexOf === -1) {
+      await vscode.window.showWarningMessage(
+        `Provide message in the following pattern: "hours spent|additional message" or "hours spent|", if you don't want to provide a message`
+      );
+      this.setTimeEntryMessage(activity);
+      return;
+    }
+    if (!input) {
+      vscode.window.showErrorMessage("Time entry input required");
+      return;
+    }
+    const hours = input.substring(0, indexOf);
+    const message = input.substring(indexOf + 1);
 
-        this.redmine
-          .addTimeEntry(this.issue.id, activity.activity.id, hours, message)
-          .then(
-            () => {
-              vscode.window.showInformationMessage(
-                `Time entry for issue #${this.issue.id} has been added.`
-              );
-            },
-            (reason) => {
-              vscode.window.showErrorMessage(reason);
-            }
-          );
-      });
+    try {
+      await this.redmine.addTimeEntry(
+        this.issue.id,
+        activity.activity.id,
+        hours,
+        message
+      );
+      vscode.window.showInformationMessage(
+        `Time entry for issue #${this.issue.id} has been added.`
+      );
+    } catch (reason) {
+      vscode.window.showErrorMessage(reason as string);
+    }
   }
 
-  changeIssueStatus(statuses: RedmineIssueStatus[]) {
-    vscode.window
-      .showQuickPick(
-        statuses.map((status) => {
-          return {
-            label: status.name,
-            description: "",
-            detail: "",
-            fullIssue: status,
-          };
-        }),
-        {
-          placeHolder: "Pick a new status",
-        }
-      )
-      .then((stat) => {
-        if (!stat) return;
+  async changeIssueStatus(statuses: RedmineIssueStatus[]) {
+    const stat = await vscode.window.showQuickPick(
+      statuses.map((status) => {
+        return {
+          label: status.name,
+          description: "",
+          detail: "",
+          fullIssue: status,
+        };
+      }),
+      {
+        placeHolder: "Pick a new status",
+      }
+    );
+    if (!stat) return;
 
-        this.redmine.setIssueStatus(this.issue, stat.fullIssue.id).then(
-          () => {
-            vscode.window.showInformationMessage(
-              `Issue #${this.issue.id} status changed to ${stat.fullIssue.name}`
-            );
-          },
-          (reason) => {
-            vscode.window.showErrorMessage(reason);
-          }
-        );
-      });
+    try {
+      await this.redmine.setIssueStatus(this.issue, stat.fullIssue.id);
+      vscode.window.showInformationMessage(
+        `Issue #${this.issue.id} status changed to ${stat.fullIssue.name}`
+      );
+    } catch (reason) {
+      vscode.window.showErrorMessage(reason as string);
+    }
   }
 
-  private openInBrowser() {
-    vscode.commands
-      .executeCommand(
+  private async openInBrowser() {
+    try {
+      await vscode.commands.executeCommand(
         "vscode.open",
         vscode.Uri.parse(
           `${this.redmine.options.address}/issues/${this.issue.id}`
         )
-      )
-      .then(undefined, (reason) => {
-        vscode.window.showErrorMessage(reason);
-      });
+      );
+    } catch (reason) {
+      vscode.window.showErrorMessage(reason as string);
+    }
   }
 
-  private changeStatus() {
-    this.redmine.getIssueStatuses().then((statuses) => {
-      this.changeIssueStatus(statuses.issue_statuses);
-    });
+  private async changeStatus() {
+    const statuses = await this.redmine.getIssueStatuses();
+    this.changeIssueStatus(statuses.issue_statuses);
   }
 
-  private addTimeEntry() {
-    this.redmine.getTimeEntryActivities().then((activities) => {
-      this.chooseTimeEntryType(activities.time_entry_activities);
-    });
+  private async addTimeEntry() {
+    const activities = await this.redmine.getTimeEntryActivities();
+    this.chooseTimeEntryType(activities.time_entry_activities);
   }
 
   private async quickUpdate() {
@@ -221,12 +205,12 @@ export class IssueController {
     }
   }
 
-  listActions() {
+  async listActions() {
     const issueDetails = `Issue #${this.issue.id} assigned to ${
       this.issue.assigned_to ? this.issue.assigned_to.name : "no one"
     }`;
-    vscode.window
-      .showQuickPick(
+    try {
+      const option = await vscode.window.showQuickPick(
         [
           {
             action: "changeStatus",
@@ -258,26 +242,22 @@ export class IssueController {
         {
           placeHolder: "Pick an action to do",
         }
-      )
-      .then(
-        (option) => {
-          if (!option) return;
-          if (option.action === "openInBrowser") {
-            this.openInBrowser();
-          }
-          if (option.action === "changeStatus") {
-            this.changeStatus();
-          }
-          if (option.action === "addTimeEntry") {
-            this.addTimeEntry();
-          }
-          if (option.action === "quickUpdate") {
-            this.quickUpdate();
-          }
-        },
-        (_error) => {
-          /* ? */
-        }
       );
+      if (!option) return;
+      if (option.action === "openInBrowser") {
+        this.openInBrowser();
+      }
+      if (option.action === "changeStatus") {
+        this.changeStatus();
+      }
+      if (option.action === "addTimeEntry") {
+        this.addTimeEntry();
+      }
+      if (option.action === "quickUpdate") {
+        this.quickUpdate();
+      }
+    } catch (_error) {
+      /* ? */
+    }
   }
 }

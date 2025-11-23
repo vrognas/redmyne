@@ -1,4 +1,3 @@
-import { RedmineServer } from "./redmine-server";
 import { QuickPickItem } from "vscode";
 import { NamedEntity } from "./models/named-entity";
 
@@ -21,10 +20,7 @@ export interface ProjectQuickPickItem extends QuickPickItem {
 }
 
 export class RedmineProject {
-  constructor(
-    private server: RedmineServer,
-    private options: RedmineProjectOptions
-  ) {}
+  constructor(private options: RedmineProjectOptions) {}
 
   get id() {
     return this.options.id;

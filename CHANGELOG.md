@@ -4,6 +4,19 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ## [Unreleased]
 
+## [3.0.3] - 2025-11-23
+
+### Changed
+
+- Refactored promise chains to async/await in RedmineServer and IssueController
+- Updated ESLint ecmaVersion from 2020 to 2023 for Node 20+ syntax support
+- Added TypeScript strict compiler options: noUnusedLocals, noUnusedParameters, noImplicitReturns
+- Removed unused server parameter from RedmineProject constructor
+
+### Added
+
+- npm scripts: `typecheck`, `clean`, `ci` for better DX
+
 ## [3.0.2] - 2025-11-22
 
 ### Changed
