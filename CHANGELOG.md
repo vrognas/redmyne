@@ -4,10 +4,18 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ## [Unreleased]
 
+## [3.1.0] - 2025-11-23
+
 ### Changed
 
+- "Issues assigned to me" UI: simplified to "{Subject} #{id}"
+- Issue number now rendered with reduced opacity
 - eslint.config.js → eslint.config.mjs (eliminates Node.js warning)
 - tsconfig.json: added *.mjs to exclude list
+
+### Added
+
+- MyIssuesTree tests (3 new tests, 101 total)
 
 ## [3.0.7] - 2025-11-23
 

@@ -29,9 +29,10 @@ export class MyIssuesTree implements vscode.TreeDataProvider<TreeItem> {
     // Type narrowed to Issue here
     const issue = item as Issue;
     const treeItem = new vscode.TreeItem(
-      `#${issue.id} [${issue.tracker.name}] (${issue.status.name}) ${issue.subject} by ${issue.author.name}`,
+      issue.subject,
       vscode.TreeItemCollapsibleState.None
     );
+    treeItem.description = `#${issue.id}`;
 
     treeItem.command = {
       command: "redmine.openActionsForIssue",
