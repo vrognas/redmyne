@@ -8,9 +8,14 @@ export enum ProjectsViewStyle {
   TREE = 1,
 }
 
-export class ProjectsTree
-  implements vscode.TreeDataProvider<RedmineProject | Issue>
-{
+interface LoadingPlaceholder {
+  isLoadingPlaceholder: true;
+  message?: string;
+}
+
+type TreeItem = RedmineProject | Issue | LoadingPlaceholder;
+
+export class ProjectsTree implements vscode.TreeDataProvider<TreeItem> {
   server?: RedmineServer;
   viewStyle: ProjectsViewStyle;
   projects: RedmineProject[] | null = null;
@@ -24,10 +29,8 @@ export class ProjectsTree
 
   onDidChangeTreeData$ = new vscode.EventEmitter<void>();
   onDidChangeTreeData: vscode.Event<void> = this.onDidChangeTreeData$.event;
-  getTreeItem(
-    projectOrIssue: RedmineProject | Issue | any
-  ): vscode.TreeItem | Thenable<vscode.TreeItem> {
-    if (projectOrIssue.isLoadingPlaceholder) {
+  getTreeItem(projectOrIssue: TreeItem): vscode.TreeItem | Thenable<vscode.TreeItem> {
+    if ("isLoadingPlaceholder" in projectOrIssue && projectOrIssue.isLoadingPlaceholder) {
       return new vscode.TreeItem(
         projectOrIssue.message || "⏳ Loading...",
         vscode.TreeItemCollapsibleState.None
@@ -54,9 +57,7 @@ export class ProjectsTree
       return item;
     }
   }
-  async getChildren(
-    projectOrIssue?: RedmineProject | Issue
-  ): Promise<(RedmineProject | Issue | any)[]> {
+  async getChildren(projectOrIssue?: TreeItem): Promise<TreeItem[]> {
     if (!this.server) {
       return [];
     }

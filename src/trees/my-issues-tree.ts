@@ -2,7 +2,13 @@ import * as vscode from "vscode";
 import { Issue } from "../redmine/models/issue";
 import { RedmineServer } from "../redmine/redmine-server";
 
-export class MyIssuesTree implements vscode.TreeDataProvider<Issue> {
+interface LoadingPlaceholder {
+  isLoadingPlaceholder: true;
+}
+
+type TreeItem = Issue | LoadingPlaceholder;
+
+export class MyIssuesTree implements vscode.TreeDataProvider<TreeItem> {
   server?: RedmineServer;
   private isLoading = false;
 
@@ -12,8 +18,8 @@ export class MyIssuesTree implements vscode.TreeDataProvider<Issue> {
 
   onDidChangeTreeData$ = new vscode.EventEmitter<void>();
   onDidChangeTreeData: vscode.Event<void> = this.onDidChangeTreeData$.event;
-  getTreeItem(issue: Issue | any): vscode.TreeItem | Thenable<vscode.TreeItem> {
-    if (issue.isLoadingPlaceholder) {
+  getTreeItem(issue: TreeItem): vscode.TreeItem | Thenable<vscode.TreeItem> {
+    if ("isLoadingPlaceholder" in issue && issue.isLoadingPlaceholder) {
       return new vscode.TreeItem(
         "⏳ Loading issues...",
         vscode.TreeItemCollapsibleState.None
@@ -33,7 +39,7 @@ export class MyIssuesTree implements vscode.TreeDataProvider<Issue> {
 
     return item;
   }
-  async getChildren(_element?: Issue): Promise<Issue[] | any[]> {
+  async getChildren(_element?: TreeItem): Promise<TreeItem[]> {
     if (!this.server) {
       return [];
     }
