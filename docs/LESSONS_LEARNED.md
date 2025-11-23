@@ -252,3 +252,32 @@
 3. **Subagents scale**: Parallel refactoring faster than manual
 4. **Strict TS catches issues**: noUnusedLocals found dead code
 5. **Test coverage validates**: 75.56% coverage confirmed no regressions
+
+## v3.0.4 Bug Fix (2025-11-23)
+
+### Package.json "type": "module" Conflict
+
+**Problem**: Extension failed to activate with error: `module is not defined in ES module scope`
+
+**Root Cause**:
+- package.json had `"type": "module"` (line 8)
+- esbuild.cjs outputs CJS (`format: 'cjs'`)
+- Node.js treated bundled output as ESM due to package.json setting
+- CJS code (`module.exports`) invalid in ESM context
+
+**Solution**: Remove `"type": "module"` from package.json
+
+**Why It Existed**: Likely added during TypeScript 5.7 migration for source ESM support, but unnecessary - TS/esbuild handle module resolution independently
+
+**Key Insight**:
+- package.json `"type"` affects bundled output, not source code
+- VS Code extensions require CJS output (per LESSONS_LEARNED.md:52)
+- Source can use ESM (import/export) while bundle outputs CJS
+- NEVER add `"type": "module"` when bundling to CJS
+
+### Lessons
+
+1. **package.json type affects runtime**: `"type": "module"` changes how Node.js interprets bundled .js files
+2. **Match type to bundle format**: CJS bundle = no type field (or `"type": "commonjs"`)
+3. **Source ≠ output format**: TypeScript source can be ESM even with CJS output
+4. **Verify extension loads**: Test activation after package.json changes

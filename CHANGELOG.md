@@ -4,6 +4,12 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ## [Unreleased]
 
+## [3.0.4] - 2025-11-23
+
+### Fixed
+
+- Extension activation error: removed `"type": "module"` from package.json (conflicts with CJS build output)
+
 ## [3.0.3] - 2025-11-23
 
 ### Changed

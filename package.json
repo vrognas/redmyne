@@ -2,10 +2,9 @@
   "name": "positron-redmine",
   "displayName": "Redmine for Positron",
   "description": "Redmine project management integration for Positron IDE and VS Code",
-  "version": "3.0.3",
+  "version": "3.0.4",
   "publisher": "vrognas",
   "license": "MIT",
-  "type": "module",
   "icon": "logo.png",
   "repository": {
     "type": "git",
