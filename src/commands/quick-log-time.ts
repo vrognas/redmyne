@@ -154,7 +154,7 @@ async function pickIssueAndActivity(
   // Pick activity
   const activities = await props.server.getTimeEntryActivities();
   const activity = await vscode.window.showQuickPick(
-    activities.time_entry_activities.map((a: any) => ({
+    activities.time_entry_activities.map((a) => ({
       label: a.name,
       description: a.is_default ? "Default" : undefined,
       activity: a,

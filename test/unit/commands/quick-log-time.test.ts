@@ -4,8 +4,12 @@ import { quickLogTime } from "../../../src/commands/quick-log-time";
 
 describe("quickLogTime", () => {
   let mockContext: vscode.ExtensionContext;
-  let mockServer: any;
-  let props: any;
+  let mockServer: {
+    getIssuesAssignedToMe: ReturnType<typeof vi.fn>;
+    getTimeEntryActivities: ReturnType<typeof vi.fn>;
+    addTimeEntry: ReturnType<typeof vi.fn>;
+  };
+  let props: { server: typeof mockServer; config: Record<string, unknown> };
 
   beforeEach(() => {
     mockContext = {
@@ -57,7 +61,7 @@ describe("quickLogTime", () => {
       .mockResolvedValueOnce({
         label: "$(history) Log to #123: Recent Issue",
         value: "recent",
-      } as any);
+      } as unknown as vscode.QuickPickItem);
 
     vi.spyOn(vscode.window, "showInputBox").mockResolvedValueOnce("2.5");
 
@@ -84,16 +88,15 @@ describe("quickLogTime", () => {
       due_date: "2025-12-01",
     };
 
-    const showQuickPickSpy = vi
-      .spyOn(vscode.window, "showQuickPick")
+    vi.spyOn(vscode.window, "showQuickPick")
       .mockResolvedValueOnce({
         label: "#123 Test Issue",
         issue: testIssue,
-      } as any)
+      } as unknown as vscode.QuickPickItem)
       .mockResolvedValueOnce({
         label: "Development",
         activity: { id: 9, name: "Development" },
-      } as any);
+      } as unknown as vscode.QuickPickItem);
 
     const showInputBoxSpy = vi
       .spyOn(vscode.window, "showInputBox")
@@ -101,7 +104,8 @@ describe("quickLogTime", () => {
 
     await quickLogTime(props, mockContext);
 
-    const inputValidator = showInputBoxSpy.mock.calls[0][0].validateInput;
+    const inputValidator = showInputBoxSpy.mock.calls[0][0]
+      .validateInput as (value: string) => string | null;
 
     expect(inputValidator("0")).toBe("Must be 0.1-24 hours");
     expect(inputValidator("-5")).toBe("Must be 0.1-24 hours");
@@ -121,8 +125,7 @@ describe("quickLogTime", () => {
     // Mock flow: pickIssueAndActivity needs 2 QuickPick calls
     // Call 1: Pick issue from list
     // Call 2: Pick activity type
-    const showQuickPickSpy = vi
-      .spyOn(vscode.window, "showQuickPick")
+    vi.spyOn(vscode.window, "showQuickPick")
       .mockResolvedValueOnce({
         label: "#123 Test Issue",
         issue: {
@@ -131,15 +134,13 @@ describe("quickLogTime", () => {
           project: { name: "Test Project" },
           status: { name: "In Progress" },
         },
-      } as any)
+      } as unknown as vscode.QuickPickItem)
       .mockResolvedValueOnce({
         label: "Development",
         activity: { id: 9, name: "Development" },
-      } as any);
+      } as unknown as vscode.QuickPickItem);
 
-    const showInputBoxSpy = vi
-      .spyOn(vscode.window, "showInputBox")
-      .mockResolvedValueOnce("2.5");
+    vi.spyOn(vscode.window, "showInputBox").mockResolvedValueOnce("2.5");
 
     await quickLogTime(props, mockContext);
 
