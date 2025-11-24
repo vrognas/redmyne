@@ -1,7 +1,7 @@
 # Phased Implementation Plan - Redmine VSCode Extension MVPs
 
 **Date**: 2025-11-24
-**Status**: MVP-2 Complete ✅ - Moving to MVP-1
+**Status**: MVP-2 Complete ✅ (v3.2.1) - Moving to MVP-1
 **Compliance**: A (91/100) - All critical issues resolved
 
 ---
@@ -807,9 +807,41 @@ describe('MyTimeEntriesTreeDataProvider', () => {
 - [x] No double-fetching (cached entries)
 - [x] Refresh command works
 - [x] Context menu opens time entry in browser
-- [x] Tests pass (7 scenarios)
+- [x] Tests pass (11 scenarios)
 
-**Status**: ✅ COMPLETE (4h actual)
+**Status**: ✅ COMPLETE (v3.2.1 - 6h actual including fixes)
+
+### Implementation Summary (v3.2.1)
+
+**Core Features Delivered**:
+- Time entries tree with Today/Week/Month groups
+- Issue caching with batch fetching (N+1 query prevention)
+- Async background loading (<10ms initial render, prevents UI blocking)
+- Tooltip with "Open in Browser" command link
+- Parallel API requests for improved UX
+
+**Critical Fixes Applied**:
+- UI blocking: 252ms → <10ms via async pattern
+- Command URI encoding for markdown tooltips
+- Null/undefined API response handling (optional chaining)
+- Module mock timing issues via DI pattern
+- Mock endpoint path corrections
+
+**Testing**:
+- 11 tests for time entries tree
+- Total: 123 tests passing (83.56% coverage)
+- CI green ✓
+
+**Key Lessons**:
+- DI > module mocking for getters (timing-independent)
+- Async loading prevents UI freezes
+- Optional chaining for robust null handling
+- Local pass ≠ CI pass (environment matters)
+
+**Documentation**:
+- LESSONS_LEARNED.md: Module mock hoisting timing issues
+- ARCHITECTURE.md: MyTimeEntriesTree architecture
+- CHANGELOG.md: v3.2.1 entry
 
 ---
 
