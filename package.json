@@ -47,6 +47,10 @@
         "title": "Redmine: Actions for issue under cursor"
       },
       {
+        "command": "redmine.quickLogTime",
+        "title": "Redmine: Quick Log Time"
+      },
+      {
         "command": "redmine.changeDefaultServer",
         "title": "Redmine: Change server"
       },
@@ -76,6 +80,14 @@
       {
         "command": "redmine.toggleApiLogging",
         "title": "Redmine: Toggle API Logging"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "redmine.quickLogTime",
+        "key": "ctrl+k ctrl+l",
+        "mac": "cmd+k cmd+l",
+        "when": "!terminalFocus && !inDebugMode && !inQuickOpen"
       }
     ],
     "views": {

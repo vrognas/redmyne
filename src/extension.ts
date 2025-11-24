@@ -9,6 +9,7 @@ import openActionsForIssue from "./commands/open-actions-for-issue";
 import openActionsForIssueUnderCursor from "./commands/open-actions-for-issue-under-cursor";
 import listOpenIssuesAssignedToMe from "./commands/list-open-issues-assigned-to-me";
 import newIssue from "./commands/new-issue";
+import { quickLogTime } from "./commands/quick-log-time";
 import { RedmineConfig } from "./definitions/redmine-config";
 import { ActionProperties } from "./commands/action-properties";
 import { MyIssuesTree } from "./trees/my-issues-tree";
@@ -516,6 +517,7 @@ export function activate(context: vscode.ExtensionContext): void {
     openActionsForIssueUnderCursor
   );
   registerCommand("newIssue", newIssue);
+  registerCommand("quickLogTime", (props) => quickLogTime(props, context));
   registerCommand("changeDefaultServer", (conf) => {
     myIssuesTree.setServer(conf.server);
     projectsTree.setServer(conf.server);
