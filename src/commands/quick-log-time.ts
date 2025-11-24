@@ -94,14 +94,29 @@ export async function quickLogTime(
       selection = picked;
     }
 
-    // 3. Input hours
+    // 3. Get today's logged hours for validation
+    const today = new Date().toISOString().split("T")[0];
+    const todayEntries = await props.server.getTimeEntries({
+      from: today,
+      to: today,
+    });
+    const todayTotal = todayEntries.time_entries.reduce(
+      (sum, entry) => sum + parseFloat(entry.hours),
+      0
+    );
+
+    // 4. Input hours
     const hoursInput = await vscode.window.showInputBox({
-      prompt: `Log time to #${selection.issueId} (${selection.activityName})`,
+      prompt: `Log time to #${selection.issueId} (${selection.activityName})${todayTotal > 0 ? ` | Today: ${todayTotal.toFixed(1)}h logged` : ""}`,
       placeHolder: "e.g., 2.5, 1:45, 1h 45min",
       validateInput: (value: string) => {
         const hours = parseTimeInput(value);
         if (hours === null || hours < 0.1 || hours > 24) {
           return "Must be 0.1-24 hours (e.g. equivalent: 1.75, 1:45, or 1h 45min)";
+        }
+        // Check if adding this entry would exceed 24h for today
+        if (todayTotal + hours > 24) {
+          return `Would exceed 24h/day limit (already logged ${todayTotal.toFixed(1)}h today)`;
         }
         return null;
       },
@@ -112,7 +127,7 @@ export async function quickLogTime(
     const hours = parseTimeInput(hoursInput)!; // Already validated
     const hoursStr = hours.toString();
 
-    // 4. Input comment (optional)
+    // 5. Input comment (optional)
     const comment = await vscode.window.showInputBox({
       prompt: `Comment for #${selection.issueId} (optional)`,
       placeHolder: "e.g., Implemented feature X",
@@ -120,7 +135,7 @@ export async function quickLogTime(
 
     if (comment === undefined) return; // User cancelled
 
-    // 5. Post time entry
+    // 6. Post time entry
     await props.server.addTimeEntry(
       selection.issueId,
       selection.activityId,
@@ -128,7 +143,7 @@ export async function quickLogTime(
       comment || "" // Empty string if no comment
     );
 
-    // 6. Update cache
+    // 7. Update cache
     await context.globalState.update("lastTimeLog", {
       issueId: selection.issueId,
       issueSubject: selection.issueSubject,
@@ -137,7 +152,7 @@ export async function quickLogTime(
       lastLogged: new Date(),
     });
 
-    // 7. Confirm with status bar flash (NOT notification)
+    // 8. Confirm with status bar flash (NOT notification)
     const statusBar = vscode.window.createStatusBarItem(
       vscode.StatusBarAlignment.Left
     );

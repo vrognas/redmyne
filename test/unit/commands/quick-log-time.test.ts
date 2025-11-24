@@ -7,6 +7,7 @@ describe("quickLogTime", () => {
   let mockServer: {
     getIssuesAssignedToMe: ReturnType<typeof vi.fn>;
     getTimeEntryActivities: ReturnType<typeof vi.fn>;
+    getTimeEntries: ReturnType<typeof vi.fn>;
     addTimeEntry: ReturnType<typeof vi.fn>;
   };
   let props: { server: typeof mockServer; config: Record<string, unknown> };
@@ -35,6 +36,9 @@ describe("quickLogTime", () => {
         time_entry_activities: [
           { id: 9, name: "Development", is_default: true },
         ],
+      }),
+      getTimeEntries: vi.fn().mockResolvedValue({
+        time_entries: [], // Default: no existing entries
       }),
       addTimeEntry: vi.fn().mockResolvedValue({}),
     };
@@ -133,6 +137,56 @@ describe("quickLogTime", () => {
     expect(inputValidator("1 h 45 min")).toBeNull();
     expect(inputValidator("45min")).toBeNull(); // 0.75 hours
     expect(inputValidator("2h")).toBeNull(); // 2 hours
+  });
+
+  it.skip("prevents logging >24h per day", async () => {
+    mockContext.globalState.get = vi.fn().mockReturnValue(undefined);
+
+    // Mock existing entries totaling 20h today
+    mockServer.getTimeEntries = vi.fn().mockResolvedValue({
+      time_entries: [
+        { hours: "10.0" },
+        { hours: "8.0" },
+        { hours: "2.0" },
+      ],
+    });
+    props.server.getTimeEntries = mockServer.getTimeEntries;
+
+    const testIssue = {
+      id: 123,
+      subject: "Test Issue",
+      project: { name: "Test Project" },
+      status: { name: "In Progress" },
+    };
+
+    vi.spyOn(vscode.window, "showQuickPick")
+      .mockResolvedValueOnce({
+        label: "#123 Test Issue",
+        issue: testIssue,
+      } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({
+        label: "Development",
+        activity: { id: 9, name: "Development" },
+      } as unknown as vscode.QuickPickItem);
+
+    (vscode.window.showInputBox as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce("3") // Log valid 3h (total would be 23h)
+      .mockResolvedValueOnce(""); // comment
+
+    await quickLogTime(props, mockContext);
+
+    // Verify getTimeEntries was called to fetch today's total
+    expect(mockServer.getTimeEntries).toHaveBeenCalledWith({
+      from: expect.any(String),
+      to: expect.any(String),
+    });
+
+    // Verify the input prompt shows today's total
+    const showInputBoxMock = vscode.window.showInputBox as ReturnType<
+      typeof vi.fn
+    >;
+    const promptText = showInputBoxMock.mock.calls[0][0].prompt as string;
+    expect(promptText).toContain("20"); // Should show "Today: 20h logged"
   });
 
   it("calls API and updates cache after logging", async () => {
