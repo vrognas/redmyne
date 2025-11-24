@@ -6,6 +6,12 @@ export const window = {
   showInformationMessage: vi.fn(),
   showErrorMessage: vi.fn(),
   withProgress: vi.fn((opts, task) => task({ report: vi.fn() })),
+  createStatusBarItem: vi.fn(() => ({
+    text: "",
+    show: vi.fn(),
+    hide: vi.fn(),
+    dispose: vi.fn(),
+  })),
 };
 
 export const workspace = {
@@ -31,7 +37,8 @@ export const EventEmitter = class {
 };
 
 export const ProgressLocation = { Notification: 15 };
-export const ConfigurationTarget = { WorkspaceFolder: 3 };
+export const ConfigurationTarget = { WorkspaceFolder: 3, Global: 1 };
+export const StatusBarAlignment = { Left: 1, Right: 2 };
 
 export const TreeItemCollapsibleState = {
   None: 0,
