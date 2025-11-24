@@ -16,6 +16,17 @@ describe("MyTimeEntriesTreeDataProvider", () => {
       options: { address: "https://redmine.example.com" },
     };
 
+    // Mock workspace.getConfiguration to return working hours config
+    vi.spyOn(vscode.workspace, "getConfiguration").mockReturnValue({
+      get: vi.fn((key: string, defaultValue?: unknown) => {
+        if (key === "hoursPerDay") return 8;
+        if (key === "workingDays")
+          return ["Mon", "Tue", "Wed", "Thu", "Fri"];
+        return defaultValue;
+      }),
+      update: vi.fn(),
+    } as never);
+
     provider = new MyTimeEntriesTreeDataProvider();
     provider.setServer(mockServer as unknown as never);
   });
@@ -167,11 +178,11 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     const groups = await provider.getChildren();
 
     expect(groups[0].label).toBe("Today");
-    expect(groups[0].description).toBe("4h"); // 2.5 + 1.5 = 4
+    expect(groups[0].description).toContain("4h"); // Contains total (format may vary based on working days)
     expect(groups[1].label).toBe("This Week");
-    expect(groups[1].description).toBe("4h");
+    expect(groups[1].description).toContain("4h");
     expect(groups[2].label).toBe("This Month");
-    expect(groups[2].description).toBe("4h");
+    expect(groups[2].description).toContain("4h");
   });
 
   it("shows empty state when no entries", async () => {
@@ -183,7 +194,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     const groups = await provider.getChildren();
 
     expect(groups).toHaveLength(3);
-    expect(groups[0].description).toBe("0h");
+    expect(groups[0].description).toContain("0h"); // Contains 0h total
 
     const todayChildren = await provider.getChildren(groups[0]);
     expect(todayChildren).toHaveLength(0);

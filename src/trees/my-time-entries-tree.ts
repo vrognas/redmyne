@@ -73,24 +73,50 @@ export class MyTimeEntriesTreeDataProvider
         const weekTotal = calculateTotal(weekResult.time_entries);
         const monthTotal = calculateTotal(monthResult.time_entries);
 
+        // Get working hours config
+        const config = vscode.workspace.getConfiguration("redmine.workingHours");
+        const hoursPerDay = config.get<number>("hoursPerDay", 8);
+        const workingDays = config.get<string[]>("workingDays", [
+          "Mon",
+          "Tue",
+          "Wed",
+          "Thu",
+          "Fri",
+        ]);
+
+        // Calculate available hours for each period
+        const todayAvailable = isWorkingDay(new Date(), workingDays)
+          ? hoursPerDay
+          : 0;
+        const weekAvailable = countWorkingDays(
+          new Date(weekStart),
+          new Date(today),
+          workingDays
+        ) * hoursPerDay;
+        const monthAvailable = countWorkingDays(
+          new Date(monthStart),
+          new Date(today),
+          workingDays
+        ) * hoursPerDay;
+
         return [
           {
             label: "Today",
-            description: formatHours(todayTotal),
+            description: formatHoursWithComparison(todayTotal, todayAvailable),
             collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
             type: "group",
             _cachedEntries: todayResult.time_entries,
           },
           {
             label: "This Week",
-            description: formatHours(weekTotal),
+            description: formatHoursWithComparison(weekTotal, weekAvailable),
             collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
             type: "group",
             _cachedEntries: weekResult.time_entries,
           },
           {
             label: "This Month",
-            description: formatHours(monthTotal),
+            description: formatHoursWithComparison(monthTotal, monthAvailable),
             collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
             type: "group",
             _cachedEntries: monthResult.time_entries,
@@ -170,4 +196,39 @@ function calculateTotal(entries: TimeEntry[]): number {
 
 function formatHours(hours: number): string {
   return `${hours.toFixed(1).replace(/\.0$/, "")}h`;
+}
+
+function formatHoursWithComparison(
+  logged: number,
+  available: number
+): string {
+  if (available === 0) {
+    return formatHours(logged);
+  }
+
+  const percentage = Math.round((logged / available) * 100);
+  return `${formatHours(logged)}/${formatHours(available)} (${percentage}%)`;
+}
+
+function isWorkingDay(date: Date, workingDays: string[]): boolean {
+  const dayName = date.toLocaleDateString("en-US", { weekday: "short" });
+  return workingDays.includes(dayName);
+}
+
+function countWorkingDays(
+  start: Date,
+  end: Date,
+  workingDays: string[]
+): number {
+  let count = 0;
+  const current = new Date(start);
+
+  while (current <= end) {
+    if (isWorkingDay(current, workingDays)) {
+      count++;
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  return count;
 }

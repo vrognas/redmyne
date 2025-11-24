@@ -271,6 +271,27 @@
           "description": "Enable API request/response logging to output channel",
           "default": true,
           "scope": "machine"
+        },
+        "redmine.workingHours.hoursPerDay": {
+          "type": "number",
+          "default": 8,
+          "minimum": 1,
+          "maximum": 16,
+          "scope": "application",
+          "markdownDescription": "**Daily working hours** for time entry calculations\n\nUsed to calculate utilization percentages in time entry view."
+        },
+        "redmine.workingHours.workingDays": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+          },
+          "default": ["Mon", "Tue", "Wed", "Thu", "Fri"],
+          "minItems": 1,
+          "maxItems": 7,
+          "uniqueItems": true,
+          "scope": "application",
+          "markdownDescription": "**Working days** for time entry calculations\n\nUsed to calculate available hours for utilization percentages."
         }
       }
     }
