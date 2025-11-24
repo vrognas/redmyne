@@ -110,11 +110,19 @@ describe("quickLogTime", () => {
     expect(inputValidator("2.5")).toBeNull();
   });
 
-  it("updates globalState cache after logging", async () => {
-    mockContext.globalState.get = vi.fn().mockReturnValue(undefined);
+  it("calls API and updates cache after logging", async () => {
+    // Mock globalState: undefined for lastTimeLog, empty array for recentIssueIds
+    mockContext.globalState.get = vi.fn((key: string) => {
+      if (key === "recentIssueIds") return [];
+      return undefined; // lastTimeLog
+    });
     mockContext.globalState.update = vi.fn().mockResolvedValue(undefined);
 
-    vi.spyOn(vscode.window, "showQuickPick")
+    // Mock flow: pickIssueAndActivity needs 2 QuickPick calls
+    // Call 1: Pick issue from list
+    // Call 2: Pick activity type
+    const showQuickPickSpy = vi
+      .spyOn(vscode.window, "showQuickPick")
       .mockResolvedValueOnce({
         label: "#123 Test Issue",
         issue: {
@@ -129,12 +137,16 @@ describe("quickLogTime", () => {
         activity: { id: 9, name: "Development" },
       } as any);
 
-    vi.spyOn(vscode.window, "showInputBox").mockResolvedValueOnce("2.5");
+    const showInputBoxSpy = vi
+      .spyOn(vscode.window, "showInputBox")
+      .mockResolvedValueOnce("2.5");
 
     await quickLogTime(props, mockContext);
 
+    // Verify API called with correct params
     expect(mockServer.addTimeEntry).toHaveBeenCalledWith(123, 9, "2.5", "");
 
+    // Verify cache updated
     expect(mockContext.globalState.update).toHaveBeenCalledWith(
       "lastTimeLog",
       expect.objectContaining({
