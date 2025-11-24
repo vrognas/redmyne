@@ -105,7 +105,7 @@ export class MyTimeEntriesTreeDataProvider
           _cachedEntries: monthResult.time_entries,
         },
       ];
-    } catch (error) {
+    } catch {
       // On error, show empty state
       this.cachedGroups = [];
     } finally {

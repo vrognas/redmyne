@@ -578,7 +578,6 @@ export function activate(context: vscode.ExtensionContext): void {
     }
 
     if (!issueId) {
-      console.error('openTimeEntryInBrowser called with unrecognized args:', args);
       vscode.window.showErrorMessage('Could not determine issue ID');
       return;
     }
