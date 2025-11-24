@@ -59,7 +59,7 @@ describe("quickLogTime", () => {
     const showQuickPickSpy = vi
       .spyOn(vscode.window, "showQuickPick")
       .mockResolvedValueOnce({
-        label: "$(history) Log to #123: Recent Issue",
+        label: "$(history) Log to #123: Recent Issue [Development]",
         value: "recent",
       } as unknown as vscode.QuickPickItem);
 
@@ -70,7 +70,7 @@ describe("quickLogTime", () => {
     expect(showQuickPickSpy).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({
-          label: expect.stringContaining("$(history) Log to #123"),
+          label: "$(history) Log to #123: Recent Issue [Development]",
         }),
       ]),
       expect.any(Object)

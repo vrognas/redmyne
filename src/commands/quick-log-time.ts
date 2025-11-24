@@ -66,7 +66,7 @@ export async function quickLogTime(
       const choice = await vscode.window.showQuickPick(
         [
           {
-            label: `$(history) Log to #${recent.issueId}: ${recent.issueSubject}`,
+            label: `$(history) Log to #${recent.issueId}: ${recent.issueSubject} [${recent.lastActivityName}]`,
             value: "recent",
           },
           { label: "$(search) Pick different issue", value: "pick" },
