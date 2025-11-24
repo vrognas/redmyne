@@ -77,10 +77,14 @@ Fix auth bug    3.5/8h 2d +100%→+60% 🟢  #123
 
 **Problem**: Can't answer "Do I have capacity for 8h new request?"
 
-**Solution**:
+**Solution**: Status bar item (always visible, minimal code)
 ```
-Workload Overview
+Status Bar: "$(pulse) 25h left, +7h 🟢"
+
+Tooltip (hover):
 ─────────────────
+Workload Overview
+
 Total estimated: 48h
 Total spent: 23h
 Remaining work: 25h
@@ -93,7 +97,9 @@ Top 3 Urgent:
 - #789: 7d left, 12h left 🟢
 ```
 
-**New MVP-4**: Workload Overview (P1, 4-6h)
+**New MVP-4**: Workload Overview (P1, 1-2h)
+
+**⚠️ Validation Update**: Changed from tree view (120 LOC) to status bar item (20 LOC) - 6× simpler, always visible
 
 ---
 
@@ -112,47 +118,61 @@ Top 3 Urgent:
 
 | # | MVP | Priority | Effort | Merged From |
 |---|-----|----------|--------|-------------|
-| **MVP-1** | Timeline & Progress Display | P0 | 6-8h | Old MVP-1 + MVP-2 |
+| **MVP-1** | Timeline & Progress Display | P0 | 8-10h | Old MVP-1 + MVP-2 |
 | **MVP-2** | Time Entry Viewing | P0 | 4-6h | Old MVP-3 (promoted) |
 | **MVP-3** | Quick Time Logging | P1 | 3-4h | Old MVP-4 (renumbered) |
-| **MVP-4** | Workload Overview | P1 | 4-6h | NEW |
+| **MVP-4** | Workload Overview (Status Bar) | P1 | 1-2h | NEW |
 
-**Total**: 17-24 hours (2-3 days)
+**Total**: 16-22 hours (2-3 days)
+
+**⚠️ Validation Update (2025-11-24)**: Effort revised after ultrathink validation review. MVP-1 increased (+2h pre-calc caching), MVP-4 decreased (-4h status bar vs tree view).
 
 ---
 
-## Implementation Sequence
+## Recommended Implementation Order
 
-### Phase 1: P0 Features (Week 1) - 10-14h
-1. **MVP-1**: Timeline & Progress Display (6-8h)
-   - Dual flexibility formula
-   - Spent/estimated hours display
-   - Days remaining
-   - Risk indicators
+**⚠️ IMPLEMENT IN THIS SEQUENCE** (not by MVP number):
 
+1. **MVP-3: Quick Time Logging** (3-4h) ⭐ START HERE
+   - Simplest design, highest ROI
+   - `Ctrl+K Ctrl+L` keybinding
+   - 1-issue globalState cache
+   - v3.2.0-alpha
+
+2. **MVP-2: Time Entry Viewing** (4-6h)
+   - Moderate complexity, P0 priority
+   - Cached time entries
+   - v3.2.0-beta
+
+3. **MVP-1: Timeline & Progress Display** (8-10h)
+   - Most complex, P0 priority
+   - Pre-calc caching critical
+   - v3.2.0 (P0 complete)
+
+4. **MVP-4: Workload Overview** (1-2h)
+   - Trivial status bar item
+   - Quick polish
+   - v3.3.0 (full suite)
+
+**Rationale**: De-risk by implementing simple→complex, validate patterns early
+
+---
+
+## Priority-Based Phases (Reference)
+
+### Phase 1: P0 Features - 12-16h
+1. **MVP-1**: Timeline & Progress Display (8-10h)
 2. **MVP-2**: Time Entry Viewing (4-6h)
-   - View logged time (Today, This Week)
-   - Verify totals
-   - Auto-refresh after logging
 
 **Release**: v3.2.0
+**Value**: Core billing workflow
 
-**Value**: Core billing workflow - work prioritization + time verification
-
-### Phase 2: P1 Features (Week 2) - 7-10h
+### Phase 2: P1 Features - 4-6h
 1. **MVP-3**: Quick Time Logging (3-4h)
-   - `Ctrl+K Ctrl+T` keybinding
-   - 5-issue LRU cache
-   - Activity defaulting
-
-2. **MVP-4**: Workload Overview (4-6h)
-   - Total remaining work
-   - Available capacity
-   - Top 3 urgent issues
+2. **MVP-4**: Workload Overview (1-2h)
 
 **Release**: v3.3.0
-
-**Value**: Workflow efficiency - rapid logging + capacity planning
+**Value**: Workflow efficiency
 
 ---
 
