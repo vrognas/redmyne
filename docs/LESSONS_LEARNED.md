@@ -1,5 +1,50 @@
 # Lessons Learned
 
+## Code Quality Assessment (2025-11-24)
+
+### Error Handling
+
+**Use errorToString() utility**
+
+- Don't cast errors with `reason as string` - fails if error is object
+- Import and use `errorToString()` from utilities for safe conversion
+- Handles: Error instances, strings, objects with message property
+
+**Don't swallow errors silently**
+
+- `catch (_error) { /* empty */ }` hides failures from users
+- At minimum show error message: `catch (e) { showErrorMessage(errorToString(e)) }`
+
+### Network Resilience
+
+**Add request timeouts**
+
+- HTTP requests without timeout can hang indefinitely
+- Add `clientRequest.setTimeout(30000, ...)` to prevent UI freeze
+- Check if `setTimeout` exists before calling (mocks may not have it)
+
+### Code Deduplication
+
+**Export shared utilities**
+
+- If same function exists in multiple files, export from one and import
+- Example: `countWorkingDays`, `countAvailableHours` were in 2 files
+- Centralizing adds caching benefits (memoization in one place)
+
+**Don't dedupe prematurely**
+
+- Similar code may have different requirements (type strictness, locale handling)
+- `WeeklySchedule` in tree uses `Record<string, number>` for VS Code config compat
+- `WeeklySchedule` in calculator uses strict day-name type for internal logic
+
+### Git Hooks
+
+**Auto-install via prepare script**
+
+- Add `"prepare": "bash scripts/install-hooks.sh"` to package.json
+- Runs after `npm install`, ensuring hooks are always installed
+- Script should exit 0 silently if not in git repo (for CI)
+
 ## v3.0.0 Modernization (2025-11-22)
 
 ### TypeScript 5.7 Migration
