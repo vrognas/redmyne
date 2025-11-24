@@ -85,8 +85,8 @@
     "keybindings": [
       {
         "command": "redmine.quickLogTime",
-        "key": "ctrl+k ctrl+l",
-        "mac": "cmd+k cmd+l",
+        "key": "ctrl+y ctrl+y",
+        "mac": "cmd+y cmd+y",
         "when": "!terminalFocus && !inDebugMode && !inQuickOpen"
       }
     ],
