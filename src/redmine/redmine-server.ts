@@ -302,6 +302,29 @@ export class RedmineServer {
   }
 
   /**
+   * Returns promise that resolves to time entries for current user
+   * @param params Query parameters { from?: 'YYYY-MM-DD', to?: 'YYYY-MM-DD' }
+   */
+  async getTimeEntries(params?: {
+    from?: string;
+    to?: string;
+  }): Promise<{ time_entries: TimeEntry[] }> {
+    const queryParams = new URLSearchParams({ user_id: "me" });
+
+    if (params?.from) {
+      queryParams.set("from", params.from);
+    }
+    if (params?.to) {
+      queryParams.set("to", params.to);
+    }
+
+    return this.doRequest<{ time_entries: TimeEntry[] }>(
+      `/time_entries.json?${queryParams.toString()}`,
+      "GET"
+    );
+  }
+
+  /**
    * Returns promise, that resolves to an issue
    * @param issueId ID of issue
    */

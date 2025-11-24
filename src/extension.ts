@@ -14,6 +14,7 @@ import { RedmineConfig } from "./definitions/redmine-config";
 import { ActionProperties } from "./commands/action-properties";
 import { MyIssuesTree } from "./trees/my-issues-tree";
 import { ProjectsTree, ProjectsViewStyle } from "./trees/projects-tree";
+import { MyTimeEntriesTreeDataProvider } from "./trees/my-time-entries-tree";
 import { RedmineSecretManager } from "./utilities/secret-manager";
 import { setApiKey } from "./commands/set-api-key";
 
@@ -21,8 +22,10 @@ import { setApiKey } from "./commands/set-api-key";
 let cleanupResources: {
   myIssuesTree?: MyIssuesTree;
   projectsTree?: ProjectsTree;
+  myTimeEntriesTree?: MyTimeEntriesTreeDataProvider;
   myIssuesTreeView?: vscode.TreeView<unknown>;
   projectsTreeView?: vscode.TreeView<unknown>;
+  myTimeEntriesTreeView?: vscode.TreeView<unknown>;
   bucket?: {
     servers: RedmineServer[];
     projects: RedmineProject[];
@@ -59,14 +62,19 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const myIssuesTree = new MyIssuesTree();
   const projectsTree = new ProjectsTree();
+  const myTimeEntriesTree = new MyTimeEntriesTreeDataProvider();
   cleanupResources.myIssuesTree = myIssuesTree;
   cleanupResources.projectsTree = projectsTree;
+  cleanupResources.myTimeEntriesTree = myTimeEntriesTree;
 
   cleanupResources.myIssuesTreeView = vscode.window.createTreeView("redmine-explorer-my-issues", {
     treeDataProvider: myIssuesTree,
   });
   cleanupResources.projectsTreeView = vscode.window.createTreeView("redmine-explorer-projects", {
     treeDataProvider: projectsTree,
+  });
+  cleanupResources.myTimeEntriesTreeView = vscode.window.createTreeView("redmine-explorer-my-time-entries", {
+    treeDataProvider: myTimeEntriesTree,
   });
 
   // Listen for secret changes
@@ -113,8 +121,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
         myIssuesTree.setServer(server);
         projectsTree.setServer(server);
+        myTimeEntriesTree.setServer(server);
         projectsTree.onDidChangeTreeData$.fire();
         myIssuesTree.onDidChangeTreeData$.fire();
+        myTimeEntriesTree.refresh();
       } catch (error) {
         vscode.window.showErrorMessage(
           `Failed to initialize Redmine server: ${error}`
@@ -124,6 +134,7 @@ export function activate(context: vscode.ExtensionContext): void {
       // Clear servers when not configured (don't refresh - let welcome view show)
       myIssuesTree.setServer(undefined);
       projectsTree.setServer(undefined);
+      myTimeEntriesTree.setServer(undefined);
     }
   };
 
@@ -530,9 +541,21 @@ export function activate(context: vscode.ExtensionContext): void {
   registerCommand("changeDefaultServer", (conf) => {
     myIssuesTree.setServer(conf.server);
     projectsTree.setServer(conf.server);
+    myTimeEntriesTree.setServer(conf.server);
 
     projectsTree.onDidChangeTreeData$.fire();
     myIssuesTree.onDidChangeTreeData$.fire();
+    myTimeEntriesTree.refresh();
+  });
+
+  registerCommand("refreshTimeEntries", () => {
+    myTimeEntriesTree.refresh();
+  });
+
+  registerCommand("openTimeEntryInBrowser", async (props: ActionProperties, ...args: unknown[]) => {
+    const node = args[0] as { _entry: { issue_id: number } };
+    const issueId = node._entry.issue_id;
+    await vscode.env.openExternal(vscode.Uri.parse(`${props.server.options.address}/issues/${issueId}`));
   });
   context.subscriptions.push(
     vscode.commands.registerCommand("redmine.refreshIssues", () => {

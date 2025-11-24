@@ -83,6 +83,15 @@
       {
         "command": "redmine.toggleApiLogging",
         "title": "Redmine: Toggle API Logging"
+      },
+      {
+        "command": "redmine.refreshTimeEntries",
+        "title": "Redmine: Refresh time entries",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "redmine.openTimeEntryInBrowser",
+        "title": "Open in Browser"
       }
     ],
     "keybindings": [
@@ -102,6 +111,10 @@
         {
           "id": "redmine-explorer-projects",
           "name": "Projects"
+        },
+        {
+          "id": "redmine-explorer-my-time-entries",
+          "name": "My Time Entries"
         }
       ]
     },
@@ -113,6 +126,11 @@
       },
       {
         "view": "redmine-explorer-projects",
+        "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmine.configure)\nSet up your Redmine server URL and API key to get started.",
+        "when": "!redmine:configured"
+      },
+      {
+        "view": "redmine-explorer-my-time-entries",
         "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmine.configure)\nSet up your Redmine server URL and API key to get started.",
         "when": "!redmine:configured"
       }
@@ -143,6 +161,14 @@
         },
         {
           "command": "redmine.toggleListView",
+          "when": "false"
+        },
+        {
+          "command": "redmine.refreshTimeEntries",
+          "when": "false"
+        },
+        {
+          "command": "redmine.openTimeEntryInBrowser",
           "when": "false"
         }
       ],
@@ -179,6 +205,26 @@
           "command": "redmine.refreshIssues",
           "when": "view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues'",
           "group": "navigation"
+        },
+        {
+          "command": "redmine.configure",
+          "when": "view == 'redmine-explorer-my-time-entries'",
+          "group": "navigation"
+        },
+        {
+          "command": "redmine.changeDefaultServer",
+          "when": "view == 'redmine-explorer-my-time-entries' && !hasSingleConfig"
+        },
+        {
+          "command": "redmine.refreshTimeEntries",
+          "when": "view == 'redmine-explorer-my-time-entries'",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "redmine.openTimeEntryInBrowser",
+          "when": "view == 'redmine-explorer-my-time-entries' && viewItem == 'time-entry'"
         }
       ]
     },
