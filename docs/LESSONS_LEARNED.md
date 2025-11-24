@@ -323,3 +323,98 @@
 5. **Git hooks in repo**: Store in `scripts/`, install via script - can't track `.git/hooks/`
 6. **Test shell scripts from Node**: `execSync` throws on non-zero exit - wrap in `expect(() => ...).toThrow()`
 7. **Pre-commit > CI**: Hooks give faster feedback than CI checks (1s vs 30s)
+
+## v3.2.0 MVP-2 Time Entry Viewing (2025-11-24)
+
+### Module Mock Hoisting Timing Issues with Getters
+
+**Problem**: Tests passed locally but failed in CI with empty arrays. RedmineServer methods returned `[]` instead of mocked data.
+
+**Root Cause**: Module mock hoisting interacted poorly with getter pattern
+
+```typescript
+// src/redmine/redmine-server.ts
+get request() {
+  return this.options.url.protocol === "https:"
+    ? https.request  // ← Evaluated at runtime, not import time
+    : http.request;
+}
+```
+
+**The Failure Sequence**:
+
+1. Test file: `vi.mock("http")` hoisted to top
+2. **CI Environment** (slower module resolution):
+   - `import * as http` resolves → caches reference to **real** `http.request`
+   - Mock applies too late → getter already captured unmocked version
+   - Real `http.request` tries network calls → fails/times out → `doRequest` returns `null`
+   - `response?.projects || []` correctly returns `[]`
+   - Tests expecting data fail: `expect(result.issues).toHaveLength(1)` got `[]`
+
+3. **Local Environment** (faster):
+   - Mock applies → `import * as http` gets mocked version
+   - Getter uses mocked `http.request` ✓
+
+**Why It's Non-Deterministic**:
+- Module cache timing varies by:
+  - CPU speed
+  - Parallel test execution
+  - File system I/O
+  - Node.js version
+  - Import graph complexity
+
+**The Fix - Dependency Injection**:
+
+```typescript
+// src/redmine/redmine-server.ts
+export interface RedmineServerConnectionOptions {
+  // ...
+  requestFn?: typeof http.request; // ← Optional injected dependency
+}
+
+get request() {
+  if (this.options.requestFn) {
+    return this.options.requestFn; // ← Use injected mock
+  }
+  return this.options.url.protocol === "https:"
+    ? https.request
+    : http.request;
+}
+```
+
+```typescript
+// test/unit/redmine/redmine-server.test.ts
+const createMockRequest = () => vi.fn(/* ... */);
+
+beforeEach(() => {
+  server = new RedmineServer({
+    address: "http://localhost:3000",
+    key: "test-api-key",
+    requestFn: createMockRequest(), // ← Direct injection
+  });
+});
+```
+
+**Why DI Works**:
+- No reliance on module mock hoisting order
+- No dependency on import resolution timing
+- No getter evaluation timing issues
+- Explicit, deterministic, works in all environments
+- Tests control exactly what code runs
+
+**Alternative Failed Attempts**:
+
+1. ❌ `queueMicrotask()` instead of `setTimeout()` in mock - didn't fix race
+2. ❌ Removing custom mock tests - symptom not cause
+3. ❌ Fixing mock endpoint paths - unrelated issue
+4. ❌ Adding null checks with optional chaining - good practice but didn't fix root cause
+
+### Lessons
+
+1. **Avoid module mocking for stateful/getter patterns**: Hoisting timing is non-deterministic
+2. **DI makes tests deterministic**: Explicit injection bypasses module resolution entirely
+3. **Local pass ≠ CI pass**: Environment differences expose timing-dependent code
+4. **Getters evaluated at runtime**: Unlike imports, getters don't benefit from hoisting
+5. **Test robustness principle**: If it works differently in CI, the test is fragile
+6. **Null safety hides symptoms**: `response?.projects || []` masked the real issue (null responses)
+7. **Debug from first principles**: "Why would doRequest return null?" led to network call discovery

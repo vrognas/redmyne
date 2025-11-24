@@ -6,6 +6,11 @@ Redmine project management integration for Positron IDE and VS Code.
 
 ## Features
 
+- **Quick Time Logging** (Ctrl+Y Ctrl+Y)
+  - Fast time entry with recent issue cache
+  - Flexible time formats: 2.5, 1:45, 1h 45min
+  - Optional comment field
+  - Status bar confirmation
 - Sidebar panel
   - List issues assigned to you in sidebar panel
   - List projects and open issues in them

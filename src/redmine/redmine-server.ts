@@ -38,6 +38,11 @@ export interface RedmineServerConnectionOptions {
    * @example { "Authorization": "Basic YTph" }
    */
   additionalHeaders?: { [key: string]: string };
+  /**
+   * Optional custom request function for testing
+   * @internal
+   */
+  requestFn?: typeof http.request;
 }
 
 interface RedmineServerOptions extends RedmineServerConnectionOptions {
@@ -54,6 +59,9 @@ export class RedmineServer {
   private timeEntryActivities: TimeEntryActivity[] | null = null;
 
   get request() {
+    if (this.options.requestFn) {
+      return this.options.requestFn;
+    }
     return this.options.url.protocol === "https:"
       ? https.request
       : http.request;
@@ -245,8 +253,8 @@ export class RedmineServer {
       }>(`/projects.json?limit=${limit}&offset=${offset}`, "GET");
 
       const [totalCount, result]: [number, RedmineProject[]] = [
-        response.total_count,
-        response.projects.map(
+        response?.total_count || 0,
+        (response?.projects || []).map(
           (proj) =>
             new RedmineProject({
               ...proj,
@@ -272,11 +280,13 @@ export class RedmineServer {
       time_entry_activities: TimeEntryActivity[];
     }>(`/enumerations/time_entry_activities.json`, "GET");
 
-    if (response) {
+    if (response && response.time_entry_activities) {
       this.timeEntryActivities = response.time_entry_activities;
     }
 
-    return response;
+    return {
+      time_entry_activities: response?.time_entry_activities || [],
+    };
   }
 
   addTimeEntry(
@@ -298,6 +308,29 @@ export class RedmineServer {
           },
         })
       )
+    );
+  }
+
+  /**
+   * Returns promise that resolves to time entries for current user
+   * @param params Query parameters { from?: 'YYYY-MM-DD', to?: 'YYYY-MM-DD' }
+   */
+  async getTimeEntries(params?: {
+    from?: string;
+    to?: string;
+  }): Promise<{ time_entries: TimeEntry[] }> {
+    const queryParams = new URLSearchParams({ user_id: "me", include: "issue" });
+
+    if (params?.from) {
+      queryParams.set("from", params.from);
+    }
+    if (params?.to) {
+      queryParams.set("to", params.to);
+    }
+
+    return this.doRequest<{ time_entries: TimeEntry[] }>(
+      `/time_entries.json?${queryParams.toString()}`,
+      "GET"
     );
   }
 
@@ -339,12 +372,14 @@ export class RedmineServer {
         "GET"
       );
 
-      if (obj) {
+      if (obj && obj.issue_statuses) {
         // Shouldn't change much; cache it.
         this.issueStatuses = obj;
       }
 
-      return obj;
+      return {
+        issue_statuses: obj?.issue_statuses || [],
+      };
     } else {
       return this.issueStatuses;
     }
@@ -352,14 +387,14 @@ export class RedmineServer {
 
   async getIssueStatusesTyped(): Promise<IssueStatus[]> {
     const statuses = await this.getIssueStatuses();
-    return statuses.issue_statuses.map((s) => new IssueStatus(s.id, s.name));
+    return (statuses?.issue_statuses || []).map((s) => new IssueStatus(s.id, s.name));
   }
   async getMemberships(projectId: number): Promise<Membership[]> {
     const membershipsResponse = await this.doRequest<{
       memberships: RedmineMembership[];
     }>(`/projects/${projectId}/memberships.json`, "GET");
 
-    return membershipsResponse.memberships.map((m) =>
+    return (membershipsResponse?.memberships || []).map((m) =>
       "user" in m
         ? new Membership(m.user.id, m.user.name)
         : new Membership(m.group.id, m.group.name, false)
@@ -414,8 +449,8 @@ export class RedmineServer {
       );
 
       const [totalCount, result]: [number, Issue[]] = [
-        response.total_count,
-        response.issues,
+        response?.total_count || 0,
+        response?.issues || [],
       ];
 
       return req(offset + limit, limit, totalCount, accumulator.concat(result));
@@ -452,8 +487,8 @@ export class RedmineServer {
       }>(`${baseUrl}&limit=${limit}&offset=${offset}`, "GET");
 
       const [totalCount, result]: [number, Issue[]] = [
-        response.total_count,
-        response.issues,
+        response?.total_count || 0,
+        response?.issues || [],
       ];
 
       return req(offset + limit, limit, totalCount, accumulator.concat(result));

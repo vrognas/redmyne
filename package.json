@@ -2,7 +2,7 @@
   "name": "positron-redmine",
   "displayName": "Redmine for Positron",
   "description": "Redmine project management integration for Positron IDE and VS Code",
-  "version": "3.1.0",
+  "version": "3.2.1",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -17,6 +17,9 @@
   },
   "categories": [
     "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -45,6 +48,10 @@
       {
         "command": "redmine.openActionsForIssueUnderCursor",
         "title": "Redmine: Actions for issue under cursor"
+      },
+      {
+        "command": "redmine.quickLogTime",
+        "title": "Redmine: Quick Log Time"
       },
       {
         "command": "redmine.changeDefaultServer",
@@ -76,6 +83,23 @@
       {
         "command": "redmine.toggleApiLogging",
         "title": "Redmine: Toggle API Logging"
+      },
+      {
+        "command": "redmine.refreshTimeEntries",
+        "title": "Redmine: Refresh time entries",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "redmine.openTimeEntryInBrowser",
+        "title": "Open in Browser"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "redmine.quickLogTime",
+        "key": "ctrl+y ctrl+y",
+        "mac": "cmd+y cmd+y",
+        "when": "!terminalFocus && !inDebugMode && !inQuickOpen"
       }
     ],
     "views": {
@@ -87,6 +111,10 @@
         {
           "id": "redmine-explorer-projects",
           "name": "Projects"
+        },
+        {
+          "id": "redmine-explorer-my-time-entries",
+          "name": "My Time Entries"
         }
       ]
     },
@@ -98,6 +126,11 @@
       },
       {
         "view": "redmine-explorer-projects",
+        "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmine.configure)\nSet up your Redmine server URL and API key to get started.",
+        "when": "!redmine:configured"
+      },
+      {
+        "view": "redmine-explorer-my-time-entries",
         "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmine.configure)\nSet up your Redmine server URL and API key to get started.",
         "when": "!redmine:configured"
       }
@@ -128,6 +161,14 @@
         },
         {
           "command": "redmine.toggleListView",
+          "when": "false"
+        },
+        {
+          "command": "redmine.refreshTimeEntries",
+          "when": "false"
+        },
+        {
+          "command": "redmine.openTimeEntryInBrowser",
           "when": "false"
         }
       ],
@@ -164,6 +205,26 @@
           "command": "redmine.refreshIssues",
           "when": "view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues'",
           "group": "navigation"
+        },
+        {
+          "command": "redmine.configure",
+          "when": "view == 'redmine-explorer-my-time-entries'",
+          "group": "navigation"
+        },
+        {
+          "command": "redmine.changeDefaultServer",
+          "when": "view == 'redmine-explorer-my-time-entries' && !hasSingleConfig"
+        },
+        {
+          "command": "redmine.refreshTimeEntries",
+          "when": "view == 'redmine-explorer-my-time-entries'",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "redmine.openTimeEntryInBrowser",
+          "when": "view == 'redmine-explorer-my-time-entries' && viewItem == 'time-entry'"
         }
       ]
     },
@@ -210,6 +271,53 @@
           "description": "Enable API request/response logging to output channel",
           "default": true,
           "scope": "machine"
+        },
+        "redmine.workingHours.hoursPerDay": {
+          "type": "number",
+          "default": 8,
+          "minimum": 1,
+          "maximum": 16,
+          "scope": "application",
+          "markdownDescription": "**DEPRECATED:** Use `#redmine.workingHours.weeklySchedule#` instead.\n\nDaily working hours for time entry calculations.",
+          "deprecationMessage": "Use redmine.workingHours.weeklySchedule to set hours per day of week"
+        },
+        "redmine.workingHours.workingDays": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+          },
+          "default": ["Mon", "Tue", "Wed", "Thu", "Fri"],
+          "minItems": 1,
+          "maxItems": 7,
+          "uniqueItems": true,
+          "scope": "application",
+          "markdownDescription": "**DEPRECATED:** Use `#redmine.workingHours.weeklySchedule#` instead.\n\nWorking days for time entry calculations.",
+          "deprecationMessage": "Use redmine.workingHours.weeklySchedule to set hours per day of week"
+        },
+        "redmine.workingHours.weeklySchedule": {
+          "type": "object",
+          "default": {
+            "Mon": 8,
+            "Tue": 8,
+            "Wed": 8,
+            "Thu": 8,
+            "Fri": 8,
+            "Sat": 0,
+            "Sun": 0
+          },
+          "properties": {
+            "Mon": { "type": "number", "minimum": 0, "maximum": 24 },
+            "Tue": { "type": "number", "minimum": 0, "maximum": 24 },
+            "Wed": { "type": "number", "minimum": 0, "maximum": 24 },
+            "Thu": { "type": "number", "minimum": 0, "maximum": 24 },
+            "Fri": { "type": "number", "minimum": 0, "maximum": 24 },
+            "Sat": { "type": "number", "minimum": 0, "maximum": 24 },
+            "Sun": { "type": "number", "minimum": 0, "maximum": 24 }
+          },
+          "additionalProperties": false,
+          "scope": "application",
+          "markdownDescription": "**Weekly working hours schedule**\n\nSet working hours for each day of the week (0-24h). Use 0 for non-working days.\n\n**Example schedules:**\n- Standard 5-day week: Mon-Fri = 8h, Sat-Sun = 0h\n- 4-day week: Mon-Thu = 10h, Fri-Sun = 0h\n- Part-time Friday: Mon-Thu = 8h, Fri = 4h, Sat-Sun = 0h\n\nUsed to calculate utilization percentages in time entry view."
         }
       }
     }

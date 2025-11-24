@@ -6,6 +6,12 @@ export const window = {
   showInformationMessage: vi.fn(),
   showErrorMessage: vi.fn(),
   withProgress: vi.fn((opts, task) => task({ report: vi.fn() })),
+  createStatusBarItem: vi.fn(() => ({
+    text: "",
+    show: vi.fn(),
+    hide: vi.fn(),
+    dispose: vi.fn(),
+  })),
 };
 
 export const workspace = {
@@ -26,12 +32,21 @@ export const Uri = {
 };
 
 export const EventEmitter = class {
-  fire = vi.fn();
-  event = vi.fn();
+  private listeners: Array<(e: unknown) => unknown> = [];
+
+  fire = vi.fn((data: unknown) => {
+    this.listeners.forEach((listener) => listener(data));
+  });
+
+  event = (listener: (e: unknown) => unknown) => {
+    this.listeners.push(listener);
+    return { dispose: vi.fn() };
+  };
 };
 
 export const ProgressLocation = { Notification: 15 };
-export const ConfigurationTarget = { WorkspaceFolder: 3 };
+export const ConfigurationTarget = { WorkspaceFolder: 3, Global: 1 };
+export const StatusBarAlignment = { Left: 1, Right: 2 };
 
 export const TreeItemCollapsibleState = {
   None: 0,
@@ -44,9 +59,28 @@ export class TreeItem {
   description?: string;
   command?: { command: string; arguments?: unknown[]; title: string };
   collapsibleState?: number;
+  tooltip?: unknown;
+  iconPath?: unknown;
+  contextValue?: string;
 
   constructor(label: string, collapsibleState?: number) {
     this.label = label;
     this.collapsibleState = collapsibleState;
+  }
+}
+
+export class MarkdownString {
+  value: string;
+
+  constructor(value: string) {
+    this.value = value;
+  }
+}
+
+export class ThemeIcon {
+  id: string;
+
+  constructor(id: string) {
+    this.id = id;
   }
 }

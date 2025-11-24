@@ -1,7 +1,7 @@
 # Phased Implementation Plan - Redmine VSCode Extension MVPs
 
 **Date**: 2025-11-24
-**Status**: Ready for implementation
+**Status**: MVP-2 Complete ✅ (v3.2.1) - Moving to MVP-1
 **Compliance**: A (91/100) - All critical issues resolved
 
 ---
@@ -12,14 +12,14 @@
 
 4 MVPs addressing consultant workflow gaps, totaling **26-40h** (3-5 days)
 
-| MVP | Priority | Effort | Start | Description |
-|-----|----------|--------|-------|-------------|
-| **MVP-3** | P1 | 3-4h | ⭐ **START** | Quick Time Logging (Ctrl+K Ctrl+L) |
-| **MVP-2** | P0 | 5-7h | Phase 2 | Time Entry Viewing (tree view) |
-| **MVP-1** | P0 | 9-11h | Phase 3 | Timeline & Progress Display (flexibility scores) |
-| **MVP-4** | P1 | 2-3h | Phase 4 | Workload Overview (status bar) |
+| MVP | Priority | Effort | Status | Description |
+|-----|----------|--------|--------|-------------|
+| **MVP-3** | P1 | 3-4h | ✅ **COMPLETE** | Quick Time Logging (Ctrl+Y Ctrl+Y) |
+| **MVP-2** | P0 | 5-7h | ✅ **COMPLETE** | Time Entry Viewing (tree view) |
+| **MVP-1** | P0 | 9-11h | ⭐ **NEXT** | Timeline & Progress Display (flexibility scores) |
+| **MVP-4** | P1 | 2-3h | Pending | Workload Overview (status bar) |
 
-**Implementation Order**: MVP-3 → MVP-2 → MVP-1 → MVP-4
+**Implementation Order**: MVP-3 ✅ → MVP-2 ✅ → MVP-1 → MVP-4
 **Rationale**: Simple→Complex, de-risk patterns early
 
 ### Validation Status
@@ -52,8 +52,8 @@
 ### Validation Findings (Fixed)
 
 #### 1. Keybinding Conflict
-**Problem**: `Ctrl+K Ctrl+T` conflicts with VSCode Color Theme picker
-**Fix**: ✅ Changed to `Ctrl+K Ctrl+L` (L for "Log time")
+**Problem**: `Ctrl+K Ctrl+T` conflicts with VSCode Color Theme picker, `Ctrl+K Ctrl+L` conflicts with Toggle Fold
+**Fix**: ✅ Changed to `Ctrl+Y Ctrl+Y` (double-press for safety)
 
 #### 2. MVP-1 Lazy Calculation Freeze
 **Problem**: Calculating flexibility in `getTreeItem()` = 200+ API calls per refresh
@@ -801,15 +801,47 @@ describe('MyTimeEntriesTreeDataProvider', () => {
 
 ### Success Criteria
 
-- [ ] Tree view shows Today/Week/Month groups
-- [ ] Total hours shown in group descriptions
-- [ ] Loading state appears during fetch
-- [ ] No double-fetching (cached entries)
-- [ ] Refresh command works
-- [ ] Context menu opens time entry in browser
-- [ ] Tests pass (3 scenarios)
+- [x] Tree view shows Today/Week/Month groups
+- [x] Total hours shown in group descriptions
+- [x] Loading state appears during fetch
+- [x] No double-fetching (cached entries)
+- [x] Refresh command works
+- [x] Context menu opens time entry in browser
+- [x] Tests pass (11 scenarios)
 
-**Estimated Effort**: 5-7 hours
+**Status**: ✅ COMPLETE (v3.2.1 - 6h actual including fixes)
+
+### Implementation Summary (v3.2.1)
+
+**Core Features Delivered**:
+- Time entries tree with Today/Week/Month groups
+- Issue caching with batch fetching (N+1 query prevention)
+- Async background loading (<10ms initial render, prevents UI blocking)
+- Tooltip with "Open in Browser" command link
+- Parallel API requests for improved UX
+
+**Critical Fixes Applied**:
+- UI blocking: 252ms → <10ms via async pattern
+- Command URI encoding for markdown tooltips
+- Null/undefined API response handling (optional chaining)
+- Module mock timing issues via DI pattern
+- Mock endpoint path corrections
+
+**Testing**:
+- 11 tests for time entries tree
+- Total: 123 tests passing (83.56% coverage)
+- CI green ✓
+
+**Key Lessons**:
+- DI > module mocking for getters (timing-independent)
+- Async loading prevents UI freezes
+- Optional chaining for robust null handling
+- Local pass ≠ CI pass (environment matters)
+
+**Documentation**:
+- LESSONS_LEARNED.md: Module mock hoisting timing issues
+- ARCHITECTURE.md: MyTimeEntriesTree architecture
+- CHANGELOG.md: v3.2.1 entry
 
 ---
 

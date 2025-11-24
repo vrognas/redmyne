@@ -4,6 +4,40 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ## [Unreleased]
 
+## [3.2.1] - 2025-11-24
+
+### Added
+
+- Issue caching in time entries tree (fetches issue details from /issues API)
+- Batch issue fetching to avoid N+1 queries
+- Tooltip with "Open in Browser" command link for time entries
+- Dependency injection for HTTP client (improves test reliability)
+
+### Fixed
+
+- UI blocking on sidebar click (252ms → <10ms via async loading)
+- Command URI encoding for markdown tooltips
+- Null/undefined API response handling (optional chaining)
+- CI test failures from module mock timing issues
+- Mock endpoint path for time entry activities
+
+## [3.2.0] - 2025-11-24
+
+### Added
+
+- Quick Time Logging (MVP-3): Ctrl+Y Ctrl+Y keybinding for fast time entry
+- Recent issue/activity cache (<24h) for one-click logging
+- Flexible time format support: decimal (2.5), HH:MM (1:45), units (1h 45min)
+- Optional comment field for time entries
+- Activity name shown in all prompts for clarity
+- Status bar confirmation (3s flash) after logging
+- Extension activation on startup for keybindings
+
+### Fixed
+
+- Auto-select single workspace folder (no picker prompt)
+- Unhandled promise rejection in list-open-issues command
+
 ## [3.1.0] - 2025-11-23
 
 ### Changed

@@ -3,38 +3,39 @@ import { RedmineServer } from "../../../src/redmine/redmine-server";
 import * as http from "http";
 import { EventEmitter } from "events";
 
-// Mock http.request
-vi.mock("http", async () => {
-  const actual = await vi.importActual<typeof http>("http");
-  return {
-    ...actual,
-    request: vi.fn(
-      (
-        options: { path?: string; method?: string },
-        callback: (
-          response: NodeJS.EventEmitter & {
-            statusCode: number;
-            statusMessage: string;
-          }
-        ) => void
-      ) => {
-        const request = new EventEmitter() as NodeJS.EventEmitter & {
-          end: () => void;
-          on: (event: string, handler: (...args: unknown[]) => void) => unknown;
+// Create mock request function
+const createMockRequest = () =>
+  vi.fn(
+    (
+      options: { path?: string; method?: string },
+      callback: (
+        response: NodeJS.EventEmitter & {
+          statusCode: number;
+          statusMessage: string;
+        }
+      ) => void
+    ) => {
+      const request = new EventEmitter() as NodeJS.EventEmitter & {
+        end: () => void;
+        on: (event: string, handler: (...args: unknown[]) => void) => unknown;
+      };
+      request.end = function () {
+        const path = options.path || "/";
+        const response = new EventEmitter() as NodeJS.EventEmitter & {
+          statusCode: number;
+          statusMessage: string;
         };
-        request.end = function () {
-          const path = options.path || "/";
-          const response = new EventEmitter() as NodeJS.EventEmitter & {
-            statusCode: number;
-            statusMessage: string;
-          };
-          response.statusCode = 200;
-          response.statusMessage = "OK";
+        response.statusCode = 200;
+        response.statusMessage = "OK";
 
-          setTimeout(() => {
-            let data: unknown;
+        // Call callback first (synchronous)
+        callback(response);
 
-            if (options.method === "GET" && path.includes("/issues.json")) {
+        // Then emit data and end events asynchronously
+        queueMicrotask(() => {
+          let data: unknown;
+
+          if (options.method === "GET" && path.includes("/issues.json")) {
               data = {
                 issues: [
                   {
@@ -85,7 +86,7 @@ vi.mock("http", async () => {
               };
             } else if (
               options.method === "GET" &&
-              path.includes("/time_entry_activities.json")
+              path.includes("/enumerations/time_entry_activities.json")
             ) {
               data = {
                 time_entry_activities: [{ id: 9, name: "Development" }],
@@ -108,9 +109,7 @@ vi.mock("http", async () => {
 
             response.emit("data", Buffer.from(JSON.stringify(data)));
             response.emit("end");
-          }, 0);
-
-          callback(response);
+          });
         };
         request.on = function (
           event: string,
@@ -121,9 +120,7 @@ vi.mock("http", async () => {
         };
         return request;
       }
-    ),
-  };
-});
+    ) as unknown as typeof http.request;
 
 describe("RedmineServer", () => {
   let server: RedmineServer;
@@ -132,6 +129,7 @@ describe("RedmineServer", () => {
     server = new RedmineServer({
       address: "http://localhost:3000",
       key: "test-api-key",
+      requestFn: createMockRequest(),
     });
   });
 
