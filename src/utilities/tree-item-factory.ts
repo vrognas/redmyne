@@ -32,7 +32,7 @@ export function createIssueTreeItem(
  */
 const STATUS_CONFIG = {
   completed: { icon: "pass", color: "testing.iconPassed", text: "Done" },
-  "on-track": { icon: "pass", color: "testing.iconPassed", text: "On Track" },
+  "on-track": { icon: "map", color: "testing.iconPassed", text: "On Track" },
   "at-risk": { icon: "warning", color: "list.warningForeground", text: "At Risk" },
   overbooked: { icon: "error", color: "list.errorForeground", text: "Overbooked" },
 } as const;
