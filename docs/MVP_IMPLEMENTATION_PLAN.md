@@ -68,20 +68,45 @@
 #### MVP-1: TreeItem Enhancement
 ```typescript
 // File: src/utilities/tree-item-factory.ts
-treeItem.description = `3.5/8h 2d +100%→+60% 🟢  #${issue.id}`;
 
-// Rich tooltip
+// ⚠️ UX COMPLIANCE: Use ThemeIcon + text for accessibility
+treeItem.description = `#${issue.id} 3.5/8h 2d $(check) +60%`;  // Simplified, current status only
+
+// ThemeIcon for risk level (accessible, theme-aware)
+treeItem.iconPath = new vscode.ThemeIcon(
+  'pass',  // or 'warning', 'error' based on risk
+  new vscode.ThemeColor('testing.iconPassed')
+);
+
+// Rich tooltip with full details
 treeItem.tooltip = new vscode.MarkdownString(`
 **Issue #${issue.id}: ${issue.subject}**
 
-**Progress:** 3.5h / 8h (44%)
+**Progress:** 3.5h / 8h (44% complete)
 
-**Initial Plan:** +100% flexibility
-**Current Status:** +60% flexibility
+**Initial Plan:**
+- Flexibility: +100% (2× time buffer)
+- Status: Comfortable
+
+**Current Status:**
+- Remaining: 2 working days (16h available)
+- Flexibility: +60% (still comfortable)
+- Status: On Track
+
+[View in Redmine](${serverUrl}/issues/${issue.id})
 `);
 ```
 
-**Key**: Emoji in description (🟢🟡🔴) simpler than ThemeIcon.
+**Key**: ThemeIcon + text alternatives for accessibility (WCAG 2.1 compliance)
+
+**Risk Icon Mapping**:
+```typescript
+function getRiskIcon(flexibility: number): { icon: string, color: string, text: string } {
+  if (flexibility < 0) return { icon: 'error', color: 'errorForeground', text: 'Overbooked' };
+  if (flexibility < 20) return { icon: 'warning', color: 'warningForeground', text: 'At Risk' };
+  return { icon: 'pass', color: 'testing.iconPassed', text: 'On Track' };
+}
+```
 
 #### MVP-2: Dynamic Parent Labels
 **Problem**: VSCode doesn't support updating parent label after children fetch.
@@ -227,6 +252,35 @@ vscode.workspace.onDidChangeConfiguration(e => {
   }
 });
 ```
+
+---
+
+### Welcome View Pattern (UX Compliance)
+
+**⚠️ UX COMPLIANCE**: Add onboarding for first-time users
+
+**Add to package.json**:
+```json
+"viewsWelcome": [
+  {
+    "view": "redmine-explorer-my-issues",
+    "contents": "No Redmine server configured.\n\n[$(gear) Configure Server](command:redmine.configure)\n\n[$(book) Documentation](https://github.com/vrognas/positron-redmine)",
+    "when": "!redmine:serverConfigured"
+  },
+  {
+    "view": "redmine-explorer-my-time-entries",
+    "contents": "No Redmine server configured.\n\n[$(gear) Configure Server](command:redmine.configure)",
+    "when": "!redmine:serverConfigured"
+  }
+]
+```
+
+**Context key** (set in extension.ts):
+```typescript
+vscode.commands.executeCommand('setContext', 'redmine:serverConfigured', !!serverUrl);
+```
+
+**Benefits**: Guides new users, improves first-time UX, reduces support burden
 
 ### Files to Create/Modify
 
@@ -768,44 +822,60 @@ Time entry (child):
    }
 
    export class MyTimeEntriesTree implements vscode.TreeDataProvider<TreeItem> {
+     private isLoading = false;
+
      async getChildren(element?: TreeItem): Promise<TreeItem[]> {
        if (!element) {
-         // ⚠️ CRITICAL VSCode pattern: Pre-calculate totals upfront
-         // VSCode doesn't support updating parent labels after children fetch
+         // ⚠️ UX COMPLIANCE: Show loading state during async fetch
+         if (this.isLoading) {
+           return [{
+             label: 'Loading time entries...',
+             iconPath: new vscode.ThemeIcon('loading~spin'),
+             isPlaceholder: true
+           }];
+         }
 
-         // ⚡ Performance: Fetch once, cache on parent node to avoid double-fetching
-         const todayEntries = await this.server.getTimeEntries({
-           userId: 'me',
-           from: today(),
-           to: today(),
-           limit: 100
-         });
-         const todayTotal = todayEntries.time_entries.reduce((sum, e) => sum + e.hours, 0);
+         this.isLoading = true;
+         try {
+           // ⚠️ CRITICAL VSCode pattern: Pre-calculate totals upfront
+           // VSCode doesn't support updating parent labels after children fetch
 
-         const weekEntries = await this.server.getTimeEntries({
-           userId: 'me',
-           from: weekAgo(),
-           to: today(),
-           limit: 100
-         });
-         const weekTotal = weekEntries.time_entries.reduce((sum, e) => sum + e.hours, 0);
-
-         return [
-           {
-             label: 'Today',
+           // ⚡ Performance: Fetch once, cache on parent node to avoid double-fetching
+           const todayEntries = await this.server.getTimeEntries({
+             userId: 'me',
              from: today(),
              to: today(),
-             total: todayTotal,
-             _cachedEntries: todayEntries.time_entries  // Cache entries
-           },
-           {
-             label: 'This Week',
+             limit: 100
+           });
+           const todayTotal = todayEntries.time_entries.reduce((sum, e) => sum + e.hours, 0);
+
+           const weekEntries = await this.server.getTimeEntries({
+             userId: 'me',
              from: weekAgo(),
              to: today(),
-             total: weekTotal,
-             _cachedEntries: weekEntries.time_entries  // Cache entries
-           }
-         ];
+             limit: 100
+           });
+           const weekTotal = weekEntries.time_entries.reduce((sum, e) => sum + e.hours, 0);
+
+           return [
+             {
+               label: 'Today',
+               from: today(),
+               to: today(),
+               total: todayTotal,
+               _cachedEntries: todayEntries.time_entries  // Cache entries
+             },
+             {
+               label: 'This Week',
+               from: weekAgo(),
+               to: today(),
+               total: weekTotal,
+               _cachedEntries: weekEntries.time_entries  // Cache entries
+             }
+           ];
+         } finally {
+           this.isLoading = false;
+         }
        }
 
        if (element instanceof DateGroup) {
@@ -1296,7 +1366,9 @@ Status bar item (always visible) showing:
 
      async update() {
        const workload = await this.calculateWorkload();
-       this.statusBar.text = `$(pulse) ${workload.remaining}h left, ${workload.buffer}h ${workload.icon}`;
+
+       // ⚠️ UX COMPLIANCE: Single icon only, no emoji (accessibility + guideline compliance)
+       this.statusBar.text = `${workload.remaining}h left, ${workload.buffer >= 0 ? '+' : ''}${workload.buffer}h buffer`;
 
        this.statusBar.tooltip = new vscode.MarkdownString(`
 **Workload Overview**
@@ -1305,10 +1377,10 @@ Total estimated: ${workload.totalEstimated}h
 Total spent: ${workload.totalSpent}h
 Remaining work: ${workload.remaining}h
 Available this week: ${workload.available}h
-Capacity: ${workload.buffer}h buffer ${workload.icon}
+Capacity: ${workload.buffer >= 0 ? '+' : ''}${workload.buffer}h ${workload.status}
 
 **Top 3 Urgent:**
-${workload.topUrgent.map(i => `- #${i.id}: ${i.daysLeft}d left, ${i.hoursLeft}h ${i.icon}`).join('\n')}
+${workload.topUrgent.map(i => `- #${i.id}: ${i.daysLeft}d left, ${i.hoursLeft}h (${i.status})`).join('\n')}
        `);
      }
 
@@ -1327,21 +1399,24 @@ ${workload.topUrgent.map(i => `- #${i.id}: ${i.daysLeft}d left, ${i.hoursLeft}h 
        const daysThisWeek = 5; // Simplified for MVP
        const available = daysThisWeek * hoursPerDay;
        const buffer = available - remaining;
-       const icon = buffer >= 0 ? '🟢' : '🔴';
+       const status = buffer >= 0 ? 'On Track' : 'Overbooked';
 
        // Top 3 urgent
        const topUrgent = openIssues
          .filter(i => i.due_date)
          .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())
          .slice(0, 3)
-         .map(i => ({
-           id: i.id,
-           daysLeft: Math.ceil((new Date(i.due_date!).getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
-           hoursLeft: (i.total_estimated_hours || 0) - (i.total_spent_hours || 0),
-           icon: '🔴' // Simplified
-         }));
+         .map(i => {
+           const daysLeft = Math.ceil((new Date(i.due_date!).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+           return {
+             id: i.id,
+             daysLeft,
+             hoursLeft: (i.total_estimated_hours || 0) - (i.total_spent_hours || 0),
+             status: daysLeft <= 0 ? 'Overdue' : daysLeft <= 1 ? 'Due Soon' : 'Scheduled'
+           };
+         });
 
-       return { totalEstimated, totalSpent, remaining, available, buffer, icon, topUrgent };
+       return { totalEstimated, totalSpent, remaining, available, buffer, status, topUrgent };
      }
 
      // ⚡ Performance: Event-driven updates (no polling)
@@ -1380,9 +1455,22 @@ ${workload.topUrgent.map(i => `- #${i.id}: ${i.daysLeft}d left, ${i.hoursLeft}h 
 
 2. **Register in Extension**: `/src/extension.ts`
    ```typescript
-   const workloadStatusBar = new WorkloadStatusBar(server);
-   workloadStatusBar.registerTriggers(context);
-   context.subscriptions.push(workloadStatusBar);
+   // ⚠️ UX COMPLIANCE: Check configuration before showing status bar
+   const config = vscode.workspace.getConfiguration('redmine.statusBar');
+   if (config.get<boolean>('showWorkload', false)) {  // Opt-in
+     const workloadStatusBar = new WorkloadStatusBar(server);
+     workloadStatusBar.registerTriggers(context);
+     context.subscriptions.push(workloadStatusBar);
+   }
+   ```
+
+3. **Add Configuration**: `package.json`
+   ```json
+   "redmine.statusBar.showWorkload": {
+     "type": "boolean",
+     "default": false,
+     "description": "Show workload overview in status bar (opt-in to reduce noise)"
+   }
    ```
 
 **Estimated Effort**: 1-2 hours (status bar item ~20 LOC vs tree view ~120 LOC)
@@ -1476,25 +1564,28 @@ ${workload.topUrgent.map(i => `- #${i.id}: ${i.daysLeft}d left, ${i.hoursLeft}h 
 
 ### Total Estimated Effort
 
-**Implementation** (includes performance optimizations):
+**Implementation** (includes performance + UX compliance):
 - MVP-3: 3-4h (start) - includes recent issues picker optimization
-- MVP-2: 4-6h - includes caching optimization
-- MVP-1: 8-10h (most complex) - includes memoization optimization
-- MVP-4: 1-2h (finish) - includes event-driven updates
+- MVP-2: 5-7h - includes caching optimization + loading states + welcome view
+- MVP-1: 9-11h (most complex) - includes memoization + ThemeIcon refactor + accessibility
+- MVP-4: 2-3h (finish) - includes event-driven updates + configuration
 
 **Testing & Documentation**:
-- Testing: ~6-8 hours
+- Testing: ~6-8 hours (includes accessibility testing)
 - Documentation: ~3-4 hours
 
-**Performance Optimizations** (integrated above):
-- MVP-1 memoization: +30 min
-- MVP-2 caching: +15 min
-- MVP-3 picker limit: +15 min
-- MVP-4 event-driven: +5 min
-- Partial refresh: +5 min
-- **Total perf overhead**: ~1.5 hours (included in estimates above)
+**Optimization Overhead** (integrated above):
+- Performance: +1.5h (memoization, caching, picker, event-driven, partial refresh)
+- UX Compliance: +3h (ThemeIcon, loading states, welcome views, configuration)
+- **Total overhead**: ~4.5 hours
 
-**Grand Total**: ~22-34 hours (3-4 days) - same as before, perf work integrated
+**Grand Total**: ~25-37 hours (3-5 days) - includes all optimizations + UX compliance
+
+**Breakdown by phase**:
+- P0 Features (MVP-1+2): 14-18h
+- P1 Features (MVP-3+4): 5-7h
+- Testing: 6-8h
+- Documentation: 3-4h
 
 ### Expected Impact
 - **After P0 (MVP-1+2)**: 60-65% workflow coverage, ~5 browser visits/day
@@ -1509,6 +1600,7 @@ ${workload.topUrgent.map(i => `- #${i.id}: ${i.daysLeft}d left, ${i.hoursLeft}h 
 1. Review `docs/LESSONS_LEARNED.md`
 2. Review `docs/ARCHITECTURE.md`
 3. Review `CLAUDE.md`
+4. Review `docs/MVP_UX_GUIDELINES_COMPLIANCE.md`
 
 ### During Implementation
 1. Write tests FIRST for each MVP
@@ -1522,6 +1614,36 @@ ${workload.topUrgent.map(i => `- #${i.id}: ${i.daysLeft}d left, ${i.hoursLeft}h 
 2. Verify coverage: `npm run coverage`
 3. Update `docs/LESSONS_LEARNED.md` with insights
 4. Update `docs/ARCHITECTURE.md` if needed
+
+---
+
+### UX Compliance Testing (Critical)
+
+**Accessibility Tests**:
+- [ ] Screen reader announces risk status as text (not "pass icon", "error icon")
+- [ ] High-contrast theme shows clear icon differentiation
+- [ ] ThemeIcon colors adapt to user theme (dark/light/high-contrast)
+- [ ] Keyboard navigation works for all tree items
+- [ ] Tooltips provide full context for screen readers
+
+**Visual Tests** (Manual):
+- [ ] Tree descriptions don't truncate on 280px sidebar width
+- [ ] Status bar text readable without relying on colors
+- [ ] Icons match VSCode theme conventions
+- [ ] Loading states appear during slow API calls
+
+**Functional Tests**:
+- [ ] Loading states show/hide correctly
+- [ ] Welcome view appears when no server configured
+- [ ] Status bar respects opt-in configuration
+- [ ] Collapsible state persists after manual expansion
+- [ ] Context menu accessible via keyboard (Shift+F10)
+
+**Theme Testing** (Required):
+- [ ] Dark theme (default)
+- [ ] Light theme
+- [ ] High contrast theme
+- [ ] Color blind simulation (deuteranopia, protanopia)
 
 ---
 
