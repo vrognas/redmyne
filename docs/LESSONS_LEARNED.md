@@ -418,3 +418,76 @@ beforeEach(() => {
 5. **Test robustness principle**: If it works differently in CI, the test is fragile
 6. **Null safety hides symptoms**: `response?.projects || []` masked the real issue (null responses)
 7. **Debug from first principles**: "Why would doRequest return null?" led to network call discovery
+
+## v3.4.0 MVP-4 Status Bar (2025-11-24)
+
+### Async Disposal Race Conditions
+
+**Problem**: `TypeError: Cannot read property 'hide' of undefined` when status bar disposed during async fetch
+
+**Root Cause**: Status bar reference captured before `await`, disposed by config change during fetch
+
+```typescript
+// BAD: Race condition
+const statusBar = cleanupResources.workloadStatusBar;
+const issues = await myIssuesTree.fetchIssuesIfNeeded(); // User toggles off during this
+statusBar.hide(); // undefined!
+
+// GOOD: Re-check after await
+const issues = await myIssuesTree.fetchIssuesIfNeeded();
+if (!cleanupResources.workloadStatusBar) return; // Disposed? Bail
+cleanupResources.workloadStatusBar.hide(); // Safe
+```
+
+### Concurrent Fetch Prevention
+
+**Problem**: Multiple rapid tree refreshes triggered dozens of API requests simultaneously
+
+**Solution**: Promise deduplication pattern
+
+```typescript
+private pendingFetch: Promise<Issue[]> | null = null;
+
+async fetchIssuesIfNeeded(): Promise<Issue[]> {
+  if (this.cachedIssues.length > 0) return this.cachedIssues;
+  if (this.pendingFetch) return this.pendingFetch; // Reuse in-flight
+
+  this.pendingFetch = this.getChildren().then(issues => {
+    this.pendingFetch = null;
+    return issues;
+  });
+  return this.pendingFetch;
+}
+```
+
+### Config Listener Filtering
+
+**Problem**: Tree "blinks" when toggling status bar config
+
+**Root Cause**: `event.affectsConfiguration("redmine")` matches ALL `redmine.*` changes, triggering unnecessary server reinit
+
+```typescript
+// BAD: Any redmine.* change triggers full reinit
+if (event.affectsConfiguration("redmine")) {
+  await updateConfiguredContext(); // Clears cache, causes blink
+}
+
+// GOOD: Filter out UI-only configs
+if (
+  event.affectsConfiguration("redmine") &&
+  !event.affectsConfiguration("redmine.statusBar") &&
+  !event.affectsConfiguration("redmine.workingHours")
+) {
+  await updateConfiguredContext();
+}
+```
+
+**Insight**: Categorize configs as server-related (url, apiKey, headers) vs UI-only (statusBar, workingHours). Only server-related changes need reinit.
+
+### Lessons
+
+1. **Re-check state after await**: Async gaps allow external state changes
+2. **Promise deduplication**: Prevent concurrent duplicate requests
+3. **Config categorization**: UI-only vs server-related - different handling
+4. **Event-driven > polling**: Subscribe to tree changes, not timers
+5. **Opt-in patterns**: Default false for non-essential features
