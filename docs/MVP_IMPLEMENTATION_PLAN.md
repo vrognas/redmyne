@@ -50,13 +50,17 @@ Calculate TWO flexibility scores: **initial** (planning quality - static) and **
 - **`spent_hours`**: Time logged on THIS issue only (excludes subtasks)
 - **`total_spent_hours`**: Time on issue + all subtasks (Redmine 3.3+)
 - **Use `total_spent_hours`** for accurate progress tracking
-- **Automatically included** in Redmine 3.3+ (2016-09-25), no `include` param needed
-- **List endpoint** (`GET /issues.json`): Returns both fields
-- **Single endpoint** (`GET /issues/123.json`): Returns both fields
+
+**VERSION REQUIREMENTS** (⚠️ CRITICAL):
+- **Show endpoint** (`GET /issues/123.json`): Includes total_* fields in Redmine 3.3+ ✓
+- **List endpoint** (`GET /issues.json`): Requires **Redmine 5.0.0+** for total_* fields ([#34857](https://www.redmine.org/issues/34857))
+- **Pre-5.0.0 workaround**: Fetch individual issues or sum time_entries manually
+- **Recommended minimum**: Redmine 5.0.0 for full MVP-1 support
 
 **GROUP ASSIGNMENTS** (affects "assigned to me" filtering):
 - Issues assigned to groups appear in "assigned to me" for group members
 - Use `assigned_to_id=me` to include both direct + group assignments
+- **⚠️ Prerequisite**: Admin must enable "Allow issue assignment to groups" in Settings → Issue Tracking
 
 **CLOSED ISSUES** (critical for workload):
 - Use `status.is_closed` flag to exclude from capacity calculations
@@ -448,10 +452,15 @@ New tree view "My Time Entries" showing logged time grouped by date with totals.
 
 **New endpoint**: `GET /time_entries.json`
 
-**CRITICAL FINDING** (from API analysis):
+**CRITICAL FINDINGS** (from API analysis):
 - **No server-side grouping**: Time entries returned as flat list
 - **Must group client-side**: By date, project, or activity
-- **Pagination required**: Max 100 entries per request (default 25)
+- **Pagination**: Default 25/request, max 100 (configurable by admin)
+
+**⚠️ user_id=me CAVEAT**:
+- Works in practice but **UNDOCUMENTED** in official API
+- May break in future Redmine versions without notice
+- **Fallback**: Fetch user ID via `GET /users/current.json` first if needed
 
 **Query parameters**:
 ```
@@ -751,11 +760,21 @@ Command palette shortcut that remembers last issue and activity for rapid re-log
 
 **CRITICAL FINDINGS** (from API analysis):
 - **`activity_id` REQUIRED** unless server has default activity configured
-- **Fetch activities**: `GET /enumerations/time_entry_activities.json`
-- **Activity response**: `[{id, name, is_default}]`
 - **Comments max length**: 255 characters (truncate if longer)
 - **Date format**: YYYY-MM-DD for `spent_on` field
 - **Either issue_id OR project_id** required (not both)
+
+**ACTIVITY FETCHING** (⚠️ TWO ENDPOINTS):
+1. **System-level activities**: `GET /enumerations/time_entry_activities.json`
+   - Returns global activities only
+   - Response: `[{id, name, is_default}]`
+
+2. **Project-specific activities**: `GET /projects/{id}.json?include=time_entry_activities`
+   - Required for projects with restricted activities ([#18095](https://www.redmine.org/issues/18095))
+   - Available since Redmine 3.4.0
+   - Returns project's allowed activities
+
+**IMPLEMENTATION**: Fetch both system + project activities, merge for complete list
 
 Request body:
 ```json
@@ -1152,10 +1171,11 @@ Based on comprehensive analysis of all 22 Redmine REST API endpoints:
 
 ### P2 Priority - Future MVPs
 
-**1. Issue Relations** (`GET /issues/{id}/relations.json`)
+**1. Issue Relations** (`GET /issues.json?include=relations`)
 - **Use case**: Show blocking/blocked issues in timeline view
 - **Impact on capacity**: Blocked issues shouldn't count as "available work"
 - **Display**: Add "🔴 BLOCKED by #456" indicator
+- **Efficiency**: Use `include=relations` param for batch requests (single API call)
 - **Effort**: 8-11h (MVP-5 candidate)
 - **Example**: `#123 Fix auth | 3.5/8h 2d +60% 🔴 BLOCKED by #456`
 
@@ -1175,10 +1195,11 @@ Based on comprehensive analysis of all 22 Redmine REST API endpoints:
 - **Limitation**: Requires admin access to fetch definitions
 - **Effort**: 6-8h (MVP-7 candidate)
 
-**4. Issue Picker with Search** (`GET /search.xml?q=<query>`)
+**4. Issue Picker with Search** (`GET /issues.json` with subject filter)
 - **Use case**: Quick issue lookup in time logging UI
-- **Enhancement**: Add search box to issue picker
-- **Performance**: Max 100 results, client-side pagination
+- **Recommended approach**: Use `/issues.json?f[]=subject&op[subject]=~&v[subject][]=<query>`
+- **Why not /search.xml**: XML-only (no JSON), returns minimal data
+- **Performance**: Max 100 results, supports wildcards
 - **Effort**: 2-3h (enhancement to MVP-3)
 
 **5. Version/Milestone Planning** (`GET /projects/{id}/versions`)
@@ -1213,8 +1234,13 @@ Based on analysis, these APIs have **no connection** to time tracking or issue m
 
 **Pagination Limits**:
 - Default: 25 items per request
-- Maximum: 100 items per request (hardcoded)
+- Maximum: 100 items per request (admin configurable, not hardcoded)
 - Large datasets require offset/limit loops
+
+**Caching Recommendations**:
+- **Issue statuses**: Cache for 24h (rarely change), clear on manual refresh
+- **Activities**: Cache for session (static data)
+- **Time entries**: Cache for 5min max (frequently updated)
 
 **No Server-Side Aggregation**:
 - Time entry grouping: Client-side only
