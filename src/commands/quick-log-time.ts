@@ -101,7 +101,7 @@ export async function quickLogTime(
       validateInput: (value: string) => {
         const hours = parseTimeInput(value);
         if (hours === null || hours < 0.1 || hours > 24) {
-          return "Must be 0.1-24 hours (e.g., 2.5, 1:45, 1h 45min)";
+          return "Must be 0.1-24 hours (e.g. equivalent: 1.75, 1:45, or 1h 45min)";
         }
         return null;
       },
