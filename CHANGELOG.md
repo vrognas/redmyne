@@ -14,6 +14,7 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 - Git hooks auto-install on `npm install` via prepare script
 - Deduplicated date utilities (-60 lines)
+- Config changes and refresh debounced (300ms) to prevent API spam
 
 ## [3.4.0] - 2025-11-24
 
