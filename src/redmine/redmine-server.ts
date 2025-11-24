@@ -38,6 +38,11 @@ export interface RedmineServerConnectionOptions {
    * @example { "Authorization": "Basic YTph" }
    */
   additionalHeaders?: { [key: string]: string };
+  /**
+   * Optional custom request function for testing
+   * @internal
+   */
+  requestFn?: typeof http.request;
 }
 
 interface RedmineServerOptions extends RedmineServerConnectionOptions {
@@ -54,6 +59,9 @@ export class RedmineServer {
   private timeEntryActivities: TimeEntryActivity[] | null = null;
 
   get request() {
+    if (this.options.requestFn) {
+      return this.options.requestFn;
+    }
     return this.options.url.protocol === "https:"
       ? https.request
       : http.request;
