@@ -205,6 +205,8 @@ export function activate(context: vscode.ExtensionContext): void {
         projectsTree.onDidChangeTreeData$.fire();
         myIssuesTree.onDidChangeTreeData$.fire();
         myTimeEntriesTree.refresh();
+        // Update status bar after server is configured
+        updateWorkloadStatusBar();
       } catch (error) {
         vscode.window.showErrorMessage(
           `Failed to initialize Redmine server: ${error}`
