@@ -227,4 +227,133 @@ describe("RedmineServer", () => {
     });
     expect(server.compare(server3)).toBe(false);
   });
+
+  it("should handle undefined projects response gracefully", async () => {
+    vi.mocked(http.request).mockImplementationOnce(
+      (
+        _options: { path?: string; method?: string },
+        callback: (
+          response: NodeJS.EventEmitter & {
+            statusCode: number;
+            statusMessage: string;
+          }
+        ) => void
+      ) => {
+        const request = new EventEmitter() as NodeJS.EventEmitter & {
+          end: () => void;
+          on: (event: string, handler: (...args: unknown[]) => void) => unknown;
+        };
+        request.end = function () {
+          const response = new EventEmitter() as NodeJS.EventEmitter & {
+            statusCode: number;
+            statusMessage: string;
+          };
+          response.statusCode = 200;
+          response.statusMessage = "OK";
+          callback(response);
+          queueMicrotask(() => {
+            response.emit("data", Buffer.from(JSON.stringify({ total_count: 0 })));
+            response.emit("end");
+          });
+        };
+        request.on = function (
+          event: string,
+          handler: (...args: unknown[]) => void
+        ) {
+          EventEmitter.prototype.on.call(this, event, handler);
+          return this;
+        };
+        return request;
+      }
+    );
+
+    const projects = await server.getProjects();
+    expect(projects).toEqual([]);
+  });
+
+  it("should handle undefined memberships response gracefully", async () => {
+    vi.mocked(http.request).mockImplementationOnce(
+      (
+        _options: { path?: string; method?: string },
+        callback: (
+          response: NodeJS.EventEmitter & {
+            statusCode: number;
+            statusMessage: string;
+          }
+        ) => void
+      ) => {
+        const request = new EventEmitter() as NodeJS.EventEmitter & {
+          end: () => void;
+          on: (event: string, handler: (...args: unknown[]) => void) => unknown;
+        };
+        request.end = function () {
+          const response = new EventEmitter() as NodeJS.EventEmitter & {
+            statusCode: number;
+            statusMessage: string;
+          };
+          response.statusCode = 200;
+          response.statusMessage = "OK";
+          callback(response);
+          queueMicrotask(() => {
+            response.emit("data", Buffer.from(JSON.stringify({})));
+            response.emit("end");
+          });
+        };
+        request.on = function (
+          event: string,
+          handler: (...args: unknown[]) => void
+        ) {
+          EventEmitter.prototype.on.call(this, event, handler);
+          return this;
+        };
+        return request;
+      }
+    );
+
+    const memberships = await server.getMemberships(1);
+    expect(memberships).toEqual([]);
+  });
+
+  it("should handle undefined issue_statuses response gracefully", async () => {
+    vi.mocked(http.request).mockImplementationOnce(
+      (
+        _options: { path?: string; method?: string },
+        callback: (
+          response: NodeJS.EventEmitter & {
+            statusCode: number;
+            statusMessage: string;
+          }
+        ) => void
+      ) => {
+        const request = new EventEmitter() as NodeJS.EventEmitter & {
+          end: () => void;
+          on: (event: string, handler: (...args: unknown[]) => void) => unknown;
+        };
+        request.end = function () {
+          const response = new EventEmitter() as NodeJS.EventEmitter & {
+            statusCode: number;
+            statusMessage: string;
+          };
+          response.statusCode = 200;
+          response.statusMessage = "OK";
+          callback(response);
+          queueMicrotask(() => {
+            response.emit("data", Buffer.from(JSON.stringify({})));
+            response.emit("end");
+          });
+        };
+        request.on = function (
+          event: string,
+          handler: (...args: unknown[]) => void
+        ) {
+          EventEmitter.prototype.on.call(this, event, handler);
+          return this;
+        };
+        return request;
+      }
+    );
+
+    const statuses = await server.getIssueStatusesTyped();
+    expect(statuses).toEqual([]);
+  });
 });
