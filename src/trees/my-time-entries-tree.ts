@@ -121,20 +121,22 @@ export class MyTimeEntriesTreeDataProvider
     // Child level - time entries (use cached)
     if (element.type === "group" && element._cachedEntries) {
       return element._cachedEntries.map((entry) => {
+        const issueId = entry.issue?.id || entry.issue_id;
         const issueSubject = entry.issue?.subject || "Unknown Issue";
         const tooltip = new vscode.MarkdownString(
-          `**Issue:** #${entry.issue?.id || entry.issue_id} ${issueSubject}\n\n` +
+          `**Issue:** #${issueId} ${issueSubject}\n\n` +
             `**Hours:** ${entry.hours}h\n\n` +
             `**Activity:** ${entry.activity?.name || "Unknown"}\n\n` +
             `**Date:** ${entry.spent_on}\n\n` +
             `**Comments:** ${entry.comments || "(none)"}\n\n` +
             `---\n\n` +
-            `[Open Issue in Browser](command:redmine.openTimeEntryInBrowser?${encodeURIComponent(JSON.stringify([{ issue_id: entry.issue?.id || entry.issue_id }]))})`
+            `[Open Issue in Browser](command:redmine.openTimeEntryInBrowser?${issueId})`
         );
         tooltip.isTrusted = true;
+        tooltip.supportHtml = false;
 
         return {
-          label: `#${entry.issue?.id || entry.issue_id} ${issueSubject}`,
+          label: `#${issueId} ${issueSubject}`,
           description: `${entry.hours}h ${entry.activity?.name || ""}`,
           tooltip,
           collapsibleState: vscode.TreeItemCollapsibleState.None,

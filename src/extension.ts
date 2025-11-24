@@ -553,18 +553,24 @@ export function activate(context: vscode.ExtensionContext): void {
   });
 
   registerCommand("openTimeEntryInBrowser", async (props: ActionProperties, ...args: unknown[]) => {
-    let issueId: number;
+    let issueId: number | undefined;
 
-    // Handle both context menu (tree node) and command URI (from tooltip link)
+    // Handle context menu (tree node with _entry)
     if (args[0] && typeof args[0] === 'object' && '_entry' in args[0]) {
-      // Called from context menu
       const node = args[0] as { _entry: { issue_id: number } };
       issueId = node._entry.issue_id;
-    } else if (args[0] && typeof args[0] === 'object' && 'issue_id' in args[0]) {
-      // Called from command URI in tooltip
+    }
+    // Handle command URI (VS Code passes parsed JSON as first arg)
+    else if (args[0] && typeof args[0] === 'number') {
+      issueId = args[0];
+    }
+    // Handle command URI with object (legacy/alternative format)
+    else if (args[0] && typeof args[0] === 'object' && 'issue_id' in args[0]) {
       const params = args[0] as { issue_id: number };
       issueId = params.issue_id;
-    } else {
+    }
+
+    if (!issueId) {
       vscode.window.showErrorMessage('Could not determine issue ID');
       return;
     }
