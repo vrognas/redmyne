@@ -146,6 +146,8 @@ export class MyIssuesTree implements vscode.TreeDataProvider<TreeItem> {
     // Start new fetch
     this.pendingFetch = this.getChildren().then(() => {
       this.pendingFetch = null;
+      // Notify tree to refresh (in case it showed loading placeholder)
+      this.onDidChangeTreeData$.fire();
       return this.cachedIssues;
     });
     return this.pendingFetch;
