@@ -109,7 +109,8 @@ export function activate(context: vscode.ExtensionContext): void {
   const updateWorkloadStatusBar = async () => {
     if (!cleanupResources.workloadStatusBar) return;
 
-    const issues = myIssuesTree.getIssues();
+    // Fetch issues if not cached (triggers initial load)
+    const issues = await myIssuesTree.fetchIssuesIfNeeded();
     if (issues.length === 0) {
       cleanupResources.workloadStatusBar.hide();
       return;
@@ -145,8 +146,9 @@ export function activate(context: vscode.ExtensionContext): void {
     cleanupResources.workloadStatusBar.show();
   };
 
-  // Initialize status bar
+  // Initialize status bar and trigger initial load
   initializeWorkloadStatusBar();
+  updateWorkloadStatusBar();
 
   // Update on tree refresh
   myIssuesTree.onDidChangeTreeData$.event(() => {

@@ -127,6 +127,20 @@ export class MyIssuesTree implements vscode.TreeDataProvider<TreeItem> {
     return this.cachedIssues;
   }
 
+  /**
+   * Fetch issues if not cached, for status bar initial load
+   */
+  async fetchIssuesIfNeeded(): Promise<Issue[]> {
+    if (this.cachedIssues.length > 0) {
+      return this.cachedIssues;
+    }
+    if (!this.server) {
+      return [];
+    }
+    await this.getChildren();
+    return this.cachedIssues;
+  }
+
   private getScheduleConfig(): WeeklySchedule {
     const config = vscode.workspace.getConfiguration("redmine.workingHours");
     return config.get<WeeklySchedule>("weeklySchedule", DEFAULT_SCHEDULE);
