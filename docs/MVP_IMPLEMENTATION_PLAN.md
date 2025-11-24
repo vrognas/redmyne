@@ -464,22 +464,23 @@ New tree view "My Time Entries" showing logged time grouped by date with totals.
 - **Must group client-side**: By date, project, or activity
 - **Pagination**: Default 25/request, max 100 (configurable by admin)
 
-**🔴 user_id Parameter** (CRITICAL):
-- **user_id=me DOES NOT WORK** - Feature #12763 confirms failure
-- **Must use numeric user ID**: Fetch via `GET /users/current.json` first
-- **Implementation**:
-  1. Call `/users/current.json` to get user ID
-  2. Use numeric ID in `/time_entries.json?user_id={id}`
-- Unlike Issues API, Time Entries does not support "me" keyword
+**⚠️ user_id=me UNCERTAINTY** (UNDOCUMENTED):
+- **Status**: Not officially documented, mixed evidence
+- **Implementation approach**: Try `user_id=me` first
+- **Conflicting reports**:
+  - Feature #12763: One failure report (may be auth issue)
+  - Issues API: `assigned_to_id=me` works reliably
+  - No confirmed working examples found for time entries
+- **Fallback strategy**: If fails, fetch user ID via `/users/current.json` and use numeric ID
+- **Risk**: May work in some Redmine versions but not others
 
-**Query parameters**:
+**Query parameters** (try this first):
 ```
-GET /time_entries.json?user_id={numeric_id}&from=2025-11-20&to=2025-11-23&limit=100
+GET /time_entries.json?user_id=me&from=2025-11-20&to=2025-11-23&limit=100
 ```
-**Note**: Replace `{numeric_id}` with actual user ID from `/users/current.json`
 
 **Supported filters**:
-- `user_id` - Filter by user (**numeric ID only**, "me" does not work)
+- `user_id` - Filter by user (try "me", fallback to numeric ID if fails)
 - `from` - Date range start (YYYY-MM-DD)
 - `to` - Date range end (YYYY-MM-DD)
 - `spent_on` - Specific date (YYYY-MM-DD)
