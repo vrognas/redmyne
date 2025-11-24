@@ -34,8 +34,9 @@ positron-redmine/
 │   │       ├── time-entry-activity.ts
 │   │       └── named-entity.ts
 │   ├── trees/                 # VS Code tree view providers
-│   │   ├── my-issues-tree.ts  # "Issues assigned to me" view
-│   │   └── projects-tree.ts   # "Projects" view (list/tree modes)
+│   │   ├── my-issues-tree.ts       # "Issues assigned to me" view
+│   │   ├── my-time-entries-tree.ts # "My time entries" view (Today/Week/Month)
+│   │   └── projects-tree.ts        # "Projects" view (list/tree modes)
 │   ├── definitions/           # TypeScript interfaces
 │   │   └── redmine-config.ts  # Extension configuration schema
 │   └── utilities/             # Helper functions
@@ -59,7 +60,7 @@ positron-redmine/
 
 - `activate()`: Entry point called by VS Code
   - Initializes `RedmineSecretManager` for secure API key storage
-  - Initializes tree providers (`MyIssuesTree`, `ProjectsTree`)
+  - Initializes tree providers (`MyIssuesTree`, `MyTimeEntriesTree`, `ProjectsTree`)
   - Registers commands with `registerCommand()` wrapper
   - Sets up configuration parsing via `parseConfiguration()`
   - Updates context (`updateConfiguredContext()`) to check URL + API key presence
@@ -152,6 +153,36 @@ getMemberships(projectId): Promise<Membership[]>
 **Click Action**: Opens issue actions menu.
 
 **Refresh**: Triggered via `onDidChangeTreeData$` EventEmitter.
+
+#### MyTimeEntriesTree (`my-time-entries-tree.ts`)
+
+**Implements**: `vscode.TreeDataProvider<TimeEntryNode>`
+
+**Purpose**: Displays user's logged time entries grouped by period (Today/Week/Month).
+
+**Data Source**: `RedmineServer.getTimeEntries()` with date range filters
+
+**Architecture**:
+- Async background loading to prevent UI blocking (<10ms initial render)
+- Issue caching with batch fetching (avoids N+1 queries)
+- Parallel API requests for Today/Week/Month groups
+- Loading state while fetching data
+
+**Tree Structure**:
+```
+📅 Today (8.5h)
+  └─ #7392 Data Management (1.25h)
+📅 This Week (17.5h)
+  └─ ...
+📅 This Month (42.0h)
+  └─ ...
+```
+
+**Tooltip**: Shows issue #, subject, hours, "Open in Browser" command link
+
+**Commands**: Refresh tree, open time entry issue in browser
+
+**Performance**: 252ms → <10ms sidebar click (async pattern)
 
 #### ProjectsTree (`projects-tree.ts`)
 

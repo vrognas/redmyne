@@ -4,14 +4,22 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ## [Unreleased]
 
+## [3.2.1] - 2025-11-24
+
 ### Added
 
-- Time Entry Viewing (MVP-2): tree view with Today/Week/Month groups
-- 3 parallel API requests for better UX (Today/Week/Month fetch concurrently)
-- getTimeEntries() API method with date range filters
-- Parent-level caching to avoid double-fetch
-- Refresh and open-in-browser commands for time entries
-- 7 new TDD tests for time entries tree (119 total, 83.56% coverage)
+- Issue caching in time entries tree (fetches issue details from /issues API)
+- Batch issue fetching to avoid N+1 queries
+- Tooltip with "Open in Browser" command link for time entries
+- Dependency injection for HTTP client (improves test reliability)
+
+### Fixed
+
+- UI blocking on sidebar click (252ms → <10ms via async loading)
+- Command URI encoding for markdown tooltips
+- Null/undefined API response handling (optional chaining)
+- CI test failures from module mock timing issues
+- Mock endpoint path for time entry activities
 
 ## [3.2.0] - 2025-11-24
 
