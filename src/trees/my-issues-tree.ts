@@ -60,6 +60,13 @@ const STATUS_PRIORITY: Record<FlexibilityScore["status"], number> = {
   completed: 3,
 };
 
+/**
+ * Check if issue is blocked by another issue
+ */
+function isBlocked(issue: Issue): boolean {
+  return issue.relations?.some((r) => r.relation_type === "blocked") ?? false;
+}
+
 export class MyIssuesTree implements vscode.TreeDataProvider<TreeItem> {
   server?: RedmineServer;
   private isLoading = false;
@@ -269,7 +276,7 @@ export class MyIssuesTree implements vscode.TreeDataProvider<TreeItem> {
         }
       }
 
-      // Sort top-level by risk priority
+      // Sort top-level by risk priority (blocked issues sink to bottom)
       const sorted = (topLevel as TreeItem[]).sort((a, b) => {
         // Containers go last
         if (isParentContainer(a) && !isParentContainer(b)) return 1;
@@ -280,6 +287,13 @@ export class MyIssuesTree implements vscode.TreeDataProvider<TreeItem> {
 
         const issueA = a as Issue;
         const issueB = b as Issue;
+
+        // Blocked issues sink to bottom (can't work on them)
+        const blockedA = isBlocked(issueA);
+        const blockedB = isBlocked(issueB);
+        if (blockedA && !blockedB) return 1;
+        if (!blockedA && blockedB) return -1;
+
         const flexA = this.flexibilityCache.get(issueA.id);
         const flexB = this.flexibilityCache.get(issueB.id);
 

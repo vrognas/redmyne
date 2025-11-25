@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { Issue } from "../redmine/models/issue";
+import { Issue, IssueRelation } from "../redmine/models/issue";
 import { RedmineServer } from "../redmine/redmine-server";
 import { FlexibilityScore } from "./flexibility-calculator";
 
@@ -46,6 +46,13 @@ function isBillable(issue: Issue): boolean {
 }
 
 /**
+ * Checks if issue is blocked by another issue
+ */
+function isBlocked(issue: Issue): boolean {
+  return issue.relations?.some((r) => r.relation_type === "blocked") ?? false;
+}
+
+/**
  * Creates an enhanced TreeItem with flexibility score and risk indicators
  * Format: Label="{Subject}", Description="#id spent/est days status"
  */
@@ -65,10 +72,12 @@ export function createEnhancedIssueTreeItem(
     const config = STATUS_CONFIG[flexibility.status];
     const spentHours = issue.spent_hours ?? 0;
     const estHours = issue.estimated_hours ?? 0;
+    const blocked = isBlocked(issue);
 
-    // Format: "#123 10/40h 5d On Track"
+    // Format: "🚫 #123 10/40h 5d On Track" (with blocked indicator if applicable)
+    const blockedPrefix = blocked ? "🚫 " : "";
     treeItem.description =
-      `#${issue.id} ${spentHours}/${estHours}h ${flexibility.daysRemaining}d ${config.text}`;
+      `${blockedPrefix}#${issue.id} ${spentHours}/${estHours}h ${flexibility.daysRemaining}d ${config.text}`;
 
     // Determine icon color: dim non-billable issues
     const iconColor = isBillable(issue)
@@ -130,10 +139,70 @@ function createFlexibilityTooltip(
 
   md.appendMarkdown(`**Status:** ${config.text}\n\n`);
 
+  // Add relations if present
+  if (issue.relations && issue.relations.length > 0) {
+    const relationsText = formatRelations(issue.relations);
+    if (relationsText) {
+      md.appendMarkdown(relationsText);
+    }
+  }
+
   if (server) {
     const baseUrl = server.options.address;
     md.appendMarkdown(`[Open in Browser](${baseUrl}/issues/${issue.id})`);
   }
 
   return md;
+}
+
+/**
+ * Format relations for tooltip display
+ * Priority order: blocked, blocks, precedes/follows, others
+ */
+function formatRelations(relations: IssueRelation[]): string {
+  const groups: Record<string, number[]> = {};
+
+  for (const rel of relations) {
+    if (!groups[rel.relation_type]) {
+      groups[rel.relation_type] = [];
+    }
+    groups[rel.relation_type].push(rel.issue_to_id);
+  }
+
+  const lines: string[] = [];
+
+  // Priority order for display
+  const typeLabels: Record<string, string> = {
+    blocked: "⛔ Blocked by",
+    blocks: "▶ Blocks",
+    precedes: "⏩ Precedes",
+    follows: "⏪ Follows",
+    relates: "🔗 Related to",
+    duplicates: "📋 Duplicates",
+    duplicated: "📋 Duplicated by",
+    copied_to: "📄 Copied to",
+    copied_from: "📄 Copied from",
+  };
+
+  const order = [
+    "blocked",
+    "blocks",
+    "precedes",
+    "follows",
+    "relates",
+    "duplicates",
+    "duplicated",
+    "copied_to",
+    "copied_from",
+  ];
+
+  for (const type of order) {
+    if (groups[type] && groups[type].length > 0) {
+      const label = typeLabels[type] || type;
+      const ids = groups[type].map((id) => `#${id}`).join(", ");
+      lines.push(`**${label}:** ${ids}\n\n`);
+    }
+  }
+
+  return lines.join("");
 }
