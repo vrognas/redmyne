@@ -189,8 +189,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
     const config = vscode.workspace.getConfiguration("redmine", folder.uri);
     const hasUrl = !!config.get<string>("url");
-    const hasApiKey = !!(await secretManager.getApiKey(folder.uri));
-    const isConfigured = hasUrl && hasApiKey;
+    const apiKey = await secretManager.getApiKey(folder.uri);
+    const isConfigured = hasUrl && !!apiKey;
 
     await vscode.commands.executeCommand(
       "setContext",
@@ -203,7 +203,7 @@ export function activate(context: vscode.ExtensionContext): void {
       try {
         const server = createServer({
           address: config.get<string>("url")!,
-          key: (await secretManager.getApiKey(folder.uri))!,
+          key: apiKey!,
           additionalHeaders: config.get("additionalHeaders"),
         });
 
@@ -213,8 +213,7 @@ export function activate(context: vscode.ExtensionContext): void {
         projectsTree.onDidChangeTreeData$.fire();
         myIssuesTree.onDidChangeTreeData$.fire();
         myTimeEntriesTree.refresh();
-        // Update status bar after server is configured
-        updateWorkloadStatusBar();
+        // Status bar updates via myIssuesTree event listener
       } catch (error) {
         vscode.window.showErrorMessage(
           `Failed to initialize Redmine server: ${error}`

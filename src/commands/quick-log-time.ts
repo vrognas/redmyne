@@ -51,6 +51,13 @@ export async function quickLogTime(
   context: vscode.ExtensionContext
 ): Promise<void> {
   try {
+    // Start fetching today's time entries early (runs during UI interactions)
+    const today = new Date().toISOString().split("T")[0];
+    const timeEntriesPromise = props.server.getTimeEntries({
+      from: today,
+      to: today,
+    });
+
     // 1. Get recent log from cache
     const recent = context.globalState.get<RecentTimeLog>("lastTimeLog");
 
@@ -94,12 +101,8 @@ export async function quickLogTime(
       selection = picked;
     }
 
-    // 3. Get today's logged hours for validation
-    const today = new Date().toISOString().split("T")[0];
-    const todayEntries = await props.server.getTimeEntries({
-      from: today,
-      to: today,
-    });
+    // 3. Await time entries (started earlier, likely ready now)
+    const todayEntries = await timeEntriesPromise;
     const todayTotal = todayEntries.time_entries.reduce(
       (sum, entry) => sum + parseFloat(entry.hours),
       0

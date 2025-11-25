@@ -452,3 +452,59 @@ fi
 4. **Use $CLAUDE_PROJECT_DIR**: Environment variable for project-relative paths in settings.json
 5. **Timeout critical hooks**: Set timeout for long-running hooks (typecheck: 120s)
 6. **Prompt hooks for soft guidance**: Use for suggestions, not enforcement
+
+## Performance Assessment (2025-11-25)
+
+### Perceived Performance Patterns
+
+**Lazy loading works well**
+- `onStartupFinished` activation = no blocking during VS Code startup
+- Trees return loading placeholder immediately, fetch in background
+- Status bar updates async, doesn't block UI
+
+**Triple-fire anti-pattern**
+- Problem: Firing 3 tree refresh events simultaneously cascades
+- Each fire triggers status bar listener → potential 4th fetch
+- Solution: Consolidate into single coordinated refresh
+
+**Sequential vs parallel in user flows**
+- Quick Log Time chains 4 network calls sequentially
+- getTimeEntries() could run while issue picker is open
+- Perceived speedup: parallelize independent fetches during UI waits
+
+**Progress indicators matter**
+- Network calls without progress = "frozen UI" perception
+- Even 500ms feels slow without feedback
+- withProgress() must be awaited to show correctly
+
+### Caching Strategy
+
+**Instance-level cache (current)**
+- Statuses/activities cached per RedmineServer instance
+- Lost on LRU eviction (3+ servers)
+- Good for repeated calls in single session
+
+**What should be cached but isn't**
+- getProjects() - changes rarely
+- getMemberships(projectId) - changes rarely
+- getIssuesAssignedToMe() - changes often, but cache for 30s reasonable
+
+### Scale Considerations
+
+**Pagination without limits**
+- Recursive pagination fetches ALL pages
+- 200 issues = 4 requests, 500 = 10 requests
+- Add maxItems parameter for UI-bounded fetches
+
+**Tree rendering constant-time**
+- Pre-calculate flexibility in getChildren(), cache result
+- Avoids N*M calculations during tree render
+- Pattern: heavy compute on fetch, light read on render
+
+### Lessons
+
+1. **Audit event chains**: One fire() can cascade through listeners
+2. **Parallelize during UI waits**: Network calls while picker is open
+3. **Progress for >200ms ops**: Any network call needs indicator
+4. **Cache by access pattern**: Rarely-changing data deserves TTL cache
+5. **Pagination with intent**: Fetch what UI needs, not everything
