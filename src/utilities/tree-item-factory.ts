@@ -38,6 +38,14 @@ const STATUS_CONFIG = {
 } as const;
 
 /**
+ * Determines if an issue is billable based on tracker name.
+ * Currently: tracker name "Task" = billable
+ */
+function isBillable(issue: Issue): boolean {
+  return issue.tracker?.name === "Task";
+}
+
+/**
  * Creates an enhanced TreeItem with flexibility score and risk indicators
  * Format: Label="{Subject}", Description="#id spent/est days status"
  */
@@ -62,11 +70,13 @@ export function createEnhancedIssueTreeItem(
     treeItem.description =
       `#${issue.id} ${spentHours}/${estHours}h ${flexibility.daysRemaining}d ${config.text}`;
 
+    // Determine icon color: dim non-billable issues
+    const iconColor = isBillable(issue)
+      ? new vscode.ThemeColor(config.color)
+      : new vscode.ThemeColor("list.deemphasizedForeground");
+
     // ThemeIcon for accessibility
-    treeItem.iconPath = new vscode.ThemeIcon(
-      config.icon,
-      new vscode.ThemeColor(config.color)
-    );
+    treeItem.iconPath = new vscode.ThemeIcon(config.icon, iconColor);
 
     // Rich tooltip with full details
     treeItem.tooltip = createFlexibilityTooltip(issue, flexibility, server);
@@ -107,6 +117,7 @@ function createFlexibilityTooltip(
   md.supportHtml = true;
 
   md.appendMarkdown(`**#${issue.id}: ${issue.subject}**\n\n`);
+  md.appendMarkdown(`**Tracker:** ${issue.tracker?.name ?? "Unknown"}\n\n`);
   md.appendMarkdown(`**Progress:** ${spentHours}h / ${estHours}h (${progress}%)\n\n`);
 
   if (flexibility.status !== "completed") {

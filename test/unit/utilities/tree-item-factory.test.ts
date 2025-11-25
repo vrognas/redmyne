@@ -137,4 +137,54 @@ describe("createEnhancedIssueTreeItem", () => {
 
     expect(treeItem.description).toBe("#7392");
   });
+
+  it("includes tracker name in tooltip", () => {
+    const treeItem = createEnhancedIssueTreeItem(
+      mockIssue,
+      mockFlexibility,
+      undefined,
+      "test.command"
+    );
+
+    // tooltip is MarkdownString
+    const tooltipValue = (treeItem.tooltip as { value: string })?.value;
+    expect(tooltipValue).toContain("**Tracker:**");
+    expect(tooltipValue).toContain("Tasks"); // tracker.name from mockIssue
+  });
+
+  it("dims non-billable issues (tracker !== Task)", () => {
+    const nonBillableIssue: Issue = {
+      ...mockIssue,
+      tracker: { id: 2, name: "Non-billable" },
+    };
+
+    const treeItem = createEnhancedIssueTreeItem(
+      nonBillableIssue,
+      mockFlexibility,
+      undefined,
+      "test.command"
+    );
+
+    // iconPath should use deemphasizedForeground color
+    const iconPath = treeItem.iconPath as { color?: { id: string } };
+    expect(iconPath?.color?.id).toBe("list.deemphasizedForeground");
+  });
+
+  it("does NOT dim billable issues (tracker === Task)", () => {
+    const billableIssue: Issue = {
+      ...mockIssue,
+      tracker: { id: 1, name: "Task" },
+    };
+
+    const treeItem = createEnhancedIssueTreeItem(
+      billableIssue,
+      mockFlexibility,
+      undefined,
+      "test.command"
+    );
+
+    // iconPath should NOT use deemphasizedForeground color
+    const iconPath = treeItem.iconPath as { color?: { id: string } };
+    expect(iconPath?.color?.id).not.toBe("list.deemphasizedForeground");
+  });
 });
