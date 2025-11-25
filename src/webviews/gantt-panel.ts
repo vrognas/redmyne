@@ -9,6 +9,17 @@ interface GanttIssue {
   start_date: string | null;
   due_date: string | null;
   status: FlexibilityScore["status"] | null;
+  project: string;
+  estimated_hours: number | null;
+  spent_hours: number | null;
+}
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function formatDateWithWeekday(dateStr: string | null): string {
+  if (!dateStr) return "—";
+  const d = new Date(dateStr);
+  return `${dateStr} (${WEEKDAYS[d.getDay()]})`;
 }
 
 /**
@@ -73,6 +84,9 @@ export class GanttPanel {
         start_date: i.start_date || null,
         due_date: i.due_date || null,
         status: flexibilityCache.get(i.id)?.status ?? null,
+        project: i.project?.name ?? "Unknown",
+        estimated_hours: i.estimated_hours ?? null,
+        spent_hours: i.spent_hours ?? null,
       }));
 
     this._updateContent();
@@ -169,6 +183,17 @@ export class GanttPanel {
             ? issue.subject.substring(0, 22) + "..."
             : issue.subject;
 
+        const estHours = issue.estimated_hours !== null ? `${issue.estimated_hours}h` : "—";
+        const spentHours = issue.spent_hours !== null ? `${issue.spent_hours}h` : "—";
+        const tooltip = [
+          `#${issue.id} ${issue.subject}`,
+          `Project: ${issue.project}`,
+          `Start: ${formatDateWithWeekday(issue.start_date)}`,
+          `Due: ${formatDateWithWeekday(issue.due_date)}`,
+          `Estimated: ${estHours}`,
+          `Spent: ${spentHours}`,
+        ].join("\n");
+
         return `
           <g class="issue-bar" data-issue-id="${issue.id}" style="cursor: pointer;">
             <text x="5" y="${y + barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12">
@@ -176,7 +201,7 @@ export class GanttPanel {
             </text>
             <rect x="${startX}" y="${y}" width="${width}" height="${barHeight}"
                   fill="${color}" rx="4" ry="4" opacity="0.8"/>
-            <title>#${issue.id}: ${issue.subject}</title>
+            <title>${tooltip}</title>
           </g>
         `;
       })
