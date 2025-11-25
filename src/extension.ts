@@ -20,6 +20,10 @@ import { setApiKey } from "./commands/set-api-key";
 import { calculateWorkload } from "./utilities/workload-calculator";
 import { WeeklySchedule } from "./utilities/flexibility-calculator";
 
+// Constants
+const CONFIG_DEBOUNCE_MS = 300;
+const SERVER_CACHE_SIZE = 3;
+
 // Module-level cleanup resources
 let cleanupResources: {
   myIssuesTree?: MyIssuesTree;
@@ -241,7 +245,6 @@ export function activate(context: vscode.ExtensionContext): void {
         clearTimeout(configChangeTimeout);
       }
 
-      // Debounce by 300ms
       configChangeTimeout = setTimeout(async () => {
         // Only update server context for server-related config changes
         // Skip for UI-only configs (statusBar, workingHours)
@@ -260,7 +263,7 @@ export function activate(context: vscode.ExtensionContext): void {
         if (event.affectsConfiguration("redmine.workingHours")) {
           updateWorkloadStatusBar();
         }
-      }, 300);
+      }, CONFIG_DEBOUNCE_MS);
     })
   );
 
@@ -554,8 +557,8 @@ export function activate(context: vscode.ExtensionContext): void {
     const server = fromBucket || redmineServer;
 
     if (!fromBucket) {
-      // LRU cache: max 3 servers
-      if (bucket.servers.length >= 3) {
+      // LRU cache: evict oldest when at capacity
+      if (bucket.servers.length >= SERVER_CACHE_SIZE) {
         const removed = bucket.servers.shift(); // Remove oldest server
         // Dispose if it's a LoggingRedmineServer
         if (removed && removed instanceof LoggingRedmineServer) {
@@ -733,7 +736,7 @@ export function activate(context: vscode.ExtensionContext): void {
         projectsTree.clearProjects();
         projectsTree.onDidChangeTreeData$.fire();
         myIssuesTree.onDidChangeTreeData$.fire();
-      }, 300);
+      }, CONFIG_DEBOUNCE_MS);
     }),
     vscode.commands.registerCommand("redmine.toggleTreeView", () => {
       vscode.commands.executeCommand(

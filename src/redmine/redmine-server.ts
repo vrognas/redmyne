@@ -17,6 +17,7 @@ import { Membership as RedmineMembership } from "./models/membership";
 type HttpMethods = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
 const REDMINE_API_KEY_HEADER_NAME = "X-Redmine-API-Key";
+const REQUEST_TIMEOUT_MS = 30000;
 
 export interface RedmineServerConnectionOptions {
   /**
@@ -269,11 +270,11 @@ export class RedmineServer {
 
       clientRequest.on("error", handleError);
 
-      // 30 second timeout to prevent indefinite hangs
+      // Timeout to prevent indefinite hangs
       if (typeof clientRequest.setTimeout === "function") {
-        clientRequest.setTimeout(30000, () => {
+        clientRequest.setTimeout(REQUEST_TIMEOUT_MS, () => {
           clientRequest.destroy();
-          const error = new Error("Request timeout after 30 seconds");
+          const error = new Error(`Request timeout after ${REQUEST_TIMEOUT_MS / 1000} seconds`);
           this.onResponseError(undefined, undefined, error, path, method, data, undefined, undefined, requestId);
           reject(error);
         });
