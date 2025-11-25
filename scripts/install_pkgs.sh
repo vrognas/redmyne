@@ -61,4 +61,96 @@ else
   echo "GitHub CLI already installed."
 fi
 
+# Configure gh CLI for Claude Code Web proxy remotes
+# The git remote uses a local proxy, so we need to help gh find the repo
+if [ -d ".git" ] || git rev-parse --git-dir > /dev/null 2>&1; then
+  REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
+  # Extract owner/repo from proxy URL (e.g., http://local_proxy@127.0.0.1:52168/git/owner/repo)
+  if [[ "$REMOTE_URL" =~ /git/([^/]+/[^/]+)$ ]] || [[ "$REMOTE_URL" =~ github\.com[:/]([^/]+/[^/.]+) ]]; then
+    REPO="${BASH_REMATCH[1]}"
+    REPO="${REPO%.git}"  # Remove .git suffix if present
+    echo "Detected GitHub repo: $REPO"
+
+    # Create gh wrapper that auto-adds --repo flag for repo-specific commands
+    cat > ~/.local/bin/gh-wrapper << 'WRAPPER_EOF'
+#!/bin/bash
+# Wrapper for gh CLI in Claude Code Web environments
+# Auto-detects repo from proxy remote URLs
+
+GH_BIN="$HOME/.local/bin/gh-bin"
+
+# Commands that need --repo flag
+REPO_FLAG_COMMANDS="pr issue release run workflow"
+
+# Get repo from git remote if not already set
+get_repo() {
+  if [ -n "$GH_REPO" ]; then
+    echo "$GH_REPO"
+    return
+  fi
+
+  REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
+  if [[ "$REMOTE_URL" =~ /git/([^/]+/[^/]+)$ ]] || [[ "$REMOTE_URL" =~ github\.com[:/]([^/]+/[^/.]+) ]]; then
+    REPO="${BASH_REMATCH[1]}"
+    echo "${REPO%.git}"
+  fi
+}
+
+CMD="$1"
+SUBCMD="$2"
+
+# Handle 'repo view' specially - uses positional arg
+if [ "$CMD" = "repo" ] && [ "$SUBCMD" = "view" ]; then
+  REPO=$(get_repo)
+  if [ -n "$REPO" ]; then
+    # Check if repo is already provided (3rd arg exists and doesn't start with -)
+    if [ -z "$3" ] || [[ "$3" == -* ]]; then
+      shift 2  # Remove 'repo view'
+      exec "$GH_BIN" repo view "$REPO" "$@"
+    fi
+  fi
+  exec "$GH_BIN" "$@"
+fi
+
+# Check if first arg needs --repo flag
+NEEDS_REPO=false
+for rc in $REPO_FLAG_COMMANDS; do
+  if [ "$CMD" = "$rc" ]; then
+    NEEDS_REPO=true
+    break
+  fi
+done
+
+# Add --repo flag if needed and not already present
+if $NEEDS_REPO; then
+  REPO=$(get_repo)
+  if [ -n "$REPO" ]; then
+    # Check if --repo or -R is already in args
+    HAS_REPO=false
+    for arg in "$@"; do
+      if [[ "$arg" == "--repo" ]] || [[ "$arg" == "-R" ]] || [[ "$arg" == --repo=* ]]; then
+        HAS_REPO=true
+        break
+      fi
+    done
+
+    if ! $HAS_REPO; then
+      exec "$GH_BIN" "$@" --repo "$REPO"
+    fi
+  fi
+fi
+
+exec "$GH_BIN" "$@"
+WRAPPER_EOF
+    chmod +x ~/.local/bin/gh-wrapper
+
+    # Rename original gh to gh-bin, make wrapper the main gh
+    if [ -f ~/.local/bin/gh ] && [ ! -f ~/.local/bin/gh-bin ]; then
+      mv ~/.local/bin/gh ~/.local/bin/gh-bin
+      mv ~/.local/bin/gh-wrapper ~/.local/bin/gh
+      echo "gh CLI wrapper configured for repo: $REPO"
+    fi
+  fi
+fi
+
 echo "Package installation complete."
