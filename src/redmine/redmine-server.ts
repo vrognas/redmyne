@@ -523,8 +523,8 @@ export class RedmineServer {
       }
 
       const baseUrl = include_subproject
-        ? `/issues.json?status_id=open&project_id=${project_id}&subproject_id=!*`
-        : `/issues.json?status_id=open&project_id=${project_id}`;
+        ? `/issues.json?status_id=open&project_id=${project_id}`
+        : `/issues.json?status_id=open&project_id=${project_id}&subproject_id=!*`;
 
       const response = await this.doRequest<{
         issues: Issue[];
