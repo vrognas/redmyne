@@ -90,6 +90,60 @@
 
 ---
 
+## UX Guidelines Compliance
+
+### Tree Views (2.1-2.3)
+
+| Guideline | Status | Notes |
+|-----------|--------|-------|
+| Max 3 nesting levels | ✅ | Plan uses 2 levels |
+| Icons as primary indicators | ✅ | Using ThemeIcon |
+| Max 3 action buttons/item | ✅ | Using context menus |
+| Avoid deep hierarchy | ✅ | Flatten grandchildren |
+
+### Webview (2.5)
+
+| Guideline | Action |
+|-----------|--------|
+| Handle resize/reflow | Test at arbitrary panel sizes |
+| Use `--vscode-*` CSS vars | No hardcoded colors |
+| ARIA labels | Add to timeline items |
+| Keyboard navigation | Arrow keys, Tab support |
+| Virtualize long lists | Render only visible tasks |
+
+### Quick Picks (2.4)
+
+| Guideline | Action |
+|-----------|--------|
+| Icons for recognition | Add to activity picker |
+| Step counter | Title: "Log Time (1/3)" |
+| Separators | Group activity categories |
+
+### Notifications
+
+| Guideline | Action |
+|-----------|--------|
+| Avoid modal spam | Use status bar flash (existing) |
+| "Don't show again" | Add for repetitive confirmations |
+| Contextual errors | Include retry/view logs actions |
+
+### Settings (New)
+
+| Setting | Type | Default | Scope |
+|---------|------|---------|-------|
+| `redmine.ui.dimNonBillable` | boolean | `true` | application |
+| `redmine.ui.showRelations` | boolean | `true` | application |
+| `redmine.gantt.enabled` | boolean | `false` | application |
+
+### Not Adding (Avoid Over-Engineering)
+
+- Walkthroughs - overkill for focused extension
+- Activity bar changes - stay in existing sidebar
+- Custom settings webview - native Settings UI sufficient
+- Toolbar beyond 2-3 buttons - use context menus
+
+---
+
 ## Phased Implementation
 
 ### Phase 2.0: Bug Fixes (P0)
@@ -348,6 +402,7 @@ Tooltip:
 
 ## Changelog
 
+- 2025-11-25: Added UX guidelines compliance section
 - 2025-11-25: Added VS Code API leverage section from docs research
 - 2025-11-25: Resolved all open questions, finalized decisions
 - 2025-11-25: Initial plan created from fit assessment
