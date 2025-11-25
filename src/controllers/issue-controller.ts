@@ -5,6 +5,7 @@ import { Issue } from "../redmine/models/issue";
 import { IssueStatus as RedmineIssueStatus } from "../redmine/models/issue-status";
 import { TimeEntryActivity } from "../redmine/models/time-entry-activity";
 import { errorToString } from "../utilities/error-to-string";
+import { parseTimeInput, validateTimeInput } from "../utilities/time-input";
 
 interface TimeEntryActivityItem extends vscode.QuickPickItem {
   activity: TimeEntryActivity;
@@ -35,35 +36,53 @@ export class IssueController {
     this.setTimeEntryMessage(act);
   }
 
+  /**
+   * Unified time entry input flow (matches QuickLogTime UX)
+   */
   async setTimeEntryMessage(activity: TimeEntryActivityItem) {
-    const input = await vscode.window.showInputBox({
-      placeHolder: `"hours spent|additional message" or "hours spent|"`,
+    // Step 1: Input hours with flexible format validation
+    const hoursInput = await vscode.window.showInputBox({
+      title: `Log Time (1/2) - #${this.issue.id}`,
+      prompt: `Hours for ${activity.activity.name}`,
+      placeHolder: "e.g., 2.5, 1:45, 1h 45min",
+      validateInput: (value: string) => validateTimeInput(value),
     });
-    const indexOf = input?.indexOf("|") ?? -1;
-    if (indexOf === -1) {
-      await vscode.window.showWarningMessage(
-        `Provide message in the following pattern: "hours spent|additional message" or "hours spent|", if you don't want to provide a message`
-      );
-      this.setTimeEntryMessage(activity);
+
+    if (!hoursInput) return; // User cancelled
+
+    const hours = parseTimeInput(hoursInput);
+    if (hours === null) {
+      vscode.window.showErrorMessage("Invalid time format");
       return;
     }
-    if (!input) {
-      vscode.window.showErrorMessage("Time entry input required");
-      return;
-    }
-    const hours = input.substring(0, indexOf);
-    const message = input.substring(indexOf + 1);
+
+    // Step 2: Input comment (optional)
+    const comment = await vscode.window.showInputBox({
+      title: `Log Time (2/2) - #${this.issue.id}`,
+      prompt: "Comment (optional)",
+      placeHolder: "e.g., Implemented feature X",
+    });
+
+    if (comment === undefined) return; // User cancelled
 
     try {
       await this.redmine.addTimeEntry(
         this.issue.id,
         activity.activity.id,
-        hours,
-        message
+        hours.toString(),
+        comment || ""
       );
-      vscode.window.showInformationMessage(
-        `Time entry for issue #${this.issue.id} has been added.`
+
+      // Status bar confirmation (matches QuickLogTime UX)
+      const statusBar = vscode.window.createStatusBarItem(
+        vscode.StatusBarAlignment.Left
       );
+      statusBar.text = `$(check) Logged ${hours.toFixed(2).replace(/\.?0+$/, "")}h to #${this.issue.id}`;
+      statusBar.show();
+      setTimeout(() => {
+        statusBar.hide();
+        statusBar.dispose();
+      }, 3000);
     } catch (error) {
       vscode.window.showErrorMessage(errorToString(error));
     }
