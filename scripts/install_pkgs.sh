@@ -61,6 +61,16 @@ else
   echo "GitHub CLI already installed."
 fi
 
+# Create symlink in /usr/local/bin for bare command access
+# Claude Code Web blocks bare 'gh' command, so we use 'ghcli' as alternative
+# Symlink points to wrapper (which has auto-repo detection)
+if [ -f ~/.local/bin/gh ]; then
+  if [ ! -L /usr/local/bin/ghcli ]; then
+    ln -sf "${HOME}/.local/bin/gh" /usr/local/bin/ghcli
+    echo "Created symlink: ghcli -> gh (use 'ghcli' as bare command)"
+  fi
+fi
+
 # Configure gh CLI for Claude Code Web proxy remotes
 # The git remote uses a local proxy, so we need to help gh find the repo
 if [ -d ".git" ] || git rev-parse --git-dir > /dev/null 2>&1; then

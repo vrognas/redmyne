@@ -1,6 +1,6 @@
 {
   "permissions": {
-    "allow": ["Bash(npm install:*)", "Bash(npm run compile:*)", "Bash(gh:*)", "Bash(~/.local/bin/gh:*)"],
+    "allow": ["Bash(npm install:*)", "Bash(npm run compile:*)", "Bash(gh:*)", "Bash(~/.local/bin/gh:*)", "Bash(ghcli:*)"],
     "deny": [],
     "ask": []
   }
