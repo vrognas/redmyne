@@ -56,6 +56,40 @@
 
 ---
 
+## VS Code API Leverage
+
+### Built-in Features (No Custom UI)
+
+| Need | VS Code API | Notes |
+|------|-------------|-------|
+| Dim non-billable | `ThemeColor('list.deemphasizedForeground')` | Native gray color |
+| Tooltip formatting | `MarkdownString` | Already in use |
+| Collapsible tree | `TreeItemCollapsibleState.Collapsed` | Native expansion |
+| Status icons | `ThemeIcon` + `ThemeColor` | Already in use |
+| Blocked indicator | `ThemeIcon('error')` | Red icon |
+| Progress feedback | `withProgress(ProgressLocation.Notification)` | Native spinner |
+
+### Patterns Already in Codebase
+
+| Pattern | File | Reuse For |
+|---------|------|-----------|
+| `ThemeIcon` with color | `tree-item-factory.ts:66` | Blocked icon (2.3) |
+| `MarkdownString` tooltip | `tree-item-factory.ts:105` | Relations display (2.3) |
+| `TreeItemCollapsibleState` | `projects-tree.ts:44` | Sub-issue hierarchy (2.2) |
+| `getChildren(element?)` | `projects-tree.ts:52` | Parent/child pattern (2.2) |
+
+### New Patterns Needed
+
+| Feature | Pattern | Effort |
+|---------|---------|--------|
+| Webview panel | `createWebviewPanel()` | Medium |
+| Webview messaging | `postMessage()` / `onDidReceiveMessage()` | Medium |
+| Webview theming | CSS `var(--vscode-*)` variables | Low |
+| Webview CSP | Content-Security-Policy meta tag | Low |
+| State persistence | `getState()` / `setState()` | Low |
+
+---
+
 ## Phased Implementation
 
 ### Phase 2.0: Bug Fixes (P0)
@@ -314,5 +348,6 @@ Tooltip:
 
 ## Changelog
 
+- 2025-11-25: Added VS Code API leverage section from docs research
 - 2025-11-25: Resolved all open questions, finalized decisions
 - 2025-11-25: Initial plan created from fit assessment
