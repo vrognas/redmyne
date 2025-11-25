@@ -328,7 +328,33 @@ export class GanttPanel {
       font-family: var(--vscode-font-family);
       overflow: hidden;
     }
-    h2 { margin-bottom: 16px; }
+    .gantt-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .gantt-header h2 { margin: 0; }
+    .gantt-actions {
+      display: flex;
+      gap: 4px;
+    }
+    .gantt-actions button {
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .gantt-actions button:hover:not(:disabled) {
+      background: var(--vscode-button-secondaryHoverBackground);
+    }
+    .gantt-actions button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
     .gantt-container {
       display: flex;
       overflow: hidden;
@@ -365,7 +391,13 @@ export class GanttPanel {
   </style>
 </head>
 <body>
-  <h2>Timeline</h2>
+  <div class="gantt-header">
+    <h2>Timeline</h2>
+    <div class="gantt-actions">
+      <button id="undoBtn" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
+      <button id="redoBtn" disabled title="Redo (Ctrl+Shift+Z)">↪ Redo</button>
+    </div>
+  </div>
   <div class="gantt-container">
     <div class="gantt-labels">
       <svg width="${labelWidth}" height="${svgHeight}">
@@ -384,6 +416,17 @@ export class GanttPanel {
     const timelineWidth = ${timelineWidth};
     const minDateMs = ${minDate.getTime()};
     const maxDateMs = ${maxDate.getTime()};
+
+    // Undo/Redo stacks
+    const undoStack = [];
+    const redoStack = [];
+    const undoBtn = document.getElementById('undoBtn');
+    const redoBtn = document.getElementById('redoBtn');
+
+    function updateUndoRedoButtons() {
+      undoBtn.disabled = undoStack.length === 0;
+      redoBtn.disabled = redoStack.length === 0;
+    }
 
     // Convert x position to date string (YYYY-MM-DD)
     function xToDate(x) {
@@ -404,6 +447,8 @@ export class GanttPanel {
         const issueId = parseInt(bar.dataset.issueId);
         const startX = parseFloat(bar.dataset.startX);
         const endX = parseFloat(bar.dataset.endX);
+        const oldStartDate = bar.dataset.startDate || null;
+        const oldDueDate = bar.dataset.dueDate || null;
         const barMain = bar.querySelector('.bar-main');
         const leftHandle = bar.querySelector('.drag-left');
         const rightHandle = bar.querySelector('.drag-right');
@@ -415,6 +460,8 @@ export class GanttPanel {
           initialMouseX: e.clientX,
           startX,
           endX,
+          oldStartDate,
+          oldDueDate,
           barMain,
           leftHandle,
           rightHandle,
@@ -466,19 +513,74 @@ export class GanttPanel {
     // Handle drag end
     document.addEventListener('mouseup', () => {
       if (!dragState) return;
-      const { issueId, isLeft, newStartX, newEndX, bar, startX, endX } = dragState;
+      const { issueId, isLeft, newStartX, newEndX, bar, startX, endX, oldStartDate, oldDueDate } = dragState;
       bar.classList.remove('dragging');
 
       // Only update if position changed
       if (newStartX !== undefined || newEndX !== undefined) {
-        const startDate = isLeft && newStartX !== startX ? xToDate(newStartX) : null;
-        const dueDate = !isLeft && newEndX !== endX ? xToDate(newEndX) : null;
+        const newStartDate = isLeft && newStartX !== startX ? xToDate(newStartX) : null;
+        const newDueDate = !isLeft && newEndX !== endX ? xToDate(newEndX) : null;
 
-        if (startDate || dueDate) {
-          vscode.postMessage({ command: 'updateDates', issueId, startDate, dueDate });
+        if (newStartDate || newDueDate) {
+          // Push to undo stack before making change
+          undoStack.push({
+            issueId,
+            oldStartDate: newStartDate ? oldStartDate : null,
+            oldDueDate: newDueDate ? oldDueDate : null,
+            newStartDate,
+            newDueDate
+          });
+          redoStack.length = 0; // Clear redo stack on new action
+          updateUndoRedoButtons();
+          vscode.postMessage({ command: 'updateDates', issueId, startDate: newStartDate, dueDate: newDueDate });
         }
       }
       dragState = null;
+    });
+
+    // Undo button
+    undoBtn.addEventListener('click', () => {
+      if (undoStack.length === 0) return;
+      const action = undoStack.pop();
+      redoStack.push(action);
+      updateUndoRedoButtons();
+      vscode.postMessage({
+        command: 'updateDates',
+        issueId: action.issueId,
+        startDate: action.oldStartDate,
+        dueDate: action.oldDueDate
+      });
+    });
+
+    // Redo button
+    redoBtn.addEventListener('click', () => {
+      if (redoStack.length === 0) return;
+      const action = redoStack.pop();
+      undoStack.push(action);
+      updateUndoRedoButtons();
+      vscode.postMessage({
+        command: 'updateDates',
+        issueId: action.issueId,
+        startDate: action.newStartDate,
+        dueDate: action.newDueDate
+      });
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const modKey = isMac ? e.metaKey : e.ctrlKey;
+
+      if (modKey && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undoBtn.click();
+      } else if (modKey && e.key === 'z' && e.shiftKey) {
+        e.preventDefault();
+        redoBtn.click();
+      } else if (modKey && e.key === 'y') {
+        e.preventDefault();
+        redoBtn.click();
+      }
     });
 
     // Auto-scroll to today marker (centered)
