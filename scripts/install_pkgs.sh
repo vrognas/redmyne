@@ -8,6 +8,24 @@ fi
 
 echo "Remote environment detected. Installing packages..."
 
+# === Dependency Validation ===
+
+# Check Node version (require >=20)
+NODE_VERSION=$(node -v 2>/dev/null | cut -d'v' -f2 | cut -d'.' -f1)
+if [ -n "$NODE_VERSION" ]; then
+  if [ "$NODE_VERSION" -lt 20 ]; then
+    echo "Warning: Node $NODE_VERSION detected, requires >=20"
+  else
+    echo "Node v$NODE_VERSION OK"
+  fi
+fi
+
+# Auto-install npm dependencies if missing
+if [ -f "package.json" ] && [ ! -d "node_modules" ]; then
+  echo "Installing npm dependencies..."
+  npm ci --silent 2>/dev/null || npm install --silent 2>/dev/null || echo "Warning: npm install failed"
+fi
+
 # Install GitHub CLI
 if ! command -v gh &> /dev/null; then
   echo "Installing GitHub CLI..."

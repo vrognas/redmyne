@@ -414,3 +414,41 @@ ln -sf "${HOME}/.local/bin/gh" /usr/local/bin/ghcli
 2. **Workarounds exist**: Full paths and renamed symlinks bypass literal command matching
 3. **Document workarounds**: Add to CLAUDE.md so future sessions know to use `ghcli`
 4. **Understand security intent**: Block exists to enforce branch naming conventions
+
+## Claude Code Hooks (2025-11-25)
+
+### Hook Architecture
+
+**Available Hooks**: SessionStart, SessionEnd, PreToolUse, PostToolUse, UserPromptSubmit, Stop, SubagentStop, Notification, PreCompact, PermissionRequest
+
+**Exit Codes**:
+- 0: Success (stdout shown in verbose mode)
+- 2: Blocking error (stderr fed to Claude)
+- Other: Non-blocking error (shown to user)
+
+**Prompt-Based Hooks**: Limited to Stop, SubagentStop, UserPromptSubmit, PreToolUse, PermissionRequest
+
+### Implementation Patterns
+
+**JSON Input Parsing**:
+```bash
+# Prefer jq, fallback to grep for environments without jq
+if command -v jq &> /dev/null; then
+  VALUE=$(echo "$INPUT" | jq -r '.tool_input.field // empty')
+else
+  VALUE=$(echo "$INPUT" | grep -oP '"field"\s*:\s*"\K[^"]+')
+fi
+```
+
+**Non-Fatal Hooks**: Exit 0 even on errors for non-blocking hooks (auto-format, context inject)
+
+**Blocking Guards**: Exit 2 with stderr message for validation hooks (typecheck before commit)
+
+### Lessons
+
+1. **Exit 2 = blocking**: Use for validation hooks that should prevent actions
+2. **Exit 0 = non-fatal**: Use for enhancement hooks that shouldn't block workflow
+3. **Test with JSON fixtures**: Use execSync with piped JSON input
+4. **Use $CLAUDE_PROJECT_DIR**: Environment variable for project-relative paths in settings.json
+5. **Timeout critical hooks**: Set timeout for long-running hooks (typecheck: 120s)
+6. **Prompt hooks for soft guidance**: Use for suggestions, not enforcement

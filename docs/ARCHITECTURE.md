@@ -6,7 +6,7 @@ Positron-Redmine is a VS Code/Positron IDE extension that integrates Redmine pro
 
 **Core Pattern**: MVC-like with Tree Providers (View), Controllers (Business Logic), and RedmineServer (Model/API).
 
-**Version**: 3.4.0 | **Min VS Code**: 1.106.0 | **Node**: >=20.0.0
+**Version**: 3.6.0 | **Min VS Code**: 1.106.0 | **Node**: >=20.0.0
 
 ## Directory Structure
 
@@ -363,6 +363,19 @@ getChildren(undefined) → Return cached or [loadingNode]
 ## Git Hooks
 
 **commit-msg**: Validates subject ≤ 50 chars, blank line, body ≤ 72 chars (exceptions: merge/revert). Install via `npm run install-hooks`.
+
+## Claude Code Hooks
+
+Located in `scripts/hooks/`, configured in `.claude/settings.json`.
+
+| Hook | Type | File | Purpose |
+|------|------|------|---------|
+| SessionStart | command | install_pkgs.sh | Install gh CLI, npm deps, validate Node |
+| PostToolUse | command | auto-format.sh | Prettier on Edit/Write |
+| PreToolUse | command | pre-commit-typecheck.sh | Typecheck before git commit |
+| UserPromptSubmit | command | context-inject.sh | Inject git branch/status |
+| Stop | prompt | (inline) | Remind about tests after code changes |
+| PreCompact | command | pre-compact-log.sh | Log context compaction events |
 
 ## Dependencies
 
