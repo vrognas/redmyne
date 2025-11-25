@@ -426,9 +426,19 @@ export class GanttPanel {
       if (dayOfWeek === 1) {
         const weekNum = getWeekNumber(current);
         const year = current.getFullYear();
+        // Calculate week end (Sunday)
+        const weekEnd = new Date(current);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        const startDay = current.getDate();
+        const startMonth = current.toLocaleString("en", { month: "short" });
+        const endDay = weekEnd.getDate();
+        const endMonth = weekEnd.toLocaleString("en", { month: "short" });
+        const dateRange = startMonth === endMonth
+          ? `${startDay} - ${endDay} ${endMonth}`
+          : `${startDay} ${startMonth} - ${endDay} ${endMonth}`;
         weekHeaders.push(`
           <line x1="${x}" y1="0" x2="${x}" y2="100%" class="date-marker"/>
-          <text x="${x + 4}" y="14" fill="var(--vscode-foreground)" font-size="11" font-weight="bold">W${weekNum}, ${year}</text>
+          <text x="${x + 4}" y="14" fill="var(--vscode-foreground)" font-size="11" font-weight="bold">W${weekNum} (${dateRange}), ${year}</text>
         `);
       }
 
