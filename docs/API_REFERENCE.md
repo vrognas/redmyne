@@ -1,8 +1,6 @@
-# API Reference Guide
+# API Reference
 
-Comprehensive reference for Redmine REST API, VS Code Extension API, and Positron IDE APIs used in this extension.
-
-> **Note**: Line number references in this document may be outdated due to code evolution. Verify locations in current source.
+Reference for Redmine REST API, VS Code Extension API, and Positron IDE APIs used in this extension.
 
 ## Table of Contents
 
@@ -51,7 +49,7 @@ Project: {
 }
 ```
 
-**Implementation**: `RedmineServer.getProjects()` - recursively fetches all pages.
+**Implementation**: `RedmineServer.getProjects()` (recursive pagination)
 
 #### Issues
 
@@ -95,19 +93,16 @@ Issue: {
 }
 ```
 
-**Implementations**:
-
-- `RedmineServer.getIssuesAssignedToMe()` - user's open issues
-- `RedmineServer.getOpenIssuesForProject(id, includeSubprojects)` - project issues
+**Implementations**: `RedmineServer.getIssuesAssignedToMe()`, `RedmineServer.getOpenIssuesForProject(id, includeSubprojects)`
 
 **GET /issues/{id}.json**
 
 ```typescript
 // Single issue by ID
-GET / issues / { id }.json;
+GET /issues/{id}.json
 
 Response: {
-  issue: Issue;
+  issue: Issue
 }
 ```
 
@@ -130,10 +125,7 @@ Body: {
 Response: 200 OK (empty body) or error
 ```
 
-**Implementations**:
-
-- `RedmineServer.setIssueStatus(issue, statusId)` - change status only
-- `RedmineServer.applyQuickUpdate(quickUpdate)` - batch update status + assignee + notes
+**Implementations**: `RedmineServer.setIssueStatus(issue, statusId)`, `RedmineServer.applyQuickUpdate(quickUpdate)`
 
 #### Issue Statuses
 
@@ -154,7 +146,7 @@ IssueStatus: {
 }
 ```
 
-**Implementation**: `RedmineServer.getIssueStatuses()` - cached after first fetch.
+**Implementation**: `RedmineServer.getIssueStatuses()` (cached)
 
 #### Time Entries
 
@@ -210,7 +202,7 @@ TimeEntryActivity: {
 }
 ```
 
-**Implementation**: `RedmineServer.getTimeEntryActivities()` - cached after first fetch.
+**Implementation**: `RedmineServer.getTimeEntryActivities()` (cached)
 
 #### Memberships
 
@@ -241,306 +233,28 @@ Role: {
 }
 ```
 
-**Implementation**: `RedmineServer.getMemberships(projectId)` - converts to domain `Membership` objects.
+**Implementation**: `RedmineServer.getMemberships(projectId)`
 
 ### Available But Unused Endpoints
 
-#### Issues (Extended)
-
-**POST /issues.json**
-
-```typescript
-// Create new issue programmatically
-POST /issues.json
-Body: {
-  issue: {
-    project_id: number,
-    tracker_id: number,
-    subject: string,
-    description?: string,
-    status_id?: number,
-    priority_id?: number,
-    assigned_to_id?: number,
-    // ... custom fields
-  }
-}
-```
-
-**Current**: Extension opens browser to Redmine's create form (`/projects/{id}/issues/new`).
-**Opportunity**: Implement in-editor issue creation with VS Code UI.
-
-**DELETE /issues/{id}.json**
-
-```typescript
-// Delete issue (if permitted)
-DELETE / issues / { id }.json;
-```
-
-**GET /issues.json (advanced queries)**
-
-```typescript
-// Filter by multiple criteria
-GET /issues.json?{params}
-
-Query params:
-  - tracker_id: Filter by tracker
-  - status_id: Filter by status (or "open", "closed", "*")
-  - assigned_to_id: Filter by assignee (or "me", specific ID)
-  - priority_id: Filter by priority
-  - created_on: Date range (e.g., ">=2024-01-01")
-  - updated_on: Date range
-  - cf_{id}: Custom field filters
-  - sort: Sort order (e.g., "updated_on:desc")
-```
-
-**Opportunity**: Advanced issue search/filtering in tree views.
-
-#### Comments/Notes
-
-**GET /issues/{id}.json?include=journals**
-
-```typescript
-// Get issue with comment history
-GET /issues/{id}.json?include=journals
-
-Response: {
-  issue: Issue & {
-    journals: Journal[]
-  }
-}
-
-Journal: {
-  id: number,
-  user: NamedEntity,
-  notes: string,
-  created_on: string,
-  details: Detail[]  // Field changes
-}
-```
-
-**Opportunity**: Display comment history, add comments directly.
-
-#### Attachments
-
-**POST /uploads.json**
-
-```typescript
-// Upload file for attachment
-POST /uploads.json
-Headers: { "Content-Type": "application/octet-stream" }
-Body: <binary data>
-
-Response: {
-  upload: {
-    token: string
-  }
-}
-```
-
-**POST /issues/{id}.json (with attachment)**
-
-```typescript
-// Attach uploaded file to issue
-PUT / issues / { id }.json;
-Body: {
-  issue: {
-    uploads: [
-      {
-        token: string, // From upload response
-        filename: string,
-        description: string,
-        content_type: string,
-      },
-    ];
-  }
-}
-```
-
-**Opportunity**: File attachments from workspace.
-
-#### Watchers
-
-**POST /issues/{id}/watchers.json**
-
-```typescript
-// Add watcher to issue
-POST / issues / { id } / watchers.json;
-Body: {
-  user_id: number;
-}
-```
-
-**DELETE /issues/{id}/watchers/{user_id}.json**
-
-```typescript
-// Remove watcher
-DELETE / issues / { id } / watchers / { user_id }.json;
-```
-
-**Opportunity**: Watch/unwatch issues.
-
-#### Custom Fields
-
-**GET /custom_fields.json**
-
-```typescript
-// Available custom fields
-GET /custom_fields.json
-
-Response: {
-  custom_fields: CustomField[]
-}
-
-CustomField: {
-  id: number,
-  name: string,
-  customized_type: string,  // "issue", "project", etc.
-  field_format: string,      // "string", "list", "date", etc.
-  possible_values?: string[],
-  is_required: boolean
-}
-```
-
-**Opportunity**: Support custom fields in issue creation/updates.
-
-#### Trackers
-
-**GET /trackers.json**
-
-```typescript
-// Available issue types (Bug, Feature, etc.)
-GET /trackers.json
-
-Response: {
-  trackers: Tracker[]
-}
-
-Tracker: {
-  id: number,
-  name: string,
-  default_status_id: number
-}
-```
-
-**Opportunity**: Filter issues by tracker type.
-
-#### Priorities
-
-**GET /enumerations/issue_priorities.json**
-
-```typescript
-// Issue priorities (Low, Normal, High, etc.)
-GET /enumerations/issue_priorities.json
-
-Response: {
-  issue_priorities: Priority[]
-}
-
-Priority: {
-  id: number,
-  name: string,
-  is_default: boolean
-}
-```
-
-**Opportunity**: Set/filter by priority.
-
-#### Versions (Releases)
-
-**GET /projects/{id}/versions.json**
-
-```typescript
-// Project versions/releases
-GET /projects/{id}/versions.json
-
-Response: {
-  versions: Version[]
-}
-
-Version: {
-  id: number,
-  project: NamedEntity,
-  name: string,
-  description: string,
-  status: "open" | "locked" | "closed",
-  due_date: string | null,
-  created_on: string,
-  updated_on: string
-}
-```
-
-**Opportunity**: Milestone tracking, release planning.
-
-#### News
-
-**GET /news.json**
-
-```typescript
-// Project news/announcements
-GET /news.json?project_id={id}
-
-Response: {
-  news: NewsItem[]
-}
-```
-
-**Opportunity**: Display project announcements in extension.
-
-#### Wiki
-
-**GET /projects/{id}/wiki/index.json**
-
-```typescript
-// Wiki page list
-GET /projects/{id}/wiki/index.json
-
-Response: {
-  wiki_pages: WikiPage[]
-}
-```
-
-**GET /projects/{id}/wiki/{title}.json**
-
-```typescript
-// Single wiki page content
-GET /projects/{id}/wiki/{title}.json
-
-Response: {
-  wiki_page: {
-    title: string,
-    text: string,
-    version: number,
-    author: NamedEntity,
-    created_on: string,
-    updated_on: string
-  }
-}
-```
-
-**Opportunity**: Embedded wiki viewer/editor.
-
-#### Users
-
-**GET /users/current.json**
-
-```typescript
-// Current user info
-GET /users/current.json
-
-Response: {
-  user: {
-    id: number,
-    login: string,
-    firstname: string,
-    lastname: string,
-    mail: string,
-    created_on: string,
-    last_login_on: string
-  }
-}
-```
-
-**Opportunity**: Display user info, validate API key.
+| Category | Endpoint | Use Case |
+|----------|----------|----------|
+| **Issues** | `POST /issues.json` | In-editor issue creation |
+| | `DELETE /issues/{id}.json` | Delete issues |
+| | `GET /issues.json?{filters}` | Advanced search/filtering |
+| **Comments** | `GET /issues/{id}.json?include=journals` | Display comment history |
+| | `PUT /issues/{id}.json` (with notes) | Add comments |
+| **Attachments** | `POST /uploads.json` | Upload files |
+| | `PUT /issues/{id}.json` (with uploads) | Attach files to issues |
+| **Watchers** | `POST /issues/{id}/watchers.json` | Add watchers |
+| | `DELETE /issues/{id}/watchers/{user_id}.json` | Remove watchers |
+| **Custom Fields** | `GET /custom_fields.json` | Support custom fields |
+| **Trackers** | `GET /trackers.json` | Filter by issue type |
+| **Priorities** | `GET /enumerations/issue_priorities.json` | Set/filter by priority |
+| **Versions** | `GET /projects/{id}/versions.json` | Milestone tracking |
+| **News** | `GET /news.json` | Display announcements |
+| **Wiki** | `GET /projects/{id}/wiki/{title}.json` | Embedded wiki viewer |
+| **Users** | `GET /users/current.json` | Display user info, validate API key |
 
 ---
 
@@ -557,11 +271,9 @@ interface ExtensionContext {
   subscriptions: Disposable[],  // Auto-cleanup on deactivate
   extensionPath: string,
   globalState: Memento,          // Global storage
-  workspaceState: Memento,       // Workspace storage
-  // ... many more
+  workspaceState: Memento        // Workspace storage
 }
 
-// Usage in extension.ts:13
 export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(...)
@@ -569,8 +281,7 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 ```
 
-**Current Usage**: Command registration cleanup.
-**Location**: `src/extension.ts:13-191`
+**Usage**: Command registration cleanup (`src/extension.ts`)
 
 #### Commands
 
@@ -581,44 +292,17 @@ vscode.commands.registerCommand(
   command: string,
   callback: (...args: any[]) => any
 ): Disposable
-
-// Usage in extension.ts:137-151
-context.subscriptions.push(
-  vscode.commands.registerCommand("redmine.openActionsForIssue", handler)
-);
 ```
 
-**Current Commands Registered**:
-
-- `redmine.setApiKey` (v3.0+)
-- `redmine.listOpenIssuesAssignedToMe`
-- `redmine.openActionsForIssue`
-- `redmine.openActionsForIssueUnderCursor`
-- `redmine.newIssue`
-- `redmine.changeDefaultServer`
-- `redmine.refreshIssues`
-- `redmine.toggleTreeView`
-- `redmine.toggleListView`
-
-**Locations**: `src/extension.ts:154-189`
+**Registered Commands**: `setApiKey`, `listOpenIssuesAssignedToMe`, `openActionsForIssue`, `openActionsForIssueUnderCursor`, `newIssue`, `changeDefaultServer`, `refreshIssues`, `toggleTreeView`, `toggleListView` (`src/extension.ts`)
 
 **`vscode.commands.executeCommand()`**
 
 ```typescript
-vscode.commands.executeCommand(
-  command: string,
-  ...args: any[]
-): Thenable<any>
-
-// Usage examples:
-vscode.commands.executeCommand("setContext", "redmine:treeViewStyle", value)
-vscode.commands.executeCommand("vscode.open", uri)
+vscode.commands.executeCommand(command: string, ...args: any[]): Thenable<any>
 ```
 
-**Current Usage**:
-
-- Setting context variables (`src/extension.ts:29-39`)
-- Opening URLs (`src/commands/new-issue.ts:7-15`)
+**Usage**: Setting context variables, opening URLs (`src/extension.ts`, `src/commands/new-issue.ts`)
 
 #### Window (UI)
 
@@ -629,19 +313,9 @@ vscode.window.createTreeView<T>(
   viewId: string,
   options: { treeDataProvider: TreeDataProvider<T> }
 ): TreeView<T>
-
-// Usage in extension.ts:22-27
-vscode.window.createTreeView("redmine-explorer-my-issues", {
-  treeDataProvider: myIssuesTree
-});
 ```
 
-**Current Tree Views**:
-
-- `redmine-explorer-my-issues` → `MyIssuesTree`
-- `redmine-explorer-projects` → `ProjectsTree`
-
-**Locations**: `src/extension.ts:22-27`
+**Tree Views**: `redmine-explorer-my-issues` (MyIssuesTree), `redmine-explorer-projects` (ProjectsTree) (`src/extension.ts`)
 
 **`vscode.window.showQuickPick()`**
 
@@ -654,69 +328,34 @@ vscode.window.showQuickPick<T extends QuickPickItem>(
 interface QuickPickItem {
   label: string,
   description?: string,
-  detail?: string,
-  picked?: boolean
+  detail?: string
 }
-
-// Usage in issue-controller.ts:74-101
-vscode.window.showQuickPick(
-  statuses.map(s => ({ label: s.name, ... })),
-  { placeHolder: "Pick a new status" }
-)
 ```
 
-**Current Usage**:
-
-- Status selection (`src/controllers/issue-controller.ts:74`)
-- Activity type selection (`src/controllers/issue-controller.ts:16`)
-- Assignee selection (`src/controllers/issue-controller.ts:167`)
-- Action menu (`src/controllers/issue-controller.ts:221`)
-- Project selection (`src/commands/new-issue.ts:40`)
-- Issue selection (`src/commands/list-open-issues-assigned-to-me.ts:45`)
+**Usage**: Status, activity, assignee, action, project, and issue selection (`src/controllers/issue-controller.ts`, `src/commands/`)
 
 **`vscode.window.showInputBox()`**
 
 ```typescript
-vscode.window.showInputBox(
-  options?: InputBoxOptions
-): Thenable<string | undefined>
+vscode.window.showInputBox(options?: InputBoxOptions): Thenable<string | undefined>
 
 interface InputBoxOptions {
   placeHolder?: string,
   prompt?: string,
-  value?: string,
-  valueSelection?: [number, number],
   password?: boolean,
   validateInput?: (value: string) => string | null
 }
-
-// Usage in open-actions-for-issue.ts:7-9
-issueId = await vscode.window.showInputBox({
-  placeHolder: "Type in issue id"
-});
 ```
 
-**Current Usage**:
+**Usage**: Issue ID, time entry, and message input (`src/commands/open-actions-for-issue.ts`, `src/controllers/issue-controller.ts`)
 
-- Issue ID input (`src/commands/open-actions-for-issue.ts:7`)
-- Time entry input (`src/controllers/issue-controller.ts:38`)
-- Quick update message (`src/controllers/issue-controller.ts:188`)
-
-**`vscode.window.showInformationMessage()`**
-**`vscode.window.showWarningMessage()`**
-**`vscode.window.showErrorMessage()`**
+**`vscode.window.show{Information|Warning|Error}Message()`**
 
 ```typescript
-vscode.window.show{Type}Message(
-  message: string,
-  ...items: string[]
-): Thenable<string | undefined>
-
-// Usage in issue-controller.ts:62
-vscode.window.showInformationMessage("Time entry added.");
+vscode.window.show{Type}Message(message: string, ...items: string[]): Thenable<string | undefined>
 ```
 
-**Current Usage**: Success/error notifications throughout codebase.
+**Usage**: Success/error notifications throughout codebase
 
 **`vscode.window.withProgress()`**
 
@@ -725,56 +364,25 @@ vscode.window.withProgress<R>(
   options: ProgressOptions,
   task: (progress: Progress<{ message?: string }>) => Thenable<R>
 ): Thenable<R>
-
-interface ProgressOptions {
-  location: ProgressLocation,
-  title?: string,
-  cancellable?: boolean
-}
-
-// Usage in open-actions-for-issue.ts:31-42
-await vscode.window.withProgress(
-  { location: vscode.ProgressLocation.Window },
-  (progress) => {
-    progress.report({ message: "Waiting for response..." });
-    return promise;
-  }
-);
 ```
 
-**Current Usage**: API call loading indicators.
-**Locations**:
-
-- `src/commands/open-actions-for-issue.ts:31`
-- `src/commands/new-issue.ts:25`
-- `src/commands/list-open-issues-assigned-to-me.ts:30`
+**Usage**: API call loading indicators (`src/commands/`)
 
 **`vscode.window.showWorkspaceFolderPick()`**
 
 ```typescript
-vscode.window.showWorkspaceFolderPick(
-  options?: WorkspaceFolderPickOptions
-): Thenable<WorkspaceFolder | undefined>
-
-// Usage in extension.ts:58
-const pickedFolder = await vscode.window.showWorkspaceFolderPick();
+vscode.window.showWorkspaceFolderPick(options?: WorkspaceFolderPickOptions): Thenable<WorkspaceFolder | undefined>
 ```
 
-**Current Usage**: Multi-root workspace server selection.
-**Location**: `src/extension.ts:58`
+**Usage**: Multi-root workspace server selection (`src/extension.ts`)
 
 **`vscode.window.activeTextEditor`**
 
 ```typescript
-// Currently active text editor
 vscode.window.activeTextEditor: TextEditor | undefined
-
-// Usage in open-actions-for-issue-under-cursor.ts:29
-const editor = vscode.window.activeTextEditor;
 ```
 
-**Current Usage**: Get cursor position for issue number extraction.
-**Location**: `src/commands/open-actions-for-issue-under-cursor.ts:29`
+**Usage**: Get cursor position for issue number extraction (`src/commands/open-actions-for-issue-under-cursor.ts`)
 
 **`vscode.window.createWebviewPanel()`**
 
@@ -785,19 +393,9 @@ vscode.window.createWebviewPanel(
   showOptions: ViewColumn,
   options?: WebviewPanelOptions
 ): WebviewPanel
-
-// Usage in extension.ts:97-128
-const panel = vscode.window.createWebviewPanel(
-  "redmineConfigurationUpdate",
-  "New configuration arrived!",
-  vscode.ViewColumn.One,
-  {}
-);
-panel.webview.html = "<!DOCTYPE html>...";
 ```
 
-**Current Usage**: Config migration guide (v1.0.0).
-**Location**: `src/extension.ts:97-128`
+**Usage**: Config migration guide (`src/extension.ts`)
 
 #### Workspace
 
@@ -808,32 +406,17 @@ vscode.workspace.getConfiguration(
   section?: string,
   scope?: WorkspaceFolder | null
 ): WorkspaceConfiguration
-
-// Usage in extension.ts:66-69
-const config = vscode.workspace.getConfiguration("redmine", pickedFolder?.uri);
-const url = config.url;
-const apiKey = config.apiKey;
 ```
 
-**Current Usage**: Read extension settings.
-**Locations**:
-
-- `src/extension.ts:66` (command configuration)
-- `src/extension.ts:94` (migration check)
-- `src/trees/my-issues-tree.ts:9` (tree initialization)
-- `src/trees/projects-tree.ts:19` (tree initialization)
+**Usage**: Read extension settings (`src/extension.ts`, `src/trees/`)
 
 **`vscode.workspace.workspaceFolders`**
 
 ```typescript
 vscode.workspace.workspaceFolders: WorkspaceFolder[] | undefined
-
-// Usage in extension.ts:32
-(vscode.workspace.workspaceFolders?.length ?? 0) <= 1
 ```
 
-**Current Usage**: Detect single vs multi-root workspace.
-**Location**: `src/extension.ts:32`
+**Usage**: Detect single vs multi-root workspace (`src/extension.ts`)
 
 #### Tree View
 
@@ -845,26 +428,9 @@ interface TreeDataProvider<T> {
   getTreeItem(element: T): TreeItem | Thenable<TreeItem>,
   getChildren(element?: T): ProviderResult<T[]>
 }
-
-// Implementation in my-issues-tree.ts:6-43
-export class MyIssuesTree implements vscode.TreeDataProvider<Issue> {
-  onDidChangeTreeData$ = new vscode.EventEmitter<Issue>();
-  onDidChangeTreeData = this.onDidChangeTreeData$.event;
-
-  getTreeItem(issue: Issue): vscode.TreeItem { ... }
-  getChildren(): Promise<Issue[]> { ... }
-}
 ```
 
-**Current Implementations**:
-
-- `MyIssuesTree` → displays `Issue[]`
-- `ProjectsTree` → displays `RedmineProject | Issue` (polymorphic)
-
-**Locations**:
-
-- `src/trees/my-issues-tree.ts:6-43`
-- `src/trees/projects-tree.ts:13-97`
+**Implementations**: `MyIssuesTree` (Issue[]), `ProjectsTree` (RedmineProject | Issue) (`src/trees/`)
 
 **`vscode.TreeItem`**
 
@@ -875,23 +441,11 @@ class TreeItem {
   command?: Command,
   contextValue?: string,
   description?: string,
-  iconPath?: string | Uri | ThemeIcon,
   tooltip?: string | MarkdownString
 }
-
-// Usage in my-issues-tree.ts:23-34
-const item = new vscode.TreeItem(
-  `#${issue.id} [${issue.tracker.name}] ...`,
-  vscode.TreeItemCollapsibleState.None
-);
-item.command = {
-  command: "redmine.openActionsForIssue",
-  arguments: [false, { server: this.server }, `${issue.id}`],
-  title: "Open actions for issue"
-};
 ```
 
-**Current Usage**: Tree item rendering with click handlers.
+**Usage**: Tree item rendering with click handlers (`src/trees/`)
 
 **`vscode.EventEmitter<T>`**
 
@@ -901,16 +455,9 @@ class EventEmitter<T> {
   fire(data: T): void,
   dispose(): void
 }
-
-// Usage in my-issues-tree.ts:20-21
-onDidChangeTreeData$ = new vscode.EventEmitter<Issue>();
-onDidChangeTreeData: vscode.Event<Issue> = this.onDidChangeTreeData$.event;
-
-// Trigger refresh
-this.onDidChangeTreeData$.fire();
 ```
 
-**Current Usage**: Tree view refresh mechanism.
+**Usage**: Tree view refresh mechanism (`src/trees/`)
 
 #### URIs
 
@@ -918,194 +465,42 @@ this.onDidChangeTreeData$.fire();
 
 ```typescript
 vscode.Uri.parse(value: string): Uri
-
-// Usage in issue-controller.ts:108
-vscode.Uri.parse(`${this.redmine.options.address}/issues/${this.issue.id}`)
 ```
 
-**Current Usage**: Create URIs for browser opening.
+**Usage**: Create URIs for browser opening (`src/controllers/issue-controller.ts`)
 
 #### Text Editor
 
-**`vscode.TextEditor`**
+**`vscode.TextEditor`** & **`vscode.Selection`**
 
 ```typescript
 interface TextEditor {
-  selection: Selection;
-  document: TextDocument;
-  // ...
+  selection: Selection
+  document: TextDocument
 }
 
-// Usage in open-actions-for-issue-under-cursor.ts:5-25
-function getTextUnderCursor(editor: vscode.TextEditor): string {
-  const { start, end } = editor.selection;
-  // Expand selection to capture issue number
-  const newSelection = new vscode.Selection(newStart, newEnd);
-  return editor.document.getText(newSelection);
-}
-```
-
-**Current Usage**: Extract issue number from cursor position.
-**Location**: `src/commands/open-actions-for-issue-under-cursor.ts`
-
-**`vscode.Selection`**
-
-```typescript
 class Selection extends Range {
-  constructor(anchor: Position, active: Position);
+  constructor(anchor: Position, active: Position)
 }
-
-// Usage in open-actions-for-issue-under-cursor.ts:13-16
-const newSelection = new vscode.Selection(
-  start.translate(0, -10),
-  end.translate(0, 10)
-);
 ```
 
-**Current Usage**: Text range expansion for pattern matching.
+**Usage**: Extract issue number from cursor position (`src/commands/open-actions-for-issue-under-cursor.ts`)
 
 ### Available But Unused APIs
 
-#### Status Bar
-
-```typescript
-vscode.window.createStatusBarItem(
-  alignment?: StatusBarAlignment,
-  priority?: number
-): StatusBarItem
-
-statusBarItem.text = "$(sync~spin) Syncing issues...";
-statusBarItem.show();
-```
-
-**Opportunity**: Show active server, issue count, sync status.
-
-#### Notifications with Actions
-
-```typescript
-vscode.window.showInformationMessage(
-  "Issue created!",
-  "Open in Browser",
-  "View Details"
-).then(selection => {
-  if (selection === "Open in Browser") { ... }
-});
-```
-
-**Opportunity**: Action buttons on notifications.
-
-#### Output Channel
-
-```typescript
-const outputChannel = vscode.window.createOutputChannel("Redmine");
-outputChannel.appendLine("API request sent...");
-outputChannel.show();
-```
-
-**Opportunity**: Debug logging, API request tracing.
-
-#### Tasks
-
-```typescript
-const task = new vscode.Task(
-  { type: "redmine" },
-  vscode.TaskScope.Workspace,
-  "Sync Issues",
-  "Redmine"
-);
-vscode.tasks.executeTask(task);
-```
-
-**Opportunity**: Background sync tasks.
-
-#### Decorations
-
-```typescript
-const decorationType = vscode.window.createTextEditorDecorationType({
-  backgroundColor: "rgba(255, 0, 0, 0.3)",
-});
-editor.setDecorations(decorationType, [rangeArray]);
-```
-
-**Opportunity**: Highlight issue references in code.
-
-#### Hover Provider
-
-```typescript
-vscode.languages.registerHoverProvider("*", {
-  provideHover(document, position) {
-    const range = document.getWordRangeAtPosition(position, /#\d+/);
-    if (range) {
-      const issueId = document.getText(range).substring(1);
-      // Fetch and display issue preview
-      return new vscode.Hover(`**Issue #${issueId}**: ${preview}`);
-    }
-  },
-});
-```
-
-**Opportunity**: Hover over `#123` to see issue preview.
-
-#### Code Actions
-
-```typescript
-vscode.languages.registerCodeActionsProvider("*", {
-  provideCodeActions(document, range) {
-    // Detect issue references, offer actions
-    return [
-      {
-        title: "Open Redmine Issue",
-        command: "redmine.openActionsForIssue",
-        arguments: [issueId],
-      },
-    ];
-  },
-});
-```
-
-**Opportunity**: Quick actions on issue references (💡 lightbulb).
-
-#### Webview API (Advanced)
-
-```typescript
-// Two-way communication
-panel.webview.onDidReceiveMessage(message => {
-  // Handle messages from webview
-});
-
-panel.webview.postMessage({ type: "update", data: ... });
-```
-
-**Opportunity**: Rich issue editor, Gantt charts, reports.
-
-#### File System Watcher
-
-```typescript
-const watcher = vscode.workspace.createFileSystemWatcher("**/*.{md,txt}");
-watcher.onDidChange((uri) => {
-  // Update issue references when files change
-});
-```
-
-**Opportunity**: Track issue references in workspace.
-
-#### Terminal
-
-```typescript
-const terminal = vscode.window.createTerminal("Redmine CLI");
-terminal.sendText("redmine-cli list-issues");
-terminal.show();
-```
-
-**Opportunity**: CLI integration.
-
-#### Source Control
-
-```typescript
-vscode.scm.createSourceControlResourceGroup(...);
-```
-
-**Opportunity**: Git commit → Redmine issue linking.
+| API | Use Case |
+|-----|----------|
+| `createStatusBarItem()` | Show active server, issue count, sync status |
+| `showInformationMessage()` (with actions) | Action buttons on notifications |
+| `createOutputChannel()` | Debug logging, API request tracing |
+| `vscode.Task` | Background sync tasks |
+| `createTextEditorDecorationType()` | Highlight issue references in code |
+| `registerHoverProvider()` | Hover over `#123` to see issue preview |
+| `registerCodeActionsProvider()` | Quick actions on issue references |
+| `Webview` (two-way) | Rich issue editor, Gantt charts, reports |
+| `createFileSystemWatcher()` | Track issue references in workspace |
+| `createTerminal()` | CLI integration |
+| `vscode.scm` | Git commit → Redmine issue linking |
 
 ---
 
@@ -1113,81 +508,26 @@ vscode.scm.createSourceControlResourceGroup(...);
 
 ### Overview
 
-Positron is a data science IDE based on VS Code, built by Posit (formerly RStudio). Extends VS Code with data science features.
-
-**Compatibility**: Extension targets both VS Code `^1.106.0` and Positron `^2025.06.0`.
-
-**Key Difference**: Positron adds data-science-specific APIs while maintaining full VS Code API compatibility.
-
-### Engine Requirements
-
-```json
-"engines": {
-  "vscode": "^1.106.0",
-  "positron": "^2025.06.0"
-}
-```
-
-**Source**: `package.json:13-16`
-
-### Positron-Specific APIs
-
-Positron extends VS Code with additional APIs under the `positron` namespace. Current extension doesn't use these yet.
-
-#### Data Explorer
-
-```typescript
-// Hypothetical Positron API (not currently used)
-positron.dataExplorer.register({
-  getDataFrame: async () => {
-    // Convert Redmine data to DataFrame
-  },
-});
-```
-
-**Opportunity**: Export issue lists, time entries to data frames for analysis.
-
-#### Notebook Integration
-
-```typescript
-// Register issue data as notebook variable
-positron.runtime.execute(`
-  issues <- fromJSON("...")
-  View(issues)
-`);
-```
-
-**Opportunity**: Load Redmine data into R/Python notebooks.
-
-#### Connections Pane
-
-```typescript
-positron.connections.register({
-  name: "Redmine Server",
-  connect: async () => { ... },
-  disconnect: async () => { ... }
-});
-```
-
-**Opportunity**: Manage multiple Redmine servers in Connections pane.
+Positron is a data science IDE based on VS Code (built by Posit). Extension targets both VS Code `^1.106.0` and Positron `^2025.06.0`.
 
 ### Compatibility Strategy
 
-**Current Approach**: Extension uses only standard VS Code APIs, ensuring compatibility with both platforms.
+**Current**: Extension uses only standard VS Code APIs, ensuring compatibility with both platforms.
 
-**Detection Pattern** (if needed):
-
+**Detection** (if needed):
 ```typescript
 const isPositron = vscode.env.appName.includes("Positron");
-
-if (isPositron) {
-  // Use Positron-specific features
-} else {
-  // Standard VS Code features
-}
 ```
 
-**Recommendation**: Continue using standard VS Code APIs unless Positron-specific features provide significant value (e.g., data frame export for analytics).
+### Potential Positron-Specific Features
+
+| API | Use Case |
+|-----|----------|
+| `positron.dataExplorer` | Export issues/time entries to data frames |
+| `positron.runtime` | Load Redmine data into R/Python notebooks |
+| `positron.connections` | Manage multiple Redmine servers in Connections pane |
+
+**Note**: Not currently implemented. Standard VS Code APIs prioritized.
 
 ---
 
@@ -1239,111 +579,41 @@ if (isPositron) {
 
 ### API Key Security
 
-```typescript
-// ✅ Current (v3.0+): RedmineSecretManager wrapper for VS Code Secrets API
-const secretManager = new RedmineSecretManager(context.secrets);
-await secretManager.setApiKey(workspaceUri, apiKey);
-const key = await secretManager.getApiKey(workspaceUri);
-
-// ❌ Deprecated (<v3.0): Plain settings (insecure, synced)
-config.get("redmine.apiKey");
-```
-
-**RedmineSecretManager** (`src/utilities/secret-manager.ts`):
-- Wraps VS Code Secrets API with workspace-scoped keys
+**Current (v3.0+)**: `RedmineSecretManager` wraps VS Code Secrets API with workspace-scoped keys
 - Platform-native encryption (Credential Manager/Keychain/libsecret)
 - Never synced across devices
-- Provides `setApiKey()`, `getApiKey()`, `deleteApiKey()`, `onSecretChanged()` event
+- Methods: `setApiKey()`, `getApiKey()`, `deleteApiKey()`, `onSecretChanged()`
+
+**Deprecated (<v3.0)**: Plain settings (insecure, synced)
 
 ### Error Handling
 
-```typescript
-// ✅ Good: Specific error messages
-catch (error) {
-  if (error.message.includes("401")) {
-    vscode.window.showErrorMessage("Invalid API key. Check settings.");
-  }
-}
-
-// ✅ Current: Descriptive errors in RedmineServer.doRequest()
-```
+Extension provides specific error messages via `RedmineServer.doRequest()`. Example: 401 errors → "Invalid API key" message.
 
 ### Progress Reporting
 
-```typescript
-// ✅ Good: Cancellable progress
-await vscode.window.withProgress(
-  {
-    location: vscode.ProgressLocation.Notification,
-    cancellable: true,
-  },
-  async (progress, token) => {
-    token.onCancellationRequested(() => abort());
-    progress.report({ increment: 50, message: "Fetching issues..." });
-  }
-);
+**Current**: Non-cancellable window progress
+**Future**: Add cancellation tokens for long-running operations
 
-// ⚠️ Current: Non-cancellable window progress
-```
+### Caching
 
-### Caching Strategy
-
-```typescript
-// ✅ Current: Static data cached (statuses, activities)
-if (this.issueStatuses) return Promise.resolve(this.issueStatuses);
-
-// ✅ Good: Add TTL for semi-static data
-if (this.projects && Date.now() - this.projectsFetchedAt < 5 * 60 * 1000) {
-  return this.projects;
-}
-```
+**Current**: Static data cached (issue statuses, time entry activities)
+**Future**: Add TTL for semi-static data (projects, memberships)
 
 ---
 
-## Extension Opportunities Matrix
+## Extension Opportunities
 
-| Feature                  | Redmine API                | VS Code API                  | Complexity | Impact |
-| ------------------------ | -------------------------- | ---------------------------- | ---------- | ------ |
-| Issue creation in-editor | POST /issues.json          | showInputBox, showQuickPick  | Medium     | High   |
-| Issue comments           | GET/POST journals          | Webview or tree children     | Medium     | Medium |
-| File attachments         | POST /uploads.json         | workspace.fs, showOpenDialog | High       | Medium |
-| Issue reference hover    | GET /issues/{id}.json      | registerHoverProvider        | Low        | High   |
-| Advanced search          | GET /issues.json?{filters} | New tree view                | Medium     | Medium |
-| Custom fields            | GET /custom_fields.json    | Dynamic UI generation        | High       | Low    |
-| Wiki viewer              | GET /wiki/\*.json          | Webview + markdown           | Medium     | Low    |
-| Status bar indicator     | -                          | createStatusBarItem          | Low        | Low    |
-| Debug logging            | -                          | createOutputChannel          | Low        | Medium |
-| Data export (Positron)   | GET /time_entries.json     | positron.dataExplorer        | High       | Medium |
+| Feature | Complexity | Impact | APIs Required |
+|---------|------------|--------|---------------|
+| Issue reference hover | Low | High | `registerHoverProvider`, `GET /issues/{id}` |
+| In-editor issue creation | Medium | High | `showInputBox`, `POST /issues.json` |
+| Status bar indicator | Low | Low | `createStatusBarItem` |
+| Debug logging | Low | Medium | `createOutputChannel` |
+| Issue comments | Medium | Medium | `GET/POST journals`, Webview |
+| Advanced search | Medium | Medium | `GET /issues.json?{filters}` |
+| File attachments | High | Medium | `POST /uploads.json`, `workspace.fs` |
+| Data export (Positron) | High | Medium | `positron.dataExplorer`, `GET /time_entries` |
 
-**Legend**:
-
-- **Complexity**: Low (< 1 day), Medium (1-3 days), High (> 3 days)
-- **Impact**: Low (nice-to-have), Medium (useful), High (game-changer)
-
----
-
-## Migration Path
-
-### Phase 1: Quick Wins
-
-1. Status bar item (server status, issue count)
-2. Output channel (debug logging)
-3. Notification action buttons
-
-### Phase 2: Enhanced UX
-
-1. Issue reference hover provider
-2. In-editor issue creation
-3. Advanced issue search/filters
-
-### Phase 3: Advanced Features
-
-1. Comment viewing/posting
-2. File attachments
-3. Custom field support
-
-### Phase 4: Positron Integration
-
-1. Data frame export (issues, time entries)
-2. Connections pane integration
-3. Notebook variable injection
+**Complexity**: Low (< 1 day), Medium (1-3 days), High (> 3 days)
+**Impact**: Low (nice-to-have), Medium (useful), High (game-changer)

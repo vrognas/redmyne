@@ -2,614 +2,386 @@
 
 ## Overview
 
-Positron-Redmine is a VS Code/Positron IDE extension that integrates Redmine project management. Built on TypeScript, it provides sidebar views, issue management, and time tracking via Redmine REST API.
+Positron-Redmine is a VS Code/Positron IDE extension that integrates Redmine project management. Built on TypeScript 5.9+, it provides sidebar views, issue management, time tracking, and workload visualization via Redmine REST API.
 
 **Core Pattern**: MVC-like with Tree Providers (View), Controllers (Business Logic), and RedmineServer (Model/API).
 
-## Project Structure
+**Version**: 3.4.0 | **Min VS Code**: 1.106.0 | **Node**: >=20.0.0
+
+## Directory Structure
 
 ```
 positron-redmine/
 ├── src/
-│   ├── extension.ts              # Entry point - registers commands, trees
+│   ├── extension.ts              # Entry point, lifecycle
 │   ├── commands/                 # User-triggered actions
-│   │   ├── commons/             # Shared command utilities
+│   │   ├── commons/             # Shared utilities
+│   │   ├── action-properties.ts
+│   │   ├── list-open-issues-assigned-to-me.ts
 │   │   ├── new-issue.ts
 │   │   ├── open-actions-for-issue.ts
 │   │   ├── open-actions-for-issue-under-cursor.ts
-│   │   ├── list-open-issues-assigned-to-me.ts
-│   │   └── action-properties.ts # Command parameter interface
-│   ├── controllers/             # Business logic layer
-│   │   ├── domain.ts           # Domain models (Membership, IssueStatus, QuickUpdate)
-│   │   └── issue-controller.ts # Issue operations orchestration
-│   ├── redmine/                # Redmine API integration
-│   │   ├── redmine-server.ts  # HTTP client, API methods
-│   │   ├── redmine-project.ts # Project representation
-│   │   └── models/            # API response models
-│   │       ├── issue.ts
-│   │       ├── project.ts
-│   │       ├── membership.ts
-│   │       ├── issue-status.ts
-│   │       ├── time-entry.ts
-│   │       ├── time-entry-activity.ts
-│   │       └── named-entity.ts
-│   ├── trees/                 # VS Code tree view providers
-│   │   ├── my-issues-tree.ts       # "Issues assigned to me" view
-│   │   ├── my-time-entries-tree.ts # "My time entries" view (Today/Week/Month)
-│   │   └── projects-tree.ts        # "Projects" view (list/tree modes)
-│   ├── definitions/           # TypeScript interfaces
-│   │   └── redmine-config.ts  # Extension configuration schema
-│   └── utilities/             # Helper functions
+│   │   ├── quick-log-time.ts
+│   │   └── set-api-key.ts
+│   ├── controllers/             # Business logic
+│   │   ├── domain.ts           # Domain models
+│   │   └── issue-controller.ts # Issue operations
+│   ├── redmine/                # API integration
+│   │   ├── redmine-server.ts
+│   │   ├── logging-redmine-server.ts
+│   │   ├── redmine-project.ts
+│   │   └── models/            # API response interfaces
+│   ├── trees/                 # Tree view providers
+│   │   ├── my-issues-tree.ts
+│   │   ├── my-time-entries-tree.ts
+│   │   └── projects-tree.ts
+│   ├── definitions/           # Configuration schemas
+│   │   └── redmine-config.ts
+│   └── utilities/             # Helpers
+│       ├── api-logger.ts
 │       ├── error-to-string.ts
-│       ├── flexibility-calculator.ts  # Issue flexibility/risk calculation
-│       ├── workload-calculator.ts     # Workload summary for status bar
-│       ├── tree-item-factory.ts       # TreeItem creation helpers
-│       └── secret-manager.ts          # Secure API key storage
-├── docs/                      # Documentation
-│   ├── ARCHITECTURE.md       # This file
-│   └── LESSONS_LEARNED.md    # Development insights
-├── package.json              # Extension manifest
-├── tsconfig.json            # TypeScript config
-└── esbuild.js               # Build configuration
+│       ├── flexibility-calculator.ts
+│       ├── redaction.ts
+│       ├── secret-manager.ts
+│       ├── tree-item-factory.ts
+│       └── workload-calculator.ts
+├── test/
+│   ├── fixtures/              # Mock data
+│   ├── mocks/                 # VS Code mocks
+│   └── unit/                  # Vitest tests
+├── scripts/                   # Git hooks
+└── docs/                      # Documentation
 ```
 
-## Core Components
+## Component Architecture
 
-### 1. Extension Entry (`src/extension.ts`)
+### 1. Extension Entry Point (`src/extension.ts`)
 
-**Responsibility**: Bootstrap extension, wire dependencies.
+**Responsibility**: Bootstrap extension, wire dependencies, manage lifecycle.
 
-**Key Functions**:
+**Initialization Flow**:
 
-- `activate()`: Entry point called by VS Code
-  - Initializes `RedmineSecretManager` for secure API key storage
-  - Initializes tree providers (`MyIssuesTree`, `MyTimeEntriesTree`, `ProjectsTree`)
-  - Registers commands with `registerCommand()` wrapper
-  - Sets up configuration parsing via `parseConfiguration()`
-  - Updates context (`updateConfiguredContext()`) to check URL + API key presence
-  - Listens for secret changes via `secretManager.onSecretChanged()`
-  - Manages server instance bucket for reuse
-
-**Configuration System**:
-
-```typescript
-parseConfiguration(withPick, props?, ...args)
-  → Prompts workspace folder selection (multi-root workspace)
-  → Reads redmine.* config from workspace settings
-  → Retrieves API key from RedmineSecretManager (v3.0+)
-  → Creates/reuses RedmineServer instance with URL + API key
-  → Returns ActionProperties { server, config }
 ```
-
-**Server Bucket**: Caches `RedmineServer` instances to avoid duplicate connections with same credentials.
+activate()
+  │
+  ├─► Create server instance bucket (LRU cache, max 3)
+  ├─► Initialize SecretManager & API log output channel
+  ├─► Create tree providers (MyIssuesTree, ProjectsTree, MyTimeEntriesTree)
+  ├─► Register tree views with VS Code
+  ├─► Initialize workload status bar (opt-in)
+  ├─► Listen for secret changes
+  ├─► updateConfiguredContext()
+  │   ├─► Check URL + API key presence
+  │   ├─► Set redmine:configured context
+  │   └─► Initialize server for trees
+  ├─► Config change listener (300ms debounce)
+  ├─► Register commands via registerCommand() wrapper
+  └─► parseConfiguration() helper
+      ├─► Workspace folder selection
+      ├─► Config reading
+      ├─► Server creation/reuse
+      └─► Return ActionProperties
+```
 
 ### 2. Redmine API Layer (`src/redmine/`)
 
 #### RedmineServer (`redmine-server.ts`)
 
-**Responsibility**: HTTP client for Redmine REST API.
-
-**Key Features**:
-
-- Protocol-agnostic (http/https) via Node.js `http`/`https` modules
-- Authentication via `X-Redmine-API-Key` header
-- Caching for statuses, activities (rarely change)
-- Error handling (401, 403, 404)
-
-**Core Methods**:
-
-```typescript
-doRequest<T>(path, method, data?): Promise<T>  // Low-level HTTP
-getProjects(): Promise<RedmineProject[]>       // Paginated fetch
-getIssuesAssignedToMe(): Promise<{issues}>
-getOpenIssuesForProject(id, subprojects?): Promise<{issues}>
-getIssueById(id): Promise<{issue}>
-setIssueStatus(issue, statusId): Promise<void>
-addTimeEntry(issueId, activityId, hours, msg): Promise<void>
-applyQuickUpdate(quickUpdate): Promise<QuickUpdateResult>
-getIssueStatuses(): Promise<{issue_statuses}>  // Cached
-getTimeEntryActivities(): Promise<{time_entry_activities}>  // Cached
-getMemberships(projectId): Promise<Membership[]>
-```
+**Responsibility**: HTTP client for Redmine REST API with caching.
 
 **Connection Options**:
+```typescript
+interface RedmineServerConnectionOptions {
+  address: string;           // https://redmine.example.com
+  key: string;               // API key
+  rejectUnauthorized?: boolean; // SSL cert validation
+  additionalHeaders?: object;   // Custom headers
+  requestFn?: typeof http.request; // DI for testing
+}
+```
 
-- `address`: Base URL (e.g., `https://redmine.example.com`)
-- `key`: API key from user's Redmine account
-- `rejectUnauthorized`: SSL cert validation (default: false)
-- `additionalHeaders`: Custom headers (e.g., auth proxies)
+**HTTP Flow**:
+```
+doRequest(path, method, data?)
+  ├─► Build request (hostname, port, headers, path)
+  ├─► Handle response (401, 403, 404, 400+ errors)
+  ├─► Success → Parse JSON, call onResponseSuccess()
+  ├─► 30s timeout
+  └─► Return Promise<T>
+```
 
-#### RedmineProject (`redmine-project.ts`)
+**Hooks for Logging**: `onResponseSuccess()`, `onResponseError()` - overridden by LoggingRedmineServer.
 
-**Responsibility**: Project data representation.
+**API Methods**:
 
-**Properties**: `id`, `name`, `description`, `identifier`, `parent` (for hierarchy).
+| Method | Purpose | Caching |
+|--------|---------|---------|
+| `getProjects()` | Paginated project fetch | No |
+| `getTimeEntryActivities()` | Activity types | Yes (instance) |
+| `addTimeEntry()` | Log time to issue | No |
+| `getTimeEntries()` | User's time entries | No |
+| `getIssueById()` | Single issue fetch | No |
+| `setIssueStatus()` | Update issue status | No |
+| `getIssueStatuses()` | All statuses | Yes (instance) |
+| `getIssueStatusesTyped()` | Typed status list | Via getIssueStatuses |
+| `getMemberships()` | Project members | No |
+| `applyQuickUpdate()` | Batch issue update | No |
+| `getIssuesAssignedToMe()` | Current user's issues | No |
+| `getOpenIssuesForProject()` | Project issues | No |
 
-**Methods**: `toQuickPickItem()` - converts to VS Code picker format.
+**Pagination Pattern**: Recursive async function fetches all pages (offset/limit) until `total_count` reached.
 
-#### Models (`src/redmine/models/`)
+#### LoggingRedmineServer (`logging-redmine-server.ts`)
 
-**Purpose**: TypeScript interfaces matching Redmine JSON responses.
+**Pattern**: Decorator extending RedmineServer for API logging.
 
-**Key Models**:
-
-- `Issue`: Full issue data (id, subject, status, assignee, etc.)
-- `Project`: Project metadata
-- `Membership`: User/group with project access
-- `IssueStatus`: Status definition
-- `TimeEntry`: Time log entry
-- `TimeEntryActivity`: Activity types (development, testing, etc.)
-- `NamedEntity`: Base interface for entities with id+name
+**Features**: Request/response logging, duration tracking, request correlation, stale request cleanup (60s).
 
 ### 3. Tree View Providers (`src/trees/`)
 
+All tree providers implement `vscode.TreeDataProvider<T>`.
+
 #### MyIssuesTree (`my-issues-tree.ts`)
 
-**Implements**: `vscode.TreeDataProvider<Issue>`
+**Displays**: Issues assigned to current user with flexibility scores.
 
-**Purpose**: Displays issues assigned to current user in sidebar.
+**Features**: Concurrent fetch deduplication, flexibility caching, risk-based sorting (overbooked → at-risk → on-track → completed).
 
-**Data Source**: `RedmineServer.getIssuesAssignedToMe()`
+**TreeItem Icons**: ThemeIcon with color coding (red: overbooked, yellow: at-risk, green: on-track/completed).
 
-**Tree Item Format**: `#123 [Bug] (New) Fix login by John Doe`
+#### MyTimeEntriesTreeDataProvider (`my-time-entries-tree.ts`)
 
-**Click Action**: Opens issue actions menu.
+**Displays**: Time entries grouped by period (Today/Week/Month) with hours/percentage.
 
-**Refresh**: Triggered via `onDidChangeTreeData$` EventEmitter.
-
-#### MyTimeEntriesTree (`my-time-entries-tree.ts`)
-
-**Implements**: `vscode.TreeDataProvider<TimeEntryNode>`
-
-**Purpose**: Displays user's logged time entries grouped by period (Today/Week/Month).
-
-**Data Source**: `RedmineServer.getTimeEntries()` with date range filters
-
-**Architecture**:
-- Async background loading to prevent UI blocking (<10ms initial render)
-- Issue caching with batch fetching (avoids N+1 queries)
-- Parallel API requests for Today/Week/Month groups
-- Loading state while fetching data
-
-**Tree Structure**:
-```
-📅 Today (8.5h)
-  └─ #7392 Data Management (1.25h)
-📅 This Week (17.5h)
-  └─ ...
-📅 This Month (42.0h)
-  └─ ...
-```
-
-**Tooltip**: Shows issue #, subject, hours, "Open in Browser" command link
-
-**Commands**: Refresh tree, open time entry issue in browser
-
-**Performance**: 252ms → <10ms sidebar click (async pattern)
+**Features**: Non-blocking async loading (<10ms initial render), parallel API requests, issue caching with batch fetching.
 
 #### ProjectsTree (`projects-tree.ts`)
 
-**Implements**: `vscode.TreeDataProvider<RedmineProject | Issue>`
+**Displays**: All projects with optional hierarchy.
 
-**Purpose**: Hierarchical project/issue browser.
-
-**View Modes** (via `ProjectsViewStyle` enum):
-
-- **LIST**: Flat project list
-- **TREE**: Hierarchical (respects project parent/child relationships)
-
-**Data Flow**:
-
-```
-getChildren(undefined) → All projects (root level)
-getChildren(project) → Subprojects + issues for that project
-```
-
-**Caching**: Projects cached in `projects` property, cleared on refresh.
-
-**Commands**:
-
-- `toggleTreeView`: Switch to LIST mode
-- `toggleListView`: Switch to TREE mode
+**View Modes**: LIST (flat) or TREE (hierarchical with parent/child).
 
 ### 4. Commands (`src/commands/`)
 
-**Pattern**: Each command exports default function accepting `ActionProperties`.
+**Registration Pattern**: Commands registered via `registerCommand()` wrapper that handles configuration parsing.
 
-**Registration**: Via `registerCommand()` wrapper in `extension.ts`, which:
+**Command Map**:
 
-1. Prefixes with `redmine.` namespace
-2. Handles configuration parsing
-3. Passes `ActionProperties` to command function
+| Command | File | Trigger |
+|---------|------|---------|
+| `listOpenIssuesAssignedToMe` | list-open-issues-assigned-to-me.ts | Command palette |
+| `openActionsForIssue` | open-actions-for-issue.ts | Tree click, input |
+| `openActionsForIssueUnderCursor` | open-actions-for-issue-under-cursor.ts | Editor context |
+| `newIssue` | new-issue.ts | Opens browser |
+| `quickLogTime` | quick-log-time.ts | Ctrl+Y Ctrl+Y |
+| `setApiKey` | set-api-key.ts | Command palette |
+| `configure` | extension.ts (inline) | Tree header |
+| `changeDefaultServer` | extension.ts (inline) | Multi-workspace |
+| `refreshIssues` | extension.ts (inline) | Tree header |
+| `refreshTimeEntries` | extension.ts (inline) | Tree header |
+| `toggleTreeView` / `toggleListView` | extension.ts (inline) | Projects tree |
+| `openTimeEntryInBrowser` | extension.ts (inline) | Time entry context |
+| `openIssueInBrowser` | extension.ts (inline) | Issue context |
+| `copyIssueUrl` | extension.ts (inline) | Issue context |
+| `showApiOutput` | extension.ts (inline) | Debug |
+| `clearApiOutput` | extension.ts (inline) | Debug |
+| `toggleApiLogging` | extension.ts (inline) | Debug |
 
-**Command Implementations**:
+#### Quick Log Time (`quick-log-time.ts`)
 
-| Command                             | File                                     | Purpose                                    |
-| ----------------------------------- | ---------------------------------------- | ------------------------------------------ |
-| `listOpenIssuesAssignedToMe`        | `list-open-issues-assigned-to-me.ts`     | Shows quick pick of user's issues          |
-| `openActionsForIssue`               | `open-actions-for-issue.ts`              | Issue actions menu (status, time, browser) |
-| `openActionsForIssueUnderCursor`    | `open-actions-for-issue-under-cursor.ts` | Extracts issue # from text, opens actions  |
-| `newIssue`                          | `new-issue.ts`                           | Opens browser to Redmine new issue form    |
-| `setApiKey`                         | `set-api-key.ts`                         | Securely stores API key in VS Code Secrets |
-| `changeDefaultServer`               | (inline in extension.ts)                 | Switches active server in trees            |
-| `refreshIssues`                     | (inline)                                 | Clears cache, refreshes trees              |
-| `toggleTreeView` / `toggleListView` | (inline)                                 | Toggle project view mode                   |
-
-**ActionProperties Interface** (`action-properties.ts`):
-
-```typescript
-{
-  server: RedmineServer,
-  config: RedmineConfig
-}
-```
+**Flow**: Prompt for recent/new issue → pick activity → input hours (flexible formats: "1.75", "1:45", "1h 45min") → input comment → POST → cache → status bar confirmation.
 
 ### 5. Controllers (`src/controllers/`)
 
 #### IssueController (`issue-controller.ts`)
 
-**Responsibility**: Orchestrates issue operations via interactive prompts.
+**Responsibility**: Orchestrate issue operations via VS Code UI prompts.
 
-**Constructor**: `(issue: Issue, redmine: RedmineServer)`
-
-**Public Method**: `listActions()` - Shows action menu with 4 options:
-
-**Actions**:
-
-1. **changeStatus()**:
-   - Fetches available statuses
-   - Shows quick pick
-   - Calls `RedmineServer.setIssueStatus()`
-
-2. **addTimeEntry()**:
-   - Fetches activity types (Development, Testing, etc.)
-   - Prompts for activity via `chooseTimeEntryType()`
-   - Prompts for `hours|message` format via `setTimeEntryMessage()`
-   - Calls `RedmineServer.addTimeEntry()`
-
-3. **openInBrowser()**:
-   - Constructs issue URL: `{server}/issues/{id}`
-   - Opens via `vscode.open` command
-
-4. **quickUpdate()**:
-   - Fetches memberships, statuses
-   - Sequential prompts: status → assignee → message
-   - Applies all changes atomically via `RedmineServer.applyQuickUpdate()`
-   - Validates changes (shows warnings if partial success)
+**Actions**: Change status, add time entry, open in browser, quick update (batch: status + assignee + message).
 
 #### Domain Models (`domain.ts`)
 
-**Classes**:
+**Classes**: `Membership`, `IssueStatus`, `QuickUpdate`, `QuickUpdateResult`.
 
-- `Membership`: User/group (id, name, isUser flag)
-- `IssueStatus`: Status with id+name
-- `QuickUpdate`: Batch update request (issueId, message, assignee, status)
-- `QuickUpdateResult`: Response with `differences[]` array for validation
+### 6. Utilities (`src/utilities/`)
 
-### 6. Configuration (`src/definitions/redmine-config.ts`)
+#### SecretManager (`secret-manager.ts`)
 
-**Extension Settings** (defined in `package.json`):
+**Responsibility**: Secure API key storage via VS Code Secrets API.
 
-| Setting                      | Type    | Description                                                   |
-| ---------------------------- | ------- | ------------------------------------------------------------- |
-| `redmine.url`                | string  | Server URL (e.g., `https://redmine.example.com:8443/redmine`) |
-| `redmine.rejectUnauthorized` | boolean | SSL cert validation (for self-signed certs)                   |
-| `redmine.identifier`         | string  | Default project identifier for new issues                     |
-| `redmine.additionalHeaders`  | object  | Custom HTTP headers                                           |
+**Platform Storage**: Windows (Credential Manager), macOS (Keychain), Linux (libsecret/gnome-keyring).
 
-**API Key Storage** (v3.0+): Stored securely via VS Code Secrets API (platform-native encryption), not in settings. Use `Redmine: Set API Key` command.
+#### Flexibility Calculator (`flexibility-calculator.ts`)
 
-**Workspace Support**: All settings scoped to `resource` (multi-root workspace).
+**Purpose**: Calculate issue timeline risk based on due date and remaining work.
 
-## Data Flow
+**Formula**: `flexibility = (available_hours / needed_hours - 1) * 100`
 
-### Issue Actions Flow
+**Status Thresholds**: completed (done_ratio = 100), overbooked (remaining < 0), at-risk (remaining < 20), on-track (remaining ≥ 20).
 
-```
-User clicks issue in tree
-  → Tree item command triggers "redmine.openActionsForIssue"
-  → Command calls RedmineServer.getIssueById()
-  → Creates IssueController with issue+server
-  → IssueController.listActions() shows menu
-  → User selects action (e.g., "Change status")
-  → Controller prompts for new status
-  → Controller calls RedmineServer.setIssueStatus()
-  → Shows success/error message
-```
+**Key Functions**: `calculateFlexibility()`, `countWorkingDays()` (memoized), `countAvailableHours()` (memoized).
 
-### Tree Refresh Flow
+#### Workload Calculator (`workload-calculator.ts`)
 
-```
-User clicks refresh button
-  → "redmine.refreshIssues" command
-  → Calls ProjectsTree.clearProjects()
-  → Fires onDidChangeTreeData$ event
-  → VS Code calls getChildren() on tree providers
-  → Trees fetch fresh data from RedmineServer
-  → UI updates
-```
+**Purpose**: Status bar summary across all assigned issues (total estimated/spent, remaining, available this week, buffer, top 3 urgent).
+
+#### API Logger (`api-logger.ts`)
+
+**Features**: Request/response formatting, sensitive data redaction, query param truncation, binary content detection.
+
+### 7. Models (`src/redmine/models/`)
+
+TypeScript interfaces matching Redmine API JSON: `Issue`, `TimeEntry`, `Project`, `Membership`, `IssueStatus`, `TimeEntryActivity`, `NamedEntity`.
+
+## Data Flow Diagrams
 
 ### Configuration Flow
 
 ```
-Extension activates
-  → Reads workspace.getConfiguration("redmine")
-  → Creates RedmineServer with config
-  → Passes to tree providers
-User changes config or workspace folder
-  → parseConfiguration() called
-  → New RedmineServer created/retrieved from bucket
-  → Trees updated via changeDefaultServer command
+Extension Activates → updateConfiguredContext()
+  ├─► Read workspace config (redmine.url)
+  ├─► Get API key from SecretManager
+  └─► Both present?
+      ├─► Yes: Set redmine:configured=true, create server, set on trees, refresh
+      └─► No: Set redmine:configured=false, clear servers
 ```
 
-## Key File Locations
+### Issue Actions Flow
 
-### Entry Points
+```
+User clicks issue → TreeItem.command → "redmine.openActionsForIssue"
+  ├─► parseConfiguration() → ActionProperties
+  ├─► server.getIssueById(id)
+  ├─► new IssueController(issue, server)
+  └─► listActions() → showQuickPick(actions) → execute action
+      ├─► Change status: getIssueStatuses() → pick → setIssueStatus()
+      ├─► Add time entry: getTimeEntryActivities() → pick → input hours/comment → POST
+      ├─► Open in browser: vscode.open(issueUrl)
+      └─► Quick update: get memberships/statuses → pick status/assignee → input message → POST
+```
 
-- **Extension activation**: `src/extension.ts:13` (`activate()`)
-- **Extension deactivation**: `src/extension.ts:195` (`deactivate()`)
+### Time Entry View Flow
 
-### Command Registration
+```
+getChildren(undefined) → Return cached or [loadingNode]
+  ├─► Start loadTimeEntries() (async, non-blocking)
+  └─► loadTimeEntries() (background)
+      ├─► Parallel fetch: today/week/month
+      ├─► Calculate totals/percentages
+      ├─► Build group nodes, set cachedGroups
+      └─► Fire onDidChangeTreeData → refresh view
+```
 
-- **Command wrapper**: `src/extension.ts:131-152` (`registerCommand()`)
-- **Command list**: `src/extension.ts:154-189`
+## Configuration Schema
 
-### API Methods
+### Extension Settings (`package.json`)
 
-- **HTTP client**: `src/redmine/redmine-server.ts:95-177` (`doRequest()`)
-- **Projects**: `src/redmine/redmine-server.ts:179-212` (`getProjects()`)
-- **Issues**: `src/redmine/redmine-server.ts:259-374`
+| Setting | Type | Scope | Description |
+|---------|------|-------|-------------|
+| `redmine.url` | string | machine | Server URL |
+| `redmine.apiKey` | string | machine | **DEPRECATED** - use Secrets |
+| `redmine.rejectUnauthorized` | boolean | machine | SSL validation |
+| `redmine.identifier` | string | machine | Default project |
+| `redmine.additionalHeaders` | object | machine | Custom headers |
+| `redmine.logging.enabled` | boolean | machine | API logging |
+| `redmine.workingHours.weeklySchedule` | object | application | Per-day hours |
+| `redmine.workingHours.hoursPerDay` | number | application | **DEPRECATED** |
+| `redmine.workingHours.workingDays` | array | application | **DEPRECATED** |
+| `redmine.statusBar.showWorkload` | boolean | application | Enable workload |
 
-### Tree Providers
+### Weekly Schedule Format
 
-- **My Issues tree**: `src/trees/my-issues-tree.ts:22-38`
-- **Projects tree**: `src/trees/projects-tree.ts:34-83`
+```json
+{
+  "redmine.workingHours.weeklySchedule": {
+    "Mon": 8, "Tue": 8, "Wed": 8, "Thu": 8, "Fri": 8,
+    "Sat": 0, "Sun": 0
+  }
+}
+```
 
-### Controllers
+### Context Variables
 
-- **Issue actions**: `src/controllers/issue-controller.ts:217-275` (`listActions()`)
-
-## Extension Points
-
-### Adding New Commands
-
-1. Create command file in `src/commands/`
-2. Export default function: `(props: ActionProperties, ...args) => void`
-3. Register in `extension.ts` via `registerCommand("commandName", handlerFn)`
-4. Add to `package.json` `contributes.commands` array
-5. Optionally add to `activationEvents`
-
-### Adding New Tree Views
-
-1. Create provider class implementing `vscode.TreeDataProvider<T>`
-2. Implement `getTreeItem(element: T)` and `getChildren(element?: T)`
-3. Add EventEmitter for `onDidChangeTreeData`
-4. Register in `extension.ts` via `vscode.window.createTreeView()`
-5. Add view definition to `package.json` `contributes.views`
-
-### Adding New API Methods
-
-1. Add method to `RedmineServer` class
-2. Use `doRequest<T>(path, method, data?)` for HTTP calls
-3. Map response to model from `src/redmine/models/`
-4. Consider caching for rarely-changing data (see `issueStatuses`, `timeEntryActivities`)
-
-### Adding New Configuration
-
-1. Add property to `RedmineConfig` interface in `src/definitions/redmine-config.ts`
-2. Add schema to `package.json` `contributes.configuration.properties`
-3. Access via `vscode.workspace.getConfiguration("redmine").{propertyName}`
+| Variable | Purpose |
+|----------|---------|
+| `redmine:configured` | Show/hide welcome views |
+| `redmine:hasSingleConfig` | Show/hide server switcher |
+| `redmine:treeViewStyle` | Projects view mode |
 
 ## Build System
 
-**Bundler**: esbuild (configured in `esbuild.js`)
+### Build Configuration
 
-**Output**: `out/extension.js` (single bundled file)
+**esbuild**: Bundle to CommonJS, minify in production, external: vscode.
 
-**Scripts** (from `package.json`):
+**TypeScript**: ES2022, strict mode, bundler resolution, strict unused checks.
 
-- `compile`: Production build
-- `watch`: Development mode with auto-rebuild
-- `package`: Create VSIX file via `@vscode/vsce`
-- `typecheck`: TypeScript validation
-- `clean`: Remove build artifacts
-- `ci`: Full validation pipeline
+### NPM Scripts
 
-**TypeScript**: Configured via `tsconfig.json`, targets ES6.
-
-## Git Hooks
-
-**Location**: `scripts/` (tracked in repo), installed to `.git/hooks/`
-
-**Installation**: Run `scripts/install-hooks.sh` after clone
-
-**commit-msg Hook** (`scripts/commit-msg`):
-- Validates subject line ≤ 50 chars
-- Enforces blank line between subject and body
-- Validates body lines ≤ 72 chars
-- Exceptions: merge commits, revert commits
-- Provides immediate feedback before commit completes
-- Prevents CI failures due to commit message format
-
-**Benefits**:
-- Fast feedback (pre-commit vs CI)
-- Agentic AI-friendly (immediate validation)
-- Enforces conventional commit style
-- Reduces CI build failures
-
-## Error Handling
-
-### API Errors
-
-- **401**: Invalid API key or additional auth required
-- **403**: Insufficient permissions
-- **404**: Resource not found
-- **400+**: Generic server error
-
-All handled in `RedmineServer.doRequest()` with descriptive error messages.
-
-### User Errors
-
-- Invalid input formats (e.g., time entry pattern)
-- Missing configuration (empty URL/API key)
-- Network failures (NodeJS request errors)
-
-Displayed via `vscode.window.showErrorMessage()`.
-
-## Migration Notes
-
-### Configuration Schema Change (v1.0.0)
-
-Extension detects old config (`redmine.serverUrl`) and shows migration guide via webview panel.
-
-**Old → New**:
-
-- `serverUrl` + `serverPort` + `serverIsSsl` → `url` (single combined URL)
-- `projectName` → `identifier`
-- `authorization` → `additionalHeaders` (object)
-
-Migration handled in `src/extension.ts:96-129`.
-
-## Output Channel Logging
-
-**Purpose**: Debug API interactions via VS Code output channel.
-
-**Architecture**: Decorator pattern with protected hooks in `RedmineServer`.
-
-**Components**:
-
-- `ApiLogger` (`src/utilities/api-logger.ts`): Formats log entries, redacts sensitive data
-- `LoggingRedmineServer` (`src/redmine/logging-redmine-server.ts`): Decorator extending `RedmineServer`
-- `redaction.ts` (`src/utilities/redaction.ts`): Redacts sensitive fields from JSON
-- Protected hooks in `RedmineServer`: `onResponseSuccess()`, `onResponseError()`
-- Output channel: "Redmine API" (created in `extension.ts:26`)
-
-**Configuration**: `redmine.logging.enabled` (boolean, default: true)
-
-**Log Format**: `[HH:MM:SS.mmm] [counter] METHOD path → status (duration) sizeB [binary]`
-
-**Features**:
-
-- Request body logging (200 char truncation, redacted)
-- Response size tracking in bytes
-- Query parameter truncation (>100 chars)
-- Binary content detection (image/\*, application/pdf)
-- Error response body logging (always shown, redacted)
-- Sensitive data redaction (password, api_key, token, secret, auth)
-
-**Example**:
-
-```
-[14:23:45.123] [1] POST /users.json
-  Body: {"user":{"login":"admin","password":"***"}}
-[14:23:45.265] [1] → 201 (142ms) 85B
-[14:23:46.100] [2] GET /avatar.png
-[14:23:46.234] [2] → 200 (134ms) 2048B [binary]
-```
-
-**Commands**:
-
-- `redmine.showApiOutput` - Reveal output channel
-- `redmine.clearApiOutput` - Clear logs
-- `redmine.toggleApiLogging` - Enable/disable at runtime
-
-**Implementation**: When logging enabled, `createServer()` returns `LoggingRedmineServer` instead of `RedmineServer` (extension.ts:30-44). Protected hooks allow child class to capture response metadata without modifying return values. Zero overhead when disabled.
-
-## Dependencies
-
-**Runtime**:
-
-- `lodash` (utility functions: `isNil`, `isEqual`)
-
-**Development**:
-
-- `@types/vscode`, `@types/node`, `@types/lodash`
-- `typescript`, `esbuild`
-- `eslint` + prettier + TypeScript plugins
-- `@vscode/vsce` (packaging)
-
-**VS Code API Usage**:
-
-- Commands: `vscode.commands`
-- Trees: `vscode.window.createTreeView`, `TreeDataProvider`
-- UI: `showQuickPick`, `showInputBox`, `showInformationMessage`
-- Progress: `withProgress`
-- Configuration: `workspace.getConfiguration`
+| Script | Purpose |
+|--------|---------|
+| `compile` | Production build |
+| `watch` | Development mode |
+| `typecheck` | TypeScript validation |
+| `lint` | ESLint check |
+| `test` | Run Vitest |
+| `test:coverage` | Coverage report |
+| `ci` | lint + typecheck + test:coverage |
+| `package` | Create VSIX |
+| `clean` | Remove artifacts |
 
 ## Testing Strategy
 
-**Current State** (v3.0+): Comprehensive test suite with 60%+ coverage.
+**Framework**: Vitest with v8 coverage (60% target).
 
-**Test Framework**: Vitest with MSW (Mock Service Worker) for HTTP mocking.
+**Exclusions**: extension.ts, trees, UI-heavy commands, controllers, type definitions.
 
-**Coverage**:
-
-- Unit tests for `RedmineServer` methods (HTTP mocked via MSW)
-- Unit tests for commands (`setApiKey`, domain utilities)
-- Unit tests for utilities (`RedmineSecretManager`, error handling)
-- 46+ tests, ~75% coverage, <2s runtime
-
-**Run Tests**: `npm test` (includes coverage report)
-
-## Future Extension Points
-
-### Potential Features
-
-- Inline issue creation (without browser)
-- Issue commenting
-- Attachment upload
-- Custom field support
-- Webhook integration
-- Issue search/filter
-- Gantt chart visualization
-- Time tracking reports
-
-### Architecture Considerations
-
-- **Custom fields**: Extend `Issue` model, add to `IssueController`
-- **Comments**: New command + API method in `RedmineServer`
-- **Attachments**: File picker + multipart upload in `doRequest()`
-- **Search**: New tree view with query-based data source
-- **Reports**: Webview panel with charting library
-
-## Performance Optimization
-
-**Current**:
-
-- Project list cached until manual refresh
-- Statuses/activities cached (fetch once per server instance)
-- Server instances reused via bucket
-
-**Future**:
-
-- Background refresh with TTL
-- Incremental issue updates (websockets/polling)
-- Lazy loading for large project hierarchies
-- Virtual scrolling for issue lists
+**HTTP Testing**: Dependency injection via `requestFn` parameter (avoids module mock hoisting).
 
 ## Security Considerations
 
-- **API Keys** (v3.0+): Stored via VS Code Secrets API with platform-native encryption
-  - Windows: Credential Manager
-  - macOS: Keychain
-  - Linux: libsecret/gnome-keyring
-  - Never synced across devices
-  - Managed via `RedmineSecretManager` utility
-- **Server URLs**: Stored in workspace settings (may sync via Settings Sync)
-- **HTTPS**: Recommended (HTTP supported for local dev)
-- **Self-signed Certs**: `rejectUnauthorized` option (use cautiously)
-- **No credential storage in extension code**: All API calls authenticated via header
+**API Key Storage**: VS Code Secrets API (platform-native encryption), per-workspace scope, never synced.
 
-## Multi-Workspace Support
+**Logging Redaction**: Auto-redacts password, api_key, token, secret, auth, authorization, key.
 
-Extension fully supports multi-root workspaces:
+**Network**: HTTPS recommended, `rejectUnauthorized: false` for self-signed certs (caution), 30s timeout.
 
-- Each workspace folder can have different Redmine config
-- `parseConfiguration()` prompts for folder selection
-- Server instances cached per unique config
-- Trees can switch between servers via `changeDefaultServer`
+## Extension Points
 
-**Context Variables**:
+**Adding Commands**: Create file in `src/commands/`, export default function, register in `extension.ts`, add to `package.json` → `contributes.commands`.
 
-- `redmine:hasSingleConfig`: Hides server switcher in single-folder workspaces
-- `redmine:treeViewStyle`: Controls tree/list view toggle visibility
+**Adding Tree Views**: Implement `TreeDataProvider<T>`, add EventEmitter, register via `createTreeView()`, add to `package.json` → `contributes.views`.
+
+**Adding API Methods**: Add method to `RedmineServer`, use `doRequest<T>()`, create model interface if needed, consider caching.
+
+**Adding Configuration**: Update `RedmineConfig` interface, add to `package.json` → `contributes.configuration.properties`, access via `vscode.workspace.getConfiguration()`.
+
+## Performance Optimizations
+
+**Optimizations**: Server LRU cache (max 3), status/activity caching, async tree loading (<10ms), working days memoization, config change debouncing (300ms), concurrent fetch deduplication.
+
+**Patterns**: Non-blocking tree loading (fire-and-forget with loading placeholder), config debouncing (300ms timeout).
+
+## Git Hooks
+
+**commit-msg**: Validates subject ≤ 50 chars, blank line, body ≤ 72 chars (exceptions: merge/revert). Install via `npm run install-hooks`.
+
+## Dependencies
+
+### Runtime
+
+None (lodash removed in v3.0.0)
+
+### Development
+
+| Package | Purpose |
+|---------|---------|
+| typescript | Language |
+| esbuild | Bundler |
+| eslint | Linting |
+| prettier | Formatting |
+| vitest | Testing |
+| @vitest/coverage-v8 | Coverage |
+| @types/vscode | Type definitions |
+| @types/node | Node types |
+| @vscode/vsce | Packaging |

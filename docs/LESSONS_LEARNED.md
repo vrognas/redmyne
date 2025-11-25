@@ -57,10 +57,9 @@
 
 **URL Migration (url.parse � new URL)**
 
-- `new URL()` throws on invalid URLs - wrap in try/catch
-- `url.port` returns string, not number - use `parseInt(url.port, 10)`
-- `url.host` includes port, use `url.hostname` for host only
-- Test edge cases: URLs with/without ports, paths, protocols
+- `new URL()` throws - wrap in try/catch
+- `url.port` returns string - use `parseInt(url.port, 10)`
+- `url.host` includes port, `url.hostname` for host only
 
 **HTTP Headers Type Safety**
 
@@ -76,17 +75,13 @@
 
 ### Testing Strategy
 
-**Vitest over Jest**
+**Vitest over Jest**: Faster, better ESM support, simpler config
 
-- Faster, better ESM support, simpler config
-- MSW 2.x doesn't support native Node.js http/https - use vitest mocks instead
-- Coverage target 60% realistic for VS Code extensions (exclude UI-heavy code)
-
-**Test Organization**
-
+**Test Organization**:
 - Unit: Pure logic (RedmineServer, domain models, utilities)
 - Exclude: extension.ts, tree providers, commands (VS Code-dependent)
-- Mock vscode module via vitest alias, not actual VS Code test environment
+- Mock vscode via vitest alias, not actual VS Code test environment
+- Coverage target 60% (realistic for VS Code extensions)
 
 ### Build Configuration
 
@@ -131,75 +126,33 @@
 
 ### Dependencies
 
-**Removed**
-
-- lodash � native JS (`isNil` � `!= null`, `isEqual` � `JSON.stringify`)
-- Bundle size reduced ~80KB
-- No behavioral changes
-
-**Updated**
-
-- TypeScript 3.9.7 � 5.7.2 (5-year jump)
-- @types/vscode 1.x � 1.96.0
-- @types/node 12.x � 22.17.10
-
-**Added**
-
-- vitest, @vitest/coverage-v8, msw (dev only)
+- Removed: lodash � native JS (~80KB savings)
+- Updated: TypeScript 3.9.7 � 5.7.2, @types/vscode 1.x � 1.96.0, @types/node 12.x � 22.17.10
+- Added: vitest, @vitest/coverage-v8 (dev only)
 
 ### Configuration
 
-**Engines**
-
-- vscode: ^1.85.0 (Secrets API minimum)
-- node: >=20.0.0 (modern LTS)
-
-**Breaking Changes**
-
-- redmine.apiKey deprecated (use Secrets)
-- Manual migration only (no auto-fallback to config)
-- Users must run "Redmine: Set API Key" command
+- Engines: vscode ^1.85.0, node >=20.0.0
+- Breaking: redmine.apiKey deprecated, manual migration via "Redmine: Set API Key" command
 
 ### Avoided Overengineering
 
-**Rejected Patterns**
-
-- Repository pattern (overkill for 1,135 LOC)
-- Dependency injection container
-- Mock repositories (use MSW/vitest mocks)
-- Docker for E2E (use HTTP mocking)
-- 80%+ coverage target (60% realistic)
-
-**Kept Simple**
-
-- Direct RedmineServer usage (no abstraction layer)
-- Vitest mocks over MSW for Node.js http
-- Minimal test fixtures
-- Pragmatic type assertions over complex type guards
+- Rejected: Repository pattern, DI container, Docker E2E, 80%+ coverage (overkill for 1,135 LOC)
+- Kept simple: Direct RedmineServer usage, vitest mocks, minimal fixtures, pragmatic type assertions
 
 ### CI/CD
 
-**GitHub Actions**
+- Pipeline: lint � typecheck � test � coverage check (>60%) � codecov
+- Node 20.x only, npm cache enabled
 
-- lint � typecheck � test � coverage check � codecov
-- Fail on <60% coverage
-- Node 20.x only (no matrix)
-- Cache npm for speed
+### Lessons
 
-### Documentation
-
-**Migration Guide**
-
-- Quick start (4 steps)
-- Manual migration only
-- Troubleshooting table
-- Breaking changes summary
-
-**No Auto-Migration**
-
-- Security risk (plaintext config � encrypted secrets)
-- Force explicit user action
-- Clear error messages pointing to command
+1. **TDD catches edge cases early**: Write tests first (URL parsing, null checks)
+2. **Simple > clever**: Native JS > lodash, vitest mocks > MSW for Node.js http
+3. **60% coverage realistic**: Don't test VS Code UI without real environment
+4. **Breaking changes OK**: Security/modernization justifies major version bump
+5. **No auto-migration**: Force explicit user action for security-sensitive changes
+6. **TypeScript strict mode**: Catches real bugs (null checks, type assertions)
 
 ## v3.0.1 UX Improvements (2025-11-22)
 
@@ -225,69 +178,38 @@
 **Problem**: 50+ simultaneous `GET "<URL>"` fetches when extension loads
 **Root Cause**: `logo.svg` contained external DTD/entity references
 
-```xml
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd" [
-  <!ENTITY ns_svg "http://www.w3.org/2000/svg">
-  <!ENTITY ns_xlink "http://www.w3.org/1999/xlink">
-]>
-```
-
 **Solution**: Removed XML declaration, DOCTYPE, and entity declarations
-
-- Replaced `xmlns="&ns_svg;"` with direct URI
-- Replaced `xmlns:xlink="&ns_xlink;"` with direct URI
+- Replaced entity references with direct URIs
 - Reduced size from 2.28 KB to 1.98 KB
-  **Investigation**: Subagent traced fetches to browser attempting DTD resolution on every SVG parse
-  **Note**: Fetches persisted with extension disabled → Positron/browser cache issue, not extension bug
 
-## Key Takeaways
+### Lessons
 
-1. **TDD works**: Write tests first caught URL edge cases early
-2. **TypeScript strict mode**: Catches real bugs (null checks, type assertions)
-3. **Simple > clever**: Native JS > lodash, mocks > MSW
-4. **60% coverage realistic**: Don't test VS Code UI integration without real env
-5. **Breaking changes OK**: Security/modernization justifies v3.0.0 bump
-6. **No auto-migration**: Explicit user action better for security
-7. **Vitest fast**: 46 tests in 1.17s
-8. **Parallel agents**: 5 phases in 2 hours (vs 3 weeks estimate)
-9. **Guard tree refreshes**: Check server exists before firing events
-10. **SVG DTD spam**: External entity refs in SVG cause browser fetch spam - use inline namespaces
-11. **Isolate issues**: Disable extension to prove source - if persists, not extension's bug
+1. **Guard tree refreshes**: Check server exists before firing events
+2. **SVG external entities**: DTD/entity refs cause browser fetch spam - use inline namespaces
+3. **Isolate issues**: Disable extension to prove source - if persists, not extension's bug
 
 ## v3.0.3 Modernization (2025-11-23)
 
 ### Async/Await Refactoring
 
-**Pattern Consistency**
-- Replaced 10+ `.then()` chains with async/await in IssueController
-- Standardized promise handling in RedmineServer (3 methods)
-- Reduced code from 283→264 lines in issue-controller.ts (-19 lines)
-- Improved readability with linear flow vs nested callbacks
-
-**Subagent Coordination**
-- Used parallel subagents for complex refactoring tasks
-- Each subagent focused on single file/concern
-- Verified compilation after each change (npx tsc --noEmit)
-- All 46 tests passed - no behavior changes
+- Replaced 10+ `.then()` chains with async/await
+- Reduced code 283→264 lines (-19 lines)
+- Improved readability: linear flow vs nested callbacks
 
 ### TypeScript Strictness
 
 **noUnusedLocals/Parameters/ImplicitReturns**
 - Found unused `server` param in RedmineProject constructor
-- Removed unused code per CLAUDE.md (no backwards-compat hacks)
-- Breaking change acceptable for internal API
-- Constructor: `(server, options)` → `(options)` - simpler
+- Removed per CLAUDE.md (no backwards-compat hacks)
+- Constructor: `(server, options)` → `(options)`
 
 **ESLint ecmaVersion**
-- 2020→2023 for Node 20+ syntax (optional chaining, nullish coalescing, top-level await)
+- 2020→2023 for Node 20+ syntax
 - Aligned with package.json engine requirement
 
 ### Build Scripts
 
-**Developer Experience**
-- Added `npm run typecheck` for explicit TS validation
-- Added `npm run clean` for artifact cleanup
-- Added `npm run ci` for full validation pipeline
+- Added `npm run typecheck`, `clean`, `ci`
 - Enables local pre-commit checks matching CI
 
 ### Lessons
@@ -331,33 +253,20 @@
 
 ### Commit Message Validation Hook
 
-**Problem**: CI checks commit messages but gives no immediate feedback to agentic AI
+**Problem**: CI checks commit messages but no immediate feedback for agentic AI
 
-**Solution**: Pre-commit hook validates before commit completes
+**Solution**: Pre-commit hook validates before commit (< 1s vs CI ~30s)
 
 **Implementation**:
-- `scripts/commit-msg`: Bash hook validates subject ≤ 50 chars, body ≤ 72 chars
-- `scripts/install-hooks.sh`: Copies hook to `.git/hooks/`
-- Tested with Vitest (7 tests, executes hook script)
-- Exception handling for merge/revert commits
+- `scripts/commit-msg`: Validates subject ≤ 50 chars, body ≤ 72 chars
+- `scripts/install-hooks.sh`: Copies to `.git/hooks/`
+- Tested with Vitest (7 tests via `execSync`)
 
 **Shell Script Gotchas**:
-- `#!/bin/sh` vs `#!/usr/bin/env bash`: Process substitution `< <(...)` requires bash
-- `wc -l` counts newlines, not lines: Use `grep -c ^` for reliable line counting
-- `read -r` without newline: Use `while read -r line || [ -n "$line" ]` pattern
-- Pipeline subshell: `tail | while` creates subshell, exit codes lost - use `< <(tail)`
-
-**Testing Strategy**:
-- Node.js tests (Vitest) execute bash script via `execSync`
-- Test both success (exit 0) and failure (exit 1) cases
-- Files without trailing newlines handled correctly
-- 98 total tests pass (91 existing + 7 new)
-
-**Benefits**:
-- Immediate feedback (< 1s vs CI ~30s)
-- Agentic AI learns from errors before push
-- Reduces CI failures
-- Enforces team conventions automatically
+- Process substitution `< <(...)` requires `#!/usr/bin/env bash`, not `#!/bin/sh`
+- `wc -l` counts newlines, not lines - use `grep -c ^`
+- `read -r` returns false on last line without trailing newline - use `|| [ -n "$line" ]`
+- `pipe | while` creates subshell, loses exit codes - use `< <(pipe)`
 
 ### Lessons
 
@@ -373,96 +282,44 @@
 
 ### Module Mock Hoisting Timing Issues with Getters
 
-**Problem**: Tests passed locally but failed in CI with empty arrays. RedmineServer methods returned `[]` instead of mocked data.
+**Problem**: Tests passed locally but failed in CI - RedmineServer returned `[]` instead of mocked data
 
-**Root Cause**: Module mock hoisting interacted poorly with getter pattern
+**Root Cause**: Module mock hoisting + runtime getter evaluation = non-deterministic
 
 ```typescript
-// src/redmine/redmine-server.ts
+// Getter evaluated at runtime, not import time
 get request() {
-  return this.options.url.protocol === "https:"
-    ? https.request  // ← Evaluated at runtime, not import time
-    : http.request;
+  return this.options.url.protocol === "https:" ? https.request : http.request;
 }
 ```
 
-**The Failure Sequence**:
+**Why It Failed in CI**:
+- `vi.mock("http")` hoists to top but applies asynchronously
+- CI environment (slower): imports cache real `http.request` before mock applies
+- Getter captures unmocked version → real network calls → timeouts → null responses
+- Local environment (faster): mock applies before import cache
 
-1. Test file: `vi.mock("http")` hoisted to top
-2. **CI Environment** (slower module resolution):
-   - `import * as http` resolves → caches reference to **real** `http.request`
-   - Mock applies too late → getter already captured unmocked version
-   - Real `http.request` tries network calls → fails/times out → `doRequest` returns `null`
-   - `response?.projects || []` correctly returns `[]`
-   - Tests expecting data fail: `expect(result.issues).toHaveLength(1)` got `[]`
-
-3. **Local Environment** (faster):
-   - Mock applies → `import * as http` gets mocked version
-   - Getter uses mocked `http.request` ✓
-
-**Why It's Non-Deterministic**:
-- Module cache timing varies by:
-  - CPU speed
-  - Parallel test execution
-  - File system I/O
-  - Node.js version
-  - Import graph complexity
-
-**The Fix - Dependency Injection**:
+**Solution**: Dependency injection
 
 ```typescript
-// src/redmine/redmine-server.ts
 export interface RedmineServerConnectionOptions {
-  // ...
-  requestFn?: typeof http.request; // ← Optional injected dependency
+  requestFn?: typeof http.request; // Optional injected dependency
 }
 
 get request() {
-  if (this.options.requestFn) {
-    return this.options.requestFn; // ← Use injected mock
-  }
-  return this.options.url.protocol === "https:"
-    ? https.request
-    : http.request;
+  return this.options.requestFn ?? (this.options.url.protocol === "https:" ? https.request : http.request);
 }
 ```
 
-```typescript
-// test/unit/redmine/redmine-server.test.ts
-const createMockRequest = () => vi.fn(/* ... */);
-
-beforeEach(() => {
-  server = new RedmineServer({
-    address: "http://localhost:3000",
-    key: "test-api-key",
-    requestFn: createMockRequest(), // ← Direct injection
-  });
-});
-```
-
-**Why DI Works**:
-- No reliance on module mock hoisting order
-- No dependency on import resolution timing
-- No getter evaluation timing issues
-- Explicit, deterministic, works in all environments
-- Tests control exactly what code runs
-
-**Alternative Failed Attempts**:
-
-1. ❌ `queueMicrotask()` instead of `setTimeout()` in mock - didn't fix race
-2. ❌ Removing custom mock tests - symptom not cause
-3. ❌ Fixing mock endpoint paths - unrelated issue
-4. ❌ Adding null checks with optional chaining - good practice but didn't fix root cause
+**Why DI works**: No reliance on module mock hoisting order or import timing - explicit, deterministic
 
 ### Lessons
 
-1. **Avoid module mocking for stateful/getter patterns**: Hoisting timing is non-deterministic
-2. **DI makes tests deterministic**: Explicit injection bypasses module resolution entirely
+1. **Avoid module mocking for runtime getters**: Hoisting timing is non-deterministic
+2. **DI makes tests deterministic**: Explicit injection bypasses module resolution
 3. **Local pass ≠ CI pass**: Environment differences expose timing-dependent code
-4. **Getters evaluated at runtime**: Unlike imports, getters don't benefit from hoisting
-5. **Test robustness principle**: If it works differently in CI, the test is fragile
-6. **Null safety hides symptoms**: `response?.projects || []` masked the real issue (null responses)
-7. **Debug from first principles**: "Why would doRequest return null?" led to network call discovery
+4. **Null safety can hide root causes**: `response?.projects || []` masked null responses
+5. **Debug from first principles**: "Why null?" led to discovering actual network calls
 
 ## v3.4.0 MVP-4 Status Bar (2025-11-24)
 
@@ -511,23 +368,9 @@ async fetchIssuesIfNeeded(): Promise<Issue[]> {
 
 **Root Cause**: `event.affectsConfiguration("redmine")` matches ALL `redmine.*` changes, triggering unnecessary server reinit
 
-```typescript
-// BAD: Any redmine.* change triggers full reinit
-if (event.affectsConfiguration("redmine")) {
-  await updateConfiguredContext(); // Clears cache, causes blink
-}
-
-// GOOD: Filter out UI-only configs
-if (
-  event.affectsConfiguration("redmine") &&
-  !event.affectsConfiguration("redmine.statusBar") &&
-  !event.affectsConfiguration("redmine.workingHours")
-) {
-  await updateConfiguredContext();
-}
-```
-
-**Insight**: Categorize configs as server-related (url, apiKey, headers) vs UI-only (statusBar, workingHours). Only server-related changes need reinit.
+**Solution**: Filter out UI-only configs (statusBar, workingHours) from triggering server reinit
+- Only server-related changes (url, apiKey, headers) need reinit
+- UI-only changes should update UI without clearing cache
 
 ### Lessons
 

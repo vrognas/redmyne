@@ -1,41 +1,29 @@
 # v3.0.0 Migration Guide
 
-## Quick Start
+## Prerequisites
 
-1. Update extension to v3.0.0
-2. Update VS Code to 1.106.0+
-3. Run: `Redmine: Set API Key`
-4. Enter API key when prompted
+- VS Code 1.106.0+ (check: Help → About)
+- Extension v3.0.0
 
-## Detailed Steps
+## Migration Steps
 
-### Step 1: Update VS Code
+1. Update VS Code to 1.106.0+
+2. Update extension via Extensions view
+3. Get API key from Redmine `/my/account`
+4. Run command: `Redmine: Set API Key`
+5. Paste key when prompted
 
-Minimum version: 1.106.0
-Check: Help → About
+Old `redmine.apiKey` settings are deprecated and can be removed.
 
-### Step 2: Update Extension
+## Troubleshooting
 
-Extensions view → Update "Redmine for Positron"
+| Issue               | Solution                   |
+| ------------------- | -------------------------- |
+| "API key not found" | Run `Redmine: Set API Key` |
+| Key disappeared     | Verify VS Code 1.106+      |
 
-### Step 3: Migrate API Key
+## What Changed
 
-**Manual**:
-
-1. Get API key from Redmine `/my/account`
-2. Delete `redmine.apiKey` from `.vscode/settings.json`
-3. Run: `Redmine: Set API Key`
-4. Paste key when prompted
-
-### Troubleshooting
-
-| Issue               | Solution                        |
-| ------------------- | ------------------------------- |
-| "API key not found" | Run "Redmine: Set API Key"      |
-| Key disappeared     | Check VS Code updated to 1.106+ |
-
-## Breaking Changes
-
-- API keys now in VS Code Secrets (machine-local)
-- VS Code 1.106+ required
-- Old `redmine.apiKey` deprecated
+- API keys stored in VS Code Secrets (machine-local, not synced)
+- VS Code 1.106+ required for Secrets API
+- `redmine.apiKey` setting deprecated
