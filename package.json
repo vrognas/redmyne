@@ -102,6 +102,11 @@
         "command": "redmine.copyIssueUrl",
         "title": "Copy Issue URL",
         "icon": "$(copy)"
+      },
+      {
+        "command": "redmine.showGantt",
+        "title": "Redmine: Show Timeline",
+        "icon": "$(calendar)"
       }
     ],
     "keybindings": [

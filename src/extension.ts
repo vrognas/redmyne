@@ -19,6 +19,7 @@ import { RedmineSecretManager } from "./utilities/secret-manager";
 import { setApiKey } from "./commands/set-api-key";
 import { calculateWorkload } from "./utilities/workload-calculator";
 import { WeeklySchedule } from "./utilities/flexibility-calculator";
+import { GanttPanel } from "./webviews/gantt-panel";
 
 // Constants
 const CONFIG_DEBOUNCE_MS = 300;
@@ -738,6 +739,22 @@ export function activate(context: vscode.ExtensionContext): void {
       );
       // Refresh trees to use new server instances
       await updateConfiguredContext();
+    }),
+
+    // Gantt timeline command
+    vscode.commands.registerCommand("redmine.showGantt", async () => {
+      // Ensure issues are fetched
+      const issues = await myIssuesTree.fetchIssuesIfNeeded();
+
+      if (issues.length === 0) {
+        vscode.window.showInformationMessage(
+          "No issues to display. Configure Redmine and assign issues to yourself."
+        );
+        return;
+      }
+
+      const panel = GanttPanel.createOrShow();
+      panel.updateIssues(issues, myIssuesTree.getFlexibilityCache());
     })
   );
 }

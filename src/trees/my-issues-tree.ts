@@ -323,6 +323,13 @@ export class MyIssuesTree implements vscode.TreeDataProvider<TreeItem> {
   }
 
   /**
+   * Get flexibility cache for Gantt display
+   */
+  getFlexibilityCache(): Map<number, FlexibilityScore | null> {
+    return this.flexibilityCache;
+  }
+
+  /**
    * Fetch issues if not cached, for status bar initial load.
    * Prevents concurrent fetches by returning pending promise.
    */
