@@ -107,10 +107,12 @@ export class ProjectsTree implements vscode.TreeDataProvider<TreeItem> {
 
   getTreeItem(item: TreeItem): vscode.TreeItem | Thenable<vscode.TreeItem> {
     if (isLoadingPlaceholder(item)) {
-      return new vscode.TreeItem(
-        item.message || "⏳ Loading...",
+      const loadingItem = new vscode.TreeItem(
+        item.message || "Loading...",
         vscode.TreeItemCollapsibleState.None
       );
+      loadingItem.iconPath = new vscode.ThemeIcon("loading~spin");
+      return loadingItem;
     }
 
     if (isProjectNode(item)) {
@@ -180,7 +182,7 @@ export class ProjectsTree implements vscode.TreeDataProvider<TreeItem> {
 
       // No assigned issues - fall back to fetching all open issues
       if (this.loadingIssuesForProject.has(project.id)) {
-        return [{ isLoadingPlaceholder: true, message: "⏳ Loading issues..." }];
+        return [{ isLoadingPlaceholder: true, message: "Loading issues..." }];
       }
 
       this.loadingIssuesForProject.add(project.id);
@@ -203,7 +205,7 @@ export class ProjectsTree implements vscode.TreeDataProvider<TreeItem> {
 
     // Root level - fetch projects and assigned issues
     if (this.isLoadingProjects) {
-      return [{ isLoadingPlaceholder: true, message: "⏳ Loading projects..." }];
+      return [{ isLoadingPlaceholder: true, message: "Loading projects..." }];
     }
 
     if (!this.projects || this.projects.length === 0) {

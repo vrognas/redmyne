@@ -19,16 +19,13 @@ export class IssueController {
 
   async chooseTimeEntryType(activities: TimeEntryActivity[]) {
     const act = await vscode.window.showQuickPick(
-      activities.map((activity) => {
-        return {
-          label: activity.name,
-          description: "",
-          detail: "",
-          activity: activity,
-        };
-      }),
+      activities.map((activity) => ({
+        label: activity.name,
+        activity: activity,
+      })),
       {
-        placeHolder: "Pick an activity type",
+        title: `Add Time Entry - #${this.issue.id}`,
+        placeHolder: "Select activity type",
       }
     );
     if (!act) return;
@@ -90,16 +87,13 @@ export class IssueController {
 
   async changeIssueStatus(statuses: RedmineIssueStatus[]) {
     const stat = await vscode.window.showQuickPick(
-      statuses.map((status) => {
-        return {
-          label: status.name,
-          description: "",
-          detail: "",
-          fullIssue: status,
-        };
-      }),
+      statuses.map((status) => ({
+        label: status.name,
+        fullIssue: status,
+      })),
       {
-        placeHolder: "Pick a new status",
+        title: `Change Status - #${this.issue.id}`,
+        placeHolder: `Current: ${this.issue.status.name}`,
       }
     );
     if (!stat) return;
@@ -153,15 +147,12 @@ export class IssueController {
     }
 
     const statusChoice = await vscode.window.showQuickPick(
-      possibleStatuses.map((status) => {
-        return {
-          label: status.name,
-          description: "",
-          detail: "",
-          status: status,
-        };
-      }),
+      possibleStatuses.map((status) => ({
+        label: status.name,
+        status: status,
+      })),
       {
+        title: `Quick Update (1/3) - #${this.issue.id}`,
         placeHolder: `Current: ${this.issue.status.name}`,
       }
     );
@@ -172,15 +163,12 @@ export class IssueController {
     const desiredStatus = statusChoice.status;
 
     const assigneeChoice = await vscode.window.showQuickPick(
-      memberships.map((membership) => {
-        return {
-          label: `${membership.name}${!membership.isUser ? " (group)" : ""}`,
-          description: "",
-          detail: "",
-          assignee: membership,
-        };
-      }),
+      memberships.map((membership) => ({
+        label: `${membership.name}${!membership.isUser ? " (group)" : ""}`,
+        assignee: membership,
+      })),
       {
+        title: `Quick Update (2/3) - #${this.issue.id}`,
         placeHolder: `Current: ${
           this.issue.assigned_to ? this.issue.assigned_to.name : "_unassigned_"
         }`,
@@ -193,7 +181,8 @@ export class IssueController {
     const desiredAssignee = assigneeChoice.assignee;
     const message =
       (await vscode.window.showInputBox({
-        placeHolder: "Message",
+        title: `Quick Update (3/3) - #${this.issue.id}`,
+        placeHolder: "Add a comment (optional)",
       })) ?? "";
 
     const quickUpdate = new QuickUpdate(
@@ -230,33 +219,32 @@ export class IssueController {
         [
           {
             action: "quickUpdate",
-            label: "Quick update",
-            description:
-              "Change assignee, status and leave a message in one step",
+            label: "$(zap) Quick update",
+            description: "Change status, assignee, and comment",
             detail: issueDetails,
           },
           {
             action: "addTimeEntry",
-            label: "Add time entry",
-            description: "Adds new time entry to this issue",
+            label: "$(history) Add time entry",
+            description: "Log time to this issue",
             detail: issueDetails,
           },
           {
             action: "changeStatus",
-            label: "Change status",
-            description: "Changes issue status",
+            label: "$(arrow-swap) Change status",
+            description: "Update issue status only",
             detail: issueDetails,
           },
           {
             action: "openInBrowser",
-            label: "Open in browser",
-            description:
-              "Opens an issue in a browser (might need additional login)",
+            label: "$(link-external) Open in browser",
+            description: "View issue in Redmine",
             detail: issueDetails,
           },
         ],
         {
-          placeHolder: "Pick an action to do",
+          title: `#${this.issue.id}: ${this.issue.subject}`,
+          placeHolder: "Select an action",
         }
       );
       if (!option) return;
