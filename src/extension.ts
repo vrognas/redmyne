@@ -189,8 +189,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
     const config = vscode.workspace.getConfiguration("redmine", folder.uri);
     const hasUrl = !!config.get<string>("url");
-    const hasApiKey = !!(await secretManager.getApiKey(folder.uri));
-    const isConfigured = hasUrl && hasApiKey;
+    const apiKey = await secretManager.getApiKey(folder.uri);
+    const isConfigured = hasUrl && !!apiKey;
 
     await vscode.commands.executeCommand(
       "setContext",
@@ -203,7 +203,7 @@ export function activate(context: vscode.ExtensionContext): void {
       try {
         const server = createServer({
           address: config.get<string>("url")!,
-          key: (await secretManager.getApiKey(folder.uri))!,
+          key: apiKey!,
           additionalHeaders: config.get("additionalHeaders"),
         });
 
