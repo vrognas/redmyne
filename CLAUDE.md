@@ -1,3 +1,12 @@
+## GitHub CLI in Claude Code Web
+
+- Use `ghcli` or `~/.local/bin/gh` instead of bare `gh` command
+- Claude Code Web blocks `gh` via system-level deny list (can't override)
+- The startup hook creates `ghcli` symlink automatically
+- Example: `ghcli pr create`, `ghcli issue list`, `~/.local/bin/gh api`
+
+---
+
 - In all interactions and commit messages, be extremely concise and sacrifice grammar for the sake of concision.
 - Do not write any code until you're fully ready to implement it.
 - It's IMPORTANT for each implementation to begin with writing and reviewing tests BEFORE moving on to implementation (TDD test-driven development).
@@ -23,4 +32,4 @@
 - Write concise commit messages that clearly describe the changes made.
 - For simple queries, use under five tool calls, but for more complex queries you can use up to 15 tool calls.
 - STOP and ask user if you find unexpected issues during implementation (breaking changes, missing dependencies, test failures).
-- When creating PRs, always write your own title and body - do not use repo templates. Use explicit `--title` and `--body` flags with `gh pr create`.
+- When creating PRs, always write your own title and body - do not use repo templates. Use explicit `--title` and `--body` flags with `ghcli pr create`.
