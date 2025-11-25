@@ -20,6 +20,10 @@ import { setApiKey } from "./commands/set-api-key";
 import { calculateWorkload } from "./utilities/workload-calculator";
 import { WeeklySchedule } from "./utilities/flexibility-calculator";
 
+// Constants
+const CONFIG_DEBOUNCE_MS = 300;
+const SERVER_CACHE_SIZE = 3;
+
 // Module-level cleanup resources
 let cleanupResources: {
   myIssuesTree?: MyIssuesTree;
@@ -241,7 +245,6 @@ export function activate(context: vscode.ExtensionContext): void {
         clearTimeout(configChangeTimeout);
       }
 
-      // Debounce by 300ms
       configChangeTimeout = setTimeout(async () => {
         // Only update server context for server-related config changes
         // Skip for UI-only configs (statusBar, workingHours)
@@ -260,7 +263,7 @@ export function activate(context: vscode.ExtensionContext): void {
         if (event.affectsConfiguration("redmine.workingHours")) {
           updateWorkloadStatusBar();
         }
-      }, 300);
+      }, CONFIG_DEBOUNCE_MS);
     })
   );
 
@@ -554,8 +557,8 @@ export function activate(context: vscode.ExtensionContext): void {
     const server = fromBucket || redmineServer;
 
     if (!fromBucket) {
-      // LRU cache: max 3 servers
-      if (bucket.servers.length >= 3) {
+      // LRU cache: evict oldest when at capacity
+      if (bucket.servers.length >= SERVER_CACHE_SIZE) {
         const removed = bucket.servers.shift(); // Remove oldest server
         // Dispose if it's a LoggingRedmineServer
         if (removed && removed instanceof LoggingRedmineServer) {
@@ -580,43 +583,6 @@ export function activate(context: vscode.ExtensionContext): void {
       args: [],
     };
   };
-
-  const currentConfig = vscode.workspace.getConfiguration("redmine");
-
-  if (currentConfig.has("serverUrl")) {
-    const panel = vscode.window.createWebviewPanel(
-      "redmineConfigurationUpdate",
-      "vscode-redmine: New configuration arrived!",
-      vscode.ViewColumn.One,
-      {}
-    );
-
-    panel.webview.html = `<!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta http-equiv="X-UA-Compatible" content="ie=edge">
-        <title>vscode-redmine: New configuration arrived!</title>
-        <style>html, body { font-size: 16px; } p, li { line-height: 1.5; }</style>
-    </head>
-    <body>
-        <h1>vscode-redmine: New configuration arrived!</h1>
-        <p>Thanks for using <code>vscode-redmine</code>! From version 1.0.0, an old configuration schema has changed. We've detected, that you still use old format, so please update it to the new one.</p>
-        <p>
-            Following changed:
-            <ul>
-                <li><code>redmine.serverUrl</code>, <code>redmine.serverPort</code> and <code>redmine.serverIsSsl</code> became single setting: <code>redmine.url</code>.<br />
-                If you had <code>serverUrl = 'example.com/test'</code>, <code>serverPort = 8080</code> and <code>serverIsSsl = true</code>, then new <code>url</code> will be <code>https://example.com:8080/test</code>.</li>
-                <li><code>redmine.projectName</code> became <code>redmine.identifier</code>. Behavior remains the same</li>
-                <li><code>redmine.authorization</code> is deprecated. If you want to add <code>Authorization</code> header to every request sent to redmine, provide <code>redmine.additionalHeaders</code>, eg.:
-                    <pre>{"redmine.additionalHeaders": {"Authorization": "Basic 123qwe"}}</pre>
-                </li>
-            </ul>
-        </p>
-    </body>
-    </html>`;
-  }
 
   const registerCommand = (
     name: string,
@@ -733,7 +699,7 @@ export function activate(context: vscode.ExtensionContext): void {
         projectsTree.clearProjects();
         projectsTree.onDidChangeTreeData$.fire();
         myIssuesTree.onDidChangeTreeData$.fire();
-      }, 300);
+      }, CONFIG_DEBOUNCE_MS);
     }),
     vscode.commands.registerCommand("redmine.toggleTreeView", () => {
       vscode.commands.executeCommand(

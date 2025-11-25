@@ -384,19 +384,6 @@ vscode.window.activeTextEditor: TextEditor | undefined
 
 **Usage**: Get cursor position for issue number extraction (`src/commands/open-actions-for-issue-under-cursor.ts`)
 
-**`vscode.window.createWebviewPanel()`**
-
-```typescript
-vscode.window.createWebviewPanel(
-  viewType: string,
-  title: string,
-  showOptions: ViewColumn,
-  options?: WebviewPanelOptions
-): WebviewPanel
-```
-
-**Usage**: Config migration guide (`src/extension.ts`)
-
 #### Workspace
 
 **`vscode.workspace.getConfiguration()`**

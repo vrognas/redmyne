@@ -9,12 +9,18 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 - Silent error catch in IssueController.listActions() now shows errors
 - Unsafe `reason as string` casts replaced with `errorToString()`
 - HTTP requests now timeout after 30s (prevents indefinite hangs)
+- HTTP error messages now user-friendly (5xx, 4xx, network errors)
 
 ### Changed
 
 - Git hooks auto-install on `npm install` via prepare script
 - Deduplicated date utilities (-60 lines)
 - Config changes and refresh debounced (300ms) to prevent API spam
+- Magic numbers extracted to named constants
+
+### Removed
+
+- Legacy v1.x migration webview (no longer needed)
 
 ## [3.4.0] - 2025-11-24
 

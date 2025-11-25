@@ -17,6 +17,7 @@ import { Membership as RedmineMembership } from "./models/membership";
 type HttpMethods = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
 const REDMINE_API_KEY_HEADER_NAME = "X-Redmine-API-Key";
+const REQUEST_TIMEOUT_MS = 30000;
 
 export interface RedmineServerConnectionOptions {
   /**
@@ -191,9 +192,25 @@ export class RedmineServer {
           return;
         }
 
-        // TODO: Other errors handle
-        if (statusCode && statusCode >= 400) {
-          const error = new Error(`Server returned ${statusMessage}`);
+        // Handle remaining 4xx client errors
+        if (statusCode && statusCode >= 400 && statusCode < 500) {
+          let message: string;
+          if (statusCode === 400) {
+            message = "Bad request (400)";
+          } else if (statusCode === 422) {
+            message = "Validation failed (422)";
+          } else {
+            message = `Client error (${statusCode} ${statusMessage})`;
+          }
+          const error = new Error(message);
+          this.onResponseError(statusCode, statusMessage, error, path, method, data, incomingBuffer, contentType, requestId);
+          reject(error);
+          return;
+        }
+
+        // Handle 5xx server errors
+        if (statusCode && statusCode >= 500) {
+          const error = new Error(`Server error (${statusCode} ${statusMessage})`);
           this.onResponseError(statusCode, statusMessage, error, path, method, data, incomingBuffer, contentType, requestId);
           reject(error);
           return;
@@ -222,21 +239,42 @@ export class RedmineServer {
         incoming.on("end", handleEnd(incoming));
       });
 
-      const handleError = (error: Error) => {
-        const wrappedError = new Error(
-          `NodeJS Request Error (${error.name}): ${error.message}`
-        );
+      const handleError = (error: Error & { code?: string }) => {
+        // Map common network error codes to user-friendly messages
+        let message: string;
+        switch (error.code) {
+          case "ECONNREFUSED":
+            message = "Connection refused - is the server running?";
+            break;
+          case "ENOTFOUND":
+            message = "Server not found - check the URL";
+            break;
+          case "ETIMEDOUT":
+            message = "Connection timed out";
+            break;
+          case "ECONNRESET":
+            message = "Connection reset by server";
+            break;
+          case "CERT_HAS_EXPIRED":
+          case "UNABLE_TO_VERIFY_LEAF_SIGNATURE":
+          case "DEPTH_ZERO_SELF_SIGNED_CERT":
+            message = "SSL certificate error - check rejectUnauthorized setting";
+            break;
+          default:
+            message = `Network error: ${error.message}`;
+        }
+        const wrappedError = new Error(message);
         this.onResponseError(undefined, undefined, wrappedError, path, method, data, undefined, undefined, requestId);
         reject(wrappedError);
       };
 
       clientRequest.on("error", handleError);
 
-      // 30 second timeout to prevent indefinite hangs
+      // Timeout to prevent indefinite hangs
       if (typeof clientRequest.setTimeout === "function") {
-        clientRequest.setTimeout(30000, () => {
+        clientRequest.setTimeout(REQUEST_TIMEOUT_MS, () => {
           clientRequest.destroy();
-          const error = new Error("Request timeout after 30 seconds");
+          const error = new Error(`Request timeout after ${REQUEST_TIMEOUT_MS / 1000} seconds`);
           this.onResponseError(undefined, undefined, error, path, method, data, undefined, undefined, requestId);
           reject(error);
         });

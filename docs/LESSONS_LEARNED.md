@@ -20,8 +20,14 @@
 **Add request timeouts**
 
 - HTTP requests without timeout can hang indefinitely
-- Add `clientRequest.setTimeout(30000, ...)` to prevent UI freeze
+- Add `clientRequest.setTimeout(REQUEST_TIMEOUT_MS, ...)` to prevent UI freeze
 - Check if `setTimeout` exists before calling (mocks may not have it)
+
+**Use user-friendly error messages**
+
+- Map HTTP status codes to actionable messages (not just "Server returned 500")
+- Map network error codes to plain English: ECONNREFUSED → "Connection refused"
+- Include hints: "Connection refused - is the server running?"
 
 ### Code Deduplication
 
