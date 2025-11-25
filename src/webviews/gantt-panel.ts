@@ -10,8 +10,84 @@ interface GanttIssue {
   due_date: string | null;
   status: FlexibilityScore["status"] | null;
   project: string;
+  projectId: number;
+  parentId: number | null;
   estimated_hours: number | null;
   spent_hours: number | null;
+}
+
+interface GanttRow {
+  type: "project" | "issue";
+  id: number;
+  label: string;
+  depth: number;
+  issue?: GanttIssue;
+}
+
+/**
+ * Build hierarchical rows from flat issues list
+ * Groups by project, then organizes parent/child issues
+ */
+function buildHierarchicalRows(issues: GanttIssue[]): GanttRow[] {
+  const rows: GanttRow[] = [];
+
+  // Group issues by project
+  const byProject = new Map<number, { name: string; issues: GanttIssue[] }>();
+  for (const issue of issues) {
+    if (!byProject.has(issue.projectId)) {
+      byProject.set(issue.projectId, { name: issue.project, issues: [] });
+    }
+    byProject.get(issue.projectId)!.issues.push(issue);
+  }
+
+  // Sort projects by issue count (descending)
+  const sortedProjects = [...byProject.entries()].sort(
+    (a, b) => b[1].issues.length - a[1].issues.length
+  );
+
+  for (const [projectId, { name, issues: projectIssues }] of sortedProjects) {
+    // Add project header
+    rows.push({
+      type: "project",
+      id: projectId,
+      label: name,
+      depth: 0,
+    });
+
+    // Build issue tree within project
+    const issueMap = new Map(projectIssues.map((i) => [i.id, i]));
+    const children = new Map<number | null, GanttIssue[]>();
+
+    // Group by parent
+    for (const issue of projectIssues) {
+      const parentId = issue.parentId;
+      // Only use parentId if parent is in this project's issues
+      const effectiveParent = parentId && issueMap.has(parentId) ? parentId : null;
+      if (!children.has(effectiveParent)) {
+        children.set(effectiveParent, []);
+      }
+      children.get(effectiveParent)!.push(issue);
+    }
+
+    // Recursively add issues
+    function addIssues(parentId: number | null, depth: number) {
+      const childIssues = children.get(parentId) || [];
+      for (const issue of childIssues) {
+        rows.push({
+          type: "issue",
+          id: issue.id,
+          label: issue.subject,
+          depth,
+          issue,
+        });
+        addIssues(issue.id, depth + 1);
+      }
+    }
+
+    addIssues(null, 1);
+  }
+
+  return rows;
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -108,6 +184,8 @@ export class GanttPanel {
         due_date: i.due_date || null,
         status: flexibilityCache.get(i.id)?.status ?? null,
         project: i.project?.name ?? "Unknown",
+        projectId: i.project?.id ?? 0,
+        parentId: i.parent?.id ?? null,
         estimated_hours: i.estimated_hours ?? null,
         spent_hours: i.spent_hours ?? null,
       }));
@@ -209,19 +287,39 @@ export class GanttPanel {
     );
 
     const timelineWidth = Math.max(600, totalDays * 40);
-    const labelWidth = 200;
+    const labelWidth = 250;
     const barHeight = 30;
     const barGap = 10;
     const headerHeight = 40;
-    const contentHeight = this._issues.length * (barHeight + barGap);
+    const indentSize = 16;
+
+    // Build hierarchical rows
+    const rows = buildHierarchicalRows(this._issues);
+    const contentHeight = rows.length * (barHeight + barGap);
 
     // Left labels (fixed column)
-    const labels = this._issues
-      .map((issue, index) => {
+    const labels = rows
+      .map((row, index) => {
         const y = headerHeight + index * (barHeight + barGap);
+        const indent = row.depth * indentSize;
+
+        if (row.type === "project") {
+          // Project header row
+          return `
+            <g class="project-label">
+              <text x="${5 + indent}" y="${y + barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12" font-weight="bold">
+                📁 ${row.label}
+              </text>
+            </g>
+          `;
+        }
+
+        // Issue row
+        const issue = row.issue!;
+        const maxLen = Math.max(5, 28 - row.depth * 2);
         const truncatedSubject =
-          issue.subject.length > 22
-            ? issue.subject.substring(0, 19) + "..."
+          issue.subject.length > maxLen
+            ? issue.subject.substring(0, maxLen - 3) + "..."
             : issue.subject;
 
         const tooltip = [
@@ -235,7 +333,7 @@ export class GanttPanel {
 
         return `
           <g class="issue-label" data-issue-id="${issue.id}" style="cursor: pointer;">
-            <text x="5" y="${y + barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12">
+            <text x="${5 + indent}" y="${y + barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12">
               #${issue.id} ${truncatedSubject}
             </text>
             <title>${tooltip}</title>
@@ -244,9 +342,15 @@ export class GanttPanel {
       })
       .join("");
 
-    // Right bars (scrollable timeline)
-    const bars = this._issues
-      .map((issue, index) => {
+    // Right bars (scrollable timeline) - only for issue rows
+    const bars = rows
+      .map((row, index) => {
+        // Skip project headers - no bar
+        if (row.type === "project") {
+          return "";
+        }
+
+        const issue = row.issue!;
         const start = issue.start_date
           ? new Date(issue.start_date)
           : new Date(issue.due_date!);
