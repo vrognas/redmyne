@@ -107,6 +107,10 @@
         "command": "redmine.showGantt",
         "title": "Redmine: Show Timeline",
         "icon": "$(calendar)"
+      },
+      {
+        "command": "redmine.createTestIssues",
+        "title": "Redmine: Create Test Issues"
       }
     ],
     "keybindings": [

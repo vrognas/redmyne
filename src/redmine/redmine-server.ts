@@ -475,6 +475,49 @@ export class RedmineServer {
     return this.doRequest(`/relations/${relationId}.json`, "DELETE");
   }
 
+  /**
+   * Get available trackers
+   */
+  async getTrackers(): Promise<{ id: number; name: string }[]> {
+    const response = await this.doRequest<{
+      trackers: { id: number; name: string }[];
+    }>("/trackers.json", "GET");
+    return response?.trackers || [];
+  }
+
+  /**
+   * Get available issue priorities
+   */
+  async getPriorities(): Promise<{ id: number; name: string }[]> {
+    const response = await this.doRequest<{
+      issue_priorities: { id: number; name: string }[];
+    }>("/enumerations/issue_priorities.json", "GET");
+    return response?.issue_priorities || [];
+  }
+
+  /**
+   * Create a new issue
+   */
+  async createIssue(issue: {
+    project_id: number;
+    tracker_id: number;
+    subject: string;
+    description?: string;
+    status_id?: number;
+    priority_id?: number;
+    start_date?: string;
+    due_date?: string;
+    estimated_hours?: number;
+    parent_issue_id?: number;
+    custom_fields?: { id: number; value: string }[];
+  }): Promise<{ issue: Issue }> {
+    return this.doRequest(
+      "/issues.json",
+      "POST",
+      Buffer.from(JSON.stringify({ issue }), "utf8")
+    );
+  }
+
   issueStatuses: { issue_statuses: RedmineIssueStatus[] } | null = null;
 
   /**

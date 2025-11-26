@@ -650,8 +650,6 @@ export class GanttPanel {
               const segX = startX + i * segmentWidth;
               // Opacity: base 0.2 + intensity * 0.6 (range 0.2 to 0.8)
               const opacity = 0.2 + Math.min(d.intensity, 1) * 0.6;
-              // First/last segment gets rounded corners
-              const rx = i === 0 ? "4" : i === dayCount - 1 ? "4" : "0";
               const isFirst = i === 0;
               const isLast = i === dayCount - 1;
               // Use clip-path for proper corner rounding on first/last
