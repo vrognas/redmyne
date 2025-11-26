@@ -11,6 +11,7 @@ All notable changes to the "vscode-redmine" extension will be documented in this
   - Inline picker for relation type (Blocks/Precedes/Follows)
 - **Past-portion texture** - Redmine-style diagonal red stripes show elapsed time on bars
 - **Past bars dimmed** - issues with due date before today are desaturated
+- **Parent issues as summaries** - bracket-style bars, no drag (dates derived from subtasks)
 - **Relation removal** - right-click dependency arrows to delete, with hover effect
 - **Gantt accessibility** - keyboard navigation (Arrow Up/Down, Enter), focus indicators, ARIA labels
 - **Interactive walkthrough** - 4-step onboarding guide (configure, view issues, log time, timeline)
