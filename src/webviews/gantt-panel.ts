@@ -306,15 +306,26 @@ export class GanttPanel {
 
     try {
       await this._server.updateIssueDates(issueId, startDate, dueDate);
-      // Update local data and refresh
+      // Update local data only (UI already updated via drag - optimistic)
       const issue = this._issues.find((i) => i.id === issueId);
       if (issue) {
         if (startDate !== null) issue.start_date = startDate;
         if (dueDate !== null) issue.due_date = dueDate;
       }
-      this._updateContent();
-      vscode.window.showInformationMessage(`Issue #${issueId} dates updated`);
+      // No _updateContent() - UI already reflects change from drag
+      // Status bar confirmation (brief, non-intrusive)
+      const statusBar = vscode.window.createStatusBarItem(
+        vscode.StatusBarAlignment.Right
+      );
+      statusBar.text = `$(check) #${issueId} dates saved`;
+      statusBar.show();
+      setTimeout(() => {
+        statusBar.hide();
+        statusBar.dispose();
+      }, 2000);
     } catch (error) {
+      // On error, re-render to reset UI to correct state
+      this._updateContent();
       vscode.window.showErrorMessage(
         `Failed to update dates: ${error instanceof Error ? error.message : String(error)}`
       );
@@ -919,9 +930,17 @@ export class GanttPanel {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    const totalDays = Math.ceil(
+      (maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)
+    );
     const dayWidth =
       (svgWidth - leftMargin) /
       ((maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    // Adaptive detail level based on timeline length
+    // Short (<30d): show all days; Medium (30-90d): show Mon/Fri; Long (>90d): show Mon only
+    const showAllDays = totalDays < 30;
+    const showMidweek = totalDays < 90;
 
     while (current <= maxDate) {
       const x =
@@ -930,8 +949,9 @@ export class GanttPanel {
           (maxDate.getTime() - minDate.getTime())) *
           (svgWidth - leftMargin);
 
-      // Weekend backgrounds (Saturday=6, Sunday=0)
       const dayOfWeek = current.getDay();
+
+      // Weekend backgrounds (always shown - important context)
       if (dayOfWeek === 0 || dayOfWeek === 6) {
         backgrounds.push(`
           <rect x="${x}" y="0" width="${dayWidth}" height="100%" class="weekend-bg"/>
@@ -942,7 +962,6 @@ export class GanttPanel {
       if (dayOfWeek === 1) {
         const weekNum = getWeekNumber(current);
         const year = current.getFullYear();
-        // Calculate week end (Sunday)
         const weekEnd = new Date(current);
         weekEnd.setDate(weekEnd.getDate() + 6);
         const startDay = current.getDate();
@@ -958,18 +977,21 @@ export class GanttPanel {
         `);
       }
 
-      // Day grid line (subtle vertical separator)
-      dayHeaders.push(`
-        <line x1="${x}" y1="35" x2="${x}" y2="100%" class="day-grid"/>
-      `);
+      // Day grid line - adaptive (Monday always, others based on timeline length)
+      const showDayDetail = showAllDays || dayOfWeek === 1 || (showMidweek && dayOfWeek === 5);
+      if (showDayDetail) {
+        dayHeaders.push(`
+          <line x1="${x}" y1="35" x2="${x}" y2="100%" class="day-grid"/>
+        `);
 
-      // Day header (bottom row) - show day number and weekday
-      const dayLabel = `${current.getDate()} ${WEEKDAYS_SHORT[dayOfWeek]}`;
-      dayHeaders.push(`
-        <text x="${x + dayWidth / 2}" y="30" fill="var(--vscode-descriptionForeground)" font-size="10" text-anchor="middle">${dayLabel}</text>
-      `);
+        // Day header (bottom row)
+        const dayLabel = `${current.getDate()} ${WEEKDAYS_SHORT[dayOfWeek]}`;
+        dayHeaders.push(`
+          <text x="${x + dayWidth / 2}" y="30" fill="var(--vscode-descriptionForeground)" font-size="10" text-anchor="middle">${dayLabel}</text>
+        `);
+      }
 
-      // Today marker
+      // Today marker (always shown)
       if (current.toDateString() === today.toDateString()) {
         markers.push(`
           <line x1="${x}" y1="0" x2="${x}" y2="100%" class="today-marker"/>
@@ -979,7 +1001,6 @@ export class GanttPanel {
       current.setDate(current.getDate() + 1);
     }
 
-    // Backgrounds first, then headers, then today marker
     return backgrounds.join("") + weekHeaders.join("") + dayHeaders.join("") + markers.join("");
   }
 }
