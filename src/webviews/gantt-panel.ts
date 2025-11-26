@@ -957,6 +957,8 @@ export class GanttPanel {
 
           return `
             <g class="dependency-arrow" data-relation-id="${rel.id}" data-from="${issue.id}" data-to="${rel.targetId}" style="cursor: pointer;">
+              <!-- Wide invisible hit area for easier clicking -->
+              <path class="arrow-hit-area" d="${path}" stroke="transparent" stroke-width="16" fill="none"/>
               <path d="${path}" stroke="${color}" stroke-width="1.5" fill="none" opacity="0.7"/>
               <path d="${arrowHead}" fill="${color}" opacity="0.7"/>
               <title>#${issue.id} ${typeLabel} #${rel.targetId} (right-click to delete)</title>
