@@ -711,11 +711,17 @@ export class GanttPanel {
         showStatusBarMessage("$(check) Relation undone", 2000);
       } else if (message.operation === "create" && message.issueId && message.targetIssueId && message.relationType) {
         // Undo delete = recreate the relation
-        await this._server.createRelation(
+        const response = await this._server.createRelation(
           message.issueId,
           message.targetIssueId,
           message.relationType as RelationType
         );
+        // Send new relationId to update redo stack
+        this._panel.webview.postMessage({
+          command: "updateRelationId",
+          stack: "redo",
+          newRelationId: response.relation.id,
+        });
         showStatusBarMessage("$(check) Relation restored", 2000);
       }
       // Refresh to show updated state
@@ -739,11 +745,17 @@ export class GanttPanel {
     try {
       if (message.operation === "create" && message.issueId && message.targetIssueId && message.relationType) {
         // Redo create = recreate the relation
-        await this._server.createRelation(
+        const response = await this._server.createRelation(
           message.issueId,
           message.targetIssueId,
           message.relationType as RelationType
         );
+        // Send new relationId to update undo stack
+        this._panel.webview.postMessage({
+          command: "updateRelationId",
+          stack: "undo",
+          newRelationId: response.relation.id,
+        });
         showStatusBarMessage("$(check) Relation recreated", 2000);
       } else if (message.operation === "delete" && message.relationId) {
         // Redo delete = delete the relation again
@@ -1610,6 +1622,16 @@ ${style.tip}
         redoStack.length = 0;
         updateUndoRedoButtons();
         saveState();
+      } else if (message.command === 'updateRelationId') {
+        // Update relationId in most recent relation action (after undo/redo recreates relation)
+        const stack = message.stack === 'undo' ? undoStack : redoStack;
+        if (stack.length > 0) {
+          const lastAction = stack[stack.length - 1];
+          if (lastAction.type === 'relation') {
+            lastAction.relationId = message.newRelationId;
+            saveState();
+          }
+        }
       }
     });
 
