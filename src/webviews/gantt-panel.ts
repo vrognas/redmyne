@@ -986,12 +986,16 @@ export class GanttPanel {
             // Different row, target to right: 3-segment elbow
             const midX = (x1 + x2) / 2;
             path = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2 - arrowSize}`;
-          } else {
-            // Target to the left or overlapping: go vertical first, no doubling back
-            // Route: down/up to clear → left to target column → down/up to row → right to arrowhead
+          } else if (sameRow) {
+            // Same row, target to left: must route above or below
             const gap = 12;
-            const routeY = y2 > y1 ? Math.max(y1, y2) + barHeight : Math.min(y1, y2) - barHeight;
+            const routeY = y1 - barHeight; // go above
             path = `M ${x1} ${y1} V ${routeY} H ${x2 - gap} V ${y2} H ${x2 - arrowSize}`;
+          } else {
+            // Different row, target to left: route BETWEEN the bars (through the gap)
+            const gap = 12;
+            const midY = (y1 + y2) / 2; // midpoint falls in gap between rows
+            path = `M ${x1} ${y1} V ${midY} H ${x2 - gap} V ${y2} H ${x2 - arrowSize}`;
           }
 
           // Arrowhead always points right (toward target.start)
