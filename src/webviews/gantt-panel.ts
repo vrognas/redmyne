@@ -1109,7 +1109,9 @@ export class GanttPanel {
         const endX = parseFloat(bar.dataset.endX);
         const oldStartDate = bar.dataset.startDate || null;
         const oldDueDate = bar.dataset.dueDate || null;
-        const barMain = bar.querySelector('.bar-main');
+        // Use bar-outline (always exists) instead of bar-main (may not exist for intensity bars)
+        const barOutline = bar.querySelector('.bar-outline');
+        const barMain = bar.querySelector('.bar-main'); // May be null for intensity bars
         const leftHandle = bar.querySelector('.drag-left');
         const rightHandle = bar.querySelector('.drag-right');
 
@@ -1122,6 +1124,7 @@ export class GanttPanel {
           endX,
           oldStartDate,
           oldDueDate,
+          barOutline,
           barMain,
           leftHandle,
           rightHandle,
@@ -1207,10 +1210,14 @@ export class GanttPanel {
         newEndX = snapToDay(Math.max(dragState.startX + dayWidth, Math.min(dragState.endX + delta, timelineWidth)));
       }
 
-      // Update visual
+      // Update visual - use barOutline (always exists), and barMain if it exists
       const width = newEndX - newStartX;
-      dragState.barMain.setAttribute('x', newStartX);
-      dragState.barMain.setAttribute('width', width);
+      dragState.barOutline.setAttribute('x', newStartX);
+      dragState.barOutline.setAttribute('width', width);
+      if (dragState.barMain) {
+        dragState.barMain.setAttribute('x', newStartX);
+        dragState.barMain.setAttribute('width', width);
+      }
       dragState.leftHandle.setAttribute('x', newStartX);
       dragState.rightHandle.setAttribute('x', newEndX - 8);
       dragState.newStartX = newStartX;
