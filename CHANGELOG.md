@@ -4,6 +4,12 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ## [Unreleased]
 
+### Added
+
+- **Drag-to-link relations** in Gantt chart - drag from link handle on bar to another bar
+  - Visual feedback: dashed arrow follows cursor, target highlights
+  - Inline picker for relation type (Blocks/Precedes/Follows)
+
 ### Security
 
 - **BREAKING**: HTTPS now required - HTTP URLs rejected
