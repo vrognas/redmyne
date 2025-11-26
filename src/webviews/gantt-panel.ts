@@ -974,6 +974,25 @@ export class GanttPanel {
       background: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
     }
+    .heatmap-legend {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: 8px;
+      font-size: 11px;
+      color: var(--vscode-descriptionForeground);
+    }
+    .heatmap-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .heatmap-legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      opacity: 0.7;
+    }
     .gantt-container {
       display: flex;
       overflow: hidden;
@@ -1071,6 +1090,14 @@ export class GanttPanel {
         <button id="zoomYear" class="${this._zoomLevel === "year" ? "active" : ""}" title="Year view">Year</button>
       </div>
       <button id="heatmapBtn" class="${this._showWorkloadHeatmap ? "active" : ""}" title="Toggle workload heatmap">Heatmap</button>
+      ${this._showWorkloadHeatmap ? `
+      <div class="heatmap-legend">
+        <span class="heatmap-legend-item"><span class="heatmap-legend-color" style="background: var(--vscode-charts-green);"></span>&lt;80%</span>
+        <span class="heatmap-legend-item"><span class="heatmap-legend-color" style="background: var(--vscode-charts-yellow);"></span>80-100%</span>
+        <span class="heatmap-legend-item"><span class="heatmap-legend-color" style="background: var(--vscode-charts-orange);"></span>100-120%</span>
+        <span class="heatmap-legend-item"><span class="heatmap-legend-color" style="background: var(--vscode-charts-red);"></span>&gt;120%</span>
+      </div>
+      ` : ""}
       <button id="todayBtn" title="Jump to Today">Today</button>
       <button id="undoBtn" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
       <button id="redoBtn" disabled title="Redo (Ctrl+Shift+Z)">↪ Redo</button>
