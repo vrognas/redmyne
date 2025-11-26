@@ -17,6 +17,8 @@ resources/**
 .eslintignore
 .eslintrc*
 .prettierrc*
+eslint.config.mjs
+scripts/**
 
 # Tests & Coverage
 test/**
@@ -25,3 +27,4 @@ coverage/**
 # Exclude all markdown files except LICENSE
 *.md
 !LICENSE.md
+!readme.md
