@@ -502,7 +502,11 @@ export class GanttPanel {
         break;
       case "toggleWorkloadHeatmap":
         this._showWorkloadHeatmap = !this._showWorkloadHeatmap;
-        this._updateContent();
+        // Send message to webview to toggle visibility without full re-render
+        this._panel.webview.postMessage({
+          command: "setHeatmapState",
+          enabled: this._showWorkloadHeatmap,
+        });
         break;
     }
   }
@@ -874,10 +878,8 @@ export class GanttPanel {
       )
       .join("");
 
-    // Calculate aggregate workload for heatmap (if enabled)
-    const workloadMap = this._showWorkloadHeatmap
-      ? calculateAggregateWorkload(this._issues, this._schedule, minDate, maxDate)
-      : undefined;
+    // Always calculate aggregate workload (needed for heatmap toggle without re-render)
+    const workloadMap = calculateAggregateWorkload(this._issues, this._schedule, minDate, maxDate);
 
     // Date markers split into fixed header and scrollable body
     const dateMarkers = this._generateDateMarkers(
@@ -886,7 +888,8 @@ export class GanttPanel {
       timelineWidth,
       0,
       this._zoomLevel,
-      workloadMap
+      workloadMap,
+      this._showWorkloadHeatmap
     );
 
     // Calculate today's position for auto-scroll
@@ -1090,14 +1093,12 @@ export class GanttPanel {
         <button id="zoomYear" class="${this._zoomLevel === "year" ? "active" : ""}" title="Year view">Year</button>
       </div>
       <button id="heatmapBtn" class="${this._showWorkloadHeatmap ? "active" : ""}" title="Toggle workload heatmap">Heatmap</button>
-      ${this._showWorkloadHeatmap ? `
-      <div class="heatmap-legend">
+      <div class="heatmap-legend" style="${this._showWorkloadHeatmap ? "" : "display: none;"}">
         <span class="heatmap-legend-item"><span class="heatmap-legend-color" style="background: var(--vscode-charts-green);"></span>&lt;80%</span>
         <span class="heatmap-legend-item"><span class="heatmap-legend-color" style="background: var(--vscode-charts-yellow);"></span>80-100%</span>
         <span class="heatmap-legend-item"><span class="heatmap-legend-color" style="background: var(--vscode-charts-orange);"></span>100-120%</span>
         <span class="heatmap-legend-item"><span class="heatmap-legend-color" style="background: var(--vscode-charts-red);"></span>&gt;120%</span>
       </div>
-      ` : ""}
       <button id="todayBtn" title="Jump to Today">Today</button>
       <button id="undoBtn" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
       <button id="redoBtn" disabled title="Redo (Ctrl+Shift+Z)">↪ Redo</button>
@@ -1232,6 +1233,29 @@ export class GanttPanel {
 
     // Initial button state
     updateUndoRedoButtons();
+
+    // Handle messages from extension (for state updates without full re-render)
+    window.addEventListener('message', event => {
+      const message = event.data;
+      if (message.command === 'setHeatmapState') {
+        const heatmapLayer = document.querySelector('.heatmap-layer');
+        const weekendLayer = document.querySelector('.weekend-layer');
+        const heatmapBtn = document.getElementById('heatmapBtn');
+        const heatmapLegend = document.querySelector('.heatmap-legend');
+
+        if (message.enabled) {
+          if (heatmapLayer) heatmapLayer.style.display = '';
+          if (weekendLayer) weekendLayer.style.display = 'none';
+          if (heatmapBtn) heatmapBtn.classList.add('active');
+          if (heatmapLegend) heatmapLegend.style.display = '';
+        } else {
+          if (heatmapLayer) heatmapLayer.style.display = 'none';
+          if (weekendLayer) weekendLayer.style.display = '';
+          if (heatmapBtn) heatmapBtn.classList.remove('active');
+          if (heatmapLegend) heatmapLegend.style.display = 'none';
+        }
+      }
+    });
 
     // Zoom toggle handlers - use saveStateForZoom to preserve center date
     document.getElementById('zoomDay').addEventListener('click', () => {
@@ -1606,10 +1630,12 @@ export class GanttPanel {
     svgWidth: number,
     leftMargin: number,
     zoomLevel: ZoomLevel = "day",
-    workloadMap?: Map<string, number>
+    workloadMap: Map<string, number>,
+    showHeatmap: boolean
   ): { header: string; body: string } {
     const headerContent: string[] = [];
-    const bodyBackgrounds: string[] = [];
+    const heatmapBackgrounds: string[] = [];
+    const weekendBackgrounds: string[] = [];
     const bodyGridLines: string[] = [];
     const bodyMarkers: string[] = [];
     const current = new Date(minDate);
@@ -1638,21 +1664,19 @@ export class GanttPanel {
       const year = current.getUTCFullYear();
       const quarter = Math.floor(month / 3) + 1;
 
-      // Workload heatmap backgrounds (when enabled)
-      if (workloadMap) {
-        const dateKey = current.toISOString().slice(0, 10);
-        const utilization = workloadMap.get(dateKey) ?? 0;
-        const color = getHeatmapColor(utilization);
-        if (color !== "transparent") {
-          bodyBackgrounds.push(`
-            <rect x="${x}" y="0" width="${dayWidth}" height="100%" fill="${color}" opacity="0.15"/>
-          `);
-        }
+      // Always generate heatmap backgrounds (toggle via CSS)
+      const dateKey = current.toISOString().slice(0, 10);
+      const utilization = workloadMap.get(dateKey) ?? 0;
+      const color = getHeatmapColor(utilization);
+      if (color !== "transparent") {
+        heatmapBackgrounds.push(`
+          <rect x="${x}" y="0" width="${dayWidth}" height="100%" fill="${color}" opacity="0.15"/>
+        `);
       }
 
-      // Weekend backgrounds (show for day/week zoom when heatmap not active)
-      if (!workloadMap && (zoomLevel === "day" || zoomLevel === "week") && (dayOfWeek === 0 || dayOfWeek === 6)) {
-        bodyBackgrounds.push(`
+      // Always generate weekend backgrounds for day/week zoom (toggle via CSS)
+      if ((zoomLevel === "day" || zoomLevel === "week") && (dayOfWeek === 0 || dayOfWeek === 6)) {
+        weekendBackgrounds.push(`
           <rect x="${x}" y="0" width="${dayWidth}" height="100%" class="weekend-bg"/>
         `);
       }
@@ -1767,9 +1791,13 @@ export class GanttPanel {
       current.setUTCDate(current.getUTCDate() + 1);
     }
 
+    // Wrap backgrounds in groups for CSS-based visibility toggle
+    const heatmapGroup = `<g class="heatmap-layer" style="${showHeatmap ? "" : "display: none;"}">${heatmapBackgrounds.join("")}</g>`;
+    const weekendGroup = `<g class="weekend-layer" style="${showHeatmap ? "display: none;" : ""}">${weekendBackgrounds.join("")}</g>`;
+
     return {
       header: headerContent.join(""),
-      body: bodyBackgrounds.join("") + bodyGridLines.join("") + bodyMarkers.join(""),
+      body: heatmapGroup + weekendGroup + bodyGridLines.join("") + bodyMarkers.join(""),
     };
   }
 }
