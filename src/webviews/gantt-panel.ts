@@ -667,7 +667,7 @@ export class GanttPanel {
       )
       .join("");
 
-    // Date markers (for timeline SVG, no leftMargin needed)
+    // Date markers split into fixed header and scrollable body
     const dateMarkers = this._generateDateMarkers(
       minDate,
       maxDate,
@@ -684,7 +684,7 @@ export class GanttPanel {
         (maxDate.getTime() - minDate.getTime())) *
       timelineWidth;
 
-    const svgHeight = headerHeight + contentHeight;
+    const bodyHeight = contentHeight;
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -764,11 +764,22 @@ export class GanttPanel {
       border-radius: 4px;
       height: calc(100vh - 100px);
     }
-    .gantt-labels {
+    .gantt-left {
       flex-shrink: 0;
       width: ${labelWidth}px;
       min-width: 150px;
       max-width: 500px;
+      display: flex;
+      flex-direction: column;
+    }
+    .gantt-left-header {
+      height: ${headerHeight}px;
+      flex-shrink: 0;
+      background: var(--vscode-editor-background);
+      border-bottom: 1px solid var(--vscode-panel-border);
+    }
+    .gantt-labels {
+      flex-grow: 1;
       background: var(--vscode-editor-background);
       z-index: 1;
       overflow-y: auto;
@@ -789,6 +800,22 @@ export class GanttPanel {
     }
     .gantt-resize-handle:hover, .gantt-resize-handle.dragging {
       background: var(--vscode-focusBorder);
+    }
+    .gantt-right {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .gantt-timeline-header {
+      height: ${headerHeight}px;
+      flex-shrink: 0;
+      overflow: hidden;
+      background: var(--vscode-editor-background);
+      border-bottom: 1px solid var(--vscode-panel-border);
+    }
+    .gantt-timeline-header::-webkit-scrollbar {
+      display: none;
     }
     .gantt-timeline {
       flex-grow: 1;
@@ -823,23 +850,34 @@ export class GanttPanel {
         <button id="zoomWeek" class="${this._zoomLevel === "week" ? "active" : ""}" title="Week view">Week</button>
         <button id="zoomMonth" class="${this._zoomLevel === "month" ? "active" : ""}" title="Month view">Month</button>
       </div>
+      <button id="todayBtn" title="Jump to Today">Today</button>
       <button id="undoBtn" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
       <button id="redoBtn" disabled title="Redo (Ctrl+Shift+Z)">↪ Redo</button>
     </div>
   </div>
   <div class="gantt-container">
-    <div class="gantt-labels" id="ganttLabels">
-      <svg width="${labelWidth}" height="${svgHeight}">
-        ${labels}
-      </svg>
+    <div class="gantt-left" id="ganttLeft">
+      <div class="gantt-left-header"></div>
+      <div class="gantt-labels" id="ganttLabels">
+        <svg width="${labelWidth}" height="${bodyHeight}">
+          ${labels}
+        </svg>
+      </div>
     </div>
     <div class="gantt-resize-handle" id="resizeHandle"></div>
-    <div class="gantt-timeline" id="ganttTimeline">
-      <svg width="${timelineWidth}" height="${svgHeight}">
-        ${dateMarkers}
-        ${bars}
-        ${dependencyArrows}
-      </svg>
+    <div class="gantt-right">
+      <div class="gantt-timeline-header" id="ganttTimelineHeader">
+        <svg width="${timelineWidth}" height="${headerHeight}">
+          ${dateMarkers.header}
+        </svg>
+      </div>
+      <div class="gantt-timeline" id="ganttTimeline">
+        <svg width="${timelineWidth}" height="${bodyHeight}">
+          ${dateMarkers.body}
+          ${bars}
+          ${dependencyArrows}
+        </svg>
+      </div>
     </div>
   </div>
   <script nonce="${nonce}">
@@ -855,15 +893,21 @@ export class GanttPanel {
       return Math.round(x / dayWidth) * dayWidth;
     }
 
+    // Get DOM elements
+    const ganttLeft = document.getElementById('ganttLeft');
+    const labelsColumn = document.getElementById('ganttLabels');
+    const timelineColumn = document.getElementById('ganttTimeline');
+    const timelineHeader = document.getElementById('ganttTimelineHeader');
+    const undoBtn = document.getElementById('undoBtn');
+    const redoBtn = document.getElementById('redoBtn');
+
     // Restore state from previous session
     const previousState = vscode.getState() || { undoStack: [], redoStack: [], labelWidth: ${labelWidth} };
     const undoStack = previousState.undoStack || [];
     const redoStack = previousState.redoStack || [];
-    const undoBtn = document.getElementById('undoBtn');
-    const redoBtn = document.getElementById('redoBtn');
 
     function saveState() {
-      vscode.setState({ undoStack, redoStack, labelWidth: labelsColumn?.offsetWidth || ${labelWidth} });
+      vscode.setState({ undoStack, redoStack, labelWidth: ganttLeft?.offsetWidth || ${labelWidth} });
     }
 
     function updateUndoRedoButtons() {
@@ -873,19 +917,22 @@ export class GanttPanel {
     }
 
     // Apply saved label width
-    const labelsColumn = document.getElementById('ganttLabels');
-    if (previousState.labelWidth && labelsColumn) {
-      labelsColumn.style.width = previousState.labelWidth + 'px';
+    if (previousState.labelWidth && ganttLeft) {
+      ganttLeft.style.width = previousState.labelWidth + 'px';
     }
 
-    // Synchronize vertical scroll between labels and timeline
-    const timelineColumn = document.getElementById('ganttTimeline');
+    // Synchronize scrolling:
+    // - Vertical: labels <-> timeline body
+    // - Horizontal: timeline header <-> timeline body
     let scrollSyncing = false;
-    if (labelsColumn && timelineColumn) {
+    if (labelsColumn && timelineColumn && timelineHeader) {
       timelineColumn.addEventListener('scroll', () => {
         if (scrollSyncing) return;
         scrollSyncing = true;
+        // Sync vertical with labels
         labelsColumn.scrollTop = timelineColumn.scrollTop;
+        // Sync horizontal with header
+        timelineHeader.scrollLeft = timelineColumn.scrollLeft;
         scrollSyncing = false;
       });
       labelsColumn.addEventListener('scroll', () => {
@@ -1128,13 +1175,20 @@ export class GanttPanel {
       }
     });
 
-    // Auto-scroll to today marker (centered)
-    const timeline = document.querySelector('.gantt-timeline');
+    // Scroll to today marker (centered)
     const todayX = ${Math.round(todayX)};
-    if (timeline && todayX > 0) {
-      const containerWidth = timeline.clientWidth;
-      timeline.scrollLeft = Math.max(0, todayX - containerWidth / 2);
+    function scrollToToday() {
+      if (timelineColumn && todayX > 0) {
+        const containerWidth = timelineColumn.clientWidth;
+        timelineColumn.scrollLeft = Math.max(0, todayX - containerWidth / 2);
+      }
     }
+
+    // Auto-scroll on load
+    scrollToToday();
+
+    // Today button handler
+    document.getElementById('todayBtn').addEventListener('click', scrollToToday);
 
     // Column resize handling
     const resizeHandle = document.getElementById('resizeHandle');
@@ -1145,7 +1199,7 @@ export class GanttPanel {
     resizeHandle.addEventListener('mousedown', (e) => {
       isResizing = true;
       resizeStartX = e.clientX;
-      resizeStartWidth = labelsColumn.offsetWidth;
+      resizeStartWidth = ganttLeft.offsetWidth;
       resizeHandle.classList.add('dragging');
       document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
@@ -1156,7 +1210,7 @@ export class GanttPanel {
       if (!isResizing) return;
       const delta = e.clientX - resizeStartX;
       const newWidth = Math.min(500, Math.max(150, resizeStartWidth + delta));
-      labelsColumn.style.width = newWidth + 'px';
+      ganttLeft.style.width = newWidth + 'px';
     });
 
     document.addEventListener('mouseup', () => {
@@ -1212,17 +1266,20 @@ export class GanttPanel {
     }
   }
 
+  /**
+   * Generate date markers split into header (fixed) and body (scrollable) parts
+   */
   private _generateDateMarkers(
     minDate: Date,
     maxDate: Date,
     svgWidth: number,
     leftMargin: number,
     zoomLevel: ZoomLevel = "day"
-  ): string {
-    const backgrounds: string[] = [];
-    const weekHeaders: string[] = [];
-    const dayHeaders: string[] = [];
-    const markers: string[] = [];
+  ): { header: string; body: string } {
+    const headerContent: string[] = [];
+    const bodyBackgrounds: string[] = [];
+    const bodyGridLines: string[] = [];
+    const bodyMarkers: string[] = [];
     const current = new Date(minDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -1248,9 +1305,9 @@ export class GanttPanel {
 
       const dayOfWeek = current.getDay();
 
-      // Weekend backgrounds (always shown - important context)
+      // Weekend backgrounds (body - full height)
       if (dayOfWeek === 0 || dayOfWeek === 6) {
-        backgrounds.push(`
+        bodyBackgrounds.push(`
           <rect x="${x}" y="0" width="${dayWidth}" height="100%" class="weekend-bg"/>
         `);
       }
@@ -1268,37 +1325,52 @@ export class GanttPanel {
         const dateRange = startMonth === endMonth
           ? `${startDay} - ${endDay} ${endMonth}`
           : `${startDay} ${startMonth} - ${endDay} ${endMonth}`;
-        weekHeaders.push(`
-          <line x1="${x}" y1="0" x2="${x}" y2="100%" class="date-marker"/>
+        // Header: week text and separator line
+        headerContent.push(`
+          <line x1="${x}" y1="0" x2="${x}" y2="40" class="date-marker"/>
           <text x="${x + 4}" y="14" fill="var(--vscode-foreground)" font-size="11" font-weight="bold">W${weekNum} (${dateRange}), ${year}</text>
+        `);
+        // Body: vertical grid line
+        bodyGridLines.push(`
+          <line x1="${x}" y1="0" x2="${x}" y2="100%" class="day-grid"/>
         `);
       }
 
       // Day grid line - adaptive (Monday always, others based on timeline length)
       const showDayDetail = showAllDays || dayOfWeek === 1 || (showMidweek && dayOfWeek === 5);
       if (showDayDetail) {
-        dayHeaders.push(`
-          <line x1="${x}" y1="35" x2="${x}" y2="100%" class="day-grid"/>
-        `);
+        // Body: vertical grid line (skip if already added for Monday)
+        if (dayOfWeek !== 1) {
+          bodyGridLines.push(`
+            <line x1="${x}" y1="0" x2="${x}" y2="100%" class="day-grid"/>
+          `);
+        }
 
-        // Day header (bottom row)
+        // Header: day label
         const dayLabel = `${current.getDate()} ${WEEKDAYS_SHORT[dayOfWeek]}`;
-        dayHeaders.push(`
+        headerContent.push(`
           <text x="${x + dayWidth / 2}" y="30" fill="var(--vscode-descriptionForeground)" font-size="10" text-anchor="middle">${dayLabel}</text>
         `);
       }
 
-      // Today marker (always shown)
+      // Today marker (body - full height)
       if (current.toDateString() === today.toDateString()) {
-        markers.push(`
+        bodyMarkers.push(`
           <line x1="${x}" y1="0" x2="${x}" y2="100%" class="today-marker"/>
+        `);
+        // Also add to header for visual continuity
+        headerContent.push(`
+          <line x1="${x}" y1="0" x2="${x}" y2="40" class="today-marker"/>
         `);
       }
 
       current.setDate(current.getDate() + 1);
     }
 
-    return backgrounds.join("") + weekHeaders.join("") + dayHeaders.join("") + markers.join("");
+    return {
+      header: headerContent.join(""),
+      body: bodyBackgrounds.join("") + bodyGridLines.join("") + bodyMarkers.join(""),
+    };
   }
 }
 
