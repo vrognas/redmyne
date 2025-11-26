@@ -32,6 +32,19 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 - Legacy v1.x migration webview (no longer needed)
 
+## [3.9.0] - 2025-11-26
+
+### Added
+
+- **Workload heatmap toggle** in Gantt chart - shades days by aggregate utilization
+  - Green (<80%), Yellow (80-100%), Orange (100-120%), Red (>120%)
+- **Zoom preserves center date** - switching zoom levels keeps same date centered
+
+### Fixed
+
+- Gantt bar segments now align with background grid (was off by 1 day)
+- Intensity line now renders as step function spanning full day width
+
 ## [3.8.0] - 2025-11-25
 
 ### Added
