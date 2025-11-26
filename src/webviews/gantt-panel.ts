@@ -37,6 +37,7 @@ interface GanttIssue {
   parentId: number | null;
   estimated_hours: number | null;
   spent_hours: number | null;
+  done_ratio: number;
   relations: GanttRelation[];
 }
 
@@ -443,6 +444,7 @@ export class GanttPanel {
         parentId: i.parent?.id ?? null,
         estimated_hours: i.estimated_hours ?? null,
         spent_hours: i.spent_hours ?? null,
+        done_ratio: i.done_ratio ?? 0,
         relations: (i.relations || [])
           .filter((r) => r.relation_type === "blocks" || r.relation_type === "precedes" || r.relation_type === "follows")
           .map((r) => ({
@@ -740,14 +742,19 @@ export class GanttPanel {
 
         const escapedSubject = escapeHtml(issue.subject);
         const escapedProject = escapeHtml(issue.project);
+        const doneRatio = issue.done_ratio;
         const tooltip = [
           `#${issue.id} ${escapedSubject}`,
           `Project: ${escapedProject}`,
           `Start: ${formatDateWithWeekday(issue.start_date)}`,
           `Due: ${formatDateWithWeekday(issue.due_date)}`,
+          `Progress: ${doneRatio}%`,
           `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
           `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
         ].join("\n");
+
+        // Calculate done portion width for progress visualization
+        const doneWidth = (doneRatio / 100) * width;
 
         const handleWidth = 8;
 
@@ -812,12 +819,14 @@ export class GanttPanel {
 
         // Parent issues: summary bar (no fill, no drag, no link handle)
         if (isParent) {
+          // Parent done_ratio is weighted average of subtasks
+          const parentDoneWidth = (doneRatio / 100) * (endX - startX - 8);
           return `
             <g class="issue-bar parent-bar" data-issue-id="${issue.id}"
                data-start-date="${issue.start_date || ""}"
                data-due-date="${issue.due_date || ""}"
                data-start-x="${startX}" data-end-x="${endX}"
-               tabindex="0" role="button" aria-label="#${issue.id} ${escapedSubject} (parent)">
+               tabindex="0" role="button" aria-label="#${issue.id} ${escapedSubject} (parent, ${doneRatio}% done)">
               <!-- Summary bar: bracket-style with downward arrows at ends -->
               <path class="bar-outline" d="M ${startX + 4} ${y + barHeight * 0.3}
                     L ${startX + 4} ${y + barHeight * 0.7}
@@ -828,7 +837,13 @@ export class GanttPanel {
                     L ${endX - 4} ${y + barHeight * 0.7}
                     L ${endX} ${y + barHeight}"
                     fill="none" stroke="${color}" stroke-width="2" opacity="0.8" style="cursor: pointer;"/>
-              <title>${tooltip} (parent - dates derived from subtasks)</title>
+              ${doneRatio > 0 ? `
+                <!-- Progress line showing done_ratio on parent -->
+                <line class="parent-progress" x1="${startX + 4}" y1="${y + barHeight * 0.5}"
+                      x2="${startX + 4 + parentDoneWidth}" y2="${y + barHeight * 0.5}"
+                      stroke="var(--vscode-charts-green)" stroke-width="3" opacity="0.8"/>
+              ` : ""}
+              <title>${tooltip} (parent - ${doneRatio}% done)</title>
             </g>
           `;
         }
@@ -853,6 +868,11 @@ export class GanttPanel {
               <!-- Past portion overlay with diagonal stripes -->
               <rect class="past-overlay" x="${startX}" y="${y}" width="${pastWidth}" height="${barHeight}"
                     fill="url(#past-stripes)" rx="4" ry="4"/>
+            ` : ""}
+            ${doneRatio > 0 && doneRatio < 100 ? `
+              <!-- Progress fill showing done_ratio -->
+              <rect class="progress-fill" x="${startX}" y="${y}" width="${doneWidth}" height="${barHeight}"
+                    fill="${color}" rx="4" ry="4" opacity="0.5"/>
             ` : ""}
             <!-- Border/outline -->
             <rect class="bar-outline" x="${startX}" y="${y}" width="${width}" height="${barHeight}"
@@ -1143,6 +1163,7 @@ export class GanttPanel {
     .issue-bar.parent-bar { opacity: 0.7; }
     .issue-bar.parent-bar:hover { opacity: 1; }
     .past-overlay { pointer-events: none; }
+    .progress-fill { pointer-events: none; }
     .issue-bar .drag-handle:hover { fill: var(--vscode-list-hoverBackground); }
     .issue-bar:hover .link-handle { opacity: 0.7; }
     .issue-bar .link-handle:hover { opacity: 1; transform-origin: center; }
