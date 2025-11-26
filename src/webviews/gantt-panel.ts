@@ -1487,6 +1487,25 @@ ${style.tip}
     const totalDays = ${totalDays};
     const dayWidth = timelineWidth / totalDays;
 
+    // Cleanup previous event listeners (prevents accumulation on re-render)
+    if (window._ganttCleanup) {
+      window._ganttCleanup();
+    }
+    const docListeners = [];
+    const winListeners = [];
+    function addDocListener(type, handler, options) {
+      document.addEventListener(type, handler, options);
+      docListeners.push({ type, handler, options });
+    }
+    function addWinListener(type, handler, options) {
+      window.addEventListener(type, handler, options);
+      winListeners.push({ type, handler, options });
+    }
+    window._ganttCleanup = () => {
+      docListeners.forEach(l => document.removeEventListener(l.type, l.handler, l.options));
+      winListeners.forEach(l => window.removeEventListener(l.type, l.handler, l.options));
+    };
+
     // Snap x position to nearest day boundary
     function snapToDay(x) {
       return Math.round(x / dayWidth) * dayWidth;
@@ -1598,7 +1617,7 @@ ${style.tip}
     updateUndoRedoButtons();
 
     // Handle messages from extension (for state updates without full re-render)
-    window.addEventListener('message', event => {
+    addWinListener('message', event => {
       const message = event.data;
       if (message.command === 'setHeatmapState') {
         const heatmapLayer = document.querySelector('.heatmap-layer');
@@ -1931,7 +1950,7 @@ ${style.tip}
     });
 
     // Escape to cancel linking mode and close pickers
-    document.addEventListener('keydown', (e) => {
+    addDocListener('keydown', (e) => {
       if (e.key === 'Escape') {
         if (linkingState) {
           cancelLinking();
@@ -1957,7 +1976,7 @@ ${style.tip}
     });
 
     // Handle drag move (resizing and linking)
-    document.addEventListener('mousemove', (e) => {
+    addDocListener('mousemove', (e) => {
       // Handle resize drag
       if (dragState) {
         const delta = e.clientX - dragState.initialMouseX;
@@ -2011,7 +2030,7 @@ ${style.tip}
     });
 
     // Handle drag end (resizing and linking)
-    document.addEventListener('mouseup', (e) => {
+    addDocListener('mouseup', (e) => {
       // Handle resize drag end
       if (dragState) {
         const { issueId, isLeft, newStartX, newEndX, bar, startX, endX, oldStartDate, oldDueDate } = dragState;
@@ -2131,7 +2150,7 @@ ${style.tip}
     });
 
     // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
+    addDocListener('keydown', (e) => {
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
       const modKey = isMac ? e.metaKey : e.ctrlKey;
 
@@ -2198,14 +2217,14 @@ ${style.tip}
       e.preventDefault();
     });
 
-    document.addEventListener('mousemove', (e) => {
+    addDocListener('mousemove', (e) => {
       if (!isResizing) return;
       const delta = e.clientX - resizeStartX;
       const newWidth = Math.min(500, Math.max(150, resizeStartWidth + delta));
       ganttLeft.style.width = newWidth + 'px';
     });
 
-    document.addEventListener('mouseup', () => {
+    addDocListener('mouseup', () => {
       if (isResizing) {
         isResizing = false;
         resizeHandle.classList.remove('dragging');
