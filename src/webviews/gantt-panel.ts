@@ -1349,19 +1349,29 @@ export class GanttPanel {
       // Week markers (for day/week/month zoom)
       if ((zoomLevel === "day" || zoomLevel === "week" || zoomLevel === "month") && dayOfWeek === 1) {
         const weekNum = getWeekNumber(current);
-        if (zoomLevel === "day" || zoomLevel === "week") {
-          const weekEnd = new Date(current);
-          weekEnd.setDate(weekEnd.getDate() + 6);
-          const startDay = dayOfMonth;
-          const startMonth = current.toLocaleString("en", { month: "short" });
-          const endDay = weekEnd.getDate();
-          const endMonth = weekEnd.toLocaleString("en", { month: "short" });
-          const dateRange = startMonth === endMonth
-            ? `${startDay} - ${endDay} ${endMonth}`
-            : `${startDay} ${startMonth} - ${endDay} ${endMonth}`;
+        const weekEnd = new Date(current);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        const startDay = dayOfMonth;
+        const startMonth = current.toLocaleString("en", { month: "short" });
+        const endDay = weekEnd.getDate();
+        const endMonth = weekEnd.toLocaleString("en", { month: "short" });
+        const dateRange = startMonth === endMonth
+          ? `${startDay}-${endDay} ${endMonth}`
+          : `${startDay} ${startMonth} - ${endDay} ${endMonth}`;
+
+        if (zoomLevel === "day") {
+          // Day zoom: full week info on top line
           headerContent.push(`
             <line x1="${x}" y1="0" x2="${x}" y2="40" class="date-marker"/>
             <text x="${x + 4}" y="14" fill="var(--vscode-foreground)" font-size="11" font-weight="bold">W${weekNum} (${dateRange}) ${year}</text>
+          `);
+        } else if (zoomLevel === "week") {
+          // Week zoom: W48, 2025 on top, 24-30 Nov on bottom (centered within week)
+          const weekWidth = dayWidth * 7;
+          headerContent.push(`
+            <line x1="${x}" y1="0" x2="${x}" y2="40" class="date-marker"/>
+            <text x="${x + weekWidth / 2}" y="14" fill="var(--vscode-foreground)" font-size="11" font-weight="bold" text-anchor="middle">W${weekNum}, ${year}</text>
+            <text x="${x + weekWidth / 2}" y="30" fill="var(--vscode-descriptionForeground)" font-size="10" text-anchor="middle">${dateRange}</text>
           `);
         } else {
           // Month zoom - just show week number
