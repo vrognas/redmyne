@@ -480,6 +480,9 @@ export class GanttPanel {
     relationId?: number;
     targetIssueId?: number;
     relationType?: RelationType;
+    left?: number;
+    top?: number;
+    operation?: string;
   }): void {
     switch (message.command) {
       case "openIssue":
@@ -536,13 +539,13 @@ export class GanttPanel {
         }
         break;
       case "undoRelation":
-        if (this._server) {
-          this._handleUndoRelation(message);
+        if (this._server && message.operation) {
+          this._handleUndoRelation(message as { operation: string; relationId?: number; issueId?: number; targetIssueId?: number; relationType?: string });
         }
         break;
       case "redoRelation":
-        if (this._server) {
-          this._handleRedoRelation(message);
+        if (this._server && message.operation) {
+          this._handleRedoRelation(message as { operation: string; relationId?: number; issueId?: number; targetIssueId?: number; relationType?: string });
         }
         break;
     }
@@ -589,9 +592,9 @@ export class GanttPanel {
         const rel = issue.relations.find((r) => r.id === relationId);
         if (rel) {
           relationInfo = {
-            issueId: rel.issue_id,
-            targetIssueId: rel.issue_to_id,
-            relationType: rel.relation_type,
+            issueId: issue.id,
+            targetIssueId: rel.targetId,
+            relationType: rel.type,
           };
           break;
         }
