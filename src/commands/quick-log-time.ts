@@ -46,7 +46,7 @@ export async function quickLogTime(
           },
           { label: "$(search) Pick different issue", value: "pick" },
         ],
-        { placeHolder: "Log time to..." }
+        { title: "Quick Log Time", placeHolder: "Log time to..." }
       );
 
       if (!choice) return; // User cancelled
@@ -115,7 +115,7 @@ export async function quickLogTime(
 
     // 8. Confirm with status bar flash (NOT notification)
     const statusBar = vscode.window.createStatusBarItem(
-      vscode.StatusBarAlignment.Left
+      vscode.StatusBarAlignment.Right
     );
     statusBar.text = `$(check) Logged ${hours.toFixed(2).replace(/\.?0+$/, "")}h to #${selection.issueId}`;
     statusBar.show();

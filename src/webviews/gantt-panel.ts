@@ -308,7 +308,7 @@ export class GanttPanel {
           return `
             <g class="project-label">
               <text x="${5 + indent}" y="${y + barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12" font-weight="bold">
-                📁 ${row.label}
+                ${row.label}
               </text>
             </g>
           `;
@@ -495,7 +495,7 @@ export class GanttPanel {
     }
     svg { display: block; }
     .issue-bar:hover .bar-main, .issue-label:hover { opacity: 0.8; }
-    .issue-bar .drag-handle:hover { fill: rgba(255,255,255,0.3); }
+    .issue-bar .drag-handle:hover { fill: var(--vscode-list-hoverBackground); }
     .issue-bar.dragging .bar-main { opacity: 0.5; }
     .weekend-bg { fill: var(--vscode-editor-inactiveSelectionBackground); opacity: 0.3; }
     .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 0.5; opacity: 0.3; }

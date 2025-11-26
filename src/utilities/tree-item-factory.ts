@@ -74,8 +74,8 @@ export function createEnhancedIssueTreeItem(
     const estHours = issue.estimated_hours ?? 0;
     const blocked = isBlocked(issue);
 
-    // Format: "🚫 #123 10/40h 5d On Track" or "○ #123..." for non-billable
-    const blockedPrefix = blocked ? "🚫 " : "";
+    // Format: "[B] #123 10/40h 5d On Track" or "○ #123..." for non-billable
+    const blockedPrefix = blocked ? "[B] " : "";
     const billablePrefix = isBillable(issue) ? "" : "○ ";
     treeItem.description =
       `${blockedPrefix}${billablePrefix}#${issue.id} ${spentHours}/${estHours}h ${flexibility.daysRemaining}d ${config.text}`;
@@ -172,15 +172,15 @@ function formatRelations(relations: IssueRelation[]): string {
 
   // Priority order for display
   const typeLabels: Record<string, string> = {
-    blocked: "⛔ Blocked by",
-    blocks: "▶ Blocks",
-    precedes: "⏩ Precedes",
-    follows: "⏪ Follows",
-    relates: "🔗 Related to",
-    duplicates: "📋 Duplicates",
-    duplicated: "📋 Duplicated by",
-    copied_to: "📄 Copied to",
-    copied_from: "📄 Copied from",
+    blocked: "Blocked by",
+    blocks: "Blocks",
+    precedes: "Precedes",
+    follows: "Follows",
+    relates: "Related to",
+    duplicates: "Duplicates",
+    duplicated: "Duplicated by",
+    copied_to: "Copied to",
+    copied_from: "Copied from",
   };
 
   const order = [

@@ -72,7 +72,7 @@ export class IssueController {
 
       // Status bar confirmation (matches QuickLogTime UX)
       const statusBar = vscode.window.createStatusBarItem(
-        vscode.StatusBarAlignment.Left
+        vscode.StatusBarAlignment.Right
       );
       statusBar.text = `$(check) Logged ${hours.toFixed(2).replace(/\.?0+$/, "")}h to #${this.issue.id}`;
       statusBar.show();

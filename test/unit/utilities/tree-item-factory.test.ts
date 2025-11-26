@@ -211,7 +211,7 @@ describe("createEnhancedIssueTreeItem", () => {
     );
 
     // Description should include blocked indicator
-    expect(treeItem.description).toContain("🚫");
+    expect(treeItem.description).toContain("[B]");
   });
 
   it("includes relations in tooltip", () => {

@@ -295,6 +295,7 @@ export function activate(context: vscode.ExtensionContext): void {
             { label: "$(settings-gear) Reconfigure Both", value: "both" },
           ],
           {
+            title: "Redmine Configuration",
             placeHolder: "What would you like to update?",
           }
         );
@@ -321,6 +322,7 @@ export function activate(context: vscode.ExtensionContext): void {
             { label: "$(link) Change URL", value: "change" },
           ],
           {
+            title: "Redmine Configuration",
             placeHolder:
               "Your Redmine URL is configured. Do you want to change it?",
           }
@@ -389,7 +391,7 @@ export function activate(context: vscode.ExtensionContext): void {
       await updateConfiguredContext();
 
       vscode.window.showInformationMessage(
-        "Redmine configured successfully! 🎉"
+        "Redmine configured successfully!"
       );
     })
   );
