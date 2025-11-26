@@ -10,6 +10,7 @@ All notable changes to the "vscode-redmine" extension will be documented in this
   - Visual feedback: arrow with arrowhead follows cursor, target highlights
   - Inline picker for relation type (Blocks/Precedes/Follows)
 - **Past bars dimmed** - issues with due date before today are desaturated
+- **Gantt accessibility** - keyboard navigation (Arrow Up/Down, Enter), focus indicators, ARIA labels
 
 ### Security
 
