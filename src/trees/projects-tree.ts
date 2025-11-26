@@ -354,7 +354,7 @@ export class ProjectsTree implements vscode.TreeDataProvider<TreeItem> {
   }
 
   clearProjects() {
-    this.projects = [];
+    this.projects = null;
     this.projectNodes = [];
     this.assignedIssues = [];
     this.issuesByProject.clear();

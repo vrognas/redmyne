@@ -167,7 +167,78 @@ export class GanttPanel {
     );
 
     GanttPanel.currentPanel = new GanttPanel(panel, server);
+    // Show loading skeleton immediately
+    GanttPanel.currentPanel._showLoadingSkeleton();
     return GanttPanel.currentPanel;
+  }
+
+  private _showLoadingSkeleton(): void {
+    this._panel.webview.html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
+  <title>Redmine Gantt</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 16px;
+      background: var(--vscode-editor-background);
+      color: var(--vscode-foreground);
+      font-family: var(--vscode-font-family);
+    }
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 200px;
+      gap: 16px;
+    }
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--vscode-panel-border);
+      border-top-color: var(--vscode-focusBorder);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .skeleton-bar {
+      height: 30px;
+      background: var(--vscode-panel-border);
+      border-radius: 4px;
+      opacity: 0.5;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 0.6; }
+    }
+    .skeleton-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Timeline</h2>
+  <div class="loading">
+    <div class="spinner"></div>
+    <span>Loading issues...</span>
+  </div>
+  <div class="skeleton-container">
+    <div class="skeleton-bar" style="width: 60%;"></div>
+    <div class="skeleton-bar" style="width: 80%;"></div>
+    <div class="skeleton-bar" style="width: 45%;"></div>
+    <div class="skeleton-bar" style="width: 70%;"></div>
+  </div>
+</body>
+</html>`;
   }
 
   public updateIssues(
