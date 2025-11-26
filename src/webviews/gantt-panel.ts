@@ -987,11 +987,11 @@ export class GanttPanel {
             const midX = (x1 + x2) / 2;
             path = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2 - arrowSize}`;
           } else {
-            // Target to the left or overlapping: route around via top/bottom
+            // Target to the left or overlapping: go vertical first, no doubling back
+            // Route: down/up to clear → left to target column → down/up to row → right to arrowhead
             const gap = 12;
-            const midX = x1 + gap;
             const routeY = y2 > y1 ? Math.max(y1, y2) + barHeight : Math.min(y1, y2) - barHeight;
-            path = `M ${x1} ${y1} H ${midX} V ${routeY} H ${x2 - gap} V ${y2} H ${x2 - arrowSize}`;
+            path = `M ${x1} ${y1} V ${routeY} H ${x2 - gap} V ${y2} H ${x2 - arrowSize}`;
           }
 
           // Arrowhead always points right (toward target.start)
