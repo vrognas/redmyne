@@ -425,6 +425,8 @@ export class GanttPanel {
       color: var(--vscode-foreground);
       font-family: var(--vscode-font-family);
       overflow: hidden;
+      height: 100vh;
+      box-sizing: border-box;
     }
     .gantt-header {
       display: flex;
@@ -458,6 +460,7 @@ export class GanttPanel {
       overflow: hidden;
       border: 1px solid var(--vscode-panel-border);
       border-radius: 4px;
+      height: calc(100vh - 100px);
     }
     .gantt-labels {
       flex-shrink: 0;
@@ -466,10 +469,14 @@ export class GanttPanel {
       max-width: 500px;
       background: var(--vscode-editor-background);
       z-index: 1;
-      overflow: hidden;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
     .gantt-labels svg {
       width: 100%;
+    }
+    .gantt-labels::-webkit-scrollbar {
+      width: 0;
     }
     .gantt-resize-handle {
       width: 6px;
@@ -484,9 +491,10 @@ export class GanttPanel {
     .gantt-timeline {
       flex-grow: 1;
       overflow-x: auto;
-      overflow-y: hidden;
+      overflow-y: auto;
     }
     .gantt-timeline::-webkit-scrollbar {
+      width: 8px;
       height: 8px;
     }
     .gantt-timeline::-webkit-scrollbar-thumb {
@@ -518,7 +526,7 @@ export class GanttPanel {
       </svg>
     </div>
     <div class="gantt-resize-handle" id="resizeHandle"></div>
-    <div class="gantt-timeline">
+    <div class="gantt-timeline" id="ganttTimeline">
       <svg width="${timelineWidth}" height="${svgHeight}">
         ${dateMarkers}
         ${bars}
@@ -559,6 +567,24 @@ export class GanttPanel {
     const labelsColumn = document.getElementById('ganttLabels');
     if (previousState.labelWidth && labelsColumn) {
       labelsColumn.style.width = previousState.labelWidth + 'px';
+    }
+
+    // Synchronize vertical scroll between labels and timeline
+    const timelineColumn = document.getElementById('ganttTimeline');
+    let scrollSyncing = false;
+    if (labelsColumn && timelineColumn) {
+      timelineColumn.addEventListener('scroll', () => {
+        if (scrollSyncing) return;
+        scrollSyncing = true;
+        labelsColumn.scrollTop = timelineColumn.scrollTop;
+        scrollSyncing = false;
+      });
+      labelsColumn.addEventListener('scroll', () => {
+        if (scrollSyncing) return;
+        scrollSyncing = true;
+        timelineColumn.scrollTop = labelsColumn.scrollTop;
+        scrollSyncing = false;
+      });
     }
 
     // Initial button state
