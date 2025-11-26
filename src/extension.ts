@@ -753,11 +753,12 @@ export function activate(context: vscode.ExtensionContext): void {
         try {
           // Fetch required data
           progress.report({ message: "Fetching metadata..." });
-          const [projects, trackers, statuses, priorities] = await Promise.all([
+          const [projects, trackers, statuses, priorities, customFields] = await Promise.all([
             server.getProjects(),
             server.getTrackers(),
             server.getIssueStatuses(),
-            server.getPriorities()
+            server.getPriorities(),
+            server.getCustomFields()
           ]);
 
           // Find Operations project
@@ -787,6 +788,24 @@ export function activate(context: vscode.ExtensionContext): void {
             vscode.window.showErrorMessage("Task tracker not found");
             return;
           }
+
+          // Build custom fields map and helper
+          const cfMap = new Map(customFields.map(f => [f.name.toLowerCase(), f]));
+          const buildCustomFields = () => {
+            const result: { id: number; value: string }[] = [];
+            const addCf = (name: string, value: string) => {
+              const field = cfMap.get(name.toLowerCase());
+              if (field) result.push({ id: field.id, value });
+            };
+            // Required custom fields for Operations project
+            addCf("Business Area", "Software Development");
+            addCf("Budget", "1000");
+            addCf("Fixed Price", "No");
+            addCf("Daily Rate", "100");
+            addCf("Currency", "EUR");
+            addCf("First time task", "No");
+            return result.length > 0 ? result : undefined;
+          };
 
           // Date helpers
           const today = () => new Date().toISOString().split("T")[0];
@@ -934,6 +953,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 due_date: issue.due_date,
                 estimated_hours: issue.estimated_hours,
                 parent_issue_id,
+                custom_fields: buildCustomFields(),
               });
               createdIssues.set(issue.subject, result.issue.id);
               created++;

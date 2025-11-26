@@ -496,6 +496,33 @@ export class RedmineServer {
   }
 
   /**
+   * Get custom fields (requires admin or appropriate permissions)
+   */
+  async getCustomFields(): Promise<{
+    id: number;
+    name: string;
+    customized_type: string;
+    field_format: string;
+    possible_values?: { value: string; label?: string }[];
+  }[]> {
+    try {
+      const response = await this.doRequest<{
+        custom_fields: {
+          id: number;
+          name: string;
+          customized_type: string;
+          field_format: string;
+          possible_values?: { value: string; label?: string }[];
+        }[];
+      }>("/custom_fields.json", "GET");
+      return (response?.custom_fields || []).filter(f => f.customized_type === "issue");
+    } catch {
+      // Custom fields API requires admin - return empty if not accessible
+      return [];
+    }
+  }
+
+  /**
    * Create a new issue
    */
   async createIssue(issue: {
