@@ -1418,6 +1418,14 @@ ${style.tip}
     .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 0.5; opacity: 0.3; }
     .date-marker { stroke: var(--vscode-editorRuler-foreground); stroke-dasharray: 2,2; }
     .today-marker { stroke: var(--vscode-charts-red); stroke-width: 2; }
+    /* Respect reduced motion preference */
+    @media (prefers-reduced-motion: reduce) {
+      .spinner { animation: none; }
+      .skeleton-bar { animation: none; opacity: 0.5; }
+      .gantt-resize-handle { transition: none; }
+      .dependency-arrow .arrow-line { transition: none; }
+      .dependency-arrow .arrow-head { transition: none; }
+    }
   </style>
 </head>
 <body>
