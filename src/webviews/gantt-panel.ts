@@ -475,10 +475,10 @@ export class GanttPanel {
     const rows = buildHierarchicalRows(this._issues);
     const contentHeight = rows.length * (barHeight + barGap);
 
-    // Left labels (fixed column)
+    // Left labels (fixed column) - Y starts at 0 in body SVG (header is separate)
     const labels = rows
       .map((row, index) => {
-        const y = headerHeight + index * (barHeight + barGap);
+        const y = index * (barHeight + barGap);
         const indent = row.depth * indentSize;
 
         if (row.type === "project") {
@@ -542,7 +542,7 @@ export class GanttPanel {
           timelineWidth;
 
         const width = Math.max(10, endX - startX);
-        const y = headerHeight + index * (barHeight + barGap);
+        const y = index * (barHeight + barGap); // Y starts at 0 in body SVG
         const color = this._getStatusColor(issue.status);
 
         const escapedSubject = escapeHtml(issue.subject);
@@ -593,7 +593,7 @@ export class GanttPanel {
           ((end.getTime() - minDate.getTime()) /
             (maxDate.getTime() - minDate.getTime())) *
           timelineWidth;
-        const y = headerHeight + index * (barHeight + barGap) + barHeight / 2;
+        const y = index * (barHeight + barGap) + barHeight / 2; // Y starts at 0 in body SVG
         issuePositions.set(issue.id, { startX, endX, y });
       }
     });
