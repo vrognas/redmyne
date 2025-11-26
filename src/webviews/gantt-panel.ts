@@ -535,6 +535,16 @@ export class GanttPanel {
           this._scrollPosition = { left: message.left, top: message.top };
         }
         break;
+      case "undoRelation":
+        if (this._server) {
+          this._handleUndoRelation(message);
+        }
+        break;
+      case "redoRelation":
+        if (this._server) {
+          this._handleRedoRelation(message);
+        }
+        break;
     }
   }
 
@@ -569,7 +579,41 @@ export class GanttPanel {
     if (!this._server) return;
 
     try {
+      // Find relation info before deleting (for undo)
+      let relationInfo: {
+        issueId: number;
+        targetIssueId: number;
+        relationType: string;
+      } | null = null;
+      for (const issue of this._issues) {
+        const rel = issue.relations.find((r) => r.id === relationId);
+        if (rel) {
+          relationInfo = {
+            issueId: rel.issue_id,
+            targetIssueId: rel.issue_to_id,
+            relationType: rel.relation_type,
+          };
+          break;
+        }
+      }
+
       await this._server.deleteRelation(relationId);
+
+      // Send undo action to webview (before local state update)
+      if (relationInfo) {
+        this._panel.webview.postMessage({
+          command: "pushUndoAction",
+          action: {
+            type: "relation",
+            operation: "delete",
+            relationId,
+            issueId: relationInfo.issueId,
+            targetIssueId: relationInfo.targetIssueId,
+            relationType: relationInfo.relationType,
+          },
+        });
+      }
+
       // Remove from local data and re-render
       for (const issue of this._issues) {
         issue.relations = issue.relations.filter((r) => r.id !== relationId);
@@ -600,8 +644,34 @@ export class GanttPanel {
     };
 
     try {
-      await this._server.createRelation(issueId, targetIssueId, relationType);
+      // Capture dates before creation (Redmine may adjust dates for precedes/blocks)
+      const sourceIssue = this._issues.find((i) => i.id === issueId);
+      const targetIssue = this._issues.find((i) => i.id === targetIssueId);
+      const datesBefore = {
+        source: { start: sourceIssue?.start_date, due: sourceIssue?.due_date },
+        target: { start: targetIssue?.start_date, due: targetIssue?.due_date },
+      };
+
+      // Create relation and get the ID
+      const response = await this._server.createRelation(issueId, targetIssueId, relationType);
+      const relationId = response.relation.id;
+
       showStatusBarMessage(`$(check) ${labels[relationType]} relation created`, 2000);
+
+      // Send undo action to webview before refreshing
+      this._panel.webview.postMessage({
+        command: "pushUndoAction",
+        action: {
+          type: "relation",
+          operation: "create",
+          relationId,
+          issueId,
+          targetIssueId,
+          relationType,
+          datesBefore,
+        },
+      });
+
       // Refresh data without resetting view
       vscode.commands.executeCommand("redmine.refreshGanttData");
     } catch (error) {
@@ -622,6 +692,70 @@ export class GanttPanel {
         }
       }
       vscode.window.showErrorMessage(`Cannot create relation: ${friendly}`);
+    }
+  }
+
+  private async _handleUndoRelation(message: {
+    operation: string;
+    relationId?: number;
+    issueId?: number;
+    targetIssueId?: number;
+    relationType?: string;
+  }): Promise<void> {
+    if (!this._server) return;
+
+    try {
+      if (message.operation === "delete" && message.relationId) {
+        // Undo create = delete the relation
+        await this._server.deleteRelation(message.relationId);
+        showStatusBarMessage("$(check) Relation undone", 2000);
+      } else if (message.operation === "create" && message.issueId && message.targetIssueId && message.relationType) {
+        // Undo delete = recreate the relation
+        await this._server.createRelation(
+          message.issueId,
+          message.targetIssueId,
+          message.relationType as RelationType
+        );
+        showStatusBarMessage("$(check) Relation restored", 2000);
+      }
+      // Refresh to show updated state
+      vscode.commands.executeCommand("redmine.refreshGanttData");
+    } catch (error) {
+      vscode.window.showErrorMessage(
+        `Failed to undo relation: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  private async _handleRedoRelation(message: {
+    operation: string;
+    relationId?: number;
+    issueId?: number;
+    targetIssueId?: number;
+    relationType?: string;
+  }): Promise<void> {
+    if (!this._server) return;
+
+    try {
+      if (message.operation === "create" && message.issueId && message.targetIssueId && message.relationType) {
+        // Redo create = recreate the relation
+        await this._server.createRelation(
+          message.issueId,
+          message.targetIssueId,
+          message.relationType as RelationType
+        );
+        showStatusBarMessage("$(check) Relation recreated", 2000);
+      } else if (message.operation === "delete" && message.relationId) {
+        // Redo delete = delete the relation again
+        await this._server.deleteRelation(message.relationId);
+        showStatusBarMessage("$(check) Relation deleted", 2000);
+      }
+      // Refresh to show updated state
+      vscode.commands.executeCommand("redmine.refreshGanttData");
+    } catch (error) {
+      vscode.window.showErrorMessage(
+        `Failed to redo relation: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -1456,6 +1590,12 @@ ${style.tip}
           if (heatmapBtn) heatmapBtn.classList.remove('active');
           if (heatmapLegend) heatmapLegend.style.display = 'none';
         }
+      } else if (message.command === 'pushUndoAction') {
+        // Push relation action to undo stack
+        undoStack.push(message.action);
+        redoStack.length = 0;
+        updateUndoRedoButtons();
+        saveState();
       }
     });
 
@@ -1863,12 +2003,37 @@ ${style.tip}
       const action = undoStack.pop();
       redoStack.push(action);
       updateUndoRedoButtons();
-      vscode.postMessage({
-        command: 'updateDates',
-        issueId: action.issueId,
-        startDate: action.oldStartDate,
-        dueDate: action.oldDueDate
-      });
+      saveState();
+
+      if (action.type === 'relation') {
+        // Undo relation action
+        if (action.operation === 'create') {
+          // Undo create = delete the relation
+          vscode.postMessage({
+            command: 'undoRelation',
+            operation: 'delete',
+            relationId: action.relationId,
+            datesBefore: action.datesBefore
+          });
+        } else {
+          // Undo delete = recreate the relation
+          vscode.postMessage({
+            command: 'undoRelation',
+            operation: 'create',
+            issueId: action.issueId,
+            targetIssueId: action.targetIssueId,
+            relationType: action.relationType
+          });
+        }
+      } else {
+        // Date change action
+        vscode.postMessage({
+          command: 'updateDates',
+          issueId: action.issueId,
+          startDate: action.oldStartDate,
+          dueDate: action.oldDueDate
+        });
+      }
     });
 
     // Redo button
@@ -1877,12 +2042,36 @@ ${style.tip}
       const action = redoStack.pop();
       undoStack.push(action);
       updateUndoRedoButtons();
-      vscode.postMessage({
-        command: 'updateDates',
-        issueId: action.issueId,
-        startDate: action.newStartDate,
-        dueDate: action.newDueDate
-      });
+      saveState();
+
+      if (action.type === 'relation') {
+        // Redo relation action
+        if (action.operation === 'create') {
+          // Redo create = recreate the relation
+          vscode.postMessage({
+            command: 'redoRelation',
+            operation: 'create',
+            issueId: action.issueId,
+            targetIssueId: action.targetIssueId,
+            relationType: action.relationType
+          });
+        } else {
+          // Redo delete = delete the relation again
+          vscode.postMessage({
+            command: 'redoRelation',
+            operation: 'delete',
+            relationId: action.relationId
+          });
+        }
+      } else {
+        // Date change action
+        vscode.postMessage({
+          command: 'updateDates',
+          issueId: action.issueId,
+          startDate: action.newStartDate,
+          dueDate: action.newDueDate
+        });
+      }
     });
 
     // Keyboard shortcuts

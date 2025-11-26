@@ -476,8 +476,9 @@ export class RedmineServer {
   /**
    * Create a relation between two issues
    * @param relationType One of: relates, duplicates, blocks, precedes, follows, copied_to
+   * @returns The created relation with its ID
    */
-  createRelation(
+  async createRelation(
     issueId: number,
     targetIssueId: number,
     relationType:
@@ -487,8 +488,10 @@ export class RedmineServer {
       | "precedes"
       | "follows"
       | "copied_to"
-  ): Promise<unknown> {
-    return this.doRequest(
+  ): Promise<{ relation: { id: number; issue_id: number; issue_to_id: number; relation_type: string } }> {
+    const response = await this.doRequest<{
+      relation: { id: number; issue_id: number; issue_to_id: number; relation_type: string };
+    }>(
       `/issues/${issueId}/relations.json`,
       "POST",
       Buffer.from(
@@ -501,6 +504,7 @@ export class RedmineServer {
         "utf8"
       )
     );
+    return response!;
   }
 
   /**
