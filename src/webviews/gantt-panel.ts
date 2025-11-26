@@ -109,6 +109,19 @@ function buildHierarchicalRows(issues: GanttIssue[]): GanttRow[] {
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
+/**
+ * Escape HTML/SVG special characters to prevent XSS
+ * User data (issue subjects, project names) must be escaped before SVG insertion
+ */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function formatDateWithWeekday(dateStr: string | null): string {
   if (!dateStr) return "—";
   const d = new Date(dateStr);
@@ -494,7 +507,7 @@ export class GanttPanel {
           return `
             <g class="project-label">
               <text x="${5 + indent}" y="${y + barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12" font-weight="bold">
-                ${row.label}
+                ${escapeHtml(row.label)}
               </text>
             </g>
           `;
@@ -502,9 +515,11 @@ export class GanttPanel {
 
         // Issue row
         const issue = row.issue!;
+        const escapedSubject = escapeHtml(issue.subject);
+        const escapedProject = escapeHtml(issue.project);
         const tooltip = [
-          `#${issue.id} ${issue.subject}`,
-          `Project: ${issue.project}`,
+          `#${issue.id} ${escapedSubject}`,
+          `Project: ${escapedProject}`,
           `Start: ${formatDateWithWeekday(issue.start_date)}`,
           `Due: ${formatDateWithWeekday(issue.due_date)}`,
           `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
@@ -514,7 +529,7 @@ export class GanttPanel {
         return `
           <g class="issue-label" data-issue-id="${issue.id}" style="cursor: pointer;">
             <text x="${5 + indent}" y="${y + barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12">
-              #${issue.id} ${issue.subject}
+              #${issue.id} ${escapedSubject}
             </text>
             <title>${tooltip}</title>
           </g>
@@ -551,9 +566,11 @@ export class GanttPanel {
         const y = headerHeight + index * (barHeight + barGap);
         const color = this._getStatusColor(issue.status);
 
+        const escapedSubject = escapeHtml(issue.subject);
+        const escapedProject = escapeHtml(issue.project);
         const tooltip = [
-          `#${issue.id} ${issue.subject}`,
-          `Project: ${issue.project}`,
+          `#${issue.id} ${escapedSubject}`,
+          `Project: ${escapedProject}`,
           `Start: ${formatDateWithWeekday(issue.start_date)}`,
           `Due: ${formatDateWithWeekday(issue.due_date)}`,
           `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
