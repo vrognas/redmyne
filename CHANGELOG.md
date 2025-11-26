@@ -8,7 +8,13 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 - **Drag-to-link relations** in Gantt chart - drag from link handle on bar to another bar
   - Visual feedback: arrow with arrowhead follows cursor, target highlights
-  - Inline picker for relation type (Blocks/Precedes/Follows)
+  - Inline picker for all 6 Redmine relation types with tooltips
+- **Improved relation arrows** (GitLens-inspired):
+  - Smooth bezier curves instead of elbow paths
+  - Distinct colors per type: blocks (red), precedes (purple), follows (blue), relates (gray dashed), duplicates (orange dotted), copied (teal dashed)
+  - Smart routing to avoid bar overlap
+  - Legend showing all relation types and colors
+  - Detailed tooltips explaining each relation's behavior
 - **Past-portion texture** - Redmine-style diagonal red stripes show elapsed time on bars
 - **Past bars dimmed** - issues with due date before today are desaturated
 - **Parent issues as summaries** - bracket-style bars, no drag (dates derived from subtasks)

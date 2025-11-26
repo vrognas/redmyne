@@ -20,10 +20,13 @@ const ZOOM_PIXELS_PER_DAY: Record<ZoomLevel, number> = {
   year: 0.8,
 };
 
+// All Redmine relation types
+type RelationType = "relates" | "duplicates" | "blocks" | "precedes" | "follows" | "copied_to";
+
 interface GanttRelation {
   id: number;
   targetId: number;
-  type: "blocks" | "precedes" | "follows";
+  type: RelationType;
 }
 
 interface GanttIssue {
@@ -446,11 +449,10 @@ export class GanttPanel {
         spent_hours: i.spent_hours ?? null,
         done_ratio: i.done_ratio ?? 0,
         relations: (i.relations || [])
-          .filter((r) => r.relation_type === "blocks" || r.relation_type === "precedes" || r.relation_type === "follows")
           .map((r) => ({
             id: r.id,
             targetId: r.issue_to_id,
-            type: r.relation_type as "blocks" | "precedes" | "follows",
+            type: r.relation_type as RelationType,
           })),
       }));
 
@@ -469,7 +471,7 @@ export class GanttPanel {
     zoomLevel?: ZoomLevel;
     relationId?: number;
     targetIssueId?: number;
-    relationType?: "blocks" | "precedes" | "follows";
+    relationType?: RelationType;
   }): void {
     switch (message.command) {
       case "openIssue":
@@ -566,14 +568,17 @@ export class GanttPanel {
   private async _createRelation(
     issueId: number,
     targetIssueId: number,
-    relationType: "blocks" | "precedes" | "follows"
+    relationType: RelationType
   ): Promise<void> {
     if (!this._server) return;
 
-    const labels: Record<string, string> = {
+    const labels: Record<RelationType, string> = {
+      relates: "Related to",
+      duplicates: "Duplicates",
       blocks: "Blocks",
       precedes: "Precedes",
       follows: "Follows",
+      copied_to: "Copied to",
     };
 
     try {
@@ -918,6 +923,22 @@ export class GanttPanel {
       }
     });
 
+    // Relation type styling (GitLens-inspired with distinct colors and styles)
+    const relationStyles: Record<RelationType, { color: string; dash: string; label: string; tip: string }> = {
+      blocks: { color: "#e74c3c", dash: "", label: "blocks",
+        tip: "Target cannot be closed until source is closed" },
+      precedes: { color: "#9b59b6", dash: "", label: "precedes",
+        tip: "Source must complete before target can start" },
+      follows: { color: "#3498db", dash: "", label: "follows",
+        tip: "Source starts after target ends" },
+      relates: { color: "#7f8c8d", dash: "4,3", label: "relates to",
+        tip: "Simple link (no constraints)" },
+      duplicates: { color: "#e67e22", dash: "2,2", label: "duplicates",
+        tip: "Closing target auto-closes source" },
+      copied_to: { color: "#1abc9c", dash: "6,2", label: "copied to",
+        tip: "Source was copied to create target" },
+    };
+
     const dependencyArrows = this._issues
       .flatMap((issue) =>
         issue.relations.map((rel) => {
@@ -925,43 +946,59 @@ export class GanttPanel {
           const target = issuePositions.get(rel.targetId);
           if (!source || !target) return "";
 
-          // Draw elbow arrow from source end to target start
           const x1 = source.endX;
           const y1 = source.y;
           const x2 = target.startX;
           const y2 = target.y;
 
-          // Elbow path: right from source, down/up, then right to target
-          const midX = x1 + 15;
-          const arrowSize = 6;
+          const style = relationStyles[rel.type] || relationStyles.relates;
+          const arrowSize = 7;
 
-          // Path: move right, then to target Y, then to target
-          const path =
-            x2 > x1
-              ? `M ${x1} ${y1} H ${midX} V ${y2} H ${x2 - arrowSize}`
-              : `M ${x1} ${y1} H ${midX} V ${y2} H ${x2 + arrowSize}`;
+          // Route arrows to avoid overlapping with bars
+          // If target is to the left or same position, route above/below
+          const yDiff = y2 - y1;
+          const xDiff = x2 - x1;
 
-          // Arrow head pointing right or left
-          const arrowHead =
-            x2 > x1
-              ? `M ${x2} ${y2} l -${arrowSize} -${arrowSize / 2} v ${arrowSize} Z`
-              : `M ${x2} ${y2} l ${arrowSize} -${arrowSize / 2} v ${arrowSize} Z`;
+          let path: string;
 
-          const colorMap: Record<string, string> = {
-            blocks: "var(--vscode-charts-orange)",
-            precedes: "var(--vscode-charts-purple)",
-            follows: "var(--vscode-charts-blue)",
-          };
-          const color = colorMap[rel.type] || "var(--vscode-charts-foreground)";
-          const typeLabel = rel.type;
+          // Calculate offset to route around bars (above or below based on direction)
+          const routeOffset = barHeight * 0.8;
+          const goingDown = yDiff > 0;
+          const goingRight = xDiff > 0;
+
+          if (Math.abs(yDiff) < barHeight && Math.abs(xDiff) < 50) {
+            // Same row or very close - simple bezier
+            const cpOffset = Math.max(30, Math.abs(xDiff) * 0.3);
+            path = `M ${x1} ${y1} C ${x1 + cpOffset} ${y1}, ${x2 - cpOffset} ${y2}, ${x2 - arrowSize} ${y2}`;
+          } else if (goingRight) {
+            // Target is to the right - smooth S-curve bezier
+            const midX = x1 + (x2 - x1) * 0.5;
+            path = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2 - arrowSize} ${y2}`;
+          } else {
+            // Target is to the left - route around via top or bottom
+            const routeY = goingDown ? Math.max(y1, y2) + routeOffset : Math.min(y1, y2) - routeOffset;
+            const cp1x = x1 + 20;
+            const cp2x = x2 - 20;
+            path = `M ${x1} ${y1} C ${cp1x} ${y1}, ${cp1x} ${routeY}, ${(x1 + x2) / 2} ${routeY} S ${cp2x} ${y2}, ${x2 + arrowSize} ${y2}`;
+          }
+
+          // Arrow head always points toward target
+          const pointsRight = goingRight || (!goingRight && Math.abs(xDiff) < 50);
+          const arrowHead = pointsRight
+            ? `M ${x2} ${y2} l -${arrowSize} -${arrowSize * 0.5} l 0 ${arrowSize} Z`
+            : `M ${x2} ${y2} l ${arrowSize} -${arrowSize * 0.5} l 0 ${arrowSize} Z`;
+
+          const dashAttr = style.dash ? `stroke-dasharray="${style.dash}"` : "";
 
           return `
-            <g class="dependency-arrow" data-relation-id="${rel.id}" data-from="${issue.id}" data-to="${rel.targetId}" style="cursor: pointer;">
+            <g class="dependency-arrow rel-${rel.type}" data-relation-id="${rel.id}" data-from="${issue.id}" data-to="${rel.targetId}" style="cursor: pointer;">
               <!-- Wide invisible hit area for easier clicking -->
-              <path class="arrow-hit-area" d="${path}" stroke="transparent" stroke-width="16" fill="none"/>
-              <path d="${path}" stroke="${color}" stroke-width="1.5" fill="none" opacity="0.7"/>
-              <path d="${arrowHead}" fill="${color}" opacity="0.7"/>
-              <title>#${issue.id} ${typeLabel} #${rel.targetId} (right-click to delete)</title>
+              <path class="arrow-hit-area" d="${path}" stroke="transparent" stroke-width="18" fill="none"/>
+              <path class="arrow-line" d="${path}" stroke="${style.color}" stroke-width="2" fill="none" ${dashAttr}/>
+              <path class="arrow-head" d="${arrowHead}" fill="${style.color}"/>
+              <title>#${issue.id} ${style.label} #${rel.targetId}
+${style.tip}
+(right-click to delete)</title>
             </g>
           `;
         })
@@ -1174,8 +1211,15 @@ export class GanttPanel {
     .issue-bar.linking-source .link-handle { opacity: 1; }
     .issue-bar.link-target .bar-outline { stroke-width: 2; stroke: var(--vscode-charts-green); }
     .temp-link-arrow { pointer-events: none; }
-    .dependency-arrow path { transition: opacity 0.15s; }
-    .dependency-arrow:hover path { opacity: 1 !important; stroke-width: 2.5; }
+    .dependency-arrow .arrow-line { transition: stroke-width 0.15s, filter 0.15s; }
+    .dependency-arrow .arrow-head { transition: transform 0.15s; }
+    .dependency-arrow:hover .arrow-line { stroke-width: 3 !important; filter: brightness(1.2); }
+    .dependency-arrow:hover .arrow-head { transform: scale(1.2); transform-origin: center; }
+    /* Relation type colors in legend */
+    .relation-legend { display: flex; gap: 12px; font-size: 11px; margin-left: 12px; align-items: center; }
+    .relation-legend-item { display: flex; align-items: center; gap: 4px; opacity: 0.8; }
+    .relation-legend-item:hover { opacity: 1; }
+    .relation-legend-line { width: 20px; height: 2px; }
     .relation-picker { position: fixed; background: var(--vscode-dropdown-background); border: 1px solid var(--vscode-dropdown-border); border-radius: 4px; padding: 4px 0; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
     .relation-picker button { display: block; width: 100%; padding: 6px 12px; border: none; background: transparent; color: var(--vscode-dropdown-foreground); text-align: left; cursor: pointer; font-size: 12px; }
     .relation-picker button:hover, .relation-picker button:focus { background: var(--vscode-list-hoverBackground); }
@@ -1209,6 +1253,14 @@ export class GanttPanel {
         <span class="heatmap-legend-item"><span class="heatmap-legend-color" style="background: var(--vscode-charts-yellow);"></span>80-100%</span>
         <span class="heatmap-legend-item"><span class="heatmap-legend-color" style="background: var(--vscode-charts-orange);"></span>100-120%</span>
         <span class="heatmap-legend-item"><span class="heatmap-legend-color" style="background: var(--vscode-charts-red);"></span>&gt;120%</span>
+      </div>
+      <div class="relation-legend" title="Relation types (drag from link handle to create)">
+        <span class="relation-legend-item"><span class="relation-legend-line" style="background: #e74c3c;"></span>blocks</span>
+        <span class="relation-legend-item"><span class="relation-legend-line" style="background: #9b59b6;"></span>precedes</span>
+        <span class="relation-legend-item"><span class="relation-legend-line" style="background: #3498db;"></span>follows</span>
+        <span class="relation-legend-item"><span class="relation-legend-line" style="background: #7f8c8d; border-style: dashed;"></span>relates</span>
+        <span class="relation-legend-item"><span class="relation-legend-line" style="background: #e67e22; border-style: dotted;"></span>duplicates</span>
+        <span class="relation-legend-item"><span class="relation-legend-line" style="background: #1abc9c; border-style: dashed;"></span>copied</span>
       </div>
       <button id="todayBtn" title="Jump to Today">Today</button>
       <button id="undoBtn" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
@@ -1524,14 +1576,24 @@ export class GanttPanel {
       picker.style.top = y + 'px';
 
       const types = [
-        { value: 'blocks', label: '🚫 Blocks' },
-        { value: 'precedes', label: '➡️ Precedes' },
-        { value: 'follows', label: '⬅️ Follows' }
+        { value: 'blocks', label: '🚫 Blocks', color: '#e74c3c',
+          tooltip: 'Target cannot be closed until this issue is closed' },
+        { value: 'precedes', label: '➡️ Precedes', color: '#9b59b6',
+          tooltip: 'This issue must complete before target can start. Date changes propagate.' },
+        { value: 'follows', label: '⬅️ Follows', color: '#3498db',
+          tooltip: 'This issue starts after target ends. Date changes propagate.' },
+        { value: 'relates', label: '🔗 Relates to', color: '#7f8c8d',
+          tooltip: 'Simple link between issues (no constraints)' },
+        { value: 'duplicates', label: '📋 Duplicates', color: '#e67e22',
+          tooltip: 'Closing target will automatically close this issue' },
+        { value: 'copied_to', label: '📄 Copied to', color: '#1abc9c',
+          tooltip: 'This issue was copied to create the target issue' }
       ];
 
       types.forEach(t => {
         const btn = document.createElement('button');
-        btn.textContent = t.label;
+        btn.innerHTML = '<span style="display:inline-block;width:12px;height:3px;background:' + t.color + ';margin-right:8px;vertical-align:middle;"></span>' + t.label;
+        btn.title = t.tooltip;
         btn.addEventListener('click', () => {
           saveState();
           vscode.postMessage({
