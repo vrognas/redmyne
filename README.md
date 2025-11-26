@@ -42,6 +42,13 @@ Desktop clients like RedmineX replicate Redmine's full project management interf
   - Flexible time formats: 2.5, 1:45, 1h 45min
   - Optional comment field
   - Status bar confirmation
+- **Quick Create Issue** (Ctrl+Y Ctrl+N)
+  - Create issues without leaving IDE
+  - Full wizard: project → tracker → priority → subject → description → hours → due date
+  - Optional fields skippable via Enter
+- **Create Sub-Issue** (context menu)
+  - Right-click any issue → "Create Sub-Issue"
+  - Inherits parent's project and tracker
 - Sidebar panel
   - List issues assigned to you in sidebar panel
   - List projects and open issues in them

@@ -6,6 +6,20 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ### Added
 
+- **Quick Create Issue** (Ctrl+Y Ctrl+N) - create issues without leaving IDE
+  - Full wizard: project → tracker → priority → subject → description → hours → due date
+  - All optional fields skippable via Enter
+  - Status bar confirmation on success
+- **Create Sub-Issue** context menu action - right-click issue to create child
+  - Inherits parent's project and tracker
+  - Reduced wizard steps (priority → subject → description → hours → due date)
+
+### Fixed
+
+- **Billable tracker detection** - now matches "Tasks" (was "Task")
+
+---
+
 - **Drag-to-link relations** in Gantt chart - drag from link handle on bar to another bar
   - Visual feedback: arrow with arrowhead follows cursor, target highlights
   - Inline picker for all 6 Redmine relation types with tooltips
