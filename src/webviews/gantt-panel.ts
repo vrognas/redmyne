@@ -314,6 +314,7 @@ export class GanttPanel {
   private _zoomLevel: ZoomLevel = "day";
   private _schedule: WeeklySchedule = DEFAULT_SCHEDULE;
   private _showWorkloadHeatmap: boolean = false;
+  private _scrollPosition: { left: number; top: number } = { left: 0, top: 0 };
 
   private constructor(panel: vscode.WebviewPanel, server?: RedmineServer) {
     this._panel = panel;
@@ -527,6 +528,12 @@ export class GanttPanel {
       case "refresh":
         // Refresh data without resetting view state
         vscode.commands.executeCommand("redmine.refreshGanttData");
+        break;
+      case "scrollPosition":
+        // Store scroll position for restoration after update
+        if (message.left !== undefined && message.top !== undefined) {
+          this._scrollPosition = { left: message.left, top: message.top };
+        }
         break;
     }
   }
@@ -1322,12 +1329,15 @@ ${style.tip}
     const undoBtn = document.getElementById('undoBtn');
     const redoBtn = document.getElementById('redoBtn');
 
-    // Restore state from previous session
+    // Restore state from previous session (use extension-stored position as fallback)
+    const extScrollLeft = ${this._scrollPosition.left};
+    const extScrollTop = ${this._scrollPosition.top};
     const previousState = vscode.getState() || { undoStack: [], redoStack: [], labelWidth: ${labelWidth}, scrollLeft: null, scrollTop: null, centerDateMs: null };
     const undoStack = previousState.undoStack || [];
     const redoStack = previousState.redoStack || [];
-    let savedScrollLeft = previousState.scrollLeft;
-    let savedScrollTop = previousState.scrollTop;
+    // Use webview state if available, otherwise use extension-stored position
+    let savedScrollLeft = previousState.scrollLeft ?? (extScrollLeft > 0 ? extScrollLeft : null);
+    let savedScrollTop = previousState.scrollTop ?? (extScrollTop > 0 ? extScrollTop : null);
     let savedCenterDateMs = previousState.centerDateMs;
 
     // Convert scroll position to center date (milliseconds)
@@ -1384,6 +1394,7 @@ ${style.tip}
     // - Vertical: labels <-> timeline body
     // - Horizontal: timeline header <-> timeline body
     let scrollSyncing = false;
+    let scrollReportTimeout = null;
     if (labelsColumn && timelineColumn && timelineHeader) {
       timelineColumn.addEventListener('scroll', () => {
         if (scrollSyncing) return;
@@ -1392,6 +1403,15 @@ ${style.tip}
         labelsColumn.scrollTop = timelineColumn.scrollTop;
         // Sync horizontal with header
         timelineHeader.scrollLeft = timelineColumn.scrollLeft;
+        // Report scroll position to extension (debounced)
+        clearTimeout(scrollReportTimeout);
+        scrollReportTimeout = setTimeout(() => {
+          vscode.postMessage({
+            command: 'scrollPosition',
+            left: timelineColumn.scrollLeft,
+            top: timelineColumn.scrollTop
+          });
+        }, 100);
         // Delay reset to prevent cascade from synced scroll events
         requestAnimationFrame(() => { scrollSyncing = false; });
       });
