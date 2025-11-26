@@ -16,6 +16,7 @@ export default defineConfig({
       exclude: [
         "src/extension.ts", // VS Code integration - requires extensive mocking
         "src/trees/**/*.ts", // VS Code TreeProvider - requires extensive mocking
+        "src/webviews/**/*.ts", // VS Code Webview - requires extensive mocking
         "src/commands/new-issue.ts", // VS Code UI heavy
         "src/commands/open-actions-for-issue.ts", // VS Code UI heavy
         "src/commands/open-actions-for-issue-under-cursor.ts", // VS Code UI heavy

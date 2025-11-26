@@ -137,4 +137,113 @@ describe("createEnhancedIssueTreeItem", () => {
 
     expect(treeItem.description).toBe("#7392");
   });
+
+  it("includes tracker name in tooltip", () => {
+    const treeItem = createEnhancedIssueTreeItem(
+      mockIssue,
+      mockFlexibility,
+      undefined,
+      "test.command"
+    );
+
+    // tooltip is MarkdownString
+    const tooltipValue = (treeItem.tooltip as { value: string })?.value;
+    expect(tooltipValue).toContain("**Tracker:**");
+    expect(tooltipValue).toContain("Tasks"); // tracker.name from mockIssue
+  });
+
+  it("shows prefix for non-billable issues (tracker !== Task)", () => {
+    const nonBillableIssue: Issue = {
+      ...mockIssue,
+      tracker: { id: 2, name: "Non-billable" },
+    };
+
+    const treeItem = createEnhancedIssueTreeItem(
+      nonBillableIssue,
+      mockFlexibility,
+      undefined,
+      "test.command"
+    );
+
+    // Non-billable issues get "○ " prefix in description
+    expect(treeItem.description).toContain("○ ");
+    // Status color is still used (not dimmed)
+    const iconPath = treeItem.iconPath as { color?: { id: string } };
+    expect(iconPath?.color?.id).toBe("testing.iconPassed");
+  });
+
+  it("does NOT dim billable issues (tracker === Task)", () => {
+    const billableIssue: Issue = {
+      ...mockIssue,
+      tracker: { id: 1, name: "Task" },
+    };
+
+    const treeItem = createEnhancedIssueTreeItem(
+      billableIssue,
+      mockFlexibility,
+      undefined,
+      "test.command"
+    );
+
+    // iconPath should NOT use deemphasizedForeground color
+    const iconPath = treeItem.iconPath as { color?: { id: string } };
+    expect(iconPath?.color?.id).not.toBe("list.deemphasizedForeground");
+  });
+
+  it("shows blocked indicator when issue has blocked relation", () => {
+    const blockedIssue: Issue = {
+      ...mockIssue,
+      relations: [
+        {
+          id: 1,
+          issue_id: mockIssue.id,
+          issue_to_id: 100,
+          relation_type: "blocked",
+        },
+      ],
+    };
+
+    const treeItem = createEnhancedIssueTreeItem(
+      blockedIssue,
+      mockFlexibility,
+      undefined,
+      "test.command"
+    );
+
+    // Description should include blocked indicator
+    expect(treeItem.description).toContain("[B]");
+  });
+
+  it("includes relations in tooltip", () => {
+    const issueWithRelations: Issue = {
+      ...mockIssue,
+      relations: [
+        {
+          id: 1,
+          issue_id: mockIssue.id,
+          issue_to_id: 100,
+          relation_type: "blocked",
+        },
+        {
+          id: 2,
+          issue_id: mockIssue.id,
+          issue_to_id: 200,
+          relation_type: "blocks",
+        },
+      ],
+    };
+
+    const treeItem = createEnhancedIssueTreeItem(
+      issueWithRelations,
+      mockFlexibility,
+      undefined,
+      "test.command"
+    );
+
+    const tooltipValue = (treeItem.tooltip as { value: string })?.value;
+    expect(tooltipValue).toContain("Blocked by");
+    expect(tooltipValue).toContain("#100");
+    expect(tooltipValue).toContain("Blocks");
+    expect(tooltipValue).toContain("#200");
+  });
 });

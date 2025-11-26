@@ -195,7 +195,17 @@ export class RedmineServer {
           if (statusCode === 400) {
             message = "Bad request (400)";
           } else if (statusCode === 422) {
-            message = "Validation failed (422)";
+            // Try to extract Redmine's error details from response body
+            try {
+              const body = JSON.parse(incomingBuffer.toString("utf8"));
+              if (body.errors && Array.isArray(body.errors) && body.errors.length > 0) {
+                message = `Validation failed: ${body.errors.join(", ")}`;
+              } else {
+                message = "Validation failed (422)";
+              }
+            } catch {
+              message = "Validation failed (422)";
+            }
           } else {
             message = `Client error (${statusCode} ${statusMessage})`;
           }
@@ -338,21 +348,22 @@ export class RedmineServer {
     issueId: number,
     activityId: number,
     hours: string,
-    message: string
+    message: string,
+    spentOn?: string // YYYY-MM-DD format, defaults to today
   ): Promise<unknown> {
+    const entry: Record<string, unknown> = {
+      issue_id: issueId,
+      activity_id: activityId,
+      hours,
+      comments: message,
+    };
+    if (spentOn) {
+      entry.spent_on = spentOn;
+    }
     return this.doRequest<{ time_entry: TimeEntry }>(
       `/time_entries.json`,
       "POST",
-      Buffer.from(
-        JSON.stringify({
-          time_entry: <TimeEntry>{
-            issue_id: issueId,
-            activity_id: activityId,
-            hours,
-            comments: message,
-          },
-        })
-      )
+      Buffer.from(JSON.stringify({ time_entry: entry }))
     );
   }
 
@@ -402,6 +413,135 @@ export class RedmineServer {
         }),
         "utf8"
       )
+    );
+  }
+
+  /**
+   * Update issue start_date and/or due_date
+   */
+  updateIssueDates(
+    issueId: number,
+    startDate: string | null,
+    dueDate: string | null
+  ): Promise<unknown> {
+    const issueUpdate: { start_date?: string; due_date?: string } = {};
+    if (startDate !== null) {
+      issueUpdate.start_date = startDate;
+    }
+    if (dueDate !== null) {
+      issueUpdate.due_date = dueDate;
+    }
+    return this.doRequest(
+      `/issues/${issueId}.json`,
+      "PUT",
+      Buffer.from(JSON.stringify({ issue: issueUpdate }), "utf8")
+    );
+  }
+
+  /**
+   * Create a relation between two issues
+   * @param relationType One of: relates, duplicates, blocks, precedes, follows, copied_to
+   */
+  createRelation(
+    issueId: number,
+    targetIssueId: number,
+    relationType:
+      | "relates"
+      | "duplicates"
+      | "blocks"
+      | "precedes"
+      | "follows"
+      | "copied_to"
+  ): Promise<unknown> {
+    return this.doRequest(
+      `/issues/${issueId}/relations.json`,
+      "POST",
+      Buffer.from(
+        JSON.stringify({
+          relation: {
+            issue_to_id: targetIssueId,
+            relation_type: relationType,
+          },
+        }),
+        "utf8"
+      )
+    );
+  }
+
+  /**
+   * Delete a relation by ID
+   */
+  deleteRelation(relationId: number): Promise<unknown> {
+    return this.doRequest(`/relations/${relationId}.json`, "DELETE");
+  }
+
+  /**
+   * Get available trackers
+   */
+  async getTrackers(): Promise<{ id: number; name: string }[]> {
+    const response = await this.doRequest<{
+      trackers: { id: number; name: string }[];
+    }>("/trackers.json", "GET");
+    return response?.trackers || [];
+  }
+
+  /**
+   * Get available issue priorities
+   */
+  async getPriorities(): Promise<{ id: number; name: string }[]> {
+    const response = await this.doRequest<{
+      issue_priorities: { id: number; name: string }[];
+    }>("/enumerations/issue_priorities.json", "GET");
+    return response?.issue_priorities || [];
+  }
+
+  /**
+   * Get custom fields (requires admin or appropriate permissions)
+   */
+  async getCustomFields(): Promise<{
+    id: number;
+    name: string;
+    customized_type: string;
+    field_format: string;
+    possible_values?: { value: string; label?: string }[];
+  }[]> {
+    try {
+      const response = await this.doRequest<{
+        custom_fields: {
+          id: number;
+          name: string;
+          customized_type: string;
+          field_format: string;
+          possible_values?: { value: string; label?: string }[];
+        }[];
+      }>("/custom_fields.json", "GET");
+      return (response?.custom_fields || []).filter(f => f.customized_type === "issue");
+    } catch {
+      // Custom fields API requires admin - return empty if not accessible
+      return [];
+    }
+  }
+
+  /**
+   * Create a new issue
+   */
+  async createIssue(issue: {
+    project_id: number;
+    tracker_id: number;
+    subject: string;
+    description?: string;
+    status_id?: number;
+    priority_id?: number;
+    start_date?: string;
+    due_date?: string;
+    estimated_hours?: number;
+    parent_issue_id?: number;
+    custom_fields?: { id: number; value: string }[];
+  }): Promise<{ issue: Issue }> {
+    return this.doRequest(
+      "/issues.json",
+      "POST",
+      Buffer.from(JSON.stringify({ issue }), "utf8")
     );
   }
 
@@ -472,7 +612,23 @@ export class RedmineServer {
   }
 
   /**
+   * Batch fetch issues by IDs (for parent containers)
+   * @param ids Array of issue IDs to fetch
+   */
+  async getIssuesByIds(ids: number[]): Promise<Issue[]> {
+    if (ids.length === 0) return [];
+
+    // Redmine supports comma-separated IDs filter
+    const response = await this.doRequest<{
+      issues: Issue[];
+    }>(`/issues.json?issue_id=${ids.join(",")}&status_id=*`, "GET");
+
+    return response?.issues || [];
+  }
+
+  /**
    * Returns promise, that resolves to list of issues assigned to api key owner
+   * Includes children and relations for hierarchy/dependency display
    */
   async getIssuesAssignedToMe(): Promise<{ issues: Issue[] }> {
     const req = async (
@@ -489,7 +645,7 @@ export class RedmineServer {
         issues: Issue[];
         total_count: number;
       }>(
-        `/issues.json?status_id=open&assigned_to_id=me&limit=${limit}&offset=${offset}`,
+        `/issues.json?status_id=open&assigned_to_id=me&include=children,relations&limit=${limit}&offset=${offset}`,
         "GET"
       );
 
@@ -523,8 +679,8 @@ export class RedmineServer {
       }
 
       const baseUrl = include_subproject
-        ? `/issues.json?status_id=open&project_id=${project_id}&subproject_id=!*`
-        : `/issues.json?status_id=open&project_id=${project_id}`;
+        ? `/issues.json?status_id=open&project_id=${project_id}`
+        : `/issues.json?status_id=open&project_id=${project_id}&subproject_id=!*`;
 
       const response = await this.doRequest<{
         issues: Issue[];

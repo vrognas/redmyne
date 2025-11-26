@@ -97,8 +97,9 @@ describe("RedmineServer Error Handling", () => {
         requestFn: createErrorMockRequest(422, "Unprocessable Entity"),
       });
 
+      // Now parses error body - mock returns {"errors": ["Server error"]}
       await expect(server.getProjects()).rejects.toThrow(
-        "Validation failed (422)"
+        "Validation failed: Server error"
       );
     });
   });

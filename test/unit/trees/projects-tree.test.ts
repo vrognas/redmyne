@@ -77,10 +77,50 @@ describe("ProjectsTree", () => {
         description: "A test project",
       });
 
-      const treeItem = tree.getTreeItem(project);
+      // ProjectsTree now wraps projects in ProjectNode
+      const projectNode = {
+        project,
+        assignedIssues: [],
+        hasAssignedIssues: false,
+      };
+
+      const treeItem = tree.getTreeItem(projectNode);
 
       expect(treeItem.label).toBe("Test Project");
       expect(treeItem.collapsibleState).toBe(1); // Collapsed
+    });
+
+    it("should show issue count for projects with assigned issues", () => {
+      const tree = new ProjectsTree();
+      const project = new RedmineProject({
+        id: 1,
+        name: "Test Project",
+        identifier: "test-proj",
+        description: "A test project",
+      });
+
+      const issue: Issue = {
+        id: 123,
+        subject: "Test Issue",
+        tracker: { id: 1, name: "Bug" },
+        status: { id: 1, name: "Open" },
+        author: { id: 1, name: "Author" },
+        project: { id: 1, name: "Test Project" },
+        priority: { id: 1, name: "Normal" },
+        description: "Test",
+        created_on: "2024-01-01",
+        updated_on: "2024-01-01",
+      };
+
+      const projectNode = {
+        project,
+        assignedIssues: [issue],
+        hasAssignedIssues: true,
+      };
+
+      const treeItem = tree.getTreeItem(projectNode);
+
+      expect(treeItem.description).toBe("(1 assigned)");
     });
   });
 });

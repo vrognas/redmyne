@@ -40,6 +40,7 @@ export default async ({ server, config }: ActionProperties) => {
     const project = await vscode.window.showQuickPick(
       projects.map((project) => project.toQuickPickItem()),
       {
+        title: "New Issue",
         placeHolder: "Choose project to create issue in",
       }
     );

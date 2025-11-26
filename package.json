@@ -2,7 +2,7 @@
   "name": "positron-redmine",
   "displayName": "Redmine for Positron",
   "description": "Redmine project management integration for Positron IDE and VS Code",
-  "version": "3.6.0",
+  "version": "3.9.0",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -102,6 +102,15 @@
         "command": "redmine.copyIssueUrl",
         "title": "Copy Issue URL",
         "icon": "$(copy)"
+      },
+      {
+        "command": "redmine.showGantt",
+        "title": "Redmine: Show Timeline",
+        "icon": "$(calendar)"
+      },
+      {
+        "command": "redmine.createTestIssues",
+        "title": "Redmine: Create Test Issues"
       }
     ],
     "keybindings": [
@@ -115,10 +124,6 @@
     "views": {
       "redmine-explorer": [
         {
-          "id": "redmine-explorer-my-issues",
-          "name": "Issues assigned to me"
-        },
-        {
           "id": "redmine-explorer-projects",
           "name": "Projects"
         },
@@ -129,11 +134,6 @@
       ]
     },
     "viewsWelcome": [
-      {
-        "view": "redmine-explorer-my-issues",
-        "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmine.configure)\nSet up your Redmine server URL and API key to get started.",
-        "when": "!redmine:configured"
-      },
       {
         "view": "redmine-explorer-projects",
         "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmine.configure)\nSet up your Redmine server URL and API key to get started.",
@@ -193,17 +193,8 @@
       "view/title": [
         {
           "command": "redmine.configure",
-          "when": "view == 'redmine-explorer-my-issues'",
-          "group": "navigation"
-        },
-        {
-          "command": "redmine.configure",
           "when": "view == 'redmine-explorer-projects'",
           "group": "navigation"
-        },
-        {
-          "command": "redmine.changeDefaultServer",
-          "when": "view == 'redmine-explorer-my-issues' && !hasSingleConfig"
         },
         {
           "command": "redmine.changeDefaultServer",
@@ -221,8 +212,13 @@
         },
         {
           "command": "redmine.refreshIssues",
-          "when": "view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues'",
+          "when": "view == 'redmine-explorer-projects'",
           "group": "navigation"
+        },
+        {
+          "command": "redmine.showGantt",
+          "when": "view == 'redmine-explorer-projects' && redmine:configured",
+          "group": "navigation@1"
         },
         {
           "command": "redmine.configure",
@@ -246,17 +242,17 @@
         },
         {
           "command": "redmine.openIssueInBrowser",
-          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
+          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^issue/",
           "group": "navigation@1"
         },
         {
           "command": "redmine.quickLogTime",
-          "when": "view == 'redmine-explorer-my-issues' && viewItem == 'issue-active'",
+          "when": "view == 'redmine-explorer-projects' && viewItem == 'issue-active'",
           "group": "redmine@1"
         },
         {
           "command": "redmine.copyIssueUrl",
-          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
+          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^issue/",
           "group": "9_cutcopypaste@1"
         }
       ]
@@ -366,7 +362,8 @@
     "test:coverage": "vitest run --coverage",
     "ci": "npm run lint && npm run typecheck && npm run test:coverage",
     "install-hooks": "bash scripts/install-hooks.sh",
-    "prepare": "bash scripts/install-hooks.sh"
+    "prepare": "bash scripts/install-hooks.sh",
+    "create-test-issues": "npx tsx scripts/create-test-issues.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

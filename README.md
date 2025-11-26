@@ -6,6 +6,14 @@ Redmine project management integration for Positron IDE and VS Code.
 
 ## Features
 
+- **Gantt Chart Timeline**
+  - Interactive SVG timeline with zoom levels (Day/Week/Month/Quarter/Year)
+  - Workload heatmap toggle - shades days by aggregate utilization (green/yellow/orange/red)
+  - Per-issue intensity visualization showing daily work distribution
+  - Drag handles to adjust start/due dates directly
+  - Dependency arrows for issue relations (blocks/precedes/follows)
+  - Zoom preserves center view position
+  - Undo/redo for date changes
 - **Quick Time Logging** (Ctrl+Y Ctrl+Y)
   - Fast time entry with recent issue cache
   - Flexible time formats: 2.5, 1:45, 1h 45min

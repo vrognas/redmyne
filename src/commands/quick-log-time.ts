@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
 import type { ActionProperties } from "./action-properties";
+import { parseTimeInput, validateTimeInput } from "../utilities/time-input";
+import { showStatusBarMessage } from "../utilities/status-bar";
 
 interface RecentTimeLog {
   issueId: number;
@@ -11,39 +13,6 @@ interface RecentTimeLog {
 
 function isRecent(date: Date): boolean {
   return Date.now() - new Date(date).getTime() < 24 * 60 * 60 * 1000; // 24h
-}
-
-function parseTimeInput(input: string): number | null {
-  const trimmed = input.trim();
-
-  // Format: "1.75" or "1,75" (decimal hours)
-  const decimalMatch = trimmed.match(/^(\d+(?:[.,]\d+)?)$/);
-  if (decimalMatch) {
-    return parseFloat(decimalMatch[1].replace(",", "."));
-  }
-
-  // Format: "1:45" (hours:minutes)
-  const colonMatch = trimmed.match(/^(\d+):(\d+)$/);
-  if (colonMatch) {
-    const hours = parseInt(colonMatch[1], 10);
-    const minutes = parseInt(colonMatch[2], 10);
-    if (minutes >= 60) return null; // Invalid minutes
-    return hours + minutes / 60;
-  }
-
-  // Format: "1h 45min" or "1 h 45 min" (with units and optional spaces)
-  const unitMatch = trimmed.match(
-    /^(?:(\d+)\s*h(?:our)?s?)?\s*(?:(\d+)\s*m(?:in(?:ute)?s?)?)?$/i
-  );
-  if (unitMatch) {
-    const hours = unitMatch[1] ? parseInt(unitMatch[1], 10) : 0;
-    const minutes = unitMatch[2] ? parseInt(unitMatch[2], 10) : 0;
-    if (hours === 0 && minutes === 0) return null; // No input
-    if (minutes >= 60) return null; // Invalid minutes
-    return hours + minutes / 60;
-  }
-
-  return null; // Invalid format
 }
 
 export async function quickLogTime(
@@ -78,7 +47,7 @@ export async function quickLogTime(
           },
           { label: "$(search) Pick different issue", value: "pick" },
         ],
-        { placeHolder: "Log time to..." }
+        { title: "Quick Log Time", placeHolder: "Log time to..." }
       );
 
       if (!choice) return; // User cancelled
@@ -112,17 +81,7 @@ export async function quickLogTime(
     const hoursInput = await vscode.window.showInputBox({
       prompt: `Log time to #${selection.issueId} (${selection.activityName})${todayTotal > 0 ? ` | Today: ${todayTotal.toFixed(1)}h logged` : ""}`,
       placeHolder: "e.g., 2.5, 1:45, 1h 45min",
-      validateInput: (value: string) => {
-        const hours = parseTimeInput(value);
-        if (hours === null || hours < 0.1 || hours > 24) {
-          return "Must be 0.1-24 hours (e.g. equivalent: 1.75, 1:45, or 1h 45min)";
-        }
-        // Check if adding this entry would exceed 24h for today
-        if (todayTotal + hours > 24) {
-          return `Would exceed 24h/day limit (already logged ${todayTotal.toFixed(1)}h today)`;
-        }
-        return null;
-      },
+      validateInput: (value: string) => validateTimeInput(value, todayTotal),
     });
 
     if (!hoursInput) return; // User cancelled
@@ -156,15 +115,9 @@ export async function quickLogTime(
     });
 
     // 8. Confirm with status bar flash (NOT notification)
-    const statusBar = vscode.window.createStatusBarItem(
-      vscode.StatusBarAlignment.Left
+    showStatusBarMessage(
+      `$(check) Logged ${hours.toFixed(2).replace(/\.?0+$/, "")}h to #${selection.issueId}`
     );
-    statusBar.text = `$(check) Logged ${hours.toFixed(2).replace(/\.?0+$/, "")}h to #${selection.issueId}`;
-    statusBar.show();
-    setTimeout(() => {
-      statusBar.hide();
-      statusBar.dispose();
-    }, 3000);
   } catch (error) {
     vscode.window.showErrorMessage(
       `Failed to log time: ${error instanceof Error ? error.message : String(error)}`

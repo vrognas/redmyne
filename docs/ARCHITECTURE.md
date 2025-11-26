@@ -6,7 +6,7 @@ Positron-Redmine is a VS Code/Positron IDE extension that integrates Redmine pro
 
 **Core Pattern**: MVC-like with Tree Providers (View), Controllers (Business Logic), and RedmineServer (Model/API).
 
-**Version**: 3.6.0 | **Min VS Code**: 1.106.0 | **Node**: >=20.0.0
+**Version**: 3.7.0 | **Min VS Code**: 1.106.0 | **Node**: >=20.0.0
 
 ## Directory Structure
 
@@ -35,6 +35,8 @@ positron-redmine/
 │   │   ├── my-issues-tree.ts
 │   │   ├── my-time-entries-tree.ts
 │   │   └── projects-tree.ts
+│   ├── webviews/              # Webview panels
+│   │   └── gantt-panel.ts     # SVG timeline
 │   ├── definitions/           # Configuration schemas
 │   │   └── redmine-config.ts
 │   └── utilities/             # Helpers
@@ -43,6 +45,7 @@ positron-redmine/
 │       ├── flexibility-calculator.ts
 │       ├── redaction.ts
 │       ├── secret-manager.ts
+│       ├── time-input.ts      # Time parsing utilities
 │       ├── tree-item-factory.ts
 │       └── workload-calculator.ts
 ├── test/
@@ -140,11 +143,19 @@ doRequest(path, method, data?)
 
 All tree providers implement `vscode.TreeDataProvider<T>`.
 
-#### MyIssuesTree (`my-issues-tree.ts`)
+#### ProjectsTree (`projects-tree.ts`)
 
-**Displays**: Issues assigned to current user with flexibility scores.
+**Displays**: All projects with assigned issues grouped by project.
 
-**Features**: Concurrent fetch deduplication, flexibility caching, risk-based sorting (overbooked → at-risk → on-track → completed).
+**Features**:
+- Parallel fetch of projects AND assigned issues
+- Issues grouped by project with flexibility scores
+- Projects with assigned issues shown first (with count)
+- Projects without assigned issues dimmed/deemphasized
+- Risk-based issue sorting within projects (overbooked → at-risk → on-track → completed)
+- Flexibility caching for status bar and Gantt integration
+
+**View Modes**: LIST (flat) or TREE (hierarchical with parent/child).
 
 **TreeItem Icons**: ThemeIcon with color coding (red: overbooked, yellow: at-risk, green: on-track/completed).
 
@@ -154,11 +165,9 @@ All tree providers implement `vscode.TreeDataProvider<T>`.
 
 **Features**: Non-blocking async loading (<10ms initial render), parallel API requests, issue caching with batch fetching.
 
-#### ProjectsTree (`projects-tree.ts`)
+#### MyIssuesTree (`my-issues-tree.ts`) [Legacy]
 
-**Displays**: All projects with optional hierarchy.
-
-**View Modes**: LIST (flat) or TREE (hierarchical with parent/child).
+**Note**: This tree is deprecated as of v3.8.0. Its functionality has been consolidated into ProjectsTree.
 
 ### 4. Commands (`src/commands/`)
 

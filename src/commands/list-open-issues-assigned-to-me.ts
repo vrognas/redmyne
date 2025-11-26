@@ -43,7 +43,11 @@ export default async ({ server }: ActionProperties) => {
     const issues = await promise;
 
     const issue = await vscode.window.showQuickPick(
-      issues.issues.map(mapIssueToPickItem)
+      issues.issues.map(mapIssueToPickItem),
+      {
+        title: "My Issues",
+        placeHolder: "Select an issue",
+      }
     );
 
     if (issue === undefined) return;

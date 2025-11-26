@@ -1,5 +1,36 @@
 import { NamedEntity } from "./named-entity";
 
+/**
+ * Redmine issue relation (from include=relations)
+ * Relations are DIRECTIONAL - blocked != blocks
+ */
+export interface IssueRelation {
+  id: number;
+  issue_id: number;
+  issue_to_id: number;
+  relation_type:
+    | "relates"
+    | "duplicates"
+    | "duplicated"
+    | "blocks"
+    | "blocked"
+    | "precedes"
+    | "follows"
+    | "copied_to"
+    | "copied_from";
+  delay?: number; // days, for precedes/follows
+}
+
+/**
+ * Child issue summary (from include=children)
+ * Contains subset of Issue fields
+ */
+export interface ChildIssue {
+  id: number;
+  subject: string;
+  tracker?: NamedEntity;
+}
+
 export interface Issue {
   id: number;
   project: NamedEntity;
@@ -22,4 +53,11 @@ export interface Issue {
   created_on: string;
   updated_on: string;
   closed_on: string | null;
+
+  /** Parent issue reference (from API - only id) */
+  parent?: { id: number };
+  /** Child issues (from include=children) */
+  children?: ChildIssue[];
+  /** Issue relations (from include=relations) */
+  relations?: IssueRelation[];
 }

@@ -202,15 +202,46 @@ describe("RedmineServer", () => {
     expect(statuses[0].name).toBe("New");
   });
 
-  it("should fetch open issues for project", async () => {
-    const result = await server.getOpenIssuesForProject(1, true);
-    expect(result.issues).toHaveLength(1);
-    expect(result.issues[0].id).toBe(123);
-  });
+  describe("getOpenIssuesForProject", () => {
+    it("should include subprojects by default (no subproject_id filter)", async () => {
+      const capturedPaths: string[] = [];
+      const baseMock = createMockRequest();
+      const mockRequest = vi.fn((options: { path?: string }, callback: unknown) => {
+        capturedPaths.push(options.path || "");
+        return baseMock(options, callback as Parameters<typeof baseMock>[1]);
+      }) as unknown as typeof http.request;
 
-  it("should fetch open issues for project without subprojects", async () => {
-    const result = await server.getOpenIssuesForProject(1, false);
-    expect(result.issues).toHaveLength(1);
+      const serverWithCapture = new RedmineServer({
+        address: "https://localhost:3000",
+        key: "test-api-key",
+        requestFn: mockRequest,
+      });
+
+      await serverWithCapture.getOpenIssuesForProject(1, true);
+
+      // When include_subproject=true, should NOT have subproject_id filter
+      expect(capturedPaths.some(p => p.includes("subproject_id=!*"))).toBe(false);
+    });
+
+    it("should exclude subprojects when include_subproject=false", async () => {
+      const capturedPaths: string[] = [];
+      const baseMock = createMockRequest();
+      const mockRequest = vi.fn((options: { path?: string }, callback: unknown) => {
+        capturedPaths.push(options.path || "");
+        return baseMock(options, callback as Parameters<typeof baseMock>[1]);
+      }) as unknown as typeof http.request;
+
+      const serverWithCapture = new RedmineServer({
+        address: "https://localhost:3000",
+        key: "test-api-key",
+        requestFn: mockRequest,
+      });
+
+      await serverWithCapture.getOpenIssuesForProject(1, false);
+
+      // When include_subproject=false, should have subproject_id=!* filter
+      expect(capturedPaths.some(p => p.includes("subproject_id=!*"))).toBe(true);
+    });
   });
 
   it("should compare servers correctly", () => {

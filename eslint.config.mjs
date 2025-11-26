@@ -8,9 +8,9 @@ export default [
     files: ["**/*.ts", "**/*.tsx"],
   },
 
-  // Ignore build output and dependencies
+  // Ignore build output, dependencies, and scripts
   {
-    ignores: ["out/", "dist/", "node_modules/", "*.js", "*.cjs", "*.mjs"],
+    ignores: ["out/", "dist/", "node_modules/", "*.js", "*.cjs", "*.mjs", "scripts/"],
   },
 
   // ESLint recommended rules

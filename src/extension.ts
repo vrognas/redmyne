@@ -12,13 +12,14 @@ import newIssue from "./commands/new-issue";
 import { quickLogTime } from "./commands/quick-log-time";
 import { RedmineConfig } from "./definitions/redmine-config";
 import { ActionProperties } from "./commands/action-properties";
-import { MyIssuesTree } from "./trees/my-issues-tree";
 import { ProjectsTree, ProjectsViewStyle } from "./trees/projects-tree";
 import { MyTimeEntriesTreeDataProvider } from "./trees/my-time-entries-tree";
 import { RedmineSecretManager } from "./utilities/secret-manager";
 import { setApiKey } from "./commands/set-api-key";
 import { calculateWorkload } from "./utilities/workload-calculator";
 import { WeeklySchedule } from "./utilities/flexibility-calculator";
+import { GanttPanel } from "./webviews/gantt-panel";
+import { disposeStatusBar } from "./utilities/status-bar";
 
 // Constants
 const CONFIG_DEBOUNCE_MS = 300;
@@ -26,13 +27,12 @@ const SERVER_CACHE_SIZE = 3;
 
 // Module-level cleanup resources
 let cleanupResources: {
-  myIssuesTree?: MyIssuesTree;
   projectsTree?: ProjectsTree;
   myTimeEntriesTree?: MyTimeEntriesTreeDataProvider;
-  myIssuesTreeView?: vscode.TreeView<unknown>;
   projectsTreeView?: vscode.TreeView<unknown>;
   myTimeEntriesTreeView?: vscode.TreeView<unknown>;
   workloadStatusBar?: vscode.StatusBarItem;
+  configChangeTimeout?: ReturnType<typeof setTimeout>;
   bucket?: {
     servers: RedmineServer[];
     projects: RedmineProject[];
@@ -67,16 +67,11 @@ export function activate(context: vscode.ExtensionContext): void {
     return new RedmineServer(options);
   };
 
-  const myIssuesTree = new MyIssuesTree();
   const projectsTree = new ProjectsTree();
   const myTimeEntriesTree = new MyTimeEntriesTreeDataProvider();
-  cleanupResources.myIssuesTree = myIssuesTree;
   cleanupResources.projectsTree = projectsTree;
   cleanupResources.myTimeEntriesTree = myTimeEntriesTree;
 
-  cleanupResources.myIssuesTreeView = vscode.window.createTreeView("redmine-explorer-my-issues", {
-    treeDataProvider: myIssuesTree,
-  });
   cleanupResources.projectsTreeView = vscode.window.createTreeView("redmine-explorer-projects", {
     treeDataProvider: projectsTree,
   });
@@ -115,7 +110,7 @@ export function activate(context: vscode.ExtensionContext): void {
     if (!statusBar) return;
 
     // Fetch issues if not cached (triggers initial load)
-    const issues = await myIssuesTree.fetchIssuesIfNeeded();
+    const issues = await projectsTree.fetchIssuesIfNeeded();
 
     // Re-check after await - status bar might have been disposed
     if (!cleanupResources.workloadStatusBar) return;
@@ -160,7 +155,7 @@ export function activate(context: vscode.ExtensionContext): void {
   updateWorkloadStatusBar();
 
   // Update on tree refresh
-  myIssuesTree.onDidChangeTreeData$.event(() => {
+  projectsTree.onDidChangeTreeData$.event(() => {
     if (cleanupResources.workloadStatusBar) {
       updateWorkloadStatusBar();
     }
@@ -207,13 +202,11 @@ export function activate(context: vscode.ExtensionContext): void {
           additionalHeaders: config.get("additionalHeaders"),
         });
 
-        myIssuesTree.setServer(server);
         projectsTree.setServer(server);
         myTimeEntriesTree.setServer(server);
         projectsTree.onDidChangeTreeData$.fire();
-        myIssuesTree.onDidChangeTreeData$.fire();
         myTimeEntriesTree.refresh();
-        // Status bar updates via myIssuesTree event listener
+        // Status bar updates via projectsTree event listener
       } catch (error) {
         vscode.window.showErrorMessage(
           `Failed to initialize Redmine server: ${error}`
@@ -221,7 +214,6 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     } else {
       // Clear servers when not configured (don't refresh - let welcome view show)
-      myIssuesTree.setServer(undefined);
       projectsTree.setServer(undefined);
       myTimeEntriesTree.setServer(undefined);
     }
@@ -230,20 +222,17 @@ export function activate(context: vscode.ExtensionContext): void {
   // Initial check
   updateConfiguredContext();
 
-  // Debounce config changes to avoid rapid-fire updates
-  let configChangeTimeout: ReturnType<typeof setTimeout> | null = null;
-
   // Listen for configuration changes
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration("redmine")) return;
 
       // Clear pending timeout
-      if (configChangeTimeout) {
-        clearTimeout(configChangeTimeout);
+      if (cleanupResources.configChangeTimeout) {
+        clearTimeout(cleanupResources.configChangeTimeout);
       }
 
-      configChangeTimeout = setTimeout(async () => {
+      cleanupResources.configChangeTimeout = setTimeout(async () => {
         // Only update server context for server-related config changes
         // Skip for UI-only configs (statusBar, workingHours)
         if (
@@ -305,6 +294,7 @@ export function activate(context: vscode.ExtensionContext): void {
             { label: "$(settings-gear) Reconfigure Both", value: "both" },
           ],
           {
+            title: "Redmine Configuration",
             placeHolder: "What would you like to update?",
           }
         );
@@ -331,6 +321,7 @@ export function activate(context: vscode.ExtensionContext): void {
             { label: "$(link) Change URL", value: "change" },
           ],
           {
+            title: "Redmine Configuration",
             placeHolder:
               "Your Redmine URL is configured. Do you want to change it?",
           }
@@ -399,7 +390,7 @@ export function activate(context: vscode.ExtensionContext): void {
       await updateConfiguredContext();
 
       vscode.window.showInformationMessage(
-        "Redmine configured successfully! 🎉"
+        "Redmine configured successfully!"
       );
     })
   );
@@ -620,12 +611,10 @@ export function activate(context: vscode.ExtensionContext): void {
   registerCommand("newIssue", newIssue);
   registerCommand("quickLogTime", (props) => quickLogTime(props, context));
   registerCommand("changeDefaultServer", (conf) => {
-    myIssuesTree.setServer(conf.server);
     projectsTree.setServer(conf.server);
     myTimeEntriesTree.setServer(conf.server);
 
     projectsTree.onDidChangeTreeData$.fire();
-    myIssuesTree.onDidChangeTreeData$.fire();
     myTimeEntriesTree.refresh();
   });
 
@@ -699,7 +688,6 @@ export function activate(context: vscode.ExtensionContext): void {
       refreshTimeout = setTimeout(() => {
         projectsTree.clearProjects();
         projectsTree.onDidChangeTreeData$.fire();
-        myIssuesTree.onDidChangeTreeData$.fire();
       }, CONFIG_DEBOUNCE_MS);
     }),
     vscode.commands.registerCommand("redmine.toggleTreeView", () => {
@@ -738,23 +726,282 @@ export function activate(context: vscode.ExtensionContext): void {
       );
       // Refresh trees to use new server instances
       await updateConfiguredContext();
+    }),
+
+    // Create test issues command
+    vscode.commands.registerCommand("redmine.createTestIssues", async () => {
+      const server = projectsTree.server;
+      if (!server) {
+        vscode.window.showErrorMessage("Redmine not configured. Run 'Redmine: Configure' first.");
+        return;
+      }
+
+      // Confirm with user
+      const confirm = await vscode.window.showWarningMessage(
+        "Create test issues for integration testing?",
+        { modal: true, detail: "This will create 10 test issues in the Operations project." },
+        "Create Issues",
+        "Cancel"
+      );
+      if (confirm !== "Create Issues") return;
+
+      await vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: "Creating test issues",
+        cancellable: false
+      }, async (progress) => {
+        try {
+          // Fetch required data
+          progress.report({ message: "Fetching metadata..." });
+          const [projects, trackers, statuses, priorities] = await Promise.all([
+            server.getProjects(),
+            server.getTrackers(),
+            server.getIssueStatuses(),
+            server.getPriorities()
+          ]);
+
+          // Find Operations project
+          const operationsProject = projects.find(p => {
+            const pick = p.toQuickPickItem();
+            return pick.label === "Operations" || pick.identifier === "operations";
+          });
+          if (!operationsProject) {
+            vscode.window.showErrorMessage(
+              `Operations project not found. Available: ${projects.map(p => p.toQuickPickItem().label).join(", ")}`
+            );
+            return;
+          }
+
+          // Find required IDs
+          const taskTracker = trackers.find(t => t.name.toLowerCase().includes("task"));
+          const inProgressStatus = statuses.issue_statuses.find(s => s.name.toLowerCase().includes("progress"));
+          const newStatus = statuses.issue_statuses.find(s =>
+            s.name.toLowerCase() === "new" || s.name.toLowerCase().includes("not yet")
+          );
+          const normalPriority = priorities.find(p => p.name.toLowerCase() === "normal");
+          const highPriority = priorities.find(p => p.name.toLowerCase() === "high");
+          const urgentPriority = priorities.find(p => p.name.toLowerCase() === "urgent");
+          const lowPriority = priorities.find(p => p.name.toLowerCase() === "low");
+
+          if (!taskTracker) {
+            vscode.window.showErrorMessage("Task tracker not found");
+            return;
+          }
+
+          // Date helpers
+          const today = () => new Date().toISOString().split("T")[0];
+          const addDays = (date: string, days: number) => {
+            const d = new Date(date);
+            d.setDate(d.getDate() + days);
+            return d.toISOString().split("T")[0];
+          };
+          const nextFriday = () => {
+            const d = new Date();
+            const day = d.getDay();
+            const daysUntilFriday = (5 - day + 7) % 7 || 7;
+            d.setDate(d.getDate() + daysUntilFriday);
+            return d.toISOString().split("T")[0];
+          };
+
+          const TEST_PREFIX = "[TEST]";
+          const todayStr = today();
+
+          // Define test issues
+          const testIssues = [
+            {
+              subject: `${TEST_PREFIX} High intensity task`,
+              start_date: todayStr,
+              due_date: addDays(todayStr, 2),
+              estimated_hours: 24,
+              status_id: inProgressStatus?.id,
+              priority_id: highPriority?.id,
+              description: "Test issue: 24h over 3 days = 100% intensity (8h/day)",
+            },
+            {
+              subject: `${TEST_PREFIX} Low intensity task`,
+              start_date: todayStr,
+              due_date: addDays(todayStr, 9),
+              estimated_hours: 8,
+              status_id: newStatus?.id,
+              priority_id: normalPriority?.id,
+              description: "Test issue: 8h over 10 days = ~10% intensity",
+            },
+            {
+              subject: `${TEST_PREFIX} Overbooked urgent`,
+              start_date: todayStr,
+              due_date: addDays(todayStr, 1),
+              estimated_hours: 24,
+              status_id: inProgressStatus?.id,
+              priority_id: urgentPriority?.id,
+              description: "Test issue: 24h over 2 days = 150% intensity (overbooked)",
+            },
+            {
+              subject: `${TEST_PREFIX} No estimate task`,
+              start_date: todayStr,
+              due_date: addDays(todayStr, 5),
+              estimated_hours: undefined,
+              status_id: newStatus?.id,
+              priority_id: lowPriority?.id,
+              description: "Test issue: No estimated hours - should show 0 intensity",
+            },
+            {
+              subject: `${TEST_PREFIX} Weekend spanning`,
+              start_date: nextFriday(),
+              due_date: addDays(nextFriday(), 4),
+              estimated_hours: 16,
+              status_id: inProgressStatus?.id,
+              priority_id: normalPriority?.id,
+              description: "Test issue: Spans weekend - tests weeklySchedule (0h Sat/Sun)",
+            },
+            {
+              subject: `${TEST_PREFIX} Parent task`,
+              start_date: todayStr,
+              due_date: addDays(todayStr, 14),
+              estimated_hours: 40,
+              status_id: newStatus?.id,
+              priority_id: highPriority?.id,
+              description: "Test issue: Parent task with children",
+              isParent: true,
+            },
+            {
+              subject: `${TEST_PREFIX} Child task A`,
+              start_date: todayStr,
+              due_date: addDays(todayStr, 6),
+              estimated_hours: 16,
+              status_id: inProgressStatus?.id,
+              priority_id: normalPriority?.id,
+              description: "Test issue: Child of parent task",
+              parentSubject: `${TEST_PREFIX} Parent task`,
+            },
+            {
+              subject: `${TEST_PREFIX} Child task B`,
+              start_date: addDays(todayStr, 7),
+              due_date: addDays(todayStr, 14),
+              estimated_hours: 24,
+              status_id: newStatus?.id,
+              priority_id: normalPriority?.id,
+              description: "Test issue: Child of parent task",
+              parentSubject: `${TEST_PREFIX} Parent task`,
+            },
+            {
+              subject: `${TEST_PREFIX} Blocking task`,
+              start_date: todayStr,
+              due_date: addDays(todayStr, 3),
+              estimated_hours: 8,
+              status_id: inProgressStatus?.id,
+              priority_id: highPriority?.id,
+              description: "Test issue: Blocks another task",
+              blocksSubject: `${TEST_PREFIX} Blocked task`,
+            },
+            {
+              subject: `${TEST_PREFIX} Blocked task`,
+              start_date: addDays(todayStr, 4),
+              due_date: addDays(todayStr, 7),
+              estimated_hours: 16,
+              status_id: newStatus?.id,
+              priority_id: normalPriority?.id,
+              description: "Test issue: Blocked by another task",
+            },
+          ];
+
+          // Create issues
+          const createdIssues = new Map<string, number>();
+          let created = 0;
+          let failed = 0;
+
+          for (let i = 0; i < testIssues.length; i++) {
+            const issue = testIssues[i];
+            progress.report({
+              message: `Creating ${i + 1}/${testIssues.length}: ${issue.subject}`,
+              increment: 100 / testIssues.length
+            });
+
+            // Find parent ID if needed
+            let parent_issue_id: number | undefined;
+            if ("parentSubject" in issue && issue.parentSubject) {
+              parent_issue_id = createdIssues.get(issue.parentSubject);
+            }
+
+            try {
+              const result = await server.createIssue({
+                project_id: operationsProject.id,
+                tracker_id: taskTracker.id,
+                subject: issue.subject,
+                description: issue.description,
+                status_id: issue.status_id,
+                priority_id: issue.priority_id,
+                start_date: issue.start_date,
+                due_date: issue.due_date,
+                estimated_hours: issue.estimated_hours,
+                parent_issue_id,
+              });
+              createdIssues.set(issue.subject, result.issue.id);
+              created++;
+            } catch (_e) {
+              failed++;
+            }
+          }
+
+          // Create blocking relation
+          const blockingId = createdIssues.get(`${TEST_PREFIX} Blocking task`);
+          const blockedId = createdIssues.get(`${TEST_PREFIX} Blocked task`);
+          if (blockingId && blockedId) {
+            try {
+              await server.createRelation(blockingId, blockedId, "blocks");
+            } catch {
+              // Relation creation failed - non-critical, continue
+            }
+          }
+
+          // Refresh issues
+          projectsTree.clearProjects();
+          projectsTree.onDidChangeTreeData$.fire();
+
+          vscode.window.showInformationMessage(
+            `Created ${created} test issues${failed > 0 ? `, ${failed} failed` : ""}`
+          );
+        } catch (e) {
+          vscode.window.showErrorMessage(`Failed to create test issues: ${e}`);
+        }
+      });
+    }),
+
+    // Gantt timeline command
+    vscode.commands.registerCommand("redmine.showGantt", async () => {
+      // Ensure issues are fetched
+      const issues = await projectsTree.fetchIssuesIfNeeded();
+
+      if (issues.length === 0) {
+        vscode.window.showInformationMessage(
+          "No issues to display. Configure Redmine and assign issues to yourself."
+        );
+        return;
+      }
+
+      // Get working hours schedule for intensity calculation
+      const scheduleConfig = vscode.workspace.getConfiguration("redmine.workingHours");
+      const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", {
+        Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0, Sun: 0,
+      });
+
+      const panel = GanttPanel.createOrShow(projectsTree.server);
+      panel.updateIssues(issues, projectsTree.getFlexibilityCache(), schedule);
     })
   );
 }
 
 export function deactivate(): void {
-  // Dispose EventEmitters in tree providers
-  if (cleanupResources.myIssuesTree) {
-    cleanupResources.myIssuesTree.onDidChangeTreeData$.dispose();
+  // Clear pending config change timeout
+  if (cleanupResources.configChangeTimeout) {
+    clearTimeout(cleanupResources.configChangeTimeout);
   }
+
+  // Dispose EventEmitters in tree providers
   if (cleanupResources.projectsTree) {
     cleanupResources.projectsTree.onDidChangeTreeData$.dispose();
   }
 
   // Dispose tree view instances
-  if (cleanupResources.myIssuesTreeView) {
-    cleanupResources.myIssuesTreeView.dispose();
-  }
   if (cleanupResources.projectsTreeView) {
     cleanupResources.projectsTreeView.dispose();
   }
@@ -763,6 +1010,9 @@ export function deactivate(): void {
   if (cleanupResources.workloadStatusBar) {
     cleanupResources.workloadStatusBar.dispose();
   }
+
+  // Dispose shared status bar utility
+  disposeStatusBar();
 
   // Dispose and clear bucket servers
   if (cleanupResources.bucket) {
