@@ -348,21 +348,22 @@ export class RedmineServer {
     issueId: number,
     activityId: number,
     hours: string,
-    message: string
+    message: string,
+    spentOn?: string // YYYY-MM-DD format, defaults to today
   ): Promise<unknown> {
+    const entry: Record<string, unknown> = {
+      issue_id: issueId,
+      activity_id: activityId,
+      hours,
+      comments: message,
+    };
+    if (spentOn) {
+      entry.spent_on = spentOn;
+    }
     return this.doRequest<{ time_entry: TimeEntry }>(
       `/time_entries.json`,
       "POST",
-      Buffer.from(
-        JSON.stringify({
-          time_entry: <TimeEntry>{
-            issue_id: issueId,
-            activity_id: activityId,
-            hours,
-            comments: message,
-          },
-        })
-      )
+      Buffer.from(JSON.stringify({ time_entry: entry }))
     );
   }
 
@@ -439,11 +440,18 @@ export class RedmineServer {
 
   /**
    * Create a relation between two issues
+   * @param relationType One of: relates, duplicates, blocks, precedes, follows, copied_to
    */
   createRelation(
     issueId: number,
     targetIssueId: number,
-    relationType: "blocks" | "precedes" | "relates"
+    relationType:
+      | "relates"
+      | "duplicates"
+      | "blocks"
+      | "precedes"
+      | "follows"
+      | "copied_to"
   ): Promise<unknown> {
     return this.doRequest(
       `/issues/${issueId}/relations.json`,

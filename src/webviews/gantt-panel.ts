@@ -15,7 +15,7 @@ const ZOOM_PIXELS_PER_DAY: Record<ZoomLevel, number> = {
 interface GanttRelation {
   id: number;
   targetId: number;
-  type: "blocks" | "precedes";
+  type: "blocks" | "precedes" | "follows";
 }
 
 interface GanttIssue {
@@ -277,11 +277,11 @@ export class GanttPanel {
         estimated_hours: i.estimated_hours ?? null,
         spent_hours: i.spent_hours ?? null,
         relations: (i.relations || [])
-          .filter((r) => r.relation_type === "blocks" || r.relation_type === "precedes")
+          .filter((r) => r.relation_type === "blocks" || r.relation_type === "precedes" || r.relation_type === "follows")
           .map((r) => ({
             id: r.id,
             targetId: r.issue_to_id,
-            type: r.relation_type as "blocks" | "precedes",
+            type: r.relation_type as "blocks" | "precedes" | "follows",
           })),
       }));
 
@@ -300,7 +300,7 @@ export class GanttPanel {
     zoomLevel?: ZoomLevel;
     relationId?: number;
     targetIssueId?: number;
-    relationType?: "blocks" | "precedes";
+    relationType?: "blocks" | "precedes" | "follows";
   }): void {
     switch (message.command) {
       case "openIssue":
@@ -405,9 +405,15 @@ export class GanttPanel {
   private async _createRelation(
     issueId: number,
     targetIssueId: number,
-    relationType: "blocks" | "precedes"
+    relationType: "blocks" | "precedes" | "follows"
   ): Promise<void> {
     if (!this._server) return;
+
+    const labels: Record<string, string> = {
+      blocks: "Blocks",
+      precedes: "Precedes",
+      follows: "Follows",
+    };
 
     try {
       await this._server.createRelation(issueId, targetIssueId, relationType);
@@ -416,7 +422,7 @@ export class GanttPanel {
       const statusBar = vscode.window.createStatusBarItem(
         vscode.StatusBarAlignment.Right
       );
-      statusBar.text = `$(check) ${relationType === "blocks" ? "Blocks" : "Precedes"} relation created`;
+      statusBar.text = `$(check) ${labels[relationType]} relation created`;
       statusBar.show();
       setTimeout(() => {
         statusBar.hide();
@@ -625,8 +631,13 @@ export class GanttPanel {
               ? `M ${x2} ${y2} l -${arrowSize} -${arrowSize / 2} v ${arrowSize} Z`
               : `M ${x2} ${y2} l ${arrowSize} -${arrowSize / 2} v ${arrowSize} Z`;
 
-          const color = rel.type === "blocks" ? "var(--vscode-charts-orange)" : "var(--vscode-charts-purple)";
-          const typeLabel = rel.type === "blocks" ? "blocks" : "precedes";
+          const colorMap: Record<string, string> = {
+            blocks: "var(--vscode-charts-orange)",
+            precedes: "var(--vscode-charts-purple)",
+            follows: "var(--vscode-charts-blue)",
+          };
+          const color = colorMap[rel.type] || "var(--vscode-charts-foreground)";
+          const typeLabel = rel.type;
 
           return `
             <g class="dependency-arrow" data-relation-id="${rel.id}" data-from="${issue.id}" data-to="${rel.targetId}" style="cursor: pointer;">
@@ -964,9 +975,10 @@ export class GanttPanel {
           document.body.style.cursor = 'crosshair';
         } else if (linkingState.fromId !== issueId) {
           // Complete link to different issue
-          const relationType = prompt('Relation type: (b)locks or (p)recedes?', 'b');
+          const relationType = prompt('Relation type: (b)locks, (p)recedes, or (f)ollows?', 'b');
           if (relationType) {
-            const type = relationType.toLowerCase().startsWith('p') ? 'precedes' : 'blocks';
+            const input = relationType.toLowerCase();
+            const type = input.startsWith('p') ? 'precedes' : input.startsWith('f') ? 'follows' : 'blocks';
             vscode.postMessage({
               command: 'createRelation',
               issueId: linkingState.fromId,
