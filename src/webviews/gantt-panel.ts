@@ -137,10 +137,10 @@ function formatDateWithWeekday(dateStr: string | null): string {
 }
 
 /**
- * Get ISO week number for a date
+ * Get ISO week number for a date (uses UTC to avoid timezone issues)
  */
 function getWeekNumber(date: Date): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   const dayNum = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
@@ -190,7 +190,7 @@ function calculateDailyIntensity(
   const current = new Date(start);
   while (current <= end) {
     totalAvailable += schedule[getDayKey(current)];
-    current.setDate(current.getDate() + 1);
+    current.setUTCDate(current.getUTCDate() + 1);
   }
 
   if (totalAvailable === 0 || estimatedHours === 0) {
@@ -213,7 +213,7 @@ function calculateDailyIntensity(
     // For uniform distribution: allocated = dayHours * (estimated / totalAvailable)
     const intensity = dayHours > 0 ? hoursPerAvailableHour : 0;
     result.push({ dayOffset, intensity: Math.min(intensity, 1.5) }); // Cap at 1.5 for display
-    current.setDate(current.getDate() + 1);
+    current.setUTCDate(current.getUTCDate() + 1);
     dayOffset++;
   }
 
@@ -236,7 +236,7 @@ function calculateAggregateWorkload(
   const current = new Date(minDate);
   while (current <= maxDate) {
     workloadMap.set(current.toISOString().slice(0, 10), 0);
-    current.setDate(current.getDate() + 1);
+    current.setUTCDate(current.getUTCDate() + 1);
   }
 
   // For each issue, distribute its estimated hours across its date range
@@ -254,7 +254,7 @@ function calculateAggregateWorkload(
     const temp = new Date(start);
     while (temp <= end) {
       totalAvailable += schedule[getDayKey(temp)];
-      temp.setDate(temp.getDate() + 1);
+      temp.setUTCDate(temp.getUTCDate() + 1);
     }
 
     if (totalAvailable === 0) continue;
@@ -272,7 +272,7 @@ function calculateAggregateWorkload(
         const current = workloadMap.get(dateKey) ?? 0;
         workloadMap.set(dateKey, current + intensity);
       }
-      temp.setDate(temp.getDate() + 1);
+      temp.setUTCDate(temp.getUTCDate() + 1);
     }
   }
 
@@ -605,9 +605,9 @@ export class GanttPanel {
       Math.max(...dates.map((d) => new Date(d).getTime()))
     );
 
-    // Add padding days
-    minDate.setDate(minDate.getDate() - 7);
-    maxDate.setDate(maxDate.getDate() + 7);
+    // Add padding days (use UTC to avoid timezone issues)
+    minDate.setUTCDate(minDate.getUTCDate() - 7);
+    maxDate.setUTCDate(maxDate.getUTCDate() + 7);
 
     const totalDays = Math.ceil(
       (maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)
@@ -684,7 +684,7 @@ export class GanttPanel {
 
         // Add 1 day to end to get END of due_date (not start/midnight)
         const endPlusOne = new Date(end);
-        endPlusOne.setDate(endPlusOne.getDate() + 1);
+        endPlusOne.setUTCDate(endPlusOne.getUTCDate() + 1);
 
         const startX =
           ((start.getTime() - minDate.getTime()) /
@@ -812,7 +812,7 @@ export class GanttPanel {
           : new Date(issue.start_date!);
         // Add 1 day to end to match bar width calculation
         const endPlusOne = new Date(end);
-        endPlusOne.setDate(endPlusOne.getDate() + 1);
+        endPlusOne.setUTCDate(endPlusOne.getUTCDate() + 1);
         const startX =
           ((start.getTime() - minDate.getTime()) /
             (maxDate.getTime() - minDate.getTime())) *
@@ -1679,11 +1679,11 @@ export class GanttPanel {
       if ((zoomLevel === "day" || zoomLevel === "week" || zoomLevel === "month") && dayOfWeek === 1) {
         const weekNum = getWeekNumber(current);
         const weekEnd = new Date(current);
-        weekEnd.setDate(weekEnd.getDate() + 6);
+        weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
         const startDay = dayOfMonth;
-        const startMonth = current.toLocaleString("en", { month: "short" });
-        const endDay = weekEnd.getDate();
-        const endMonth = weekEnd.toLocaleString("en", { month: "short" });
+        const startMonth = current.toLocaleString("en", { month: "short", timeZone: "UTC" });
+        const endDay = weekEnd.getUTCDate();
+        const endMonth = weekEnd.toLocaleString("en", { month: "short", timeZone: "UTC" });
         const dateRange = startMonth === endMonth
           ? `${startDay}-${endDay} ${endMonth}`
           : `${startDay} ${startMonth} - ${endDay} ${endMonth}`;
@@ -1737,7 +1737,7 @@ export class GanttPanel {
         `);
       }
 
-      current.setDate(current.getDate() + 1);
+      current.setUTCDate(current.getUTCDate() + 1);
     }
 
     return {
