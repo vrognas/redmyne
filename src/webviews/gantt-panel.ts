@@ -797,6 +797,10 @@ export class GanttPanel {
                   fill="transparent" style="cursor: ew-resize;"/>
             <rect class="drag-handle drag-right" x="${startX + width - handleWidth}" y="${y}" width="${handleWidth}" height="${barHeight}"
                   fill="transparent" style="cursor: ew-resize;"/>
+            <!-- Link handle for creating relations -->
+            <circle class="link-handle" cx="${endX + 8}" cy="${y + barHeight / 2}" r="5"
+                    fill="var(--vscode-button-background)" stroke="var(--vscode-button-foreground)"
+                    stroke-width="1" opacity="0" style="cursor: crosshair;"/>
             <title>${tooltip}</title>
           </g>
         `;
@@ -1073,8 +1077,16 @@ export class GanttPanel {
     .issue-bar:hover .bar-main, .issue-bar:hover .bar-outline, .issue-label:hover { opacity: 1; }
     .issue-bar:hover .bar-intensity rect { filter: brightness(1.1); }
     .issue-bar .drag-handle:hover { fill: var(--vscode-list-hoverBackground); }
+    .issue-bar:hover .link-handle { opacity: 0.7; }
+    .issue-bar .link-handle:hover { opacity: 1; transform-origin: center; }
     .issue-bar.dragging .bar-main, .issue-bar.dragging .bar-intensity { opacity: 0.5; }
     .issue-bar.linking-source .bar-outline { stroke-width: 3; stroke: var(--vscode-focusBorder); }
+    .issue-bar.linking-source .link-handle { opacity: 1; }
+    .issue-bar.link-target .bar-outline { stroke-width: 2; stroke: var(--vscode-charts-green); }
+    .temp-link-arrow { pointer-events: none; }
+    .relation-picker { position: fixed; background: var(--vscode-dropdown-background); border: 1px solid var(--vscode-dropdown-border); border-radius: 4px; padding: 4px 0; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+    .relation-picker button { display: block; width: 100%; padding: 6px 12px; border: none; background: transparent; color: var(--vscode-dropdown-foreground); text-align: left; cursor: pointer; font-size: 12px; }
+    .relation-picker button:hover { background: var(--vscode-list-hoverBackground); }
     .weekend-bg { fill: var(--vscode-editor-inactiveSelectionBackground); opacity: 0.3; }
     .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 0.5; opacity: 0.3; }
     .date-marker { stroke: var(--vscode-editorRuler-foreground); stroke-dasharray: 2,2; }
@@ -1344,55 +1356,106 @@ export class GanttPanel {
       });
     });
 
-    // Linking mode state
+    // Linking drag state
     let linkingState = null;
+    let tempArrow = null;
+    let currentTarget = null;
 
-    // Handle click on bar (open issue or linking) - use bar-outline which always exists
+    function cancelLinking() {
+      if (!linkingState) return;
+      linkingState.fromBar.classList.remove('linking-source');
+      document.querySelectorAll('.link-target').forEach(el => el.classList.remove('link-target'));
+      if (tempArrow) { tempArrow.remove(); tempArrow = null; }
+      linkingState = null;
+      currentTarget = null;
+      document.body.style.cursor = '';
+    }
+
+    function showRelationPicker(x, y, fromId, toId) {
+      // Remove existing picker
+      document.querySelector('.relation-picker')?.remove();
+
+      const picker = document.createElement('div');
+      picker.className = 'relation-picker';
+      picker.style.left = x + 'px';
+      picker.style.top = y + 'px';
+
+      const types = [
+        { value: 'blocks', label: '🚫 Blocks' },
+        { value: 'precedes', label: '➡️ Precedes' },
+        { value: 'follows', label: '⬅️ Follows' }
+      ];
+
+      types.forEach(t => {
+        const btn = document.createElement('button');
+        btn.textContent = t.label;
+        btn.addEventListener('click', () => {
+          saveState();
+          vscode.postMessage({
+            command: 'createRelation',
+            issueId: fromId,
+            targetIssueId: toId,
+            relationType: t.value
+          });
+          picker.remove();
+        });
+        picker.appendChild(btn);
+      });
+
+      document.body.appendChild(picker);
+
+      // Close on outside click
+      setTimeout(() => {
+        document.addEventListener('click', function closeHandler(e) {
+          if (!picker.contains(e.target)) {
+            picker.remove();
+            document.removeEventListener('click', closeHandler);
+          }
+        });
+      }, 0);
+    }
+
+    // Handle click on bar (open issue) - use bar-outline which always exists
     document.querySelectorAll('.issue-bar .bar-outline').forEach(bar => {
       bar.addEventListener('click', (e) => {
-        if (dragState) return;
+        if (dragState || linkingState) return;
         const issueBar = bar.closest('.issue-bar');
         const issueId = parseInt(issueBar.dataset.issueId);
+        vscode.postMessage({ command: 'openIssue', issueId });
+      });
+    });
 
-        if (e.altKey) {
-          // Alt+click: linking mode
-          e.stopPropagation();
-          if (!linkingState) {
-            // Start linking mode
-            linkingState = { fromId: issueId, fromBar: issueBar };
-            issueBar.classList.add('linking-source');
-            document.body.style.cursor = 'crosshair';
-          } else if (linkingState.fromId !== issueId) {
-            // Complete link to different issue
-            const relationType = prompt('Relation type: (b)locks, (p)recedes, or (f)ollows?', 'b');
-            if (relationType) {
-              const input = relationType.toLowerCase();
-              const type = input.startsWith('p') ? 'precedes' : input.startsWith('f') ? 'follows' : 'blocks';
-              saveState();
-              vscode.postMessage({
-                command: 'createRelation',
-                issueId: linkingState.fromId,
-                targetIssueId: issueId,
-                relationType: type
-              });
-            }
-            linkingState.fromBar.classList.remove('linking-source');
-            linkingState = null;
-            document.body.style.cursor = '';
-          }
-        } else {
-          // Normal click: open issue
-          vscode.postMessage({ command: 'openIssue', issueId });
-        }
+    // Handle link handle mousedown to start linking
+    document.querySelectorAll('.link-handle').forEach(handle => {
+      handle.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const bar = handle.closest('.issue-bar');
+        const issueId = parseInt(bar.dataset.issueId);
+        const cx = parseFloat(handle.getAttribute('cx'));
+        const cy = parseFloat(handle.getAttribute('cy'));
+
+        bar.classList.add('linking-source');
+        document.body.style.cursor = 'crosshair';
+
+        // Create temp arrow in SVG
+        const svg = document.querySelector('#ganttTimeline svg');
+        tempArrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        tempArrow.classList.add('temp-link-arrow');
+        tempArrow.setAttribute('stroke', 'var(--vscode-focusBorder)');
+        tempArrow.setAttribute('stroke-width', '2');
+        tempArrow.setAttribute('fill', 'none');
+        tempArrow.setAttribute('stroke-dasharray', '4,2');
+        svg.appendChild(tempArrow);
+
+        linkingState = { fromId: issueId, fromBar: bar, startX: cx, startY: cy };
       });
     });
 
     // Escape to cancel linking mode
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && linkingState) {
-        linkingState.fromBar.classList.remove('linking-source');
-        linkingState = null;
-        document.body.style.cursor = '';
+        cancelLinking();
       }
     });
 
@@ -1404,64 +1467,98 @@ export class GanttPanel {
       });
     });
 
-    // Handle drag move
+    // Handle drag move (resizing and linking)
     document.addEventListener('mousemove', (e) => {
-      if (!dragState) return;
-      const delta = e.clientX - dragState.initialMouseX;
-      let newStartX = dragState.startX;
-      let newEndX = dragState.endX;
+      // Handle resize drag
+      if (dragState) {
+        const delta = e.clientX - dragState.initialMouseX;
+        let newStartX = dragState.startX;
+        let newEndX = dragState.endX;
 
-      if (dragState.isLeft) {
-        // Snap to day boundary, ensure minimum bar width of 1 day
-        newStartX = snapToDay(Math.max(0, Math.min(dragState.startX + delta, dragState.endX - dayWidth)));
-      } else {
-        // Snap to day boundary, ensure minimum bar width of 1 day
-        newEndX = snapToDay(Math.max(dragState.startX + dayWidth, Math.min(dragState.endX + delta, timelineWidth)));
+        if (dragState.isLeft) {
+          newStartX = snapToDay(Math.max(0, Math.min(dragState.startX + delta, dragState.endX - dayWidth)));
+        } else {
+          newEndX = snapToDay(Math.max(dragState.startX + dayWidth, Math.min(dragState.endX + delta, timelineWidth)));
+        }
+
+        const width = newEndX - newStartX;
+        dragState.barOutline.setAttribute('x', newStartX);
+        dragState.barOutline.setAttribute('width', width);
+        if (dragState.barMain) {
+          dragState.barMain.setAttribute('x', newStartX);
+          dragState.barMain.setAttribute('width', width);
+        }
+        dragState.leftHandle.setAttribute('x', newStartX);
+        dragState.rightHandle.setAttribute('x', newEndX - 8);
+        dragState.newStartX = newStartX;
+        dragState.newEndX = newEndX;
       }
 
-      // Update visual - use barOutline (always exists), and barMain if it exists
-      const width = newEndX - newStartX;
-      dragState.barOutline.setAttribute('x', newStartX);
-      dragState.barOutline.setAttribute('width', width);
-      if (dragState.barMain) {
-        dragState.barMain.setAttribute('x', newStartX);
-        dragState.barMain.setAttribute('width', width);
-      }
-      dragState.leftHandle.setAttribute('x', newStartX);
-      dragState.rightHandle.setAttribute('x', newEndX - 8);
-      dragState.newStartX = newStartX;
-      dragState.newEndX = newEndX;
-    });
+      // Handle linking drag
+      if (linkingState && tempArrow) {
+        const svg = document.querySelector('#ganttTimeline svg');
+        const rect = svg.getBoundingClientRect();
+        const scrollLeft = timelineColumn.scrollLeft;
+        const scrollTop = timelineColumn.scrollTop;
+        const endX = e.clientX - rect.left + scrollLeft;
+        const endY = e.clientY - rect.top + scrollTop;
 
-    // Handle drag end
-    document.addEventListener('mouseup', () => {
-      if (!dragState) return;
-      const { issueId, isLeft, newStartX, newEndX, bar, startX, endX, oldStartDate, oldDueDate } = dragState;
-      bar.classList.remove('dragging');
+        // Draw dashed line from start to cursor
+        const path = \`M \${linkingState.startX} \${linkingState.startY} L \${endX} \${endY}\`;
+        tempArrow.setAttribute('d', path);
 
-      // Only update if date actually changed (not just pixels)
-      if (newStartX !== undefined || newEndX !== undefined) {
-        const calcStartDate = isLeft && newStartX !== startX ? xToDate(newStartX) : null;
-        const calcDueDate = !isLeft && newEndX !== endX ? xToDate(newEndX) : null;
-        // Skip if date is same as original
-        const newStartDate = calcStartDate && calcStartDate !== oldStartDate ? calcStartDate : null;
-        const newDueDate = calcDueDate && calcDueDate !== oldDueDate ? calcDueDate : null;
-
-        if (newStartDate || newDueDate) {
-          // Push to undo stack before making change
-          undoStack.push({
-            issueId,
-            oldStartDate: newStartDate ? oldStartDate : null,
-            oldDueDate: newDueDate ? oldDueDate : null,
-            newStartDate,
-            newDueDate
-          });
-          redoStack.length = 0; // Clear redo stack on new action
-          updateUndoRedoButtons();
-          vscode.postMessage({ command: 'updateDates', issueId, startDate: newStartDate, dueDate: newDueDate });
+        // Find target bar under cursor
+        const targetBar = document.elementFromPoint(e.clientX, e.clientY)?.closest('.issue-bar');
+        if (currentTarget && currentTarget !== targetBar) {
+          currentTarget.classList.remove('link-target');
+        }
+        if (targetBar && targetBar !== linkingState.fromBar) {
+          targetBar.classList.add('link-target');
+          currentTarget = targetBar;
+        } else {
+          currentTarget = null;
         }
       }
-      dragState = null;
+    });
+
+    // Handle drag end (resizing and linking)
+    document.addEventListener('mouseup', (e) => {
+      // Handle resize drag end
+      if (dragState) {
+        const { issueId, isLeft, newStartX, newEndX, bar, startX, endX, oldStartDate, oldDueDate } = dragState;
+        bar.classList.remove('dragging');
+
+        if (newStartX !== undefined || newEndX !== undefined) {
+          const calcStartDate = isLeft && newStartX !== startX ? xToDate(newStartX) : null;
+          const calcDueDate = !isLeft && newEndX !== endX ? xToDate(newEndX) : null;
+          const newStartDate = calcStartDate && calcStartDate !== oldStartDate ? calcStartDate : null;
+          const newDueDate = calcDueDate && calcDueDate !== oldDueDate ? calcDueDate : null;
+
+          if (newStartDate || newDueDate) {
+            undoStack.push({
+              issueId,
+              oldStartDate: newStartDate ? oldStartDate : null,
+              oldDueDate: newDueDate ? oldDueDate : null,
+              newStartDate,
+              newDueDate
+            });
+            redoStack.length = 0;
+            updateUndoRedoButtons();
+            vscode.postMessage({ command: 'updateDates', issueId, startDate: newStartDate, dueDate: newDueDate });
+          }
+        }
+        dragState = null;
+      }
+
+      // Handle linking drag end
+      if (linkingState) {
+        const fromId = linkingState.fromId;
+        if (currentTarget) {
+          const toId = parseInt(currentTarget.dataset.issueId);
+          showRelationPicker(e.clientX, e.clientY, fromId, toId);
+        }
+        cancelLinking();
+      }
     });
 
     // Undo button
