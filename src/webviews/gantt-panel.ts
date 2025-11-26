@@ -613,6 +613,10 @@ export class GanttPanel {
     minDate.setUTCDate(minDate.getUTCDate() - 7);
     maxDate.setUTCDate(maxDate.getUTCDate() + 7);
 
+    // Today for past-bar detection (start of today UTC)
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
     const totalDays = Math.ceil(
       (maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)
     );
@@ -702,6 +706,7 @@ export class GanttPanel {
         const width = Math.max(10, endX - startX);
         const y = index * (barHeight + barGap); // Y starts at 0 in body SVG
         const color = this._getStatusColor(issue.status);
+        const isPast = end < today;
 
         const escapedSubject = escapeHtml(issue.subject);
         const escapedProject = escapeHtml(issue.project);
@@ -776,7 +781,7 @@ export class GanttPanel {
         }
 
         return `
-          <g class="issue-bar" data-issue-id="${issue.id}"
+          <g class="issue-bar${isPast ? " bar-past" : ""}" data-issue-id="${issue.id}"
              data-start-date="${issue.start_date || ""}"
              data-due-date="${issue.due_date || ""}"
              data-start-x="${startX}" data-end-x="${endX}">
@@ -896,9 +901,7 @@ export class GanttPanel {
       this._showWorkloadHeatmap
     );
 
-    // Calculate today's position for auto-scroll
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Calculate today's position for auto-scroll (reuse today from above)
     const todayX =
       ((today.getTime() - minDate.getTime()) /
         (maxDate.getTime() - minDate.getTime())) *
@@ -1076,6 +1079,8 @@ export class GanttPanel {
     svg { display: block; }
     .issue-bar:hover .bar-main, .issue-bar:hover .bar-outline, .issue-label:hover { opacity: 1; }
     .issue-bar:hover .bar-intensity rect { filter: brightness(1.1); }
+    .issue-bar.bar-past { filter: saturate(0.4) opacity(0.7); }
+    .issue-bar.bar-past:hover { filter: saturate(0.6) opacity(0.85); }
     .issue-bar .drag-handle:hover { fill: var(--vscode-list-hoverBackground); }
     .issue-bar:hover .link-handle { opacity: 0.7; }
     .issue-bar .link-handle:hover { opacity: 1; transform-origin: center; }
