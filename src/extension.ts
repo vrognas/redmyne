@@ -483,7 +483,7 @@ export function activate(context: vscode.ExtensionContext): void {
   vscode.commands.executeCommand(
     "setContext",
     "redmine:treeViewStyle",
-    ProjectsViewStyle.LIST
+    ProjectsViewStyle.TREE
   );
 
   const parseConfiguration = async (

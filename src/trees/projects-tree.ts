@@ -30,6 +30,8 @@ interface ProjectNode {
   project: RedmineProject;
   assignedIssues: Issue[];
   hasAssignedIssues: boolean;
+  /** Total issues including subprojects (for parent highlighting) */
+  totalIssuesWithSubprojects: number;
 }
 
 type TreeItem = ProjectNode | Issue | LoadingPlaceholder;
@@ -86,7 +88,7 @@ export class ProjectsTree implements vscode.TreeDataProvider<TreeItem> {
   private configListener: vscode.Disposable | undefined;
 
   constructor() {
-    this.viewStyle = ProjectsViewStyle.LIST;
+    this.viewStyle = ProjectsViewStyle.TREE;
 
     // Listen for config changes
     this.configListener = vscode.workspace.onDidChangeConfiguration((e) => {
@@ -139,23 +141,42 @@ export class ProjectsTree implements vscode.TreeDataProvider<TreeItem> {
    * Create tree item for a project node
    */
   private createProjectTreeItem(node: ProjectNode): vscode.TreeItem {
-    const { project, assignedIssues, hasAssignedIssues } = node;
+    const {
+      project,
+      assignedIssues,
+      hasAssignedIssues,
+      totalIssuesWithSubprojects,
+    } = node;
 
     const treeItem = new vscode.TreeItem(
       project.toQuickPickItem().label,
       vscode.TreeItemCollapsibleState.Collapsed
     );
 
+    // Check if has issues directly or in subprojects
+    const hasAnyIssues = totalIssuesWithSubprojects > 0;
+    const subprojectIssues = totalIssuesWithSubprojects - assignedIssues.length;
+
     if (hasAssignedIssues) {
-      // Project with assigned issues - show count and enhanced styling
-      treeItem.description = `(${assignedIssues.length} assigned)`;
+      // Project with direct assigned issues
+      const subNote =
+        subprojectIssues > 0 ? ` +${subprojectIssues} in subprojects` : "";
+      treeItem.description = `(${assignedIssues.length} assigned${subNote})`;
+      treeItem.iconPath = new vscode.ThemeIcon(
+        "folder-opened",
+        new vscode.ThemeColor("list.highlightForeground")
+      );
+      treeItem.contextValue = "project-with-issues";
+    } else if (hasAnyIssues) {
+      // Parent project with issues only in subprojects
+      treeItem.description = `(${subprojectIssues} in subprojects)`;
       treeItem.iconPath = new vscode.ThemeIcon(
         "folder-opened",
         new vscode.ThemeColor("list.highlightForeground")
       );
       treeItem.contextValue = "project-with-issues";
     } else {
-      // Project without assigned issues - dim it
+      // Project without any assigned issues
       treeItem.iconPath = new vscode.ThemeIcon(
         "folder",
         new vscode.ThemeColor("list.deemphasizedForeground")
@@ -255,14 +276,31 @@ export class ProjectsTree implements vscode.TreeDataProvider<TreeItem> {
   }
 
   /**
+   * Count issues recursively including subprojects
+   */
+  private countIssuesWithSubprojects(projectId: number): number {
+    const direct = this.issuesByProject.get(projectId)?.length || 0;
+    const subprojects = this.projects.filter((p) => p.parent?.id === projectId);
+    const subCount = subprojects.reduce(
+      (sum, sub) => sum + this.countIssuesWithSubprojects(sub.id),
+      0
+    );
+    return direct + subCount;
+  }
+
+  /**
    * Create a project node with assigned issues info
    */
   private createProjectNode(project: RedmineProject): ProjectNode {
     const assignedIssues = this.issuesByProject.get(project.id) || [];
+    const totalIssuesWithSubprojects = this.countIssuesWithSubprojects(
+      project.id
+    );
     return {
       project,
       assignedIssues,
       hasAssignedIssues: assignedIssues.length > 0,
+      totalIssuesWithSubprojects,
     };
   }
 
@@ -277,13 +315,15 @@ export class ProjectsTree implements vscode.TreeDataProvider<TreeItem> {
     }
 
     return filtered.sort((a, b) => {
-      // Projects with assigned issues come first
-      if (a.hasAssignedIssues && !b.hasAssignedIssues) return -1;
-      if (!a.hasAssignedIssues && b.hasAssignedIssues) return 1;
+      // Projects with any issues (direct or subproject) come first
+      const aHasAny = a.totalIssuesWithSubprojects > 0;
+      const bHasAny = b.totalIssuesWithSubprojects > 0;
+      if (aHasAny && !bHasAny) return -1;
+      if (!aHasAny && bHasAny) return 1;
 
-      // Among projects with issues, sort by issue count (descending)
-      if (a.hasAssignedIssues && b.hasAssignedIssues) {
-        return b.assignedIssues.length - a.assignedIssues.length;
+      // Among projects with issues, sort by total issue count (descending)
+      if (aHasAny && bHasAny) {
+        return b.totalIssuesWithSubprojects - a.totalIssuesWithSubprojects;
       }
 
       // Among projects without issues, sort alphabetically
