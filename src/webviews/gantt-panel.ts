@@ -3,6 +3,15 @@ import { Issue } from "../redmine/models/issue";
 import { RedmineServer } from "../redmine/redmine-server";
 import { FlexibilityScore } from "../utilities/flexibility-calculator";
 
+type ZoomLevel = "day" | "week" | "month";
+
+// Pixels per day for each zoom level
+const ZOOM_PIXELS_PER_DAY: Record<ZoomLevel, number> = {
+  day: 40,
+  week: 15,
+  month: 5,
+};
+
 interface GanttIssue {
   id: number;
   subject: string;
@@ -132,6 +141,7 @@ export class GanttPanel {
   private _disposables: vscode.Disposable[] = [];
   private _issues: GanttIssue[] = [];
   private _server: RedmineServer | undefined;
+  private _zoomLevel: ZoomLevel = "day";
 
   private constructor(panel: vscode.WebviewPanel, server?: RedmineServer) {
     this._panel = panel;
@@ -273,6 +283,7 @@ export class GanttPanel {
     issueId?: number;
     startDate?: string | null;
     dueDate?: string | null;
+    zoomLevel?: ZoomLevel;
   }): void {
     switch (message.command) {
       case "openIssue":
@@ -292,6 +303,12 @@ export class GanttPanel {
             message.startDate ?? null,
             message.dueDate ?? null
           );
+        }
+        break;
+      case "setZoom":
+        if (message.zoomLevel) {
+          this._zoomLevel = message.zoomLevel;
+          this._updateContent();
         }
         break;
     }
@@ -368,7 +385,8 @@ export class GanttPanel {
       (maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)
     );
 
-    const timelineWidth = Math.max(600, totalDays * 40);
+    const pixelsPerDay = ZOOM_PIXELS_PER_DAY[this._zoomLevel];
+    const timelineWidth = Math.max(600, totalDays * pixelsPerDay);
     const labelWidth = 250;
     const barHeight = 30;
     const barGap = 10;
@@ -479,7 +497,8 @@ export class GanttPanel {
       minDate,
       maxDate,
       timelineWidth,
-      0
+      0,
+      this._zoomLevel
     );
 
     // Calculate today's position for auto-scroll
@@ -536,6 +555,32 @@ export class GanttPanel {
     .gantt-actions button:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+    .zoom-toggle {
+      display: flex;
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-right: 8px;
+    }
+    .zoom-toggle button {
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: none;
+      border-right: 1px solid var(--vscode-panel-border);
+      padding: 4px 10px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .zoom-toggle button:last-child {
+      border-right: none;
+    }
+    .zoom-toggle button:hover {
+      background: var(--vscode-button-secondaryHoverBackground);
+    }
+    .zoom-toggle button.active {
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
     }
     .gantt-container {
       display: flex;
@@ -597,6 +642,11 @@ export class GanttPanel {
   <div class="gantt-header">
     <h2>Timeline</h2>
     <div class="gantt-actions">
+      <div class="zoom-toggle" role="group" aria-label="Zoom level">
+        <button id="zoomDay" class="${this._zoomLevel === "day" ? "active" : ""}" title="Day view">Day</button>
+        <button id="zoomWeek" class="${this._zoomLevel === "week" ? "active" : ""}" title="Week view">Week</button>
+        <button id="zoomMonth" class="${this._zoomLevel === "month" ? "active" : ""}" title="Month view">Month</button>
+      </div>
       <button id="undoBtn" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
       <button id="redoBtn" disabled title="Redo (Ctrl+Shift+Z)">↪ Redo</button>
     </div>
@@ -671,6 +721,17 @@ export class GanttPanel {
 
     // Initial button state
     updateUndoRedoButtons();
+
+    // Zoom toggle handlers
+    document.getElementById('zoomDay').addEventListener('click', () => {
+      vscode.postMessage({ command: 'setZoom', zoomLevel: 'day' });
+    });
+    document.getElementById('zoomWeek').addEventListener('click', () => {
+      vscode.postMessage({ command: 'setZoom', zoomLevel: 'week' });
+    });
+    document.getElementById('zoomMonth').addEventListener('click', () => {
+      vscode.postMessage({ command: 'setZoom', zoomLevel: 'month' });
+    });
 
     // Convert x position to date string (YYYY-MM-DD)
     function xToDate(x) {
@@ -920,7 +981,8 @@ export class GanttPanel {
     minDate: Date,
     maxDate: Date,
     svgWidth: number,
-    leftMargin: number
+    leftMargin: number,
+    zoomLevel: ZoomLevel = "day"
   ): string {
     const backgrounds: string[] = [];
     const weekHeaders: string[] = [];
@@ -937,10 +999,10 @@ export class GanttPanel {
       (svgWidth - leftMargin) /
       ((maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    // Adaptive detail level based on timeline length
-    // Short (<30d): show all days; Medium (30-90d): show Mon/Fri; Long (>90d): show Mon only
-    const showAllDays = totalDays < 30;
-    const showMidweek = totalDays < 90;
+    // Adaptive detail level based on zoom and timeline length
+    // Day zoom: show all days; Week zoom: show Mon/Fri; Month zoom: Mon only
+    const showAllDays = zoomLevel === "day" && totalDays < 60;
+    const showMidweek = zoomLevel === "day" || (zoomLevel === "week" && totalDays < 120);
 
     while (current <= maxDate) {
       const x =
