@@ -1102,11 +1102,25 @@ export class GanttPanel {
           const arrowSize = 6;
           const sameRow = Math.abs(source.y - target.y) < 5;
 
-          // Always: source.end → target.start (semantic: "source ends, then target can start")
-          const x1 = source.endX + 2;
-          const y1 = source.y;
-          const x2 = target.startX - 2;
-          const y2 = target.y;
+          // Temporal relations (blocks, precedes): end → start
+          // Non-temporal relations (relates, duplicates, copied_to): center → center
+          const isTemporal = rel.type === "blocks" || rel.type === "precedes";
+
+          let x1: number, y1: number, x2: number, y2: number;
+
+          if (isTemporal) {
+            // End of source → start of target
+            x1 = source.endX + 2;
+            y1 = source.y;
+            x2 = target.startX - 2;
+            y2 = target.y;
+          } else {
+            // Center of source → center of target
+            x1 = (source.startX + source.endX) / 2;
+            y1 = source.y;
+            x2 = (target.startX + target.endX) / 2;
+            y2 = target.y;
+          }
 
           // Is target to the right (natural flow) or left/overlapping (route around)?
           const goingRight = x2 > x1;
@@ -1140,7 +1154,7 @@ export class GanttPanel {
             path = `M ${x1} ${y1} V ${midY} H ${x2 - gap} V ${y2} H ${x2 - arrowSize}`;
           }
 
-          // Arrowhead always points right (toward target.start)
+          // Arrowhead points toward target
           const arrowHead = `M ${x2} ${y2} l -${arrowSize} -${arrowSize * 0.6} l 0 ${arrowSize * 1.2} Z`;
 
           const dashAttr = style.dash ? `stroke-dasharray="${style.dash}"` : "";
