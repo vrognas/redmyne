@@ -976,12 +976,20 @@ export class GanttPanel {
 
           // Is target to the right (natural flow) or left/overlapping (route around)?
           const goingRight = x2 > x1;
+          const horizontalDist = Math.abs(x2 - x1);
+          const nearlyVertical = horizontalDist < 30; // bars are vertically aligned
 
           let path: string;
 
           if (sameRow && goingRight) {
             // Same row, target to right: straight horizontal line
             path = `M ${x1} ${y1} H ${x2 - arrowSize}`;
+          } else if (!sameRow && nearlyVertical) {
+            // Nearly vertical: S-curve that jogs out and back
+            // Go right, down to midpoint, left to align, down to target
+            const jogX = 20; // small horizontal offset
+            const midY = (y1 + y2) / 2;
+            path = `M ${x1} ${y1} H ${x1 + jogX} V ${midY} H ${x2 - jogX} V ${y2} H ${x2 - arrowSize}`;
           } else if (goingRight) {
             // Different row, target to right: 3-segment elbow
             const midX = (x1 + x2) / 2;
