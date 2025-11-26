@@ -525,8 +525,12 @@ export class GanttPanel {
         });
         break;
       case "refresh":
-        // Trigger a full refresh via the VS Code command
+        // Clear cache and re-fetch fresh data for Gantt
         vscode.commands.executeCommand("redmine.refreshIssues");
+        // Re-open Gantt with fresh data after cache clears
+        setTimeout(() => {
+          vscode.commands.executeCommand("redmine.showGantt");
+        }, 150);
         break;
     }
   }
@@ -594,9 +598,12 @@ export class GanttPanel {
 
     try {
       await this._server.createRelation(issueId, targetIssueId, relationType);
-      // Refresh by triggering a full reload via VS Code command
-      vscode.commands.executeCommand("redmine.refreshIssues");
       showStatusBarMessage(`$(check) ${labels[relationType]} relation created`, 2000);
+      // Refresh: clear cache and re-fetch for Gantt
+      vscode.commands.executeCommand("redmine.refreshIssues");
+      setTimeout(() => {
+        vscode.commands.executeCommand("redmine.showGantt");
+      }, 150);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       // Map Redmine validation errors to user-friendly messages
