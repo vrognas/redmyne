@@ -988,10 +988,17 @@ export class GanttPanel {
             path = `M ${x1} ${y1} L ${x2 - arrowSize} ${y2}`;
           } else if (goingRight) {
             // Target to the right, different row - elbow path
-            // Use dynamic gap: half the available space, clamped between 8-20px
-            const elbowGap = Math.max(8, Math.min(20, horizontalGap / 2));
-            const midX = x1 + elbowGap;
-            path = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2 - arrowSize}`;
+            // Use dynamic gap: half the available space, but don't overshoot target
+            const maxElbow = Math.max(0, horizontalGap - arrowSize - 2);
+            const elbowGap = Math.min(maxElbow, Math.max(8, Math.min(20, horizontalGap / 2)));
+
+            if (elbowGap < 4) {
+              // Gap too small for elbow - use straight diagonal line
+              path = `M ${x1} ${y1} L ${x2 - arrowSize} ${y2}`;
+            } else {
+              const midX = x1 + elbowGap;
+              path = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2 - arrowSize}`;
+            }
           } else {
             // Target overlaps or is to the left - route around bars
             const gap = 12;
