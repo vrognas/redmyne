@@ -968,64 +968,34 @@ export class GanttPanel {
           const arrowSize = 6;
           const sameRow = Math.abs(source.y - target.y) < 5;
 
-          // Determine if bars overlap horizontally
-          const barsOverlap = source.startX < target.endX && source.endX > target.startX;
+          // Always: source.end → target.start (semantic: "source ends, then target can start")
+          const x1 = source.endX + 2;
+          const y1 = source.y;
+          const x2 = target.startX - 2;
+          const y2 = target.y;
 
-          let x1: number, y1: number, x2: number, y2: number;
-          let pointsRight: boolean;
+          // Is target to the right (natural flow) or left/overlapping (route around)?
+          const goingRight = x2 > x1;
+
           let path: string;
 
-          if (barsOverlap) {
-            // Bars overlap - must route around vertically
-            x1 = source.endX + 2;
-            y1 = source.y;
-            x2 = target.startX - 2;
-            y2 = target.y;
-            pointsRight = true;
-
+          if (sameRow && goingRight) {
+            // Same row, target to right: straight horizontal line
+            path = `M ${x1} ${y1} H ${x2 - arrowSize}`;
+          } else if (goingRight) {
+            // Different row, target to right: 3-segment elbow
+            const midX = (x1 + x2) / 2;
+            path = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2 - arrowSize}`;
+          } else {
+            // Target to the left or overlapping: route around via top/bottom
             const gap = 12;
             const midX = x1 + gap;
             const routeY = y2 > y1 ? Math.max(y1, y2) + barHeight : Math.min(y1, y2) - barHeight;
             path = `M ${x1} ${y1} H ${midX} V ${routeY} H ${x2 - gap} V ${y2} H ${x2 - arrowSize}`;
-          } else if (target.startX > source.endX) {
-            // Target is to the right - source.end → target.start
-            x1 = source.endX + 2;
-            y1 = source.y;
-            x2 = target.startX - 2;
-            y2 = target.y;
-            pointsRight = true;
-
-            if (sameRow) {
-              // Same row: straight horizontal line
-              path = `M ${x1} ${y1} H ${x2 - arrowSize}`;
-            } else {
-              // Different row: 3-segment elbow (H → V → H)
-              // Turn at midpoint between bars for balanced appearance
-              const midX = (x1 + x2) / 2;
-              path = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2 - arrowSize}`;
-            }
-          } else {
-            // Target is to the left - source.start → target.end (shortest)
-            x1 = source.startX - 2;
-            y1 = source.y;
-            x2 = target.endX + 2;
-            y2 = target.y;
-            pointsRight = false;
-
-            if (sameRow) {
-              // Same row: straight horizontal line
-              path = `M ${x1} ${y1} H ${x2 + arrowSize}`;
-            } else {
-              // Different row: 3-segment elbow (H → V → H)
-              const midX = (x1 + x2) / 2;
-              path = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2 + arrowSize}`;
-            }
           }
 
-          // Arrowhead pointing in the direction of travel
-          const arrowHead = pointsRight
-            ? `M ${x2} ${y2} l -${arrowSize} -${arrowSize * 0.6} l 0 ${arrowSize * 1.2} Z`
-            : `M ${x2} ${y2} l ${arrowSize} -${arrowSize * 0.6} l 0 ${arrowSize * 1.2} Z`;
+          // Arrowhead always points right (toward target.start)
+          const arrowHead = `M ${x2} ${y2} l -${arrowSize} -${arrowSize * 0.6} l 0 ${arrowSize * 1.2} Z`;
 
           const dashAttr = style.dash ? `stroke-dasharray="${style.dash}"` : "";
 
