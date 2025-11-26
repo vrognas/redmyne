@@ -1104,6 +1104,8 @@ export class GanttPanel {
     .issue-bar.linking-source .link-handle { opacity: 1; }
     .issue-bar.link-target .bar-outline { stroke-width: 2; stroke: var(--vscode-charts-green); }
     .temp-link-arrow { pointer-events: none; }
+    .dependency-arrow path { transition: opacity 0.15s; }
+    .dependency-arrow:hover path { opacity: 1 !important; stroke-width: 2.5; }
     .relation-picker { position: fixed; background: var(--vscode-dropdown-background); border: 1px solid var(--vscode-dropdown-border); border-radius: 4px; padding: 4px 0; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
     .relation-picker button { display: block; width: 100%; padding: 6px 12px; border: none; background: transparent; color: var(--vscode-dropdown-foreground); text-align: left; cursor: pointer; font-size: 12px; }
     .relation-picker button:hover, .relation-picker button:focus { background: var(--vscode-list-hoverBackground); }
@@ -1324,6 +1326,48 @@ export class GanttPanel {
       vscode.postMessage({ command: 'toggleWorkloadHeatmap' });
     });
 
+    // Show delete confirmation picker
+    function showDeletePicker(x, y, relationId, fromId, toId) {
+      document.querySelector('.relation-picker')?.remove();
+
+      const picker = document.createElement('div');
+      picker.className = 'relation-picker';
+      picker.style.left = x + 'px';
+      picker.style.top = y + 'px';
+
+      const label = document.createElement('div');
+      label.style.padding = '6px 12px';
+      label.style.fontSize = '11px';
+      label.style.opacity = '0.7';
+      label.textContent = \`#\${fromId} → #\${toId}\`;
+      picker.appendChild(label);
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.textContent = '🗑️ Delete relation';
+      deleteBtn.addEventListener('click', () => {
+        saveState();
+        vscode.postMessage({ command: 'deleteRelation', relationId });
+        picker.remove();
+      });
+      picker.appendChild(deleteBtn);
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.textContent = 'Cancel';
+      cancelBtn.addEventListener('click', () => picker.remove());
+      picker.appendChild(cancelBtn);
+
+      document.body.appendChild(picker);
+
+      setTimeout(() => {
+        document.addEventListener('click', function closeHandler(e) {
+          if (!picker.contains(e.target)) {
+            picker.remove();
+            document.removeEventListener('click', closeHandler);
+          }
+        });
+      }, 0);
+    }
+
     // Right-click on dependency arrow to delete
     document.querySelectorAll('.dependency-arrow').forEach(arrow => {
       arrow.addEventListener('contextmenu', (e) => {
@@ -1331,10 +1375,7 @@ export class GanttPanel {
         const relationId = parseInt(arrow.dataset.relationId);
         const fromId = arrow.dataset.from;
         const toId = arrow.dataset.to;
-        if (confirm('Delete relation from #' + fromId + ' to #' + toId + '?')) {
-          saveState();
-          vscode.postMessage({ command: 'deleteRelation', relationId });
-        }
+        showDeletePicker(e.clientX, e.clientY, relationId, fromId, toId);
       });
     });
 
