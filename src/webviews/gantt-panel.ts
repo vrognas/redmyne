@@ -1443,14 +1443,26 @@ export class GanttPanel {
         bar.classList.add('linking-source');
         document.body.style.cursor = 'crosshair';
 
-        // Create temp arrow in SVG
+        // Create temp arrow in SVG with arrowhead marker
         const svg = document.querySelector('#ganttTimeline svg');
+
+        // Add arrowhead marker if not exists
+        if (!document.getElementById('temp-arrow-head')) {
+          const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+          defs.innerHTML = \`
+            <marker id="temp-arrow-head" markerWidth="10" markerHeight="7"
+                    refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth">
+              <polygon points="0 0, 10 3.5, 0 7" fill="var(--vscode-focusBorder)"/>
+            </marker>\`;
+          svg.insertBefore(defs, svg.firstChild);
+        }
+
         tempArrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         tempArrow.classList.add('temp-link-arrow');
         tempArrow.setAttribute('stroke', 'var(--vscode-focusBorder)');
         tempArrow.setAttribute('stroke-width', '2');
         tempArrow.setAttribute('fill', 'none');
-        tempArrow.setAttribute('stroke-dasharray', '4,2');
+        tempArrow.setAttribute('marker-end', 'url(#temp-arrow-head)');
         svg.appendChild(tempArrow);
 
         linkingState = { fromId: issueId, fromBar: bar, startX: cx, startY: cy };
