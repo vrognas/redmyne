@@ -347,7 +347,52 @@
           "markdownDescription": "**Show workload overview in status bar**\n\nDisplays remaining work and capacity buffer.\n\n**Note:** Opt-in to reduce noise. Enable if you need capacity planning at a glance.\n\n**Format:** `25h left, +8h buffer`"
         }
       }
-    }
+    },
+    "walkthroughs": [
+      {
+        "id": "redmine.getStarted",
+        "title": "Get Started with Redmine",
+        "description": "Learn how to connect to Redmine and manage your issues",
+        "steps": [
+          {
+            "id": "redmine.configure",
+            "title": "Connect to Redmine",
+            "description": "Enter your Redmine server URL and API key to get started.\n\n[Configure Redmine](command:redmine.configure)",
+            "media": {
+              "markdown": "media/walkthrough/configure.md"
+            },
+            "completionEvents": ["onSettingChanged:redmine.url"]
+          },
+          {
+            "id": "redmine.viewIssues",
+            "title": "View Your Issues",
+            "description": "Open the Redmine sidebar to see issues assigned to you, organized by project.\n\n[Open Redmine Sidebar](command:workbench.view.extension.redmine-explorer)",
+            "media": {
+              "markdown": "media/walkthrough/view-issues.md"
+            },
+            "completionEvents": ["onView:redmine-explorer-projects"]
+          },
+          {
+            "id": "redmine.logTime",
+            "title": "Log Time Quickly",
+            "description": "Use the keyboard shortcut to log time without leaving your editor.\n\n**Shortcut:** `Ctrl+Y Ctrl+Y` (Mac: `Cmd+Y Cmd+Y`)\n\n[Log Time Now](command:redmine.quickLogTime)",
+            "media": {
+              "markdown": "media/walkthrough/log-time.md"
+            },
+            "completionEvents": ["onCommand:redmine.quickLogTime"]
+          },
+          {
+            "id": "redmine.timeline",
+            "title": "Explore the Timeline",
+            "description": "View your issues on a Gantt chart with drag-to-edit dates and workload heatmap.\n\n[Open Timeline](command:redmine.showGantt)",
+            "media": {
+              "markdown": "media/walkthrough/timeline.md"
+            },
+            "completionEvents": ["onCommand:redmine.showGantt"]
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
