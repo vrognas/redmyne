@@ -722,6 +722,16 @@ export class GanttPanel {
         const color = this._getStatusColor(issue.status);
         const isPast = end < today;
 
+        // Calculate past portion (from start to today)
+        const todayX =
+          ((today.getTime() - minDate.getTime()) /
+            (maxDate.getTime() - minDate.getTime())) *
+          timelineWidth;
+        // Past portion: from bar start to min(todayX, barEnd)
+        const pastEndX = Math.min(todayX, endX);
+        const pastWidth = Math.max(0, pastEndX - startX);
+        const hasPastPortion = start < today && pastWidth > 0;
+
         const escapedSubject = escapeHtml(issue.subject);
         const escapedProject = escapeHtml(issue.project);
         const tooltip = [
@@ -810,6 +820,11 @@ export class GanttPanel {
               <rect class="bar-main" x="${startX}" y="${y}" width="${width}" height="${barHeight}"
                     fill="${color}" rx="4" ry="4" opacity="0.3"/>
             `}
+            ${hasPastPortion ? `
+              <!-- Past portion overlay with diagonal stripes -->
+              <rect class="past-overlay" x="${startX}" y="${y}" width="${pastWidth}" height="${barHeight}"
+                    fill="url(#past-stripes)" rx="4" ry="4"/>
+            ` : ""}
             <!-- Border/outline -->
             <rect class="bar-outline" x="${startX}" y="${y}" width="${width}" height="${barHeight}"
                   fill="none" stroke="${color}" stroke-width="1" rx="4" ry="4" opacity="0.8" style="cursor: pointer;"/>
@@ -1096,6 +1111,7 @@ export class GanttPanel {
     .issue-bar:hover .bar-intensity rect { filter: brightness(1.1); }
     .issue-bar.bar-past { filter: saturate(0.4) opacity(0.7); }
     .issue-bar.bar-past:hover { filter: saturate(0.6) opacity(0.85); }
+    .past-overlay { pointer-events: none; }
     .issue-bar .drag-handle:hover { fill: var(--vscode-list-hoverBackground); }
     .issue-bar:hover .link-handle { opacity: 0.7; }
     .issue-bar .link-handle:hover { opacity: 1; transform-origin: center; }
@@ -1163,6 +1179,11 @@ export class GanttPanel {
       </div>
       <div class="gantt-timeline" id="ganttTimeline">
         <svg width="${timelineWidth}" height="${bodyHeight}">
+          <defs>
+            <pattern id="past-stripes" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+              <line x1="0" y1="0" x2="0" y2="6" stroke="var(--vscode-charts-red)" stroke-width="2" stroke-opacity="0.4"/>
+            </pattern>
+          </defs>
           ${dateMarkers.body}
           ${bars}
           ${dependencyArrows}
