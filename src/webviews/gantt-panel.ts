@@ -12,6 +12,11 @@ const ZOOM_PIXELS_PER_DAY: Record<ZoomLevel, number> = {
   month: 5,
 };
 
+interface GanttRelation {
+  targetId: number;
+  type: "blocks" | "precedes";
+}
+
 interface GanttIssue {
   id: number;
   subject: string;
@@ -23,6 +28,7 @@ interface GanttIssue {
   parentId: number | null;
   estimated_hours: number | null;
   spent_hours: number | null;
+  relations: GanttRelation[];
 }
 
 interface GanttRow {
@@ -269,6 +275,12 @@ export class GanttPanel {
         parentId: i.parent?.id ?? null,
         estimated_hours: i.estimated_hours ?? null,
         spent_hours: i.spent_hours ?? null,
+        relations: (i.relations || [])
+          .filter((r) => r.relation_type === "blocks" || r.relation_type === "precedes")
+          .map((r) => ({
+            targetId: r.issue_to_id,
+            type: r.relation_type as "blocks" | "precedes",
+          })),
       }));
 
     this._updateContent();
@@ -492,6 +504,71 @@ export class GanttPanel {
       })
       .join("");
 
+    // Dependency arrows - draw from end of source to start of target
+    const issuePositions = new Map<number, { startX: number; endX: number; y: number }>();
+    rows.forEach((row, index) => {
+      if (row.type === "issue" && row.issue) {
+        const issue = row.issue;
+        const start = issue.start_date
+          ? new Date(issue.start_date)
+          : new Date(issue.due_date!);
+        const end = issue.due_date
+          ? new Date(issue.due_date)
+          : new Date(issue.start_date!);
+        const startX =
+          ((start.getTime() - minDate.getTime()) /
+            (maxDate.getTime() - minDate.getTime())) *
+          timelineWidth;
+        const endX =
+          ((end.getTime() - minDate.getTime()) /
+            (maxDate.getTime() - minDate.getTime())) *
+          timelineWidth;
+        const y = headerHeight + index * (barHeight + barGap) + barHeight / 2;
+        issuePositions.set(issue.id, { startX, endX, y });
+      }
+    });
+
+    const dependencyArrows = this._issues
+      .flatMap((issue) =>
+        issue.relations.map((rel) => {
+          const source = issuePositions.get(issue.id);
+          const target = issuePositions.get(rel.targetId);
+          if (!source || !target) return "";
+
+          // Draw elbow arrow from source end to target start
+          const x1 = source.endX;
+          const y1 = source.y;
+          const x2 = target.startX;
+          const y2 = target.y;
+
+          // Elbow path: right from source, down/up, then right to target
+          const midX = x1 + 15;
+          const arrowSize = 6;
+
+          // Path: move right, then to target Y, then to target
+          const path =
+            x2 > x1
+              ? `M ${x1} ${y1} H ${midX} V ${y2} H ${x2 - arrowSize}`
+              : `M ${x1} ${y1} H ${midX} V ${y2} H ${x2 + arrowSize}`;
+
+          // Arrow head pointing right or left
+          const arrowHead =
+            x2 > x1
+              ? `M ${x2} ${y2} l -${arrowSize} -${arrowSize / 2} v ${arrowSize} Z`
+              : `M ${x2} ${y2} l ${arrowSize} -${arrowSize / 2} v ${arrowSize} Z`;
+
+          const color = rel.type === "blocks" ? "var(--vscode-charts-orange)" : "var(--vscode-charts-purple)";
+
+          return `
+            <g class="dependency-arrow" data-from="${issue.id}" data-to="${rel.targetId}">
+              <path d="${path}" stroke="${color}" stroke-width="1.5" fill="none" opacity="0.7"/>
+              <path d="${arrowHead}" fill="${color}" opacity="0.7"/>
+            </g>
+          `;
+        })
+      )
+      .join("");
+
     // Date markers (for timeline SVG, no leftMargin needed)
     const dateMarkers = this._generateDateMarkers(
       minDate,
@@ -662,6 +739,7 @@ export class GanttPanel {
       <svg width="${timelineWidth}" height="${svgHeight}">
         ${dateMarkers}
         ${bars}
+        ${dependencyArrows}
       </svg>
     </div>
   </div>
