@@ -1,10 +1,15 @@
 import * as vscode from "vscode";
 import { Issue } from "../redmine/models/issue";
 import { RedmineServer } from "../redmine/redmine-server";
-import { FlexibilityScore } from "../utilities/flexibility-calculator";
+import { FlexibilityScore, WeeklySchedule } from "../utilities/flexibility-calculator";
 import { showStatusBarMessage } from "../utilities/status-bar";
 
 type ZoomLevel = "day" | "week" | "month" | "quarter" | "year";
+
+// Default schedule if none provided
+const DEFAULT_SCHEDULE: WeeklySchedule = {
+  Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0, Sun: 0,
+};
 
 // Pixels per day for each zoom level
 const ZOOM_PIXELS_PER_DAY: Record<ZoomLevel, number> = {
@@ -154,6 +159,68 @@ function formatHoursAsTime(hours: number | null): string {
 }
 
 /**
+ * Get day name key for WeeklySchedule lookup
+ */
+function getDayKey(date: Date): keyof WeeklySchedule {
+  const keys: (keyof WeeklySchedule)[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return keys[date.getDay()];
+}
+
+/**
+ * Calculate daily intensity for an issue
+ * Returns array of {dayOffset, intensity} where intensity is 0-1 (can exceed 1 if overbooked)
+ * Single-issue ratio: distributes estimated_hours evenly across available days
+ */
+function calculateDailyIntensity(
+  issue: GanttIssue,
+  schedule: WeeklySchedule
+): { dayOffset: number; intensity: number }[] {
+  const result: { dayOffset: number; intensity: number }[] = [];
+
+  if (!issue.start_date || !issue.due_date) {
+    return result;
+  }
+
+  const start = new Date(issue.start_date);
+  const end = new Date(issue.due_date);
+  const estimatedHours = issue.estimated_hours ?? 0;
+
+  // Calculate total available hours in range
+  let totalAvailable = 0;
+  const current = new Date(start);
+  while (current <= end) {
+    totalAvailable += schedule[getDayKey(current)];
+    current.setDate(current.getDate() + 1);
+  }
+
+  if (totalAvailable === 0 || estimatedHours === 0) {
+    // No available hours or no estimate - return 0 intensity for all days
+    const dayCount = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    for (let i = 0; i < dayCount; i++) {
+      result.push({ dayOffset: i, intensity: 0 });
+    }
+    return result;
+  }
+
+  // Distribute hours evenly: each day gets proportional share of estimated work
+  const hoursPerAvailableHour = estimatedHours / totalAvailable;
+
+  current.setTime(start.getTime());
+  let dayOffset = 0;
+  while (current <= end) {
+    const dayHours = schedule[getDayKey(current)];
+    // Intensity = (allocated hours for this day) / (available hours for this day)
+    // For uniform distribution: allocated = dayHours * (estimated / totalAvailable)
+    const intensity = dayHours > 0 ? hoursPerAvailableHour : 0;
+    result.push({ dayOffset, intensity: Math.min(intensity, 1.5) }); // Cap at 1.5 for display
+    current.setDate(current.getDate() + 1);
+    dayOffset++;
+  }
+
+  return result;
+}
+
+/**
  * Gantt timeline webview panel
  * Shows issues as horizontal bars on a timeline
  */
@@ -165,6 +232,7 @@ export class GanttPanel {
   private _issues: GanttIssue[] = [];
   private _server: RedmineServer | undefined;
   private _zoomLevel: ZoomLevel = "day";
+  private _schedule: WeeklySchedule = DEFAULT_SCHEDULE;
 
   private constructor(panel: vscode.WebviewPanel, server?: RedmineServer) {
     this._panel = panel;
@@ -276,8 +344,14 @@ export class GanttPanel {
 
   public updateIssues(
     issues: Issue[],
-    flexibilityCache: Map<number, FlexibilityScore | null>
+    flexibilityCache: Map<number, FlexibilityScore | null>,
+    schedule?: WeeklySchedule
   ): void {
+    // Update schedule if provided
+    if (schedule) {
+      this._schedule = schedule;
+    }
+
     // Filter issues with dates and map to Gantt format
     this._issues = issues
       .filter((i) => i.start_date || i.due_date)
@@ -557,13 +631,69 @@ export class GanttPanel {
         ].join("\n");
 
         const handleWidth = 8;
+
+        // Calculate daily intensity for this issue
+        const intensities = calculateDailyIntensity(issue, this._schedule);
+        const hasIntensity = intensities.length > 0 && issue.estimated_hours !== null;
+
+        // Generate intensity segments and line chart
+        let intensitySegments = "";
+        let intensityLine = "";
+
+        if (hasIntensity && intensities.length > 0) {
+          const dayCount = intensities.length;
+          const segmentWidth = width / dayCount;
+
+          // Generate day segments with varying opacity
+          intensitySegments = intensities
+            .map((d, i) => {
+              const segX = startX + i * segmentWidth;
+              // Opacity: base 0.2 + intensity * 0.6 (range 0.2 to 0.8)
+              const opacity = 0.2 + Math.min(d.intensity, 1) * 0.6;
+              // First/last segment gets rounded corners
+              const rx = i === 0 ? "4" : i === dayCount - 1 ? "4" : "0";
+              const isFirst = i === 0;
+              const isLast = i === dayCount - 1;
+              // Use clip-path for proper corner rounding on first/last
+              return `<rect x="${segX}" y="${y}" width="${segmentWidth + 0.5}" height="${barHeight}"
+                            fill="${color}" opacity="${opacity.toFixed(2)}"
+                            ${isFirst ? 'rx="4" ry="4"' : isLast ? 'rx="4" ry="4"' : ""}/>`;
+            })
+            .join("");
+
+          // Generate line chart points (polyline)
+          const linePoints = intensities
+            .map((d, i) => {
+              const px = startX + (i + 0.5) * segmentWidth;
+              // Line Y: bottom of bar (y + barHeight) minus intensity * barHeight
+              const py = y + barHeight - Math.min(d.intensity, 1) * (barHeight - 4);
+              return `${px.toFixed(1)},${py.toFixed(1)}`;
+            })
+            .join(" ");
+
+          intensityLine = `<polyline points="${linePoints}"
+                                     fill="none" stroke="var(--vscode-editor-foreground)"
+                                     stroke-width="1.5" opacity="0.7"/>`;
+        }
+
         return `
           <g class="issue-bar" data-issue-id="${issue.id}"
              data-start-date="${issue.start_date || ""}"
              data-due-date="${issue.due_date || ""}"
              data-start-x="${startX}" data-end-x="${endX}">
-            <rect class="bar-main" x="${startX}" y="${y}" width="${width}" height="${barHeight}"
-                  fill="${color}" rx="4" ry="4" opacity="0.8" style="cursor: pointer;"/>
+            ${hasIntensity ? `
+              <!-- Intensity segments -->
+              <g class="bar-intensity">${intensitySegments}</g>
+              <!-- Intensity line chart -->
+              ${intensityLine}
+            ` : `
+              <!-- Fallback: solid bar when no intensity data -->
+              <rect class="bar-main" x="${startX}" y="${y}" width="${width}" height="${barHeight}"
+                    fill="${color}" rx="4" ry="4" opacity="0.3"/>
+            `}
+            <!-- Border/outline -->
+            <rect class="bar-outline" x="${startX}" y="${y}" width="${width}" height="${barHeight}"
+                  fill="none" stroke="${color}" stroke-width="1" rx="4" ry="4" opacity="0.8" style="cursor: pointer;"/>
             <rect class="drag-handle drag-left" x="${startX}" y="${y}" width="${handleWidth}" height="${barHeight}"
                   fill="transparent" style="cursor: ew-resize;"/>
             <rect class="drag-handle drag-right" x="${startX + width - handleWidth}" y="${y}" width="${handleWidth}" height="${barHeight}"
@@ -810,10 +940,11 @@ export class GanttPanel {
       border-radius: 4px;
     }
     svg { display: block; }
-    .issue-bar:hover .bar-main, .issue-label:hover { opacity: 0.8; }
+    .issue-bar:hover .bar-main, .issue-bar:hover .bar-outline, .issue-label:hover { opacity: 1; }
+    .issue-bar:hover .bar-intensity rect { filter: brightness(1.1); }
     .issue-bar .drag-handle:hover { fill: var(--vscode-list-hoverBackground); }
-    .issue-bar.dragging .bar-main { opacity: 0.5; }
-    .issue-bar.linking-source .bar-main { stroke: var(--vscode-focusBorder); stroke-width: 3; }
+    .issue-bar.dragging .bar-main, .issue-bar.dragging .bar-intensity { opacity: 0.5; }
+    .issue-bar.linking-source .bar-outline { stroke-width: 3; stroke: var(--vscode-focusBorder); }
     .weekend-bg { fill: var(--vscode-editor-inactiveSelectionBackground); opacity: 0.3; }
     .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 0.5; opacity: 0.3; }
     .date-marker { stroke: var(--vscode-editorRuler-foreground); stroke-dasharray: 2,2; }

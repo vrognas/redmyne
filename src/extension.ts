@@ -740,8 +740,14 @@ export function activate(context: vscode.ExtensionContext): void {
         return;
       }
 
+      // Get working hours schedule for intensity calculation
+      const scheduleConfig = vscode.workspace.getConfiguration("redmine.workingHours");
+      const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", {
+        Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0, Sun: 0,
+      });
+
       const panel = GanttPanel.createOrShow(projectsTree.server);
-      panel.updateIssues(issues, projectsTree.getFlexibilityCache());
+      panel.updateIssues(issues, projectsTree.getFlexibilityCache(), schedule);
     })
   );
 }
