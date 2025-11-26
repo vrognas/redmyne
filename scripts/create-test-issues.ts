@@ -7,11 +7,20 @@
  *
  * Or with arguments:
  *   npx tsx scripts/create-test-issues.ts --url https://your-redmine.com --key your-key
+ *
+ * For self-signed/corporate certificates, add --insecure flag
  */
 
 const REDMINE_URL = process.env.REDMINE_URL || process.argv.find((_, i, a) => a[i - 1] === "--url");
 const REDMINE_API_KEY = process.env.REDMINE_API_KEY || process.argv.find((_, i, a) => a[i - 1] === "--key");
 const DRY_RUN = process.argv.includes("--dry-run");
+const INSECURE = process.argv.includes("--insecure");
+
+// Handle self-signed certificates if --insecure flag is used
+if (INSECURE) {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+  console.log("WARNING: SSL certificate verification disabled (--insecure)\n");
+}
 
 if (!REDMINE_URL || !REDMINE_API_KEY) {
   console.error("Error: REDMINE_URL and REDMINE_API_KEY are required");
