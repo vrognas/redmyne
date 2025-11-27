@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as vscode from "vscode";
 import { quickLogTime } from "../../../src/commands/quick-log-time";
+import { validateTimeInput } from "../../../src/utilities/time-input";
 
 describe("quickLogTime", () => {
   let mockContext: vscode.ExtensionContext;
@@ -87,60 +88,28 @@ describe("quickLogTime", () => {
     );
   });
 
-  it("validates hours input (0.1-24 range, multiple formats)", async () => {
-    mockContext.globalState.get = vi.fn().mockReturnValue(undefined);
-
-    const testIssue = {
-      id: 123,
-      subject: "Test Issue",
-      project: { id: 1, name: "Test Project" },
-      status: { name: "In Progress" },
-      due_date: "2025-12-01",
-    };
-
-    vi.spyOn(vscode.window, "showQuickPick")
-      .mockResolvedValueOnce({
-        label: "#123 Test Issue",
-        issue: testIssue,
-      } as unknown as vscode.QuickPickItem)
-      .mockResolvedValueOnce({
-        label: "Development",
-        activity: { id: 9, name: "Development" },
-      } as unknown as vscode.QuickPickItem);
-
-    (vscode.window.showInputBox as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce("2.5") // hours
-      .mockResolvedValueOnce(""); // comment (empty)
-
-    await quickLogTime(props, mockContext);
-
-    const showInputBoxMock = vscode.window.showInputBox as ReturnType<
-      typeof vi.fn
-    >;
-    const inputValidator = showInputBoxMock.mock.calls[0][0]
-      .validateInput as (value: string) => string | null;
-
+  it("validates hours input (0.1-24 range, multiple formats)", () => {
     // Invalid: out of range or bad format
-    expect(inputValidator("0")).toContain("Must be 0.1-24 hours");
-    expect(inputValidator("-5")).toContain("Must be 0.1-24 hours");
-    expect(inputValidator("25")).toContain("Must be 0.1-24 hours");
-    expect(inputValidator("abc")).toContain("Must be 0.1-24 hours");
-    expect(inputValidator("1:75")).toContain("Must be 0.1-24 hours"); // Invalid minutes
+    expect(validateTimeInput("0")).toContain("Must be 0.1-24 hours");
+    expect(validateTimeInput("-5")).toContain("Must be 0.1-24 hours");
+    expect(validateTimeInput("25")).toContain("Must be 0.1-24 hours");
+    expect(validateTimeInput("abc")).toContain("Must be 0.1-24 hours");
+    expect(validateTimeInput("1:75")).toContain("Must be 0.1-24 hours"); // Invalid minutes
 
     // Valid: decimal format
-    expect(inputValidator("2.5")).toBeNull();
-    expect(inputValidator("1,5")).toBeNull(); // European format
+    expect(validateTimeInput("2.5")).toBeNull();
+    expect(validateTimeInput("1,5")).toBeNull(); // European format
 
     // Valid: HH:MM format
-    expect(inputValidator("1:45")).toBeNull(); // 1.75 hours
-    expect(inputValidator("0:30")).toBeNull(); // 0.5 hours
+    expect(validateTimeInput("1:45")).toBeNull(); // 1.75 hours
+    expect(validateTimeInput("0:30")).toBeNull(); // 0.5 hours
 
     // Valid: text with units
-    expect(inputValidator("1h 45min")).toBeNull();
-    expect(inputValidator("1h45min")).toBeNull();
-    expect(inputValidator("1 h 45 min")).toBeNull();
-    expect(inputValidator("45min")).toBeNull(); // 0.75 hours
-    expect(inputValidator("2h")).toBeNull(); // 2 hours
+    expect(validateTimeInput("1h 45min")).toBeNull();
+    expect(validateTimeInput("1h45min")).toBeNull();
+    expect(validateTimeInput("1 h 45 min")).toBeNull();
+    expect(validateTimeInput("45min")).toBeNull(); // 0.75 hours
+    expect(validateTimeInput("2h")).toBeNull(); // 2 hours
   });
 
   it.skip("prevents logging >24h per day", async () => {
