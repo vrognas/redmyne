@@ -16,6 +16,7 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ### Fixed
 
+- **Positron stable compatibility** - lowered VS Code engine from 1.106 to 1.105
 - **Billable tracker detection** - now matches "Tasks" (was "Task")
 
 ---
@@ -49,7 +50,6 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 - **View renamed**: "Projects" → "My Issues" (better describes content)
 - **Default view style**: Tree view (was list) - groups issues by project hierarchy
 - **Parent project highlighting**: Projects with subproject issues are now highlighted
-- **Category**: "Other" → "Project Management" for marketplace
 - **Command prefixes**: Toggle commands now use "Redmine:" prefix
 - **Status bar**: Workload now on left side (workspace status)
 - **Notifications**: Success messages use status bar instead of popups

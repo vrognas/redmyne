@@ -2,7 +2,7 @@
   "name": "positron-redmine",
   "displayName": "Redmine for Positron",
   "description": "Redmine project management integration for Positron IDE and VS Code",
-  "version": "3.10.0",
+  "version": "3.10.1",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -11,12 +11,12 @@
     "url": "https://github.com/vrognas/positron-redmine.git"
   },
   "engines": {
-    "vscode": "^1.106.0",
+    "vscode": "^1.105.0",
     "positron": "^2025.06.0",
     "node": ">=20.0.0"
   },
   "categories": [
-    "Project Management"
+    "Other"
   ],
   "activationEvents": [
     "onStartupFinished"
@@ -438,7 +438,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@types/node": "^24.10.1",
-    "@types/vscode": "^1.106.1",
+    "@types/vscode": "^1.105.0",
     "@vitest/coverage-v8": "^4.0.14",
     "esbuild": "^0.27.0",
     "eslint": "^9.39.1",
