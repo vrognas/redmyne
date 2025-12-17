@@ -1,8 +1,8 @@
 {
   "name": "positron-redmine",
-  "displayName": "Redmyn",
+  "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "3.11.0",
+  "version": "3.11.1",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",

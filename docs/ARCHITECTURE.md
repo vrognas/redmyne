@@ -2,11 +2,11 @@
 
 ## Overview
 
-Redmyn is a VS Code/Positron IDE extension for personal workload management with Redmine. Built on TypeScript 5.9+, it provides sidebar views, issue management, time tracking, and workload visualization via Redmine REST API.
+Redmyne is a VS Code/Positron IDE extension for personal workload management with Redmine. Built on TypeScript 5.9+, it provides sidebar views, issue management, time tracking, and workload visualization via Redmine REST API.
 
 **Core Pattern**: MVC-like with Tree Providers (View), Controllers (Business Logic), and RedmineServer (Model/API).
 
-**Version**: 3.11.0 | **Min VS Code**: 1.105.0 | **Node**: >=20.0.0
+**Version**: 3.11.1 | **Min VS Code**: 1.105.0 | **Node**: >=20.0.0
 
 ## Directory Structure
 

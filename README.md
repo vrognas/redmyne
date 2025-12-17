@@ -1,4 +1,4 @@
-# Redmyn
+# Redmyne
 
 > **⚠️ This is a fork** of [vscode-redmine](https://github.com/rozpuszczalny/vscode-redmine) by Tomasz Domański (MIT licensed).
 > This extension adds **personal workload management features** not present in the original.
