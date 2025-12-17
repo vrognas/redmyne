@@ -4,6 +4,12 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ## [Unreleased]
 
+### Changed
+
+- **Rebranded** to "Redmyn" - clearer differentiation from original extension
+- **New green logo** - distinct from original Redmine blue
+- **README** - prominent fork notice, feature comparison table
+
 ### Added
 
 - **Quick Create Issue** (Ctrl+Y Ctrl+N) - create issues without leaving IDE

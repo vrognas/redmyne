@@ -1,8 +1,9 @@
-# Redmine for Positron
+# Redmyn
+
+> **⚠️ This is a fork** of [vscode-redmine](https://github.com/rozpuszczalny/vscode-redmine) by Tomasz Domański (MIT licensed).
+> This extension adds **personal workload management features** not present in the original.
 
 **Personal workload management for developers using Redmine.**
-
-> **Attribution**: This is a Positron-focused fork of [vscode-redmine](https://github.com/rozpuszczalny/vscode-redmine) by Tomasz Domański, originally licensed under MIT.
 
 ## Why This Extension?
 
@@ -27,54 +28,36 @@ Desktop clients like RedmineX replicate Redmine's full project management interf
 
 **Think of it as:** Redmine for *you*, not Redmine for your *project*.
 
+## What's Different From the Original?
+
+| Feature | Original | This Fork |
+|---------|----------|-----------|
+| **Gantt Chart** | ❌ | ✅ Interactive timeline with drag-to-edit |
+| **Workload Heatmap** | ❌ | ✅ Visual capacity utilization |
+| **Quick Time Logging** | ❌ | ✅ Ctrl+Y Ctrl+Y shortcut |
+| **Quick Create Issue** | ❌ | ✅ Ctrl+Y Ctrl+N wizard |
+| **Flexibility Scoring** | ❌ | ✅ Overbooked/at-risk/on-track indicators |
+| **Status Bar Workload** | ❌ | ✅ "25h left, +8h buffer" |
+| **Sub-Issue Creation** | ❌ | ✅ Right-click context menu |
+| **Time Entry View** | ❌ | ✅ Today/Week/Month grouping |
+
 ## Features
 
-- **Gantt Chart Timeline**
-  - Interactive SVG timeline with zoom levels (Day/Week/Month/Quarter/Year)
-  - Workload heatmap toggle - shades days by aggregate utilization (green/yellow/orange/red)
-  - Per-issue intensity visualization showing daily work distribution
-  - Drag handles to adjust start/due dates directly
-  - Dependency arrows for issue relations (blocks/precedes/follows)
-  - Zoom preserves center view position
-  - Undo/redo for date changes
-- **Quick Time Logging** (Ctrl+Y Ctrl+Y)
-  - Fast time entry with recent issue cache
-  - Flexible time formats: 2.5, 1:45, 1h 45min
-  - Optional comment field
-  - Status bar confirmation
-- **Quick Create Issue** (Ctrl+Y Ctrl+N)
-  - Create issues without leaving IDE
-  - Full wizard: project → tracker → priority → subject → description → hours → due date
-  - Optional fields skippable via Enter
-- **Create Sub-Issue** (context menu)
-  - Right-click any issue → "Create Sub-Issue"
-  - Inherits parent's project and tracker
-- Sidebar panel
-  - List issues assigned to you in sidebar panel
-  - List projects and open issues in them
-- Create issue (opens redmine create issue in browser)
-- List of issues assigned to you
-- Open issue by id
-- Open issue by selected number in document
-- Issue actions:
-  - Change status of an issue
-  - Add time entry to an issue
-  - Open issue in browser
-  - Quick update issue
+### Workload Visualization
+- **Gantt Chart** - interactive timeline with drag-to-edit dates, dependency arrows, undo/redo
+- **Workload Heatmap** - color-coded daily utilization (green → red)
+- **Flexibility Scoring** - issues marked as overbooked/at-risk/on-track
+- **Status Bar** - "25h left, +8h buffer" at a glance
 
-_Missing a feature? Open an issue and let me know!_
+### Quick Actions
+- **Quick Time Logging** (Ctrl+Y Ctrl+Y) - flexible formats: `2.5`, `1:45`, `1h 45min`
+- **Quick Create Issue** (Ctrl+Y Ctrl+N) - full wizard without leaving IDE
+- **Create Sub-Issue** - right-click context menu
 
-### Sidebar panel
-
-![Sidebar panel GIF showcase](./resources/redmine-sidebar-panel.gif)
-
-### Add time entry from action menu
-
-![Add time entry from action menu GIF showcase](./resources/redmine-add-time-entry.gif)
-
-### Change server to other workspace folder in sidebar panel
-
-![Change server to other workspace folder in sidebar panel GIF showcase](./resources/redmine-change-sidebar-server.gif)
+### Sidebar
+- Issues assigned to you, grouped by project
+- Time entries grouped by Today/Week/Month
+- Issue actions: change status, log time, quick update
 
 ## Compatibility
 
@@ -103,16 +86,15 @@ See [Migration Guide](./MIGRATION_GUIDE.md).
 
 ## Extension Settings
 
-This extension contributes the following settings:
+| Setting | Description |
+|---------|-------------|
+| `redmine.url` | Redmine server URL (HTTPS required) |
+| `redmine.identifier` | Default project identifier |
+| `redmine.additionalHeaders` | Custom HTTP headers |
+| `redmine.workingHours.weeklySchedule` | Hours per day for capacity calculations |
+| `redmine.statusBar.showWorkload` | Show workload summary in status bar |
 
-- `redmine.url`: URL of redmine server (eg. `https://example.com`, `http://example.com:8080`, `https://example.com:8443/redmine`, `http://example.com/redmine` _etc._)
-- `redmine.apiKey`: API Key of your redmine account (see `/my/account` page, on right-hand pane)
-- `redmine.rejectUnauthorized`: Parameter, which is passed to https request options (true/false) (useful to fix issues with self-signed certificates, see issue #3)
-- `redmine.identifier`: If set, this will be the project, to which new issue will be created
-
-  _NOTE: this is an identifier of project, not display name of the project_
-
-- `redmine.additionalHeaders`: Object of additional headers to be sent along with every request to redmine server
+API keys are stored securely via `Redmine: Set API Key` command.
 
 ## Development Setup
 
