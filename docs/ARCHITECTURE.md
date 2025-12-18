@@ -6,7 +6,7 @@ Redmyne is a VS Code/Positron IDE extension for personal workload management wit
 
 **Core Pattern**: MVC-like with Tree Providers (View), Controllers (Business Logic), and RedmineServer (Model/API).
 
-**Version**: 3.11.2 | **Min VS Code**: 1.105.0 | **Node**: >=20.0.0
+**Version**: 3.11.3 | **Min VS Code**: 1.105.0 | **Node**: >=20.0.0
 
 ## Directory Structure
 

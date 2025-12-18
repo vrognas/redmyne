@@ -2,13 +2,13 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "3.11.2",
+  "version": "3.11.3",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/vrognas/positron-redmine.git"
+    "url": "https://github.com/vrognas/redmyne.git"
   },
   "engines": {
     "vscode": "^1.105.0",
