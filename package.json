@@ -423,6 +423,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "node esbuild.cjs --production",
     "watch": "node esbuild.cjs --watch",
+    "dev": "npm run watch",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf out/ coverage/",
     "lint": "eslint .",
