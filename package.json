@@ -421,6 +421,7 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
+    "build": "npm run compile",
     "compile": "node esbuild.cjs --production",
     "watch": "node esbuild.cjs --watch",
     "dev": "npm run watch",
