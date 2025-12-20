@@ -82,23 +82,30 @@ export class MyTimeEntriesTreeDataProvider
         schedule
       );
 
+      // Format labels with current date context
+      const now = new Date();
+      const dayName = now.toLocaleDateString("en-US", { weekday: "short" });
+      const dayNum = now.getDate();
+      const weekNum = getISOWeekNumber(now);
+      const monthName = now.toLocaleDateString("en-US", { month: "short" });
+
       this.cachedGroups = [
         {
-          label: "Today",
+          label: `Today (${dayName} ${dayNum})`,
           description: formatHoursWithComparison(todayTotal, todayAvailable),
           collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
           type: "group",
           _cachedEntries: todayResult.time_entries,
         },
         {
-          label: "This Week",
+          label: `This Week (${weekNum})`,
           description: formatHoursWithComparison(weekTotal, weekAvailable),
           collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
           type: "week-group",
           _cachedEntries: weekResult.time_entries,
         },
         {
-          label: "This Month",
+          label: `This Month (${monthName})`,
           description: formatHoursWithComparison(monthTotal, monthAvailable),
           collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
           type: "month-group",

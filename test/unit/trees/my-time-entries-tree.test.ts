@@ -90,9 +90,9 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     // Second call returns actual data (cached)
     const secondResult = await provider.getChildren();
     expect(secondResult).toHaveLength(3);
-    expect(secondResult[0].label).toBe("Today");
-    expect(secondResult[1].label).toBe("This Week");
-    expect(secondResult[2].label).toBe("This Month");
+    expect(secondResult[0].label).toContain("Today");
+    expect(secondResult[1].label).toContain("This Week");
+    expect(secondResult[2].label).toContain("This Month");
   });
 
   it("caches entries at parent level (no double-fetch)", async () => {
@@ -214,11 +214,11 @@ describe("MyTimeEntriesTreeDataProvider", () => {
 
     const groups = await getLoadedGroups();
 
-    expect(groups[0].label).toBe("Today");
+    expect(groups[0].label).toContain("Today");
     expect(groups[0].description).toContain("4h"); // Contains total (format may vary based on working days)
-    expect(groups[1].label).toBe("This Week");
+    expect(groups[1].label).toContain("This Week");
     expect(groups[1].description).toContain("4h");
-    expect(groups[2].label).toBe("This Month");
+    expect(groups[2].label).toContain("This Month");
     expect(groups[2].description).toContain("4h");
   });
 
@@ -429,7 +429,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
 
     const groups = await getLoadedGroups();
     const thisWeek = groups[1];
-    expect(thisWeek.label).toBe("This Week");
+    expect(thisWeek.label).toContain("This Week");
 
     // Get day groups
     const dayGroups = await provider.getChildren(thisWeek);
@@ -493,7 +493,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
 
     const groups = await getLoadedGroups();
     const thisMonth = groups[2];
-    expect(thisMonth.label).toBe("This Month");
+    expect(thisMonth.label).toContain("This Month");
 
     // Get week groups
     const weekGroups = await provider.getChildren(thisMonth);
