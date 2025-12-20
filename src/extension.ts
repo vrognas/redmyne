@@ -173,21 +173,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Check if configured and update context
   const updateConfiguredContext = async () => {
-    const folders = vscode.workspace.workspaceFolders || [];
-    const folder = folders[0];
-
-    if (!folder) {
-      await vscode.commands.executeCommand(
-        "setContext",
-        "redmine:configured",
-        false
-      );
-      return;
-    }
-
-    const config = vscode.workspace.getConfiguration("redmine", folder.uri);
+    const config = vscode.workspace.getConfiguration("redmine");
     const hasUrl = !!config.get<string>("url");
-    const apiKey = await secretManager.getApiKey(folder.uri);
+    const apiKey = await secretManager.getApiKey();
     const isConfigured = hasUrl && !!apiKey;
 
     await vscode.commands.executeCommand(
@@ -260,21 +248,9 @@ export function activate(context: vscode.ExtensionContext): void {
   // Register configure command
   context.subscriptions.push(
     vscode.commands.registerCommand("redmine.configure", async () => {
-      const folders = vscode.workspace.workspaceFolders;
-      if (!folders || folders.length === 0) {
-        vscode.window.showErrorMessage("Please open a workspace folder first");
-        return;
-      }
-
-      const folder =
-        folders.length === 1
-          ? folders[0]
-          : await vscode.window.showWorkspaceFolderPick();
-      if (!folder) return;
-
-      const config = vscode.workspace.getConfiguration("redmine", folder.uri);
+      const config = vscode.workspace.getConfiguration("redmine");
       const existingUrl = config.get<string>("url");
-      const existingApiKey = await secretManager.getApiKey(folder.uri);
+      const existingApiKey = await secretManager.getApiKey();
 
       let url = existingUrl;
       let shouldUpdateApiKey = false;
@@ -355,7 +331,7 @@ export function activate(context: vscode.ExtensionContext): void {
         if (action !== "Reconfigure") return;
 
         // Delete orphaned API key
-        await secretManager.deleteApiKey(folder.uri);
+        await secretManager.deleteApiKey();
 
         // Start fresh
         url = await promptForUrl();
@@ -385,7 +361,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
       // Prompt for API Key if needed
       if (shouldUpdateApiKey && url) {
-        const success = await promptForApiKey(secretManager, folder.uri, url);
+        const success = await promptForApiKey(secretManager, url);
         if (!success) return;
       }
 
@@ -425,7 +401,6 @@ export function activate(context: vscode.ExtensionContext): void {
 
   async function promptForApiKey(
     manager: RedmineSecretManager,
-    folderUri: vscode.Uri,
     url: string
   ): Promise<boolean> {
     // Explain how to get API key
@@ -465,7 +440,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
     if (!apiKey) return false;
 
-    await manager.setApiKey(folderUri, apiKey);
+    await manager.setApiKey(apiKey);
     return true;
   }
 
@@ -475,12 +450,6 @@ export function activate(context: vscode.ExtensionContext): void {
       await setApiKey(context);
       await updateConfiguredContext();
     })
-  );
-
-  vscode.commands.executeCommand(
-    "setContext",
-    "redmine:hasSingleConfig",
-    (vscode.workspace.workspaceFolders?.length ?? 0) <= 1
   );
 
   vscode.commands.executeCommand(
@@ -504,38 +473,14 @@ export function activate(context: vscode.ExtensionContext): void {
       });
     }
 
-    const folders = vscode.workspace.workspaceFolders;
-    if (!folders || folders.length === 0) {
-      vscode.window.showErrorMessage("Please open a workspace folder first");
-      return Promise.resolve({ props: undefined, args: [] });
-    }
+    const config = vscode.workspace.getConfiguration("redmine") as RedmineConfig;
 
-    const pickedFolder =
-      folders.length === 1
-        ? folders[0]
-        : await vscode.window.showWorkspaceFolderPick();
-
-    if (!pickedFolder) {
-      return Promise.resolve({ props: undefined, args: [] });
-    }
-
-    vscode.commands.executeCommand(
-      "setContext",
-      "redmine:hasSingleConfig",
-      !pickedFolder
-    );
-
-    const config = vscode.workspace.getConfiguration(
-      "redmine",
-      pickedFolder.uri
-    ) as RedmineConfig;
-
-    // Get API key from secrets - NO auto-migration
-    const apiKey = await secretManager.getApiKey(pickedFolder.uri);
+    // Get API key from secrets
+    const apiKey = await secretManager.getApiKey();
 
     if (!apiKey) {
       vscode.window.showErrorMessage(
-        'No API key configured. Run "Redmine: Set API Key"'
+        'No API key configured. Run "Redmine: Configure"'
       );
       return Promise.resolve({ props: undefined, args: [] });
     }

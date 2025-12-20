@@ -19,21 +19,26 @@ describe("RedmineSecretManager", () => {
     manager = new RedmineSecretManager(context);
   });
 
-  it("should store API key", async () => {
-    const uri = vscode.Uri.parse("file:///home/user/project");
-    await manager.setApiKey(uri, "test-key-123");
+  it("should store API key globally", async () => {
+    await manager.setApiKey("test-key-123");
 
     expect(context.secrets.store).toHaveBeenCalledWith(
-      expect.stringContaining("redmine:"),
+      "redmine:global:apiKey:v2",
       "test-key-123"
     );
   });
 
   it("should retrieve API key", async () => {
-    const uri = vscode.Uri.parse("file:///home/user/project");
     vi.mocked(context.secrets.get).mockResolvedValue("test-key-123");
 
-    const key = await manager.getApiKey(uri);
+    const key = await manager.getApiKey();
     expect(key).toBe("test-key-123");
+    expect(context.secrets.get).toHaveBeenCalledWith("redmine:global:apiKey:v2");
+  });
+
+  it("should delete API key", async () => {
+    await manager.deleteApiKey();
+
+    expect(context.secrets.delete).toHaveBeenCalledWith("redmine:global:apiKey:v2");
   });
 });

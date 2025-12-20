@@ -287,12 +287,12 @@
       "properties": {
         "redmine.url": {
           "type": "string",
-          "markdownDescription": "**Redmine server URL (HTTPS required)**\n\n🔒 HTTP connections are not allowed for security.\n\n⚠️ Changing/removing this requires reconfiguring API key\n\n**Storage:**\n- URL: User settings (`settings.json`)\n- API Key: Encrypted secrets (Windows Credential Manager / macOS Keychain / Linux libsecret)\n- API keys are machine-local and never synced",
+          "markdownDescription": "**Redmine server URL (HTTPS required)**\n\n🔒 HTTP connections are not allowed for security.\n\n**Storage:**\n- URL: User settings (`settings.json`)\n- API Key: Encrypted secrets (Windows Credential Manager / macOS Keychain / Linux libsecret)\n- Both are global (single Redmine server)",
           "examples": [
             "https://example.com",
             "https://example.com:8443/redmine"
           ],
-          "scope": "machine"
+          "scope": "application"
         },
         "redmine.apiKey": {
           "type": "string",
