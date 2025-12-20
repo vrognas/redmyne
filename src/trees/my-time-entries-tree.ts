@@ -9,7 +9,7 @@ export interface TimeEntryNode {
   iconPath?: vscode.ThemeIcon;
   collapsibleState: vscode.TreeItemCollapsibleState;
   contextValue?: string;
-  type: "loading" | "group" | "entry";
+  type: "loading" | "group" | "week-group" | "day-group" | "entry";
   _cachedEntries?: TimeEntry[];
   _entry?: TimeEntry;
 }
@@ -94,7 +94,7 @@ export class MyTimeEntriesTreeDataProvider
           label: "This Week",
           description: formatHoursWithComparison(weekTotal, weekAvailable),
           collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
-          type: "group",
+          type: "week-group",
           _cachedEntries: weekResult.time_entries,
         },
         {
@@ -144,70 +144,115 @@ export class MyTimeEntriesTreeDataProvider
       ];
     }
 
-    // Child level - time entries (use cached)
-    if (element.type === "group" && element._cachedEntries) {
-      // Collect unique issue IDs that need fetching
-      const uniqueIssueIds = Array.from(
-        new Set(
-          element._cachedEntries.map(
-            (entry) => entry.issue?.id || entry.issue_id
-          )
-        )
-      );
+    // Week group - return day groups
+    if (element.type === "week-group" && element._cachedEntries) {
+      return this.groupEntriesByDay(element._cachedEntries);
+    }
 
-      // Filter out already-cached issues
-      const missingIssueIds = uniqueIssueIds.filter(
-        (id) => !this.issueCache.has(id)
-      );
-
-      // Batch fetch missing issues
-      if (missingIssueIds.length > 0 && this.server) {
-        await Promise.allSettled(
-          missingIssueIds.map(async (id) => {
-            try {
-              const { issue } = await this.server!.getIssueById(id);
-              this.issueCache.set(id, { id: issue.id, subject: issue.subject });
-            } catch {
-              // If fetch fails, cache as "Unknown Issue" to avoid retry
-              this.issueCache.set(id, { id, subject: "Unknown Issue" });
-            }
-          })
-        );
-      }
-
-      // Map entries using cached issue subjects
-      return element._cachedEntries.map((entry) => {
-        const issueId = entry.issue?.id || entry.issue_id;
-        const cached = this.issueCache.get(issueId);
-        const issueSubject = cached?.subject || "Unknown Issue";
-
-        // Encode command arguments as JSON array for VS Code command URI
-        const commandArgs = encodeURIComponent(JSON.stringify([issueId]));
-        const tooltip = new vscode.MarkdownString(
-          `**Issue:** #${issueId} ${issueSubject}\n\n` +
-            `**Hours:** ${entry.hours}h\n\n` +
-            `**Activity:** ${entry.activity?.name || "Unknown"}\n\n` +
-            `**Date:** ${entry.spent_on}\n\n` +
-            `**Comments:** ${entry.comments || "(none)"}\n\n` +
-            `---\n\n` +
-            `[Open Issue in Browser](command:redmine.openTimeEntryInBrowser?${commandArgs})`
-        );
-        tooltip.isTrusted = true;
-        tooltip.supportHtml = false;
-
-        return {
-          label: `#${issueId} ${issueSubject}`,
-          description: `${entry.hours}h ${entry.activity?.name || ""}`,
-          tooltip,
-          collapsibleState: vscode.TreeItemCollapsibleState.None,
-          type: "entry",
-          contextValue: "time-entry",
-          _entry: entry,
-        };
-      });
+    // Day group or regular group - return time entries
+    if (
+      (element.type === "group" || element.type === "day-group") &&
+      element._cachedEntries
+    ) {
+      return this.mapEntriesToNodes(element._cachedEntries);
     }
 
     return [];
+  }
+
+  private groupEntriesByDay(entries: TimeEntry[]): TimeEntryNode[] {
+    // Group entries by spent_on date
+    const byDate = new Map<string, TimeEntry[]>();
+    for (const entry of entries) {
+      const date = entry.spent_on || "unknown";
+      if (!byDate.has(date)) {
+        byDate.set(date, []);
+      }
+      byDate.get(date)!.push(entry);
+    }
+
+    // Sort dates (earliest first for chronological order)
+    const sortedDates = Array.from(byDate.keys()).sort();
+
+    // Get working hours config
+    const config = vscode.workspace.getConfiguration("redmine.workingHours");
+    const schedule = getWeeklySchedule(config);
+
+    // Create day group nodes
+    return sortedDates.map((dateStr) => {
+      const dateEntries = byDate.get(dateStr)!;
+      const total = calculateTotal(dateEntries);
+      const date = new Date(dateStr + "T12:00:00"); // Add time to avoid timezone issues
+      const dayName = date.toLocaleDateString("en-US", { weekday: "short" });
+      const dayNum = date.getDate();
+      const available = getHoursForDate(date, schedule);
+
+      return {
+        label: `${dayName} ${dayNum}`,
+        description: formatHoursWithComparison(total, available),
+        collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
+        type: "day-group" as const,
+        _cachedEntries: dateEntries,
+      };
+    });
+  }
+
+  private async mapEntriesToNodes(entries: TimeEntry[]): Promise<TimeEntryNode[]> {
+    // Collect unique issue IDs that need fetching
+    const uniqueIssueIds = Array.from(
+      new Set(entries.map((entry) => entry.issue?.id || entry.issue_id))
+    );
+
+    // Filter out already-cached issues
+    const missingIssueIds = uniqueIssueIds.filter(
+      (id) => !this.issueCache.has(id)
+    );
+
+    // Batch fetch missing issues
+    if (missingIssueIds.length > 0 && this.server) {
+      await Promise.allSettled(
+        missingIssueIds.map(async (id) => {
+          try {
+            const { issue } = await this.server!.getIssueById(id);
+            this.issueCache.set(id, { id: issue.id, subject: issue.subject });
+          } catch {
+            // If fetch fails, cache as "Unknown Issue" to avoid retry
+            this.issueCache.set(id, { id, subject: "Unknown Issue" });
+          }
+        })
+      );
+    }
+
+    // Map entries using cached issue subjects
+    return entries.map((entry) => {
+      const issueId = entry.issue?.id || entry.issue_id;
+      const cached = this.issueCache.get(issueId);
+      const issueSubject = cached?.subject || "Unknown Issue";
+
+      // Encode command arguments as JSON array for VS Code command URI
+      const commandArgs = encodeURIComponent(JSON.stringify([issueId]));
+      const tooltip = new vscode.MarkdownString(
+        `**Issue:** #${issueId} ${issueSubject}\n\n` +
+          `**Hours:** ${entry.hours}h\n\n` +
+          `**Activity:** ${entry.activity?.name || "Unknown"}\n\n` +
+          `**Date:** ${entry.spent_on}\n\n` +
+          `**Comments:** ${entry.comments || "(none)"}\n\n` +
+          `---\n\n` +
+          `[Open Issue in Browser](command:redmine.openTimeEntryInBrowser?${commandArgs})`
+      );
+      tooltip.isTrusted = true;
+      tooltip.supportHtml = false;
+
+      return {
+        label: `#${issueId} ${issueSubject}`,
+        description: `${entry.hours}h ${entry.activity?.name || ""}`,
+        tooltip,
+        collapsibleState: vscode.TreeItemCollapsibleState.None,
+        type: "entry" as const,
+        contextValue: "time-entry",
+        _entry: entry,
+      };
+    });
   }
 
   getTreeItem(node: TimeEntryNode): vscode.TreeItem {

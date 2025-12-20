@@ -390,4 +390,66 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     expect(todayChildren).toHaveLength(1);
     expect(todayChildren[0].label).toBe("#999 Unknown Issue");
   });
+
+  it("groups This Week entries by day of week", async () => {
+    const weekEntries: TimeEntry[] = [
+      {
+        id: 1,
+        issue_id: 123,
+        activity_id: 9,
+        activity: { id: 9, name: "Development" },
+        hours: "4",
+        comments: "",
+        spent_on: "2025-12-15", // Monday
+      },
+      {
+        id: 2,
+        issue_id: 124,
+        activity_id: 9,
+        activity: { id: 9, name: "Development" },
+        hours: "3",
+        comments: "",
+        spent_on: "2025-12-15", // Monday (same day)
+      },
+      {
+        id: 3,
+        issue_id: 125,
+        activity_id: 10,
+        activity: { id: 10, name: "Testing" },
+        hours: "2",
+        comments: "",
+        spent_on: "2025-12-16", // Tuesday
+      },
+    ];
+
+    mockServer.getTimeEntries
+      .mockResolvedValueOnce({ time_entries: [] }) // today
+      .mockResolvedValueOnce({ time_entries: weekEntries }) // week
+      .mockResolvedValueOnce({ time_entries: weekEntries }); // month
+
+    const groups = await getLoadedGroups();
+    const thisWeek = groups[1];
+    expect(thisWeek.label).toBe("This Week");
+
+    // Get day groups
+    const dayGroups = await provider.getChildren(thisWeek);
+
+    // Should have 2 day groups (Monday and Tuesday)
+    expect(dayGroups.length).toBe(2);
+    expect(dayGroups[0].type).toBe("day-group");
+
+    // Days should be in order (Monday before Tuesday)
+    expect(dayGroups[0].label).toContain("Mon");
+    expect(dayGroups[1].label).toContain("Tue");
+
+    // Monday should show 7h total (4+3)
+    expect(dayGroups[0].description).toContain("7h");
+
+    // Tuesday should show 2h
+    expect(dayGroups[1].description).toContain("2h");
+
+    // Get entries for Monday
+    const mondayEntries = await provider.getChildren(dayGroups[0]);
+    expect(mondayEntries.length).toBe(2);
+  });
 });
