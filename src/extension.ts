@@ -614,38 +614,49 @@ export function activate(context: vscode.ExtensionContext): void {
     myTimeEntriesTree.refresh();
   });
 
-  registerCommand("openTimeEntryInBrowser", async (props: ActionProperties, ...args: unknown[]) => {
-    let issueId: number | undefined;
+  // Open time entry's issue in browser - registered directly to handle tooltip command URIs
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.openTimeEntryInBrowser", async (...args: unknown[]) => {
+      let issueId: number | undefined;
 
-    // Handle context menu (tree node with _entry)
-    if (args[0] && typeof args[0] === 'object' && '_entry' in args[0]) {
-      const node = args[0] as { _entry: { issue_id: number } };
-      issueId = node._entry.issue_id;
-    }
-    // Handle command URI (VS Code passes parsed JSON as first arg)
-    else if (args[0] && typeof args[0] === 'number') {
-      issueId = args[0];
-    }
-    // Handle command URI with object (legacy/alternative format)
-    else if (args[0] && typeof args[0] === 'object' && 'issue_id' in args[0]) {
-      const params = args[0] as { issue_id: number };
-      issueId = params.issue_id;
-    }
-    // Handle string that needs parsing
-    else if (typeof args[0] === 'string') {
-      const parsed = parseInt(args[0], 10);
-      if (!isNaN(parsed)) {
-        issueId = parsed;
+      // Handle command URI (tooltip link passes [issueId] as first arg)
+      if (typeof args[0] === 'number') {
+        issueId = args[0];
       }
-    }
+      // Handle context menu (tree node with _entry)
+      else if (args[0] && typeof args[0] === 'object' && '_entry' in args[0]) {
+        const node = args[0] as { _entry: { issue_id: number } };
+        issueId = node._entry.issue_id;
+      }
+      // Handle object with issue_id
+      else if (args[0] && typeof args[0] === 'object' && 'issue_id' in args[0]) {
+        const params = args[0] as { issue_id: number };
+        issueId = params.issue_id;
+      }
+      // Handle string
+      else if (typeof args[0] === 'string') {
+        const parsed = parseInt(args[0], 10);
+        if (!isNaN(parsed)) {
+          issueId = parsed;
+        }
+      }
 
-    if (!issueId) {
-      vscode.window.showErrorMessage('Could not determine issue ID');
-      return;
-    }
+      if (!issueId) {
+        vscode.window.showErrorMessage('Could not determine issue ID');
+        return;
+      }
 
-    await vscode.env.openExternal(vscode.Uri.parse(`${props.server.options.address}/issues/${issueId}`));
-  });
+      // Get URL from config
+      const config = vscode.workspace.getConfiguration("redmine");
+      const url = config.get<string>("url");
+      if (!url) {
+        vscode.window.showErrorMessage('Redmine URL not configured');
+        return;
+      }
+
+      await vscode.env.openExternal(vscode.Uri.parse(`${url}/issues/${issueId}`));
+    })
+  );
 
   // Open issue in browser (context menu for my-issues tree)
   registerCommand("openIssueInBrowser", async (props: ActionProperties, ...args: unknown[]) => {
