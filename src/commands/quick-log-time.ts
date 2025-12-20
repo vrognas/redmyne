@@ -20,13 +20,6 @@ export async function quickLogTime(
   context: vscode.ExtensionContext
 ): Promise<void> {
   try {
-    // Start fetching today's time entries early (runs during UI interactions)
-    const today = new Date().toISOString().split("T")[0];
-    const timeEntriesPromise = props.server.getTimeEntries({
-      from: today,
-      to: today,
-    });
-
     // 1. Get recent log from cache
     const recent = context.globalState.get<RecentTimeLog>("lastTimeLog");
 
@@ -70,18 +63,29 @@ export async function quickLogTime(
       selection = picked;
     }
 
-    // 3. Await time entries (started earlier, likely ready now)
-    const todayEntries = await timeEntriesPromise;
-    const todayTotal = todayEntries.time_entries.reduce(
+    // 3. Pick date (Today/Yesterday/Custom)
+    const selectedDate = await pickDate();
+    if (selectedDate === undefined) return; // User cancelled
+
+    // 4. Fetch time entries for selected date (runs during date picker)
+    const timeEntriesPromise = props.server.getTimeEntries({
+      from: selectedDate,
+      to: selectedDate,
+    });
+
+    const dateEntries = await timeEntriesPromise;
+    const dateTotal = dateEntries.time_entries.reduce(
       (sum, entry) => sum + parseFloat(entry.hours),
       0
     );
 
-    // 4. Input hours
+    // 5. Input hours
+    const today = new Date().toISOString().split("T")[0];
+    const dateLabel = selectedDate === today ? "Today" : selectedDate;
     const hoursInput = await vscode.window.showInputBox({
-      prompt: `Log time to #${selection.issueId} (${selection.activityName})${todayTotal > 0 ? ` | Today: ${todayTotal.toFixed(1)}h logged` : ""}`,
+      prompt: `Log time to #${selection.issueId} (${selection.activityName})${dateTotal > 0 ? ` | ${dateLabel}: ${dateTotal.toFixed(1)}h logged` : ""}`,
       placeHolder: "e.g., 2.5, 1:45, 1h 45min",
-      validateInput: (value: string) => validateTimeInput(value, todayTotal),
+      validateInput: (value: string) => validateTimeInput(value, dateTotal),
     });
 
     if (!hoursInput) return; // User cancelled
@@ -89,7 +93,7 @@ export async function quickLogTime(
     const hours = parseTimeInput(hoursInput)!; // Already validated
     const hoursStr = hours.toString();
 
-    // 5. Input comment (optional)
+    // 6. Input comment (optional)
     const comment = await vscode.window.showInputBox({
       prompt: `Comment for #${selection.issueId} (optional)`,
       placeHolder: "e.g., Implemented feature X",
@@ -97,15 +101,25 @@ export async function quickLogTime(
 
     if (comment === undefined) return; // User cancelled
 
-    // 6. Post time entry
-    await props.server.addTimeEntry(
-      selection.issueId,
-      selection.activityId,
-      hoursStr,
-      comment || "" // Empty string if no comment
-    );
+    // 7. Post time entry (only pass spentOn if not today)
+    if (selectedDate === today) {
+      await props.server.addTimeEntry(
+        selection.issueId,
+        selection.activityId,
+        hoursStr,
+        comment || ""
+      );
+    } else {
+      await props.server.addTimeEntry(
+        selection.issueId,
+        selection.activityId,
+        hoursStr,
+        comment || "",
+        selectedDate
+      );
+    }
 
-    // 7. Update cache
+    // 8. Update cache
     await context.globalState.update("lastTimeLog", {
       issueId: selection.issueId,
       issueSubject: selection.issueSubject,
@@ -114,15 +128,54 @@ export async function quickLogTime(
       lastLogged: new Date(),
     });
 
-    // 8. Confirm with status bar flash (NOT notification)
+    // 9. Confirm with status bar flash (NOT notification)
+    const dateConfirmation = selectedDate === today ? "" : ` on ${selectedDate}`;
     showStatusBarMessage(
-      `$(check) Logged ${hours.toFixed(2).replace(/\.?0+$/, "")}h to #${selection.issueId}`
+      `$(check) Logged ${hours.toFixed(2).replace(/\.?0+$/, "")}h to #${selection.issueId}${dateConfirmation}`
     );
   } catch (error) {
     vscode.window.showErrorMessage(
       `Failed to log time: ${error instanceof Error ? error.message : String(error)}`
     );
   }
+}
+
+async function pickDate(): Promise<string | undefined> {
+  const today = new Date();
+  const todayStr = today.toISOString().split("T")[0];
+
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+  const dateChoice = await vscode.window.showQuickPick(
+    [
+      { label: "$(calendar) Today", value: "today", date: todayStr },
+      { label: "$(history) Yesterday", value: "yesterday", date: yesterdayStr },
+      { label: "$(edit) Pick date...", value: "pick", date: "" },
+    ],
+    { title: "Log Time - Select Date", placeHolder: "Which day?" }
+  );
+
+  if (!dateChoice) return undefined;
+
+  if (dateChoice.value === "pick") {
+    const customDate = await vscode.window.showInputBox({
+      prompt: "Enter date (YYYY-MM-DD)",
+      placeHolder: yesterdayStr,
+      validateInput: (value: string) => {
+        if (!value) return "Date required";
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Use YYYY-MM-DD format";
+        const parsed = new Date(value);
+        if (isNaN(parsed.getTime())) return "Invalid date";
+        if (parsed > today) return "Cannot log time in the future";
+        return null;
+      },
+    });
+    return customDate;
+  }
+
+  return dateChoice.date;
 }
 
 async function pickIssueAndActivity(

@@ -163,8 +163,8 @@ describe("quickLogTime", () => {
   });
 
   it("calls API and updates cache after logging", async () => {
-    // Clear mock before setting up new return values
-    (vscode.window.showInputBox as ReturnType<typeof vi.fn>).mockClear();
+    // Reset mock before setting up new return values
+    (vscode.window.showInputBox as ReturnType<typeof vi.fn>).mockReset();
 
     // Mock globalState: undefined for lastTimeLog, empty array for recentIssueIds
     mockContext.globalState.get = vi.fn((key: string) => {
@@ -173,9 +173,10 @@ describe("quickLogTime", () => {
     });
     mockContext.globalState.update = vi.fn().mockResolvedValue(undefined);
 
-    // Mock flow: pickIssueAndActivity needs 2 QuickPick calls
+    // Mock flow: pickIssueAndActivity needs 2 QuickPick calls + date picker
     // Call 1: Pick issue from list
     // Call 2: Pick activity type
+    // Call 3: Pick date
     vi.spyOn(vscode.window, "showQuickPick")
       .mockResolvedValueOnce({
         label: "#123 Test Issue",
@@ -189,6 +190,11 @@ describe("quickLogTime", () => {
       .mockResolvedValueOnce({
         label: "Development",
         activity: { id: 9, name: "Development" },
+      } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({
+        label: "$(calendar) Today",
+        value: "today",
+        date: new Date().toISOString().split("T")[0],
       } as unknown as vscode.QuickPickItem);
 
     (vscode.window.showInputBox as ReturnType<typeof vi.fn>)
@@ -197,7 +203,7 @@ describe("quickLogTime", () => {
 
     await quickLogTime(props, mockContext);
 
-    // Verify API called with correct params (comment is empty)
+    // Verify API called with correct params (comment is empty, no spentOn for today)
     expect(mockServer.addTimeEntry).toHaveBeenCalledWith(123, 9, "2.5", "");
 
     // Verify cache updated
@@ -212,6 +218,105 @@ describe("quickLogTime", () => {
     expect(mockContext.globalState.update).toHaveBeenCalledWith(
       "recentIssueIds",
       expect.arrayContaining([123])
+    );
+  });
+
+  it("logs time to yesterday when selected", async () => {
+    (vscode.window.showInputBox as ReturnType<typeof vi.fn>).mockReset();
+
+    mockContext.globalState.get = vi.fn((key: string) => {
+      if (key === "recentIssueIds") return [];
+      return undefined;
+    });
+    mockContext.globalState.update = vi.fn().mockResolvedValue(undefined);
+
+    vi.spyOn(vscode.window, "showQuickPick")
+      .mockResolvedValueOnce({
+        label: "#123 Test Issue",
+        issue: {
+          id: 123,
+          subject: "Test Issue",
+          project: { id: 1, name: "Test Project" },
+          status: { name: "In Progress" },
+        },
+      } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({
+        label: "Development",
+        activity: { id: 9, name: "Development" },
+      } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({
+        label: "$(history) Yesterday",
+        value: "yesterday",
+        date: (() => {
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          return yesterday.toISOString().split("T")[0];
+        })(),
+      } as unknown as vscode.QuickPickItem);
+
+    (vscode.window.showInputBox as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce("8") // hours
+      .mockResolvedValueOnce("Worked late"); // comment
+
+    await quickLogTime(props, mockContext);
+
+    // Calculate expected yesterday date
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const expectedDate = yesterday.toISOString().split("T")[0];
+
+    // Verify API called with spentOn for yesterday
+    expect(mockServer.addTimeEntry).toHaveBeenCalledWith(
+      123,
+      9,
+      "8",
+      "Worked late",
+      expectedDate
+    );
+  });
+
+  it("allows custom date selection", async () => {
+    (vscode.window.showInputBox as ReturnType<typeof vi.fn>).mockReset();
+
+    mockContext.globalState.get = vi.fn((key: string) => {
+      if (key === "recentIssueIds") return [];
+      return undefined;
+    });
+    mockContext.globalState.update = vi.fn().mockResolvedValue(undefined);
+
+    vi.spyOn(vscode.window, "showQuickPick")
+      .mockResolvedValueOnce({
+        label: "#123 Test Issue",
+        issue: {
+          id: 123,
+          subject: "Test Issue",
+          project: { id: 1, name: "Test Project" },
+          status: { name: "In Progress" },
+        },
+      } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({
+        label: "Development",
+        activity: { id: 9, name: "Development" },
+      } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({
+        label: "$(edit) Pick date...",
+        value: "pick",
+      } as unknown as vscode.QuickPickItem);
+
+    (vscode.window.showInputBox as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce("2025-12-15") // custom date
+      .mockResolvedValueOnce("4") // hours
+      .mockResolvedValueOnce("Custom date work"); // comment
+
+    await quickLogTime(props, mockContext);
+
+    // Verify API called with custom spentOn date
+    expect(mockServer.addTimeEntry).toHaveBeenCalledWith(
+      123,
+      9,
+      "4",
+      "Custom date work",
+      "2025-12-15"
     );
   });
 });

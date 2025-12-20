@@ -12,6 +12,7 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ### Added
 
+- **Date picker for Quick Log Time** - log time on previous days (Today/Yesterday/custom)
 - **Quick Create Issue** (Ctrl+Y Ctrl+N) - create issues without leaving IDE
   - Full wizard: project → tracker → priority → subject → description → hours → due date
   - All optional fields skippable via Enter
