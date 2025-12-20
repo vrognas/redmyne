@@ -625,19 +625,25 @@ export class RedmineServer {
     );
   }
   async applyQuickUpdate(quickUpdate: QuickUpdate): Promise<QuickUpdateResult> {
+    // Build issue payload with optional date fields
+    const issuePayload: Record<string, unknown> = {
+      status_id: quickUpdate.status.statusId,
+      assigned_to_id: quickUpdate.assignee.id,
+      notes: quickUpdate.message,
+    };
+
+    // Only include dates if they were explicitly set (not undefined)
+    if (quickUpdate.startDate !== undefined) {
+      issuePayload.start_date = quickUpdate.startDate; // null clears, string sets
+    }
+    if (quickUpdate.dueDate !== undefined) {
+      issuePayload.due_date = quickUpdate.dueDate; // null clears, string sets
+    }
+
     const issueRequest = await this.doRequest<{ issue: Issue }>(
       `/issues/${quickUpdate.issueId}.json`,
       "PUT",
-      Buffer.from(
-        JSON.stringify({
-          issue: {
-            status_id: quickUpdate.status.statusId,
-            assigned_to_id: quickUpdate.assignee.id,
-            notes: quickUpdate.message,
-          },
-        }),
-        "utf8"
-      )
+      Buffer.from(JSON.stringify({ issue: issuePayload }), "utf8")
     );
     const issue = issueRequest.issue;
     const updateResult = new QuickUpdateResult();
