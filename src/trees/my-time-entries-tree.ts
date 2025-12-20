@@ -9,7 +9,7 @@ export interface TimeEntryNode {
   iconPath?: vscode.ThemeIcon;
   collapsibleState: vscode.TreeItemCollapsibleState;
   contextValue?: string;
-  type: "loading" | "group" | "week-group" | "day-group" | "entry";
+  type: "loading" | "group" | "week-group" | "day-group" | "month-group" | "week-subgroup" | "entry";
   _cachedEntries?: TimeEntry[];
   _entry?: TimeEntry;
 }
@@ -101,7 +101,7 @@ export class MyTimeEntriesTreeDataProvider
           label: "This Month",
           description: formatHoursWithComparison(monthTotal, monthAvailable),
           collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
-          type: "group",
+          type: "month-group",
           _cachedEntries: monthResult.time_entries,
         },
       ];
@@ -149,6 +149,16 @@ export class MyTimeEntriesTreeDataProvider
       return this.groupEntriesByDay(element._cachedEntries);
     }
 
+    // Month group - return week subgroups
+    if (element.type === "month-group" && element._cachedEntries) {
+      return this.groupEntriesByWeek(element._cachedEntries);
+    }
+
+    // Week subgroup - return day groups
+    if (element.type === "week-subgroup" && element._cachedEntries) {
+      return this.groupEntriesByDay(element._cachedEntries);
+    }
+
     // Day group or regular group - return time entries
     if (
       (element.type === "group" || element.type === "day-group") &&
@@ -193,6 +203,49 @@ export class MyTimeEntriesTreeDataProvider
         collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
         type: "day-group" as const,
         _cachedEntries: dateEntries,
+      };
+    });
+  }
+
+  private groupEntriesByWeek(entries: TimeEntry[]): TimeEntryNode[] {
+    // Group entries by ISO week number
+    const byWeek = new Map<number, TimeEntry[]>();
+    for (const entry of entries) {
+      const date = new Date((entry.spent_on || "unknown") + "T12:00:00");
+      const weekNum = getISOWeekNumber(date);
+      if (!byWeek.has(weekNum)) {
+        byWeek.set(weekNum, []);
+      }
+      byWeek.get(weekNum)!.push(entry);
+    }
+
+    // Sort weeks chronologically
+    const sortedWeeks = Array.from(byWeek.keys()).sort((a, b) => a - b);
+
+    // Get working hours config
+    const config = vscode.workspace.getConfiguration("redmine.workingHours");
+    const schedule = getWeeklySchedule(config);
+
+    // Create week subgroup nodes
+    return sortedWeeks.map((weekNum) => {
+      const weekEntries = byWeek.get(weekNum)!;
+      const total = calculateTotal(weekEntries);
+
+      // Calculate available hours for this week's entries
+      const dates = weekEntries.map((e) => e.spent_on || "");
+      const uniqueDates = [...new Set(dates)].filter((d) => d);
+      let available = 0;
+      for (const dateStr of uniqueDates) {
+        const date = new Date(dateStr + "T12:00:00");
+        available += getHoursForDate(date, schedule);
+      }
+
+      return {
+        label: `Week ${weekNum}`,
+        description: formatHoursWithComparison(total, available),
+        collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
+        type: "week-subgroup" as const,
+        _cachedEntries: weekEntries,
       };
     });
   }
@@ -369,4 +422,18 @@ function calculateAvailableHours(
   }
 
   return total;
+}
+
+/**
+ * Get ISO week number for a date
+ */
+function getISOWeekNumber(date: Date): number {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  // Set to nearest Thursday (current date + 4 - current day number, making Sunday = 7)
+  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+  // Get first day of year
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  // Calculate full weeks to nearest Thursday
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }

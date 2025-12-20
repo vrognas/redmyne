@@ -452,4 +452,67 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     const mondayEntries = await provider.getChildren(dayGroups[0]);
     expect(mondayEntries.length).toBe(2);
   });
+
+  it("groups This Month entries by week then day", async () => {
+    const monthEntries: TimeEntry[] = [
+      // Week 50 (Dec 9-15)
+      {
+        id: 1,
+        issue_id: 123,
+        activity_id: 9,
+        activity: { id: 9, name: "Development" },
+        hours: "8",
+        comments: "",
+        spent_on: "2025-12-09", // Tuesday (week 50)
+      },
+      // Week 51 (Dec 16-22)
+      {
+        id: 2,
+        issue_id: 124,
+        activity_id: 9,
+        activity: { id: 9, name: "Development" },
+        hours: "4",
+        comments: "",
+        spent_on: "2025-12-15", // Monday (week 51)
+      },
+      {
+        id: 3,
+        issue_id: 125,
+        activity_id: 10,
+        activity: { id: 10, name: "Testing" },
+        hours: "3",
+        comments: "",
+        spent_on: "2025-12-16", // Tuesday (week 51)
+      },
+    ];
+
+    mockServer.getTimeEntries
+      .mockResolvedValueOnce({ time_entries: [] }) // today
+      .mockResolvedValueOnce({ time_entries: [] }) // week
+      .mockResolvedValueOnce({ time_entries: monthEntries }); // month
+
+    const groups = await getLoadedGroups();
+    const thisMonth = groups[2];
+    expect(thisMonth.label).toBe("This Month");
+
+    // Get week groups
+    const weekGroups = await provider.getChildren(thisMonth);
+
+    // Should have 2 week groups
+    expect(weekGroups.length).toBe(2);
+    expect(weekGroups[0].type).toBe("week-subgroup");
+
+    // Weeks should be in chronological order
+    expect(weekGroups[0].label).toContain("Week 50");
+    expect(weekGroups[1].label).toContain("Week 51");
+
+    // Get days for Week 51
+    const week51Days = await provider.getChildren(weekGroups[1]);
+    expect(week51Days.length).toBe(2); // Mon 15, Tue 16
+    expect(week51Days[0].type).toBe("day-group");
+
+    // Get entries for a day
+    const dayEntries = await provider.getChildren(week51Days[0]);
+    expect(dayEntries.length).toBe(1);
+  });
 });
