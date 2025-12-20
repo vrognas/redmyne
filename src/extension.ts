@@ -11,7 +11,6 @@ import listOpenIssuesAssignedToMe from "./commands/list-open-issues-assigned-to-
 import newIssue from "./commands/new-issue";
 import { quickLogTime } from "./commands/quick-log-time";
 import { quickCreateIssue, quickCreateSubIssue } from "./commands/quick-create-issue";
-import { RedmineConfig } from "./definitions/redmine-config";
 import { ActionProperties } from "./commands/action-properties";
 import { ProjectsTree, ProjectsViewStyle } from "./trees/projects-tree";
 import { MyTimeEntriesTreeDataProvider } from "./trees/my-time-entries-tree";
@@ -50,7 +49,7 @@ export function activate(context: vscode.ExtensionContext): void {
   cleanupResources.bucket = bucket;
 
   const secretManager = new RedmineSecretManager(context);
-  const outputChannel = vscode.window.createOutputChannel("Redmine API");
+  const outputChannel = vscode.window.createOutputChannel("Redmyne");
 
   context.subscriptions.push(outputChannel);
 
@@ -473,7 +472,15 @@ export function activate(context: vscode.ExtensionContext): void {
       });
     }
 
-    const config = vscode.workspace.getConfiguration("redmine") as RedmineConfig;
+    const config = vscode.workspace.getConfiguration("redmine");
+    const url = config.get<string>("url");
+
+    if (!url) {
+      vscode.window.showErrorMessage(
+        'No Redmine URL configured. Run "Redmine: Configure"'
+      );
+      return Promise.resolve({ props: undefined, args: [] });
+    }
 
     // Get API key from secrets
     const apiKey = await secretManager.getApiKey();
@@ -486,9 +493,9 @@ export function activate(context: vscode.ExtensionContext): void {
     }
 
     const redmineServer = createServer({
-      address: config.url,
+      address: url,
       key: apiKey,
-      additionalHeaders: config.additionalHeaders,
+      additionalHeaders: config.get("additionalHeaders"),
     });
 
     const fromBucket = bucket.servers.find((s) => s.compare(redmineServer));
@@ -516,7 +523,11 @@ export function activate(context: vscode.ExtensionContext): void {
     return {
       props: {
         server,
-        config,
+        config: {
+          ...config,
+          url,
+          apiKey: "", // Deprecated, not used
+        },
       },
       args: [],
     };
