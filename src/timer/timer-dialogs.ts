@@ -203,20 +203,24 @@ export async function pickIssueAndActivity(
         return;
       }
 
-      // Debounce search (300ms), require at least 2 chars
+      // Debounce search (300ms)
       searchTimeout = setTimeout(async () => {
         const query = value.trim();
-        if (!query || query.length < 2 || isSearching) return;
+        if (!query || isSearching) return;
+
+        // Check if it's an issue ID (#123 or 123)
+        const cleanQuery = query.replace(/^#/, "");
+        const issueId = parseInt(cleanQuery, 10);
+        const isIdLookup = !isNaN(issueId) && cleanQuery === String(issueId);
+
+        // Require 2+ chars for text search, but allow single digit for ID lookup
+        if (!isIdLookup && query.length < 2) return;
 
         isSearching = true;
         quickPick.busy = true;
 
         try {
-          // Check if it's an issue ID (#123 or 123)
-          const cleanQuery = query.replace(/^#/, "");
-          const issueId = parseInt(cleanQuery, 10);
-
-          if (!isNaN(issueId) && cleanQuery === String(issueId)) {
+          if (isIdLookup) {
             // Fetch by ID
             try {
               const result = await server.getIssueById(issueId);
