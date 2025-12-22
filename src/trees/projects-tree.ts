@@ -193,9 +193,15 @@ export class ProjectsTree implements vscode.TreeDataProvider<TreeItem> {
           const subprojects = (this.projects ?? [])
             .filter((p) => p.parent && p.parent.id === project.id)
             .map((p) => this.createProjectNode(p));
-          const issues = (
-            await this.server.getOpenIssuesForProject(project.id, false)
-          ).issues;
+          // Try to fetch issues, but don't fail if 403 (user may have access to subprojects only)
+          let issues: Issue[] = [];
+          try {
+            issues = (
+              await this.server.getOpenIssuesForProject(project.id, false)
+            ).issues;
+          } catch {
+            // 403 = no access to parent project issues, show subprojects only
+          }
           return [...subprojects, ...issues];
         }
 
