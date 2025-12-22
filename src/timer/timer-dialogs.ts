@@ -199,7 +199,14 @@ export async function pickIssueAndActivity(
       return undefined;
     }
   } else {
-    selectedIssue = issueChoice.issue;
+    // Re-fetch issue to ensure we have complete and fresh data
+    try {
+      const result = await server.getIssueById(issueChoice.issue!.id);
+      selectedIssue = result.issue;
+    } catch {
+      // Fallback to cached data if re-fetch fails
+      selectedIssue = issueChoice.issue;
+    }
   }
 
   if (!selectedIssue) return undefined;
