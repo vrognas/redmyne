@@ -9,9 +9,32 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 - **Rebranded** to "Redmyne" - clearer differentiation from original extension
 - **New green logo** - distinct from original Redmine blue
 - **README** - prominent fork notice, feature comparison table
+- **Week groups in This Month** - sorted most recent first (descending)
+
+### Fixed
+
+- **Timer status bar shows activity** - working/paused now shows `#1234 [Data Management] (4/8)`
+- **Timer session recovery** - preserves "logging" phase for completed timers
+- **Timer phase consistency** - orphaned "paused" phase when unit removed/reset
+- **Timer state mutation** - getPlan() returns copy, restoreState() deep clones
+- **Timer resume finds correct unit** - searches by unitPhase, not index
+- **Timer persisted state validation** - validates phase, plan, numeric fields
 
 ### Added
 
+- **Enter/click starts timer unit** - click or Enter on tree item starts/pauses unit
+- **Start Timer respects selection** - title bar button starts selected unit
+
+
+
+- **Pomodoro/Unit Timer** (Ctrl+Y Ctrl+T) - plan work units with auto-logging
+  - Day planning wizard: pick unit count, assign issues/activities
+  - 45min work + 15min break cycles (configurable)
+  - Status bar shows timer countdown, current issue, progress
+  - "Today's Plan" tree view shows all units with status
+  - Auto-log time when unit completes (full unit duration)
+  - Sound notification on completion
+  - State persists across VS Code restarts (same day)
 - **Date picker for Quick Log Time** - log time on previous days (Today/Yesterday/custom)
 - **Day subdivisions in This Week** - time entries grouped by day (Mon, Tue, etc.)
 - **Week/day subdivisions in This Month** - entries grouped by week, then day
