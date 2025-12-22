@@ -14,6 +14,7 @@ export interface WorkUnit {
   comment?: string;
   logged: boolean;
   loggedHours?: number;
+  completedAt?: string; // ISO timestamp when unit was logged
   // Per-unit timer state
   secondsLeft: number;
   unitPhase: UnitPhase;

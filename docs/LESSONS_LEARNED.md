@@ -508,3 +508,67 @@ fi
 3. **Progress for >200ms ops**: Any network call needs indicator
 4. **Cache by access pattern**: Rarely-changing data deserves TTL cache
 5. **Pagination with intent**: Fetch what UI needs, not everything
+
+## Per-Unit Timer Architecture (2025-12-21)
+
+### State Consistency in Multi-Unit Timers
+
+**Problem**: Timer state inconsistencies when switching between units or recovering sessions
+
+**Root Causes Identified**:
+1. Constructor parameter mismatch (minutes vs seconds)
+2. Session recovery set wrong phase for completed timers
+3. Orphaned global "paused" phase when paused unit removed/reset
+4. Shared array references allowed external mutation
+
+**Solutions**:
+- Deep clone units in `restoreState()` to prevent reference leaks
+- Preserve "logging" phase during session recovery so markLogged/skipLogging work
+- Transition to "idle" when paused unit is removed or reset
+- Return copy from `getPlan()` to prevent external mutation
+
+### Finding Active Units by Phase
+
+**Problem**: `resume()` checked wrong unit because currentUnitIndex didn't match paused unit
+
+**Root Cause**: User could pause unit A, select unit B, then resume - code assumed paused unit was at currentUnitIndex
+
+**Solution**: Find paused unit by `unitPhase === "paused"` instead of using currentUnitIndex
+
+### Input Validation for Persisted State
+
+**Problem**: Corrupted persisted state could crash extension
+
+**Solution**: Validate all fields in `fromPersistedState()`:
+- Phase must be one of valid phases (default to "idle")
+- Plan must be array of valid WorkUnits
+- Numeric fields must be valid numbers with sensible defaults
+
+### Tree View Click/Enter UX
+
+**Problem**: Clicking tree item or pressing Enter did nothing
+
+**Solution**: Add `command` property to tree items based on unit state:
+- Pending/Paused → `startUnit` command
+- Working → `pause` command
+
+### Start Button Respecting Selection
+
+**Problem**: "Start Timer" button always started current unit, ignoring selection
+
+**Solution**: Check `treeView.selection` in start command and call `startUnit(index)` if selected
+
+### Status Bar Information Density
+
+**Problem**: Activity name (like "Data Management") not visible when timer running
+
+**Solution**: Add activity in brackets to status bar text: `$(pulse) 32:15 #1234 [Data Management] (4/8)`
+
+### Lessons
+
+1. **Find units by state, not index**: unitPhase is truth, currentUnitIndex is position
+2. **Deep clone on restore**: Prevent reference leaks from persisted state
+3. **Validate persisted data**: Corrupted storage shouldn't crash extension
+4. **Icons convey state**: Don't duplicate state in description when icon shows it
+5. **Tree commands enable keyboard**: Adding command property enables Enter/Space
+6. **Selection awareness**: Title bar buttons can check treeView.selection for context

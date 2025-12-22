@@ -53,6 +53,7 @@ export class RedmineServer {
   options: RedmineServerOptions = {} as RedmineServerOptions;
 
   private timeEntryActivities: TimeEntryActivity[] | null = null;
+  private cachedProjects: RedmineProject[] | null = null;
 
   get request() {
     if (this.options.requestFn) {
@@ -292,6 +293,11 @@ export class RedmineServer {
   }
 
   async getProjects(): Promise<RedmineProject[]> {
+    // Return cached if available
+    if (this.cachedProjects) {
+      return this.cachedProjects;
+    }
+
     const req = async (
       offset = 0,
       limit = 50,
@@ -320,7 +326,15 @@ export class RedmineServer {
       return req(offset + limit, limit, totalCount, accumulator.concat(result));
     };
 
-    return req();
+    this.cachedProjects = await req();
+    return this.cachedProjects;
+  }
+
+  /**
+   * Clear cached projects (call on refresh)
+   */
+  clearProjectsCache(): void {
+    this.cachedProjects = null;
   }
 
   async getTimeEntryActivities(): Promise<{
@@ -640,14 +654,17 @@ export class RedmineServer {
       issuePayload.due_date = quickUpdate.dueDate; // null clears, string sets
     }
 
-    const issueRequest = await this.doRequest<{ issue: Issue }>(
+    // PUT returns 204 No Content on success (null response)
+    await this.doRequest<null>(
       `/issues/${quickUpdate.issueId}.json`,
       "PUT",
       Buffer.from(JSON.stringify({ issue: issuePayload }), "utf8")
     );
-    const issue = issueRequest.issue;
+
+    // Fetch updated issue to verify changes
+    const { issue } = await this.getIssueById(quickUpdate.issueId);
     const updateResult = new QuickUpdateResult();
-    if (issue.assigned_to.id !== quickUpdate.assignee.id) {
+    if (issue.assigned_to?.id !== quickUpdate.assignee.id) {
       updateResult.addDifference("Couldn't assign user");
     }
     if (issue.status.id !== quickUpdate.status.statusId) {

@@ -71,6 +71,9 @@ export class IssueController {
         comment || ""
       );
 
+      // Refresh time entries tree
+      vscode.commands.executeCommand("redmine.refreshTimeEntries");
+
       // Status bar confirmation (matches QuickLogTime UX)
       showStatusBarMessage(
         `$(check) Logged ${hours.toFixed(2).replace(/\.?0+$/, "")}h to #${this.issue.id}`
@@ -208,11 +211,11 @@ export class IssueController {
     );
     if (dueDateResult === undefined) return; // cancelled
 
-    const message =
-      (await vscode.window.showInputBox({
-        title: `Quick Update (5/5) - #${this.issue.id}`,
-        placeHolder: "Add a comment (optional)",
-      })) ?? "";
+    const message = await vscode.window.showInputBox({
+      title: `Quick Update (5/5) - #${this.issue.id}`,
+      placeHolder: "Add a comment (optional)",
+    });
+    if (message === undefined) return; // cancelled
 
     const quickUpdate = new QuickUpdate(
       this.issue.id,

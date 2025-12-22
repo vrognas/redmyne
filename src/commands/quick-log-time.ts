@@ -119,7 +119,10 @@ export async function quickLogTime(
       );
     }
 
-    // 8. Update cache
+    // 8. Refresh time entries tree
+    vscode.commands.executeCommand("redmine.refreshTimeEntries");
+
+    // 9. Update cache
     await context.globalState.update("lastTimeLog", {
       issueId: selection.issueId,
       issueSubject: selection.issueSubject,
@@ -128,7 +131,7 @@ export async function quickLogTime(
       lastLogged: new Date(),
     });
 
-    // 9. Confirm with status bar flash (NOT notification)
+    // 10. Confirm with status bar flash (NOT notification)
     const dateConfirmation = selectedDate === today ? "" : ` on ${selectedDate}`;
     showStatusBarMessage(
       `$(check) Logged ${hours.toFixed(2).replace(/\.?0+$/, "")}h to #${selection.issueId}${dateConfirmation}`

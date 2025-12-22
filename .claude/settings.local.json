@@ -1,6 +1,23 @@
 {
   "permissions": {
-    "allow": ["Bash(npm install:*)", "Bash(npm run compile:*)", "Bash(gh:*)", "Bash(~/.local/bin/gh:*)", "Bash(ghcli:*)"],
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npm run compile:*)",
+      "Bash(gh:*)",
+      "Bash(~/.local/bin/gh:*)",
+      "Bash(ghcli:*)",
+      "Bash(git add:*)",
+      "Bash(git restore:*)",
+      "Bash(git commit:*)",
+      "Bash(npm test)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm run typecheck:all:*)",
+      "WebFetch(domain:www.redmine.org)",
+      "Bash(npm test:*)",
+      "WebSearch",
+      "WebFetch(domain:code.visualstudio.com)",
+      "WebFetch(domain:github.com)"
+    ],
     "deny": [],
     "ask": []
   }

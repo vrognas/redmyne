@@ -399,6 +399,8 @@ export class ProjectsTree implements vscode.TreeDataProvider<TreeItem> {
     this.assignedIssues = [];
     this.issuesByProject.clear();
     this.flexibilityCache.clear();
+    // Also clear server's project cache so next fetch gets fresh data
+    this.server?.clearProjectsCache();
   }
 
   setViewStyle(style: ProjectsViewStyle) {

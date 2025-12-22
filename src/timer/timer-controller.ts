@@ -207,6 +207,7 @@ export class TimerController {
         logged: true,
         loggedHours: hours,
         unitPhase: "completed",
+        completedAt: new Date().toISOString(),
       };
     }
 
@@ -219,7 +220,11 @@ export class TimerController {
     const index = this.state.currentUnitIndex;
     const unit = this.state.plan[index];
     if (unit) {
-      this.state.plan[index] = { ...unit, unitPhase: "completed" };
+      this.state.plan[index] = {
+        ...unit,
+        unitPhase: "completed",
+        completedAt: new Date().toISOString(),
+      };
     }
     this.transitionToBreak();
   }

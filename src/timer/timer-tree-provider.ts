@@ -87,6 +87,28 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   }
 
+  /**
+   * Format ISO timestamp as HH:MM for description
+   */
+  private formatClockTime(isoString: string): string {
+    const date = new Date(isoString);
+    return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  /**
+   * Format ISO timestamp as YYYY-MM-DD HH:MM:SS for tooltip
+   */
+  private formatFullTimestamp(isoString: string): string {
+    const date = new Date(isoString);
+    const yyyy = date.getFullYear();
+    const mm = (date.getMonth() + 1).toString().padStart(2, "0");
+    const dd = date.getDate().toString().padStart(2, "0");
+    const hh = date.getHours().toString().padStart(2, "0");
+    const min = date.getMinutes().toString().padStart(2, "0");
+    const ss = date.getSeconds().toString().padStart(2, "0");
+    return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
+  }
+
   private createUnitTreeItem(
     unit: WorkUnit,
     index: number,
@@ -120,7 +142,8 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
 
     // Description: show timer and activity for all non-completed units
     if (isCompleted && unit.loggedHours) {
-      item.description = `${unit.loggedHours}h logged`;
+      const timeStr = unit.completedAt ? ` @ ${this.formatClockTime(unit.completedAt)}` : "";
+      item.description = `${unit.loggedHours}h logged${timeStr}`;
     } else if (unit.unitPhase === "working" || unit.unitPhase === "paused") {
       item.description = `${this.formatTime(unit.secondsLeft)} [${unit.activityName || "?"}]`;
     } else if (unit.secondsLeft > 0) {
@@ -155,7 +178,8 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
         md.appendMarkdown(`Comment: ${unit.comment}\n\n`);
       }
       if (unit.logged && unit.loggedHours) {
-        md.appendMarkdown(`---\n\n✓ ${unit.loggedHours}h logged`);
+        const timestampStr = unit.completedAt ? ` at ${this.formatFullTimestamp(unit.completedAt)}` : "";
+        md.appendMarkdown(`---\n\n✓ ${unit.loggedHours}h logged${timestampStr}`);
       }
       item.tooltip = md;
     }
