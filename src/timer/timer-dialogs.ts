@@ -203,10 +203,10 @@ export async function pickIssueAndActivity(
         return;
       }
 
-      // Debounce search (300ms)
+      // Debounce search (300ms), require at least 2 chars
       searchTimeout = setTimeout(async () => {
         const query = value.trim();
-        if (!query || isSearching) return;
+        if (!query || query.length < 2 || isSearching) return;
 
         isSearching = true;
         quickPick.busy = true;
