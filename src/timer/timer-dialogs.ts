@@ -217,6 +217,15 @@ export async function pickIssueAndActivity(
     return undefined;
   }
 
+  // Check if project has time tracking enabled
+  const hasTimeTracking = await server.isTimeTrackingEnabled(selectedIssue.project.id);
+  if (!hasTimeTracking) {
+    vscode.window.showErrorMessage(
+      `Cannot log time: Project "${selectedIssue.project.name}" does not have time tracking enabled`
+    );
+    return undefined;
+  }
+
   let activities: TimeEntryActivity[];
   try {
     activities = await server.getProjectTimeEntryActivities(

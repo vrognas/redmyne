@@ -359,6 +359,28 @@ export class RedmineServer {
   }
 
   /**
+   * Check if a project has time_tracking module enabled
+   */
+  async isTimeTrackingEnabled(projectId: number | string): Promise<boolean> {
+    try {
+      const response = await this.doRequest<{
+        project: {
+          enabled_modules?: { name: string }[];
+        };
+      }>(`/projects/${projectId}.json?include=enabled_modules`, "GET");
+
+      const modules = response?.project?.enabled_modules || [];
+      const hasTimeTracking = modules.some(m => m.name === "time_tracking");
+      console.log(`[Redmine] Project ${projectId} time_tracking: ${hasTimeTracking}`);
+      return hasTimeTracking;
+    } catch (error) {
+      console.log(`[Redmine] Failed to check time_tracking for project ${projectId}:`, error);
+      // Assume enabled if we can't check (fail open)
+      return true;
+    }
+  }
+
+  /**
    * Get activities for a specific project (Redmine 3.4.0+)
    * Projects can restrict which activities are available
    * Falls back to global activities if project has no restrictions
