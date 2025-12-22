@@ -1,15 +1,11 @@
 import * as vscode from "vscode";
 import { Issue } from "../redmine/models/issue";
 import { RedmineServer } from "../redmine/redmine-server";
-import { FlexibilityScore, WeeklySchedule } from "../utilities/flexibility-calculator";
+import { FlexibilityScore, WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "../utilities/flexibility-calculator";
 import { showStatusBarMessage } from "../utilities/status-bar";
 
 type ZoomLevel = "day" | "week" | "month" | "quarter" | "year";
 
-// Default schedule if none provided
-const DEFAULT_SCHEDULE: WeeklySchedule = {
-  Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0, Sun: 0,
-};
 
 // Pixels per day for each zoom level
 const ZOOM_PIXELS_PER_DAY: Record<ZoomLevel, number> = {
@@ -312,7 +308,7 @@ export class GanttPanel {
   private _issues: GanttIssue[] = [];
   private _server: RedmineServer | undefined;
   private _zoomLevel: ZoomLevel = "day";
-  private _schedule: WeeklySchedule = DEFAULT_SCHEDULE;
+  private _schedule: WeeklySchedule = DEFAULT_WEEKLY_SCHEDULE;
   private _showWorkloadHeatmap: boolean = false;
   private _scrollPosition: { left: number; top: number } = { left: 0, top: 0 };
 

@@ -180,9 +180,9 @@ describe("MyTimeEntriesTreeDataProvider", () => {
 
     expect(todayChildren).toHaveLength(2);
     expect(todayChildren[0].label).toBe("#123 Test Issue 123");
-    expect(todayChildren[0].description).toBe("2.5h • Development • Test Project");
+    expect(todayChildren[0].description).toBe("2:30 • Development • Test Project");
     expect(todayChildren[1].label).toBe("#124 Test Issue 124");
-    expect(todayChildren[1].description).toBe("1.5h • Testing • Test Project");
+    expect(todayChildren[1].description).toBe("1:30 • Testing • Test Project");
   });
 
   it("calculates correct totals for groups", async () => {
@@ -215,11 +215,11 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     const groups = await getLoadedGroups();
 
     expect(groups[0].label).toContain("Today");
-    expect(groups[0].description).toContain("4h"); // Contains total (format may vary based on working days)
+    expect(groups[0].description).toContain("4:00"); // Contains total in H:MM format
     expect(groups[1].label).toContain("This Week");
-    expect(groups[1].description).toContain("4h");
+    expect(groups[1].description).toContain("4:00");
     expect(groups[2].label).toContain("This Month");
-    expect(groups[2].description).toContain("4h");
+    expect(groups[2].description).toContain("4:00");
   });
 
   it("shows empty state when no entries", async () => {
@@ -231,7 +231,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     const groups = await getLoadedGroups();
 
     expect(groups).toHaveLength(3);
-    expect(groups[0].description).toContain("0h"); // Contains 0h total
+    expect(groups[0].description).toContain("0:00"); // Contains 0:00 total
 
     const todayChildren = await provider.getChildren(groups[0]);
     expect(todayChildren).toHaveLength(0);
@@ -442,11 +442,11 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     expect(dayGroups[0].label).toContain("Mon");
     expect(dayGroups[1].label).toContain("Tue");
 
-    // Monday should show 7h total (4+3)
-    expect(dayGroups[0].description).toContain("7h");
+    // Monday should show 7:00 total (4+3)
+    expect(dayGroups[0].description).toContain("7:00");
 
-    // Tuesday should show 2h
-    expect(dayGroups[1].description).toContain("2h");
+    // Tuesday should show 2:00
+    expect(dayGroups[1].description).toContain("2:00");
 
     // Get entries for Monday
     const mondayEntries = await provider.getChildren(dayGroups[0]);

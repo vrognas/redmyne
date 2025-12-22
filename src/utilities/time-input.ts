@@ -68,3 +68,22 @@ export function formatHoursAsHHMM(hours: number): string {
   const m = totalMinutes % 60;
   return `${h}:${m.toString().padStart(2, "0")}`;
 }
+
+/**
+ * Format minutes as H:MM (e.g., 60 → "1:00", 45 → "0:45", 90 → "1:30")
+ */
+export function formatMinutesAsHHMM(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h}:${m.toString().padStart(2, "0")}`;
+}
+
+/**
+ * Format seconds as MM:SS for timer display (e.g., 125 → "2:05", 3600 → "60:00")
+ */
+export function formatSecondsAsMMSS(seconds: number): string {
+  const absSeconds = Math.max(0, seconds);
+  const mins = Math.floor(absSeconds / 60);
+  const secs = absSeconds % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}

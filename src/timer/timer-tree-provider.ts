@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { TimerController } from "./timer-controller";
 import { WorkUnit } from "./timer-state";
-import { formatHoursAsHHMM } from "./timer-dialogs";
+import { formatHoursAsHHMM, formatSecondsAsMMSS } from "../utilities/time-input";
 
 interface PlanTreeItem {
   type: "header" | "unit" | "add-button";
@@ -79,14 +79,6 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
     return new vscode.TreeItem("");
   }
 
-  /**
-   * Format seconds as MM:SS
-   */
-  private formatTime(seconds: number): string {
-    const mins = Math.floor(Math.max(0, seconds) / 60);
-    const secs = Math.max(0, seconds) % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  }
 
   /**
    * Format ISO timestamp as HH:MM for description
@@ -146,10 +138,10 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
       const timeStr = unit.completedAt ? ` @ ${this.formatClockTime(unit.completedAt)}` : "";
       item.description = `${formatHoursAsHHMM(unit.loggedHours)} logged${timeStr}`;
     } else if (unit.unitPhase === "working" || unit.unitPhase === "paused") {
-      item.description = `${this.formatTime(unit.secondsLeft)} [${unit.activityName || "?"}]`;
+      item.description = `${formatSecondsAsMMSS(unit.secondsLeft)} [${unit.activityName || "?"}]`;
     } else if (unit.secondsLeft > 0) {
       // Pending - show timer
-      item.description = `${this.formatTime(unit.secondsLeft)} [${unit.activityName || "?"}]`;
+      item.description = `${formatSecondsAsMMSS(unit.secondsLeft)} [${unit.activityName || "?"}]`;
     } else if (unit.activityName) {
       item.description = `[${unit.activityName}]`;
     }
@@ -174,7 +166,7 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
       const md = new vscode.MarkdownString();
       md.appendMarkdown(`**#${unit.issueId}** ${unit.issueSubject}\n\n`);
       md.appendMarkdown(`Activity: ${unit.activityName}\n\n`);
-      md.appendMarkdown(`Timer: ${this.formatTime(unit.secondsLeft)}\n\n`);
+      md.appendMarkdown(`Timer: ${formatSecondsAsMMSS(unit.secondsLeft)}\n\n`);
       if (unit.comment) {
         md.appendMarkdown(`Comment: ${unit.comment}\n\n`);
       }

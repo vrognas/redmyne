@@ -49,7 +49,7 @@ function isBillable(issue: Issue): boolean {
 /**
  * Checks if issue is blocked by another issue
  */
-function isBlocked(issue: Issue): boolean {
+export function isBlocked(issue: Issue): boolean {
   return issue.relations?.some((r) => r.relation_type === "blocked") ?? false;
 }
 

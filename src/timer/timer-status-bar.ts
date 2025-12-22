@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { TimerController } from "./timer-controller";
 import { TimerState, TimerPhase, countCompleted, getWorkingUnit } from "./timer-state";
-import { formatHoursAsHHMM } from "./timer-dialogs";
+import { formatHoursAsHHMM, formatSecondsAsMMSS } from "../utilities/time-input";
 
 /**
  * Status bar display for timer
@@ -58,7 +58,7 @@ export class TimerStatusBar {
         break;
 
       case "working":
-        this.statusBarItem.text = `$(pulse) ${formatTime(workingUnit?.secondsLeft ?? 0)} #${workingUnit?.issueId || "?"} [${workingUnit?.activityName || "?"}] ${progress}`;
+        this.statusBarItem.text = `$(pulse) ${formatSecondsAsMMSS(workingUnit?.secondsLeft ?? 0)} #${workingUnit?.issueId || "?"} [${workingUnit?.activityName || "?"}] ${progress}`;
         if (phaseChanged) {
           this.statusBarItem.tooltip = this.buildTooltip(state);
           this.statusBarItem.command = "redmine.timer.toggle";
@@ -67,7 +67,7 @@ export class TimerStatusBar {
 
       case "paused":
         // Use pausedUnit which may differ from currentUnitIndex
-        this.statusBarItem.text = `$(debug-pause) ${formatTime(pausedUnit?.secondsLeft ?? 0)} #${pausedUnit?.issueId || "?"} [${pausedUnit?.activityName || "?"}] ${progress}`;
+        this.statusBarItem.text = `$(debug-pause) ${formatSecondsAsMMSS(pausedUnit?.secondsLeft ?? 0)} #${pausedUnit?.issueId || "?"} [${pausedUnit?.activityName || "?"}] ${progress}`;
         if (phaseChanged) {
           this.statusBarItem.tooltip = "Timer paused - click to resume";
           this.statusBarItem.command = "redmine.timer.toggle";
@@ -83,7 +83,7 @@ export class TimerStatusBar {
         break;
 
       case "break":
-        this.statusBarItem.text = `$(coffee) ${formatTime(breakSecondsLeft)} break`;
+        this.statusBarItem.text = `$(coffee) ${formatSecondsAsMMSS(breakSecondsLeft)} break`;
         if (phaseChanged) {
           this.statusBarItem.tooltip = "Break time - click to start next unit";
           this.statusBarItem.command = "redmine.timer.toggle";
@@ -129,12 +129,3 @@ export class TimerStatusBar {
   }
 }
 
-/**
- * Format seconds as MM:SS (handles negative values)
- */
-function formatTime(seconds: number): string {
-  const absSeconds = Math.max(0, seconds);
-  const mins = Math.floor(absSeconds / 60);
-  const secs = absSeconds % 60;
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
-}

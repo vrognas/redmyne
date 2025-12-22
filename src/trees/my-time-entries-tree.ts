@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { RedmineServer } from "../redmine/redmine-server";
 import { TimeEntry } from "../redmine/models/time-entry";
+import { formatHoursAsHHMM } from "../utilities/time-input";
 
 export interface TimeEntryNode {
   id?: string; // Stable ID for preserving expansion state
@@ -324,7 +325,7 @@ export class MyTimeEntriesTreeDataProvider
         `**Issue:** #${issueId} ${issueSubject}\n\n` +
           (clientName ? `**Client:** ${clientName}\n\n` : "") +
           (projectName ? `**Project:** ${projectName}\n\n` : "") +
-          `**Hours:** ${formatHours(parseFloat(entry.hours))}\n\n` +
+          `**Hours:** ${formatHoursAsHHMM(parseFloat(entry.hours))}\n\n` +
           `**Activity:** ${entry.activity?.name || "Unknown"}\n\n` +
           `**Date:** ${entry.spent_on}\n\n` +
           `**Comments:** ${entry.comments || "(none)"}\n\n` +
@@ -336,7 +337,7 @@ export class MyTimeEntriesTreeDataProvider
 
       // Build description: "2h Dev • ProjectName" or "2h Dev" if no project
       const activityPart = entry.activity?.name || "";
-      const descParts = [formatHours(parseFloat(entry.hours)), activityPart, projectName].filter(Boolean);
+      const descParts = [formatHoursAsHHMM(parseFloat(entry.hours)), activityPart, projectName].filter(Boolean);
       const description = descParts.join(" • ");
 
       return {
@@ -384,23 +385,17 @@ function calculateTotal(entries: TimeEntry[]): number {
   return entries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
 }
 
-function formatHours(hours: number): string {
-  const totalMinutes = Math.round(hours * 60);
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return `${h}:${m.toString().padStart(2, "0")}`;
-}
 
 function formatHoursWithComparison(
   logged: number,
   available: number
 ): string {
   if (available === 0) {
-    return formatHours(logged);
+    return formatHoursAsHHMM(logged);
   }
 
   const percentage = Math.round((logged / available) * 100);
-  return `${formatHours(logged)}/${formatHours(available)} (${percentage}%)`;
+  return `${formatHoursAsHHMM(logged)}/${formatHoursAsHHMM(available)} (${percentage}%)`;
 }
 
 type WeeklySchedule = Record<string, number>;

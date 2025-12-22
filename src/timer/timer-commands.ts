@@ -1,9 +1,10 @@
 import * as vscode from "vscode";
 import { RedmineServer } from "../redmine/redmine-server";
 import { TimerController } from "./timer-controller";
-import { showPlanDayDialog, pickIssueAndActivity, formatHoursAsHHMM } from "./timer-dialogs";
+import { showPlanDayDialog, pickIssueAndActivity } from "./timer-dialogs";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { playCompletionSound } from "./timer-sound";
+import { formatHoursAsHHMM } from "../utilities/time-input";
 
 interface TreeItem {
   type?: string;

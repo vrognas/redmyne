@@ -3,6 +3,7 @@ import { RedmineServer } from "../redmine/redmine-server";
 import { Issue } from "../redmine/models/issue";
 import { TimeEntryActivity } from "../redmine/models/time-entry-activity";
 import { WorkUnit } from "./timer-state";
+import { formatHoursAsHHMM, formatMinutesAsHHMM } from "../utilities/time-input";
 
 interface IssueQuickPickItem extends vscode.QuickPickItem {
   issue?: Issue;
@@ -363,21 +364,3 @@ export async function showCompletionDialog(
   };
 }
 
-/**
- * Format minutes as H:MM (e.g., 60 → "1:00", 45 → "0:45", 90 → "1:30")
- */
-function formatMinutesAsHHMM(minutes: number): string {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return `${h}:${m.toString().padStart(2, "0")}`;
-}
-
-/**
- * Format decimal hours as H:MM (e.g., 1.0 → "1:00", 0.75 → "0:45", 1.5 → "1:30")
- */
-export function formatHoursAsHHMM(hours: number): string {
-  const totalMinutes = Math.round(hours * 60);
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return `${h}:${m.toString().padStart(2, "0")}`;
-}

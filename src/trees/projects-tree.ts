@@ -5,12 +5,15 @@ import { Issue } from "../redmine/models/issue";
 import {
   createIssueTreeItem,
   createEnhancedIssueTreeItem,
+  isBlocked,
 } from "../utilities/tree-item-factory";
 import {
   calculateFlexibility,
   clearFlexibilityCache,
   FlexibilityScore,
   WeeklySchedule,
+  STATUS_PRIORITY,
+  DEFAULT_WEEKLY_SCHEDULE,
 } from "../utilities/flexibility-calculator";
 
 export enum ProjectsViewStyle {
@@ -36,30 +39,8 @@ interface ProjectNode {
 
 type TreeItem = ProjectNode | Issue | LoadingPlaceholder;
 
-const DEFAULT_SCHEDULE: WeeklySchedule = {
-  Mon: 8,
-  Tue: 8,
-  Wed: 8,
-  Thu: 8,
-  Fri: 8,
-  Sat: 0,
-  Sun: 0,
-};
 
-// Status priority for sorting (lower = higher priority)
-const STATUS_PRIORITY: Record<FlexibilityScore["status"], number> = {
-  overbooked: 0,
-  "at-risk": 1,
-  "on-track": 2,
-  completed: 3,
-};
 
-/**
- * Check if issue is blocked by another issue
- */
-function isBlocked(issue: Issue): boolean {
-  return issue.relations?.some((r) => r.relation_type === "blocked") ?? false;
-}
 
 /**
  * Type guard for ProjectNode
@@ -361,7 +342,7 @@ export class ProjectsTree implements vscode.TreeDataProvider<TreeItem> {
 
   private getScheduleConfig(): WeeklySchedule {
     const config = vscode.workspace.getConfiguration("redmine.workingHours");
-    return config.get<WeeklySchedule>("weeklySchedule", DEFAULT_SCHEDULE);
+    return config.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
   }
 
   /**
