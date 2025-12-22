@@ -23,10 +23,10 @@ export async function showPlanDayDialog(
   workDurationSeconds: number = 45 * 60
 ): Promise<WorkUnit[] | undefined> {
   // Step 1: How many units?
-  const hoursPerUnit = unitDurationMinutes / 60;
+  const unitDurationStr = formatMinutesAsHHMM(unitDurationMinutes);
   const countInput = await vscode.window.showInputBox({
     title: "Plan Day",
-    prompt: `How many units? (${hoursPerUnit}h each)`,
+    prompt: `How many units? (${unitDurationStr} each)`,
     placeHolder: "e.g., 8",
     value: "8",
     validateInput: (v) => {
@@ -300,4 +300,13 @@ export async function showCompletionDialog(
     hours: defaultHours,
     comment: comment || undefined,
   };
+}
+
+/**
+ * Format minutes as H:MM (e.g., 60 → "1:00", 45 → "0:45", 90 → "1:30")
+ */
+function formatMinutesAsHHMM(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h}:${m.toString().padStart(2, "0")}`;
 }
