@@ -39,20 +39,37 @@ const createMockRequest = () =>
           let data: unknown;
 
           if (options.method === "GET" && path.includes("/issues.json")) {
-              data = {
-                issues: [
-                  {
-                    id: 123,
-                    subject: "Test issue",
+              // Check if fetching by specific IDs (from searchIssues)
+              const issueIdMatch = path.match(/issue_id=([0-9,]+)/);
+              if (issueIdMatch) {
+                const ids = issueIdMatch[1].split(",").map(Number);
+                data = {
+                  issues: ids.map(id => ({
+                    id,
+                    subject: `Issue ${id}`,
                     status: { id: 1, name: "New" },
                     tracker: { id: 1, name: "Bug" },
                     author: { id: 1, name: "John Doe" },
                     project: { id: 1, name: "Test Project" },
-                    assigned_to: { id: 1, name: "John Doe" },
-                  },
-                ],
-                total_count: 1,
-              };
+                  })),
+                  total_count: ids.length,
+                };
+              } else {
+                data = {
+                  issues: [
+                    {
+                      id: 123,
+                      subject: "Test issue",
+                      status: { id: 1, name: "New" },
+                      tracker: { id: 1, name: "Bug" },
+                      author: { id: 1, name: "John Doe" },
+                      project: { id: 1, name: "Test Project" },
+                      assigned_to: { id: 1, name: "John Doe" },
+                    },
+                  ],
+                  total_count: 1,
+                };
+              }
             } else if (path.match(/\/issues\/\d+\.json/)) {
               if (options.method === "GET") {
                 data = {
@@ -106,6 +123,17 @@ const createMockRequest = () =>
               path.includes("/time_entries.json")
             ) {
               data = { time_entry: { id: 1 } };
+            } else if (
+              options.method === "GET" &&
+              path.includes("/search.json")
+            ) {
+              // Return search results with issue type
+              data = {
+                results: [
+                  { id: 456, title: "Issue #456: Search result", type: "issue", url: "/issues/456" },
+                  { id: 789, title: "Issue #789: Another result", type: "issue", url: "/issues/789" },
+                ],
+              };
             } else {
               data = { error: "Not found" };
             }
@@ -258,6 +286,25 @@ describe("RedmineServer", () => {
       requestFn: createMockRequest(),
     });
     expect(server.compare(server3)).toBe(false);
+  });
+
+  describe("searchIssues", () => {
+    it("should search issues by text", async () => {
+      const results = await server.searchIssues("test query");
+      expect(results).toHaveLength(2);
+      expect(results[0].id).toBe(456);
+      expect(results[1].id).toBe(789);
+    });
+
+    it("should return empty array for empty query", async () => {
+      const results = await server.searchIssues("");
+      expect(results).toHaveLength(0);
+    });
+
+    it("should return empty array for whitespace query", async () => {
+      const results = await server.searchIssues("   ");
+      expect(results).toHaveLength(0);
+    });
   });
 
   describe("security validation", () => {

@@ -792,6 +792,31 @@ export class RedmineServer {
   }
 
   /**
+   * Search issues by text query using Redmine's /search API
+   * @param query Search text (searches subject, description, ID)
+   * @param limit Max results (default 10)
+   * @returns Full Issue objects matching query
+   */
+  async searchIssues(query: string, limit = 10): Promise<Issue[]> {
+    if (!query.trim()) return [];
+
+    // Redmine search API returns lightweight results
+    const response = await this.doRequest<{
+      results: { id: number; title: string; type: string; url: string }[];
+    }>(`/search.json?q=${encodeURIComponent(query)}&issues=1&limit=${limit}`, "GET");
+
+    // Extract issue IDs from results (type="issue")
+    const issueIds = (response?.results || [])
+      .filter((r) => r.type === "issue")
+      .map((r) => r.id);
+
+    if (issueIds.length === 0) return [];
+
+    // Fetch full issues to get complete data
+    return this.getIssuesByIds(issueIds);
+  }
+
+  /**
    * Returns promise, that resolves to list of open issues for project
    */
   async getOpenIssuesForProject(

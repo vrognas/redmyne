@@ -160,6 +160,17 @@ export async function pickIssueAndActivity(
   );
 
   const issueItems: IssueQuickPickItem[] = [
+    // Search option at top for discoverability
+    {
+      label: "$(search) Search by #ID or text...",
+      action: "search",
+      description: "Find any issue",
+    },
+    // Separator
+    {
+      label: "",
+      kind: vscode.QuickPickItemKind.Separator,
+    } as IssueQuickPickItem,
     // Trackable issues (selectable)
     ...trackableIssues.map((issue) => ({
       label: `#${issue.id} ${issue.subject}`,
@@ -174,24 +185,19 @@ export async function pickIssueAndActivity(
       issue,
       disabled: true,
     })),
+    // Skip at the end
+    {
+      label: "$(dash) Skip (assign later)",
+      action: "skip",
+    },
   ];
-
-  issueItems.push({
-    label: "$(search) Search issues...",
-    action: "search",
-  });
-
-  issueItems.push({
-    label: "$(dash) Skip (assign later)",
-    action: "skip",
-  });
 
   // Loop to re-show picker if disabled issue selected
   let selectedIssue: Issue | undefined;
   while (true) {
     const issueChoice = await vscode.window.showQuickPick(issueItems, {
       title: `Plan Day - ${title}`,
-      placeHolder: "Select issue",
+      placeHolder: "Select issue or search",
     });
 
     if (!issueChoice) return undefined;
@@ -212,14 +218,15 @@ export async function pickIssueAndActivity(
       // Search dialog
       const query = await vscode.window.showInputBox({
         title: `Plan Day - ${title}`,
-        prompt: "Search issues by ID or text",
+        prompt: "Enter #ID or search text",
         placeHolder: "e.g., 1234 or keyword",
       });
-      if (!query) return undefined;
+      if (!query) continue; // Return to picker if cancelled
 
-      // Try as issue ID first
-      const issueId = parseInt(query, 10);
-      if (!isNaN(issueId)) {
+      // Try as issue ID first (handles #123 or 123)
+      const cleanQuery = query.replace(/^#/, "");
+      const issueId = parseInt(cleanQuery, 10);
+      if (!isNaN(issueId) && cleanQuery === String(issueId)) {
         try {
           const result = await server.getIssueById(issueId);
           selectedIssue = result.issue;
@@ -229,9 +236,29 @@ export async function pickIssueAndActivity(
           continue;
         }
       } else {
-        // Search by text - for now just show error, could add full search later
-        vscode.window.showErrorMessage("Text search not yet implemented");
-        continue;
+        // Text search
+        const searchResults = await server.searchIssues(query, 10);
+        if (searchResults.length === 0) {
+          vscode.window.showInformationMessage(`No issues found for "${query}"`);
+          continue;
+        }
+
+        // Show search results in a picker
+        const searchItems = searchResults.map((issue) => ({
+          label: `#${issue.id} ${issue.subject}`,
+          description: issue.project?.name,
+          detail: issue.status?.name,
+          issue,
+        }));
+
+        const searchChoice = await vscode.window.showQuickPick(searchItems, {
+          title: `Search Results - "${query}"`,
+          placeHolder: `${searchResults.length} result(s)`,
+        });
+
+        if (!searchChoice) continue; // Return to main picker
+        selectedIssue = searchChoice.issue;
+        break;
       }
     }
 

@@ -24,6 +24,7 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ### Added
 
+- **Issue search in unit picker** - search option at top; find any issue by #ID or text
 - **Empty working days in time entries** - show days with 0 logged hours based on weekly schedule; tooltips explain date range
 - **Add Time Entry from day** - right-click day in time entries to add entry for that date
 - **Enter/click starts timer unit** - click or Enter on tree item starts/pauses unit
