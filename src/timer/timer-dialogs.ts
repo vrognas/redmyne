@@ -159,18 +159,8 @@ export async function pickIssueAndActivity(
     (issue) => !issue.project?.id || !timeTrackingByProject.get(issue.project.id)
   );
 
-  const issueItems: IssueQuickPickItem[] = [
-    // Search option at top for discoverability
-    {
-      label: "$(search) Search by #ID or text...",
-      action: "search",
-      description: "Find any issue",
-    },
-    // Separator
-    {
-      label: "",
-      kind: vscode.QuickPickItemKind.Separator,
-    } as IssueQuickPickItem,
+  // Build base items from assigned issues
+  const baseItems: IssueQuickPickItem[] = [
     // Trackable issues (selectable)
     ...trackableIssues.map((issue) => ({
       label: `#${issue.id} ${issue.subject}`,
@@ -192,108 +182,154 @@ export async function pickIssueAndActivity(
     },
   ];
 
-  // Loop to re-show picker if disabled issue selected
-  let selectedIssue: Issue | undefined;
-  while (true) {
-    const issueChoice = await vscode.window.showQuickPick(issueItems, {
-      title: `Plan Day - ${title}`,
-      placeHolder: "Select issue or search",
+  // Use createQuickPick for inline search
+  const selectedIssue = await new Promise<Issue | "skip" | undefined>((resolve) => {
+    const quickPick = vscode.window.createQuickPick<IssueQuickPickItem>();
+    quickPick.title = `Plan Day - ${title}`;
+    quickPick.placeholder = "Type to search any issue by #ID or text";
+    quickPick.items = baseItems;
+    quickPick.matchOnDescription = true;
+
+    let searchTimeout: ReturnType<typeof setTimeout> | undefined;
+    let isSearching = false;
+
+    quickPick.onDidChangeValue(async (value) => {
+      // Clear previous timeout
+      if (searchTimeout) clearTimeout(searchTimeout);
+
+      // If empty, show base items
+      if (!value.trim()) {
+        quickPick.items = baseItems;
+        return;
+      }
+
+      // Debounce search (300ms)
+      searchTimeout = setTimeout(async () => {
+        const query = value.trim();
+        if (!query || isSearching) return;
+
+        isSearching = true;
+        quickPick.busy = true;
+
+        try {
+          // Check if it's an issue ID (#123 or 123)
+          const cleanQuery = query.replace(/^#/, "");
+          const issueId = parseInt(cleanQuery, 10);
+
+          if (!isNaN(issueId) && cleanQuery === String(issueId)) {
+            // Fetch by ID
+            try {
+              const result = await server.getIssueById(issueId);
+              const searchItem: IssueQuickPickItem = {
+                label: `$(search) #${result.issue.id} ${result.issue.subject}`,
+                description: result.issue.project?.name,
+                detail: `${result.issue.status?.name} • Press Enter to select`,
+                issue: result.issue,
+              };
+              quickPick.items = [searchItem, { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem, ...baseItems];
+            } catch {
+              quickPick.items = [
+                { label: `$(error) Issue #${issueId} not found`, disabled: true },
+                { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
+                ...baseItems,
+              ];
+            }
+          } else {
+            // Text search
+            const searchResults = await server.searchIssues(query, 10);
+            if (searchResults.length === 0) {
+              quickPick.items = [
+                { label: `$(info) No results for "${query}"`, disabled: true },
+                { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
+                ...baseItems,
+              ];
+            } else {
+              const searchItems: IssueQuickPickItem[] = searchResults.map((issue) => ({
+                label: `$(search) #${issue.id} ${issue.subject}`,
+                description: issue.project?.name,
+                detail: issue.status?.name,
+                issue,
+              }));
+              quickPick.items = [
+                ...searchItems,
+                { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
+                ...baseItems,
+              ];
+            }
+          }
+        } finally {
+          isSearching = false;
+          quickPick.busy = false;
+        }
+      }, 300);
     });
 
-    if (!issueChoice) return undefined;
+    quickPick.onDidAccept(() => {
+      const selected = quickPick.selectedItems[0];
+      if (!selected) return;
 
-    if (issueChoice.action === "skip") {
-      return {
-        issueId: 0,
-        issueSubject: "(not assigned)",
-        activityId: 0,
-        activityName: "",
-        logged: false,
-        secondsLeft: workDurationSeconds,
-        unitPhase: "pending",
-      };
-    }
-
-    if (issueChoice.action === "search") {
-      // Search dialog
-      const query = await vscode.window.showInputBox({
-        title: `Plan Day - ${title}`,
-        prompt: "Enter #ID or search text",
-        placeHolder: "e.g., 1234 or keyword",
-      });
-      if (!query) continue; // Return to picker if cancelled
-
-      // Try as issue ID first (handles #123 or 123)
-      const cleanQuery = query.replace(/^#/, "");
-      const issueId = parseInt(cleanQuery, 10);
-      if (!isNaN(issueId) && cleanQuery === String(issueId)) {
-        try {
-          const result = await server.getIssueById(issueId);
-          selectedIssue = result.issue;
-          break;
-        } catch {
-          vscode.window.showErrorMessage(`Issue #${issueId} not found`);
-          continue;
-        }
-      } else {
-        // Text search
-        const searchResults = await server.searchIssues(query, 10);
-        if (searchResults.length === 0) {
-          vscode.window.showInformationMessage(`No issues found for "${query}"`);
-          continue;
-        }
-
-        // Show search results in a picker
-        const searchItems = searchResults.map((issue) => ({
-          label: `#${issue.id} ${issue.subject}`,
-          description: issue.project?.name,
-          detail: issue.status?.name,
-          issue,
-        }));
-
-        const searchChoice = await vscode.window.showQuickPick(searchItems, {
-          title: `Search Results - "${query}"`,
-          placeHolder: `${searchResults.length} result(s)`,
-        });
-
-        if (!searchChoice) continue; // Return to main picker
-        selectedIssue = searchChoice.issue;
-        break;
+      if (selected.action === "skip") {
+        quickPick.dispose();
+        resolve("skip");
+        return;
       }
-    }
 
-    // Check if selected issue is disabled (no time tracking)
-    if (issueChoice.disabled) {
-      vscode.window.showInformationMessage(
-        `Project "${issueChoice.issue?.project?.name}" has no time tracking enabled`
-      );
-      continue;
-    }
+      if (selected.disabled) {
+        vscode.window.showInformationMessage(
+          `Project "${selected.issue?.project?.name}" has no time tracking enabled`
+        );
+        return; // Don't close, let user pick again
+      }
 
-    // Re-fetch issue to ensure we have complete and fresh data
-    try {
-      const result = await server.getIssueById(issueChoice.issue!.id);
-      selectedIssue = result.issue;
-    } catch {
-      // Fallback to cached data if re-fetch fails
-      selectedIssue = issueChoice.issue;
-    }
-    break;
+      if (selected.issue) {
+        quickPick.dispose();
+        resolve(selected.issue);
+      }
+    });
+
+    quickPick.onDidHide(() => {
+      if (searchTimeout) clearTimeout(searchTimeout);
+      quickPick.dispose();
+      resolve(undefined);
+    });
+
+    quickPick.show();
+  });
+
+  if (selectedIssue === undefined) return undefined;
+
+  if (selectedIssue === "skip") {
+    return {
+      issueId: 0,
+      issueSubject: "(not assigned)",
+      activityId: 0,
+      activityName: "",
+      logged: false,
+      secondsLeft: workDurationSeconds,
+      unitPhase: "pending",
+    };
   }
 
-  if (!selectedIssue) return undefined;
+  // Re-fetch to ensure fresh data
+  let finalIssue: Issue;
+  try {
+    const result = await server.getIssueById(selectedIssue.id);
+    finalIssue = result.issue;
+  } catch {
+    finalIssue = selectedIssue;
+  }
 
   // Pick activity for this issue's project
-  if (!selectedIssue.project?.id) {
+  if (!finalIssue.project?.id) {
     vscode.window.showErrorMessage("Issue has no associated project");
     return undefined;
   }
 
   // Check if project has time tracking enabled
-  const hasTimeTracking = await server.isTimeTrackingEnabled(selectedIssue.project.id);
+  const hasTimeTracking = await server.isTimeTrackingEnabled(finalIssue.project.id);
   if (!hasTimeTracking) {
     vscode.window.showErrorMessage(
-      `Cannot log time: Project "${selectedIssue.project.name}" does not have time tracking enabled`
+      `Cannot log time: Project "${finalIssue.project.name}" does not have time tracking enabled`
     );
     return undefined;
   }
@@ -301,7 +337,7 @@ export async function pickIssueAndActivity(
   let activities: TimeEntryActivity[];
   try {
     activities = await server.getProjectTimeEntryActivities(
-      selectedIssue.project.id
+      finalIssue.project.id
     );
   } catch (error) {
     vscode.window.showErrorMessage(`Failed to fetch activities: ${error}`);
@@ -320,7 +356,7 @@ export async function pickIssueAndActivity(
 
   const activityChoice = await vscode.window.showQuickPick(activityItems, {
     title: `Plan Day - ${title}`,
-    placeHolder: `Activity for #${selectedIssue.id}`,
+    placeHolder: `Activity for #${finalIssue.id}`,
   });
 
   if (!activityChoice) return undefined;
@@ -335,8 +371,8 @@ export async function pickIssueAndActivity(
   if (comment === undefined) return undefined;
 
   return {
-    issueId: selectedIssue.id,
-    issueSubject: selectedIssue.subject,
+    issueId: finalIssue.id,
+    issueSubject: finalIssue.subject,
     activityId: activityChoice.activity.id,
     activityName: activityChoice.activity.name,
     comment: comment || undefined,
