@@ -1,0 +1,212 @@
+import * as vscode from "vscode";
+import { TimerController } from "./timer-controller";
+import { WorkUnit } from "./timer-state";
+
+interface PlanTreeItem {
+  type: "header" | "unit" | "add-button";
+  unit?: WorkUnit;
+  index?: number;
+  isCurrent: boolean;
+  isCompleted: boolean;
+}
+
+/**
+ * Tree provider for "Today's Plan" view
+ */
+export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> {
+  private _onDidChangeTreeData = new vscode.EventEmitter<PlanTreeItem | undefined | null>();
+  readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+
+  private disposables: vscode.Disposable[] = [];
+  private cachedItems: PlanTreeItem[] = [];
+
+  constructor(private controller: TimerController) {
+    // Subscribe to state changes
+    this.disposables.push(
+      controller.onStateChange(() => this.refreshWorkingUnit())
+    );
+  }
+
+  dispose(): void {
+    this.disposables.forEach((d) => d.dispose());
+    this._onDidChangeTreeData.dispose();
+  }
+
+  /**
+   * Refresh only the working unit to update timer, avoiding full tree refresh flicker
+   */
+  private refreshWorkingUnit(): void {
+    const state = this.controller.getState();
+    const workingIndex = state.plan.findIndex(u => u.unitPhase === "working");
+
+    const cachedItem = this.cachedItems[workingIndex];
+    if (workingIndex >= 0 && cachedItem && cachedItem.type === "unit") {
+      // Update cached item in place (same object reference) and fire targeted refresh
+      cachedItem.unit = state.plan[workingIndex];
+      this._onDidChangeTreeData.fire(cachedItem);
+    } else {
+      // Structure changed or no cached items yet - full refresh
+      this._onDidChangeTreeData.fire(undefined);
+    }
+  }
+
+  refresh(): void {
+    this.cachedItems = [];
+    this._onDidChangeTreeData.fire(undefined);
+  }
+
+  getTreeItem(element: PlanTreeItem): vscode.TreeItem {
+    if (element.type === "add-button") {
+      const item = new vscode.TreeItem("Add unit...");
+      item.iconPath = new vscode.ThemeIcon("add");
+      item.command = {
+        command: "redmine.timer.addUnit",
+        title: "Add Unit",
+      };
+      return item;
+    }
+
+    if (element.type === "unit" && element.unit && element.index !== undefined) {
+      return this.createUnitTreeItem(
+        element.unit,
+        element.index,
+        element.isCurrent,
+        element.isCompleted
+      );
+    }
+
+    return new vscode.TreeItem("");
+  }
+
+  /**
+   * Format seconds as MM:SS
+   */
+  private formatTime(seconds: number): string {
+    const mins = Math.floor(Math.max(0, seconds) / 60);
+    const secs = Math.max(0, seconds) % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  }
+
+  private createUnitTreeItem(
+    unit: WorkUnit,
+    index: number,
+    _isCurrent: boolean,  // Kept for API compatibility, using unit.unitPhase instead
+    isCompleted: boolean
+  ): vscode.TreeItem {
+    // Label: "1. #1234 Subject" or "1. (not assigned)"
+    let label: string;
+    if (unit.issueId > 0) {
+      label = `${index + 1}. #${unit.issueId} ${unit.issueSubject}`;
+    } else {
+      label = `${index + 1}. (not assigned)`;
+    }
+
+    const item = new vscode.TreeItem(label);
+
+    // Icon based on unitPhase
+    switch (unit.unitPhase) {
+      case "completed":
+        item.iconPath = new vscode.ThemeIcon("check", new vscode.ThemeColor("testing.iconPassed"));
+        break;
+      case "working":
+        item.iconPath = new vscode.ThemeIcon("pulse", new vscode.ThemeColor("charts.green"));
+        break;
+      case "paused":
+        item.iconPath = new vscode.ThemeIcon("debug-pause", new vscode.ThemeColor("charts.yellow"));
+        break;
+      default:
+        item.iconPath = new vscode.ThemeIcon("circle-outline");
+    }
+
+    // Description: show timer and activity for all non-completed units
+    if (isCompleted && unit.loggedHours) {
+      item.description = `${unit.loggedHours}h logged`;
+    } else if (unit.unitPhase === "working" || unit.unitPhase === "paused") {
+      item.description = `${this.formatTime(unit.secondsLeft)} [${unit.activityName || "?"}]`;
+    } else if (unit.secondsLeft > 0) {
+      // Pending - show timer
+      item.description = `${this.formatTime(unit.secondsLeft)} [${unit.activityName || "?"}]`;
+    } else if (unit.activityName) {
+      item.description = `[${unit.activityName}]`;
+    }
+
+    // Context menu - use unitPhase for accurate state
+    switch (unit.unitPhase) {
+      case "completed":
+        item.contextValue = "timer-unit-completed";
+        break;
+      case "working":
+        item.contextValue = "timer-unit-working";
+        break;
+      case "paused":
+        item.contextValue = "timer-unit-paused";
+        break;
+      default:
+        item.contextValue = "timer-unit-pending";
+    }
+
+    // Tooltip
+    if (unit.issueId > 0) {
+      const md = new vscode.MarkdownString();
+      md.appendMarkdown(`**#${unit.issueId}** ${unit.issueSubject}\n\n`);
+      md.appendMarkdown(`Activity: ${unit.activityName}\n\n`);
+      md.appendMarkdown(`Timer: ${this.formatTime(unit.secondsLeft)}\n\n`);
+      if (unit.comment) {
+        md.appendMarkdown(`Comment: ${unit.comment}\n\n`);
+      }
+      if (unit.logged && unit.loggedHours) {
+        md.appendMarkdown(`---\n\n✓ ${unit.loggedHours}h logged`);
+      }
+      item.tooltip = md;
+    }
+
+    // No click command - use Enter/Space keybinding instead (avoids accidental clicks)
+
+    return item;
+  }
+
+  getChildren(element?: PlanTreeItem): PlanTreeItem[] {
+    // Only show root level
+    if (element) return [];
+
+    const state = this.controller.getState();
+    const { plan, currentUnitIndex } = state;
+
+    if (plan.length === 0) {
+      // No plan - show message
+      this.cachedItems = [];
+      return [];
+    }
+
+    // Build items, reusing cached objects where possible for targeted refresh
+    const items: PlanTreeItem[] = plan.map((unit, index) => {
+      const existing = this.cachedItems[index];
+      if (existing && existing.type === "unit" && existing.index === index) {
+        // Update existing item (keeps same object reference for targeted refresh)
+        existing.unit = unit;
+        existing.isCurrent = index === currentUnitIndex;
+        existing.isCompleted = unit.logged;
+        return existing;
+      }
+      // Create new item
+      return {
+        type: "unit" as const,
+        unit,
+        index,
+        isCurrent: index === currentUnitIndex,
+        isCompleted: unit.logged,
+      };
+    });
+
+    // Add button at end
+    const addButton = this.cachedItems.find(i => i.type === "add-button") || {
+      type: "add-button" as const,
+      isCurrent: false,
+      isCompleted: false,
+    };
+    items.push(addButton);
+
+    this.cachedItems = items;
+    return items;
+  }
+}

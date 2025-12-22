@@ -43,6 +43,10 @@ export const EventEmitter = class {
     this.listeners.push(listener);
     return { dispose: vi.fn() };
   };
+
+  dispose = vi.fn(() => {
+    this.listeners = [];
+  });
 };
 
 export const ProgressLocation = { Notification: 15 };

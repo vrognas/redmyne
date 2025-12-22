@@ -24,7 +24,7 @@ export class MyTimeEntriesTreeDataProvider
 
   private isLoading = false;
   private server?: RedmineServer;
-  private issueCache = new Map<number, { id: number; subject: string }>();
+  private issueCache = new Map<number, { id: number; subject: string; projectId?: number; project: string; client?: string }>();
   private cachedGroups?: TimeEntryNode[];
 
   constructor() {}
@@ -226,8 +226,8 @@ export class MyTimeEntriesTreeDataProvider
       byWeek.get(weekNum)!.push(entry);
     }
 
-    // Sort weeks chronologically
-    const sortedWeeks = Array.from(byWeek.keys()).sort((a, b) => a - b);
+    // Sort weeks descending (most recent first)
+    const sortedWeeks = Array.from(byWeek.keys()).sort((a, b) => b - a);
 
     // Get working hours config
     const config = vscode.workspace.getConfiguration("redmine.workingHours");
@@ -258,6 +258,21 @@ export class MyTimeEntriesTreeDataProvider
   }
 
   private async mapEntriesToNodes(entries: TimeEntry[]): Promise<TimeEntryNode[]> {
+    // Build project→client lookup from server's cached projects
+    const projectClientMap = new Map<number, string>();
+    if (this.server) {
+      try {
+        const projects = await this.server.getProjects(); // Uses server's cache
+        for (const project of projects) {
+          if (project.parent?.name) {
+            projectClientMap.set(project.id, project.parent.name);
+          }
+        }
+      } catch {
+        // Ignore - client info is optional
+      }
+    }
+
     // Collect unique issue IDs that need fetching
     const uniqueIssueIds = Array.from(
       new Set(entries.map((entry) => entry.issue?.id || entry.issue_id))
@@ -274,10 +289,16 @@ export class MyTimeEntriesTreeDataProvider
         missingIssueIds.map(async (id) => {
           try {
             const { issue } = await this.server!.getIssueById(id);
-            this.issueCache.set(id, { id: issue.id, subject: issue.subject });
+            const projectId = issue.project?.id;
+            this.issueCache.set(id, {
+              id: issue.id,
+              subject: issue.subject,
+              projectId,
+              project: issue.project?.name || "",
+            });
           } catch {
             // If fetch fails, cache as "Unknown Issue" to avoid retry
-            this.issueCache.set(id, { id, subject: "Unknown Issue" });
+            this.issueCache.set(id, { id, subject: "Unknown Issue", project: "" });
           }
         })
       );
@@ -288,11 +309,15 @@ export class MyTimeEntriesTreeDataProvider
       const issueId = entry.issue?.id || entry.issue_id;
       const cached = this.issueCache.get(issueId);
       const issueSubject = cached?.subject || "Unknown Issue";
+      const projectName = cached?.project || "";
+      const clientName = cached?.projectId ? projectClientMap.get(cached.projectId) || "" : "";
 
       // Encode command arguments as JSON array for VS Code command URI
       const commandArgs = encodeURIComponent(JSON.stringify([issueId]));
       const tooltip = new vscode.MarkdownString(
         `**Issue:** #${issueId} ${issueSubject}\n\n` +
+          (clientName ? `**Client:** ${clientName}\n\n` : "") +
+          (projectName ? `**Project:** ${projectName}\n\n` : "") +
           `**Hours:** ${entry.hours}h\n\n` +
           `**Activity:** ${entry.activity?.name || "Unknown"}\n\n` +
           `**Date:** ${entry.spent_on}\n\n` +
@@ -303,9 +328,14 @@ export class MyTimeEntriesTreeDataProvider
       tooltip.isTrusted = true;
       tooltip.supportHtml = false;
 
+      // Build description: "2h Dev • ProjectName" or "2h Dev" if no project
+      const activityPart = entry.activity?.name || "";
+      const descParts = [`${entry.hours}h`, activityPart, projectName].filter(Boolean);
+      const description = descParts.join(" • ");
+
       return {
         label: `#${issueId} ${issueSubject}`,
-        description: `${entry.hours}h ${entry.activity?.name || ""}`,
+        description,
         tooltip,
         collapsibleState: vscode.TreeItemCollapsibleState.None,
         type: "entry" as const,

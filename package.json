@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "3.11.3",
+  "version": "3.12.0",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -121,6 +121,96 @@
         "command": "redmine.quickCreateSubIssue",
         "title": "Create Sub-Issue",
         "icon": "$(add)"
+      },
+      {
+        "command": "redmine.timer.planDay",
+        "title": "Redmine: Plan Day",
+        "icon": "$(calendar)"
+      },
+      {
+        "command": "redmine.timer.start",
+        "title": "Redmine: Start Timer",
+        "icon": "$(play)"
+      },
+      {
+        "command": "redmine.timer.pause",
+        "title": "Redmine: Pause Timer",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "redmine.timer.resume",
+        "title": "Redmine: Resume Timer",
+        "icon": "$(play)"
+      },
+      {
+        "command": "redmine.timer.stop",
+        "title": "Redmine: Stop Timer",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "redmine.timer.toggle",
+        "title": "Redmine: Toggle Timer"
+      },
+      {
+        "command": "redmine.timer.startNextUnit",
+        "title": "Redmine: Start Next Unit"
+      },
+      {
+        "command": "redmine.timer.skipBreak",
+        "title": "Redmine: Skip Break"
+      },
+      {
+        "command": "redmine.timer.showLogDialog",
+        "title": "Redmine: Log Time Dialog"
+      },
+      {
+        "command": "redmine.timer.addUnit",
+        "title": "Add Unit",
+        "icon": "$(add)"
+      },
+      {
+        "command": "redmine.timer.clearPlan",
+        "title": "Redmine: Clear Plan",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "redmine.timer.removeUnit",
+        "title": "Remove Unit",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "redmine.timer.editUnit",
+        "title": "Edit Unit",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "redmine.timer.startUnit",
+        "title": "Start This Unit",
+        "icon": "$(play)"
+      },
+      {
+        "command": "redmine.timer.configureTimer",
+        "title": "Timer Settings",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "redmine.timer.moveUnitUp",
+        "title": "Move Up",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "redmine.timer.moveUnitDown",
+        "title": "Move Down",
+        "icon": "$(arrow-down)"
+      },
+      {
+        "command": "redmine.timer.resetUnit",
+        "title": "Reset Timer",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "redmine.timer.toggleSelectedUnit",
+        "title": "Toggle Selected Unit"
       }
     ],
     "keybindings": [
@@ -135,10 +225,30 @@
         "key": "ctrl+y ctrl+n",
         "mac": "cmd+y cmd+n",
         "when": "!terminalFocus && !inDebugMode && !inQuickOpen"
+      },
+      {
+        "command": "redmine.timer.toggle",
+        "key": "ctrl+y ctrl+t",
+        "mac": "cmd+y cmd+t",
+        "when": "!terminalFocus && !inDebugMode && !inQuickOpen"
+      },
+      {
+        "command": "redmine.timer.toggleSelectedUnit",
+        "key": "enter",
+        "when": "focusedView == 'redmine-explorer-timer' && listFocus"
+      },
+      {
+        "command": "redmine.timer.toggleSelectedUnit",
+        "key": "space",
+        "when": "focusedView == 'redmine-explorer-timer' && listFocus"
       }
     ],
     "views": {
       "redmine-explorer": [
+        {
+          "id": "redmine-explorer-timer",
+          "name": "Today's Plan"
+        },
         {
           "id": "redmine-explorer-projects",
           "name": "My Issues"
@@ -150,6 +260,16 @@
       ]
     },
     "viewsWelcome": [
+      {
+        "view": "redmine-explorer-timer",
+        "contents": "No plan for today.\n[Plan Your Day](command:redmine.timer.planDay)\nPlan work units to track your time.",
+        "when": "redmine:configured && !redmine:timerHasPlan"
+      },
+      {
+        "view": "redmine-explorer-timer",
+        "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmine.configure)\nSet up your Redmine server URL and API key to get started.",
+        "when": "!redmine:configured"
+      },
       {
         "view": "redmine-explorer-projects",
         "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmine.configure)\nSet up your Redmine server URL and API key to get started.",
@@ -208,9 +328,91 @@
         {
           "command": "redmine.quickCreateSubIssue",
           "when": "false"
+        },
+        {
+          "command": "redmine.timer.start",
+          "when": "false"
+        },
+        {
+          "command": "redmine.timer.pause",
+          "when": "false"
+        },
+        {
+          "command": "redmine.timer.resume",
+          "when": "false"
+        },
+        {
+          "command": "redmine.timer.startNextUnit",
+          "when": "false"
+        },
+        {
+          "command": "redmine.timer.skipBreak",
+          "when": "false"
+        },
+        {
+          "command": "redmine.timer.showLogDialog",
+          "when": "false"
+        },
+        {
+          "command": "redmine.timer.addUnit",
+          "when": "false"
+        },
+        {
+          "command": "redmine.timer.removeUnit",
+          "when": "false"
+        },
+        {
+          "command": "redmine.timer.editUnit",
+          "when": "false"
+        },
+        {
+          "command": "redmine.timer.startUnit",
+          "when": "false"
+        },
+        {
+          "command": "redmine.timer.moveUnitUp",
+          "when": "false"
+        },
+        {
+          "command": "redmine.timer.moveUnitDown",
+          "when": "false"
+        },
+        {
+          "command": "redmine.timer.resetUnit",
+          "when": "false"
         }
       ],
       "view/title": [
+        {
+          "command": "redmine.timer.start",
+          "when": "view == 'redmine-explorer-timer' && redmine:timerPhase == 'idle' && redmine:timerHasPlan",
+          "group": "navigation@1"
+        },
+        {
+          "command": "redmine.timer.pause",
+          "when": "view == 'redmine-explorer-timer' && redmine:timerPhase == 'working'",
+          "group": "navigation@1"
+        },
+        {
+          "command": "redmine.timer.resume",
+          "when": "view == 'redmine-explorer-timer' && redmine:timerPhase == 'paused'",
+          "group": "navigation@1"
+        },
+        {
+          "command": "redmine.timer.stop",
+          "when": "view == 'redmine-explorer-timer' && (redmine:timerPhase == 'working' || redmine:timerPhase == 'paused')",
+          "group": "navigation@2"
+        },
+        {
+          "command": "redmine.timer.clearPlan",
+          "when": "view == 'redmine-explorer-timer' && redmine:timerHasPlan",
+          "group": "navigation@3"
+        },
+        {
+          "command": "redmine.timer.configureTimer",
+          "when": "view == 'redmine-explorer-timer'",
+          "group": "navigation@4"
+        },
         {
           "command": "redmine.configure",
           "when": "view == 'redmine-explorer-projects'",
@@ -279,6 +481,36 @@
           "command": "redmine.quickCreateSubIssue",
           "when": "view == 'redmine-explorer-projects' && viewItem =~ /^issue/",
           "group": "redmine@2"
+        },
+        {
+          "command": "redmine.timer.startUnit",
+          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit-(pending|paused)$/",
+          "group": "timer@1"
+        },
+        {
+          "command": "redmine.timer.editUnit",
+          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit/",
+          "group": "timer@2"
+        },
+        {
+          "command": "redmine.timer.removeUnit",
+          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit/ && viewItem != 'timer-unit-working'",
+          "group": "timer@3"
+        },
+        {
+          "command": "redmine.timer.moveUnitUp",
+          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit/",
+          "group": "reorder@1"
+        },
+        {
+          "command": "redmine.timer.moveUnitDown",
+          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit/",
+          "group": "reorder@2"
+        },
+        {
+          "command": "redmine.timer.resetUnit",
+          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit-(pending|working|paused)$/",
+          "group": "timer@4"
         }
       ]
     },
@@ -370,6 +602,12 @@
           "default": false,
           "scope": "application",
           "markdownDescription": "**Show workload overview in status bar**\n\nDisplays remaining work and capacity buffer.\n\n**Note:** Opt-in to reduce noise. Enable if you need capacity planning at a glance.\n\n**Format:** `25h left, +8h buffer`"
+        },
+        "redmine.timer.showInStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "Show timer in status bar"
         }
       }
     },

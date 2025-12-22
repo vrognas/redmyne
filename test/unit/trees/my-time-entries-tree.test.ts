@@ -27,9 +27,9 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     mockServer = {
       getTimeEntries: vi.fn(),
       getIssueById: vi.fn().mockImplementation((id: number) => {
-        // Default mock: return issue with subject based on ID
+        // Default mock: return issue with subject and project based on ID
         return Promise.resolve({
-          issue: { id, subject: `Test Issue ${id}` },
+          issue: { id, subject: `Test Issue ${id}`, project: { id: 1, name: "Test Project" } },
         });
       }),
       options: { address: "https://redmine.example.com" },
@@ -180,9 +180,9 @@ describe("MyTimeEntriesTreeDataProvider", () => {
 
     expect(todayChildren).toHaveLength(2);
     expect(todayChildren[0].label).toBe("#123 Test Issue 123");
-    expect(todayChildren[0].description).toBe("2.5h Development");
+    expect(todayChildren[0].description).toBe("2.5h • Development • Test Project");
     expect(todayChildren[1].label).toBe("#124 Test Issue 124");
-    expect(todayChildren[1].description).toBe("1.5h Testing");
+    expect(todayChildren[1].description).toBe("1.5h • Testing • Test Project");
   });
 
   it("calculates correct totals for groups", async () => {
@@ -289,7 +289,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
       .mockResolvedValueOnce({ time_entries: [] });
 
     mockServer.getIssueById.mockResolvedValue({
-      issue: { id: 123, subject: "Fetched Issue Subject" },
+      issue: { id: 123, subject: "Fetched Issue Subject", project: { id: 1, name: "Test Project" } },
     });
 
     const groups = await getLoadedGroups();
@@ -319,7 +319,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
       .mockResolvedValueOnce({ time_entries: [] });
 
     mockServer.getIssueById.mockResolvedValue({
-      issue: { id: 123, subject: "Cached Issue" },
+      issue: { id: 123, subject: "Cached Issue", project: { id: 1, name: "Test Project" } },
     });
 
     const groups = await getLoadedGroups();
@@ -349,7 +349,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     mockServer.getTimeEntries.mockResolvedValue({ time_entries: todayEntries });
 
     mockServer.getIssueById.mockResolvedValue({
-      issue: { id: 123, subject: "Fresh Issue" },
+      issue: { id: 123, subject: "Fresh Issue", project: { id: 1, name: "Test Project" } },
     });
 
     const groups = await getLoadedGroups();
@@ -502,12 +502,12 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     expect(weekGroups.length).toBe(2);
     expect(weekGroups[0].type).toBe("week-subgroup");
 
-    // Weeks should be in chronological order
-    expect(weekGroups[0].label).toContain("Week 50");
-    expect(weekGroups[1].label).toContain("Week 51");
+    // Weeks should be in reverse chronological order (most recent first)
+    expect(weekGroups[0].label).toContain("Week 51");
+    expect(weekGroups[1].label).toContain("Week 50");
 
-    // Get days for Week 51
-    const week51Days = await provider.getChildren(weekGroups[1]);
+    // Get days for Week 51 (now first)
+    const week51Days = await provider.getChildren(weekGroups[0]);
     expect(week51Days.length).toBe(2); // Mon 15, Tue 16
     expect(week51Days[0].type).toBe("day-group");
 
