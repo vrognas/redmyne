@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { TimerController } from "./timer-controller";
 import { WorkUnit } from "./timer-state";
+import { formatHoursAsHHMM } from "./timer-dialogs";
 
 interface PlanTreeItem {
   type: "header" | "unit" | "add-button";
@@ -143,7 +144,7 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
     // Description: show timer and activity for all non-completed units
     if (isCompleted && unit.loggedHours) {
       const timeStr = unit.completedAt ? ` @ ${this.formatClockTime(unit.completedAt)}` : "";
-      item.description = `${unit.loggedHours}h logged${timeStr}`;
+      item.description = `${formatHoursAsHHMM(unit.loggedHours)} logged${timeStr}`;
     } else if (unit.unitPhase === "working" || unit.unitPhase === "paused") {
       item.description = `${this.formatTime(unit.secondsLeft)} [${unit.activityName || "?"}]`;
     } else if (unit.secondsLeft > 0) {
@@ -179,7 +180,7 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
       }
       if (unit.logged && unit.loggedHours) {
         const timestampStr = unit.completedAt ? ` at ${this.formatFullTimestamp(unit.completedAt)}` : "";
-        md.appendMarkdown(`---\n\n✓ ${unit.loggedHours}h logged${timestampStr}`);
+        md.appendMarkdown(`---\n\n✓ ${formatHoursAsHHMM(unit.loggedHours)} logged${timestampStr}`);
       }
       item.tooltip = md;
     }

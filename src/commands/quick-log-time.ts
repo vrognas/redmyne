@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import type { ActionProperties } from "./action-properties";
-import { parseTimeInput, validateTimeInput } from "../utilities/time-input";
+import { parseTimeInput, validateTimeInput, formatHoursAsHHMM } from "../utilities/time-input";
 import { showStatusBarMessage } from "../utilities/status-bar";
 
 interface RecentTimeLog {
@@ -83,7 +83,7 @@ export async function quickLogTime(
     const today = new Date().toISOString().split("T")[0];
     const dateLabel = selectedDate === today ? "Today" : selectedDate;
     const hoursInput = await vscode.window.showInputBox({
-      prompt: `Log time to #${selection.issueId} (${selection.activityName})${dateTotal > 0 ? ` | ${dateLabel}: ${dateTotal.toFixed(1)}h logged` : ""}`,
+      prompt: `Log time to #${selection.issueId} (${selection.activityName})${dateTotal > 0 ? ` | ${dateLabel}: ${formatHoursAsHHMM(dateTotal)} logged` : ""}`,
       placeHolder: "e.g., 2.5, 1:45, 1h 45min",
       validateInput: (value: string) => validateTimeInput(value, dateTotal),
     });
@@ -134,7 +134,7 @@ export async function quickLogTime(
     // 10. Confirm with status bar flash (NOT notification)
     const dateConfirmation = selectedDate === today ? "" : ` on ${selectedDate}`;
     showStatusBarMessage(
-      `$(check) Logged ${hours.toFixed(2).replace(/\.?0+$/, "")}h to #${selection.issueId}${dateConfirmation}`
+      `$(check) Logged ${formatHoursAsHHMM(hours)} to #${selection.issueId}${dateConfirmation}`
     );
   } catch (error) {
     vscode.window.showErrorMessage(

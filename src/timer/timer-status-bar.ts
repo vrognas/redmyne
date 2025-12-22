@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { TimerController } from "./timer-controller";
 import { TimerState, TimerPhase, countCompleted, getWorkingUnit } from "./timer-state";
+import { formatHoursAsHHMM } from "./timer-dialogs";
 
 /**
  * Status bar display for timer
@@ -121,7 +122,7 @@ export class TimerStatusBar {
     }
 
     md.appendMarkdown("---\n\n");
-    md.appendMarkdown(`Today: ${hoursLogged}h logged (${completedCount}/${total} units)\n\n`);
+    md.appendMarkdown(`Today: ${formatHoursAsHHMM(hoursLogged)} logged (${completedCount}/${total} units)\n\n`);
     md.appendMarkdown("Click to pause");
 
     return md;

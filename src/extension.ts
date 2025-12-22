@@ -18,6 +18,7 @@ import { RedmineSecretManager } from "./utilities/secret-manager";
 import { setApiKey } from "./commands/set-api-key";
 import { calculateWorkload } from "./utilities/workload-calculator";
 import { WeeklySchedule } from "./utilities/flexibility-calculator";
+import { formatHoursAsHHMM, parseTimeInput } from "./utilities/time-input";
 import { GanttPanel } from "./webviews/gantt-panel";
 import { disposeStatusBar, showStatusBarMessage } from "./utilities/status-bar";
 import { TimerController } from "./timer/timer-controller";
@@ -290,7 +291,7 @@ export function activate(context: vscode.ExtensionContext): void {
     if (workload.topUrgent.length > 0) {
       tooltip.appendMarkdown("**Top Urgent:**\n");
       for (const issue of workload.topUrgent) {
-        tooltip.appendMarkdown(`- #${issue.id}: ${issue.daysLeft}d, ${issue.hoursLeft}h left\n`);
+        tooltip.appendMarkdown(`- #${issue.id}: ${issue.daysLeft}d, ${formatHoursAsHHMM(issue.hoursLeft)} left\n`);
       }
     }
 
@@ -801,6 +802,131 @@ export function activate(context: vscode.ExtensionContext): void {
       }
 
       await vscode.env.openExternal(vscode.Uri.parse(`${url}/issues/${issueId}`));
+    })
+  );
+
+  // Edit time entry
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.editTimeEntry", async (node: { _entry?: { id?: number; hours: string; comments: string; activity?: { id: number; name: string }; spent_on?: string; issue?: { id: number; subject: string } } }) => {
+      const entry = node?._entry;
+      if (!entry?.id) {
+        vscode.window.showErrorMessage("No time entry selected");
+        return;
+      }
+
+      const server = projectsTree.server;
+      if (!server) {
+        vscode.window.showErrorMessage("No Redmine server configured");
+        return;
+      }
+
+      // Show what to edit
+      const hoursDisplay = formatHoursAsHHMM(parseFloat(entry.hours));
+      const options = [
+        { label: `Hours: ${hoursDisplay}`, field: "hours" as const },
+        { label: `Comment: ${entry.comments || "(none)"}`, field: "comments" as const },
+        { label: `Activity: ${entry.activity?.name || "Unknown"}`, field: "activity" as const },
+        { label: `Date: ${entry.spent_on || "Unknown"}`, field: "date" as const },
+      ];
+
+      const choice = await vscode.window.showQuickPick(options, {
+        title: `Edit Time Entry #${entry.id}`,
+        placeHolder: `#${entry.issue?.id} ${entry.issue?.subject || ""}`,
+      });
+
+      if (!choice) return;
+
+      try {
+        if (choice.field === "hours") {
+          const input = await vscode.window.showInputBox({
+            title: "Edit Hours",
+            value: formatHoursAsHHMM(parseFloat(entry.hours)),
+            placeHolder: "e.g., 1:30, 1.5, 1h 30min",
+            validateInput: (v) => {
+              const parsed = parseTimeInput(v);
+              if (parsed === null || parsed <= 0) return "Enter valid hours (e.g., 1:30, 1.5, 1h 30min)";
+              return null;
+            },
+          });
+          if (input === undefined) return;
+          const hours = parseTimeInput(input)!;
+          await server.updateTimeEntry(entry.id, { hours: hours.toString() });
+        } else if (choice.field === "comments") {
+          const input = await vscode.window.showInputBox({
+            title: "Edit Comment",
+            value: entry.comments,
+            placeHolder: "Comment (optional)",
+          });
+          if (input === undefined) return;
+          await server.updateTimeEntry(entry.id, { comments: input });
+        } else if (choice.field === "activity") {
+          // Need to fetch activities for this issue's project
+          const issueResult = await server.getIssueById(entry.issue?.id || 0);
+          const projectId = issueResult.issue.project?.id;
+          if (!projectId) {
+            vscode.window.showErrorMessage("Could not determine project");
+            return;
+          }
+          const activities = await server.getProjectTimeEntryActivities(projectId);
+          const activityChoice = await vscode.window.showQuickPick(
+            activities.map((a: { name: string; id: number }) => ({ label: a.name, activityId: a.id })),
+            { title: "Select Activity", placeHolder: "Activity" }
+          );
+          if (!activityChoice) return;
+          await server.updateTimeEntry(entry.id, { activity_id: activityChoice.activityId });
+        } else if (choice.field === "date") {
+          const input = await vscode.window.showInputBox({
+            title: "Edit Date",
+            value: entry.spent_on || "",
+            placeHolder: "YYYY-MM-DD",
+            validateInput: (v) => {
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return "Use YYYY-MM-DD format";
+              return null;
+            },
+          });
+          if (input === undefined) return;
+          await server.updateTimeEntry(entry.id, { spent_on: input });
+        }
+
+        showStatusBarMessage("$(check) Time entry updated", 2000);
+        myTimeEntriesTree.refresh();
+      } catch (error) {
+        vscode.window.showErrorMessage(`Failed to update: ${error}`);
+      }
+    })
+  );
+
+  // Delete time entry
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.deleteTimeEntry", async (node: { _entry?: { id?: number; hours: string; issue?: { id: number; subject: string }; spent_on?: string } }) => {
+      const entry = node?._entry;
+      if (!entry?.id) {
+        vscode.window.showErrorMessage("No time entry selected");
+        return;
+      }
+
+      const server = projectsTree.server;
+      if (!server) {
+        vscode.window.showErrorMessage("No Redmine server configured");
+        return;
+      }
+
+      const hoursDisplay = formatHoursAsHHMM(parseFloat(entry.hours));
+      const confirm = await vscode.window.showWarningMessage(
+        `Delete ${hoursDisplay} on #${entry.issue?.id || "?"}?`,
+        { modal: true, detail: `${entry.issue?.subject || ""}\nDate: ${entry.spent_on || ""}` },
+        "Delete"
+      );
+
+      if (confirm !== "Delete") return;
+
+      try {
+        await server.deleteTimeEntry(entry.id);
+        showStatusBarMessage("$(check) Time entry deleted", 2000);
+        myTimeEntriesTree.refresh();
+      } catch (error) {
+        vscode.window.showErrorMessage(`Failed to delete: ${error}`);
+      }
     })
   );
 

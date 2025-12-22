@@ -3,6 +3,7 @@ import { RedmineServer } from "../redmine/redmine-server";
 import { TimeEntry } from "../redmine/models/time-entry";
 
 export interface TimeEntryNode {
+  id?: string; // Stable ID for preserving expansion state
   label: string;
   description?: string;
   tooltip?: vscode.MarkdownString;
@@ -91,6 +92,7 @@ export class MyTimeEntriesTreeDataProvider
 
       this.cachedGroups = [
         {
+          id: "group-today",
           label: `Today (${dayName} ${dayNum})`,
           description: formatHoursWithComparison(todayTotal, todayAvailable),
           collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
@@ -98,6 +100,7 @@ export class MyTimeEntriesTreeDataProvider
           _cachedEntries: todayResult.time_entries,
         },
         {
+          id: "group-week",
           label: `This Week (${weekNum})`,
           description: formatHoursWithComparison(weekTotal, weekAvailable),
           collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
@@ -105,6 +108,7 @@ export class MyTimeEntriesTreeDataProvider
           _cachedEntries: weekResult.time_entries,
         },
         {
+          id: "group-month",
           label: `This Month (${monthName})`,
           description: formatHoursWithComparison(monthTotal, monthAvailable),
           collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
@@ -205,6 +209,7 @@ export class MyTimeEntriesTreeDataProvider
       const available = getHoursForDate(date, schedule);
 
       return {
+        id: `day-${dateStr}`,
         label: `${dayName} ${dayNum}`,
         description: formatHoursWithComparison(total, available),
         collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
@@ -248,6 +253,7 @@ export class MyTimeEntriesTreeDataProvider
       }
 
       return {
+        id: `week-${weekNum}`,
         label: `Week ${weekNum}`,
         description: formatHoursWithComparison(total, available),
         collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
@@ -318,7 +324,7 @@ export class MyTimeEntriesTreeDataProvider
         `**Issue:** #${issueId} ${issueSubject}\n\n` +
           (clientName ? `**Client:** ${clientName}\n\n` : "") +
           (projectName ? `**Project:** ${projectName}\n\n` : "") +
-          `**Hours:** ${entry.hours}h\n\n` +
+          `**Hours:** ${formatHours(parseFloat(entry.hours))}\n\n` +
           `**Activity:** ${entry.activity?.name || "Unknown"}\n\n` +
           `**Date:** ${entry.spent_on}\n\n` +
           `**Comments:** ${entry.comments || "(none)"}\n\n` +
@@ -330,10 +336,11 @@ export class MyTimeEntriesTreeDataProvider
 
       // Build description: "2h Dev • ProjectName" or "2h Dev" if no project
       const activityPart = entry.activity?.name || "";
-      const descParts = [`${entry.hours}h`, activityPart, projectName].filter(Boolean);
+      const descParts = [formatHours(parseFloat(entry.hours)), activityPart, projectName].filter(Boolean);
       const description = descParts.join(" • ");
 
       return {
+        id: `entry-${entry.id}`,
         label: `#${issueId} ${issueSubject}`,
         description,
         tooltip,
@@ -347,6 +354,7 @@ export class MyTimeEntriesTreeDataProvider
 
   getTreeItem(node: TimeEntryNode): vscode.TreeItem {
     const treeItem = new vscode.TreeItem(node.label, node.collapsibleState);
+    treeItem.id = node.id; // Stable ID preserves expansion state
     treeItem.description = node.description;
     treeItem.tooltip = node.tooltip;
     treeItem.iconPath = node.iconPath;
@@ -377,7 +385,10 @@ function calculateTotal(entries: TimeEntry[]): number {
 }
 
 function formatHours(hours: number): string {
-  return `${hours.toFixed(1).replace(/\.0$/, "")}h`;
+  const totalMinutes = Math.round(hours * 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return `${h}:${m.toString().padStart(2, "0")}`;
 }
 
 function formatHoursWithComparison(

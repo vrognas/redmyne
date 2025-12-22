@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { Issue, IssueRelation } from "../redmine/models/issue";
 import { RedmineServer } from "../redmine/redmine-server";
 import { FlexibilityScore } from "./flexibility-calculator";
+import { formatHoursAsHHMM } from "./time-input";
 
 /**
  * Creates a VS Code TreeItem for displaying a Redmine issue
@@ -78,7 +79,7 @@ export function createEnhancedIssueTreeItem(
     const blockedPrefix = blocked ? "[B] " : "";
     const billablePrefix = isBillable(issue) ? "" : "○ ";
     treeItem.description =
-      `${blockedPrefix}${billablePrefix}#${issue.id} ${spentHours}/${estHours}h ${flexibility.daysRemaining}d ${config.text}`;
+      `${blockedPrefix}${billablePrefix}#${issue.id} ${formatHoursAsHHMM(spentHours)}/${formatHoursAsHHMM(estHours)} ${flexibility.daysRemaining}d ${config.text}`;
 
     // Always use status color - billability shown via prefix
     const iconColor = new vscode.ThemeColor(config.color);
@@ -126,11 +127,11 @@ function createFlexibilityTooltip(
 
   md.appendMarkdown(`**#${issue.id}: ${issue.subject}**\n\n`);
   md.appendMarkdown(`**Tracker:** ${issue.tracker?.name ?? "Unknown"}\n\n`);
-  md.appendMarkdown(`**Progress:** ${spentHours}h / ${estHours}h (${progress}%)\n\n`);
+  md.appendMarkdown(`**Progress:** ${formatHoursAsHHMM(spentHours)} / ${formatHoursAsHHMM(estHours)} (${progress}%)\n\n`);
 
   if (flexibility.status !== "completed") {
     md.appendMarkdown(`**Days Remaining:** ${flexibility.daysRemaining}\n\n`);
-    md.appendMarkdown(`**Hours Remaining:** ${flexibility.hoursRemaining}h\n\n`);
+    md.appendMarkdown(`**Hours Remaining:** ${formatHoursAsHHMM(flexibility.hoursRemaining)}\n\n`);
     md.appendMarkdown(
       `**Flexibility:** ${flexibility.remaining >= 0 ? "+" : ""}${flexibility.remaining}%\n\n`
     );

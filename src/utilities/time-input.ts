@@ -54,7 +54,17 @@ export function validateTimeInput(
     return "Must be 0.1-24 hours (e.g. 1.75, 1:45, or 1h 45min)";
   }
   if (todayTotal + hours > 24) {
-    return `Would exceed 24h/day limit (already logged ${todayTotal.toFixed(1)}h today)`;
+    return `Would exceed 24h/day limit (already logged ${formatHoursAsHHMM(todayTotal)} today)`;
   }
   return null;
+}
+
+/**
+ * Format decimal hours as H:MM (e.g., 1.0 → "1:00", 0.75 → "0:45", 1.5 → "1:30")
+ */
+export function formatHoursAsHHMM(hours: number): string {
+  const totalMinutes = Math.round(hours * 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return `${h}:${m.toString().padStart(2, "0")}`;
 }

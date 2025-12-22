@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { RedmineServer } from "../redmine/redmine-server";
 import { TimerController } from "./timer-controller";
-import { showPlanDayDialog, showCompletionDialog, pickIssueAndActivity, formatHoursAsHHMM } from "./timer-dialogs";
+import { showPlanDayDialog, pickIssueAndActivity, formatHoursAsHHMM } from "./timer-dialogs";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { playCompletionSound } from "./timer-sound";
 
@@ -148,45 +148,52 @@ export function registerTimerCommands(
 
       const server = getServer();
       if (!server) {
+        vscode.window.showErrorMessage("No Redmine server configured");
+        return; // Stay in logging phase, let user retry
+      }
+
+      // Handle unassigned units
+      if (unit.issueId <= 0) {
         controller.skipLogging();
+        showStatusBarMessage("$(info) No issue assigned - skipped", 2000);
         return;
       }
 
       const hoursPerUnit = getUnitDuration() / 60;
-      const result = await showCompletionDialog(unit, hoursPerUnit);
+      const hoursStr = formatHoursAsHHMM(hoursPerUnit);
 
-      if (!result) {
-        controller.skipLogging();
-        return;
-      }
+      // Go directly to comment input (skip redundant QuickPick)
+      const comment = await vscode.window.showInputBox({
+        title: `Log ${hoursStr} to #${unit.issueId}`,
+        prompt: `${unit.issueSubject} • ${unit.activityName}`,
+        value: unit.comment || "",
+        placeHolder: "Comment (optional)",
+      });
+
+      // Cancel → stay in logging phase, let user retry
+      if (comment === undefined) return;
 
       // Log to Redmine
-      if (unit.issueId > 0) {
-        try {
-          await server.addTimeEntry(
-            unit.issueId,
-            unit.activityId,
-            result.hours.toString(),
-            result.comment || ""
-          );
+      try {
+        await server.addTimeEntry(
+          unit.issueId,
+          unit.activityId,
+          hoursPerUnit.toString(),
+          comment || ""
+        );
 
-          // Refresh time entries tree
-          vscode.commands.executeCommand("redmine.refreshTimeEntries");
+        // Refresh time entries tree
+        vscode.commands.executeCommand("redmine.refreshTimeEntries");
 
-          const loggedHoursStr = formatHoursAsHHMM(result.hours);
-          showStatusBarMessage(
-            `$(check) Logged ${loggedHoursStr} to #${unit.issueId}`,
-            2000
-          );
+        showStatusBarMessage(
+          `$(check) Logged ${hoursStr} to #${unit.issueId}`,
+          2000
+        );
 
-          controller.markLogged(result.hours);
-        } catch (error) {
-          vscode.window.showErrorMessage(`Failed to log time: ${error}`);
-          controller.skipLogging();
-        }
-      } else {
-        // Unassigned unit - just skip
-        controller.skipLogging();
+        controller.markLogged(hoursPerUnit);
+      } catch (error) {
+        vscode.window.showErrorMessage(`Failed to log time: ${error}`);
+        // Stay in logging phase, let user retry
       }
     })
   );
@@ -425,16 +432,18 @@ export function registerTimerCommands(
       // Show prominent modal notification
       const issueLabel = unit.issueId > 0 ? `#${unit.issueId} ${unit.issueSubject}` : "Unassigned";
       const action = await vscode.window.showWarningMessage(
-        `⏰ Timer Complete!\n${issueLabel}`,
+        `Unit Complete\n${issueLabel}`,
         { modal: true },
         "Log Time",
         "Skip"
       );
       if (action === "Log Time") {
         vscode.commands.executeCommand("redmine.timer.showLogDialog");
-      } else {
+      } else if (action === "Skip") {
         controller.skipLogging();
+        showStatusBarMessage("$(dash) Skipped logging", 2000);
       }
+      // Cancel (undefined) → do nothing, stay in logging phase
     })
   );
 

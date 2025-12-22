@@ -94,6 +94,14 @@
         "title": "Open in Browser"
       },
       {
+        "command": "redmine.editTimeEntry",
+        "title": "Edit Time Entry..."
+      },
+      {
+        "command": "redmine.deleteTimeEntry",
+        "title": "Delete Time Entry"
+      },
+      {
         "command": "redmine.openIssueInBrowser",
         "title": "Open in Browser",
         "icon": "$(link-external)"
@@ -318,6 +326,14 @@
           "when": "false"
         },
         {
+          "command": "redmine.editTimeEntry",
+          "when": "false"
+        },
+        {
+          "command": "redmine.deleteTimeEntry",
+          "when": "false"
+        },
+        {
           "command": "redmine.openIssueInBrowser",
           "when": "false"
         },
@@ -459,8 +475,19 @@
       ],
       "view/item/context": [
         {
+          "command": "redmine.editTimeEntry",
+          "when": "view == 'redmine-explorer-my-time-entries' && viewItem == 'time-entry'",
+          "group": "1_edit@1"
+        },
+        {
+          "command": "redmine.deleteTimeEntry",
+          "when": "view == 'redmine-explorer-my-time-entries' && viewItem == 'time-entry'",
+          "group": "1_edit@2"
+        },
+        {
           "command": "redmine.openTimeEntryInBrowser",
-          "when": "view == 'redmine-explorer-my-time-entries' && viewItem == 'time-entry'"
+          "when": "view == 'redmine-explorer-my-time-entries' && viewItem == 'time-entry'",
+          "group": "2_navigation@1"
         },
         {
           "command": "redmine.openIssueInBrowser",

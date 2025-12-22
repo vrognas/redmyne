@@ -7,6 +7,7 @@ import { WorkUnit } from "./timer-state";
 interface IssueQuickPickItem extends vscode.QuickPickItem {
   issue?: Issue;
   action?: "search" | "skip";
+  disabled?: boolean;
 }
 
 interface ActivityQuickPickItem extends vscode.QuickPickItem {
@@ -149,16 +150,30 @@ export async function pickIssueAndActivity(
     })
   );
 
-  // Filter issues to only those with time tracking enabled
+  // Build issue list: trackable issues first, then non-trackable (disabled)
   const trackableIssues = issues.filter(
     (issue) => issue.project?.id && timeTrackingByProject.get(issue.project.id)
   );
+  const nonTrackableIssues = issues.filter(
+    (issue) => !issue.project?.id || !timeTrackingByProject.get(issue.project.id)
+  );
 
-  const issueItems: IssueQuickPickItem[] = trackableIssues.map((issue) => ({
-    label: `#${issue.id} ${issue.subject}`,
-    description: issue.project?.name,
-    issue,
-  }));
+  const issueItems: IssueQuickPickItem[] = [
+    // Trackable issues (selectable)
+    ...trackableIssues.map((issue) => ({
+      label: `#${issue.id} ${issue.subject}`,
+      description: issue.project?.name,
+      issue,
+      disabled: false,
+    })),
+    // Non-trackable issues (disabled, greyed out)
+    ...nonTrackableIssues.map((issue) => ({
+      label: `$(circle-slash) #${issue.id} ${issue.subject}`,
+      description: `${issue.project?.name ?? "Unknown"} (no time tracking)`,
+      issue,
+      disabled: true,
+    })),
+  ];
 
   issueItems.push({
     label: "$(search) Search issues...",
@@ -170,52 +185,63 @@ export async function pickIssueAndActivity(
     action: "skip",
   });
 
-  const issueChoice = await vscode.window.showQuickPick(issueItems, {
-    title: `Plan Day - ${title}`,
-    placeHolder: "Select issue",
-  });
-
-  if (!issueChoice) return undefined;
-
-  if (issueChoice.action === "skip") {
-    return {
-      issueId: 0,
-      issueSubject: "(not assigned)",
-      activityId: 0,
-      activityName: "",
-      logged: false,
-      secondsLeft: workDurationSeconds,
-      unitPhase: "pending",
-    };
-  }
-
+  // Loop to re-show picker if disabled issue selected
   let selectedIssue: Issue | undefined;
-
-  if (issueChoice.action === "search") {
-    // Search dialog
-    const query = await vscode.window.showInputBox({
+  while (true) {
+    const issueChoice = await vscode.window.showQuickPick(issueItems, {
       title: `Plan Day - ${title}`,
-      prompt: "Search issues by ID or text",
-      placeHolder: "e.g., 1234 or keyword",
+      placeHolder: "Select issue",
     });
-    if (!query) return undefined;
 
-    // Try as issue ID first
-    const issueId = parseInt(query, 10);
-    if (!isNaN(issueId)) {
-      try {
-        const result = await server.getIssueById(issueId);
-        selectedIssue = result.issue;
-      } catch {
-        vscode.window.showErrorMessage(`Issue #${issueId} not found`);
-        return undefined;
-      }
-    } else {
-      // Search by text - for now just show error, could add full search later
-      vscode.window.showErrorMessage("Text search not yet implemented");
-      return undefined;
+    if (!issueChoice) return undefined;
+
+    if (issueChoice.action === "skip") {
+      return {
+        issueId: 0,
+        issueSubject: "(not assigned)",
+        activityId: 0,
+        activityName: "",
+        logged: false,
+        secondsLeft: workDurationSeconds,
+        unitPhase: "pending",
+      };
     }
-  } else {
+
+    if (issueChoice.action === "search") {
+      // Search dialog
+      const query = await vscode.window.showInputBox({
+        title: `Plan Day - ${title}`,
+        prompt: "Search issues by ID or text",
+        placeHolder: "e.g., 1234 or keyword",
+      });
+      if (!query) return undefined;
+
+      // Try as issue ID first
+      const issueId = parseInt(query, 10);
+      if (!isNaN(issueId)) {
+        try {
+          const result = await server.getIssueById(issueId);
+          selectedIssue = result.issue;
+          break;
+        } catch {
+          vscode.window.showErrorMessage(`Issue #${issueId} not found`);
+          continue;
+        }
+      } else {
+        // Search by text - for now just show error, could add full search later
+        vscode.window.showErrorMessage("Text search not yet implemented");
+        continue;
+      }
+    }
+
+    // Check if selected issue is disabled (no time tracking)
+    if (issueChoice.disabled) {
+      vscode.window.showInformationMessage(
+        `Project "${issueChoice.issue?.project?.name}" has no time tracking enabled`
+      );
+      continue;
+    }
+
     // Re-fetch issue to ensure we have complete and fresh data
     try {
       const result = await server.getIssueById(issueChoice.issue!.id);
@@ -224,6 +250,7 @@ export async function pickIssueAndActivity(
       // Fallback to cached data if re-fetch fails
       selectedIssue = issueChoice.issue;
     }
+    break;
   }
 
   if (!selectedIssue) return undefined;

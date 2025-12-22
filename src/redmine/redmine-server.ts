@@ -472,6 +472,35 @@ export class RedmineServer {
   }
 
   /**
+   * Update an existing time entry
+   * @param id Time entry ID
+   * @param updates Fields to update (hours, comments, activity_id, spent_on)
+   */
+  async updateTimeEntry(
+    id: number,
+    updates: {
+      hours?: string;
+      comments?: string;
+      activity_id?: number;
+      spent_on?: string;
+    }
+  ): Promise<void> {
+    await this.doRequest(
+      `/time_entries/${id}.json`,
+      "PUT",
+      Buffer.from(JSON.stringify({ time_entry: updates }))
+    );
+  }
+
+  /**
+   * Delete a time entry
+   * @param id Time entry ID
+   */
+  async deleteTimeEntry(id: number): Promise<void> {
+    await this.doRequest(`/time_entries/${id}.json`, "DELETE");
+  }
+
+  /**
    * Returns promise, that resolves to an issue
    * @param issueId ID of issue
    */
