@@ -11,6 +11,7 @@ describe("quickLogTime", () => {
     getProjectTimeEntryActivities: ReturnType<typeof vi.fn>;
     getTimeEntries: ReturnType<typeof vi.fn>;
     addTimeEntry: ReturnType<typeof vi.fn>;
+    isTimeTrackingEnabled: ReturnType<typeof vi.fn>;
   };
   let props: { server: typeof mockServer; config: Record<string, unknown> };
 
@@ -46,6 +47,7 @@ describe("quickLogTime", () => {
         time_entries: [], // Default: no existing entries
       }),
       addTimeEntry: vi.fn().mockResolvedValue({}),
+      isTimeTrackingEnabled: vi.fn().mockResolvedValue(true),
     };
 
     props = { server: mockServer, config: {} };

@@ -714,6 +714,12 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   registerCommand("newIssue", newIssue);
   registerCommand("quickLogTime", (props) => quickLogTime(props, context));
+  registerCommand("addTimeEntryForDate", (props, ...args) => {
+    // Extract date from day-group node
+    const node = args[0] as { _date?: string } | undefined;
+    const date = node?._date;
+    return quickLogTime(props, context, date);
+  });
   registerCommand("quickCreateIssue", async (props) => {
     const created = await quickCreateIssue(props);
     if (created) {
@@ -772,8 +778,8 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       // Handle context menu (tree node with _entry)
       else if (args[0] && typeof args[0] === 'object' && '_entry' in args[0]) {
-        const node = args[0] as { _entry: { issue_id: number } };
-        issueId = node._entry.issue_id;
+        const node = args[0] as { _entry: { issue_id?: number; issue?: { id: number } } };
+        issueId = node._entry.issue_id ?? node._entry.issue?.id;
       }
       // Handle object with issue_id
       else if (args[0] && typeof args[0] === 'object' && 'issue_id' in args[0]) {

@@ -7,13 +7,15 @@ export interface TimeEntryNode {
   id?: string; // Stable ID for preserving expansion state
   label: string;
   description?: string;
-  tooltip?: vscode.MarkdownString;
+  tooltip?: string | vscode.MarkdownString;
   iconPath?: vscode.ThemeIcon;
   collapsibleState: vscode.TreeItemCollapsibleState;
   contextValue?: string;
   type: "loading" | "group" | "week-group" | "day-group" | "month-group" | "week-subgroup" | "entry";
   _cachedEntries?: TimeEntry[];
   _entry?: TimeEntry;
+  _dateRange?: { start: string; end: string }; // For filling empty working days
+  _date?: string; // ISO date for day-group nodes (YYYY-MM-DD)
 }
 
 export class MyTimeEntriesTreeDataProvider
@@ -104,14 +106,17 @@ export class MyTimeEntriesTreeDataProvider
           id: "group-week",
           label: `This Week (${weekNum})`,
           description: formatHoursWithComparison(weekTotal, weekAvailable),
+          tooltip: "Shows working days from Monday up to today",
           collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
           type: "week-group",
           _cachedEntries: weekResult.time_entries,
+          _dateRange: { start: weekStart, end: today },
         },
         {
           id: "group-month",
           label: `This Month (${monthName})`,
           description: formatHoursWithComparison(monthTotal, monthAvailable),
+          tooltip: "Shows working days from 1st up to today",
           collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
           type: "month-group",
           _cachedEntries: monthResult.time_entries,
@@ -158,7 +163,7 @@ export class MyTimeEntriesTreeDataProvider
 
     // Week group - return day groups
     if (element.type === "week-group" && element._cachedEntries) {
-      return this.groupEntriesByDay(element._cachedEntries);
+      return this.groupEntriesByDay(element._cachedEntries, element._dateRange, "week");
     }
 
     // Month group - return week subgroups
@@ -168,7 +173,8 @@ export class MyTimeEntriesTreeDataProvider
 
     // Week subgroup - return day groups
     if (element.type === "week-subgroup" && element._cachedEntries) {
-      return this.groupEntriesByDay(element._cachedEntries);
+      const prefix = element.id || "subweek";
+      return this.groupEntriesByDay(element._cachedEntries, element._dateRange, prefix);
     }
 
     // Day group or regular group - return time entries
@@ -176,13 +182,18 @@ export class MyTimeEntriesTreeDataProvider
       (element.type === "group" || element.type === "day-group") &&
       element._cachedEntries
     ) {
-      return this.mapEntriesToNodes(element._cachedEntries);
+      const prefix = element.id || "entry";
+      return this.mapEntriesToNodes(element._cachedEntries, prefix);
     }
 
     return [];
   }
 
-  private groupEntriesByDay(entries: TimeEntry[]): TimeEntryNode[] {
+  private groupEntriesByDay(
+    entries: TimeEntry[],
+    dateRange?: { start: string; end: string },
+    idPrefix = "day"
+  ): TimeEntryNode[] {
     // Group entries by spent_on date
     const byDate = new Map<string, TimeEntry[]>();
     for (const entry of entries) {
@@ -193,16 +204,29 @@ export class MyTimeEntriesTreeDataProvider
       byDate.get(date)!.push(entry);
     }
 
-    // Sort dates (earliest first for chronological order)
-    const sortedDates = Array.from(byDate.keys()).sort();
-
     // Get working hours config
     const config = vscode.workspace.getConfiguration("redmine.workingHours");
     const schedule = getWeeklySchedule(config);
 
+    // Build list of all dates to show
+    let allDates: string[];
+    if (dateRange) {
+      // Generate all dates in range, filter to working days or days with entries
+      allDates = getDateRange(dateRange.start, dateRange.end).filter(
+        (dateStr) => {
+          const date = new Date(dateStr + "T12:00:00");
+          const hours = getHoursForDate(date, schedule);
+          return hours > 0 || byDate.has(dateStr);
+        }
+      );
+    } else {
+      // No range, show only dates with entries
+      allDates = Array.from(byDate.keys()).sort();
+    }
+
     // Create day group nodes
-    return sortedDates.map((dateStr) => {
-      const dateEntries = byDate.get(dateStr)!;
+    return allDates.map((dateStr) => {
+      const dateEntries = byDate.get(dateStr) || [];
       const total = calculateTotal(dateEntries);
       const date = new Date(dateStr + "T12:00:00"); // Add time to avoid timezone issues
       const dayName = date.toLocaleDateString("en-US", { weekday: "short" });
@@ -210,61 +234,74 @@ export class MyTimeEntriesTreeDataProvider
       const available = getHoursForDate(date, schedule);
 
       return {
-        id: `day-${dateStr}`,
+        id: `${idPrefix}-day-${dateStr}`,
         label: `${dayName} ${dayNum}`,
         description: formatHoursWithComparison(total, available),
-        collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
+        collapsibleState:
+          dateEntries.length > 0
+            ? vscode.TreeItemCollapsibleState.Collapsed
+            : vscode.TreeItemCollapsibleState.None,
         type: "day-group" as const,
+        contextValue: "day-group",
         _cachedEntries: dateEntries,
+        _date: dateStr,
       };
     });
   }
 
   private groupEntriesByWeek(entries: TimeEntry[]): TimeEntryNode[] {
-    // Group entries by ISO week number
-    const byWeek = new Map<number, TimeEntry[]>();
+    // Group entries by ISO week number and year
+    const byWeek = new Map<string, { weekNum: number; year: number; entries: TimeEntry[] }>();
     for (const entry of entries) {
       const date = new Date((entry.spent_on || "unknown") + "T12:00:00");
       const weekNum = getISOWeekNumber(date);
-      if (!byWeek.has(weekNum)) {
-        byWeek.set(weekNum, []);
+      const year = getISOWeekYear(date);
+      const key = `${year}-W${weekNum}`;
+      if (!byWeek.has(key)) {
+        byWeek.set(key, { weekNum, year, entries: [] });
       }
-      byWeek.get(weekNum)!.push(entry);
+      byWeek.get(key)!.entries.push(entry);
     }
 
     // Sort weeks descending (most recent first)
-    const sortedWeeks = Array.from(byWeek.keys()).sort((a, b) => b - a);
+    const sortedKeys = Array.from(byWeek.keys()).sort((a, b) => b.localeCompare(a));
 
     // Get working hours config
     const config = vscode.workspace.getConfiguration("redmine.workingHours");
     const schedule = getWeeklySchedule(config);
 
+    // Get today's date for capping week range
+    const today = new Date().toISOString().split("T")[0];
+
     // Create week subgroup nodes
-    return sortedWeeks.map((weekNum) => {
-      const weekEntries = byWeek.get(weekNum)!;
+    return sortedKeys.map((key) => {
+      const { weekNum, year, entries: weekEntries } = byWeek.get(key)!;
       const total = calculateTotal(weekEntries);
 
-      // Calculate available hours for this week's entries
-      const dates = weekEntries.map((e) => e.spent_on || "");
-      const uniqueDates = [...new Set(dates)].filter((d) => d);
-      let available = 0;
-      for (const dateStr of uniqueDates) {
-        const date = new Date(dateStr + "T12:00:00");
-        available += getHoursForDate(date, schedule);
-      }
+      // Calculate week date range (Mon-Sun), capped at today
+      const weekRange = getWeekDateRange(weekNum, year);
+      const cappedEnd = weekRange.end > today ? today : weekRange.end;
+
+      // Calculate available hours for the week range
+      const available = calculateAvailableHours(
+        new Date(weekRange.start + "T12:00:00"),
+        new Date(cappedEnd + "T12:00:00"),
+        schedule
+      );
 
       return {
-        id: `week-${weekNum}`,
+        id: `week-${year}-${weekNum}`,
         label: `Week ${weekNum}`,
         description: formatHoursWithComparison(total, available),
         collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
         type: "week-subgroup" as const,
         _cachedEntries: weekEntries,
+        _dateRange: { start: weekRange.start, end: cappedEnd },
       };
     });
   }
 
-  private async mapEntriesToNodes(entries: TimeEntry[]): Promise<TimeEntryNode[]> {
+  private async mapEntriesToNodes(entries: TimeEntry[], idPrefix = "entry"): Promise<TimeEntryNode[]> {
     // Build project→client lookup from server's cached projects
     const projectClientMap = new Map<number, string>();
     if (this.server) {
@@ -341,7 +378,7 @@ export class MyTimeEntriesTreeDataProvider
       const description = descParts.join(" • ");
 
       return {
-        id: `entry-${entry.id}`,
+        id: `${idPrefix}-entry-${entry.id}`,
         label: `#${issueId} ${issueSubject}`,
         description,
         tooltip,
@@ -383,6 +420,22 @@ function getMonthStart(): string {
 
 function calculateTotal(entries: TimeEntry[]): number {
   return entries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
+}
+
+/**
+ * Generate all dates between start and end (inclusive)
+ */
+function getDateRange(start: string, end: string): string[] {
+  const dates: string[] = [];
+  const current = new Date(start + "T12:00:00");
+  const endDate = new Date(end + "T12:00:00");
+
+  while (current <= endDate) {
+    dates.push(current.toISOString().split("T")[0]);
+    current.setDate(current.getDate() + 1);
+  }
+
+  return dates;
 }
 
 
@@ -479,4 +532,43 @@ function getISOWeekNumber(date: Date): number {
   const yearStart = new Date(d.getFullYear(), 0, 1);
   // Calculate full weeks to nearest Thursday
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
+/**
+ * Get ISO week year for a date (may differ from calendar year at year boundaries)
+ */
+function getISOWeekYear(date: Date): number {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  // Set to nearest Thursday
+  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+  return d.getFullYear();
+}
+
+/**
+ * Get date range (Mon-Sun) for a given ISO week number and year
+ */
+function getWeekDateRange(
+  weekNum: number,
+  year: number
+): { start: string; end: string } {
+  // January 4th is always in week 1
+  const jan4 = new Date(year, 0, 4);
+  // Find the Monday of week 1
+  const dayOfWeek = jan4.getDay() || 7; // Sunday = 7
+  const week1Monday = new Date(jan4);
+  week1Monday.setDate(jan4.getDate() - dayOfWeek + 1);
+
+  // Calculate target week's Monday
+  const targetMonday = new Date(week1Monday);
+  targetMonday.setDate(week1Monday.getDate() + (weekNum - 1) * 7);
+
+  // Calculate Sunday
+  const targetSunday = new Date(targetMonday);
+  targetSunday.setDate(targetMonday.getDate() + 6);
+
+  return {
+    start: targetMonday.toISOString().split("T")[0],
+    end: targetSunday.toISOString().split("T")[0],
+  };
 }

@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "3.13.0",
+  "version": "3.14.0",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -100,6 +100,10 @@
       {
         "command": "redmine.deleteTimeEntry",
         "title": "Delete Time Entry"
+      },
+      {
+        "command": "redmine.addTimeEntryForDate",
+        "title": "Add Time Entry..."
       },
       {
         "command": "redmine.openIssueInBrowser",
@@ -334,6 +338,10 @@
           "when": "false"
         },
         {
+          "command": "redmine.addTimeEntryForDate",
+          "when": "false"
+        },
+        {
           "command": "redmine.openIssueInBrowser",
           "when": "false"
         },
@@ -488,6 +496,11 @@
           "command": "redmine.openTimeEntryInBrowser",
           "when": "view == 'redmine-explorer-my-time-entries' && viewItem == 'time-entry'",
           "group": "2_navigation@1"
+        },
+        {
+          "command": "redmine.addTimeEntryForDate",
+          "when": "view == 'redmine-explorer-my-time-entries' && viewItem == 'day-group'",
+          "group": "1_edit@1"
         },
         {
           "command": "redmine.openIssueInBrowser",

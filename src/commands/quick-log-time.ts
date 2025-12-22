@@ -17,7 +17,8 @@ function isRecent(date: Date): boolean {
 
 export async function quickLogTime(
   props: ActionProperties,
-  context: vscode.ExtensionContext
+  context: vscode.ExtensionContext,
+  presetDate?: string // Optional pre-selected date (YYYY-MM-DD)
 ): Promise<void> {
   try {
     // 1. Get recent log from cache
@@ -63,8 +64,8 @@ export async function quickLogTime(
       selection = picked;
     }
 
-    // 3. Pick date (Today/Yesterday/Custom)
-    const selectedDate = await pickDate();
+    // 3. Pick date (skip if presetDate provided)
+    const selectedDate = presetDate ?? (await pickDate());
     if (selectedDate === undefined) return; // User cancelled
 
     // 4. Fetch time entries for selected date (runs during date picker)
@@ -206,10 +207,33 @@ async function pickIssueAndActivity(
     return undefined;
   }
 
+  // Filter out issues from projects without time_tracking enabled
+  const projectIds = [...new Set(issues.map(i => i.project?.id).filter(Boolean))] as number[];
+  const timeTrackingByProject = new Map<number, boolean>();
+
+  await Promise.all(
+    projectIds.map(async (projectId) => {
+      const enabled = await props.server.isTimeTrackingEnabled(projectId);
+      timeTrackingByProject.set(projectId, enabled);
+    })
+  );
+
+  const trackableIssues = issues.filter(i => {
+    const projectId = i.project?.id;
+    return projectId && timeTrackingByProject.get(projectId) !== false;
+  });
+
+  if (trackableIssues.length === 0) {
+    vscode.window.showErrorMessage(
+      "No issues with time tracking enabled. Check project settings."
+    );
+    return undefined;
+  }
+
   // Sort: recent first, then by due date
   const sortedIssues = [
-    ...issues.filter((i) => recentIds.includes(i.id)),
-    ...issues.filter((i) => !recentIds.includes(i.id)),
+    ...trackableIssues.filter((i) => recentIds.includes(i.id)),
+    ...trackableIssues.filter((i) => !recentIds.includes(i.id)),
   ].slice(0, 10); // Limit to 10 for instant UX
 
   const quickPickItems = sortedIssues.map((i) => ({

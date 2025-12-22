@@ -13,6 +13,8 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ### Fixed
 
+- **Open in Browser for time entries** - handles entries with `issue.id` instead of `issue_id`
+- **Quick Log Time filters issues** - only shows issues from projects with time tracking enabled
 - **Timer status bar shows activity** - working/paused now shows `#1234 [Data Management] (4/8)`
 - **Timer session recovery** - preserves "logging" phase for completed timers
 - **Timer phase consistency** - orphaned "paused" phase when unit removed/reset
@@ -22,6 +24,8 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ### Added
 
+- **Empty working days in time entries** - show days with 0 logged hours based on weekly schedule; tooltips explain date range
+- **Add Time Entry from day** - right-click day in time entries to add entry for that date
 - **Enter/click starts timer unit** - click or Enter on tree item starts/pauses unit
 - **Start Timer respects selection** - title bar button starts selected unit
 
