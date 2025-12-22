@@ -12,7 +12,7 @@ jobs:
     name: Lint & Typecheck
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -52,7 +52,7 @@ jobs:
           git config --global core.autocrlf false
           git config --global core.eol lf
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # Full history only needed for commit validation
           fetch-depth: ${{ matrix.os == 'ubuntu-latest' && 0 || 1 }}
@@ -93,7 +93,7 @@ jobs:
     name: Build & Package
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Node
         uses: actions/setup-node@v6
