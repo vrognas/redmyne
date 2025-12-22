@@ -137,7 +137,24 @@ export async function pickIssueAndActivity(
     return undefined;
   }
 
-  const issueItems: IssueQuickPickItem[] = issues.map((issue) => ({
+  // Filter out issues from projects without time_tracking enabled
+  const projectIds = [...new Set(issues.map(i => i.project?.id).filter(Boolean))] as number[];
+  const timeTrackingByProject = new Map<number, boolean>();
+
+  // Check time_tracking for all projects in parallel
+  await Promise.all(
+    projectIds.map(async (projectId) => {
+      const enabled = await server.isTimeTrackingEnabled(projectId);
+      timeTrackingByProject.set(projectId, enabled);
+    })
+  );
+
+  // Filter issues to only those with time tracking enabled
+  const trackableIssues = issues.filter(
+    (issue) => issue.project?.id && timeTrackingByProject.get(issue.project.id)
+  );
+
+  const issueItems: IssueQuickPickItem[] = trackableIssues.map((issue) => ({
     label: `#${issue.id} ${issue.subject}`,
     description: issue.project?.name,
     issue,
