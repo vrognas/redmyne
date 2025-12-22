@@ -266,9 +266,10 @@ export async function showCompletionDialog(
   unit: WorkUnit,
   defaultHours: number
 ): Promise<{ hours: number; comment?: string } | undefined> {
+  const hoursStr = formatHoursAsHHMM(defaultHours);
   const options = [
     {
-      label: `$(check) Log ${defaultHours}h & Start Break`,
+      label: `$(check) Log ${hoursStr} & Start Break`,
       action: "log" as const,
     },
     {
@@ -308,5 +309,15 @@ export async function showCompletionDialog(
 function formatMinutesAsHHMM(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
+  return `${h}:${m.toString().padStart(2, "0")}`;
+}
+
+/**
+ * Format decimal hours as H:MM (e.g., 1.0 → "1:00", 0.75 → "0:45", 1.5 → "1:30")
+ */
+export function formatHoursAsHHMM(hours: number): string {
+  const totalMinutes = Math.round(hours * 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
   return `${h}:${m.toString().padStart(2, "0")}`;
 }

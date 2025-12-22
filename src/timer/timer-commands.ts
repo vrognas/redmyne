@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { RedmineServer } from "../redmine/redmine-server";
 import { TimerController } from "./timer-controller";
-import { showPlanDayDialog, showCompletionDialog, pickIssueAndActivity } from "./timer-dialogs";
+import { showPlanDayDialog, showCompletionDialog, pickIssueAndActivity, formatHoursAsHHMM } from "./timer-dialogs";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { playCompletionSound } from "./timer-sound";
 
@@ -173,8 +173,9 @@ export function registerTimerCommands(
           // Refresh time entries tree
           vscode.commands.executeCommand("redmine.refreshTimeEntries");
 
+          const loggedHoursStr = formatHoursAsHHMM(result.hours);
           showStatusBarMessage(
-            `$(check) Logged ${result.hours}h to #${unit.issueId}`,
+            `$(check) Logged ${loggedHoursStr} to #${unit.issueId}`,
             2000
           );
 
@@ -417,12 +418,23 @@ export function registerTimerCommands(
 
   // Listen for timer complete event
   context.subscriptions.push(
-    controller.onTimerComplete(() => {
+    controller.onTimerComplete(async (unit) => {
       if (getSoundEnabled()) {
         playCompletionSound();
       }
-      // Show log dialog
-      vscode.commands.executeCommand("redmine.timer.showLogDialog");
+      // Show prominent modal notification
+      const issueLabel = unit.issueId > 0 ? `#${unit.issueId} ${unit.issueSubject}` : "Unassigned";
+      const action = await vscode.window.showWarningMessage(
+        `⏰ Timer Complete!\n${issueLabel}`,
+        { modal: true },
+        "Log Time",
+        "Skip"
+      );
+      if (action === "Log Time") {
+        vscode.commands.executeCommand("redmine.timer.showLogDialog");
+      } else {
+        controller.skipLogging();
+      }
     })
   );
 

@@ -401,7 +401,25 @@ export class TimerController {
     this.state.phase = "break";
     this.state.breakSecondsLeft = this.breakDurationSeconds;
     this.state.startedAt = new Date();
-    // No auto-timer for break - user manually starts next
+    this.startBreakInterval();
+    this.emitChange();
+  }
+
+  private startBreakInterval(): void {
+    this.stopInterval();
+    this.intervalId = setInterval(() => this.breakTick(), 1000);
+  }
+
+  private breakTick(): void {
+    if (this.disposed || this.state.phase !== "break") return;
+
+    if (this.state.breakSecondsLeft <= 1) {
+      this.state.breakSecondsLeft = 0;
+      this.stopInterval();
+      // Break done - wait for user to start next unit
+    } else {
+      this.state.breakSecondsLeft--;
+    }
     this.emitChange();
   }
 
