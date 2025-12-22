@@ -386,7 +386,7 @@ export class RedmineServer {
     return global.time_entry_activities;
   }
 
-  addTimeEntry(
+  async addTimeEntry(
     issueId: number,
     activityId: number,
     hours: string,
@@ -402,11 +402,23 @@ export class RedmineServer {
     if (spentOn) {
       entry.spent_on = spentOn;
     }
-    return this.doRequest<{ time_entry: TimeEntry }>(
-      `/time_entries.json`,
-      "POST",
-      Buffer.from(JSON.stringify({ time_entry: entry }))
-    );
+    try {
+      return await this.doRequest<{ time_entry: TimeEntry }>(
+        `/time_entries.json`,
+        "POST",
+        Buffer.from(JSON.stringify({ time_entry: entry }))
+      );
+    } catch (error) {
+      // Log details for debugging
+      console.error(`[Redmine] addTimeEntry failed:`, {
+        issueId,
+        activityId,
+        hours,
+        spentOn,
+        error: String(error),
+      });
+      throw error;
+    }
   }
 
   /**
