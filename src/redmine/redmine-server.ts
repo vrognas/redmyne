@@ -375,14 +375,19 @@ export class RedmineServer {
 
       const projectActivities = response?.project?.time_entry_activities;
       if (projectActivities && projectActivities.length > 0) {
+        console.log(`[Redmine] Project ${projectId} activities (${projectActivities.length}):`,
+          projectActivities.map(a => `${a.id}:${a.name}`).join(', '));
         return projectActivities;
       }
-    } catch {
+      console.log(`[Redmine] Project ${projectId} has no specific activities, using global`);
+    } catch (error) {
+      console.log(`[Redmine] Failed to get project ${projectId} activities:`, error);
       // Project-specific activities not available, fall through to global
     }
 
     // Fallback to global activities
     const global = await this.getTimeEntryActivities();
+    console.log(`[Redmine] Using global activities (${global.time_entry_activities.length})`);
     return global.time_entry_activities;
   }
 
