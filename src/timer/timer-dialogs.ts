@@ -277,11 +277,9 @@ export async function pickIssueAndActivity(
                 }
               }
             })(),
-            // Server text search for non-numeric queries
+            // Server text search (always - numeric queries might match subjects like "2024 report")
             (async () => {
-              if (!isNumericQuery) {
-                searchResult.serverResults = await server.searchIssues(query, 10);
-              }
+              searchResult.serverResults = await server.searchIssues(query, 10);
             })(),
           ]);
 
