@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import type { ActionProperties } from "./action-properties";
 import { parseTimeInput, validateTimeInput, formatHoursAsHHMM } from "../utilities/time-input";
 import { showStatusBarMessage } from "../utilities/status-bar";
+import { pickIssueWithSearch } from "../utilities/issue-picker";
 
 interface RecentTimeLog {
   issueId: number;
@@ -54,13 +55,13 @@ export async function quickLogTime(
           issueSubject: recent.issueSubject,
         };
       } else {
-        const picked = await pickIssueAndActivity(props, context);
-        if (!picked) return;
+        const picked = await pickIssueWithSearch(props.server, "Log Time (1/2)");
+        if (!picked || picked === "skip") return;
         selection = picked;
       }
     } else {
-      const picked = await pickIssueAndActivity(props, context);
-      if (!picked) return;
+      const picked = await pickIssueWithSearch(props.server, "Log Time (1/2)");
+      if (!picked || picked === "skip") return;
       selection = picked;
     }
 
@@ -182,104 +183,3 @@ async function pickDate(): Promise<string | undefined> {
   return dateChoice.date;
 }
 
-async function pickIssueAndActivity(
-  props: ActionProperties,
-  context: vscode.ExtensionContext
-): Promise<
-  | {
-      issueId: number;
-      activityId: number;
-      activityName: string;
-      issueSubject: string;
-    }
-  | undefined
-> {
-  // Get recent issue IDs from cache (LRU 10)
-  const recentIds = context.globalState.get<number[]>("recentIssueIds", []);
-
-  // Fetch assigned issues
-  const { issues } = await props.server.getIssuesAssignedToMe();
-
-  if (issues.length === 0) {
-    vscode.window.showErrorMessage(
-      "No issues assigned to you. Please use browser to create issues."
-    );
-    return undefined;
-  }
-
-  // Filter out issues from projects without time_tracking enabled
-  const projectIds = [...new Set(issues.map(i => i.project?.id).filter(Boolean))] as number[];
-  const timeTrackingByProject = new Map<number, boolean>();
-
-  await Promise.all(
-    projectIds.map(async (projectId) => {
-      const enabled = await props.server.isTimeTrackingEnabled(projectId);
-      timeTrackingByProject.set(projectId, enabled);
-    })
-  );
-
-  const trackableIssues = issues.filter(i => {
-    const projectId = i.project?.id;
-    return projectId && timeTrackingByProject.get(projectId) !== false;
-  });
-
-  if (trackableIssues.length === 0) {
-    vscode.window.showErrorMessage(
-      "No issues with time tracking enabled. Check project settings."
-    );
-    return undefined;
-  }
-
-  // Sort: recent first, then by due date
-  const sortedIssues = [
-    ...trackableIssues.filter((i) => recentIds.includes(i.id)),
-    ...trackableIssues.filter((i) => !recentIds.includes(i.id)),
-  ].slice(0, 10); // Limit to 10 for instant UX
-
-  const quickPickItems = sortedIssues.map((i) => ({
-    label: `#${i.id} ${i.subject}`,
-    description: i.project.name,
-    detail: `${i.status.name}${i.due_date ? ` | Due: ${i.due_date}` : ""}`,
-    issue: i,
-  }));
-
-  const picked = await vscode.window.showQuickPick(quickPickItems, {
-    title: "Log Time (1/2)",
-    placeHolder: "Select issue to log time",
-    matchOnDescription: true,
-  });
-
-  if (!picked) return undefined;
-
-  // Update recent issues cache
-  const updatedRecent = [
-    picked.issue.id,
-    ...recentIds.filter((id: number) => id !== picked.issue.id),
-  ].slice(0, 10);
-  await context.globalState.update("recentIssueIds", updatedRecent);
-
-  // Pick activity (use project-specific activities if configured)
-  const activities = await props.server.getProjectTimeEntryActivities(
-    picked.issue.project.id
-  );
-  const activity = await vscode.window.showQuickPick(
-    activities.map((a) => ({
-      label: a.name,
-      description: a.is_default ? "Default" : undefined,
-      activity: a,
-    })),
-    {
-      title: "Log Time (2/2)",
-      placeHolder: "Select activity",
-    }
-  );
-
-  if (!activity) return undefined;
-
-  return {
-    issueId: picked.issue.id,
-    activityId: activity.activity.id,
-    activityName: activity.activity.name,
-    issueSubject: picked.issue.subject,
-  };
-}

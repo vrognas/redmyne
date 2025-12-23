@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as vscode from "vscode";
 import { quickLogTime } from "../../../src/commands/quick-log-time";
 import { validateTimeInput } from "../../../src/utilities/time-input";
+import * as issuePicker from "../../../src/utilities/issue-picker";
 
 describe("quickLogTime", () => {
   let mockContext: vscode.ExtensionContext;
@@ -175,29 +176,20 @@ describe("quickLogTime", () => {
     });
     mockContext.globalState.update = vi.fn().mockResolvedValue(undefined);
 
-    // Mock flow: pickIssueAndActivity needs 2 QuickPick calls + date picker
-    // Call 1: Pick issue from list
-    // Call 2: Pick activity type
-    // Call 3: Pick date
-    vi.spyOn(vscode.window, "showQuickPick")
-      .mockResolvedValueOnce({
-        label: "#123 Test Issue",
-        issue: {
-          id: 123,
-          subject: "Test Issue",
-          project: { id: 1, name: "Test Project" },
-          status: { name: "In Progress" },
-        },
-      } as unknown as vscode.QuickPickItem)
-      .mockResolvedValueOnce({
-        label: "Development",
-        activity: { id: 9, name: "Development" },
-      } as unknown as vscode.QuickPickItem)
-      .mockResolvedValueOnce({
-        label: "$(calendar) Today",
-        value: "today",
-        date: new Date().toISOString().split("T")[0],
-      } as unknown as vscode.QuickPickItem);
+    // Mock the shared issue picker
+    vi.spyOn(issuePicker, "pickIssueWithSearch").mockResolvedValueOnce({
+      issueId: 123,
+      issueSubject: "Test Issue",
+      activityId: 9,
+      activityName: "Development",
+    });
+
+    // Mock date picker
+    vi.spyOn(vscode.window, "showQuickPick").mockResolvedValueOnce({
+      label: "$(calendar) Today",
+      value: "today",
+      date: new Date().toISOString().split("T")[0],
+    } as unknown as vscode.QuickPickItem);
 
     (vscode.window.showInputBox as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce("2.5") // hours
@@ -216,11 +208,6 @@ describe("quickLogTime", () => {
         lastActivityId: 9,
       })
     );
-
-    expect(mockContext.globalState.update).toHaveBeenCalledWith(
-      "recentIssueIds",
-      expect.arrayContaining([123])
-    );
   });
 
   it("logs time to yesterday when selected", async () => {
@@ -232,40 +219,31 @@ describe("quickLogTime", () => {
     });
     mockContext.globalState.update = vi.fn().mockResolvedValue(undefined);
 
-    vi.spyOn(vscode.window, "showQuickPick")
-      .mockResolvedValueOnce({
-        label: "#123 Test Issue",
-        issue: {
-          id: 123,
-          subject: "Test Issue",
-          project: { id: 1, name: "Test Project" },
-          status: { name: "In Progress" },
-        },
-      } as unknown as vscode.QuickPickItem)
-      .mockResolvedValueOnce({
-        label: "Development",
-        activity: { id: 9, name: "Development" },
-      } as unknown as vscode.QuickPickItem)
-      .mockResolvedValueOnce({
-        label: "$(history) Yesterday",
-        value: "yesterday",
-        date: (() => {
-          const yesterday = new Date();
-          yesterday.setDate(yesterday.getDate() - 1);
-          return yesterday.toISOString().split("T")[0];
-        })(),
-      } as unknown as vscode.QuickPickItem);
+    // Mock the shared issue picker
+    vi.spyOn(issuePicker, "pickIssueWithSearch").mockResolvedValueOnce({
+      issueId: 123,
+      issueSubject: "Test Issue",
+      activityId: 9,
+      activityName: "Development",
+    });
+
+    // Calculate yesterday date
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const expectedDate = yesterday.toISOString().split("T")[0];
+
+    // Mock date picker to select yesterday
+    vi.spyOn(vscode.window, "showQuickPick").mockResolvedValueOnce({
+      label: "$(history) Yesterday",
+      value: "yesterday",
+      date: expectedDate,
+    } as unknown as vscode.QuickPickItem);
 
     (vscode.window.showInputBox as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce("8") // hours
       .mockResolvedValueOnce("Worked late"); // comment
 
     await quickLogTime(props, mockContext);
-
-    // Calculate expected yesterday date
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const expectedDate = yesterday.toISOString().split("T")[0];
 
     // Verify API called with spentOn for yesterday
     expect(mockServer.addTimeEntry).toHaveBeenCalledWith(
@@ -286,24 +264,19 @@ describe("quickLogTime", () => {
     });
     mockContext.globalState.update = vi.fn().mockResolvedValue(undefined);
 
-    vi.spyOn(vscode.window, "showQuickPick")
-      .mockResolvedValueOnce({
-        label: "#123 Test Issue",
-        issue: {
-          id: 123,
-          subject: "Test Issue",
-          project: { id: 1, name: "Test Project" },
-          status: { name: "In Progress" },
-        },
-      } as unknown as vscode.QuickPickItem)
-      .mockResolvedValueOnce({
-        label: "Development",
-        activity: { id: 9, name: "Development" },
-      } as unknown as vscode.QuickPickItem)
-      .mockResolvedValueOnce({
-        label: "$(edit) Pick date...",
-        value: "pick",
-      } as unknown as vscode.QuickPickItem);
+    // Mock the shared issue picker
+    vi.spyOn(issuePicker, "pickIssueWithSearch").mockResolvedValueOnce({
+      issueId: 123,
+      issueSubject: "Test Issue",
+      activityId: 9,
+      activityName: "Development",
+    });
+
+    // Mock date picker with "pick" option
+    vi.spyOn(vscode.window, "showQuickPick").mockResolvedValueOnce({
+      label: "$(edit) Pick date...",
+      value: "pick",
+    } as unknown as vscode.QuickPickItem);
 
     (vscode.window.showInputBox as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce("2025-12-15") // custom date

@@ -1,0 +1,376 @@
+import * as vscode from "vscode";
+import { RedmineServer } from "../redmine/redmine-server";
+import { Issue } from "../redmine/models/issue";
+import { TimeEntryActivity } from "../redmine/models/time-entry-activity";
+
+interface IssueQuickPickItem extends vscode.QuickPickItem {
+  issue?: Issue;
+  action?: "search" | "skip";
+  disabled?: boolean;
+}
+
+export interface PickedIssueAndActivity {
+  issueId: number;
+  issueSubject: string;
+  activityId: number;
+  activityName: string;
+}
+
+/**
+ * Pick an issue with inline search and activity selection
+ * Shared between timer dialogs and quick-log-time
+ */
+export async function pickIssueWithSearch(
+  server: RedmineServer,
+  title: string,
+  options?: {
+    allowSkip?: boolean; // Show "Skip" option (default: false)
+  }
+): Promise<PickedIssueAndActivity | "skip" | undefined> {
+  const allowSkip = options?.allowSkip ?? false;
+
+  // Get assigned issues
+  let issues: Issue[];
+  try {
+    const result = await server.getIssuesAssignedToMe();
+    issues = result.issues;
+  } catch (error) {
+    vscode.window.showErrorMessage(`Failed to fetch issues: ${error}`);
+    return undefined;
+  }
+
+  // Filter out issues from projects without time_tracking enabled
+  const projectIds = [...new Set(issues.map(i => i.project?.id).filter(Boolean))] as number[];
+  const timeTrackingByProject = new Map<number, boolean>();
+
+  // Check time_tracking for all projects in parallel
+  await Promise.all(
+    projectIds.map(async (projectId) => {
+      const enabled = await server.isTimeTrackingEnabled(projectId);
+      timeTrackingByProject.set(projectId, enabled);
+    })
+  );
+
+  // Build issue list: trackable issues first, then non-trackable (disabled)
+  const trackableIssues = issues.filter(
+    (issue) => issue.project?.id && timeTrackingByProject.get(issue.project.id)
+  );
+  const nonTrackableIssues = issues.filter(
+    (issue) => !issue.project?.id || !timeTrackingByProject.get(issue.project.id)
+  );
+
+  // Build base items from assigned issues
+  const baseItems: IssueQuickPickItem[] = [
+    // Trackable issues (selectable)
+    ...trackableIssues.map((issue) => ({
+      label: `#${issue.id} ${issue.subject}`,
+      description: issue.project?.name,
+      issue,
+      disabled: false,
+    })),
+    // Non-trackable issues (disabled, greyed out)
+    ...nonTrackableIssues.map((issue) => ({
+      label: `$(circle-slash) #${issue.id} ${issue.subject}`,
+      description: `${issue.project?.name ?? "Unknown"} (no time tracking)`,
+      issue,
+      disabled: true,
+    })),
+  ];
+
+  // Add skip option if allowed
+  if (allowSkip) {
+    baseItems.push({
+      label: "$(dash) Skip (assign later)",
+      action: "skip",
+    });
+  }
+
+  // Use createQuickPick for inline search
+  const selectedIssue = await new Promise<Issue | "skip" | undefined>((resolve) => {
+    const quickPick = vscode.window.createQuickPick<IssueQuickPickItem>();
+    quickPick.title = title;
+    quickPick.placeholder = "Type to search, or select from list";
+    quickPick.items = baseItems;
+    quickPick.matchOnDescription = true;
+
+    let searchTimeout: ReturnType<typeof setTimeout> | undefined;
+    let resolved = false;
+    let searchVersion = 0;
+
+    const handleSelection = (selected: IssueQuickPickItem): boolean => {
+      if (resolved) return false;
+
+      if (selected.action === "skip") {
+        resolved = true;
+        quickPick.dispose();
+        resolve("skip");
+        return true;
+      }
+
+      if (selected.disabled) {
+        vscode.window.showInformationMessage(
+          `Project "${selected.issue?.project?.name}" has no time tracking enabled`
+        );
+        return false;
+      }
+
+      if (selected.issue) {
+        resolved = true;
+        quickPick.dispose();
+        resolve(selected.issue);
+        return true;
+      }
+      return false;
+    };
+
+    quickPick.onDidChangeValue(async (value) => {
+      if (searchTimeout) clearTimeout(searchTimeout);
+
+      if (!value.trim()) {
+        quickPick.items = baseItems;
+        return;
+      }
+
+      // Debounce search (300ms)
+      searchTimeout = setTimeout(async () => {
+        const query = value.trim();
+        if (!query || query.length < 2) return;
+
+        const thisSearchVersion = ++searchVersion;
+        quickPick.busy = true;
+
+        try {
+          const lowerQuery = query.toLowerCase();
+          const cleanQuery = query.replace(/^#/, "");
+          const possibleId = parseInt(cleanQuery, 10);
+          const isNumericQuery = !isNaN(possibleId) && cleanQuery === String(possibleId);
+
+          // 1. Search local assigned issues
+          const localMatches = issues.filter((issue) =>
+            String(issue.id).includes(cleanQuery) ||
+            issue.subject.toLowerCase().includes(lowerQuery) ||
+            issue.project?.name?.toLowerCase().includes(lowerQuery)
+          );
+
+          // 2. Parallel: exact ID fetch + server text search
+          type SearchResult = {
+            exactMatch: Issue | null;
+            exactMatchError: string | null;
+            serverResults: Issue[];
+          };
+
+          const searchResult: SearchResult = { exactMatch: null, exactMatchError: null, serverResults: [] };
+
+          await Promise.all([
+            (async () => {
+              if (isNumericQuery) {
+                try {
+                  const result = await server.getIssueById(possibleId);
+                  searchResult.exactMatch = result.issue;
+                } catch (error: unknown) {
+                  if (error instanceof Error) {
+                    searchResult.exactMatchError = error.message.includes("403") ? "no access" :
+                                     error.message.includes("404") ? "not found" : null;
+                  }
+                }
+              }
+            })(),
+            (async () => {
+              searchResult.serverResults = await server.searchIssues(query, 10);
+            })(),
+          ]);
+
+          const { exactMatch, exactMatchError, serverResults } = searchResult;
+
+          // 3. Merge results
+          const seenIds = new Set<number>();
+          const allResults: Issue[] = [];
+
+          if (exactMatch) {
+            allResults.push(exactMatch);
+            seenIds.add(exactMatch.id);
+          }
+          for (const issue of localMatches) {
+            if (!seenIds.has(issue.id)) {
+              allResults.push(issue);
+              seenIds.add(issue.id);
+            }
+          }
+          for (const issue of serverResults) {
+            if (!seenIds.has(issue.id)) {
+              allResults.push(issue);
+              seenIds.add(issue.id);
+            }
+          }
+
+          // 4. Check time tracking for new projects
+          const newProjectIds = [...new Set(
+            allResults
+              .map(i => i.project?.id)
+              .filter((id): id is number => id != null && !timeTrackingByProject.has(id))
+          )];
+
+          if (newProjectIds.length > 0) {
+            await Promise.all(
+              newProjectIds.map(async (projectId) => {
+                try {
+                  const enabled = await server.isTimeTrackingEnabled(projectId);
+                  timeTrackingByProject.set(projectId, enabled);
+                } catch {
+                  timeTrackingByProject.set(projectId, false);
+                }
+              })
+            );
+          }
+
+          // 5. Filter to trackable issues
+          const assignedIds = new Set(issues.map(i => i.id));
+          const trackableResults = allResults.filter((issue) => {
+            const projectId = issue.project?.id;
+            return projectId != null && timeTrackingByProject.get(projectId) === true;
+          });
+
+          // Sort: assigned issues first
+          trackableResults.sort((a, b) => {
+            const aAssigned = assignedIds.has(a.id);
+            const bAssigned = assignedIds.has(b.id);
+            if (aAssigned && !bAssigned) return -1;
+            if (!aAssigned && bAssigned) return 1;
+            return b.id - a.id;
+          });
+
+          // 6. Check if results are still relevant
+          if (thisSearchVersion !== searchVersion || resolved) return;
+
+          // 7. Build result items
+          const limitedResults = trackableResults.slice(0, 15);
+          const resultItems: IssueQuickPickItem[] = [];
+
+          if (isNumericQuery && exactMatchError && limitedResults.length === 0) {
+            resultItems.push({
+              label: `$(error) #${possibleId} ${exactMatchError}`,
+              disabled: true,
+            });
+          }
+
+          if (limitedResults.length === 0 && resultItems.length === 0) {
+            resultItems.push({
+              label: `$(info) No results for "${query}"`,
+              disabled: true,
+            });
+          }
+
+          for (const issue of limitedResults) {
+            const isAssigned = assignedIds.has(issue.id);
+            const icon = isAssigned ? "$(account)" : "$(search)";
+            const assignedTag = isAssigned ? " (assigned)" : "";
+            resultItems.push({
+              label: `${icon} #${issue.id} ${issue.subject}`,
+              description: `${issue.project?.name ?? ""}${assignedTag}`,
+              detail: issue.status?.name,
+              issue,
+            });
+          }
+
+          quickPick.items = [
+            ...resultItems,
+            { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
+            ...baseItems,
+          ];
+        } catch {
+          if (thisSearchVersion === searchVersion && !resolved) {
+            quickPick.items = [
+              { label: `$(error) Search failed`, disabled: true },
+              { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
+              ...baseItems,
+            ];
+          }
+        } finally {
+          if (thisSearchVersion === searchVersion) {
+            quickPick.busy = false;
+          }
+        }
+      }, 300);
+    });
+
+    quickPick.onDidAccept(() => {
+      const selected = quickPick.activeItems[0];
+      if (selected) handleSelection(selected);
+    });
+
+    quickPick.onDidChangeSelection((items) => {
+      if (items.length > 0) handleSelection(items[0]);
+    });
+
+    quickPick.onDidHide(() => {
+      if (searchTimeout) clearTimeout(searchTimeout);
+      if (!resolved) {
+        resolved = true;
+        resolve(undefined);
+      }
+      quickPick.dispose();
+    });
+
+    quickPick.show();
+  });
+
+  if (selectedIssue === undefined) return undefined;
+  if (selectedIssue === "skip") return "skip";
+
+  // Re-fetch to ensure fresh data
+  let finalIssue: Issue;
+  try {
+    const result = await server.getIssueById(selectedIssue.id);
+    finalIssue = result.issue;
+  } catch {
+    finalIssue = selectedIssue;
+  }
+
+  // Pick activity for this issue's project
+  if (!finalIssue.project?.id) {
+    vscode.window.showErrorMessage("Issue has no associated project");
+    return undefined;
+  }
+
+  // Check if project has time tracking enabled
+  const hasTimeTracking = await server.isTimeTrackingEnabled(finalIssue.project.id);
+  if (!hasTimeTracking) {
+    vscode.window.showErrorMessage(
+      `Cannot log time: Project "${finalIssue.project.name}" does not have time tracking enabled`
+    );
+    return undefined;
+  }
+
+  let activities: TimeEntryActivity[];
+  try {
+    activities = await server.getProjectTimeEntryActivities(finalIssue.project.id);
+  } catch (error) {
+    vscode.window.showErrorMessage(`Failed to fetch activities: ${error}`);
+    return undefined;
+  }
+
+  if (activities.length === 0) {
+    vscode.window.showErrorMessage("No activities available for this project");
+    return undefined;
+  }
+
+  const activityItems = activities.map((a) => ({
+    label: a.name,
+    description: a.is_default ? "Default" : undefined,
+    activity: a,
+  }));
+
+  const activityChoice = await vscode.window.showQuickPick(activityItems, {
+    title,
+    placeHolder: `Activity for #${finalIssue.id}`,
+  });
+
+  if (!activityChoice) return undefined;
+
+  return {
+    issueId: finalIssue.id,
+    issueSubject: finalIssue.subject,
+    activityId: activityChoice.activity.id,
+    activityName: activityChoice.activity.name,
+  };
+}
