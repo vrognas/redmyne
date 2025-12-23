@@ -858,8 +858,8 @@ export class RedmineServer {
     try {
       const lowerQuery = query.toLowerCase();
 
-      // Fetch more results to allow for better ranking
-      const fetchLimit = Math.max(limit * 5, 50);
+      // Fetch many results - Redmine sorts by ID desc, old important issues get buried
+      const fetchLimit = 300;
 
       const params = new URLSearchParams();
       params.append("set_filter", "1");
