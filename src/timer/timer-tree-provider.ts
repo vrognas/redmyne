@@ -4,7 +4,7 @@ import { WorkUnit } from "./timer-state";
 import { formatHoursAsHHMM, formatSecondsAsMMSS } from "../utilities/time-input";
 
 interface PlanTreeItem {
-  type: "header" | "unit" | "add-button";
+  type: "header" | "unit" | "add-button" | "completed-header";
   unit?: WorkUnit;
   index?: number;
   isCurrent: boolean;
@@ -85,6 +85,13 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
         command: "redmine.timer.addUnit",
         title: "Add Unit",
       };
+      return item;
+    }
+
+    if (element.type === "completed-header") {
+      const item = new vscode.TreeItem("Completed", vscode.TreeItemCollapsibleState.Expanded);
+      item.iconPath = new vscode.ThemeIcon("checklist");
+      item.contextValue = "completed-header";
       return item;
     }
 
@@ -210,29 +217,45 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
   }
 
   getChildren(element?: PlanTreeItem): PlanTreeItem[] {
-    // Only show root level
-    if (element) return [];
-
     const state = this.controller.getState();
     const { plan, currentUnitIndex } = state;
 
+    // Children of completed-header: completed units
+    if (element?.type === "completed-header") {
+      return plan
+        .map((unit, index) => ({
+          type: "unit" as const,
+          unit,
+          index,
+          isCurrent: index === currentUnitIndex,
+          isCompleted: unit.logged,
+        }))
+        .filter(item => item.isCompleted);
+    }
+
+    // Other elements have no children
+    if (element) return [];
+
     if (plan.length === 0) {
-      // No plan - show message
       this.cachedItems = [];
       return [];
     }
 
-    // Build items, reusing cached objects where possible for targeted refresh
-    const items: PlanTreeItem[] = plan.map((unit, index) => {
-      const existing = this.cachedItems[index];
-      if (existing && existing.type === "unit" && existing.index === index) {
-        // Update existing item (keeps same object reference for targeted refresh)
+    // Separate active and completed units
+    const activeUnits = plan
+      .map((unit, index) => ({ unit, index }))
+      .filter(({ unit }) => !unit.logged);
+    const completedUnits = plan.filter(unit => unit.logged);
+
+    // Build active unit items
+    const items: PlanTreeItem[] = activeUnits.map(({ unit, index }) => {
+      const existing = this.cachedItems.find(i => i.type === "unit" && i.index === index);
+      if (existing && existing.type === "unit") {
         existing.unit = unit;
         existing.isCurrent = index === currentUnitIndex;
         existing.isCompleted = unit.logged;
         return existing;
       }
-      // Create new item
       return {
         type: "unit" as const,
         unit,
@@ -242,13 +265,23 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
       };
     });
 
-    // Add button at end
+    // Add button
     const addButton = this.cachedItems.find(i => i.type === "add-button") || {
       type: "add-button" as const,
       isCurrent: false,
       isCompleted: false,
     };
     items.push(addButton);
+
+    // Completed header (only if there are completed units)
+    if (completedUnits.length > 0) {
+      const completedHeader = this.cachedItems.find(i => i.type === "completed-header") || {
+        type: "completed-header" as const,
+        isCurrent: false,
+        isCompleted: false,
+      };
+      items.push(completedHeader);
+    }
 
     this.cachedItems = items;
     return items;

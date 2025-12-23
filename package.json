@@ -206,6 +206,11 @@
         "icon": "$(gear)"
       },
       {
+        "command": "redmine.timer.revealTimeEntry",
+        "title": "Reveal in My Time Entries",
+        "icon": "$(eye)"
+      },
+      {
         "command": "redmine.timer.moveUnitUp",
         "title": "Move Up",
         "icon": "$(arrow-up)"
@@ -394,6 +399,10 @@
         {
           "command": "redmine.timer.resetUnit",
           "when": "false"
+        },
+        {
+          "command": "redmine.timer.revealTimeEntry",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -499,28 +508,33 @@
         },
         {
           "command": "redmine.timer.editUnit",
-          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit/",
+          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit-(pending|working|paused)$/",
           "group": "timer@2"
         },
         {
           "command": "redmine.timer.removeUnit",
-          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit/ && viewItem != 'timer-unit-working'",
+          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit-(pending|paused|completed)$/",
           "group": "timer@3"
         },
         {
           "command": "redmine.timer.moveUnitUp",
-          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit/",
+          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit-(pending|working|paused)$/",
           "group": "reorder@1"
         },
         {
           "command": "redmine.timer.moveUnitDown",
-          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit/",
+          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit-(pending|working|paused)$/",
           "group": "reorder@2"
         },
         {
           "command": "redmine.timer.resetUnit",
           "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit-(pending|working|paused)$/",
           "group": "timer@4"
+        },
+        {
+          "command": "redmine.timer.revealTimeEntry",
+          "when": "view == 'redmine-explorer-timer' && viewItem == 'timer-unit-completed'",
+          "group": "timer@1"
         }
       ]
     },

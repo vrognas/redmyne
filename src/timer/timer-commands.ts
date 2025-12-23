@@ -353,6 +353,15 @@ export function registerTimerCommands(
     })
   );
 
+  // Reveal completed unit in My Time Entries
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.timer.revealTimeEntry", async () => {
+      // Focus the time entries view and refresh
+      await vscode.commands.executeCommand("redmine-explorer-time-entries.focus");
+      await vscode.commands.executeCommand("redmine.refreshTimeEntries");
+    })
+  );
+
   // Configure timer settings (stored in globalState for proper validation)
   context.subscriptions.push(
     vscode.commands.registerCommand("redmine.timer.configureTimer", async () => {
