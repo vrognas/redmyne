@@ -374,3 +374,52 @@ export async function pickIssueWithSearch(
     activityName: activityChoice.activity.name,
   };
 }
+
+/**
+ * Pick activity for a known project (skip issue selection)
+ * Used when issue is already known (e.g., personal tasks)
+ */
+export async function pickActivityForProject(
+  server: RedmineServer,
+  projectId: number,
+  title: string,
+  issueHint?: string
+): Promise<{ activityId: number; activityName: string } | undefined> {
+  // Check if project has time tracking enabled
+  const hasTimeTracking = await server.isTimeTrackingEnabled(projectId);
+  if (!hasTimeTracking) {
+    vscode.window.showErrorMessage("Project does not have time tracking enabled");
+    return undefined;
+  }
+
+  let activities: TimeEntryActivity[];
+  try {
+    activities = await server.getProjectTimeEntryActivities(projectId);
+  } catch (error) {
+    vscode.window.showErrorMessage(`Failed to fetch activities: ${error}`);
+    return undefined;
+  }
+
+  if (activities.length === 0) {
+    vscode.window.showErrorMessage("No activities available for this project");
+    return undefined;
+  }
+
+  const activityItems = activities.map((a) => ({
+    label: a.name,
+    description: a.is_default ? "Default" : undefined,
+    activity: a,
+  }));
+
+  const activityChoice = await vscode.window.showQuickPick(activityItems, {
+    title,
+    placeHolder: issueHint ? `Activity for ${issueHint}` : "Select activity",
+  });
+
+  if (!activityChoice) return undefined;
+
+  return {
+    activityId: activityChoice.activity.id,
+    activityName: activityChoice.activity.name,
+  };
+}

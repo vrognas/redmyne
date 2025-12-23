@@ -231,8 +231,63 @@
         "icon": "$(check)"
       },
       {
+        "command": "redmine.timer.logAndContinue",
+        "title": "Log & Continue",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "redmine.timer.switchSubtask",
+        "title": "Switch Subtask",
+        "icon": "$(replace)"
+      },
+      {
         "command": "redmine.timer.toggleSelectedUnit",
         "title": "Toggle Selected Unit"
+      },
+      {
+        "command": "redmine.personalTasks.add",
+        "title": "Add Personal Task",
+        "icon": "$(add)"
+      },
+      {
+        "command": "redmine.personalTasks.edit",
+        "title": "Edit Task",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "redmine.personalTasks.delete",
+        "title": "Delete Task",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "redmine.personalTasks.markDone",
+        "title": "Mark Done",
+        "icon": "$(check)"
+      },
+      {
+        "command": "redmine.personalTasks.reopen",
+        "title": "Reopen Task",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "redmine.personalTasks.setPriority",
+        "title": "Set Priority",
+        "icon": "$(arrow-both)"
+      },
+      {
+        "command": "redmine.personalTasks.openInBrowser",
+        "title": "Open Linked Issue in Browser",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "redmine.personalTasks.clearDone",
+        "title": "Clear Done Tasks",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "redmine.personalTasks.addToPlan",
+        "title": "Add to Today's Plan",
+        "icon": "$(calendar)"
       }
     ],
     "keybindings": [
@@ -262,6 +317,10 @@
           "name": "Today's Plan"
         },
         {
+          "id": "redmine-explorer-personal-tasks",
+          "name": "Personal Tasks"
+        },
+        {
           "id": "redmine-explorer-projects",
           "name": "My Issues"
         },
@@ -279,6 +338,16 @@
       },
       {
         "view": "redmine-explorer-timer",
+        "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmine.configure)\nSet up your Redmine server URL and API key to get started.",
+        "when": "!redmine:configured"
+      },
+      {
+        "view": "redmine-explorer-personal-tasks",
+        "contents": "No personal tasks yet.\n[Add Task](command:redmine.personalTasks.add)\nCreate local subtasks for your Redmine issues.",
+        "when": "redmine:configured"
+      },
+      {
+        "view": "redmine-explorer-personal-tasks",
         "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmine.configure)\nSet up your Redmine server URL and API key to get started.",
         "when": "!redmine:configured"
       },
@@ -412,6 +481,50 @@
         {
           "command": "redmine.timer.logUnitNow",
           "when": "false"
+        },
+        {
+          "command": "redmine.timer.logAndContinue",
+          "when": "false"
+        },
+        {
+          "command": "redmine.timer.switchSubtask",
+          "when": "false"
+        },
+        {
+          "command": "redmine.personalTasks.add",
+          "when": "false"
+        },
+        {
+          "command": "redmine.personalTasks.edit",
+          "when": "false"
+        },
+        {
+          "command": "redmine.personalTasks.delete",
+          "when": "false"
+        },
+        {
+          "command": "redmine.personalTasks.markDone",
+          "when": "false"
+        },
+        {
+          "command": "redmine.personalTasks.reopen",
+          "when": "false"
+        },
+        {
+          "command": "redmine.personalTasks.setPriority",
+          "when": "false"
+        },
+        {
+          "command": "redmine.personalTasks.openInBrowser",
+          "when": "false"
+        },
+        {
+          "command": "redmine.personalTasks.clearDone",
+          "when": "false"
+        },
+        {
+          "command": "redmine.personalTasks.addToPlan",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -423,6 +536,16 @@
         {
           "command": "redmine.timer.configureTimer",
           "when": "view == 'redmine-explorer-timer'",
+          "group": "navigation@2"
+        },
+        {
+          "command": "redmine.personalTasks.add",
+          "when": "view == 'redmine-explorer-personal-tasks' && redmine:configured",
+          "group": "navigation@1"
+        },
+        {
+          "command": "redmine.personalTasks.clearDone",
+          "when": "view == 'redmine-explorer-personal-tasks' && redmine:hasPersonalDoneTasks",
           "group": "navigation@2"
         },
         {
@@ -546,9 +669,54 @@
           "group": "timer@5"
         },
         {
+          "command": "redmine.timer.logAndContinue",
+          "when": "view == 'redmine-explorer-timer' && viewItem == 'timer-unit-working'",
+          "group": "timer@6"
+        },
+        {
+          "command": "redmine.timer.switchSubtask",
+          "when": "view == 'redmine-explorer-timer' && viewItem == 'timer-unit-working'",
+          "group": "timer@7"
+        },
+        {
           "command": "redmine.timer.revealTimeEntry",
           "when": "view == 'redmine-explorer-timer' && viewItem == 'timer-unit-completed'",
           "group": "timer@1"
+        },
+        {
+          "command": "redmine.personalTasks.addToPlan",
+          "when": "view == 'redmine-explorer-personal-tasks' && viewItem =~ /^task-(todo|in-progress)$/",
+          "group": "personal@1"
+        },
+        {
+          "command": "redmine.personalTasks.markDone",
+          "when": "view == 'redmine-explorer-personal-tasks' && viewItem =~ /^task-(todo|in-progress)$/",
+          "group": "personal@2"
+        },
+        {
+          "command": "redmine.personalTasks.reopen",
+          "when": "view == 'redmine-explorer-personal-tasks' && viewItem == 'task-done'",
+          "group": "personal@2"
+        },
+        {
+          "command": "redmine.personalTasks.setPriority",
+          "when": "view == 'redmine-explorer-personal-tasks' && viewItem =~ /^task-(todo|in-progress)$/",
+          "group": "personal@3"
+        },
+        {
+          "command": "redmine.personalTasks.edit",
+          "when": "view == 'redmine-explorer-personal-tasks' && viewItem =~ /^task-/",
+          "group": "edit@1"
+        },
+        {
+          "command": "redmine.personalTasks.delete",
+          "when": "view == 'redmine-explorer-personal-tasks' && viewItem =~ /^task-/",
+          "group": "edit@2"
+        },
+        {
+          "command": "redmine.personalTasks.openInBrowser",
+          "when": "view == 'redmine-explorer-personal-tasks' && viewItem =~ /^task-/",
+          "group": "navigation@1"
         }
       ]
     },

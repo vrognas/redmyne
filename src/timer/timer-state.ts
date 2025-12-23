@@ -16,6 +16,8 @@ export interface WorkUnit {
   loggedHours?: number;
   completedAt?: string; // ISO timestamp when unit was logged
   timeEntryId?: number; // Redmine time entry ID after logging
+  personalTaskId?: string; // Link back to personal task for syncing logged hours
+  deferredMinutes?: number; // Accumulated deferred time from previous units
   // Per-unit timer state
   secondsLeft: number;
   unitPhase: UnitPhase;

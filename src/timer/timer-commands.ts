@@ -11,6 +11,10 @@ interface TreeItem {
   index?: number;
 }
 
+interface TimerCommandsOptions {
+  onTimeLogged?: (personalTaskId: string, hours: number) => Promise<void>;
+}
+
 /**
  * Register all timer-related commands
  */
@@ -18,7 +22,8 @@ export function registerTimerCommands(
   context: vscode.ExtensionContext,
   controller: TimerController,
   getServer: () => RedmineServer | undefined,
-  timerTreeView?: vscode.TreeView<TreeItem>
+  timerTreeView?: vscode.TreeView<TreeItem>,
+  options?: TimerCommandsOptions
 ): void {
   // Timer config stored in globalState (not VS Code settings - allows proper validation)
   const getUnitDuration = () => {
@@ -160,12 +165,18 @@ export function registerTimerCommands(
         return;
       }
 
-      const hoursPerUnit = getUnitDuration() / 60;
-      const hoursStr = formatHoursAsHHMM(hoursPerUnit);
+      // Calculate total hours (unit + deferred)
+      const unitDuration = getUnitDuration();
+      const deferredMinutes = unit.deferredMinutes ?? 0;
+      const totalMinutes = unitDuration + deferredMinutes;
+      const totalHours = totalMinutes / 60;
+      const hoursStr = formatHoursAsHHMM(totalHours);
+
+      const deferredInfo = deferredMinutes > 0 ? ` (+${deferredMinutes}min deferred)` : "";
 
       // Go directly to comment input (skip redundant QuickPick)
       const comment = await vscode.window.showInputBox({
-        title: `Log ${hoursStr} to #${unit.issueId}`,
+        title: `Log ${hoursStr} to #${unit.issueId}${deferredInfo}`,
         prompt: `${unit.issueSubject} • ${unit.activityName}`,
         value: unit.comment || "",
         placeHolder: "Comment (optional)",
@@ -179,10 +190,19 @@ export function registerTimerCommands(
         const response = await server.addTimeEntry(
           unit.issueId,
           unit.activityId,
-          hoursPerUnit.toString(),
+          totalHours.toString(),
           comment || ""
         );
         const timeEntryId = response?.time_entry?.id;
+
+        // Sync to personal task if linked (isolated - don't fail main flow)
+        if (unit.personalTaskId && options?.onTimeLogged) {
+          try {
+            await options.onTimeLogged(unit.personalTaskId, totalHours);
+          } catch {
+            // Sync failed, but time was logged - don't surface error
+          }
+        }
 
         // Refresh time entries tree
         vscode.commands.executeCommand("redmine.refreshTimeEntries");
@@ -192,7 +212,7 @@ export function registerTimerCommands(
           2000
         );
 
-        controller.markLogged(hoursPerUnit, timeEntryId);
+        controller.markLogged(totalHours, timeEntryId);
       } catch (error) {
         vscode.window.showErrorMessage(`Failed to log time: ${error}`);
         // Stay in logging phase, let user retry
@@ -359,6 +379,13 @@ export function registerTimerCommands(
 
       // Round to 2 decimal places
       const hoursToLog = Math.round(proportionalHours * 100) / 100;
+
+      // Reject zero elapsed time
+      if (hoursToLog < 0.01) {
+        vscode.window.showWarningMessage("No time elapsed to log");
+        return;
+      }
+
       const hoursStr = formatHoursAsHHMM(hoursToLog);
 
       // Show confirmation with calculated hours
@@ -385,6 +412,15 @@ export function registerTimerCommands(
         );
         const timeEntryId = response?.time_entry?.id;
 
+        // Sync to personal task if linked (isolated - don't fail main flow)
+        if (unit.personalTaskId && options?.onTimeLogged) {
+          try {
+            await options.onTimeLogged(unit.personalTaskId, hoursToLog);
+          } catch {
+            // Sync failed, but time was logged - don't surface error
+          }
+        }
+
         // Mark unit as completed
         controller.markUnitLogged(index, hoursToLog, timeEntryId);
 
@@ -393,6 +429,115 @@ export function registerTimerCommands(
       } catch (error) {
         vscode.window.showErrorMessage(`Failed to log time: ${error}`);
       }
+    })
+  );
+
+  // Log and continue working (for mid-unit subtask completion)
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.timer.logAndContinue", async (item: { index?: number }) => {
+      const index = item?.index;
+      if (index === undefined) return;
+
+      const unit = controller.getPlan()[index];
+      if (!unit || unit.unitPhase !== "working") {
+        vscode.window.showWarningMessage("Can only log working units");
+        return;
+      }
+
+      const server = getServer();
+      if (!server) {
+        vscode.window.showErrorMessage("No Redmine server configured");
+        return;
+      }
+
+      if (unit.issueId <= 0) {
+        vscode.window.showWarningMessage("Cannot log unassigned unit");
+        return;
+      }
+
+      // Calculate proportional hours: elapsed / work_duration * unit_duration
+      const workDurationSeconds = getWorkDurationSeconds();
+      const unitDurationHours = getUnitDuration() / 60;
+      const elapsedSeconds = workDurationSeconds - unit.secondsLeft;
+      const proportionalHours = (elapsedSeconds / workDurationSeconds) * unitDurationHours;
+      const hoursToLog = Math.round(proportionalHours * 100) / 100;
+
+      // Reject zero elapsed time
+      if (hoursToLog < 0.01) {
+        vscode.window.showWarningMessage("No time elapsed to log");
+        return;
+      }
+
+      const hoursStr = formatHoursAsHHMM(hoursToLog);
+
+      // Confirm with editable comment
+      const comment = await vscode.window.showInputBox({
+        title: `Log ${hoursStr} and continue`,
+        prompt: `${unit.issueSubject} • ${unit.activityName} (${Math.round(elapsedSeconds / 60)}min elapsed)`,
+        value: unit.comment || "",
+        placeHolder: "Comment (optional)",
+      });
+
+      if (comment === undefined) return; // Cancelled
+
+      try {
+        await server.addTimeEntry(
+          unit.issueId,
+          unit.activityId,
+          hoursToLog.toString(),
+          comment || ""
+        );
+
+        // Sync to personal task if linked (isolated - don't fail main flow)
+        if (unit.personalTaskId && options?.onTimeLogged) {
+          try {
+            await options.onTimeLogged(unit.personalTaskId, hoursToLog);
+          } catch {
+            // Sync failed, but time was logged - don't surface error
+          }
+        }
+
+        // Reset timer and continue working
+        controller.logAndContinue(index, hoursToLog);
+
+        vscode.commands.executeCommand("redmine.refreshTimeEntries");
+        showStatusBarMessage(`$(check) Logged ${hoursStr}, timer reset`, 2000);
+      } catch (error) {
+        vscode.window.showErrorMessage(`Failed to log time: ${error}`);
+      }
+    })
+  );
+
+  // Switch subtask (change comment/personalTaskId mid-work)
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.timer.switchSubtask", async (item: { index?: number }) => {
+      const index = item?.index;
+      if (index === undefined) return;
+
+      const unit = controller.getPlan()[index];
+      if (!unit || unit.unitPhase !== "working") {
+        vscode.window.showWarningMessage("Can only switch subtask on working units");
+        return;
+      }
+
+      // Let user enter a new comment (which represents the subtask)
+      const newComment = await vscode.window.showInputBox({
+        title: "Switch Subtask",
+        prompt: `Enter new subtask/comment for #${unit.issueId}`,
+        value: unit.comment || "",
+        placeHolder: "What are you working on now?",
+      });
+
+      if (newComment === undefined) return; // Cancelled
+
+      // Update the unit's comment (and optionally clear personalTaskId)
+      controller.updateUnit(index, {
+        ...unit,
+        comment: newComment,
+        personalTaskId: undefined, // Clear the link since it's a new subtask
+      });
+
+      showStatusBarMessage(`$(check) Switched to: ${newComment || "(no comment)"}`, 2000);
     })
   );
 
@@ -529,6 +674,13 @@ export function registerTimerCommands(
       if (getSoundEnabled()) {
         playCompletionSound();
       }
+
+      const unitDuration = getUnitDuration();
+      const deferredMinutes = unit.deferredMinutes ?? 0;
+      const totalMinutes = unitDuration + deferredMinutes;
+      const totalHours = totalMinutes / 60;
+      const totalHoursStr = formatHoursAsHHMM(totalHours);
+
       // Show prominent modal notification
       let issueLabel: string;
       if (unit.issueId > 0) {
@@ -538,17 +690,20 @@ export function registerTimerCommands(
       } else {
         issueLabel = "Unassigned";
       }
+
+      const deferredInfo = deferredMinutes > 0 ? ` (+${deferredMinutes}min deferred)` : "";
       const action = await vscode.window.showWarningMessage(
-        `Unit Complete\n${issueLabel}`,
+        `Unit Complete: ${totalHoursStr}${deferredInfo}\n${issueLabel}`,
         { modal: true },
         "Log Time",
-        "Skip"
+        "Defer"
       );
+
       if (action === "Log Time") {
         vscode.commands.executeCommand("redmine.timer.showLogDialog");
-      } else if (action === "Skip") {
-        controller.skipLogging();
-        showStatusBarMessage("$(dash) Skipped logging", 2000);
+      } else if (action === "Defer") {
+        controller.deferToNext(unitDuration);
+        showStatusBarMessage(`$(clock) Deferred ${unitDuration}min to next unit`, 2000);
       }
       // Cancel (undefined) → do nothing, stay in logging phase
     })

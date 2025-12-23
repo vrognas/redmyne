@@ -26,6 +26,10 @@ import { TimerStatusBar } from "./timer/timer-status-bar";
 import { TimerTreeProvider } from "./timer/timer-tree-provider";
 import { registerTimerCommands } from "./timer/timer-commands";
 import { toPersistedState, fromPersistedState, PersistedTimerState } from "./timer/timer-state";
+import { PersonalTaskController } from "./personal-tasks/personal-task-controller";
+import { PersonalTasksTreeProvider } from "./personal-tasks/personal-tasks-tree-provider";
+import { registerPersonalTaskCommands } from "./personal-tasks/personal-task-commands";
+import { getTaskStatus } from "./personal-tasks/personal-task-state";
 
 // Constants
 const CONFIG_DEBOUNCE_MS = 300;
@@ -38,11 +42,14 @@ let cleanupResources: {
   projectsTreeView?: vscode.TreeView<unknown>;
   myTimeEntriesTreeView?: vscode.TreeView<unknown>;
   timerTreeView?: vscode.TreeView<unknown>;
+  personalTasksTreeView?: vscode.TreeView<unknown>;
   workloadStatusBar?: vscode.StatusBarItem;
   configChangeTimeout?: ReturnType<typeof setTimeout>;
   timerController?: TimerController;
   timerStatusBar?: TimerStatusBar;
   timerTreeProvider?: TimerTreeProvider;
+  personalTaskController?: PersonalTaskController;
+  personalTasksTreeProvider?: PersonalTasksTreeProvider;
   bucket?: {
     servers: RedmineServer[];
     projects: RedmineProject[];
@@ -217,12 +224,51 @@ export function activate(context: vscode.ExtensionContext): void {
 
   restoreTimerState();
 
+  // Initialize Personal Tasks (before timer commands so we can pass the callback)
+  const personalTaskController = new PersonalTaskController(context.globalState);
+  cleanupResources.personalTaskController = personalTaskController;
+
   // Register timer commands (needs server access and tree view for selection)
   registerTimerCommands(
     context,
     timerController,
     () => projectsTree.server,
-    cleanupResources.timerTreeView as vscode.TreeView<{ type?: string; index?: number }>
+    cleanupResources.timerTreeView as vscode.TreeView<{ type?: string; index?: number }>,
+    {
+      onTimeLogged: async (personalTaskId, hours) => {
+        await personalTaskController.addLoggedHours(personalTaskId, hours);
+      },
+    }
+  );
+
+  const personalTasksTreeProvider = new PersonalTasksTreeProvider(personalTaskController);
+  cleanupResources.personalTasksTreeProvider = personalTasksTreeProvider;
+
+  cleanupResources.personalTasksTreeView = vscode.window.createTreeView("redmine-explorer-personal-tasks", {
+    treeDataProvider: personalTasksTreeProvider,
+  });
+  context.subscriptions.push(cleanupResources.personalTasksTreeView);
+
+  // Update context for "Clear Done" button visibility
+  const updatePersonalTasksContext = () => {
+    const tasks = personalTaskController.getTasks();
+    const hasDone = tasks.some((t) => getTaskStatus(t) === "done");
+    vscode.commands.executeCommand("setContext", "redmine:hasPersonalDoneTasks", hasDone);
+  };
+  updatePersonalTasksContext();
+  context.subscriptions.push(
+    personalTaskController.onTasksChange(() => updatePersonalTasksContext())
+  );
+
+  // Register personal task commands
+  context.subscriptions.push(
+    ...registerPersonalTaskCommands(
+      context,
+      personalTaskController,
+      () => projectsTree.server,
+      () => timerController,
+      () => workDuration * 60
+    )
   );
 
   // Initialize workload status bar (opt-in via config)
@@ -1318,6 +1364,14 @@ export function deactivate(): void {
   }
   if (cleanupResources.timerController) {
     cleanupResources.timerController.dispose();
+  }
+
+  // Dispose personal tasks resources
+  if (cleanupResources.personalTasksTreeView) {
+    cleanupResources.personalTasksTreeView.dispose();
+  }
+  if (cleanupResources.personalTasksTreeProvider) {
+    cleanupResources.personalTasksTreeProvider.dispose();
   }
 
   // Dispose status bar

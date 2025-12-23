@@ -231,6 +231,45 @@ export class TimerController {
   }
 
   /**
+   * Defer logging to the next unit (carry time forward)
+   * Used when user doesn't want to log the current unit's time now
+   */
+  deferToNext(unitDurationMinutes: number): void {
+    if (this.state.phase !== "logging") return;
+
+    const currentIndex = this.state.currentUnitIndex;
+    const currentUnit = this.state.plan[currentIndex];
+    if (!currentUnit) return;
+
+    // Calculate total time to defer (unit duration + any already deferred)
+    const currentDeferred = currentUnit.deferredMinutes ?? 0;
+    const totalDeferred = currentDeferred + unitDurationMinutes;
+
+    // Mark current unit as completed (skipped)
+    this.state.plan[currentIndex] = {
+      ...currentUnit,
+      unitPhase: "completed",
+      completedAt: new Date().toISOString(),
+    };
+
+    // Find next pending or paused unit and add deferred time
+    const nextIndex = this.state.plan.findIndex(
+      (u, i) => i > currentIndex && (u.unitPhase === "pending" || u.unitPhase === "paused")
+    );
+
+    if (nextIndex >= 0) {
+      const nextUnit = this.state.plan[nextIndex];
+      this.state.plan[nextIndex] = {
+        ...nextUnit,
+        deferredMinutes: (nextUnit.deferredMinutes ?? 0) + totalDeferred,
+      };
+    }
+    // If no next unit (all completed), deferred time is lost (end of day)
+
+    this.transitionToBreak();
+  }
+
+  /**
    * Mark a specific unit as logged (for early logging before timer runs out)
    */
   markUnitLogged(index: number, hours: number, timeEntryId?: number): void {
@@ -252,6 +291,29 @@ export class TimerController {
       this.stopInterval();
       this.state.phase = "idle";
     }
+
+    this.emitChange();
+  }
+
+  /**
+   * Log time for a unit and continue working (timer resets)
+   * Used for mid-unit logging of personal task subtasks
+   */
+  logAndContinue(index: number, hours: number): void {
+    const unit = this.state.plan[index];
+    if (!unit || unit.unitPhase !== "working") return;
+
+    // Accumulate logged hours
+    const existingHours = unit.loggedHours ?? 0;
+    this.state.plan[index] = {
+      ...unit,
+      logged: true,
+      loggedHours: existingHours + hours,
+      // Reset timer to full duration
+      secondsLeft: this.workDurationSeconds,
+      // Keep working phase
+      unitPhase: "working",
+    };
 
     this.emitChange();
   }
