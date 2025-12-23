@@ -852,26 +852,55 @@ export class RedmineServer {
 
   /**
    * Search using subject filter (undocumented but more reliable)
-   * Uses: /issues.json?f[]=subject&op[subject]=~&v[subject][]=query
+   * Tries exact match first, then contains match
    */
   private async searchViaSubjectFilter(query: string, limit: number): Promise<Issue[]> {
     try {
-      const params = new URLSearchParams();
-      params.append("set_filter", "1");
-      params.append("f[]", "subject");
-      params.append("op[subject]", "~");
-      params.append("v[subject][]", query);
-      params.append("status_id", "*"); // All statuses
-      params.append("limit", String(limit));
+      // Try exact match first (finds issues with exact subject like "Vacation")
+      const exactParams = new URLSearchParams();
+      exactParams.append("set_filter", "1");
+      exactParams.append("f[]", "subject");
+      exactParams.append("op[subject]", "="); // Exact match
+      exactParams.append("v[subject][]", query);
+      exactParams.append("status_id", "*");
+      exactParams.append("limit", String(limit));
 
-      const response = await this.doRequest<{ issues: Issue[] }>(
-        `/issues.json?${params.toString()}`,
-        "GET"
-      );
+      // Then contains match (finds "Viktor vacation", etc.)
+      const containsParams = new URLSearchParams();
+      containsParams.append("set_filter", "1");
+      containsParams.append("f[]", "subject");
+      containsParams.append("op[subject]", "~"); // Contains
+      containsParams.append("v[subject][]", query);
+      containsParams.append("status_id", "*");
+      containsParams.append("limit", String(limit));
 
-      return response?.issues || [];
+      const [exactResults, containsResults] = await Promise.all([
+        this.doRequest<{ issues: Issue[] }>(`/issues.json?${exactParams.toString()}`, "GET")
+          .catch(() => ({ issues: [] })),
+        this.doRequest<{ issues: Issue[] }>(`/issues.json?${containsParams.toString()}`, "GET")
+          .catch(() => ({ issues: [] })),
+      ]);
+
+      // Merge: exact matches first, then contains matches
+      const seenIds = new Set<number>();
+      const merged: Issue[] = [];
+
+      for (const issue of exactResults?.issues || []) {
+        if (!seenIds.has(issue.id)) {
+          merged.push(issue);
+          seenIds.add(issue.id);
+        }
+      }
+      for (const issue of containsResults?.issues || []) {
+        if (!seenIds.has(issue.id)) {
+          merged.push(issue);
+          seenIds.add(issue.id);
+        }
+      }
+
+      return merged.slice(0, limit);
     } catch {
-      return []; // Fail silently, other method may work
+      return [];
     }
   }
 
