@@ -447,7 +447,14 @@ export function registerTimerCommands(
         playCompletionSound();
       }
       // Show prominent modal notification
-      const issueLabel = unit.issueId > 0 ? `#${unit.issueId} ${unit.issueSubject}` : "Unassigned";
+      let issueLabel: string;
+      if (unit.issueId > 0) {
+        const comment = unit.comment ? ` ${unit.comment}` : "";
+        const activity = unit.activityName ? ` [${unit.activityName}]` : "";
+        issueLabel = `#${unit.issueId}${comment}${activity} ${unit.issueSubject}`;
+      } else {
+        issueLabel = "Unassigned";
+      }
       const action = await vscode.window.showWarningMessage(
         `Unit Complete\n${issueLabel}`,
         { modal: true },
