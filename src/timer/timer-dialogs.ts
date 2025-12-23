@@ -250,10 +250,11 @@ export async function pickIssueAndActivity(
             issue.project?.name?.toLowerCase().includes(lowerQuery)
           );
 
-          // Try exact ID fetch if query looks like an issue ID (e.g., "#1186" or "1186")
+          // Try exact ID fetch only if query starts with "#" (explicit ID request)
           let exactMatch: Issue | null = null;
+          const startsWithHash = query.startsWith("#");
           const possibleId = parseInt(cleanQuery, 10);
-          if (!isNaN(possibleId) && cleanQuery === String(possibleId)) {
+          if (startsWithHash && !isNaN(possibleId) && cleanQuery === String(possibleId)) {
             try {
               const result = await server.getIssueById(possibleId);
               exactMatch = result.issue;
@@ -295,9 +296,10 @@ export async function pickIssueAndActivity(
               ...baseItems,
             ];
           } else {
+            // Include query in description to help VS Code's fuzzy filter show results
             const searchItems: IssueQuickPickItem[] = limitedResults.map((issue) => ({
               label: `$(search) #${issue.id} ${issue.subject}`,
-              description: issue.project?.name,
+              description: `${issue.project?.name ?? ""} [${query}]`,
               detail: issue.status?.name,
               issue,
             }));
