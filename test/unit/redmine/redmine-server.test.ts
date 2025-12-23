@@ -41,6 +41,8 @@ const createMockRequest = () =>
           if (options.method === "GET" && path.includes("/issues.json")) {
               // Check if fetching by specific IDs (from searchIssues)
               const issueIdMatch = path.match(/issue_id=([0-9,]+)/);
+              // Check if subject filter search
+              const isSubjectFilter = path.includes("f%5B%5D=subject") || path.includes("f[]=subject");
               if (issueIdMatch) {
                 const ids = issueIdMatch[1].split(",").map(Number);
                 data = {
@@ -53,6 +55,15 @@ const createMockRequest = () =>
                     project: { id: 1, name: "Test Project" },
                   })),
                   total_count: ids.length,
+                };
+              } else if (isSubjectFilter) {
+                // Subject filter returns same issues as search API for test consistency
+                data = {
+                  issues: [
+                    { id: 456, subject: "Issue 456", status: { id: 1, name: "New" }, tracker: { id: 1, name: "Bug" }, author: { id: 1, name: "John Doe" }, project: { id: 1, name: "Test Project" } },
+                    { id: 789, subject: "Issue 789", status: { id: 1, name: "New" }, tracker: { id: 1, name: "Bug" }, author: { id: 1, name: "John Doe" }, project: { id: 1, name: "Test Project" } },
+                  ],
+                  total_count: 2,
                 };
               } else {
                 data = {

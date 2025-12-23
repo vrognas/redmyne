@@ -792,7 +792,7 @@ export class RedmineServer {
   }
 
   /**
-   * Search issues by text query using Redmine's /search API
+   * Search issues by text query using multiple methods for better results
    * @param query Search text (searches subject, description, ID)
    * @param limit Max results (default 10)
    * @returns Full Issue objects matching query
@@ -800,20 +800,79 @@ export class RedmineServer {
   async searchIssues(query: string, limit = 10): Promise<Issue[]> {
     if (!query.trim()) return [];
 
-    // Redmine search API returns lightweight results (scope=all searches all projects)
-    const response = await this.doRequest<{
-      results: { id: number; title: string; type: string; url: string }[];
-    }>(`/search.json?q=${encodeURIComponent(query)}&scope=all&issues=1&limit=${limit}`, "GET");
+    // Use both search methods in parallel for better coverage
+    const [searchApiResults, subjectFilterResults] = await Promise.all([
+      // Method 1: Redmine search API (searches indexed content)
+      this.searchViaSearchApi(query, limit),
+      // Method 2: Subject filter (searches subject field directly - more reliable)
+      this.searchViaSubjectFilter(query, limit),
+    ]);
 
-    // Extract issue IDs from results (type="issue")
-    const issueIds = (response?.results || [])
-      .filter((r) => r.type === "issue")
-      .map((r) => r.id);
+    // Merge results, avoiding duplicates
+    const seenIds = new Set<number>();
+    const merged: Issue[] = [];
 
-    if (issueIds.length === 0) return [];
+    // Subject filter results first (more reliable)
+    for (const issue of subjectFilterResults) {
+      if (!seenIds.has(issue.id)) {
+        merged.push(issue);
+        seenIds.add(issue.id);
+      }
+    }
+    // Then search API results
+    for (const issue of searchApiResults) {
+      if (!seenIds.has(issue.id)) {
+        merged.push(issue);
+        seenIds.add(issue.id);
+      }
+    }
 
-    // Fetch full issues to get complete data
-    return this.getIssuesByIds(issueIds);
+    return merged.slice(0, limit);
+  }
+
+  /**
+   * Search using Redmine's /search API (searches indexed content)
+   */
+  private async searchViaSearchApi(query: string, limit: number): Promise<Issue[]> {
+    try {
+      const response = await this.doRequest<{
+        results: { id: number; title: string; type: string; url: string }[];
+      }>(`/search.json?q=${encodeURIComponent(query)}&scope=all&issues=1&limit=${limit}`, "GET");
+
+      const issueIds = (response?.results || [])
+        .filter((r) => r.type === "issue")
+        .map((r) => r.id);
+
+      if (issueIds.length === 0) return [];
+      return this.getIssuesByIds(issueIds);
+    } catch {
+      return []; // Fail silently, other method may work
+    }
+  }
+
+  /**
+   * Search using subject filter (undocumented but more reliable)
+   * Uses: /issues.json?f[]=subject&op[subject]=~&v[subject][]=query
+   */
+  private async searchViaSubjectFilter(query: string, limit: number): Promise<Issue[]> {
+    try {
+      const params = new URLSearchParams();
+      params.append("set_filter", "1");
+      params.append("f[]", "subject");
+      params.append("op[subject]", "~");
+      params.append("v[subject][]", query);
+      params.append("status_id", "*"); // All statuses
+      params.append("limit", String(limit));
+
+      const response = await this.doRequest<{ issues: Issue[] }>(
+        `/issues.json?${params.toString()}`,
+        "GET"
+      );
+
+      return response?.issues || [];
+    } catch {
+      return []; // Fail silently, other method may work
+    }
   }
 
   /**
