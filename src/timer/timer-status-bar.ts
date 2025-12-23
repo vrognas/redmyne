@@ -50,10 +50,29 @@ export class TimerStatusBar {
 
     switch (phase) {
       case "idle":
-        this.statusBarItem.text = "$(clock) Plan day...";
-        if (phaseChanged) {
-          this.statusBarItem.tooltip = "Click to plan your work units";
-          this.statusBarItem.command = "redmine.timer.planDay";
+        if (total === 0) {
+          this.statusBarItem.text = "$(clock) Plan day...";
+          if (phaseChanged) {
+            this.statusBarItem.tooltip = "Click to plan your work units";
+            this.statusBarItem.command = "redmine.timer.planDay";
+          }
+        } else {
+          // Has plan but not started - find next startable unit
+          const nextUnit = plan.find(u => u.unitPhase === "pending" || u.unitPhase === "paused");
+          if (nextUnit) {
+            this.statusBarItem.text = `$(play) #${nextUnit.issueId} ready ${progress}`;
+            if (phaseChanged) {
+              this.statusBarItem.tooltip = `Click to start: ${nextUnit.issueSubject}`;
+              this.statusBarItem.command = "redmine.timer.start";
+            }
+          } else {
+            // All units completed
+            this.statusBarItem.text = `$(check) Done ${progress}`;
+            if (phaseChanged) {
+              this.statusBarItem.tooltip = "All units completed - click to plan more";
+              this.statusBarItem.command = "redmine.timer.planDay";
+            }
+          }
         }
         break;
 
