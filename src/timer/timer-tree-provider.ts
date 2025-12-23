@@ -117,14 +117,15 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
     _isCurrent: boolean,  // Kept for API compatibility, using unit.unitPhase instead
     isCompleted: boolean
   ): vscode.TreeItem {
-    // Label: "1. #ID Comment" or "1. #ID" or "1. (not assigned)"
+    // Label: "1. #ID Comment MM:SS" or "1. #ID MM:SS" or "1. (not assigned) MM:SS"
+    const timeStr = formatSecondsAsMMSS(unit.secondsLeft);
     let label: string;
     if (unit.issueId > 0) {
       label = unit.comment
-        ? `${index + 1}. #${unit.issueId} ${unit.comment}`
-        : `${index + 1}. #${unit.issueId}`;
+        ? `${index + 1}. #${unit.issueId} ${unit.comment} ${timeStr}`
+        : `${index + 1}. #${unit.issueId} ${timeStr}`;
     } else {
-      label = `${index + 1}. (not assigned)`;
+      label = `${index + 1}. (not assigned) ${timeStr}`;
     }
 
     const item = new vscode.TreeItem(label);
@@ -144,16 +145,13 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
         item.iconPath = new vscode.ThemeIcon("circle-outline");
     }
 
-    // Description: "MM:SS [Activity] Subject" or completed status
+    // Description: "[Activity] Subject" or completed status
     if (isCompleted && unit.loggedHours) {
-      const timeStr = unit.completedAt ? ` @ ${this.formatClockTime(unit.completedAt)}` : "";
-      item.description = `${formatHoursAsHHMM(unit.loggedHours)} logged${timeStr}`;
+      const completedTimeStr = unit.completedAt ? ` @ ${this.formatClockTime(unit.completedAt)}` : "";
+      item.description = `${formatHoursAsHHMM(unit.loggedHours)} logged${completedTimeStr}`;
     } else if (unit.issueId > 0) {
-      const timeStr = formatSecondsAsMMSS(unit.secondsLeft);
       const activityStr = unit.activityName ? `[${unit.activityName}]` : "";
-      item.description = `${timeStr} ${activityStr} ${unit.issueSubject}`.trim();
-    } else if (unit.secondsLeft > 0) {
-      item.description = formatSecondsAsMMSS(unit.secondsLeft);
+      item.description = `${activityStr} ${unit.issueSubject}`.trim();
     }
 
     // Context menu - use unitPhase for accurate state
