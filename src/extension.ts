@@ -177,8 +177,9 @@ export function activate(context: vscode.ExtensionContext): void {
           // Adjust timer and offer to continue
           restored.plan[workingIdx] = { ...unit, secondsLeft: adjustedSecondsLeft };
           const pendingCount = restored.plan.filter(u => u.unitPhase !== "completed").length;
-          const action = await vscode.window.showInformationMessage(
+          const action = await vscode.window.showWarningMessage(
             `Timer recovered: ${formatSecondsAsMMSS(adjustedSecondsLeft)} left (${pendingCount} unit${pendingCount !== 1 ? "s" : ""})`,
+            { modal: true },
             "Continue",
             "Start Fresh"
           );
@@ -196,8 +197,9 @@ export function activate(context: vscode.ExtensionContext): void {
       const pausedUnit = restored.plan.find(u => u.unitPhase === "paused");
       if (pausedUnit) {
         const pendingCount = restored.plan.filter(u => u.unitPhase !== "completed").length;
-        const action = await vscode.window.showInformationMessage(
+        const action = await vscode.window.showWarningMessage(
           `Timer recovered: ${formatSecondsAsMMSS(pausedUnit.secondsLeft)} left, paused (${pendingCount} unit${pendingCount !== 1 ? "s" : ""})`,
+          { modal: true },
           "Continue",
           "Start Fresh"
         );
