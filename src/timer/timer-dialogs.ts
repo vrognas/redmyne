@@ -191,8 +191,8 @@ export async function pickIssueAndActivity(
     quickPick.matchOnDescription = true;
 
     let searchTimeout: ReturnType<typeof setTimeout> | undefined;
-    let isSearching = false;
     let resolved = false;
+    let searchVersion = 0; // Track search version to discard stale results
 
     const handleSelection = (selected: IssueQuickPickItem): boolean => {
       if (resolved) return false;
@@ -231,42 +231,63 @@ export async function pickIssueAndActivity(
       // Debounce search (300ms)
       searchTimeout = setTimeout(async () => {
         const query = value.trim();
-        if (!query || isSearching) return;
+        if (!query) return;
 
         // Require at least 2 chars to search
         if (query.length < 2) return;
 
-        isSearching = true;
+        // Track this search version to detect stale results
+        const thisSearchVersion = ++searchVersion;
         quickPick.busy = true;
 
         try {
           const lowerQuery = query.toLowerCase();
           const cleanQuery = query.replace(/^#/, "");
+          const possibleId = parseInt(cleanQuery, 10);
+          const isNumericQuery = !isNaN(possibleId) && cleanQuery === String(possibleId);
 
-          // Search local assigned issues by ID, subject, or project
+          // 1. Search local assigned issues (instant, no API)
           const localMatches = issues.filter((issue) =>
             String(issue.id).includes(cleanQuery) ||
             issue.subject.toLowerCase().includes(lowerQuery) ||
             issue.project?.name?.toLowerCase().includes(lowerQuery)
           );
 
-          // Try exact ID fetch only if query starts with "#" (explicit ID request)
-          let exactMatch: Issue | null = null;
-          const startsWithHash = query.startsWith("#");
-          const possibleId = parseInt(cleanQuery, 10);
-          if (startsWithHash && !isNaN(possibleId) && cleanQuery === String(possibleId)) {
-            try {
-              const result = await server.getIssueById(possibleId);
-              exactMatch = result.issue;
-            } catch {
-              // Issue not found or no access - continue with other results
-            }
-          }
+          // 2. Parallel: exact ID fetch + server text search
+          type SearchResult = {
+            exactMatch: Issue | null;
+            exactMatchError: string | null;
+            serverResults: Issue[];
+          };
 
-          // Search server (Redmine search API)
-          const serverResults = await server.searchIssues(query, 10);
+          const searchResult: SearchResult = { exactMatch: null, exactMatchError: null, serverResults: [] };
 
-          // Merge results: exact match first, then local, then server (avoid duplicates)
+          await Promise.all([
+            // Exact ID fetch for numeric queries
+            (async () => {
+              if (isNumericQuery) {
+                try {
+                  const result = await server.getIssueById(possibleId);
+                  searchResult.exactMatch = result.issue;
+                } catch (error: unknown) {
+                  if (error instanceof Error) {
+                    searchResult.exactMatchError = error.message.includes("403") ? "no access" :
+                                     error.message.includes("404") ? "not found" : null;
+                  }
+                }
+              }
+            })(),
+            // Server text search for non-numeric queries
+            (async () => {
+              if (!isNumericQuery) {
+                searchResult.serverResults = await server.searchIssues(query, 10);
+              }
+            })(),
+          ]);
+
+          const { exactMatch, exactMatchError, serverResults } = searchResult;
+
+          // 3. Merge results (exact match first, then local, then server)
           const seenIds = new Set<number>();
           const allResults: Issue[] = [];
 
@@ -287,31 +308,98 @@ export async function pickIssueAndActivity(
             }
           }
 
-          const limitedResults = allResults.slice(0, 15);
+          // 4. Check time tracking for new projects
+          const newProjectIds = [...new Set(
+            allResults
+              .map(i => i.project?.id)
+              .filter((id): id is number => id != null && !timeTrackingByProject.has(id))
+          )];
 
-          if (limitedResults.length === 0) {
-            quickPick.items = [
-              { label: `$(info) No results for "${query}"`, disabled: true },
-              { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
-              ...baseItems,
-            ];
-          } else {
-            // Include query in description to help VS Code's fuzzy filter show results
-            const searchItems: IssueQuickPickItem[] = limitedResults.map((issue) => ({
-              label: `$(search) #${issue.id} ${issue.subject}`,
-              description: `${issue.project?.name ?? ""} [${query}]`,
+          if (newProjectIds.length > 0) {
+            await Promise.all(
+              newProjectIds.map(async (projectId) => {
+                try {
+                  const enabled = await server.isTimeTrackingEnabled(projectId);
+                  timeTrackingByProject.set(projectId, enabled);
+                } catch {
+                  // If can't check, assume not trackable
+                  timeTrackingByProject.set(projectId, false);
+                }
+              })
+            );
+          }
+
+          // 5. Filter to trackable issues and rank assigned issues higher
+          const assignedIds = new Set(issues.map(i => i.id));
+          const trackableResults = allResults.filter((issue) => {
+            const projectId = issue.project?.id;
+            return projectId != null && timeTrackingByProject.get(projectId) === true;
+          });
+
+          // Sort: assigned issues first, then by ID (most recent first)
+          trackableResults.sort((a, b) => {
+            const aAssigned = assignedIds.has(a.id);
+            const bAssigned = assignedIds.has(b.id);
+            if (aAssigned && !bAssigned) return -1;
+            if (!aAssigned && bAssigned) return 1;
+            return b.id - a.id; // Higher ID = more recent
+          });
+
+          // 6. Check if results are still relevant (not stale, picker not closed)
+          if (thisSearchVersion !== searchVersion || resolved) {
+            return; // Discard stale results
+          }
+
+          // 7. Build result items with visual distinction for assigned issues
+          const limitedResults = trackableResults.slice(0, 15);
+          const resultItems: IssueQuickPickItem[] = [];
+
+          // Show exact match error if no results
+          if (isNumericQuery && exactMatchError && limitedResults.length === 0) {
+            resultItems.push({
+              label: `$(error) #${possibleId} ${exactMatchError}`,
+              disabled: true,
+            });
+          }
+
+          if (limitedResults.length === 0 && resultItems.length === 0) {
+            resultItems.push({
+              label: `$(info) No results for "${query}"`,
+              disabled: true,
+            });
+          }
+
+          // Add search results with visual distinction
+          for (const issue of limitedResults) {
+            const isAssigned = assignedIds.has(issue.id);
+            const icon = isAssigned ? "$(account)" : "$(search)";
+            const assignedTag = isAssigned ? " (assigned)" : "";
+            resultItems.push({
+              label: `${icon} #${issue.id} ${issue.subject}`,
+              description: `${issue.project?.name ?? ""}${assignedTag} [${query}]`,
               detail: issue.status?.name,
               issue,
-            }));
+            });
+          }
+
+          quickPick.items = [
+            ...resultItems,
+            { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
+            ...baseItems,
+          ];
+        } catch (error) {
+          // Show error feedback if this search is still current
+          if (thisSearchVersion === searchVersion && !resolved) {
             quickPick.items = [
-              ...searchItems,
+              { label: `$(error) Search failed`, disabled: true },
               { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
               ...baseItems,
             ];
           }
         } finally {
-          isSearching = false;
-          quickPick.busy = false;
+          if (thisSearchVersion === searchVersion) {
+            quickPick.busy = false;
+          }
         }
       }, 300);
     });
