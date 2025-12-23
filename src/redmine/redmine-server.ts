@@ -851,37 +851,63 @@ export class RedmineServer {
   }
 
   /**
-   * Search using subject filter (undocumented but more reliable)
-   * Fetches more results and ranks by relevance
+   * Search using subject filter with two strategies:
+   * 1. Starts-with (^): Focused prefix matches like "Vacation" for "vac"
+   * 2. Contains (~) sorted by created_on:asc: Old important issues first
+   * Redmine API caps at 100 results, so we use smart queries instead of pagination.
    */
   private async searchViaSubjectFilter(query: string, limit: number): Promise<Issue[]> {
     try {
       const lowerQuery = query.toLowerCase();
 
-      // Fetch many results - Redmine sorts by ID desc, old important issues get buried
-      const fetchLimit = 300;
+      // Two parallel searches with different strategies
+      const startsWithParams = new URLSearchParams();
+      startsWithParams.append("set_filter", "1");
+      startsWithParams.append("f[]", "subject");
+      startsWithParams.append("op[subject]", "^"); // Starts with
+      startsWithParams.append("v[subject][]", query);
+      startsWithParams.append("status_id", "*");
+      startsWithParams.append("limit", "100");
 
-      const params = new URLSearchParams();
-      params.append("set_filter", "1");
-      params.append("f[]", "subject");
-      params.append("op[subject]", "~"); // Contains
-      params.append("v[subject][]", query);
-      params.append("status_id", "*");
-      params.append("limit", String(fetchLimit));
+      const containsParams = new URLSearchParams();
+      containsParams.append("set_filter", "1");
+      containsParams.append("f[]", "subject");
+      containsParams.append("op[subject]", "~"); // Contains
+      containsParams.append("v[subject][]", query);
+      containsParams.append("status_id", "*");
+      containsParams.append("sort", "created_on:asc"); // Oldest first - catches old important issues
+      containsParams.append("limit", "100");
 
-      const response = await this.doRequest<{ issues: Issue[] }>(
-        `/issues.json?${params.toString()}`,
-        "GET"
-      ).catch(() => ({ issues: [] }));
+      const [startsWithResult, containsResult] = await Promise.all([
+        this.doRequest<{ issues: Issue[] }>(
+          `/issues.json?${startsWithParams.toString()}`,
+          "GET"
+        ).catch(() => ({ issues: [] })),
+        this.doRequest<{ issues: Issue[] }>(
+          `/issues.json?${containsParams.toString()}`,
+          "GET"
+        ).catch(() => ({ issues: [] })),
+      ]);
 
-      const issues = response?.issues || [];
+      // Merge: starts-with first (more focused), then contains
+      const seenIds = new Set<number>();
+      const merged: Issue[] = [];
 
-      // Rank results by relevance:
-      // 1. Exact match (subject === query)
-      // 2. Starts with query
-      // 3. Shorter subjects (more focused)
-      // 4. Rest by ID (newer first)
-      issues.sort((a, b) => {
+      for (const issue of startsWithResult?.issues || []) {
+        if (!seenIds.has(issue.id)) {
+          merged.push(issue);
+          seenIds.add(issue.id);
+        }
+      }
+      for (const issue of containsResult?.issues || []) {
+        if (!seenIds.has(issue.id)) {
+          merged.push(issue);
+          seenIds.add(issue.id);
+        }
+      }
+
+      // Rank by relevance
+      merged.sort((a, b) => {
         const aSubject = a.subject?.toLowerCase() || "";
         const bSubject = b.subject?.toLowerCase() || "";
 
@@ -901,11 +927,11 @@ export class RedmineServer {
         const lenDiff = aSubject.length - bSubject.length;
         if (lenDiff !== 0) return lenDiff;
 
-        // Finally by ID (newer first)
+        // By ID (newer first)
         return b.id - a.id;
       });
 
-      return issues.slice(0, limit);
+      return merged.slice(0, limit);
     } catch {
       return [];
     }
