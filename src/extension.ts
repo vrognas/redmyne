@@ -947,7 +947,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Delete time entry
   context.subscriptions.push(
-    vscode.commands.registerCommand("redmine.deleteTimeEntry", async (node: { _entry?: { id?: number; hours: string; issue?: { id: number; subject: string }; spent_on?: string } }) => {
+    vscode.commands.registerCommand("redmine.deleteTimeEntry", async (node: { _entry?: { id?: number; hours: string; issue?: { id: number; subject: string }; activity?: { name: string }; spent_on?: string } }) => {
       const entry = node?._entry;
       if (!entry?.id) {
         vscode.window.showErrorMessage("No time entry selected");
@@ -961,9 +961,11 @@ export function activate(context: vscode.ExtensionContext): void {
       }
 
       const hoursDisplay = formatHoursAsHHMM(parseFloat(entry.hours));
+      const issueInfo = entry.issue ? `#${entry.issue.id} ${entry.issue.subject}` : "Unknown issue";
+      const activityInfo = entry.activity?.name ? `[${entry.activity.name}]` : "";
       const confirm = await vscode.window.showWarningMessage(
-        `Delete ${hoursDisplay} on #${entry.issue?.id || "?"}?`,
-        { modal: true, detail: `${entry.issue?.subject || ""}\nDate: ${entry.spent_on || ""}` },
+        "Delete time entry?",
+        { modal: true, detail: `${issueInfo}\n${hoursDisplay} ${activityInfo} on ${entry.spent_on || "?"}` },
         "Delete"
       );
 
