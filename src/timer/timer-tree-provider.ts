@@ -117,10 +117,12 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
     _isCurrent: boolean,  // Kept for API compatibility, using unit.unitPhase instead
     isCompleted: boolean
   ): vscode.TreeItem {
-    // Label: "1. #1234 Subject" or "1. (not assigned)"
+    // Label: "1. #ID Comment" or "1. #ID" or "1. (not assigned)"
     let label: string;
     if (unit.issueId > 0) {
-      label = `${index + 1}. #${unit.issueId} ${unit.issueSubject}`;
+      label = unit.comment
+        ? `${index + 1}. #${unit.issueId} ${unit.comment}`
+        : `${index + 1}. #${unit.issueId}`;
     } else {
       label = `${index + 1}. (not assigned)`;
     }
@@ -142,17 +144,16 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
         item.iconPath = new vscode.ThemeIcon("circle-outline");
     }
 
-    // Description: show timer and activity for all non-completed units
+    // Description: "MM:SS [Activity] Subject" or completed status
     if (isCompleted && unit.loggedHours) {
       const timeStr = unit.completedAt ? ` @ ${this.formatClockTime(unit.completedAt)}` : "";
       item.description = `${formatHoursAsHHMM(unit.loggedHours)} logged${timeStr}`;
-    } else if (unit.unitPhase === "working" || unit.unitPhase === "paused") {
-      item.description = `${formatSecondsAsMMSS(unit.secondsLeft)} [${unit.activityName || "?"}]`;
+    } else if (unit.issueId > 0) {
+      const timeStr = formatSecondsAsMMSS(unit.secondsLeft);
+      const activityStr = unit.activityName ? `[${unit.activityName}]` : "";
+      item.description = `${timeStr} ${activityStr} ${unit.issueSubject}`.trim();
     } else if (unit.secondsLeft > 0) {
-      // Pending - show timer
-      item.description = `${formatSecondsAsMMSS(unit.secondsLeft)} [${unit.activityName || "?"}]`;
-    } else if (unit.activityName) {
-      item.description = `[${unit.activityName}]`;
+      item.description = formatSecondsAsMMSS(unit.secondsLeft);
     }
 
     // Context menu - use unitPhase for accurate state
