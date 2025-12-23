@@ -800,10 +800,10 @@ export class RedmineServer {
   async searchIssues(query: string, limit = 10): Promise<Issue[]> {
     if (!query.trim()) return [];
 
-    // Redmine search API returns lightweight results
+    // Redmine search API returns lightweight results (scope=all searches all projects)
     const response = await this.doRequest<{
       results: { id: number; title: string; type: string; url: string }[];
-    }>(`/search.json?q=${encodeURIComponent(query)}&issues=1&limit=${limit}`, "GET");
+    }>(`/search.json?q=${encodeURIComponent(query)}&scope=all&issues=1&limit=${limit}`, "GET");
 
     // Extract issue IDs from results (type="issue")
     const issueIds = (response?.results || [])
