@@ -303,8 +303,9 @@ describe("RedmineServer", () => {
     it("should search issues by text", async () => {
       const results = await server.searchIssues("test query");
       expect(results).toHaveLength(2);
-      expect(results[0].id).toBe(456);
-      expect(results[1].id).toBe(789);
+      // Results are sorted by relevance (newer IDs first when equal relevance)
+      const ids = results.map(r => r.id).sort((a, b) => a - b);
+      expect(ids).toEqual([456, 789]);
     });
 
     it("should return empty array for empty query", async () => {

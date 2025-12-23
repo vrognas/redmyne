@@ -852,53 +852,60 @@ export class RedmineServer {
 
   /**
    * Search using subject filter (undocumented but more reliable)
-   * Tries exact match first, then contains match
+   * Fetches more results and ranks by relevance
    */
   private async searchViaSubjectFilter(query: string, limit: number): Promise<Issue[]> {
     try {
-      // Try exact match first (finds issues with exact subject like "Vacation")
-      const exactParams = new URLSearchParams();
-      exactParams.append("set_filter", "1");
-      exactParams.append("f[]", "subject");
-      exactParams.append("op[subject]", "="); // Exact match
-      exactParams.append("v[subject][]", query);
-      exactParams.append("status_id", "*");
-      exactParams.append("limit", String(limit));
+      const lowerQuery = query.toLowerCase();
 
-      // Then contains match (finds "Viktor vacation", etc.)
-      const containsParams = new URLSearchParams();
-      containsParams.append("set_filter", "1");
-      containsParams.append("f[]", "subject");
-      containsParams.append("op[subject]", "~"); // Contains
-      containsParams.append("v[subject][]", query);
-      containsParams.append("status_id", "*");
-      containsParams.append("limit", String(limit));
+      // Fetch more results to allow for better ranking
+      const fetchLimit = Math.max(limit * 5, 50);
 
-      const [exactResults, containsResults] = await Promise.all([
-        this.doRequest<{ issues: Issue[] }>(`/issues.json?${exactParams.toString()}`, "GET")
-          .catch(() => ({ issues: [] })),
-        this.doRequest<{ issues: Issue[] }>(`/issues.json?${containsParams.toString()}`, "GET")
-          .catch(() => ({ issues: [] })),
-      ]);
+      const params = new URLSearchParams();
+      params.append("set_filter", "1");
+      params.append("f[]", "subject");
+      params.append("op[subject]", "~"); // Contains
+      params.append("v[subject][]", query);
+      params.append("status_id", "*");
+      params.append("limit", String(fetchLimit));
 
-      // Merge: exact matches first, then contains matches
-      const seenIds = new Set<number>();
-      const merged: Issue[] = [];
+      const response = await this.doRequest<{ issues: Issue[] }>(
+        `/issues.json?${params.toString()}`,
+        "GET"
+      ).catch(() => ({ issues: [] }));
 
-      for (const issue of exactResults?.issues || []) {
-        if (!seenIds.has(issue.id)) {
-          merged.push(issue);
-          seenIds.add(issue.id);
-        }
-      }
-      for (const issue of containsResults?.issues || []) {
-        if (!seenIds.has(issue.id)) {
-          merged.push(issue);
-          seenIds.add(issue.id);
-        }
-      }
+      const issues = response?.issues || [];
 
-      return merged.slice(0, limit);
+      // Rank results by relevance:
+      // 1. Exact match (subject === query)
+      // 2. Starts with query
+      // 3. Shorter subjects (more focused)
+      // 4. Rest by ID (newer first)
+      issues.sort((a, b) => {
+        const aSubject = a.subject?.toLowerCase() || "";
+        const bSubject = b.subject?.toLowerCase() || "";
+
+        // Exact match first
+        const aExact = aSubject === lowerQuery;
+        const bExact = bSubject === lowerQuery;
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
+
+        // Starts with query second
+        const aStarts = aSubject.startsWith(lowerQuery);
+        const bStarts = bSubject.startsWith(lowerQuery);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+
+        // Shorter subjects third (more focused)
+        const lenDiff = aSubject.length - bSubject.length;
+        if (lenDiff !== 0) return lenDiff;
+
+        // Finally by ID (newer first)
+        return b.id - a.id;
+      });
+
+      return issues.slice(0, limit);
     } catch {
       return [];
     }
