@@ -97,6 +97,7 @@ export function activate(context: vscode.ExtensionContext): void {
   cleanupResources.myTimeEntriesTreeView = vscode.window.createTreeView("redmine-explorer-my-time-entries", {
     treeDataProvider: myTimeEntriesTree,
   });
+  myTimeEntriesTree.setTreeView(cleanupResources.myTimeEntriesTreeView as vscode.TreeView<import("./trees/my-time-entries-tree").TimeEntryNode>);
 
   // Initialize timer controller with settings from globalState
   const unitDuration = context.globalState.get<number>("redmine.timer.unitDuration", 60);

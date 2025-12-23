@@ -30,8 +30,38 @@ export class MyTimeEntriesTreeDataProvider
   private server?: RedmineServer;
   private issueCache = new Map<number, { id: number; subject: string; projectId?: number; project: string; client?: string }>();
   private cachedGroups?: TimeEntryNode[];
+  private expandedIds = new Set<string>();
+  private disposables: vscode.Disposable[] = [];
 
   constructor() {}
+
+  /**
+   * Connect tree view to track expansion state
+   */
+  setTreeView(treeView: vscode.TreeView<TimeEntryNode>): void {
+    this.disposables.push(
+      treeView.onDidExpandElement((e) => {
+        if (e.element.id) this.expandedIds.add(e.element.id);
+      }),
+      treeView.onDidCollapseElement((e) => {
+        if (e.element.id) this.expandedIds.delete(e.element.id);
+      })
+    );
+  }
+
+  dispose(): void {
+    this.disposables.forEach((d) => d.dispose());
+  }
+
+  /**
+   * Get collapsible state preserving expansion from previous render
+   */
+  private getCollapsibleState(id: string, hasChildren: boolean): vscode.TreeItemCollapsibleState {
+    if (!hasChildren) return vscode.TreeItemCollapsibleState.None;
+    return this.expandedIds.has(id)
+      ? vscode.TreeItemCollapsibleState.Expanded
+      : vscode.TreeItemCollapsibleState.Collapsed;
+  }
 
   setServer(server: RedmineServer | undefined): void {
     this.server = server;
@@ -98,7 +128,7 @@ export class MyTimeEntriesTreeDataProvider
           id: "group-today",
           label: `Today (${dayName} ${dayNum})`,
           description: formatHoursWithComparison(todayTotal, todayAvailable),
-          collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
+          collapsibleState: this.getCollapsibleState("group-today", true),
           type: "group",
           _cachedEntries: todayResult.time_entries,
         },
@@ -107,7 +137,7 @@ export class MyTimeEntriesTreeDataProvider
           label: `This Week (${weekNum})`,
           description: formatHoursWithComparison(weekTotal, weekAvailable),
           tooltip: "Shows working days from Monday up to today",
-          collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
+          collapsibleState: this.getCollapsibleState("group-week", true),
           type: "week-group",
           _cachedEntries: weekResult.time_entries,
           _dateRange: { start: weekStart, end: today },
@@ -117,7 +147,7 @@ export class MyTimeEntriesTreeDataProvider
           label: `This Month (${monthName})`,
           description: formatHoursWithComparison(monthTotal, monthAvailable),
           tooltip: "Shows working days from 1st up to today",
-          collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
+          collapsibleState: this.getCollapsibleState("group-month", true),
           type: "month-group",
           _cachedEntries: monthResult.time_entries,
         },
@@ -233,14 +263,12 @@ export class MyTimeEntriesTreeDataProvider
       const dayNum = date.getDate();
       const available = getHoursForDate(date, schedule);
 
+      const nodeId = `${idPrefix}-day-${dateStr}`;
       return {
-        id: `${idPrefix}-day-${dateStr}`,
+        id: nodeId,
         label: `${dayName} ${dayNum}`,
         description: formatHoursWithComparison(total, available),
-        collapsibleState:
-          dateEntries.length > 0
-            ? vscode.TreeItemCollapsibleState.Collapsed
-            : vscode.TreeItemCollapsibleState.None,
+        collapsibleState: this.getCollapsibleState(nodeId, dateEntries.length > 0),
         type: "day-group" as const,
         contextValue: "day-group",
         _cachedEntries: dateEntries,
@@ -289,11 +317,12 @@ export class MyTimeEntriesTreeDataProvider
         schedule
       );
 
+      const nodeId = `week-${year}-${weekNum}`;
       return {
-        id: `week-${year}-${weekNum}`,
+        id: nodeId,
         label: `Week ${weekNum}`,
         description: formatHoursWithComparison(total, available),
-        collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
+        collapsibleState: this.getCollapsibleState(nodeId, true),
         type: "week-subgroup" as const,
         _cachedEntries: weekEntries,
         _dateRange: { start: weekRange.start, end: cappedEnd },
