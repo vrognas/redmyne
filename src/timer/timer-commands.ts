@@ -357,7 +357,7 @@ export function registerTimerCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand("redmine.timer.revealTimeEntry", async () => {
       // Focus the time entries view and refresh
-      await vscode.commands.executeCommand("redmine-explorer-time-entries.focus");
+      await vscode.commands.executeCommand("redmine-explorer-my-time-entries.focus");
       await vscode.commands.executeCommand("redmine.refreshTimeEntries");
     })
   );
