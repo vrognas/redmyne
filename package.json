@@ -398,34 +398,14 @@
       ],
       "view/title": [
         {
-          "command": "redmine.timer.start",
-          "when": "view == 'redmine-explorer-timer' && redmine:timerPhase == 'idle' && redmine:timerHasPlan",
-          "group": "navigation@1"
-        },
-        {
-          "command": "redmine.timer.pause",
-          "when": "view == 'redmine-explorer-timer' && redmine:timerPhase == 'working'",
-          "group": "navigation@1"
-        },
-        {
-          "command": "redmine.timer.resume",
-          "when": "view == 'redmine-explorer-timer' && redmine:timerPhase == 'paused'",
-          "group": "navigation@1"
-        },
-        {
-          "command": "redmine.timer.stop",
-          "when": "view == 'redmine-explorer-timer' && (redmine:timerPhase == 'working' || redmine:timerPhase == 'paused')",
-          "group": "navigation@2"
-        },
-        {
           "command": "redmine.timer.clearPlan",
           "when": "view == 'redmine-explorer-timer' && redmine:timerHasPlan",
-          "group": "navigation@3"
+          "group": "navigation@1"
         },
         {
           "command": "redmine.timer.configureTimer",
           "when": "view == 'redmine-explorer-timer'",
-          "group": "navigation@4"
+          "group": "navigation@2"
         },
         {
           "command": "redmine.configure",
