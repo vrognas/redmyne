@@ -195,7 +195,7 @@ export class TimerController {
     this.emitChange();
   }
 
-  markLogged(hours: number): void {
+  markLogged(hours: number, timeEntryId?: number): void {
     if (this.state.phase !== "logging") return;
 
     const index = this.state.currentUnitIndex;
@@ -208,6 +208,7 @@ export class TimerController {
         loggedHours: hours,
         unitPhase: "completed",
         completedAt: new Date().toISOString(),
+        timeEntryId,
       };
     }
 

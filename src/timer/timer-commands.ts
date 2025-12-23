@@ -176,12 +176,13 @@ export function registerTimerCommands(
 
       // Log to Redmine
       try {
-        await server.addTimeEntry(
+        const response = await server.addTimeEntry(
           unit.issueId,
           unit.activityId,
           hoursPerUnit.toString(),
           comment || ""
         );
+        const timeEntryId = response?.time_entry?.id;
 
         // Refresh time entries tree
         vscode.commands.executeCommand("redmine.refreshTimeEntries");
@@ -191,7 +192,7 @@ export function registerTimerCommands(
           2000
         );
 
-        controller.markLogged(hoursPerUnit);
+        controller.markLogged(hoursPerUnit, timeEntryId);
       } catch (error) {
         vscode.window.showErrorMessage(`Failed to log time: ${error}`);
         // Stay in logging phase, let user retry
@@ -355,10 +356,18 @@ export function registerTimerCommands(
 
   // Reveal completed unit in My Time Entries
   context.subscriptions.push(
-    vscode.commands.registerCommand("redmine.timer.revealTimeEntry", async () => {
+    vscode.commands.registerCommand("redmine.timer.revealTimeEntry", async (item: { index?: number }) => {
+      const index = item?.index;
+      const unit = index !== undefined ? controller.getPlan()[index] : undefined;
+
       // Focus the time entries view and refresh
       await vscode.commands.executeCommand("redmine-explorer-my-time-entries.focus");
       await vscode.commands.executeCommand("redmine.refreshTimeEntries");
+
+      // Show info about which entry to look for
+      if (unit?.timeEntryId) {
+        showStatusBarMessage(`$(eye) Look for entry #${unit.timeEntryId}`, 3000);
+      }
     })
   );
 

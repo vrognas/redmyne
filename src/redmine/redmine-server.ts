@@ -419,7 +419,7 @@ export class RedmineServer {
     hours: string,
     message: string,
     spentOn?: string // YYYY-MM-DD format, defaults to today
-  ): Promise<unknown> {
+  ): Promise<{ time_entry: TimeEntry }> {
     const entry: Record<string, unknown> = {
       issue_id: issueId,
       activity_id: activityId,

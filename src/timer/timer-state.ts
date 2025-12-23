@@ -15,6 +15,7 @@ export interface WorkUnit {
   logged: boolean;
   loggedHours?: number;
   completedAt?: string; // ISO timestamp when unit was logged
+  timeEntryId?: number; // Redmine time entry ID after logging
   // Per-unit timer state
   secondsLeft: number;
   unitPhase: UnitPhase;
