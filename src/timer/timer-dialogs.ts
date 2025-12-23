@@ -233,71 +233,79 @@ export async function pickIssueAndActivity(
         const query = value.trim();
         if (!query || isSearching) return;
 
-        const cleanQuery = query.replace(/^#/, "");
-        const issueId = parseInt(cleanQuery, 10);
-        const isIdLookup = !isNaN(issueId) && cleanQuery === String(issueId);
-
-        // Require 2+ chars for text search, allow single digit for ID
-        if (!isIdLookup && query.length < 2) return;
+        // Require at least 2 chars to search
+        if (query.length < 2) return;
 
         isSearching = true;
         quickPick.busy = true;
 
         try {
-          if (isIdLookup) {
+          const lowerQuery = query.toLowerCase();
+          const cleanQuery = query.replace(/^#/, "");
+
+          // Search local assigned issues by ID, subject, or project
+          const localMatches = issues.filter((issue) =>
+            String(issue.id).includes(cleanQuery) ||
+            issue.subject.toLowerCase().includes(lowerQuery) ||
+            issue.project?.name?.toLowerCase().includes(lowerQuery)
+          );
+
+          // Try exact ID fetch if query looks like an issue ID (e.g., "#1186" or "1186")
+          let exactMatch: Issue | null = null;
+          const possibleId = parseInt(cleanQuery, 10);
+          if (!isNaN(possibleId) && cleanQuery === String(possibleId)) {
             try {
-              const result = await server.getIssueById(issueId);
-              const searchItem: IssueQuickPickItem = {
-                label: `$(search) #${result.issue.id} ${result.issue.subject}`,
-                description: result.issue.project?.name,
-                detail: result.issue.status?.name,
-                issue: result.issue,
-              };
-              quickPick.items = [searchItem, { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem, ...baseItems];
-            } catch (error: unknown) {
-              // Handle 403 (no access) vs other errors
-              const is403 = error instanceof Error && error.message.includes("403");
-              quickPick.items = [
-                { label: `$(error) Issue #${issueId} ${is403 ? "- no access" : "not found"}`, disabled: true },
-                { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
-                ...baseItems,
-              ];
+              const result = await server.getIssueById(possibleId);
+              exactMatch = result.issue;
+            } catch {
+              // Issue not found or no access - continue with other results
             }
+          }
+
+          // Search server (Redmine search API)
+          const serverResults = await server.searchIssues(query, 10);
+
+          // Merge results: exact match first, then local, then server (avoid duplicates)
+          const seenIds = new Set<number>();
+          const allResults: Issue[] = [];
+
+          if (exactMatch) {
+            allResults.push(exactMatch);
+            seenIds.add(exactMatch.id);
+          }
+          for (const issue of localMatches) {
+            if (!seenIds.has(issue.id)) {
+              allResults.push(issue);
+              seenIds.add(issue.id);
+            }
+          }
+          for (const issue of serverResults) {
+            if (!seenIds.has(issue.id)) {
+              allResults.push(issue);
+              seenIds.add(issue.id);
+            }
+          }
+
+          const limitedResults = allResults.slice(0, 15);
+
+          if (limitedResults.length === 0) {
+            quickPick.items = [
+              { label: `$(info) No results for "${query}"`, disabled: true },
+              { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
+              ...baseItems,
+            ];
           } else {
-            // Search server + local assigned issues (Redmine search can miss items)
-            const lowerQuery = query.toLowerCase();
-            const localMatches = issues.filter((issue) =>
-              issue.subject.toLowerCase().includes(lowerQuery) ||
-              issue.project?.name?.toLowerCase().includes(lowerQuery) ||
-              String(issue.id).includes(query)
-            );
-
-            const serverResults = await server.searchIssues(query, 10);
-
-            // Merge results, avoiding duplicates (local matches first)
-            const seenIds = new Set(localMatches.map(i => i.id));
-            const uniqueServerResults = serverResults.filter(i => !seenIds.has(i.id));
-            const allResults = [...localMatches, ...uniqueServerResults].slice(0, 15);
-
-            if (allResults.length === 0) {
-              quickPick.items = [
-                { label: `$(info) No results for "${query}"`, disabled: true },
-                { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
-                ...baseItems,
-              ];
-            } else {
-              const searchItems: IssueQuickPickItem[] = allResults.map((issue) => ({
-                label: `$(search) #${issue.id} ${issue.subject}`,
-                description: issue.project?.name,
-                detail: issue.status?.name,
-                issue,
-              }));
-              quickPick.items = [
-                ...searchItems,
-                { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
-                ...baseItems,
-              ];
-            }
+            const searchItems: IssueQuickPickItem[] = limitedResults.map((issue) => ({
+              label: `$(search) #${issue.id} ${issue.subject}`,
+              description: issue.project?.name,
+              detail: issue.status?.name,
+              issue,
+            }));
+            quickPick.items = [
+              ...searchItems,
+              { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
+              ...baseItems,
+            ];
           }
         } finally {
           isSearching = false;
