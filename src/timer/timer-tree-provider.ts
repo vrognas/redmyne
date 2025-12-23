@@ -40,6 +40,15 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
     const state = this.controller.getState();
     const workingIndex = state.plan.findIndex(u => u.unitPhase === "working");
 
+    // Count unit items in cache (excluding add-button)
+    const cachedUnitCount = this.cachedItems.filter(i => i.type === "unit").length;
+
+    // If plan length changed (unit added/removed), do full refresh
+    if (state.plan.length !== cachedUnitCount) {
+      this._onDidChangeTreeData.fire(undefined);
+      return;
+    }
+
     const cachedItem = this.cachedItems[workingIndex];
     if (workingIndex >= 0 && cachedItem && cachedItem.type === "unit") {
       // Update cached item in place (same object reference) and fire targeted refresh
