@@ -230,6 +230,32 @@ export class TimerController {
     this.transitionToBreak();
   }
 
+  /**
+   * Mark a specific unit as logged (for early logging before timer runs out)
+   */
+  markUnitLogged(index: number, hours: number, timeEntryId?: number): void {
+    const unit = this.state.plan[index];
+    if (!unit || unit.unitPhase === "completed") return;
+
+    // Update the unit
+    this.state.plan[index] = {
+      ...unit,
+      logged: true,
+      loggedHours: hours,
+      unitPhase: "completed",
+      completedAt: new Date().toISOString(),
+      timeEntryId,
+    };
+
+    // If this was the current working unit, go to idle
+    if (unit.unitPhase === "working") {
+      this.stopInterval();
+      this.state.phase = "idle";
+    }
+
+    this.emitChange();
+  }
+
   startNextUnit(): void {
     if (this.state.phase !== "break") return;
 

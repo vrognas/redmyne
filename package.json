@@ -226,6 +226,11 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "redmine.timer.logUnitNow",
+        "title": "Log Now",
+        "icon": "$(check)"
+      },
+      {
         "command": "redmine.timer.toggleSelectedUnit",
         "title": "Toggle Selected Unit"
       }
@@ -403,6 +408,10 @@
         {
           "command": "redmine.timer.revealTimeEntry",
           "when": "false"
+        },
+        {
+          "command": "redmine.timer.logUnitNow",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -530,6 +539,11 @@
           "command": "redmine.timer.resetUnit",
           "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit-(pending|working|paused)$/",
           "group": "timer@4"
+        },
+        {
+          "command": "redmine.timer.logUnitNow",
+          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit-(working|paused)$/",
+          "group": "timer@5"
         },
         {
           "command": "redmine.timer.revealTimeEntry",

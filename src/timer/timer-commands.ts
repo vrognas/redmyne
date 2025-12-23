@@ -331,6 +331,71 @@ export function registerTimerCommands(
     })
   );
 
+  // Log unit now (before timer runs out) - proportional to elapsed time
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.timer.logUnitNow", async (item: { index?: number }) => {
+      const index = item?.index;
+      if (index === undefined) return;
+
+      const unit = controller.getPlan()[index];
+      if (!unit || unit.unitPhase === "completed" || unit.unitPhase === "pending") return;
+
+      const server = getServer();
+      if (!server) {
+        vscode.window.showErrorMessage("No Redmine server configured");
+        return;
+      }
+
+      if (unit.issueId <= 0) {
+        vscode.window.showWarningMessage("Cannot log unassigned unit");
+        return;
+      }
+
+      // Calculate proportional hours: elapsed / work_duration * unit_duration
+      const workDurationSeconds = getWorkDurationSeconds();
+      const unitDurationHours = getUnitDuration() / 60;
+      const elapsedSeconds = workDurationSeconds - unit.secondsLeft;
+      const proportionalHours = (elapsedSeconds / workDurationSeconds) * unitDurationHours;
+
+      // Round to 2 decimal places
+      const hoursToLog = Math.round(proportionalHours * 100) / 100;
+      const hoursStr = formatHoursAsHHMM(hoursToLog);
+
+      // Show confirmation with calculated hours
+      const comment = await vscode.window.showInputBox({
+        title: `Log ${hoursStr} to #${unit.issueId}`,
+        prompt: `${unit.issueSubject} • ${unit.activityName} (${Math.round(elapsedSeconds / 60)}min elapsed)`,
+        value: unit.comment || "",
+        placeHolder: "Comment (optional)",
+      });
+
+      if (comment === undefined) return; // Cancelled
+
+      try {
+        // Pause if running
+        if (unit.unitPhase === "working") {
+          controller.pause();
+        }
+
+        const response = await server.addTimeEntry(
+          unit.issueId,
+          unit.activityId,
+          hoursToLog.toString(),
+          comment || ""
+        );
+        const timeEntryId = response?.time_entry?.id;
+
+        // Mark unit as completed
+        controller.markUnitLogged(index, hoursToLog, timeEntryId);
+
+        vscode.commands.executeCommand("redmine.refreshTimeEntries");
+        showStatusBarMessage(`$(check) Logged ${hoursStr} to #${unit.issueId}`, 2000);
+      } catch (error) {
+        vscode.window.showErrorMessage(`Failed to log time: ${error}`);
+      }
+    })
+  );
+
   // Move unit up
   context.subscriptions.push(
     vscode.commands.registerCommand("redmine.timer.moveUnitUp", (item: { index?: number }) => {
