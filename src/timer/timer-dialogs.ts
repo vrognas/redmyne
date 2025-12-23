@@ -159,18 +159,8 @@ export async function pickIssueAndActivity(
     (issue) => !issue.project?.id || !timeTrackingByProject.get(issue.project.id)
   );
 
-  const issueItems: IssueQuickPickItem[] = [
-    // Search option at top
-    {
-      label: "$(search) Search by #ID or text...",
-      action: "search",
-      description: "Find any issue",
-    },
-    // Separator
-    {
-      label: "",
-      kind: vscode.QuickPickItemKind.Separator,
-    } as IssueQuickPickItem,
+  // Build base items from assigned issues
+  const baseItems: IssueQuickPickItem[] = [
     // Trackable issues (selectable)
     ...trackableIssues.map((issue) => ({
       label: `#${issue.id} ${issue.subject}`,
@@ -192,87 +182,150 @@ export async function pickIssueAndActivity(
     },
   ];
 
-  // Loop to handle search and disabled issue selection
-  let selectedIssue: Issue | undefined;
-  while (true) {
-    const issueChoice = await vscode.window.showQuickPick(issueItems, {
-      title: `Plan Day - ${title}`,
-      placeHolder: "Select issue or search",
-      matchOnDescription: true,
+  // Use createQuickPick for inline search with proper click handling
+  const selectedIssue = await new Promise<Issue | "skip" | undefined>((resolve) => {
+    const quickPick = vscode.window.createQuickPick<IssueQuickPickItem>();
+    quickPick.title = `Plan Day - ${title}`;
+    quickPick.placeholder = "Type to search, or select from list";
+    quickPick.items = baseItems;
+    quickPick.matchOnDescription = true;
+
+    let searchTimeout: ReturnType<typeof setTimeout> | undefined;
+    let isSearching = false;
+    let resolved = false;
+
+    const handleSelection = (selected: IssueQuickPickItem): boolean => {
+      if (resolved) return false;
+
+      if (selected.action === "skip") {
+        resolved = true;
+        quickPick.dispose();
+        resolve("skip");
+        return true;
+      }
+
+      if (selected.disabled) {
+        vscode.window.showInformationMessage(
+          `Project "${selected.issue?.project?.name}" has no time tracking enabled`
+        );
+        return false;
+      }
+
+      if (selected.issue) {
+        resolved = true;
+        quickPick.dispose();
+        resolve(selected.issue);
+        return true;
+      }
+      return false;
+    };
+
+    quickPick.onDidChangeValue(async (value) => {
+      if (searchTimeout) clearTimeout(searchTimeout);
+
+      if (!value.trim()) {
+        quickPick.items = baseItems;
+        return;
+      }
+
+      // Debounce search (300ms)
+      searchTimeout = setTimeout(async () => {
+        const query = value.trim();
+        if (!query || isSearching) return;
+
+        const cleanQuery = query.replace(/^#/, "");
+        const issueId = parseInt(cleanQuery, 10);
+        const isIdLookup = !isNaN(issueId) && cleanQuery === String(issueId);
+
+        // Require 2+ chars for text search, allow single digit for ID
+        if (!isIdLookup && query.length < 2) return;
+
+        isSearching = true;
+        quickPick.busy = true;
+
+        try {
+          if (isIdLookup) {
+            try {
+              const result = await server.getIssueById(issueId);
+              const searchItem: IssueQuickPickItem = {
+                label: `$(search) #${result.issue.id} ${result.issue.subject}`,
+                description: result.issue.project?.name,
+                detail: result.issue.status?.name,
+                issue: result.issue,
+              };
+              quickPick.items = [searchItem, { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem, ...baseItems];
+            } catch {
+              quickPick.items = [
+                { label: `$(error) Issue #${issueId} not found`, disabled: true },
+                { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
+                ...baseItems,
+              ];
+            }
+          } else {
+            const searchResults = await server.searchIssues(query, 10);
+            if (searchResults.length === 0) {
+              quickPick.items = [
+                { label: `$(info) No results for "${query}"`, disabled: true },
+                { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
+                ...baseItems,
+              ];
+            } else {
+              const searchItems: IssueQuickPickItem[] = searchResults.map((issue) => ({
+                label: `$(search) #${issue.id} ${issue.subject}`,
+                description: issue.project?.name,
+                detail: issue.status?.name,
+                issue,
+              }));
+              quickPick.items = [
+                ...searchItems,
+                { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
+                ...baseItems,
+              ];
+            }
+          }
+        } finally {
+          isSearching = false;
+          quickPick.busy = false;
+        }
+      }, 300);
     });
 
-    if (!issueChoice) return undefined;
+    // Handle Enter key
+    quickPick.onDidAccept(() => {
+      const selected = quickPick.activeItems[0];
+      if (selected) handleSelection(selected);
+    });
 
-    if (issueChoice.action === "skip") {
-      return {
-        issueId: 0,
-        issueSubject: "(not assigned)",
-        activityId: 0,
-        activityName: "",
-        logged: false,
-        secondsLeft: workDurationSeconds,
-        unitPhase: "pending",
-      };
-    }
+    // Handle click (onDidChangeSelection fires on click)
+    quickPick.onDidChangeSelection((items) => {
+      if (items.length > 0) handleSelection(items[0]);
+    });
 
-    if (issueChoice.action === "search") {
-      const query = await vscode.window.showInputBox({
-        title: `Plan Day - ${title}`,
-        prompt: "Enter #ID or search text",
-        placeHolder: "e.g., 1234 or keyword",
-      });
-      if (!query) continue;
-
-      // Check if it's an issue ID (#123 or 123)
-      const cleanQuery = query.replace(/^#/, "");
-      const issueId = parseInt(cleanQuery, 10);
-
-      if (!isNaN(issueId) && cleanQuery === String(issueId)) {
-        try {
-          const result = await server.getIssueById(issueId);
-          selectedIssue = result.issue;
-          break;
-        } catch {
-          vscode.window.showErrorMessage(`Issue #${issueId} not found`);
-          continue;
-        }
-      } else if (query.length >= 2) {
-        const searchResults = await server.searchIssues(query, 10);
-        if (searchResults.length === 0) {
-          vscode.window.showInformationMessage(`No results for "${query}"`);
-          continue;
-        }
-        const searchItems = searchResults.map((issue) => ({
-          label: `#${issue.id} ${issue.subject}`,
-          description: issue.project?.name,
-          detail: issue.status?.name,
-          issue,
-        }));
-        const searchChoice = await vscode.window.showQuickPick(searchItems, {
-          title: `Search Results - "${query}"`,
-          placeHolder: `${searchResults.length} result(s)`,
-        });
-        if (!searchChoice) continue;
-        selectedIssue = searchChoice.issue;
-        break;
-      } else {
-        vscode.window.showInformationMessage("Enter at least 2 characters to search");
-        continue;
+    quickPick.onDidHide(() => {
+      if (searchTimeout) clearTimeout(searchTimeout);
+      if (!resolved) {
+        resolved = true;
+        resolve(undefined);
       }
-    }
+      quickPick.dispose();
+    });
 
-    if (issueChoice.disabled) {
-      vscode.window.showInformationMessage(
-        `Project "${issueChoice.issue?.project?.name}" has no time tracking enabled`
-      );
-      continue;
-    }
+    quickPick.show();
+  });
 
-    selectedIssue = issueChoice.issue;
-    break;
+  if (selectedIssue === undefined) return undefined;
+
+  if (selectedIssue === "skip") {
+    return {
+      issueId: 0,
+      issueSubject: "(not assigned)",
+      activityId: 0,
+      activityName: "",
+      logged: false,
+      secondsLeft: workDurationSeconds,
+      unitPhase: "pending",
+    };
   }
-
-  if (!selectedIssue) return undefined;
 
   // Re-fetch to ensure fresh data
   let finalIssue: Issue;
