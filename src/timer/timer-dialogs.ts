@@ -331,10 +331,17 @@ export async function pickIssueAndActivity(
 
           // 5. Filter to trackable issues and rank assigned issues higher
           const assignedIds = new Set(issues.map(i => i.id));
+          console.log(`[Search] allResults: ${allResults.length}, projects: ${[...new Set(allResults.map(i => i.project?.id))].join(',')}`);
+          console.log(`[Search] timeTrackingByProject:`, [...timeTrackingByProject.entries()].map(([k,v]) => `${k}=${v}`).join(', '));
           const trackableResults = allResults.filter((issue) => {
             const projectId = issue.project?.id;
-            return projectId != null && timeTrackingByProject.get(projectId) === true;
+            const isTrackable = projectId != null && timeTrackingByProject.get(projectId) === true;
+            if (!isTrackable) {
+              console.log(`[Search] Filtered out #${issue.id} (project ${projectId}, trackable=${timeTrackingByProject.get(projectId!)})`);
+            }
+            return isTrackable;
           });
+          console.log(`[Search] trackableResults: ${trackableResults.length}`);
 
           // Sort: assigned issues first, then by ID (most recent first)
           trackableResults.sort((a, b) => {
@@ -376,7 +383,7 @@ export async function pickIssueAndActivity(
             const assignedTag = isAssigned ? " (assigned)" : "";
             resultItems.push({
               label: `${icon} #${issue.id} ${issue.subject}`,
-              description: `${issue.project?.name ?? ""}${assignedTag} [${query}]`,
+              description: `${issue.project?.name ?? ""}${assignedTag}`,
               detail: issue.status?.name,
               issue,
             });
