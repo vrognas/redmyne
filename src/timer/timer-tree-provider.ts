@@ -20,6 +20,7 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
 
   private disposables: vscode.Disposable[] = [];
   private cachedItems: PlanTreeItem[] = [];
+  private lastWorkingIndex: number = -1;
 
   constructor(private controller: TimerController) {
     // Subscribe to state changes
@@ -45,8 +46,19 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
 
     // If plan length changed (unit added/removed), do full refresh
     if (state.plan.length !== cachedUnitCount) {
+      this.lastWorkingIndex = workingIndex;
       this._onDidChangeTreeData.fire(undefined);
       return;
+    }
+
+    // If working unit changed, refresh both old and new
+    if (workingIndex !== this.lastWorkingIndex) {
+      // Refresh previously working unit (now paused)
+      if (this.lastWorkingIndex >= 0 && this.cachedItems[this.lastWorkingIndex]?.type === "unit") {
+        this.cachedItems[this.lastWorkingIndex].unit = state.plan[this.lastWorkingIndex];
+        this._onDidChangeTreeData.fire(this.cachedItems[this.lastWorkingIndex]);
+      }
+      this.lastWorkingIndex = workingIndex;
     }
 
     const cachedItem = this.cachedItems[workingIndex];
@@ -54,8 +66,8 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
       // Update cached item in place (same object reference) and fire targeted refresh
       cachedItem.unit = state.plan[workingIndex];
       this._onDidChangeTreeData.fire(cachedItem);
-    } else {
-      // Structure changed or no cached items yet - full refresh
+    } else if (workingIndex < 0 && this.lastWorkingIndex < 0) {
+      // No working unit - might need full refresh for phase changes
       this._onDidChangeTreeData.fire(undefined);
     }
   }
@@ -117,15 +129,14 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
     _isCurrent: boolean,  // Kept for API compatibility, using unit.unitPhase instead
     isCompleted: boolean
   ): vscode.TreeItem {
-    // Label: "1. #ID Comment MM:SS" or "1. #ID MM:SS" or "1. (not assigned) MM:SS"
-    const timeStr = formatSecondsAsMMSS(unit.secondsLeft);
+    // Label: "1. #ID Comment" or "1. #ID" or "1. (not assigned)"
     let label: string;
     if (unit.issueId > 0) {
       label = unit.comment
-        ? `${index + 1}. #${unit.issueId} ${unit.comment} ${timeStr}`
-        : `${index + 1}. #${unit.issueId} ${timeStr}`;
+        ? `${index + 1}. #${unit.issueId} ${unit.comment}`
+        : `${index + 1}. #${unit.issueId}`;
     } else {
-      label = `${index + 1}. (not assigned) ${timeStr}`;
+      label = `${index + 1}. (not assigned)`;
     }
 
     const item = new vscode.TreeItem(label);
@@ -145,13 +156,16 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
         item.iconPath = new vscode.ThemeIcon("circle-outline");
     }
 
-    // Description: "[Activity] Subject" or completed status
+    // Description: "MM:SS [Activity] Subject" or completed status
     if (isCompleted && unit.loggedHours) {
       const completedTimeStr = unit.completedAt ? ` @ ${this.formatClockTime(unit.completedAt)}` : "";
       item.description = `${formatHoursAsHHMM(unit.loggedHours)} logged${completedTimeStr}`;
     } else if (unit.issueId > 0) {
+      const timeStr = formatSecondsAsMMSS(unit.secondsLeft);
       const activityStr = unit.activityName ? `[${unit.activityName}]` : "";
-      item.description = `${activityStr} ${unit.issueSubject}`.trim();
+      item.description = `${timeStr} ${activityStr} ${unit.issueSubject}`.trim();
+    } else if (unit.secondsLeft > 0) {
+      item.description = formatSecondsAsMMSS(unit.secondsLeft);
     }
 
     // Context menu - use unitPhase for accurate state
