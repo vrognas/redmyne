@@ -254,23 +254,39 @@ export async function pickIssueAndActivity(
                 issue: result.issue,
               };
               quickPick.items = [searchItem, { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem, ...baseItems];
-            } catch {
+            } catch (error: unknown) {
+              // Handle 403 (no access) vs other errors
+              const is403 = error instanceof Error && error.message.includes("403");
               quickPick.items = [
-                { label: `$(error) Issue #${issueId} not found`, disabled: true },
+                { label: `$(error) Issue #${issueId} ${is403 ? "- no access" : "not found"}`, disabled: true },
                 { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
                 ...baseItems,
               ];
             }
           } else {
-            const searchResults = await server.searchIssues(query, 10);
-            if (searchResults.length === 0) {
+            // Search server + local assigned issues (Redmine search can miss items)
+            const lowerQuery = query.toLowerCase();
+            const localMatches = issues.filter((issue) =>
+              issue.subject.toLowerCase().includes(lowerQuery) ||
+              issue.project?.name?.toLowerCase().includes(lowerQuery) ||
+              String(issue.id).includes(query)
+            );
+
+            const serverResults = await server.searchIssues(query, 10);
+
+            // Merge results, avoiding duplicates (local matches first)
+            const seenIds = new Set(localMatches.map(i => i.id));
+            const uniqueServerResults = serverResults.filter(i => !seenIds.has(i.id));
+            const allResults = [...localMatches, ...uniqueServerResults].slice(0, 15);
+
+            if (allResults.length === 0) {
               quickPick.items = [
                 { label: `$(info) No results for "${query}"`, disabled: true },
                 { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
                 ...baseItems,
               ];
             } else {
-              const searchItems: IssueQuickPickItem[] = searchResults.map((issue) => ({
+              const searchItems: IssueQuickPickItem[] = allResults.map((issue) => ({
                 label: `$(search) #${issue.id} ${issue.subject}`,
                 description: issue.project?.name,
                 detail: issue.status?.name,
