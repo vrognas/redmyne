@@ -6,6 +6,7 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ### Changed
 
+- **Timer plan persists indefinitely** - no auto-clear on new day; manual clear only
 - **Rebranded** to "Redmyne" - clearer differentiation from original extension
 - **New green logo** - distinct from original Redmine blue
 - **README** - prominent fork notice, feature comparison table

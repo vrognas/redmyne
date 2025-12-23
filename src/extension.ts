@@ -142,17 +142,10 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
-  // Restore timer state if same day
+  // Restore timer state (persists until manually cleared)
   const restoreTimerState = async () => {
     const persisted = context.globalState.get<PersistedTimerState>("redmine.timer.state");
     if (!persisted) return;
-
-    const today = new Date().toISOString().split("T")[0];
-    if (persisted.todayDate !== today) {
-      // Different day - clear stale state
-      await context.globalState.update("redmine.timer.state", undefined);
-      return;
-    }
 
     // Restore state
     if (persisted.plan.length > 0) {
