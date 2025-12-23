@@ -18,7 +18,7 @@ import { RedmineSecretManager } from "./utilities/secret-manager";
 import { setApiKey } from "./commands/set-api-key";
 import { calculateWorkload } from "./utilities/workload-calculator";
 import { WeeklySchedule } from "./utilities/flexibility-calculator";
-import { formatHoursAsHHMM, parseTimeInput } from "./utilities/time-input";
+import { formatHoursAsHHMM, formatSecondsAsMMSS, parseTimeInput } from "./utilities/time-input";
 import { GanttPanel } from "./webviews/gantt-panel";
 import { disposeStatusBar, showStatusBarMessage } from "./utilities/status-bar";
 import { TimerController } from "./timer/timer-controller";
@@ -176,8 +176,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
           // Adjust timer and offer to continue
           restored.plan[workingIdx] = { ...unit, secondsLeft: adjustedSecondsLeft };
+          const pendingCount = restored.plan.filter(u => u.unitPhase !== "completed").length;
           const action = await vscode.window.showInformationMessage(
-            `Timer recovered: ${Math.floor(adjustedSecondsLeft / 60)}min left on current unit`,
+            `Timer recovered: ${formatSecondsAsMMSS(adjustedSecondsLeft)} left (${pendingCount} unit${pendingCount !== 1 ? "s" : ""})`,
             "Continue",
             "Start Fresh"
           );
@@ -194,8 +195,9 @@ export function activate(context: vscode.ExtensionContext): void {
       // Paused or other states - just offer to restore plan
       const pausedUnit = restored.plan.find(u => u.unitPhase === "paused");
       if (pausedUnit) {
+        const pendingCount = restored.plan.filter(u => u.unitPhase !== "completed").length;
         const action = await vscode.window.showInformationMessage(
-          `Timer recovered: ${Math.floor(pausedUnit.secondsLeft / 60)}min left (paused)`,
+          `Timer recovered: ${formatSecondsAsMMSS(pausedUnit.secondsLeft)} left, paused (${pendingCount} unit${pendingCount !== 1 ? "s" : ""})`,
           "Continue",
           "Start Fresh"
         );

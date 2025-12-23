@@ -280,7 +280,32 @@ export function registerTimerCommands(
     })
   );
 
-  // Toggle selected unit (for Enter/Space keybinding)
+  // Toggle selected unit via selection change (Enter/Space/click)
+  // VS Code fires onDidChangeSelection AFTER updating selection, so we can reliably read it
+  if (timerTreeView) {
+    context.subscriptions.push(
+      timerTreeView.onDidChangeSelection((e) => {
+        if (!e.selection.length) return;
+
+        const selected = e.selection[0];
+        if (selected?.type !== "unit" || selected.index === undefined) return;
+
+        const plan = controller.getPlan();
+        const unit = plan[selected.index];
+        if (!unit) return;
+
+        // Toggle based on unit state
+        if (unit.unitPhase === "working") {
+          controller.pause();
+        } else if (unit.unitPhase === "pending" || unit.unitPhase === "paused") {
+          controller.startUnit(selected.index);
+        }
+        // completed: do nothing
+      })
+    );
+  }
+
+  // Keep command for programmatic access
   context.subscriptions.push(
     vscode.commands.registerCommand("redmine.timer.toggleSelectedUnit", () => {
       if (!timerTreeView?.selection?.length) return;

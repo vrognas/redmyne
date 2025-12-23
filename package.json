@@ -243,16 +243,6 @@
         "key": "ctrl+y ctrl+t",
         "mac": "cmd+y cmd+t",
         "when": "!terminalFocus && !inDebugMode && !inQuickOpen"
-      },
-      {
-        "command": "redmine.timer.toggleSelectedUnit",
-        "key": "enter",
-        "when": "focusedView == 'redmine-explorer-timer' && listFocus && !inputFocus"
-      },
-      {
-        "command": "redmine.timer.toggleSelectedUnit",
-        "key": "space",
-        "when": "focusedView == 'redmine-explorer-timer' && listFocus && !inputFocus"
       }
     ],
     "views": {
