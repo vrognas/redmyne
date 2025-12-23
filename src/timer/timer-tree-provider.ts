@@ -187,7 +187,12 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
       item.tooltip = md;
     }
 
-    // No click command - use Enter/Space keybinding instead (avoids accidental clicks)
+    // Command to toggle on Enter/click (passes index for the command to use)
+    item.command = {
+      command: "redmine.timer.toggleUnit",
+      title: "Toggle Timer",
+      arguments: [index],
+    };
 
     return item;
   }
