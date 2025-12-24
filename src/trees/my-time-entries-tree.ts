@@ -44,10 +44,6 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     );
   }
 
-  override dispose(): void {
-    super.dispose();
-  }
-
   /**
    * Get collapsible state preserving expansion from previous render
    */

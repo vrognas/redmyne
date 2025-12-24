@@ -1349,10 +1349,16 @@ export function deactivate(): void {
   if (cleanupResources.projectsTree) {
     cleanupResources.projectsTree.dispose();
   }
+  if (cleanupResources.myTimeEntriesTree) {
+    cleanupResources.myTimeEntriesTree.dispose();
+  }
 
   // Dispose tree view instances
   if (cleanupResources.projectsTreeView) {
     cleanupResources.projectsTreeView.dispose();
+  }
+  if (cleanupResources.myTimeEntriesTreeView) {
+    cleanupResources.myTimeEntriesTreeView.dispose();
   }
   if (cleanupResources.timerTreeView) {
     cleanupResources.timerTreeView.dispose();
