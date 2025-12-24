@@ -35,6 +35,9 @@ positron-redmine/
 │   │   ├── my-issues-tree.ts
 │   │   ├── my-time-entries-tree.ts
 │   │   └── projects-tree.ts
+│   ├── shared/                # Shared abstractions
+│   │   ├── base-tree-provider.ts  # Base class for tree providers
+│   │   └── loading-placeholder.ts # Loading state utilities
 │   ├── webviews/              # Webview panels
 │   │   └── gantt-panel.ts     # SVG timeline
 │   ├── definitions/           # Configuration schemas
@@ -141,7 +144,13 @@ doRequest(path, method, data?)
 
 ### 3. Tree View Providers (`src/trees/`)
 
-All tree providers implement `vscode.TreeDataProvider<T>`.
+All tree providers extend `BaseTreeProvider<T>` which provides:
+- EventEmitter boilerplate (`onDidChangeTreeData`)
+- `refresh()` method to trigger full tree refresh
+- `dispose()` method for cleanup
+- `disposables` array for subscription management
+
+See `src/shared/base-tree-provider.ts` for the base class implementation.
 
 #### ProjectsTree (`projects-tree.ts`)
 
