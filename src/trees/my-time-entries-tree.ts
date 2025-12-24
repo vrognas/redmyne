@@ -71,10 +71,13 @@ export class MyTimeEntriesTreeDataProvider
   }
 
   refresh(): void {
-    // Clear cache on refresh to get fresh data
+    // Clear issue cache but keep tree data visible during refresh
     this.issueCache.clear();
-    this.cachedGroups = undefined;
-    this._onDidChangeTreeData.fire(undefined);
+    // Fetch new data in background, keeping old data visible
+    if (!this.isLoading && this.server) {
+      this.isLoading = true;
+      this.loadTimeEntries();
+    }
   }
 
   private async loadTimeEntries(): Promise<void> {
