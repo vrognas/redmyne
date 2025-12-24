@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { RedmineServer } from "../redmine/redmine-server";
 import { TimeEntry } from "../redmine/models/time-entry";
 import { formatHoursAsHHMM } from "../utilities/time-input";
+import { BaseTreeProvider } from "../shared/base-tree-provider";
 
 export interface TimeEntryNode {
   id?: string; // Stable ID for preserving expansion state
@@ -18,22 +19,16 @@ export interface TimeEntryNode {
   _date?: string; // ISO date for day-group nodes (YYYY-MM-DD)
 }
 
-export class MyTimeEntriesTreeDataProvider
-  implements vscode.TreeDataProvider<TimeEntryNode>
-{
-  private _onDidChangeTreeData = new vscode.EventEmitter<
-    TimeEntryNode | undefined
-  >();
-  readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
-
+export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNode> {
   private isLoading = false;
   private server?: RedmineServer;
   private issueCache = new Map<number, { id: number; subject: string; projectId?: number; project: string; client?: string }>();
   private cachedGroups?: TimeEntryNode[];
   private expandedIds = new Set<string>();
-  private disposables: vscode.Disposable[] = [];
 
-  constructor() {}
+  constructor() {
+    super();
+  }
 
   /**
    * Connect tree view to track expansion state
@@ -49,8 +44,8 @@ export class MyTimeEntriesTreeDataProvider
     );
   }
 
-  dispose(): void {
-    this.disposables.forEach((d) => d.dispose());
+  override dispose(): void {
+    super.dispose();
   }
 
   /**
@@ -70,7 +65,7 @@ export class MyTimeEntriesTreeDataProvider
     this.cachedGroups = undefined;
   }
 
-  refresh(): void {
+  override refresh(): void {
     // Clear issue cache but keep tree data visible during refresh
     this.issueCache.clear();
     // Fetch new data in background, keeping old data visible
