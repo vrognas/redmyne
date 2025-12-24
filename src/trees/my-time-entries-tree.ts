@@ -404,15 +404,16 @@ export class MyTimeEntriesTreeDataProvider
       tooltip.isTrusted = true;
       tooltip.supportHtml = false;
 
-      // Build description: "2h Dev • ProjectName" or "2h Dev" if no project
-      const activityPart = entry.activity?.name || "";
-      const descParts = [formatHoursAsHHMM(parseFloat(entry.hours)), activityPart, projectName].filter(Boolean);
-      const description = descParts.join(" • ");
+      // Format: "#1234 comment" with "HH:MM [activity] issue_subject" as description
+      const hours = formatHoursAsHHMM(parseFloat(entry.hours));
+      const activity = entry.activity?.name ? `[${entry.activity.name}]` : "";
+      const comment = entry.comments ? ` ${entry.comments}` : "";
+      const descParts = [hours, activity, issueSubject].filter(Boolean);
 
       return {
         id: `${idPrefix}-entry-${entry.id}`,
-        label: `#${issueId} ${issueSubject}`,
-        description,
+        label: `#${issueId}${comment}`,
+        description: descParts.join(" "),
         tooltip,
         collapsibleState: vscode.TreeItemCollapsibleState.None,
         type: "entry" as const,
