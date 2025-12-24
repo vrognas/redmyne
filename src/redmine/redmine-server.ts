@@ -371,10 +371,8 @@ export class RedmineServer {
 
       const modules = response?.project?.enabled_modules || [];
       const hasTimeTracking = modules.some(m => m.name === "time_tracking");
-      console.log(`[Redmine] Project ${projectId} time_tracking: ${hasTimeTracking}`);
       return hasTimeTracking;
-    } catch (error) {
-      console.log(`[Redmine] Failed to check time_tracking for project ${projectId}:`, error);
+    } catch {
       // Assume enabled if we can't check (fail open)
       return true;
     }
@@ -397,19 +395,14 @@ export class RedmineServer {
 
       const projectActivities = response?.project?.time_entry_activities;
       if (projectActivities && projectActivities.length > 0) {
-        console.log(`[Redmine] Project ${projectId} activities (${projectActivities.length}):`,
-          projectActivities.map(a => `${a.id}:${a.name}`).join(', '));
         return projectActivities;
       }
-      console.log(`[Redmine] Project ${projectId} has no specific activities, using global`);
-    } catch (error) {
-      console.log(`[Redmine] Failed to get project ${projectId} activities:`, error);
+    } catch {
       // Project-specific activities not available, fall through to global
     }
 
     // Fallback to global activities
     const global = await this.getTimeEntryActivities();
-    console.log(`[Redmine] Using global activities (${global.time_entry_activities.length})`);
     return global.time_entry_activities;
   }
 
@@ -429,23 +422,11 @@ export class RedmineServer {
     if (spentOn) {
       entry.spent_on = spentOn;
     }
-    try {
-      return await this.doRequest<{ time_entry: TimeEntry }>(
-        `/time_entries.json`,
-        "POST",
-        Buffer.from(JSON.stringify({ time_entry: entry }))
-      );
-    } catch (error) {
-      // Log details for debugging
-      console.error(`[Redmine] addTimeEntry failed:`, {
-        issueId,
-        activityId,
-        hours,
-        spentOn,
-        error: String(error),
-      });
-      throw error;
-    }
+    return await this.doRequest<{ time_entry: TimeEntry }>(
+      `/time_entries.json`,
+      "POST",
+      Buffer.from(JSON.stringify({ time_entry: entry }))
+    );
   }
 
   /**

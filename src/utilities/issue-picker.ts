@@ -207,7 +207,7 @@ export async function pickIssueWithSearch(
           const newProjectIds = [...new Set(
             allResults
               .map(i => i.project?.id)
-              .filter((id): id is number => id != null && !timeTrackingByProject.has(id))
+              .filter((id): id is number => id !== null && id !== undefined && !timeTrackingByProject.has(id))
           )];
 
           if (newProjectIds.length > 0) {
@@ -227,7 +227,7 @@ export async function pickIssueWithSearch(
           const assignedIds = new Set(issues.map(i => i.id));
           const trackableResults = allResults.filter((issue) => {
             const projectId = issue.project?.id;
-            return projectId != null && timeTrackingByProject.get(projectId) === true;
+            return projectId !== null && projectId !== undefined && timeTrackingByProject.get(projectId) === true;
           });
 
           // Sort: assigned issues first

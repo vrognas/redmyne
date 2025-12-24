@@ -57,7 +57,6 @@ let cleanupResources: {
 } = {};
 
 export function activate(context: vscode.ExtensionContext): void {
-  console.log("Redmyne: activate() called");
 
   const bucket = {
     servers: [] as RedmineServer[],
@@ -1335,8 +1334,6 @@ export function activate(context: vscode.ExtensionContext): void {
       panel.updateIssues(issues, projectsTree.getFlexibilityCache(), schedule);
     })
   );
-
-  console.log("Redmyne: activation complete");
 }
 
 export function deactivate(): void {
