@@ -8,6 +8,7 @@ import {
   sortTasksByPriority,
 } from "./personal-task-state";
 import { formatHoursAsHHMM } from "../utilities/time-input";
+import { BaseTreeProvider } from "../shared/base-tree-provider";
 
 type TaskTreeItemType = "add-button" | "status-header" | "task";
 
@@ -20,27 +21,10 @@ interface TaskTreeItem {
 /**
  * Tree provider for "Personal Tasks" view
  */
-export class PersonalTasksTreeProvider
-  implements vscode.TreeDataProvider<TaskTreeItem>
-{
-  private _onDidChangeTreeData = new vscode.EventEmitter<
-    TaskTreeItem | undefined | null
-  >();
-  readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
-
-  private disposables: vscode.Disposable[] = [];
-
+export class PersonalTasksTreeProvider extends BaseTreeProvider<TaskTreeItem> {
   constructor(private controller: PersonalTaskController) {
+    super();
     this.disposables.push(controller.onTasksChange(() => this.refresh()));
-  }
-
-  dispose(): void {
-    this.disposables.forEach((d) => d.dispose());
-    this._onDidChangeTreeData.dispose();
-  }
-
-  refresh(): void {
-    this._onDidChangeTreeData.fire(undefined);
   }
 
   getTreeItem(element: TaskTreeItem): vscode.TreeItem {
