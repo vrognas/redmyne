@@ -348,7 +348,7 @@ export function activate(context: vscode.ExtensionContext): void {
   updateWorkloadStatusBar();
 
   // Update on tree refresh
-  projectsTree.onDidChangeTreeData$.event(() => {
+  projectsTree.onDidChangeTreeData(() => {
     if (cleanupResources.workloadStatusBar) {
       updateWorkloadStatusBar();
     }
@@ -385,7 +385,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
         projectsTree.setServer(server);
         myTimeEntriesTree.setServer(server);
-        projectsTree.onDidChangeTreeData$.fire();
+        projectsTree.refresh();
         myTimeEntriesTree.refresh();
         // Status bar updates via projectsTree event listener
       } catch (error) {
@@ -769,7 +769,7 @@ export function activate(context: vscode.ExtensionContext): void {
     if (created) {
       // Refresh issues to show newly created issue
       projectsTree.clearProjects();
-      projectsTree.onDidChangeTreeData$.fire();
+      projectsTree.refresh();
     }
   });
   registerCommand("quickCreateSubIssue", async (props, ...args) => {
@@ -796,14 +796,14 @@ export function activate(context: vscode.ExtensionContext): void {
     const created = await quickCreateSubIssue(props, parentId);
     if (created) {
       projectsTree.clearProjects();
-      projectsTree.onDidChangeTreeData$.fire();
+      projectsTree.refresh();
     }
   });
   registerCommand("changeDefaultServer", (conf) => {
     projectsTree.setServer(conf.server);
     myTimeEntriesTree.setServer(conf.server);
 
-    projectsTree.onDidChangeTreeData$.fire();
+    projectsTree.refresh();
     myTimeEntriesTree.refresh();
   });
 
@@ -1014,7 +1014,7 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       refreshTimeout = setTimeout(() => {
         projectsTree.clearProjects();
-        projectsTree.onDidChangeTreeData$.fire();
+        projectsTree.refresh();
       }, CONFIG_DEBOUNCE_MS);
     }),
     vscode.commands.registerCommand("redmine.toggleTreeView", () => {
@@ -1283,7 +1283,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
           // Refresh issues
           projectsTree.clearProjects();
-          projectsTree.onDidChangeTreeData$.fire();
+          projectsTree.refresh();
 
           vscode.window.showInformationMessage(
             `Created ${created} test issues${failed > 0 ? `, ${failed} failed` : ""}`
@@ -1345,9 +1345,9 @@ export function deactivate(): void {
     clearTimeout(cleanupResources.configChangeTimeout);
   }
 
-  // Dispose EventEmitters in tree providers
+  // Dispose tree providers
   if (cleanupResources.projectsTree) {
-    cleanupResources.projectsTree.onDidChangeTreeData$.dispose();
+    cleanupResources.projectsTree.dispose();
   }
 
   // Dispose tree view instances
