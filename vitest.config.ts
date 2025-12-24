@@ -16,12 +16,22 @@ export default defineConfig({
       exclude: [
         "src/extension.ts", // VS Code integration - requires extensive mocking
         "src/trees/**/*.ts", // VS Code TreeProvider - requires extensive mocking
+        "src/shared/**/*.ts", // VS Code TreeProvider base - requires extensive mocking
         "src/webviews/**/*.ts", // VS Code Webview - requires extensive mocking
         "src/commands/new-issue.ts", // VS Code UI heavy
         "src/commands/open-actions-for-issue.ts", // VS Code UI heavy
         "src/commands/open-actions-for-issue-under-cursor.ts", // VS Code UI heavy
         "src/commands/commons/**/*.ts", // VS Code UI heavy
         "src/controllers/issue-controller.ts", // VS Code UI heavy - requires integration tests
+        "src/timer/timer-commands.ts", // VS Code UI heavy
+        "src/timer/timer-dialogs.ts", // VS Code UI heavy
+        "src/timer/timer-sound.ts", // Audio playback - requires mocking
+        "src/timer/timer-status-bar.ts", // VS Code StatusBar - requires mocking
+        "src/timer/timer-tree-provider.ts", // VS Code TreeProvider
+        "src/personal-tasks/personal-task-commands.ts", // VS Code UI heavy
+        "src/personal-tasks/personal-task-dialogs.ts", // VS Code UI heavy
+        "src/personal-tasks/personal-tasks-tree-provider.ts", // VS Code TreeProvider
+        "src/utilities/issue-picker.ts", // VS Code QuickPick - requires mocking
         "src/redmine/models/**/*.ts", // Type definitions only
         "src/definitions/**/*.ts", // Type definitions only
       ],

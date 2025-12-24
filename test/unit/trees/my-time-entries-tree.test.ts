@@ -179,10 +179,11 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     const todayChildren = await provider.getChildren(groups[0]);
 
     expect(todayChildren).toHaveLength(2);
-    expect(todayChildren[0].label).toBe("#123 Test Issue 123");
-    expect(todayChildren[0].description).toBe("2:30 • Development • Test Project");
-    expect(todayChildren[1].label).toBe("#124 Test Issue 124");
-    expect(todayChildren[1].description).toBe("1:30 • Testing • Test Project");
+    // Label format: "#id comment", description: "H:MM [activity] subject"
+    expect(todayChildren[0].label).toBe("#123 Test comment");
+    expect(todayChildren[0].description).toBe("2:30 [Development] Test Issue 123");
+    expect(todayChildren[1].label).toBe("#124");
+    expect(todayChildren[1].description).toBe("1:30 [Testing] Test Issue 124");
   });
 
   it("calculates correct totals for groups", async () => {
@@ -261,11 +262,15 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     expect(todayChildren[0].contextValue).toBe("time-entry");
   });
 
-  it("refresh fires onDidChangeTreeData event", () => {
+  it("refresh fires onDidChangeTreeData event", async () => {
+    mockServer.getTimeEntries.mockResolvedValue({ time_entries: [] });
+
     const eventSpy = vi.fn();
     provider.onDidChangeTreeData(eventSpy);
 
     provider.refresh();
+    // Wait for async loadTimeEntries to complete
+    await waitForLoad();
 
     expect(eventSpy).toHaveBeenCalledWith(undefined);
   });
@@ -296,7 +301,9 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     const todayChildren = await provider.getChildren(groups[0]);
 
     expect(todayChildren).toHaveLength(1);
-    expect(todayChildren[0].label).toBe("#123 Fetched Issue Subject");
+    // Label format: "#id comment", description: "HH:MM [activity] subject"
+    expect(todayChildren[0].label).toBe("#123 Test comment");
+    expect(todayChildren[0].description).toContain("Fetched Issue Subject");
     expect(mockServer.getIssueById).toHaveBeenCalledWith(123);
   });
 
@@ -388,7 +395,10 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     const todayChildren = await provider.getChildren(groups[0]);
 
     expect(todayChildren).toHaveLength(1);
-    expect(todayChildren[0].label).toBe("#999 Unknown Issue");
+    // Label format: "#id comment" (no comment = just "#id")
+    // "Unknown Issue" goes in description as subject fallback
+    expect(todayChildren[0].label).toBe("#999");
+    expect(todayChildren[0].description).toContain("Unknown Issue");
   });
 
   it("groups This Week entries by day of week with empty working days", async () => {
