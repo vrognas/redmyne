@@ -623,8 +623,18 @@
           "group": "navigation@1"
         },
         {
+          "command": "redmine.openIssueInBrowser",
+          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
+          "group": "navigation@1"
+        },
+        {
           "command": "redmine.quickLogTime",
           "when": "view == 'redmine-explorer-projects' && viewItem == 'issue-active'",
+          "group": "redmine@1"
+        },
+        {
+          "command": "redmine.quickLogTime",
+          "when": "view == 'redmine-explorer-my-issues' && viewItem == 'issue-active'",
           "group": "redmine@1"
         },
         {
@@ -633,8 +643,18 @@
           "group": "9_cutcopypaste@1"
         },
         {
+          "command": "redmine.copyIssueUrl",
+          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
+          "group": "9_cutcopypaste@1"
+        },
+        {
           "command": "redmine.quickCreateSubIssue",
           "when": "view == 'redmine-explorer-projects' && viewItem =~ /^issue/",
+          "group": "redmine@2"
+        },
+        {
+          "command": "redmine.quickCreateSubIssue",
+          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
           "group": "redmine@2"
         },
         {
