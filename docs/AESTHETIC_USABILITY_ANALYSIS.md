@@ -869,8 +869,8 @@ Correlate SUS scores with aesthetic ratings:
 3. ✅ 4.2 - Gantt progressive disclosure
 4. ✅ 4.5 - Error feedback improvements
 
-**Phase 3: Advanced (1 week)** 🟡 IN PROGRESS
-5. 4.3 - Wizard infrastructure + refactor
+**Phase 3: Advanced (1 week)** ✅ COMPLETE
+5. ✅ 4.3 - Wizard infrastructure + quick-create-issue refactor (quick-log-time deferred)
 6. ✅ 4.6 - Timer phase clarity
 
 ### Total Estimated Effort

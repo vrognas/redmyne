@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { ActionProperties } from "./action-properties";
 import { showStatusBarMessage } from "../utilities/status-bar";
+import { wizardPick, wizardInput, isBack, WizardPickItem } from "../utilities/wizard";
 
 interface CreatedIssue {
   id: number;
@@ -18,90 +19,163 @@ const validateDate = (v: string): string | null => {
     : "Use YYYY-MM-DD format";
 };
 
-// Shared input prompts
-async function promptOptionalFields(prefix: string, step: number, total: number) {
-  const description = await vscode.window.showInputBox({
-    title: `${prefix} (${step}/${total}) - Description`,
-    prompt: "Description (optional, Enter to skip)",
-    placeHolder: "Detailed description...",
-  });
-  if (description === undefined) return undefined;
-
-  const hours = await vscode.window.showInputBox({
-    title: `${prefix} (${step + 1}/${total}) - Estimated Hours`,
-    prompt: "Estimated hours (optional, Enter to skip)",
-    placeHolder: "e.g., 8",
-    validateInput: validateHours,
-  });
-  if (hours === undefined) return undefined;
-
-  const dueDate = await vscode.window.showInputBox({
-    title: `${prefix} (${step + 2}/${total}) - Due Date`,
-    prompt: "Due date (optional, Enter to skip)",
-    placeHolder: "YYYY-MM-DD",
-    validateInput: validateDate,
-  });
-  if (dueDate === undefined) return undefined;
-
-  return {
-    description: description || undefined,
-    estimated_hours: hours ? parseFloat(hours) : undefined,
-    due_date: dueDate || undefined,
-  };
-}
-
 /**
- * Quick create issue wizard
+ * Quick create issue wizard with back navigation
  */
 export async function quickCreateIssue(
   props: ActionProperties
 ): Promise<CreatedIssue | undefined> {
   try {
-    // Parallel fetch metadata while user sees first picker
+    // Parallel fetch metadata
     const [projects, trackers, priorities] = await Promise.all([
       props.server.getProjects(),
       props.server.getTrackers(),
       props.server.getPriorities(),
     ]);
 
-    const projectPick = await vscode.window.showQuickPick(
-      projects.map((p) => {
-        const item = p.toQuickPickItem();
-        return { label: item.label, description: item.description, id: p.id };
-      }),
-      { title: "Create Issue (1/7) - Project", placeHolder: "Select project" }
-    );
-    if (!projectPick) return undefined;
+    // State machine for wizard with back navigation
+    type WizardState = {
+      project?: { label: string; id: number };
+      tracker?: { label: string; id: number };
+      priority?: { label: string; id: number };
+      subject?: string;
+      description?: string;
+      hours?: string;
+      dueDate?: string;
+    };
 
-    const trackerPick = await vscode.window.showQuickPick(
-      trackers.map((t) => ({ label: t.name, id: t.id })),
-      { title: "Create Issue (2/7) - Tracker", placeHolder: "Select tracker" }
-    );
-    if (!trackerPick) return undefined;
+    const state: WizardState = {};
+    let step = 1;
 
-    const priorityPick = await vscode.window.showQuickPick(
-      priorities.map((p) => ({ label: p.name, id: p.id })),
-      { title: "Create Issue (3/7) - Priority", placeHolder: "Select priority" }
-    );
-    if (!priorityPick) return undefined;
+    while (step <= 7) {
+      const showBack = step > 1;
 
-    const subject = await vscode.window.showInputBox({
-      title: "Create Issue (4/7) - Subject",
-      prompt: `Issue subject for ${projectPick.label}`,
-      placeHolder: "e.g., Implement login feature",
-      validateInput: (v) => (v ? null : "Subject is required"),
-    });
-    if (!subject) return undefined;
+      switch (step) {
+        case 1: {
+          const items: WizardPickItem<{ label: string; id: number }>[] = projects.map((p) => {
+            const item = p.toQuickPickItem();
+            return { label: item.label, description: item.description, data: { label: item.label, id: p.id } };
+          });
+          const result = await wizardPick(items, {
+            title: "Create Issue (1/7) - Project",
+            placeHolder: "Select project",
+          }, showBack);
 
-    const optional = await promptOptionalFields("Create Issue", 5, 7);
-    if (!optional) return undefined;
+          if (result === undefined) return undefined;
+          if (isBack(result)) { step--; continue; }
+          state.project = result;
+          step++;
+          break;
+        }
 
+        case 2: {
+          const items: WizardPickItem<{ label: string; id: number }>[] = trackers.map((t) => ({
+            label: t.name,
+            data: { label: t.name, id: t.id },
+          }));
+          const result = await wizardPick(items, {
+            title: "Create Issue (2/7) - Tracker",
+            placeHolder: "Select tracker",
+          }, showBack);
+
+          if (result === undefined) return undefined;
+          if (isBack(result)) { step--; continue; }
+          state.tracker = result;
+          step++;
+          break;
+        }
+
+        case 3: {
+          const items: WizardPickItem<{ label: string; id: number }>[] = priorities.map((p) => ({
+            label: p.name,
+            data: { label: p.name, id: p.id },
+          }));
+          const result = await wizardPick(items, {
+            title: "Create Issue (3/7) - Priority",
+            placeHolder: "Select priority",
+          }, showBack);
+
+          if (result === undefined) return undefined;
+          if (isBack(result)) { step--; continue; }
+          state.priority = result;
+          step++;
+          break;
+        }
+
+        case 4: {
+          const result = await wizardInput({
+            title: "Create Issue (4/7) - Subject",
+            prompt: `Issue subject for ${state.project?.label}`,
+            placeHolder: "e.g., Implement login feature",
+            validateInput: (v) => (v ? null : "Subject is required"),
+            value: state.subject,
+          }, showBack);
+
+          if (result === undefined) return undefined;
+          if (isBack(result)) { step--; continue; }
+          state.subject = result;
+          step++;
+          break;
+        }
+
+        case 5: {
+          const result = await wizardInput({
+            title: "Create Issue (5/7) - Description",
+            prompt: "Description (optional, Enter to skip)",
+            placeHolder: "Detailed description...",
+            value: state.description,
+          }, showBack);
+
+          if (result === undefined) return undefined;
+          if (isBack(result)) { step--; continue; }
+          state.description = result || undefined;
+          step++;
+          break;
+        }
+
+        case 6: {
+          const result = await wizardInput({
+            title: "Create Issue (6/7) - Estimated Hours",
+            prompt: "Estimated hours (optional, Enter to skip)",
+            placeHolder: "e.g., 8",
+            validateInput: validateHours,
+            value: state.hours,
+          }, showBack);
+
+          if (result === undefined) return undefined;
+          if (isBack(result)) { step--; continue; }
+          state.hours = result || undefined;
+          step++;
+          break;
+        }
+
+        case 7: {
+          const result = await wizardInput({
+            title: "Create Issue (7/7) - Due Date",
+            prompt: "Due date (optional, Enter to skip)",
+            placeHolder: "YYYY-MM-DD",
+            validateInput: validateDate,
+            value: state.dueDate,
+          }, showBack);
+
+          if (result === undefined) return undefined;
+          if (isBack(result)) { step--; continue; }
+          state.dueDate = result || undefined;
+          step++;
+          break;
+        }
+      }
+    }
+
+    // All steps completed - create issue
     const response = await props.server.createIssue({
-      project_id: projectPick.id,
-      tracker_id: trackerPick.id,
-      priority_id: priorityPick.id,
-      subject,
-      ...optional,
+      project_id: state.project!.id,
+      tracker_id: state.tracker!.id,
+      priority_id: state.priority!.id,
+      subject: state.subject!,
+      description: state.description,
+      estimated_hours: state.hours ? parseFloat(state.hours) : undefined,
+      due_date: state.dueDate,
     });
 
     showStatusBarMessage(`$(check) Created #${response.issue.id}: ${response.issue.subject}`);
@@ -115,7 +189,7 @@ export async function quickCreateIssue(
 }
 
 /**
- * Quick create sub-issue - inherits parent's project and tracker
+ * Quick create sub-issue with back navigation - inherits parent's project and tracker
  */
 export async function quickCreateSubIssue(
   props: ActionProperties,
@@ -127,31 +201,115 @@ export async function quickCreateSubIssue(
       props.server.getPriorities(),
     ]);
     const parent = parentResponse.issue;
+    const prefix = `Sub-Issue of #${parent.id}`;
 
-    const priorityPick = await vscode.window.showQuickPick(
-      priorities.map((p) => ({ label: p.name, id: p.id })),
-      { title: `Sub-Issue of #${parent.id} (1/5) - Priority`, placeHolder: "Select priority" }
-    );
-    if (!priorityPick) return undefined;
+    // State machine for wizard
+    type WizardState = {
+      priority?: { label: string; id: number };
+      subject?: string;
+      description?: string;
+      hours?: string;
+      dueDate?: string;
+    };
 
-    const subject = await vscode.window.showInputBox({
-      title: `Sub-Issue of #${parent.id} (2/5) - Subject`,
-      prompt: `Sub-issue of #${parent.id}: ${parent.subject}`,
-      placeHolder: "e.g., Subtask description",
-      validateInput: (v) => (v ? null : "Subject is required"),
-    });
-    if (!subject) return undefined;
+    const state: WizardState = {};
+    let step = 1;
 
-    const optional = await promptOptionalFields(`Sub-Issue of #${parent.id}`, 3, 5);
-    if (!optional) return undefined;
+    while (step <= 5) {
+      const showBack = step > 1;
+
+      switch (step) {
+        case 1: {
+          const items: WizardPickItem<{ label: string; id: number }>[] = priorities.map((p) => ({
+            label: p.name,
+            data: { label: p.name, id: p.id },
+          }));
+          const result = await wizardPick(items, {
+            title: `${prefix} (1/5) - Priority`,
+            placeHolder: "Select priority",
+          }, showBack);
+
+          if (result === undefined) return undefined;
+          if (isBack(result)) { step--; continue; }
+          state.priority = result;
+          step++;
+          break;
+        }
+
+        case 2: {
+          const result = await wizardInput({
+            title: `${prefix} (2/5) - Subject`,
+            prompt: `Sub-issue of #${parent.id}: ${parent.subject}`,
+            placeHolder: "e.g., Subtask description",
+            validateInput: (v) => (v ? null : "Subject is required"),
+            value: state.subject,
+          }, showBack);
+
+          if (result === undefined) return undefined;
+          if (isBack(result)) { step--; continue; }
+          state.subject = result;
+          step++;
+          break;
+        }
+
+        case 3: {
+          const result = await wizardInput({
+            title: `${prefix} (3/5) - Description`,
+            prompt: "Description (optional, Enter to skip)",
+            placeHolder: "Detailed description...",
+            value: state.description,
+          }, showBack);
+
+          if (result === undefined) return undefined;
+          if (isBack(result)) { step--; continue; }
+          state.description = result || undefined;
+          step++;
+          break;
+        }
+
+        case 4: {
+          const result = await wizardInput({
+            title: `${prefix} (4/5) - Estimated Hours`,
+            prompt: "Estimated hours (optional, Enter to skip)",
+            placeHolder: "e.g., 8",
+            validateInput: validateHours,
+            value: state.hours,
+          }, showBack);
+
+          if (result === undefined) return undefined;
+          if (isBack(result)) { step--; continue; }
+          state.hours = result || undefined;
+          step++;
+          break;
+        }
+
+        case 5: {
+          const result = await wizardInput({
+            title: `${prefix} (5/5) - Due Date`,
+            prompt: "Due date (optional, Enter to skip)",
+            placeHolder: "YYYY-MM-DD",
+            validateInput: validateDate,
+            value: state.dueDate,
+          }, showBack);
+
+          if (result === undefined) return undefined;
+          if (isBack(result)) { step--; continue; }
+          state.dueDate = result || undefined;
+          step++;
+          break;
+        }
+      }
+    }
 
     const response = await props.server.createIssue({
       project_id: parent.project.id,
       tracker_id: parent.tracker.id,
-      priority_id: priorityPick.id,
-      subject,
+      priority_id: state.priority!.id,
+      subject: state.subject!,
       parent_issue_id: parentIssueId,
-      ...optional,
+      description: state.description,
+      estimated_hours: state.hours ? parseFloat(state.hours) : undefined,
+      due_date: state.dueDate,
     });
 
     showStatusBarMessage(`$(check) Created #${response.issue.id} under #${parentIssueId}`);
