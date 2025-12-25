@@ -124,7 +124,9 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
           description: formatHoursWithComparison(todayTotal, todayAvailable),
           collapsibleState: this.getCollapsibleState("group-today", true),
           type: "group",
+          contextValue: "day-group",
           _cachedEntries: todayResult.time_entries,
+          _date: today,
         },
         {
           id: "group-week",

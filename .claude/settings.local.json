@@ -16,7 +16,8 @@
       "Bash(npm test:*)",
       "WebSearch",
       "WebFetch(domain:code.visualstudio.com)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []
