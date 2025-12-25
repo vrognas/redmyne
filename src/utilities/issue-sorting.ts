@@ -5,18 +5,9 @@
 
 import { Issue } from "../redmine/models/issue";
 import { FlexibilityScore } from "./flexibility-calculator";
+import { isBlocked } from "./tree-item-factory";
 
 type FlexibilityStatus = FlexibilityScore["status"];
-
-/**
- * Check if an issue is blocked by relations
- */
-function isBlocked(issue: Issue): boolean {
-  if (!issue.relations) return false;
-  return issue.relations.some(
-    (r) => r.relation_type === "blocked" && r.issue_to_id === issue.id
-  );
-}
 
 /**
  * Get sort priority for flexibility status (lower = more urgent)
@@ -63,5 +54,3 @@ export function sortIssuesByRisk(
     return flexA.remaining - flexB.remaining;
   });
 }
-
-export { isBlocked };

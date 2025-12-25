@@ -292,41 +292,70 @@ export class RedmineServer {
     });
   }
 
-  async getProjects(): Promise<RedmineProject[]> {
-    // Return cached if available
-    if (this.cachedProjects) {
-      return this.cachedProjects;
-    }
-
+  /**
+   * Generic pagination helper for Redmine API endpoints
+   * Handles recursive fetching with limit/offset
+   */
+  private async paginate<TRaw, TResult = TRaw>(
+    endpoint: string,
+    responseKey: string,
+    transform?: (items: TRaw[]) => TResult[]
+  ): Promise<TResult[]> {
     const req = async (
       offset = 0,
       limit = 50,
       count: number | null = null,
-      accumulator: RedmineProject[] = []
-    ): Promise<RedmineProject[]> => {
+      accumulator: TResult[] = []
+    ): Promise<TResult[]> => {
       if (count !== null && count <= offset) {
         return accumulator;
       }
 
-      const response = await this.doRequest<{
-        projects: Project[];
-        total_count: number;
-      }>(`/projects.json?limit=${limit}&offset=${offset}`, "GET");
+      const url = `${endpoint}${endpoint.includes("?") ? "&" : "?"}limit=${limit}&offset=${offset}`;
+      const response = await this.doRequest<Record<string, unknown> & { total_count: number }>(
+        url,
+        "GET"
+      );
 
-      const [totalCount, result]: [number, RedmineProject[]] = [
-        response?.total_count || 0,
-        (response?.projects || []).map(
-          (proj) =>
-            new RedmineProject({
-              ...proj,
-            })
-        ),
-      ];
+      const rawItems = (response?.[responseKey] || []) as TRaw[];
+      const items = transform ? transform(rawItems) : (rawItems as unknown as TResult[]);
+      const totalCount = response?.total_count || 0;
 
-      return req(offset + limit, limit, totalCount, accumulator.concat(result));
+      return req(offset + limit, limit, totalCount, accumulator.concat(items));
     };
 
-    this.cachedProjects = await req();
+    return req();
+  }
+
+  /**
+   * Encode data as JSON buffer for POST/PUT requests
+   */
+  private encodeJson<T>(data: T): Buffer {
+    return Buffer.from(JSON.stringify(data), "utf8");
+  }
+
+  /**
+   * Deduplicate items by ID, preserving order
+   */
+  private deduplicateById<T extends { id: number }>(items: T[]): T[] {
+    const seen = new Set<number>();
+    return items.filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  }
+
+  async getProjects(): Promise<RedmineProject[]> {
+    if (this.cachedProjects) {
+      return this.cachedProjects;
+    }
+
+    this.cachedProjects = await this.paginate<Project, RedmineProject>(
+      "/projects.json",
+      "projects",
+      (projects) => projects.map((proj) => new RedmineProject({ ...proj }))
+    );
     return this.cachedProjects;
   }
 
@@ -425,7 +454,7 @@ export class RedmineServer {
     return await this.doRequest<{ time_entry: TimeEntry }>(
       `/time_entries.json`,
       "POST",
-      Buffer.from(JSON.stringify({ time_entry: entry }))
+      this.encodeJson({ time_entry: entry })
     );
   }
 
@@ -469,7 +498,7 @@ export class RedmineServer {
     await this.doRequest(
       `/time_entries/${id}.json`,
       "PUT",
-      Buffer.from(JSON.stringify({ time_entry: updates }))
+      this.encodeJson({ time_entry: updates })
     );
   }
 
@@ -532,7 +561,7 @@ export class RedmineServer {
     return this.doRequest(
       `/issues/${issueId}.json`,
       "PUT",
-      Buffer.from(JSON.stringify({ issue: issueUpdate }), "utf8")
+      this.encodeJson({ issue: issueUpdate })
     );
   }
 
@@ -675,7 +704,7 @@ export class RedmineServer {
     return this.doRequest(
       "/issues.json",
       "POST",
-      Buffer.from(JSON.stringify({ issue }), "utf8")
+      this.encodeJson({ issue })
     );
   }
 
@@ -739,7 +768,7 @@ export class RedmineServer {
     await this.doRequest<null>(
       `/issues/${quickUpdate.issueId}.json`,
       "PUT",
-      Buffer.from(JSON.stringify({ issue: issuePayload }), "utf8")
+      this.encodeJson({ issue: issuePayload })
     );
 
     // Fetch updated issue to verify changes
@@ -774,33 +803,10 @@ export class RedmineServer {
    * Includes children and relations for hierarchy/dependency display
    */
   async getIssuesAssignedToMe(): Promise<{ issues: Issue[] }> {
-    const req = async (
-      offset = 0,
-      limit = 50,
-      count: number | null = null,
-      accumulator: Issue[] = []
-    ): Promise<Issue[]> => {
-      if (count !== null && count <= offset) {
-        return accumulator;
-      }
-
-      const response = await this.doRequest<{
-        issues: Issue[];
-        total_count: number;
-      }>(
-        `/issues.json?status_id=open&assigned_to_id=me&include=children,relations&limit=${limit}&offset=${offset}`,
-        "GET"
-      );
-
-      const [totalCount, result]: [number, Issue[]] = [
-        response?.total_count || 0,
-        response?.issues || [],
-      ];
-
-      return req(offset + limit, limit, totalCount, accumulator.concat(result));
-    };
-
-    const issues = await req();
+    const issues = await this.paginate<Issue>(
+      "/issues.json?status_id=open&assigned_to_id=me&include=children,relations",
+      "issues"
+    );
     return { issues };
   }
 
@@ -821,25 +827,8 @@ export class RedmineServer {
       this.searchViaSubjectFilter(query, limit),
     ]);
 
-    // Merge results, avoiding duplicates
-    const seenIds = new Set<number>();
-    const merged: Issue[] = [];
-
-    // Subject filter results first (more reliable)
-    for (const issue of subjectFilterResults) {
-      if (!seenIds.has(issue.id)) {
-        merged.push(issue);
-        seenIds.add(issue.id);
-      }
-    }
-    // Then search API results
-    for (const issue of searchApiResults) {
-      if (!seenIds.has(issue.id)) {
-        merged.push(issue);
-        seenIds.add(issue.id);
-      }
-    }
-
+    // Merge results: subject filter first (more reliable), then search API
+    const merged = this.deduplicateById([...subjectFilterResults, ...searchApiResults]);
     return merged.slice(0, limit);
   }
 
@@ -903,21 +892,10 @@ export class RedmineServer {
       ]);
 
       // Merge: starts-with first (more focused), then contains
-      const seenIds = new Set<number>();
-      const merged: Issue[] = [];
-
-      for (const issue of startsWithResult?.issues || []) {
-        if (!seenIds.has(issue.id)) {
-          merged.push(issue);
-          seenIds.add(issue.id);
-        }
-      }
-      for (const issue of containsResult?.issues || []) {
-        if (!seenIds.has(issue.id)) {
-          merged.push(issue);
-          seenIds.add(issue.id);
-        }
-      }
+      const merged = this.deduplicateById([
+        ...(startsWithResult?.issues || []),
+        ...(containsResult?.issues || []),
+      ]);
 
       // Rank by relevance
       merged.sort((a, b) => {
@@ -957,34 +935,11 @@ export class RedmineServer {
     project_id: number | string,
     include_subproject = true
   ): Promise<{ issues: Issue[] }> {
-    const req = async (
-      offset = 0,
-      limit = 50,
-      count: number | null = null,
-      accumulator: Issue[] = []
-    ): Promise<Issue[]> => {
-      if (count !== null && count <= offset) {
-        return accumulator;
-      }
+    const endpoint = include_subproject
+      ? `/issues.json?status_id=open&project_id=${project_id}`
+      : `/issues.json?status_id=open&project_id=${project_id}&subproject_id=!*`;
 
-      const baseUrl = include_subproject
-        ? `/issues.json?status_id=open&project_id=${project_id}`
-        : `/issues.json?status_id=open&project_id=${project_id}&subproject_id=!*`;
-
-      const response = await this.doRequest<{
-        issues: Issue[];
-        total_count: number;
-      }>(`${baseUrl}&limit=${limit}&offset=${offset}`, "GET");
-
-      const [totalCount, result]: [number, Issue[]] = [
-        response?.total_count || 0,
-        response?.issues || [],
-      ];
-
-      return req(offset + limit, limit, totalCount, accumulator.concat(result));
-    };
-
-    const issues = await req();
+    const issues = await this.paginate<Issue>(endpoint, "issues");
     return { issues };
   }
 
