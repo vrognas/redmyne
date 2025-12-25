@@ -4,6 +4,7 @@ import { parseTimeInput, validateTimeInput, formatHoursAsHHMM } from "../utiliti
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { pickIssueWithSearch } from "../utilities/issue-picker";
 import { pickDate } from "../utilities/date-picker";
+import { errorToString } from "../utilities/error-feedback";
 
 interface RecentTimeLog {
   issueId: number;
@@ -141,7 +142,7 @@ export async function quickLogTime(
     );
   } catch (error) {
     vscode.window.showErrorMessage(
-      `Failed to log time: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to log time: ${errorToString(error)}`
     );
   }
 }

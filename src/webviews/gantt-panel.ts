@@ -3,6 +3,7 @@ import { Issue } from "../redmine/models/issue";
 import { RedmineServer } from "../redmine/redmine-server";
 import { FlexibilityScore, WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "../utilities/flexibility-calculator";
 import { showStatusBarMessage } from "../utilities/status-bar";
+import { errorToString } from "../utilities/error-feedback";
 
 type ZoomLevel = "day" | "week" | "month" | "quarter" | "year";
 
@@ -583,7 +584,7 @@ export class GanttPanel {
       // On error, re-render to reset UI to correct state
       this._updateContent();
       vscode.window.showErrorMessage(
-        `Failed to update dates: ${error instanceof Error ? error.message : String(error)}`
+        `Failed to update dates: ${errorToString(error)}`
       );
     }
   }
@@ -635,7 +636,7 @@ export class GanttPanel {
       showStatusBarMessage("$(check) Relation deleted", 2000);
     } catch (error) {
       vscode.window.showErrorMessage(
-        `Failed to delete relation: ${error instanceof Error ? error.message : String(error)}`
+        `Failed to delete relation: ${errorToString(error)}`
       );
     }
   }
@@ -688,7 +689,7 @@ export class GanttPanel {
       // Refresh data without resetting view
       vscode.commands.executeCommand("redmine.refreshGanttData");
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
+      const msg = errorToString(error);
       // Map Redmine validation errors to user-friendly messages
       const friendlyMessages: Record<string, string> = {
         "doesn't belong to the same project": "Issues must be in the same project",
@@ -741,7 +742,7 @@ export class GanttPanel {
       vscode.commands.executeCommand("redmine.refreshGanttData");
     } catch (error) {
       vscode.window.showErrorMessage(
-        `Failed to undo relation: ${error instanceof Error ? error.message : String(error)}`
+        `Failed to undo relation: ${errorToString(error)}`
       );
     }
   }
@@ -779,7 +780,7 @@ export class GanttPanel {
       vscode.commands.executeCommand("redmine.refreshGanttData");
     } catch (error) {
       vscode.window.showErrorMessage(
-        `Failed to redo relation: ${error instanceof Error ? error.message : String(error)}`
+        `Failed to redo relation: ${errorToString(error)}`
       );
     }
   }

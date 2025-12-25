@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import type { ActionProperties } from "./action-properties";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { wizardPick, wizardInput, isBack, WizardPickItem } from "../utilities/wizard";
+import { errorToString } from "../utilities/error-feedback";
 
 interface CreatedIssue {
   id: number;
@@ -185,7 +186,7 @@ export async function quickCreateIssue(
     return { id: response.issue.id, subject: response.issue.subject };
   } catch (error) {
     vscode.window.showErrorMessage(
-      `Failed to create issue: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to create issue: ${errorToString(error)}`
     );
     return undefined;
   }
@@ -319,7 +320,7 @@ export async function quickCreateSubIssue(
     return { id: response.issue.id, subject: response.issue.subject };
   } catch (error) {
     vscode.window.showErrorMessage(
-      `Failed to create sub-issue: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to create sub-issue: ${errorToString(error)}`
     );
     return undefined;
   }
