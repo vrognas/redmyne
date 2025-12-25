@@ -6,7 +6,7 @@
  * Validate issue ID string
  * Returns true if valid numeric issue ID
  */
-export function validateIssueId(issueId: string | null | undefined): boolean {
+function validateIssueId(issueId: string | null | undefined): boolean {
   if (!issueId || !issueId.trim()) return false;
   const parsed = parseInt(issueId, 10);
   return !isNaN(parsed) && parsed > 0;

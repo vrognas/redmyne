@@ -94,13 +94,6 @@ export function getCurrentUnit(state: TimerState): WorkUnit | undefined {
 }
 
 /**
- * Check if all units are completed
- */
-export function isAllCompleted(state: TimerState): boolean {
-  return state.plan.length > 0 && state.plan.every((u) => u.logged);
-}
-
-/**
  * Count completed units
  */
 export function countCompleted(state: TimerState): number {
