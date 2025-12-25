@@ -39,14 +39,6 @@ const STATUS_CONFIG = {
 } as const;
 
 /**
- * Determines if an issue is billable based on tracker name.
- * Currently: tracker name "Tasks" = billable
- */
-function isBillable(issue: Issue): boolean {
-  return issue.tracker?.name === "Tasks";
-}
-
-/**
  * Checks if issue is blocked by another issue
  */
 export function isBlocked(issue: Issue): boolean {
@@ -55,7 +47,8 @@ export function isBlocked(issue: Issue): boolean {
 
 /**
  * Creates an enhanced TreeItem with flexibility score and risk indicators
- * Format: Label="{Subject}", Description="#id spent/est days status"
+ * Format: Label="#id Subject", Description="spent/est • days"
+ * Status conveyed via icon color, blocked/billable info in tooltip
  */
 export function createEnhancedIssueTreeItem(
   issue: Issue,
@@ -63,8 +56,9 @@ export function createEnhancedIssueTreeItem(
   server: RedmineServer | undefined,
   commandName: string
 ): vscode.TreeItem {
+  // Label always includes issue ID for scannability
   const treeItem = new vscode.TreeItem(
-    issue.subject,
+    `#${issue.id} ${issue.subject}`,
     vscode.TreeItemCollapsibleState.None
   );
 
@@ -73,21 +67,17 @@ export function createEnhancedIssueTreeItem(
     const config = STATUS_CONFIG[flexibility.status];
     const spentHours = issue.spent_hours ?? 0;
     const estHours = issue.estimated_hours ?? 0;
-    const blocked = isBlocked(issue);
 
-    // Format: "[B] #123 10/40h 5d On Track" or "○ #123..." for non-billable
-    const blockedPrefix = blocked ? "[B] " : "";
-    const billablePrefix = isBillable(issue) ? "" : "○ ";
+    // Reduced density: just hours and days, no status text or prefixes
+    // Status is conveyed via icon color, blocked/billable in tooltip
     treeItem.description =
-      `${blockedPrefix}${billablePrefix}#${issue.id} ${formatHoursAsHHMM(spentHours)}/${formatHoursAsHHMM(estHours)} ${flexibility.daysRemaining}d ${config.text}`;
+      `${formatHoursAsHHMM(spentHours)}/${formatHoursAsHHMM(estHours)} • ${flexibility.daysRemaining}d`;
 
-    // Always use status color - billability shown via prefix
+    // Icon color conveys status (no text needed)
     const iconColor = new vscode.ThemeColor(config.color);
-
-    // ThemeIcon for accessibility
     treeItem.iconPath = new vscode.ThemeIcon(config.icon, iconColor);
 
-    // Rich tooltip with full details
+    // Rich tooltip with full details including blocked/billable info
     treeItem.tooltip = createFlexibilityTooltip(issue, flexibility, server);
 
     // Context value for menus

@@ -82,7 +82,8 @@ describe("createEnhancedIssueTreeItem", () => {
     hoursRemaining: 20,
   };
 
-  it("shows On Track status with icon", () => {
+  // New format tests: label has ID+subject, description has hours+days only
+  it("includes issue ID and subject in label", () => {
     const treeItem = createEnhancedIssueTreeItem(
       mockIssue,
       mockFlexibility,
@@ -90,11 +91,41 @@ describe("createEnhancedIssueTreeItem", () => {
       "test.command"
     );
 
-    expect(treeItem.description).toContain("On Track");
-    expect(treeItem.iconPath).toBeDefined();
+    expect(treeItem.label).toBe("#7392 Test Issue");
   });
 
-  it("shows Overbooked status for negative flexibility", () => {
+  it("shows hours and days in description without status text", () => {
+    const treeItem = createEnhancedIssueTreeItem(
+      mockIssue,
+      mockFlexibility,
+      undefined,
+      "test.command"
+    );
+
+    // Description should have hours/estimate and days, but NO status text
+    expect(treeItem.description).toContain("20:00/40:00");
+    expect(treeItem.description).toContain("10d");
+    expect(treeItem.description).not.toContain("On Track");
+    expect(treeItem.description).not.toContain("Overbooked");
+    expect(treeItem.description).not.toContain("Done");
+    expect(treeItem.description).not.toContain("At Risk");
+  });
+
+  it("uses icon to convey status (not description text)", () => {
+    const treeItem = createEnhancedIssueTreeItem(
+      mockIssue,
+      mockFlexibility,
+      undefined,
+      "test.command"
+    );
+
+    // Icon should be defined and colored for status
+    expect(treeItem.iconPath).toBeDefined();
+    const iconPath = treeItem.iconPath as { id: string; color?: { id: string } };
+    expect(iconPath.id).toBe("git-pull-request-draft"); // on-track icon
+  });
+
+  it("uses error icon for overbooked status", () => {
     const overbooked: FlexibilityScore = {
       ...mockFlexibility,
       remaining: -30,
@@ -108,10 +139,13 @@ describe("createEnhancedIssueTreeItem", () => {
       "test.command"
     );
 
-    expect(treeItem.description).toContain("Overbooked");
+    const iconPath = treeItem.iconPath as { id: string; color?: { id: string } };
+    expect(iconPath.id).toBe("error");
+    // Description should NOT contain status text
+    expect(treeItem.description).not.toContain("Overbooked");
   });
 
-  it("shows Done for completed issues", () => {
+  it("uses pass icon for completed status", () => {
     const completed: FlexibilityScore = {
       ...mockFlexibility,
       status: "completed",
@@ -124,7 +158,10 @@ describe("createEnhancedIssueTreeItem", () => {
       "test.command"
     );
 
-    expect(treeItem.description).toContain("Done");
+    const iconPath = treeItem.iconPath as { id: string; color?: { id: string } };
+    expect(iconPath.id).toBe("pass");
+    // Description should NOT contain status text
+    expect(treeItem.description).not.toContain("Done");
   });
 
   it("falls back to simple display when no flexibility", () => {
@@ -135,7 +172,10 @@ describe("createEnhancedIssueTreeItem", () => {
       "test.command"
     );
 
+    // Without flexibility, just show issue ID in description
     expect(treeItem.description).toBe("#7392");
+    // But label should still have ID + subject
+    expect(treeItem.label).toBe("#7392 Test Issue");
   });
 
   it("includes tracker name in tooltip", () => {
@@ -152,7 +192,7 @@ describe("createEnhancedIssueTreeItem", () => {
     expect(tooltipValue).toContain("Tasks"); // tracker.name from mockIssue
   });
 
-  it("shows prefix for non-billable issues (tracker !== Task)", () => {
+  it("does not show billable prefix in description (moved to tooltip)", () => {
     const nonBillableIssue: Issue = {
       ...mockIssue,
       tracker: { id: 2, name: "Non-billable" },
@@ -165,14 +205,14 @@ describe("createEnhancedIssueTreeItem", () => {
       "test.command"
     );
 
-    // Non-billable issues get "○ " prefix in description
-    expect(treeItem.description).toContain("○ ");
-    // Status color is still used (not dimmed)
-    const iconPath = treeItem.iconPath as { color?: { id: string } };
-    expect(iconPath?.color?.id).toBe("testing.iconPassed");
+    // Non-billable indicator NOT in description (reduces density)
+    expect(treeItem.description).not.toContain("○");
+    // Tracker info is in tooltip
+    const tooltipValue = (treeItem.tooltip as { value: string })?.value;
+    expect(tooltipValue).toContain("Non-billable");
   });
 
-  it("does NOT dim billable issues (tracker === Task)", () => {
+  it("uses status color for icon regardless of billability", () => {
     const billableIssue: Issue = {
       ...mockIssue,
       tracker: { id: 1, name: "Task" },
@@ -185,12 +225,12 @@ describe("createEnhancedIssueTreeItem", () => {
       "test.command"
     );
 
-    // iconPath should NOT use deemphasizedForeground color
+    // iconPath should use status color
     const iconPath = treeItem.iconPath as { color?: { id: string } };
-    expect(iconPath?.color?.id).not.toBe("list.deemphasizedForeground");
+    expect(iconPath?.color?.id).toBe("testing.iconPassed");
   });
 
-  it("shows blocked indicator when issue has blocked relation", () => {
+  it("shows blocked info in tooltip not description", () => {
     const blockedIssue: Issue = {
       ...mockIssue,
       relations: [
@@ -210,8 +250,12 @@ describe("createEnhancedIssueTreeItem", () => {
       "test.command"
     );
 
-    // Description should include blocked indicator
-    expect(treeItem.description).toContain("[B]");
+    // Blocked indicator NOT in description (reduces density)
+    expect(treeItem.description).not.toContain("[B]");
+    // Blocked info IS in tooltip
+    const tooltipValue = (treeItem.tooltip as { value: string })?.value;
+    expect(tooltipValue).toContain("Blocked by");
+    expect(tooltipValue).toContain("#100");
   });
 
   it("includes relations in tooltip", () => {
