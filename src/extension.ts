@@ -1269,7 +1269,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
         return {
           label: `${isOverride ? "$(calendar)" : "$(dash)"} ${opt.label}`,
-          description: `${weeklyTotal}h/week, ${monthlyTotal}h total`,
+          description: `${formatHoursAsHHMM(weeklyTotal)}/week, ${formatHoursAsHHMM(monthlyTotal)} total`,
           detail: isOverride ? formatScheduleDisplay(schedule) : "(using default)",
           key: opt.key,
         };
