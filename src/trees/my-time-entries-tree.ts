@@ -8,7 +8,7 @@ import {
   countAvailableHoursMonthly,
   getHoursForDateMonthly,
 } from "../utilities/monthly-schedule";
-import { WeeklySchedule } from "../utilities/flexibility-calculator";
+import { WeeklySchedule, clearFlexibilityCache } from "../utilities/flexibility-calculator";
 
 export interface TimeEntryNode {
   id?: string; // Stable ID for preserving expansion state
@@ -35,6 +35,16 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
 
   constructor() {
     super();
+    // Refresh when working hours config changes
+    this.disposables.push(
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration("redmine.workingHours")) {
+          clearFlexibilityCache();
+          this.cachedGroups = undefined;
+          this._onDidChangeTreeData.fire(undefined);
+        }
+      })
+    );
   }
 
   /**

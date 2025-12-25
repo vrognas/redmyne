@@ -3,8 +3,8 @@
  */
 
 import * as vscode from "vscode";
+import { formatDateISO } from "./date-utils";
 
-const formatDateISO = (d: Date) => d.toISOString().split("T")[0];
 const formatDisplay = (d: Date) =>
   d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 

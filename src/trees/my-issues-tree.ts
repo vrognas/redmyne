@@ -6,12 +6,12 @@ import {
   clearFlexibilityCache,
   FlexibilityScore,
   buildFlexibilityCache,
+  getWeeklySchedule,
 } from "../utilities/flexibility-calculator";
 import { groupBy } from "../utilities/collection-utils";
 import { sortIssuesByRisk } from "../utilities/issue-sorting";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
 import { LoadingPlaceholder, isLoadingPlaceholder, createLoadingTreeItem } from "../shared/loading-placeholder";
-import { getWeeklySchedule } from "../utilities/schedule-config";
 
 /**
  * Container for unassigned parent issues (parent not in assigned list)

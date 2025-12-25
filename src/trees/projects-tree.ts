@@ -11,6 +11,7 @@ import {
   clearFlexibilityCache,
   FlexibilityScore,
   buildFlexibilityCache,
+  getWeeklySchedule,
 } from "../utilities/flexibility-calculator";
 import { groupBy } from "../utilities/collection-utils";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
@@ -19,7 +20,6 @@ import {
   isLoadingPlaceholder,
   createLoadingTreeItem,
 } from "../shared/loading-placeholder";
-import { getWeeklySchedule } from "../utilities/schedule-config";
 
 export enum ProjectsViewStyle {
   LIST = 0,

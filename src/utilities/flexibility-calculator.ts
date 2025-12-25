@@ -6,6 +6,8 @@
  * - Remaining: Current risk (how much buffer remains)
  */
 
+import * as vscode from "vscode";
+
 export type WeeklySchedule = {
   Mon: number;
   Tue: number;
@@ -233,4 +235,12 @@ export function buildFlexibilityCache(
     const issueWithId = issue as FlexibilityIssue & { id: number };
     cache.set(issueWithId.id, calculateFlexibility(issue, schedule));
   }
+}
+
+/**
+ * Get the weekly schedule from configuration
+ */
+export function getWeeklySchedule(): WeeklySchedule {
+  const config = vscode.workspace.getConfiguration("redmine.workingHours");
+  return config.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
 }
