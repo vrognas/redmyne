@@ -8,7 +8,7 @@ import {
   countAvailableHoursMonthly,
   getHoursForDateMonthly,
 } from "../utilities/monthly-schedule";
-import { WeeklySchedule, clearFlexibilityCache } from "../utilities/flexibility-calculator";
+import { clearFlexibilityCache, getWeeklySchedule } from "../utilities/flexibility-calculator";
 import {
   getWeekStart,
   getMonthStart,
@@ -129,9 +129,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const monthTotal = calculateTotal(monthResult.time_entries);
       const lastMonthTotal = calculateTotal(lastMonthResult.time_entries);
 
-      // Get working hours config (supports both old and new format)
-      const config = vscode.workspace.getConfiguration("redmine.workingHours");
-      const defaultSchedule = getWeeklySchedule(config);
+      const defaultSchedule = getWeeklySchedule();
 
       // Calculate available hours for each period (using monthly overrides)
       const todayAvailable = getHoursForDateMonthly(
@@ -287,9 +285,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       byDate.get(date)!.push(entry);
     }
 
-    // Get working hours config
-    const config = vscode.workspace.getConfiguration("redmine.workingHours");
-    const defaultSchedule = getWeeklySchedule(config);
+    const defaultSchedule = getWeeklySchedule();
 
     // Build list of all dates to show
     let allDates: string[];
@@ -347,9 +343,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     // Sort weeks descending (most recent first)
     const sortedKeys = Array.from(byWeek.keys()).sort((a, b) => b.localeCompare(a));
 
-    // Get working hours config
-    const config = vscode.workspace.getConfiguration("redmine.workingHours");
-    const defaultSchedule = getWeeklySchedule(config);
+    const defaultSchedule = getWeeklySchedule();
 
     // Get today's date for capping week range
     const today = new Date().toISOString().split("T")[0];
@@ -502,48 +496,4 @@ function formatHoursWithComparison(
 
   const percentage = Math.round((logged / available) * 100);
   return `${formatHoursAsHHMM(logged)}/${formatHoursAsHHMM(available)} (${percentage}%)`;
-}
-
-// WeeklySchedule imported from flexibility-calculator
-
-/**
- * Get weekly schedule from config, supporting both old and new format
- */
-function getWeeklySchedule(
-  config: vscode.WorkspaceConfiguration
-): WeeklySchedule {
-  // Try new format first
-  const schedule = config.get<WeeklySchedule>("weeklySchedule");
-  if (schedule) {
-    return schedule;
-  }
-
-  // Fallback to old format (backward compatibility)
-  const hoursPerDay = config.get<number>("hoursPerDay", 8);
-  const workingDays = config.get<string[]>("workingDays", [
-    "Mon",
-    "Tue",
-    "Wed",
-    "Thu",
-    "Fri",
-  ]);
-
-  // Convert old format to new format
-  const defaultSchedule: WeeklySchedule = {
-    Mon: 0,
-    Tue: 0,
-    Wed: 0,
-    Thu: 0,
-    Fri: 0,
-    Sat: 0,
-    Sun: 0,
-  };
-
-  workingDays.forEach((day) => {
-    if (day in defaultSchedule) {
-      defaultSchedule[day as keyof WeeklySchedule] = hoursPerDay;
-    }
-  });
-
-  return defaultSchedule;
 }
