@@ -8,10 +8,11 @@ import {
 } from "../utilities/tree-item-factory";
 import { sortIssuesByRisk } from "../utilities/issue-sorting";
 import {
-  calculateFlexibility,
   clearFlexibilityCache,
   FlexibilityScore,
+  buildFlexibilityCache,
 } from "../utilities/flexibility-calculator";
+import { groupBy } from "../utilities/collection-utils";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
 import {
   LoadingPlaceholder,
@@ -162,7 +163,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
 
       if (hasAssignedIssues) {
         // Return only assigned issues (sorted by risk)
-        return this.sortIssuesByRiskCached(assignedIssues);
+        return sortIssuesByRisk(assignedIssues, this.flexibilityCache);
       }
 
       // No assigned issues - fall back to fetching all open issues
@@ -212,24 +213,13 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
         this.assignedIssues = assignedResult.issues;
 
         // Calculate flexibility for assigned issues
-        const schedule = this.getScheduleConfig();
-        this.flexibilityCache.clear();
-        for (const issue of this.assignedIssues) {
-          const flexibility = calculateFlexibility(issue, schedule);
-          this.flexibilityCache.set(issue.id, flexibility);
-        }
+        buildFlexibilityCache(this.assignedIssues, this.flexibilityCache, this.getScheduleConfig());
 
         // Group issues by project
-        this.issuesByProject.clear();
-        for (const issue of this.assignedIssues) {
-          const projectId = issue.project?.id;
-          if (projectId) {
-            if (!this.issuesByProject.has(projectId)) {
-              this.issuesByProject.set(projectId, []);
-            }
-            this.issuesByProject.get(projectId)!.push(issue);
-          }
-        }
+        this.issuesByProject = groupBy(
+          this.assignedIssues.filter((i) => i.project?.id),
+          (issue) => issue.project!.id
+        );
 
         // Build project nodes
         this.projectNodes = this.projects.map((p) => this.createProjectNode(p));
@@ -301,13 +291,6 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
         b.project.toQuickPickItem().label
       );
     });
-  }
-
-  /**
-   * Sort issues by risk priority (blocked issues sink to bottom)
-   */
-  private sortIssuesByRiskCached(issues: Issue[]): Issue[] {
-    return sortIssuesByRisk(issues, this.flexibilityCache);
   }
 
   private getScheduleConfig() {

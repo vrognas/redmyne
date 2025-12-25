@@ -3,10 +3,11 @@ import { Issue } from "../redmine/models/issue";
 import { RedmineServer } from "../redmine/redmine-server";
 import { createEnhancedIssueTreeItem } from "../utilities/tree-item-factory";
 import {
-  calculateFlexibility,
   clearFlexibilityCache,
   FlexibilityScore,
+  buildFlexibilityCache,
 } from "../utilities/flexibility-calculator";
+import { groupBy } from "../utilities/collection-utils";
 import { sortIssuesByRisk } from "../utilities/issue-sorting";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
 import { LoadingPlaceholder, isLoadingPlaceholder, createLoadingTreeItem } from "../shared/loading-placeholder";
@@ -143,36 +144,21 @@ export class MyIssuesTree extends BaseTreeProvider<TreeItem> {
       const result = await this.server.getIssuesAssignedToMe();
       const schedule = this.getScheduleConfig();
 
-      // Clear caches
-      this.flexibilityCache.clear();
+      // Clear caches and calculate flexibility
       this.parentContainers.clear();
-      this.childrenByParent.clear();
+      buildFlexibilityCache(result.issues, this.flexibilityCache, schedule);
 
-      // Calculate flexibility for all issues
-      for (const issue of result.issues) {
-        const flexibility = calculateFlexibility(issue, schedule);
-        this.flexibilityCache.set(issue.id, flexibility);
-      }
-
-      // Build hierarchy
+      // Build hierarchy - group children by parent
       const issueMap = new Map(result.issues.map((i) => [i.id, i]));
+      const issuesWithParent = result.issues.filter((i) => i.parent?.id);
+      this.childrenByParent = groupBy(issuesWithParent, (i) => i.parent!.id);
+
+      // Track parents not in assigned list
       const topLevel: TreeItem[] = [];
       const missingParentIds = new Set<number>();
-
-      // Group children by parent
-      for (const issue of result.issues) {
-        if (issue.parent?.id) {
-          const parentId = issue.parent.id;
-
-          if (!this.childrenByParent.has(parentId)) {
-            this.childrenByParent.set(parentId, []);
-          }
-          this.childrenByParent.get(parentId)!.push(issue);
-
-          // Track parents not in assigned list
-          if (!issueMap.has(parentId)) {
-            missingParentIds.add(parentId);
-          }
+      for (const parentId of this.childrenByParent.keys()) {
+        if (!issueMap.has(parentId)) {
+          missingParentIds.add(parentId);
         }
       }
 

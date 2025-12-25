@@ -218,3 +218,19 @@ export function getDayName(date: Date): keyof WeeklySchedule {
 export function clearFlexibilityCache(): void {
   workingDaysCache.clear();
 }
+
+/**
+ * Build flexibility cache for a set of issues
+ * Common pattern used by tree providers
+ */
+export function buildFlexibilityCache(
+  issues: FlexibilityIssue[],
+  cache: Map<number, FlexibilityScore | null>,
+  schedule: WeeklySchedule
+): void {
+  cache.clear();
+  for (const issue of issues) {
+    const issueWithId = issue as FlexibilityIssue & { id: number };
+    cache.set(issueWithId.id, calculateFlexibility(issue, schedule));
+  }
+}
