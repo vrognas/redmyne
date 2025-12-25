@@ -9,8 +9,11 @@ interface CreatedIssue {
 }
 
 // Validators
-const validateHours = (v: string): string | null =>
-  !v || (parseFloat(v) >= 0 && !isNaN(parseFloat(v))) ? null : "Must be positive number";
+const validateHours = (v: string): string | null => {
+  if (!v) return null; // empty is valid (optional field)
+  const num = Number(v); // Number() returns NaN for "5abc", unlike parseFloat
+  return !isNaN(num) && num >= 0 ? null : "Must be positive number";
+};
 
 const validateDate = (v: string): string | null => {
   if (!v) return null;

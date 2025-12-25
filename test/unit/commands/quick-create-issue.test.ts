@@ -204,14 +204,20 @@ describe("quickCreateIssue", () => {
 
   it("validates estimated hours input", () => {
     // Test validators directly - they're pure functions
-    const validateHours = (v: string): string | null =>
-      !v || (parseFloat(v) >= 0 && !isNaN(parseFloat(v))) ? null : "Must be positive number";
+    const validateHours = (v: string): string | null => {
+      if (!v) return null;
+      const num = Number(v);
+      return !isNaN(num) && num >= 0 ? null : "Must be positive number";
+    };
 
     expect(validateHours("")).toBeNull(); // empty is valid (optional)
     expect(validateHours("8")).toBeNull();
     expect(validateHours("0.5")).toBeNull();
+    expect(validateHours("0")).toBeNull();
     expect(validateHours("-5")).toBeTruthy(); // should return error
     expect(validateHours("abc")).toBeTruthy(); // should return error
+    expect(validateHours("5abc")).toBeTruthy(); // malformed - should return error
+    expect(validateHours("1.5x")).toBeTruthy(); // malformed - should return error
   });
 
   it("validates due date format", () => {
