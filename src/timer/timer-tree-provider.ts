@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { TimerController } from "./timer-controller";
 import { WorkUnit } from "./timer-state";
 import { formatHoursAsHHMM, formatSecondsAsMMSS } from "../utilities/time-input";
+import { BaseTreeProvider } from "../shared/base-tree-provider";
 
 interface PlanTreeItem {
   type: "header" | "unit" | "add-button" | "completed-header";
@@ -14,24 +15,16 @@ interface PlanTreeItem {
 /**
  * Tree provider for "Today's Plan" view
  */
-export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> {
-  private _onDidChangeTreeData = new vscode.EventEmitter<PlanTreeItem | undefined | null>();
-  readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
-
-  private disposables: vscode.Disposable[] = [];
+export class TimerTreeProvider extends BaseTreeProvider<PlanTreeItem> {
   private cachedItems: PlanTreeItem[] = [];
   private lastWorkingIndex: number = -1;
 
   constructor(private controller: TimerController) {
+    super();
     // Subscribe to state changes
     this.disposables.push(
       controller.onStateChange(() => this.refreshWorkingUnit())
     );
-  }
-
-  dispose(): void {
-    this.disposables.forEach((d) => d.dispose());
-    this._onDidChangeTreeData.dispose();
   }
 
   /**
@@ -72,9 +65,9 @@ export class TimerTreeProvider implements vscode.TreeDataProvider<PlanTreeItem> 
     }
   }
 
-  refresh(): void {
+  override refresh(): void {
     this.cachedItems = [];
-    this._onDidChangeTreeData.fire(undefined);
+    super.refresh();
   }
 
   getTreeItem(element: PlanTreeItem): vscode.TreeItem {

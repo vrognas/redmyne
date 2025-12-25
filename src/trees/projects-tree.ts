@@ -15,15 +15,16 @@ import {
   STATUS_PRIORITY,
   DEFAULT_WEEKLY_SCHEDULE,
 } from "../utilities/flexibility-calculator";
+import { BaseTreeProvider } from "../shared/base-tree-provider";
+import {
+  LoadingPlaceholder,
+  isLoadingPlaceholder,
+  createLoadingTreeItem,
+} from "../shared/loading-placeholder";
 
 export enum ProjectsViewStyle {
   LIST = 0,
   TREE = 1,
-}
-
-interface LoadingPlaceholder {
-  isLoadingPlaceholder: true;
-  message?: string;
 }
 
 /**
@@ -49,14 +50,8 @@ function isProjectNode(item: TreeItem): item is ProjectNode {
   return "project" in item && item.project instanceof RedmineProject;
 }
 
-/**
- * Type guard for LoadingPlaceholder
- */
-function isLoadingPlaceholder(item: TreeItem): item is LoadingPlaceholder {
-  return "isLoadingPlaceholder" in item && item.isLoadingPlaceholder === true;
-}
 
-export class ProjectsTree implements vscode.TreeDataProvider<TreeItem> {
+export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   server?: RedmineServer;
   viewStyle: ProjectsViewStyle;
   projects: RedmineProject[] | null = null;
@@ -66,36 +61,26 @@ export class ProjectsTree implements vscode.TreeDataProvider<TreeItem> {
   private assignedIssues: Issue[] = [];
   private issuesByProject = new Map<number, Issue[]>();
   private flexibilityCache = new Map<number, FlexibilityScore | null>();
-  private configListener: vscode.Disposable | undefined;
 
   constructor() {
+    super();
     this.viewStyle = ProjectsViewStyle.TREE;
 
     // Listen for config changes
-    this.configListener = vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration("redmine.workingHours")) {
-        clearFlexibilityCache();
-        this.flexibilityCache.clear();
-        this.onDidChangeTreeData$.fire();
-      }
-    });
+    this.disposables.push(
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration("redmine.workingHours")) {
+          clearFlexibilityCache();
+          this.flexibilityCache.clear();
+          this.refresh();
+        }
+      })
+    );
   }
-
-  dispose() {
-    this.configListener?.dispose();
-  }
-
-  onDidChangeTreeData$ = new vscode.EventEmitter<void>();
-  onDidChangeTreeData: vscode.Event<void> = this.onDidChangeTreeData$.event;
 
   getTreeItem(item: TreeItem): vscode.TreeItem | Thenable<vscode.TreeItem> {
     if (isLoadingPlaceholder(item)) {
-      const loadingItem = new vscode.TreeItem(
-        item.message || "Loading...",
-        vscode.TreeItemCollapsibleState.None
-      );
-      loadingItem.iconPath = new vscode.ThemeIcon("loading~spin");
-      return loadingItem;
+      return createLoadingTreeItem(item.message);
     }
 
     if (isProjectNode(item)) {
@@ -252,7 +237,7 @@ export class ProjectsTree implements vscode.TreeDataProvider<TreeItem> {
         this.projectNodes = this.projects.map((p) => this.createProjectNode(p));
 
         // Fire refresh in case VS Code received a loading placeholder during async load
-        this.onDidChangeTreeData$.fire();
+        this.refresh();
       } finally {
         this.isLoadingProjects = false;
       }
@@ -392,7 +377,7 @@ export class ProjectsTree implements vscode.TreeDataProvider<TreeItem> {
 
   setViewStyle(style: ProjectsViewStyle) {
     this.viewStyle = style;
-    this.onDidChangeTreeData$.fire();
+    this.refresh();
   }
 
   setServer(server: RedmineServer | undefined) {

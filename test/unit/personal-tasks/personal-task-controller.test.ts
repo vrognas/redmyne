@@ -3,7 +3,7 @@ import {
   PersonalTaskController,
   MockGlobalState,
 } from "../../../src/personal-tasks/personal-task-controller";
-import { PersonalTask, getTaskStatus } from "../../../src/personal-tasks/personal-task-state";
+import { getTaskStatus } from "../../../src/personal-tasks/personal-task-state";
 
 function createMockGlobalState(): MockGlobalState {
   const store: Record<string, unknown> = {};
