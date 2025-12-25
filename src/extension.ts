@@ -146,12 +146,24 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   context.subscriptions.push(cleanupResources.timerTreeView);
 
-  // Update timer context variables for menu visibility
+  // Update timer context variables for menu visibility and tree view title
   const updateTimerContext = () => {
     const phase = timerController.getPhase();
     const hasPlan = timerController.getPlan().length > 0;
     vscode.commands.executeCommand("setContext", "redmine:timerPhase", phase);
     vscode.commands.executeCommand("setContext", "redmine:timerHasPlan", hasPlan);
+
+    // Update tree view title based on phase (4.6 Timer Phase Clarity)
+    if (cleanupResources.timerTreeView) {
+      const phaseTitles: Record<string, string> = {
+        idle: hasPlan ? "Today's Plan" : "Today's Plan",
+        working: "Today's Plan (Working)",
+        paused: "Today's Plan (Paused)",
+        logging: "Today's Plan (Log Time)",
+        break: "Today's Plan (Break)",
+      };
+      cleanupResources.timerTreeView.title = phaseTitles[phase] || "Today's Plan";
+    }
   };
 
   // Initial context update
