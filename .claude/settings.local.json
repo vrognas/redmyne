@@ -18,7 +18,12 @@
       "WebFetch(domain:code.visualstudio.com)",
       "WebFetch(domain:github.com)",
       "Bash(git pull:*)",
-      "Bash(git push)"
+      "Bash(git push)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(wc:*)",
+      "Bash(find:*)",
+      "Bash(sort:*)"
     ],
     "deny": [],
     "ask": []
