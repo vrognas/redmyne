@@ -26,6 +26,13 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ### Added
 
+- **Monthly Working Hours** - configure different working schedules per month
+  - Edit schedules: `Redmine: Edit Monthly Working Hours` command
+  - View all months: `Redmine: View Monthly Working Hours` command
+  - Supports varying FTE (e.g., 100% in Jan, 50% in Feb)
+  - Flexible distribution (8h Mon/Tue + 4h Wed vs 4h every day)
+  - Persists across VS Code restarts
+  - Shows custom schedule in workload tooltip
 - **Inline issue search in unit picker** - type directly to search by #ID or text; results appear inline
 - **Empty working days in time entries** - show days with 0 logged hours based on weekly schedule; tooltips explain date range
 - **Add Time Entry from day** - right-click day in time entries to add entry for that date

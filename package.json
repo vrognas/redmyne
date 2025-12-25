@@ -85,6 +85,14 @@
         "title": "Redmine: Toggle API Logging"
       },
       {
+        "command": "redmine.workingHours.editMonth",
+        "title": "Redmine: Edit Monthly Working Hours"
+      },
+      {
+        "command": "redmine.workingHours.viewMonths",
+        "title": "Redmine: View Monthly Working Hours"
+      },
+      {
         "command": "redmine.refreshTimeEntries",
         "title": "Redmine: Refresh time entries",
         "icon": "$(refresh)"

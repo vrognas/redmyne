@@ -3,6 +3,11 @@ import { RedmineServer } from "../redmine/redmine-server";
 import { TimeEntry } from "../redmine/models/time-entry";
 import { formatHoursAsHHMM } from "../utilities/time-input";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
+import {
+  MonthlyScheduleOverrides,
+  countAvailableHoursMonthly,
+  getHoursForDateMonthly,
+} from "../utilities/monthly-schedule";
 
 export interface TimeEntryNode {
   id?: string; // Stable ID for preserving expansion state
@@ -25,9 +30,17 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   private issueCache = new Map<number, { id: number; subject: string; projectId?: number; project: string; client?: string }>();
   private cachedGroups?: TimeEntryNode[];
   private expandedIds = new Set<string>();
+  private monthlySchedules: MonthlyScheduleOverrides = {};
 
   constructor() {
     super();
+  }
+
+  /**
+   * Set monthly schedule overrides for date-specific hour calculations
+   */
+  setMonthlySchedules(overrides: MonthlyScheduleOverrides): void {
+    this.monthlySchedules = overrides;
   }
 
   /**
@@ -98,24 +111,31 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
 
       // Get working hours config (supports both old and new format)
       const config = vscode.workspace.getConfiguration("redmine.workingHours");
-      const schedule = getWeeklySchedule(config);
+      const defaultSchedule = getWeeklySchedule(config);
 
-      // Calculate available hours for each period
-      const todayAvailable = getHoursForDate(new Date(), schedule);
-      const weekAvailable = calculateAvailableHours(
+      // Calculate available hours for each period (using monthly overrides)
+      const todayAvailable = getHoursForDateMonthly(
+        new Date(),
+        this.monthlySchedules,
+        defaultSchedule
+      );
+      const weekAvailable = countAvailableHoursMonthly(
         new Date(weekStart),
         new Date(today),
-        schedule
+        this.monthlySchedules,
+        defaultSchedule
       );
-      const monthAvailable = calculateAvailableHours(
+      const monthAvailable = countAvailableHoursMonthly(
         new Date(monthStart),
         new Date(today),
-        schedule
+        this.monthlySchedules,
+        defaultSchedule
       );
-      const lastMonthAvailable = calculateAvailableHours(
+      const lastMonthAvailable = countAvailableHoursMonthly(
         new Date(lastMonth.start + "T12:00:00"),
         new Date(lastMonth.end + "T12:00:00"),
-        schedule
+        this.monthlySchedules,
+        defaultSchedule
       );
 
       // Format labels with current date context
@@ -249,7 +269,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
 
     // Get working hours config
     const config = vscode.workspace.getConfiguration("redmine.workingHours");
-    const schedule = getWeeklySchedule(config);
+    const defaultSchedule = getWeeklySchedule(config);
 
     // Build list of all dates to show
     let allDates: string[];
@@ -258,7 +278,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       allDates = getDateRange(dateRange.start, dateRange.end).filter(
         (dateStr) => {
           const date = new Date(dateStr + "T12:00:00");
-          const hours = getHoursForDate(date, schedule);
+          const hours = getHoursForDateMonthly(date, this.monthlySchedules, defaultSchedule);
           return hours > 0 || byDate.has(dateStr);
         }
       );
@@ -274,7 +294,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const date = new Date(dateStr + "T12:00:00"); // Add time to avoid timezone issues
       const dayName = date.toLocaleDateString("en-US", { weekday: "short" });
       const dayNum = date.getDate();
-      const available = getHoursForDate(date, schedule);
+      const available = getHoursForDateMonthly(date, this.monthlySchedules, defaultSchedule);
 
       const nodeId = `${idPrefix}-day-${dateStr}`;
       return {
@@ -309,7 +329,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
 
     // Get working hours config
     const config = vscode.workspace.getConfiguration("redmine.workingHours");
-    const schedule = getWeeklySchedule(config);
+    const defaultSchedule = getWeeklySchedule(config);
 
     // Get today's date for capping week range
     const today = new Date().toISOString().split("T")[0];
@@ -324,10 +344,11 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const cappedEnd = weekRange.end > today ? today : weekRange.end;
 
       // Calculate available hours for the week range
-      const available = calculateAvailableHours(
+      const available = countAvailableHoursMonthly(
         new Date(weekRange.start + "T12:00:00"),
         new Date(cappedEnd + "T12:00:00"),
-        schedule
+        this.monthlySchedules,
+        defaultSchedule
       );
 
       const nodeId = `week-${year}-${weekNum}`;
@@ -545,33 +566,6 @@ function getWeeklySchedule(
   });
 
   return defaultSchedule;
-}
-
-/**
- * Get working hours for a specific date
- */
-function getHoursForDate(date: Date, schedule: WeeklySchedule): number {
-  const dayName = date.toLocaleDateString("en-US", { weekday: "short" });
-  return schedule[dayName] || 0;
-}
-
-/**
- * Calculate total available hours between two dates
- */
-function calculateAvailableHours(
-  start: Date,
-  end: Date,
-  schedule: WeeklySchedule
-): number {
-  let total = 0;
-  const current = new Date(start);
-
-  while (current <= end) {
-    total += getHoursForDate(current, schedule);
-    current.setDate(current.getDate() + 1);
-  }
-
-  return total;
 }
 
 /**

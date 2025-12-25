@@ -17,7 +17,19 @@ import { MyTimeEntriesTreeDataProvider } from "./trees/my-time-entries-tree";
 import { RedmineSecretManager } from "./utilities/secret-manager";
 import { setApiKey } from "./commands/set-api-key";
 import { calculateWorkload } from "./utilities/workload-calculator";
-import { WeeklySchedule } from "./utilities/flexibility-calculator";
+import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "./utilities/flexibility-calculator";
+import {
+  MonthlyScheduleOverrides,
+  loadMonthlySchedules,
+  saveMonthlySchedules,
+  getMonthOptions,
+  getMonthKey,
+  formatMonthKeyDisplay,
+  formatScheduleDisplay,
+  calculateWeeklyTotal,
+  calculateMonthlyTotal,
+  countAvailableHoursMonthly,
+} from "./utilities/monthly-schedule";
 import { formatHoursAsHHMM, formatSecondsAsMMSS, parseTimeInput } from "./utilities/time-input";
 import { GanttPanel } from "./webviews/gantt-panel";
 import { disposeStatusBar, showStatusBarMessage } from "./utilities/status-bar";
@@ -55,6 +67,7 @@ let cleanupResources: {
     projects: RedmineProject[];
   };
   userFte?: number; // FTE from Redmine user custom field
+  monthlySchedules?: MonthlyScheduleOverrides; // Monthly schedule overrides
 } = {};
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -64,6 +77,9 @@ export function activate(context: vscode.ExtensionContext): void {
     projects: [] as RedmineProject[],
   };
   cleanupResources.bucket = bucket;
+
+  // Load monthly schedule overrides
+  cleanupResources.monthlySchedules = loadMonthlySchedules(context.globalState);
 
   const secretManager = new RedmineSecretManager(context);
   const outputChannel = vscode.window.createOutputChannel("Redmyne");
@@ -98,6 +114,7 @@ export function activate(context: vscode.ExtensionContext): void {
     treeDataProvider: myTimeEntriesTree,
   });
   myTimeEntriesTree.setTreeView(cleanupResources.myTimeEntriesTreeView as vscode.TreeView<import("./trees/my-time-entries-tree").TimeEntryNode>);
+  myTimeEntriesTree.setMonthlySchedules(cleanupResources.monthlySchedules ?? {});
 
   // Initialize timer controller with settings from globalState
   const unitDuration = context.globalState.get<number>("redmine.timer.unitDuration", 60);
@@ -314,9 +331,13 @@ export function activate(context: vscode.ExtensionContext): void {
     }
 
     const scheduleConfig = vscode.workspace.getConfiguration("redmine.workingHours");
-    let schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", {
+    const defaultSchedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", {
       Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0, Sun: 0,
     });
+
+    // Get schedule for current month (monthly overrides take precedence)
+    const currentMonthKey = getMonthKey(new Date());
+    const schedule = cleanupResources.monthlySchedules?.[currentMonthKey] ?? defaultSchedule;
 
     const workload = calculateWorkload(issues, schedule);
 
@@ -333,6 +354,12 @@ export function activate(context: vscode.ExtensionContext): void {
     tooltip.appendMarkdown(`**Buffer:** ${bufferText} ${workload.buffer >= 0 ? "(On Track)" : "(Overbooked)"}\n\n`);
     if (cleanupResources.userFte) {
       tooltip.appendMarkdown(`**Your FTE:** ${cleanupResources.userFte}\n\n`);
+    }
+
+    // Show if using custom monthly schedule
+    if (cleanupResources.monthlySchedules?.[currentMonthKey]) {
+      const weeklyTotal = calculateWeeklyTotal(schedule);
+      tooltip.appendMarkdown(`**Schedule:** ${formatMonthKeyDisplay(currentMonthKey)} (${weeklyTotal}h/week)\n\n`);
     }
 
     if (workload.topUrgent.length > 0) {
@@ -1072,6 +1099,180 @@ export function activate(context: vscode.ExtensionContext): void {
       );
       // Refresh trees to use new server instances
       await updateConfiguredContext();
+    }),
+
+    // Monthly working hours commands
+    vscode.commands.registerCommand("redmine.workingHours.editMonth", async () => {
+      // Get default schedule from config
+      const config = vscode.workspace.getConfiguration("redmine.workingHours");
+      const defaultSchedule = config.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
+      const overrides = cleanupResources.monthlySchedules ?? {};
+
+      // Select month
+      const monthOptions = getMonthOptions();
+      const monthItems = monthOptions.map((opt) => {
+        const existing = overrides[opt.key];
+        const weeklyHours = existing ? calculateWeeklyTotal(existing) : calculateWeeklyTotal(defaultSchedule);
+        const monthlyHours = existing
+          ? calculateMonthlyTotal(opt.key, existing)
+          : calculateMonthlyTotal(opt.key, defaultSchedule);
+        return {
+          label: opt.label,
+          description: existing
+            ? `${weeklyHours}h/week, ${monthlyHours}h total (custom)`
+            : `${weeklyHours}h/week, ${monthlyHours}h total (default)`,
+          key: opt.key,
+          hasOverride: !!existing,
+        };
+      });
+
+      const selectedMonth = await vscode.window.showQuickPick(monthItems, {
+        title: "Edit Monthly Working Hours",
+        placeHolder: "Select month to configure",
+      });
+
+      if (!selectedMonth) return;
+
+      // Get current schedule for this month
+      const currentSchedule = overrides[selectedMonth.key] ?? { ...defaultSchedule };
+
+      // Quick pick for what to do
+      const actions = [
+        {
+          label: "$(edit) Edit day-by-day",
+          description: "Configure hours for each day",
+          action: "edit",
+        },
+        {
+          label: "$(files) Copy from default",
+          description: `Reset to default (${calculateWeeklyTotal(defaultSchedule)}h/week)`,
+          action: "copy",
+        },
+        {
+          label: "$(trash) Clear override",
+          description: "Use default schedule",
+          action: "clear",
+          disabled: !selectedMonth.hasOverride,
+        },
+      ].filter((a) => !a.disabled);
+
+      const selectedAction = await vscode.window.showQuickPick(actions, {
+        title: `${formatMonthKeyDisplay(selectedMonth.key)}`,
+        placeHolder: "What would you like to do?",
+      });
+
+      if (!selectedAction) return;
+
+      if (selectedAction.action === "clear") {
+        delete overrides[selectedMonth.key];
+        cleanupResources.monthlySchedules = overrides;
+        await saveMonthlySchedules(context.globalState, overrides);
+        myTimeEntriesTree.setMonthlySchedules(overrides);
+        showStatusBarMessage(
+          `$(check) ${formatMonthKeyDisplay(selectedMonth.key)} reset to default`,
+          2000
+        );
+        myTimeEntriesTree.refresh();
+        return;
+      }
+
+      if (selectedAction.action === "copy") {
+        overrides[selectedMonth.key] = { ...defaultSchedule };
+        cleanupResources.monthlySchedules = overrides;
+        await saveMonthlySchedules(context.globalState, overrides);
+        myTimeEntriesTree.setMonthlySchedules(overrides);
+        showStatusBarMessage(
+          `$(check) ${formatMonthKeyDisplay(selectedMonth.key)} set to default`,
+          2000
+        );
+        myTimeEntriesTree.refresh();
+        return;
+      }
+
+      // Edit day-by-day
+      const days: (keyof WeeklySchedule)[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+      const newSchedule = { ...currentSchedule };
+
+      for (const day of days) {
+        const input = await vscode.window.showInputBox({
+          title: `${formatMonthKeyDisplay(selectedMonth.key)} - ${day}`,
+          prompt: `Hours for ${day} (0-24)`,
+          value: String(newSchedule[day]),
+          validateInput: (v) => {
+            const num = parseFloat(v);
+            if (isNaN(num) || num < 0 || num > 24) {
+              return "Enter a number between 0 and 24";
+            }
+            return null;
+          },
+        });
+
+        if (input === undefined) {
+          // User cancelled - ask if they want to save partial changes
+          const save = await vscode.window.showWarningMessage(
+            "Save partial changes?",
+            { modal: true },
+            "Save",
+            "Discard"
+          );
+          if (save === "Save") {
+            overrides[selectedMonth.key] = newSchedule;
+            cleanupResources.monthlySchedules = overrides;
+            await saveMonthlySchedules(context.globalState, overrides);
+            myTimeEntriesTree.setMonthlySchedules(overrides);
+            showStatusBarMessage("$(check) Partial changes saved", 2000);
+            myTimeEntriesTree.refresh();
+          }
+          return;
+        }
+
+        newSchedule[day] = parseFloat(input);
+      }
+
+      // Save complete schedule
+      overrides[selectedMonth.key] = newSchedule;
+      cleanupResources.monthlySchedules = overrides;
+      await saveMonthlySchedules(context.globalState, overrides);
+      myTimeEntriesTree.setMonthlySchedules(overrides);
+
+      const weeklyTotal = calculateWeeklyTotal(newSchedule);
+      const monthlyTotal = calculateMonthlyTotal(selectedMonth.key, newSchedule);
+      showStatusBarMessage(
+        `$(check) ${formatMonthKeyDisplay(selectedMonth.key)}: ${weeklyTotal}h/week, ${monthlyTotal}h total`,
+        3000
+      );
+      myTimeEntriesTree.refresh();
+    }),
+
+    vscode.commands.registerCommand("redmine.workingHours.viewMonths", async () => {
+      const config = vscode.workspace.getConfiguration("redmine.workingHours");
+      const defaultSchedule = config.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
+      const overrides = cleanupResources.monthlySchedules ?? {};
+
+      const monthOptions = getMonthOptions();
+      const items = monthOptions.map((opt) => {
+        const schedule = overrides[opt.key] ?? defaultSchedule;
+        const isOverride = !!overrides[opt.key];
+        const weeklyTotal = calculateWeeklyTotal(schedule);
+        const monthlyTotal = calculateMonthlyTotal(opt.key, schedule);
+
+        return {
+          label: `${isOverride ? "$(calendar)" : "$(dash)"} ${opt.label}`,
+          description: `${weeklyTotal}h/week, ${monthlyTotal}h total`,
+          detail: isOverride ? formatScheduleDisplay(schedule) : "(using default)",
+          key: opt.key,
+        };
+      });
+
+      const selected = await vscode.window.showQuickPick(items, {
+        title: "Monthly Working Hours",
+        placeHolder: "Select a month to edit",
+      });
+
+      if (selected) {
+        // Trigger edit command for the selected month
+        vscode.commands.executeCommand("redmine.workingHours.editMonth");
+      }
     }),
 
     // Create test issues command
