@@ -310,6 +310,8 @@ export class GanttPanel {
   private _zoomLevel: ZoomLevel = "day";
   private _schedule: WeeklySchedule = DEFAULT_WEEKLY_SCHEDULE;
   private _showWorkloadHeatmap: boolean = false;
+  private _showDependencies: boolean = true;
+  private _showIntensity: boolean = false;
   private _scrollPosition: { left: number; top: number } = { left: 0, top: 0 };
 
   private constructor(panel: vscode.WebviewPanel, server?: RedmineServer) {
@@ -523,6 +525,18 @@ export class GanttPanel {
           command: "setHeatmapState",
           enabled: this._showWorkloadHeatmap,
         });
+        break;
+      case "toggleDependencies":
+        this._showDependencies = !this._showDependencies;
+        this._panel.webview.postMessage({
+          command: "setDependenciesState",
+          enabled: this._showDependencies,
+        });
+        break;
+      case "toggleIntensity":
+        this._showIntensity = !this._showIntensity;
+        // Intensity affects bar rendering, so we need to re-render
+        this._updateContent();
         break;
       case "refresh":
         // Refresh data without resetting view state
@@ -927,8 +941,9 @@ export class GanttPanel {
         const handleWidth = 8;
 
         // Calculate daily intensity for this issue (skip for parent issues - work is in subtasks)
-        const intensities = isParent ? [] : calculateDailyIntensity(issue, this._schedule);
-        const hasIntensity = !isParent && intensities.length > 0 && issue.estimated_hours !== null;
+        // Only compute if intensity display is enabled globally
+        const intensities = this._showIntensity && !isParent ? calculateDailyIntensity(issue, this._schedule) : [];
+        const hasIntensity = this._showIntensity && !isParent && intensities.length > 0 && issue.estimated_hours !== null;
 
         // Generate intensity segments and line chart
         let intensitySegments = "";
@@ -1437,13 +1452,15 @@ ${style.tip}
         <button id="zoomYear" class="${this._zoomLevel === "year" ? "active" : ""}" title="Year view">Year</button>
       </div>
       <button id="heatmapBtn" class="${this._showWorkloadHeatmap ? "active" : ""}" title="Toggle workload heatmap" aria-pressed="${this._showWorkloadHeatmap}">Heatmap</button>
+      <button id="depsBtn" class="${this._showDependencies ? "active" : ""}" title="Toggle dependency arrows" aria-pressed="${this._showDependencies}">Deps</button>
+      <button id="intensityBtn" class="${this._showIntensity ? "active" : ""}" title="Toggle daily intensity" aria-pressed="${this._showIntensity}">Intensity</button>
       <div class="heatmap-legend" style="${this._showWorkloadHeatmap ? "" : "display: none;"}">
         <span class="heatmap-legend-item"><span class="heatmap-legend-color" style="background: var(--vscode-charts-green);"></span>&lt;80%</span>
         <span class="heatmap-legend-item"><span class="heatmap-legend-color" style="background: var(--vscode-charts-yellow);"></span>80-100%</span>
         <span class="heatmap-legend-item"><span class="heatmap-legend-color" style="background: var(--vscode-charts-orange);"></span>100-120%</span>
         <span class="heatmap-legend-item"><span class="heatmap-legend-color" style="background: var(--vscode-charts-red);"></span>&gt;120%</span>
       </div>
-      <div class="relation-legend" title="Relation types (drag from link handle to create)">
+      <div class="relation-legend" style="${this._showDependencies ? "" : "display: none;"}" title="Relation types (drag from link handle to create)">
         <span class="relation-legend-item"><span class="relation-legend-line" style="background: #e74c3c;"></span>blocks</span>
         <span class="relation-legend-item"><span class="relation-legend-line" style="background: #9b59b6;"></span>precedes</span>
         <span class="relation-legend-item"><span class="relation-legend-line" style="background: #7f8c8d; border-style: dashed;"></span>relates</span>
@@ -1481,7 +1498,7 @@ ${style.tip}
           </defs>
           ${dateMarkers.body}
           ${bars}
-          ${dependencyArrows}
+          <g class="dependency-layer" style="${this._showDependencies ? "" : "display: none;"}">${dependencyArrows}</g>
         </svg>
       </div>
     </div>
@@ -1643,6 +1660,20 @@ ${style.tip}
           if (heatmapBtn) heatmapBtn.classList.remove('active');
           if (heatmapLegend) heatmapLegend.style.display = 'none';
         }
+      } else if (message.command === 'setDependenciesState') {
+        const dependencyLayer = document.querySelector('.dependency-layer');
+        const depsBtn = document.getElementById('depsBtn');
+        const relationLegend = document.querySelector('.relation-legend');
+
+        if (message.enabled) {
+          if (dependencyLayer) dependencyLayer.style.display = '';
+          if (depsBtn) depsBtn.classList.add('active');
+          if (relationLegend) relationLegend.style.display = '';
+        } else {
+          if (dependencyLayer) dependencyLayer.style.display = 'none';
+          if (depsBtn) depsBtn.classList.remove('active');
+          if (relationLegend) relationLegend.style.display = 'none';
+        }
       } else if (message.command === 'pushUndoAction') {
         // Push relation action to undo stack
         undoStack.push(message.action);
@@ -1688,6 +1719,18 @@ ${style.tip}
     document.getElementById('heatmapBtn').addEventListener('click', () => {
       saveState();
       vscode.postMessage({ command: 'toggleWorkloadHeatmap' });
+    });
+
+    // Dependencies toggle handler
+    document.getElementById('depsBtn').addEventListener('click', () => {
+      saveState();
+      vscode.postMessage({ command: 'toggleDependencies' });
+    });
+
+    // Intensity toggle handler
+    document.getElementById('intensityBtn').addEventListener('click', () => {
+      saveState();
+      vscode.postMessage({ command: 'toggleIntensity' });
     });
 
     // Refresh button handler

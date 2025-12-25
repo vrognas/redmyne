@@ -7,7 +7,7 @@ import {
 import { Issue } from "../../../src/redmine/models/issue";
 
 describe("MyIssuesTree", () => {
-  it("should format issue label as subject only", () => {
+  it("should format issue label with ID prefix", () => {
     const tree = new MyIssuesTree();
     const issue: Issue = {
       id: 7392,
@@ -24,10 +24,11 @@ describe("MyIssuesTree", () => {
 
     const treeItem = tree.getTreeItem(issue);
 
-    expect(treeItem.label).toBe("Test Issue 1234");
+    // Label includes issue ID for scannability (4.1 info density reduction)
+    expect(treeItem.label).toBe("#7392 Test Issue 1234");
   });
 
-  it("should format issue description as issue number with reduced opacity", () => {
+  it("should format issue description as issue number when no flexibility data", () => {
     const tree = new MyIssuesTree();
     const issue: Issue = {
       id: 7392,
