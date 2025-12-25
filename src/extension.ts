@@ -1128,10 +1128,9 @@ export function activate(context: vscode.ExtensionContext): void {
           ? calculateMonthlyTotal(opt.key, existing)
           : calculateMonthlyTotal(opt.key, defaultSchedule);
         return {
-          label: opt.label,
-          description: existing
-            ? `${weeklyHours}h/week, ${monthlyHours}h total (custom)`
-            : `${weeklyHours}h/week, ${monthlyHours}h total (default)`,
+          label: `${existing ? "$(calendar)" : "$(dash)"} ${opt.label}`,
+          description: `${formatHoursAsHHMM(weeklyHours)}/week, ${formatHoursAsHHMM(monthlyHours)} total`,
+          detail: existing ? formatScheduleDisplay(existing) : "(using default)",
           key: opt.key,
           hasOverride: !!existing,
         };
@@ -1253,37 +1252,6 @@ export function activate(context: vscode.ExtensionContext): void {
         3000
       );
       myTimeEntriesTree.refresh();
-    }),
-
-    vscode.commands.registerCommand("redmine.workingHours.viewMonths", async () => {
-      const config = vscode.workspace.getConfiguration("redmine.workingHours");
-      const defaultSchedule = config.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
-      const overrides = cleanupResources.monthlySchedules ?? {};
-
-      const monthOptions = getMonthOptions();
-      const items = monthOptions.map((opt) => {
-        const schedule = overrides[opt.key] ?? defaultSchedule;
-        const isOverride = !!overrides[opt.key];
-        const weeklyTotal = calculateWeeklyTotal(schedule);
-        const monthlyTotal = calculateMonthlyTotal(opt.key, schedule);
-
-        return {
-          label: `${isOverride ? "$(calendar)" : "$(dash)"} ${opt.label}`,
-          description: `${formatHoursAsHHMM(weeklyTotal)}/week, ${formatHoursAsHHMM(monthlyTotal)} total`,
-          detail: isOverride ? formatScheduleDisplay(schedule) : "(using default)",
-          key: opt.key,
-        };
-      });
-
-      const selected = await vscode.window.showQuickPick(items, {
-        title: "Monthly Working Hours",
-        placeHolder: "Select a month to edit",
-      });
-
-      if (selected) {
-        // Trigger edit command for the selected month
-        vscode.commands.executeCommand("redmine.workingHours.editMonth");
-      }
     }),
 
     // Create test issues command
