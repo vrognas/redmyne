@@ -24,15 +24,6 @@ export function isLoadingPlaceholder<T>(
 }
 
 /**
- * Create a loading placeholder object.
- */
-export function createLoadingPlaceholder(message?: string): LoadingPlaceholder {
-  return message
-    ? { isLoadingPlaceholder: true, message }
-    : { isLoadingPlaceholder: true };
-}
-
-/**
  * Create a VS Code TreeItem for loading state.
  */
 export function createLoadingTreeItem(message = "Loading..."): vscode.TreeItem {

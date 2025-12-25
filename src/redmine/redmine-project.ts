@@ -1,5 +1,5 @@
 import { QuickPickItem } from "vscode";
-import { NamedEntity } from "./models/named-entity";
+import { NamedEntity } from "./models/common";
 
 export interface RedmineProjectOptions {
   /**

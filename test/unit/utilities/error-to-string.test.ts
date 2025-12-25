@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { errorToString } from "../../../src/utilities/error-to-string";
+import { errorToString } from "../../../src/utilities/error-feedback";
 
 describe("errorToString", () => {
   it("should convert Error to string", () => {

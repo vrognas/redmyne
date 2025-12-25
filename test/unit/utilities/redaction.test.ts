@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { redactSensitiveData } from "../../../src/utilities/redaction";
+import { redactSensitiveData } from "../../../src/utilities/api-logger";
 
 describe("redactSensitiveData", () => {
   describe("JSON redaction", () => {

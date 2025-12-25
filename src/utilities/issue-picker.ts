@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { RedmineServer } from "../redmine/redmine-server";
 import { Issue } from "../redmine/models/issue";
-import { TimeEntryActivity } from "../redmine/models/time-entry-activity";
+import { TimeEntryActivity } from "../redmine/models/common";
 
 interface IssueQuickPickItem extends vscode.QuickPickItem {
   issue?: Issue;

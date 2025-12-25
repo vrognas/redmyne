@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { IssueController } from "../controllers/issue-controller";
 import { ActionProperties } from "./action-properties";
 import { Issue } from "../redmine/models/issue";
-import { errorToString } from "../utilities/error-to-string";
+import { errorToString } from "../utilities/error-feedback";
 
 export interface PickItem extends vscode.QuickPickItem {
   label: string;

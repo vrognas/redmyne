@@ -7,11 +7,11 @@ import {
   QuickUpdate,
   QuickUpdateResult,
 } from "../controllers/domain";
-import { TimeEntryActivity } from "./models/time-entry-activity";
+import { TimeEntryActivity } from "./models/common";
 import { Project } from "./models/project";
 import { TimeEntry } from "./models/time-entry";
 import { Issue } from "./models/issue";
-import { IssueStatus as RedmineIssueStatus } from "./models/issue-status";
+import { IssueStatus as RedmineIssueStatus } from "./models/common";
 import { Membership as RedmineMembership } from "./models/membership";
 
 type HttpMethods = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";

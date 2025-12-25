@@ -1,5 +1,4 @@
-import { TimeEntryActivity } from "./time-entry-activity";
-import { NamedEntity } from "./named-entity";
+import { TimeEntryActivity, NamedEntity } from "./common";
 
 export interface TimeEntry {
   id?: number; // Present in GET responses

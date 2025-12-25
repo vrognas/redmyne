@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   isLoadingPlaceholder,
-  createLoadingPlaceholder,
   createLoadingTreeItem,
   LoadingPlaceholder,
 } from "../../../src/shared/loading-placeholder";
@@ -32,21 +31,6 @@ describe("loading-placeholder", () => {
       expect(isLoadingPlaceholder(undefined as unknown)).toBe(false);
       expect(isLoadingPlaceholder("string" as unknown)).toBe(false);
       expect(isLoadingPlaceholder(123 as unknown)).toBe(false);
-    });
-  });
-
-  describe("createLoadingPlaceholder", () => {
-    it("creates placeholder without message", () => {
-      const placeholder = createLoadingPlaceholder();
-      expect(placeholder).toEqual({ isLoadingPlaceholder: true });
-    });
-
-    it("creates placeholder with message", () => {
-      const placeholder = createLoadingPlaceholder("Loading...");
-      expect(placeholder).toEqual({
-        isLoadingPlaceholder: true,
-        message: "Loading...",
-      });
     });
   });
 

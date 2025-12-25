@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { errorToString } from "../utilities/error-to-string";
+import { errorToString } from "../utilities/error-feedback";
 import { ActionProperties } from "./action-properties";
 
 export default async ({ server, config }: ActionProperties) => {

@@ -213,7 +213,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
         this.assignedIssues = assignedResult.issues;
 
         // Calculate flexibility for assigned issues
-        buildFlexibilityCache(this.assignedIssues, this.flexibilityCache, this.getScheduleConfig());
+        buildFlexibilityCache(this.assignedIssues, this.flexibilityCache, getWeeklySchedule());
 
         // Group issues by project
         this.issuesByProject = groupBy(
@@ -291,10 +291,6 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
         b.project.toQuickPickItem().label
       );
     });
-  }
-
-  private getScheduleConfig() {
-    return getWeeklySchedule();
   }
 
   /**

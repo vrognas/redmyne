@@ -1,18 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
   getMonthKey,
-  parseMonthKey,
-  getScheduleForMonth,
-  getScheduleForDate,
   countAvailableHoursMonthly,
-  countWorkingDaysMonthly,
   getHoursForDateMonthly,
   calculateMonthlyTotal,
   formatMonthKeyDisplay,
   getMonthOptions,
   formatScheduleDisplay,
   calculateWeeklyTotal,
-  createScheduleFromPreset,
   MonthlyScheduleOverrides,
 } from "../../../src/utilities/monthly-schedule";
 import { WeeklySchedule } from "../../../src/utilities/flexibility-calculator";
@@ -52,53 +47,6 @@ describe("monthly-schedule", () => {
     it("handles December correctly", () => {
       const date = new Date(2025, 11, 25); // Dec 25, 2025
       expect(getMonthKey(date)).toBe("2025-12");
-    });
-  });
-
-  describe("parseMonthKey", () => {
-    it("parses year and month", () => {
-      expect(parseMonthKey("2025-01")).toEqual({ year: 2025, month: 1 });
-      expect(parseMonthKey("2024-12")).toEqual({ year: 2024, month: 12 });
-    });
-  });
-
-  describe("getScheduleForMonth", () => {
-    it("returns override if exists", () => {
-      const overrides: MonthlyScheduleOverrides = {
-        "2025-01": halfTimeSchedule,
-      };
-      expect(getScheduleForMonth("2025-01", overrides, defaultSchedule)).toBe(
-        halfTimeSchedule
-      );
-    });
-
-    it("returns default if no override", () => {
-      const overrides: MonthlyScheduleOverrides = {};
-      expect(getScheduleForMonth("2025-01", overrides, defaultSchedule)).toBe(
-        defaultSchedule
-      );
-    });
-  });
-
-  describe("getScheduleForDate", () => {
-    it("returns override for date's month", () => {
-      const overrides: MonthlyScheduleOverrides = {
-        "2025-01": halfTimeSchedule,
-      };
-      const date = new Date(2025, 0, 15); // Jan 15, 2025
-      expect(getScheduleForDate(date, overrides, defaultSchedule)).toBe(
-        halfTimeSchedule
-      );
-    });
-
-    it("returns default for dates without override", () => {
-      const overrides: MonthlyScheduleOverrides = {
-        "2025-01": halfTimeSchedule,
-      };
-      const date = new Date(2025, 1, 15); // Feb 15, 2025
-      expect(getScheduleForDate(date, overrides, defaultSchedule)).toBe(
-        defaultSchedule
-      );
     });
   });
 
@@ -146,20 +94,6 @@ describe("monthly-schedule", () => {
       expect(countAvailableHoursMonthly(start, end, overrides, defaultSchedule)).toBe(
         4 + 4 + 0 + 0 + 8 // Jan30:4h + Jan31:4h + Feb1:0h + Feb2:0h + Feb3:8h
       );
-    });
-  });
-
-  describe("countWorkingDaysMonthly", () => {
-    it("counts working days within single month", () => {
-      const start = new Date(2025, 0, 6); // Mon Jan 6
-      const end = new Date(2025, 0, 10); // Fri Jan 10
-      expect(countWorkingDaysMonthly(start, end, {}, defaultSchedule)).toBe(5);
-    });
-
-    it("excludes weekends", () => {
-      const start = new Date(2025, 0, 4); // Sat Jan 4
-      const end = new Date(2025, 0, 6); // Mon Jan 6
-      expect(countWorkingDaysMonthly(start, end, {}, defaultSchedule)).toBe(1); // Only Monday
     });
   });
 
@@ -243,24 +177,4 @@ describe("monthly-schedule", () => {
     });
   });
 
-  describe("createScheduleFromPreset", () => {
-    it("creates full-time schedule", () => {
-      const schedule = createScheduleFromPreset(8);
-      expect(schedule).toEqual(defaultSchedule);
-    });
-
-    it("creates half-time schedule", () => {
-      const schedule = createScheduleFromPreset(4);
-      expect(schedule).toEqual(halfTimeSchedule);
-    });
-
-    it("creates custom working days", () => {
-      const schedule = createScheduleFromPreset(8, ["Mon", "Tue", "Wed"]);
-      expect(schedule.Mon).toBe(8);
-      expect(schedule.Tue).toBe(8);
-      expect(schedule.Wed).toBe(8);
-      expect(schedule.Thu).toBe(0);
-      expect(schedule.Fri).toBe(0);
-    });
-  });
 });

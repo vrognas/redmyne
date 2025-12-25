@@ -31,7 +31,7 @@ export function getMonthKey(date: Date): MonthKey {
 /**
  * Parse month key to year and month
  */
-export function parseMonthKey(key: MonthKey): { year: number; month: number } {
+function parseMonthKey(key: MonthKey): { year: number; month: number } {
   const [year, month] = key.split("-").map(Number);
   return { year, month };
 }
@@ -39,7 +39,7 @@ export function parseMonthKey(key: MonthKey): { year: number; month: number } {
 /**
  * Get schedule for a specific month, falling back to default
  */
-export function getScheduleForMonth(
+function getScheduleForMonth(
   monthKey: MonthKey,
   overrides: MonthlyScheduleOverrides,
   defaultSchedule: WeeklySchedule
@@ -50,7 +50,7 @@ export function getScheduleForMonth(
 /**
  * Get schedule for a specific date
  */
-export function getScheduleForDate(
+function getScheduleForDate(
   date: Date,
   overrides: MonthlyScheduleOverrides,
   defaultSchedule: WeeklySchedule
@@ -101,49 +101,6 @@ export function countAvailableHoursMonthly(
   }
 
   return hours;
-}
-
-/**
- * Count working days between dates using monthly schedules
- */
-export function countWorkingDaysMonthly(
-  start: Date,
-  end: Date,
-  overrides: MonthlyScheduleOverrides,
-  defaultSchedule: WeeklySchedule
-): number {
-  let count = 0;
-  const current = new Date(start);
-  current.setHours(0, 0, 0, 0);
-  const endDate = new Date(end);
-  endDate.setHours(0, 0, 0, 0);
-
-  let currentMonthKey = getMonthKey(current);
-  let currentSchedule = getScheduleForMonth(
-    currentMonthKey,
-    overrides,
-    defaultSchedule
-  );
-
-  while (current <= endDate) {
-    const monthKey = getMonthKey(current);
-    if (monthKey !== currentMonthKey) {
-      currentMonthKey = monthKey;
-      currentSchedule = getScheduleForMonth(
-        monthKey,
-        overrides,
-        defaultSchedule
-      );
-    }
-
-    const dayName = getDayName(current);
-    if (currentSchedule[dayName] > 0) {
-      count++;
-    }
-    current.setDate(current.getDate() + 1);
-  }
-
-  return count;
 }
 
 /**
@@ -287,28 +244,4 @@ export function calculateWeeklyTotal(schedule: WeeklySchedule): number {
     schedule.Sat +
     schedule.Sun
   );
-}
-
-/**
- * Create schedule from hours per day preset
- */
-export function createScheduleFromPreset(
-  hoursPerDay: number,
-  workingDays: (keyof WeeklySchedule)[] = ["Mon", "Tue", "Wed", "Thu", "Fri"]
-): WeeklySchedule {
-  const schedule: WeeklySchedule = {
-    Mon: 0,
-    Tue: 0,
-    Wed: 0,
-    Thu: 0,
-    Fri: 0,
-    Sat: 0,
-    Sun: 0,
-  };
-
-  for (const day of workingDays) {
-    schedule[day] = hoursPerDay;
-  }
-
-  return schedule;
 }

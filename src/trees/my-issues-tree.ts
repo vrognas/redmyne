@@ -142,7 +142,7 @@ export class MyIssuesTree extends BaseTreeProvider<TreeItem> {
     this.isLoading = true;
     try {
       const result = await this.server.getIssuesAssignedToMe();
-      const schedule = this.getScheduleConfig();
+      const schedule = getWeeklySchedule();
 
       // Clear caches and calculate flexibility
       this.parentContainers.clear();
@@ -210,19 +210,6 @@ export class MyIssuesTree extends BaseTreeProvider<TreeItem> {
         topLevel.push(container);
       }
 
-      // Add assigned parent issues (that have children) to top level
-      for (const issue of result.issues) {
-        if (this.childrenByParent.has(issue.id) && !issue.parent?.id) {
-          // Already in topLevel as root issue - no action needed
-        } else if (
-          this.childrenByParent.has(issue.id) &&
-          issue.parent?.id &&
-          issueMap.has(issue.parent.id)
-        ) {
-          // Has children but also has parent in list - treat as nested
-        }
-      }
-
       // Separate issues and containers, sort each, then combine
       const issues = topLevel.filter((item): item is Issue => !isParentContainer(item));
       const containers = topLevel.filter(isParentContainer);
@@ -276,10 +263,6 @@ export class MyIssuesTree extends BaseTreeProvider<TreeItem> {
       return this.cachedIssues;
     });
     return this.pendingFetch;
-  }
-
-  private getScheduleConfig() {
-    return getWeeklySchedule();
   }
 
   setServer(server: RedmineServer | undefined) {

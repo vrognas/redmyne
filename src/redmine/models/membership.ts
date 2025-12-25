@@ -1,4 +1,4 @@
-import { NamedEntity } from "./named-entity";
+import { NamedEntity } from "./common";
 
 interface MembershipBase {
   id: number;

@@ -50,14 +50,6 @@ export interface FlexibilityIssue {
   done_ratio?: number;
 }
 
-/** Status priority for sorting (lower = higher priority) */
-export const STATUS_PRIORITY: Record<FlexibilityScore["status"], number> = {
-  overbooked: 0,
-  "at-risk": 1,
-  "on-track": 2,
-  completed: 3,
-};
-
 // Memoization cache for working days calculation
 const workingDaysCache = new Map<string, number>();
 

@@ -1,7 +1,7 @@
 import { RedmineServer } from "../../redmine/redmine-server";
 import * as vscode from "vscode";
 import { IssueController } from "../../controllers/issue-controller";
-import { errorToString } from "../../utilities/error-to-string";
+import { errorToString } from "../../utilities/error-feedback";
 import { parseIssueId } from "../../utilities/validation";
 
 export default async (
