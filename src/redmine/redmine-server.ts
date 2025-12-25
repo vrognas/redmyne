@@ -598,6 +598,38 @@ export class RedmineServer {
   }
 
   /**
+   * Get current user info including custom fields (e.g., FTE)
+   */
+  async getCurrentUser(): Promise<{
+    id: number;
+    login: string;
+    firstname: string;
+    lastname: string;
+    mail: string;
+    created_on: string;
+    last_login_on?: string;
+    custom_fields?: { id: number; name: string; value: string }[];
+  } | undefined> {
+    try {
+      const response = await this.doRequest<{
+        user: {
+          id: number;
+          login: string;
+          firstname: string;
+          lastname: string;
+          mail: string;
+          created_on: string;
+          last_login_on?: string;
+          custom_fields?: { id: number; name: string; value: string }[];
+        };
+      }>("/users/current.json", "GET");
+      return response?.user;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
    * Get custom fields (requires admin or appropriate permissions)
    */
   async getCustomFields(): Promise<{
