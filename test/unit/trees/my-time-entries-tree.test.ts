@@ -74,7 +74,8 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     mockServer.getTimeEntries
       .mockResolvedValueOnce({ time_entries: todayEntries })
       .mockResolvedValueOnce({ time_entries: [] })
-      .mockResolvedValueOnce({ time_entries: [] });
+      .mockResolvedValueOnce({ time_entries: [] })
+      .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     // First call returns loading state
     const firstResult = await provider.getChildren();
@@ -89,10 +90,11 @@ describe("MyTimeEntriesTreeDataProvider", () => {
 
     // Second call returns actual data (cached)
     const secondResult = await provider.getChildren();
-    expect(secondResult).toHaveLength(3);
+    expect(secondResult).toHaveLength(4); // Today, This Week, This Month, Last Month
     expect(secondResult[0].label).toContain("Today");
     expect(secondResult[1].label).toContain("This Week");
     expect(secondResult[2].label).toContain("This Month");
+    expect(secondResult[3].label).toContain("Last Month");
   });
 
   it("caches entries at parent level (no double-fetch)", async () => {
@@ -126,7 +128,8 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     mockServer.getTimeEntries
       .mockResolvedValueOnce({ time_entries: todayEntries })
       .mockResolvedValueOnce({ time_entries: weekEntries })
-      .mockResolvedValueOnce({ time_entries: monthEntries });
+      .mockResolvedValueOnce({ time_entries: monthEntries })
+      .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     // First call returns loading state
     await provider.getChildren();
@@ -137,14 +140,14 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     // Get root groups (cached)
     const groups = await provider.getChildren();
 
-    expect(groups).toHaveLength(3);
-    expect(mockServer.getTimeEntries).toHaveBeenCalledTimes(3);
+    expect(groups).toHaveLength(4); // Today, This Week, This Month, Last Month
+    expect(mockServer.getTimeEntries).toHaveBeenCalledTimes(4);
 
     // Get children for first group (Today)
     const todayChildren = await provider.getChildren(groups[0]);
 
     // Should NOT call API again (cached)
-    expect(mockServer.getTimeEntries).toHaveBeenCalledTimes(3);
+    expect(mockServer.getTimeEntries).toHaveBeenCalledTimes(4);
     expect(todayChildren).toHaveLength(1);
   });
 
@@ -173,7 +176,8 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     mockServer.getTimeEntries
       .mockResolvedValueOnce({ time_entries: todayEntries })
       .mockResolvedValueOnce({ time_entries: [] })
-      .mockResolvedValueOnce({ time_entries: [] });
+      .mockResolvedValueOnce({ time_entries: [] })
+      .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     const groups = await getLoadedGroups();
     const todayChildren = await provider.getChildren(groups[0]);
@@ -211,7 +215,8 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     mockServer.getTimeEntries
       .mockResolvedValueOnce({ time_entries: todayEntries })
       .mockResolvedValueOnce({ time_entries: todayEntries })
-      .mockResolvedValueOnce({ time_entries: todayEntries });
+      .mockResolvedValueOnce({ time_entries: todayEntries })
+      .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     const groups = await getLoadedGroups();
 
@@ -221,17 +226,19 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     expect(groups[1].description).toContain("4:00");
     expect(groups[2].label).toContain("This Month");
     expect(groups[2].description).toContain("4:00");
+    expect(groups[3].label).toContain("Last Month");
   });
 
   it("shows empty state when no entries", async () => {
     mockServer.getTimeEntries
       .mockResolvedValueOnce({ time_entries: [] })
       .mockResolvedValueOnce({ time_entries: [] })
-      .mockResolvedValueOnce({ time_entries: [] });
+      .mockResolvedValueOnce({ time_entries: [] })
+      .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     const groups = await getLoadedGroups();
 
-    expect(groups).toHaveLength(3);
+    expect(groups).toHaveLength(4); // Today, This Week, This Month, Last Month
     expect(groups[0].description).toContain("0:00"); // Contains 0:00 total
 
     const todayChildren = await provider.getChildren(groups[0]);
@@ -254,7 +261,8 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     mockServer.getTimeEntries
       .mockResolvedValueOnce({ time_entries: todayEntries })
       .mockResolvedValueOnce({ time_entries: [] })
-      .mockResolvedValueOnce({ time_entries: [] });
+      .mockResolvedValueOnce({ time_entries: [] })
+      .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     const groups = await getLoadedGroups();
     const todayChildren = await provider.getChildren(groups[0]);
@@ -291,7 +299,8 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     mockServer.getTimeEntries
       .mockResolvedValueOnce({ time_entries: todayEntries })
       .mockResolvedValueOnce({ time_entries: [] })
-      .mockResolvedValueOnce({ time_entries: [] });
+      .mockResolvedValueOnce({ time_entries: [] })
+      .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     mockServer.getIssueById.mockResolvedValue({
       issue: { id: 123, subject: "Fetched Issue Subject", project: { id: 1, name: "Test Project" } },
@@ -323,7 +332,8 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     mockServer.getTimeEntries
       .mockResolvedValueOnce({ time_entries: todayEntries })
       .mockResolvedValueOnce({ time_entries: todayEntries })
-      .mockResolvedValueOnce({ time_entries: [] });
+      .mockResolvedValueOnce({ time_entries: [] })
+      .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     mockServer.getIssueById.mockResolvedValue({
       issue: { id: 123, subject: "Cached Issue", project: { id: 1, name: "Test Project" } },
@@ -387,7 +397,8 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     mockServer.getTimeEntries
       .mockResolvedValueOnce({ time_entries: todayEntries })
       .mockResolvedValueOnce({ time_entries: [] })
-      .mockResolvedValueOnce({ time_entries: [] });
+      .mockResolvedValueOnce({ time_entries: [] })
+      .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     mockServer.getIssueById.mockRejectedValue(new Error("Issue not found"));
 
@@ -432,7 +443,8 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     mockServer.getTimeEntries
       .mockResolvedValueOnce({ time_entries: weekEntries }) // today
       .mockResolvedValueOnce({ time_entries: weekEntries }) // week
-      .mockResolvedValueOnce({ time_entries: weekEntries }); // month
+      .mockResolvedValueOnce({ time_entries: weekEntries }) // month
+      .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     const groups = await getLoadedGroups();
     const thisWeek = groups[1];
@@ -479,7 +491,8 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     mockServer.getTimeEntries
       .mockResolvedValueOnce({ time_entries: weekEntries }) // today
       .mockResolvedValueOnce({ time_entries: weekEntries }) // week
-      .mockResolvedValueOnce({ time_entries: weekEntries }); // month
+      .mockResolvedValueOnce({ time_entries: weekEntries }) // month
+      .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     const groups = await getLoadedGroups();
     const thisWeek = groups[1];
@@ -516,7 +529,8 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     mockServer.getTimeEntries
       .mockResolvedValueOnce({ time_entries: weekEntries }) // today
       .mockResolvedValueOnce({ time_entries: weekEntries }) // week
-      .mockResolvedValueOnce({ time_entries: weekEntries }); // month
+      .mockResolvedValueOnce({ time_entries: weekEntries }) // month
+      .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     const groups = await getLoadedGroups();
     const thisWeek = groups[1];
@@ -568,7 +582,8 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     mockServer.getTimeEntries
       .mockResolvedValueOnce({ time_entries: [] }) // today
       .mockResolvedValueOnce({ time_entries: [] }) // week
-      .mockResolvedValueOnce({ time_entries: monthEntries }); // month
+      .mockResolvedValueOnce({ time_entries: monthEntries }) // month
+      .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     const groups = await getLoadedGroups();
     const thisMonth = groups[2];

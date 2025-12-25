@@ -54,6 +54,7 @@ let cleanupResources: {
     servers: RedmineServer[];
     projects: RedmineProject[];
   };
+  userFte?: number; // FTE from Redmine user custom field
 } = {};
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -313,7 +314,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }
 
     const scheduleConfig = vscode.workspace.getConfiguration("redmine.workingHours");
-    const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", {
+    let schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", {
       Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0, Sun: 0,
     });
 
@@ -330,6 +331,9 @@ export function activate(context: vscode.ExtensionContext): void {
     tooltip.appendMarkdown(`**Remaining work:** ${workload.remaining}h\n\n`);
     tooltip.appendMarkdown(`**Available this week:** ${workload.availableThisWeek}h\n\n`);
     tooltip.appendMarkdown(`**Buffer:** ${bufferText} ${workload.buffer >= 0 ? "(On Track)" : "(Overbooked)"}\n\n`);
+    if (cleanupResources.userFte) {
+      tooltip.appendMarkdown(`**Your FTE:** ${cleanupResources.userFte}\n\n`);
+    }
 
     if (workload.topUrgent.length > 0) {
       tooltip.appendMarkdown("**Top Urgent:**\n");
@@ -386,6 +390,21 @@ export function activate(context: vscode.ExtensionContext): void {
         myTimeEntriesTree.setServer(server);
         projectsTree.refresh();
         myTimeEntriesTree.refresh();
+
+        // Fetch FTE from user's custom fields
+        server.getCurrentUser().then((user) => {
+          const fteField = user?.custom_fields?.find(
+            (f) => f.name.toLowerCase().includes("fte")
+          );
+          if (fteField?.value) {
+            const fte = parseFloat(fteField.value);
+            if (!isNaN(fte) && fte > 0) {
+              cleanupResources.userFte = fte;
+              // Trigger workload recalc with new FTE
+              updateWorkloadStatusBar();
+            }
+          }
+        });
         // Status bar updates via projectsTree event listener
       } catch (error) {
         vscode.window.showErrorMessage(
