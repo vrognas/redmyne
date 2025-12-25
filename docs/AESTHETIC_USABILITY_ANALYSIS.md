@@ -809,7 +809,7 @@ The current analysis does NOT cover:
 
 Before implementing recommendations, audit for:
 
-1. **Test coverage gaps**: `tree-item-factory.ts` has no unit tests currently
+1. **Test coverage for UI changes**: While `tree-item-factory.ts` has tests (14 test cases), changes to description format need corresponding test updates
 2. **Type safety**: Some tree providers use `any` types that could hide bugs
 3. **Event listener cleanup**: Ensure all `onDidChange*` listeners are disposed
 4. **Memory leaks**: Gantt panel creates new HTML on every update - verify no DOM leaks
