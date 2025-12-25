@@ -1,43 +1,14 @@
 import * as vscode from "vscode";
-import { IssueController } from "../controllers/issue-controller";
 import { ActionProperties } from "./action-properties";
+import openActionsForIssueId from "./commons/open-actions-for-issue-id";
 
 export default async ({ server }: ActionProperties, ...args: unknown[]) => {
   let issueId = args[0] as string | undefined;
   if (!issueId) {
     issueId = await vscode.window.showInputBox({
-      placeHolder: `Type in issue id`,
+      placeHolder: "Type in issue id",
     });
   }
 
-  if (!issueId || !issueId.trim() || isNaN(parseInt(issueId, 10))) {
-    return;
-  }
-
-  const promise = server.getIssueById(parseInt(issueId, 10));
-
-  promise.then(
-    (issue) => {
-      if (!issue) return;
-
-      const controller = new IssueController(issue.issue, server);
-
-      controller.listActions();
-    },
-    (error) => {
-      vscode.window.showErrorMessage(error);
-    }
-  );
-
-  await vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-    },
-    (progress) => {
-      progress.report({
-        message: `Waiting for response from ${server.options.url.hostname}...`,
-      });
-      return promise;
-    }
-  );
+  await openActionsForIssueId(server, issueId);
 };

@@ -7,6 +7,7 @@ import { TimeEntryActivity } from "../redmine/models/time-entry-activity";
 import { errorToString } from "../utilities/error-to-string";
 import { parseTimeInput, validateTimeInput, formatHoursAsHHMM } from "../utilities/time-input";
 import { showStatusBarMessage } from "../utilities/status-bar";
+import { pickOptionalDate } from "../utilities/date-picker";
 
 interface TimeEntryActivityItem extends vscode.QuickPickItem {
   activity: TimeEntryActivity;
@@ -196,7 +197,7 @@ export class IssueController {
     const desiredAssignee = assigneeChoice.assignee;
 
     // Start date picker
-    const startDateResult = await this.pickDate(
+    const startDateResult = await pickOptionalDate(
       "Start date",
       this.issue.start_date || undefined,
       `Quick Update (3/5) - #${this.issue.id}`
@@ -204,7 +205,7 @@ export class IssueController {
     if (startDateResult === undefined) return; // cancelled
 
     // Due date picker
-    const dueDateResult = await this.pickDate(
+    const dueDateResult = await pickOptionalDate(
       "Due date",
       this.issue.due_date || undefined,
       `Quick Update (4/5) - #${this.issue.id}`
@@ -242,76 +243,6 @@ export class IssueController {
         `Error while applying quick update: ${error}`
       );
     }
-  }
-
-  /**
-   * Date picker for quick update (start/due date)
-   * Returns { changed: false } for no change, { changed: true, value: string|null } for change
-   */
-  private async pickDate(
-    label: string,
-    currentValue: string | undefined,
-    title: string
-  ): Promise<{ changed: boolean; value: string | null } | undefined> {
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const nextWeek = new Date(today);
-    nextWeek.setDate(nextWeek.getDate() + 7);
-
-    const formatDate = (d: Date) => d.toISOString().split("T")[0];
-    const formatDisplay = (d: Date) =>
-      d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-
-    const options: { label: string; value: string | null; action: string }[] = [
-      { label: "$(check) No change", value: currentValue || null, action: "nochange" },
-    ];
-
-    if (currentValue) {
-      options.push({ label: "$(close) Clear date", value: null, action: "clear" });
-    }
-
-    options.push(
-      { label: `$(calendar) Today (${formatDisplay(today)})`, value: formatDate(today), action: "set" },
-      { label: `$(arrow-right) Tomorrow (${formatDisplay(tomorrow)})`, value: formatDate(tomorrow), action: "set" },
-      { label: `$(arrow-right) Next week (${formatDisplay(nextWeek)})`, value: formatDate(nextWeek), action: "set" },
-      { label: "$(edit) Pick date...", value: "", action: "pick" }
-    );
-
-    const choice = await vscode.window.showQuickPick(options, {
-      title,
-      placeHolder: `${label}: ${currentValue || "not set"}`,
-    });
-
-    if (!choice) return undefined; // cancelled
-
-    if (choice.action === "nochange") {
-      return { changed: false, value: null };
-    }
-
-    if (choice.action === "clear") {
-      return { changed: true, value: null };
-    }
-
-    if (choice.action === "pick") {
-      const customDate = await vscode.window.showInputBox({
-        title,
-        prompt: `Enter ${label.toLowerCase()} (YYYY-MM-DD)`,
-        placeHolder: currentValue || formatDate(today),
-        validateInput: (value: string) => {
-          if (!value) return `${label} required`;
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Use YYYY-MM-DD format";
-          const parsed = new Date(value);
-          if (isNaN(parsed.getTime())) return "Invalid date";
-          return null;
-        },
-      });
-      if (customDate === undefined) return undefined; // cancelled
-      return { changed: true, value: customDate };
-    }
-
-    // "set" action (today/tomorrow/next week)
-    return { changed: true, value: choice.value };
   }
 
   async listActions() {

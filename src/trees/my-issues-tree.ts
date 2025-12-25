@@ -1,19 +1,16 @@
 import * as vscode from "vscode";
 import { Issue } from "../redmine/models/issue";
 import { RedmineServer } from "../redmine/redmine-server";
-import { createEnhancedIssueTreeItem, isBlocked } from "../utilities/tree-item-factory";
+import { createEnhancedIssueTreeItem } from "../utilities/tree-item-factory";
 import {
   calculateFlexibility,
   clearFlexibilityCache,
   FlexibilityScore,
-  WeeklySchedule,
-  STATUS_PRIORITY,
-  DEFAULT_WEEKLY_SCHEDULE,
 } from "../utilities/flexibility-calculator";
-
-interface LoadingPlaceholder {
-  isLoadingPlaceholder: true;
-}
+import { sortIssuesByRisk } from "../utilities/issue-sorting";
+import { BaseTreeProvider } from "../shared/base-tree-provider";
+import { LoadingPlaceholder, isLoadingPlaceholder, createLoadingTreeItem } from "../shared/loading-placeholder";
+import { getWeeklySchedule } from "../utilities/schedule-config";
 
 /**
  * Container for unassigned parent issues (parent not in assigned list)
@@ -35,19 +32,12 @@ export function isParentContainer(
   return "isContainer" in item && item.isContainer === true;
 }
 
-/**
- * Type guard for LoadingPlaceholder
- */
-function isLoadingPlaceholder(item: TreeItem): item is LoadingPlaceholder {
-  return "isLoadingPlaceholder" in item && item.isLoadingPlaceholder === true;
-}
-
 type TreeItem = Issue | ParentContainer | LoadingPlaceholder;
 
 
 
 
-export class MyIssuesTree implements vscode.TreeDataProvider<TreeItem> {
+export class MyIssuesTree extends BaseTreeProvider<TreeItem> {
   server?: RedmineServer;
   private isLoading = false;
   private pendingFetch: Promise<Issue[]> | null = null;
@@ -55,32 +45,24 @@ export class MyIssuesTree implements vscode.TreeDataProvider<TreeItem> {
   private cachedIssues: Issue[] = [];
   private parentContainers = new Map<number, ParentContainer>();
   private childrenByParent = new Map<number, Issue[]>();
-  private configListener: vscode.Disposable | undefined;
 
   constructor() {
+    super();
     // Listen for config changes
-    this.configListener = vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration("redmine.workingHours")) {
-        clearFlexibilityCache();
-        this.flexibilityCache.clear();
-        this.onDidChangeTreeData$.fire();
-      }
-    });
+    this.disposables.push(
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration("redmine.workingHours")) {
+          clearFlexibilityCache();
+          this.flexibilityCache.clear();
+          this._onDidChangeTreeData.fire(undefined);
+        }
+      })
+    );
   }
-
-  dispose() {
-    this.configListener?.dispose();
-  }
-
-  onDidChangeTreeData$ = new vscode.EventEmitter<void>();
-  onDidChangeTreeData: vscode.Event<void> = this.onDidChangeTreeData$.event;
 
   getTreeItem(item: TreeItem): vscode.TreeItem | Thenable<vscode.TreeItem> {
     if (isLoadingPlaceholder(item)) {
-      return new vscode.TreeItem(
-        "Loading issues...",
-        vscode.TreeItemCollapsibleState.None
-      );
+      return createLoadingTreeItem("Loading issues...");
     }
 
     if (isParentContainer(item)) {
@@ -255,37 +237,14 @@ export class MyIssuesTree implements vscode.TreeDataProvider<TreeItem> {
         }
       }
 
-      // Sort top-level by risk priority (blocked issues sink to bottom)
-      const sorted = (topLevel as TreeItem[]).sort((a, b) => {
-        // Containers go last
-        if (isParentContainer(a) && !isParentContainer(b)) return 1;
-        if (!isParentContainer(a) && isParentContainer(b)) return -1;
-        if (isParentContainer(a) && isParentContainer(b)) {
-          return a.subject.localeCompare(b.subject);
-        }
+      // Separate issues and containers, sort each, then combine
+      const issues = topLevel.filter((item): item is Issue => !isParentContainer(item));
+      const containers = topLevel.filter(isParentContainer);
 
-        const issueA = a as Issue;
-        const issueB = b as Issue;
+      const sortedIssues = sortIssuesByRisk(issues, this.flexibilityCache);
+      const sortedContainers = containers.sort((a, b) => a.subject.localeCompare(b.subject));
 
-        // Blocked issues sink to bottom (can't work on them)
-        const blockedA = isBlocked(issueA);
-        const blockedB = isBlocked(issueB);
-        if (blockedA && !blockedB) return 1;
-        if (!blockedA && blockedB) return -1;
-
-        const flexA = this.flexibilityCache.get(issueA.id);
-        const flexB = this.flexibilityCache.get(issueB.id);
-
-        if (!flexA && !flexB) return 0;
-        if (!flexA) return 1;
-        if (!flexB) return -1;
-
-        const priorityDiff =
-          STATUS_PRIORITY[flexA.status] - STATUS_PRIORITY[flexB.status];
-        if (priorityDiff !== 0) return priorityDiff;
-
-        return flexA.remaining - flexB.remaining;
-      });
+      const sorted: TreeItem[] = [...sortedIssues, ...sortedContainers];
 
       this.cachedIssues = result.issues;
       return sorted;
@@ -327,15 +286,14 @@ export class MyIssuesTree implements vscode.TreeDataProvider<TreeItem> {
     this.pendingFetch = this.getChildren().then(() => {
       this.pendingFetch = null;
       // Notify tree to refresh (in case it showed loading placeholder)
-      this.onDidChangeTreeData$.fire();
+      this._onDidChangeTreeData.fire(undefined);
       return this.cachedIssues;
     });
     return this.pendingFetch;
   }
 
-  private getScheduleConfig(): WeeklySchedule {
-    const config = vscode.workspace.getConfiguration("redmine.workingHours");
-    return config.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
+  private getScheduleConfig() {
+    return getWeeklySchedule();
   }
 
   setServer(server: RedmineServer | undefined) {

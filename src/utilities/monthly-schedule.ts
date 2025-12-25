@@ -7,7 +7,7 @@
  */
 
 import * as vscode from "vscode";
-import { WeeklySchedule } from "./flexibility-calculator";
+import { WeeklySchedule, getDayName } from "./flexibility-calculator";
 
 /** Storage key for monthly schedule overrides */
 export const MONTHLY_SCHEDULES_KEY = "redmine.monthlySchedules";
@@ -182,22 +182,6 @@ export function calculateMonthlyTotal(
   }
 
   return total;
-}
-
-/**
- * Get day name from Date object
- */
-function getDayName(date: Date): keyof WeeklySchedule {
-  const days: (keyof WeeklySchedule)[] = [
-    "Sun",
-    "Mon",
-    "Tue",
-    "Wed",
-    "Thu",
-    "Fri",
-    "Sat",
-  ];
-  return days[date.getDay()];
 }
 
 /**

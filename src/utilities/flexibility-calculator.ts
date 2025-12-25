@@ -199,7 +199,7 @@ export function countAvailableHours(
 /**
  * Get day name from Date object
  */
-function getDayName(date: Date): keyof WeeklySchedule {
+export function getDayName(date: Date): keyof WeeklySchedule {
   const days: (keyof WeeklySchedule)[] = [
     "Sun",
     "Mon",

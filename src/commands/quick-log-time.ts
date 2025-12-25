@@ -3,6 +3,7 @@ import type { ActionProperties } from "./action-properties";
 import { parseTimeInput, validateTimeInput, formatHoursAsHHMM } from "../utilities/time-input";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { pickIssueWithSearch } from "../utilities/issue-picker";
+import { pickDate } from "../utilities/date-picker";
 
 interface RecentTimeLog {
   issueId: number;
@@ -143,43 +144,5 @@ export async function quickLogTime(
       `Failed to log time: ${error instanceof Error ? error.message : String(error)}`
     );
   }
-}
-
-async function pickDate(): Promise<string | undefined> {
-  const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
-
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split("T")[0];
-
-  const dateChoice = await vscode.window.showQuickPick(
-    [
-      { label: "$(calendar) Today", value: "today", date: todayStr },
-      { label: "$(history) Yesterday", value: "yesterday", date: yesterdayStr },
-      { label: "$(edit) Pick date...", value: "pick", date: "" },
-    ],
-    { title: "Log Time - Select Date", placeHolder: "Which day?" }
-  );
-
-  if (!dateChoice) return undefined;
-
-  if (dateChoice.value === "pick") {
-    const customDate = await vscode.window.showInputBox({
-      prompt: "Enter date (YYYY-MM-DD)",
-      placeHolder: yesterdayStr,
-      validateInput: (value: string) => {
-        if (!value) return "Date required";
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Use YYYY-MM-DD format";
-        const parsed = new Date(value);
-        if (isNaN(parsed.getTime())) return "Invalid date";
-        if (parsed > today) return "Cannot log time in the future";
-        return null;
-      },
-    });
-    return customDate;
-  }
-
-  return dateChoice.date;
 }
 

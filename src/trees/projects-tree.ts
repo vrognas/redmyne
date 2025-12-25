@@ -5,15 +5,12 @@ import { Issue } from "../redmine/models/issue";
 import {
   createIssueTreeItem,
   createEnhancedIssueTreeItem,
-  isBlocked,
 } from "../utilities/tree-item-factory";
+import { sortIssuesByRisk } from "../utilities/issue-sorting";
 import {
   calculateFlexibility,
   clearFlexibilityCache,
   FlexibilityScore,
-  WeeklySchedule,
-  STATUS_PRIORITY,
-  DEFAULT_WEEKLY_SCHEDULE,
 } from "../utilities/flexibility-calculator";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
 import {
@@ -21,6 +18,7 @@ import {
   isLoadingPlaceholder,
   createLoadingTreeItem,
 } from "../shared/loading-placeholder";
+import { getWeeklySchedule } from "../utilities/schedule-config";
 
 export enum ProjectsViewStyle {
   LIST = 0,
@@ -164,7 +162,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
 
       if (hasAssignedIssues) {
         // Return only assigned issues (sorted by risk)
-        return this.sortIssuesByRisk(assignedIssues);
+        return this.sortIssuesByRiskCached(assignedIssues);
       }
 
       // No assigned issues - fall back to fetching all open issues
@@ -308,32 +306,12 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   /**
    * Sort issues by risk priority (blocked issues sink to bottom)
    */
-  private sortIssuesByRisk(issues: Issue[]): Issue[] {
-    return [...issues].sort((a, b) => {
-      // Blocked issues sink to bottom
-      const blockedA = isBlocked(a);
-      const blockedB = isBlocked(b);
-      if (blockedA && !blockedB) return 1;
-      if (!blockedA && blockedB) return -1;
-
-      const flexA = this.flexibilityCache.get(a.id);
-      const flexB = this.flexibilityCache.get(b.id);
-
-      if (!flexA && !flexB) return 0;
-      if (!flexA) return 1;
-      if (!flexB) return -1;
-
-      const priorityDiff =
-        STATUS_PRIORITY[flexA.status] - STATUS_PRIORITY[flexB.status];
-      if (priorityDiff !== 0) return priorityDiff;
-
-      return flexA.remaining - flexB.remaining;
-    });
+  private sortIssuesByRiskCached(issues: Issue[]): Issue[] {
+    return sortIssuesByRisk(issues, this.flexibilityCache);
   }
 
-  private getScheduleConfig(): WeeklySchedule {
-    const config = vscode.workspace.getConfiguration("redmine.workingHours");
-    return config.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
+  private getScheduleConfig() {
+    return getWeeklySchedule();
   }
 
   /**

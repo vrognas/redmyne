@@ -2,16 +2,18 @@ import { RedmineServer } from "../../redmine/redmine-server";
 import * as vscode from "vscode";
 import { IssueController } from "../../controllers/issue-controller";
 import { errorToString } from "../../utilities/error-to-string";
+import { parseIssueId } from "../../utilities/validation";
 
 export default async (
   server: RedmineServer,
   issueId: string | null | undefined
 ) => {
-  if (!issueId || !issueId.trim() || !parseInt(issueId, 10)) {
+  const parsedId = parseIssueId(issueId);
+  if (!parsedId) {
     return;
   }
 
-  const promise = server.getIssueById(parseInt(issueId, 10));
+  const promise = server.getIssueById(parsedId);
 
   vscode.window.withProgress(
     {

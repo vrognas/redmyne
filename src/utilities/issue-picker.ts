@@ -9,6 +9,28 @@ interface IssueQuickPickItem extends vscode.QuickPickItem {
   disabled?: boolean;
 }
 
+interface ActivityQuickPickItem extends vscode.QuickPickItem {
+  activity: TimeEntryActivity;
+}
+
+/**
+ * Show activity picker QuickPick
+ */
+async function showActivityPicker(
+  activities: TimeEntryActivity[],
+  title: string,
+  placeHolder: string
+): Promise<TimeEntryActivity | undefined> {
+  const items: ActivityQuickPickItem[] = activities.map((a) => ({
+    label: a.name,
+    description: a.is_default ? "Default" : undefined,
+    activity: a,
+  }));
+
+  const choice = await vscode.window.showQuickPick(items, { title, placeHolder });
+  return choice?.activity;
+}
+
 export interface PickedIssueAndActivity {
   issueId: number;
   issueSubject: string;
@@ -354,24 +376,18 @@ export async function pickIssueWithSearch(
     return undefined;
   }
 
-  const activityItems = activities.map((a) => ({
-    label: a.name,
-    description: a.is_default ? "Default" : undefined,
-    activity: a,
-  }));
-
-  const activityChoice = await vscode.window.showQuickPick(activityItems, {
+  const activity = await showActivityPicker(
+    activities,
     title,
-    placeHolder: `Activity for #${finalIssue.id}`,
-  });
-
-  if (!activityChoice) return undefined;
+    `Activity for #${finalIssue.id}`
+  );
+  if (!activity) return undefined;
 
   return {
     issueId: finalIssue.id,
     issueSubject: finalIssue.subject,
-    activityId: activityChoice.activity.id,
-    activityName: activityChoice.activity.name,
+    activityId: activity.id,
+    activityName: activity.name,
   };
 }
 
@@ -405,21 +421,15 @@ export async function pickActivityForProject(
     return undefined;
   }
 
-  const activityItems = activities.map((a) => ({
-    label: a.name,
-    description: a.is_default ? "Default" : undefined,
-    activity: a,
-  }));
-
-  const activityChoice = await vscode.window.showQuickPick(activityItems, {
+  const activity = await showActivityPicker(
+    activities,
     title,
-    placeHolder: issueHint ? `Activity for ${issueHint}` : "Select activity",
-  });
-
-  if (!activityChoice) return undefined;
+    issueHint ? `Activity for ${issueHint}` : "Select activity"
+  );
+  if (!activity) return undefined;
 
   return {
-    activityId: activityChoice.activity.id,
-    activityName: activityChoice.activity.name,
+    activityId: activity.id,
+    activityName: activity.name,
   };
 }

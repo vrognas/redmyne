@@ -1,0 +1,61 @@
+/**
+ * Gantt Commands
+ * Commands for the Gantt timeline view
+ */
+
+import * as vscode from "vscode";
+import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE, FlexibilityScore } from "../utilities/flexibility-calculator";
+import { GanttPanel } from "../webviews/gantt-panel";
+import { Issue } from "../redmine/models/issue";
+import { RedmineServer } from "../redmine/redmine-server";
+
+export interface GanttCommandDeps {
+  getServer: () => RedmineServer | undefined;
+  fetchIssuesIfNeeded: () => Promise<Issue[]>;
+  getFlexibilityCache: () => Map<number, FlexibilityScore | null>;
+  clearProjects: () => void;
+}
+
+export function registerGanttCommands(
+  context: vscode.ExtensionContext,
+  deps: GanttCommandDeps
+): void {
+  context.subscriptions.push(
+    // Gantt timeline command
+    vscode.commands.registerCommand("redmine.showGantt", async () => {
+      // Ensure issues are fetched
+      const issues = await deps.fetchIssuesIfNeeded();
+
+      if (issues.length === 0) {
+        vscode.window.showInformationMessage(
+          "No issues to display. Configure Redmine and assign issues to yourself."
+        );
+        return;
+      }
+
+      // Get working hours schedule for intensity calculation
+      const scheduleConfig = vscode.workspace.getConfiguration("redmine.workingHours");
+      const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
+
+      const panel = GanttPanel.createOrShow(deps.getServer());
+      panel.updateIssues(issues, deps.getFlexibilityCache(), schedule);
+    }),
+
+    // Refresh Gantt data without resetting view state
+    vscode.commands.registerCommand("redmine.refreshGanttData", async () => {
+      const panel = GanttPanel.currentPanel;
+      if (!panel) return;
+
+      // Clear cache and re-fetch
+      deps.clearProjects();
+      const issues = await deps.fetchIssuesIfNeeded();
+
+      if (issues.length === 0) return;
+
+      const scheduleConfig = vscode.workspace.getConfiguration("redmine.workingHours");
+      const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
+
+      panel.updateIssues(issues, deps.getFlexibilityCache(), schedule);
+    })
+  );
+}

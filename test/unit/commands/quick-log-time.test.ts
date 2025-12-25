@@ -184,11 +184,11 @@ describe("quickLogTime", () => {
       activityName: "Development",
     });
 
-    // Mock date picker
+    // Mock date picker (matches date-picker.ts structure)
     vi.spyOn(vscode.window, "showQuickPick").mockResolvedValueOnce({
       label: "$(calendar) Today",
-      value: "today",
-      date: new Date().toISOString().split("T")[0],
+      value: new Date().toISOString().split("T")[0],
+      action: "preset",
     } as unknown as vscode.QuickPickItem);
 
     (vscode.window.showInputBox as ReturnType<typeof vi.fn>)
@@ -232,11 +232,11 @@ describe("quickLogTime", () => {
     yesterday.setDate(yesterday.getDate() - 1);
     const expectedDate = yesterday.toISOString().split("T")[0];
 
-    // Mock date picker to select yesterday
+    // Mock date picker to select yesterday (matches date-picker.ts structure)
     vi.spyOn(vscode.window, "showQuickPick").mockResolvedValueOnce({
       label: "$(history) Yesterday",
-      value: "yesterday",
-      date: expectedDate,
+      value: expectedDate,
+      action: "preset",
     } as unknown as vscode.QuickPickItem);
 
     (vscode.window.showInputBox as ReturnType<typeof vi.fn>)
@@ -272,10 +272,11 @@ describe("quickLogTime", () => {
       activityName: "Development",
     });
 
-    // Mock date picker with "pick" option
+    // Mock date picker with "pick" option (matches date-picker.ts structure)
     vi.spyOn(vscode.window, "showQuickPick").mockResolvedValueOnce({
       label: "$(edit) Pick date...",
-      value: "pick",
+      value: "",
+      action: "pick",
     } as unknown as vscode.QuickPickItem);
 
     (vscode.window.showInputBox as ReturnType<typeof vi.fn>)

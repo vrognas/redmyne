@@ -16,21 +16,8 @@ import { ProjectsTree, ProjectsViewStyle } from "./trees/projects-tree";
 import { MyTimeEntriesTreeDataProvider } from "./trees/my-time-entries-tree";
 import { RedmineSecretManager } from "./utilities/secret-manager";
 import { setApiKey } from "./commands/set-api-key";
-import { calculateWorkload } from "./utilities/workload-calculator";
-import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "./utilities/flexibility-calculator";
-import {
-  MonthlyScheduleOverrides,
-  loadMonthlySchedules,
-  saveMonthlySchedules,
-  getMonthOptions,
-  getMonthKey,
-  formatMonthKeyDisplay,
-  formatScheduleDisplay,
-  calculateWeeklyTotal,
-  calculateMonthlyTotal,
-} from "./utilities/monthly-schedule";
-import { formatHoursAsHHMM, formatSecondsAsMMSS, parseTimeInput } from "./utilities/time-input";
-import { GanttPanel } from "./webviews/gantt-panel";
+import { MonthlyScheduleOverrides, loadMonthlySchedules } from "./utilities/monthly-schedule";
+import { formatSecondsAsMMSS } from "./utilities/time-input";
 import { disposeStatusBar, showStatusBarMessage } from "./utilities/status-bar";
 import { TimerController } from "./timer/timer-controller";
 import { TimerStatusBar } from "./timer/timer-status-bar";
@@ -41,6 +28,13 @@ import { PersonalTaskController } from "./personal-tasks/personal-task-controlle
 import { PersonalTasksTreeProvider } from "./personal-tasks/personal-tasks-tree-provider";
 import { registerPersonalTaskCommands } from "./personal-tasks/personal-task-commands";
 import { getTaskStatus } from "./personal-tasks/personal-task-state";
+import { registerTimeEntryCommands } from "./commands/time-entry-commands";
+import { registerMonthlyScheduleCommands } from "./commands/monthly-schedule-commands";
+import { registerGanttCommands } from "./commands/gantt-commands";
+import { registerConfigureCommand } from "./commands/configure-command";
+import { registerViewCommands } from "./commands/view-commands";
+import { registerCreateTestIssuesCommand } from "./commands/create-test-issues";
+import { WorkloadStatusBar } from "./status-bars/workload-status-bar";
 
 // Constants
 const CONFIG_DEBOUNCE_MS = 300;
@@ -54,7 +48,7 @@ let cleanupResources: {
   myTimeEntriesTreeView?: vscode.TreeView<unknown>;
   timerTreeView?: vscode.TreeView<unknown>;
   personalTasksTreeView?: vscode.TreeView<unknown>;
-  workloadStatusBar?: vscode.StatusBarItem;
+  workloadStatusBar?: WorkloadStatusBar;
   configChangeTimeout?: ReturnType<typeof setTimeout>;
   timerController?: TimerController;
   timerStatusBar?: TimerStatusBar;
@@ -65,8 +59,8 @@ let cleanupResources: {
     servers: RedmineServer[];
     projects: RedmineProject[];
   };
-  userFte?: number; // FTE from Redmine user custom field
-  monthlySchedules?: MonthlyScheduleOverrides; // Monthly schedule overrides
+  userFte?: number;
+  monthlySchedules?: MonthlyScheduleOverrides;
 } = {};
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -300,99 +294,39 @@ export function activate(context: vscode.ExtensionContext): void {
     )
   );
 
-  // Initialize workload status bar (opt-in via config)
-  const initializeWorkloadStatusBar = () => {
-    const config = vscode.workspace.getConfiguration("redmine.statusBar");
-    const showWorkload = config.get<boolean>("showWorkload", false);
+  // Register time entry commands
+  registerTimeEntryCommands(context, {
+    getServer: () => projectsTree.server,
+    refreshTree: () => myTimeEntriesTree.refresh(),
+  });
 
-    // Dispose existing if disabled
-    if (!showWorkload && cleanupResources.workloadStatusBar) {
-      cleanupResources.workloadStatusBar.dispose();
-      cleanupResources.workloadStatusBar = undefined;
-      return;
-    }
+  // Register monthly schedule commands
+  registerMonthlyScheduleCommands(context, {
+    getOverrides: () => cleanupResources.monthlySchedules ?? {},
+    setOverrides: (overrides) => { cleanupResources.monthlySchedules = overrides; },
+    refreshTree: () => myTimeEntriesTree.refresh(),
+    setTreeSchedules: (overrides) => myTimeEntriesTree.setMonthlySchedules(overrides),
+  });
 
-    if (!showWorkload) return;
+  // Register gantt commands
+  registerGanttCommands(context, {
+    getServer: () => projectsTree.server,
+    fetchIssuesIfNeeded: () => projectsTree.fetchIssuesIfNeeded(),
+    getFlexibilityCache: () => projectsTree.getFlexibilityCache(),
+    clearProjects: () => projectsTree.clearProjects(),
+  });
 
-    // Create status bar if not exists
-    if (!cleanupResources.workloadStatusBar) {
-      cleanupResources.workloadStatusBar = vscode.window.createStatusBarItem(
-        vscode.StatusBarAlignment.Left,
-        50 // Lower priority to not compete with core features
-      );
-      cleanupResources.workloadStatusBar.command = "redmine.listOpenIssuesAssignedToMe";
-      context.subscriptions.push(cleanupResources.workloadStatusBar);
-    }
-  };
-
-  // Update workload status bar content
-  const updateWorkloadStatusBar = async () => {
-    const statusBar = cleanupResources.workloadStatusBar;
-    if (!statusBar) return;
-
-    // Fetch issues if not cached (triggers initial load)
-    const issues = await projectsTree.fetchIssuesIfNeeded();
-
-    // Re-check after await - status bar might have been disposed
-    if (!cleanupResources.workloadStatusBar) return;
-
-    if (issues.length === 0) {
-      statusBar.hide();
-      return;
-    }
-
-    const scheduleConfig = vscode.workspace.getConfiguration("redmine.workingHours");
-    const defaultSchedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", {
-      Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0, Sun: 0,
-    });
-
-    // Get schedule for current month (monthly overrides take precedence)
-    const currentMonthKey = getMonthKey(new Date());
-    const schedule = cleanupResources.monthlySchedules?.[currentMonthKey] ?? defaultSchedule;
-
-    const workload = calculateWorkload(issues, schedule);
-
-    // Text format: "25h left, +8h buffer"
-    const bufferText = workload.buffer >= 0 ? `+${workload.buffer}h` : `${workload.buffer}h`;
-    statusBar.text = `$(pulse) ${workload.remaining}h left, ${bufferText} buffer`;
-
-    // Rich tooltip with top 3 urgent
-    const tooltip = new vscode.MarkdownString();
-    tooltip.isTrusted = true;
-    tooltip.appendMarkdown("**Workload Overview**\n\n");
-    tooltip.appendMarkdown(`**Remaining work:** ${workload.remaining}h\n\n`);
-    tooltip.appendMarkdown(`**Available this week:** ${workload.availableThisWeek}h\n\n`);
-    tooltip.appendMarkdown(`**Buffer:** ${bufferText} ${workload.buffer >= 0 ? "(On Track)" : "(Overbooked)"}\n\n`);
-    if (cleanupResources.userFte) {
-      tooltip.appendMarkdown(`**Your FTE:** ${cleanupResources.userFte}\n\n`);
-    }
-
-    // Show if using custom monthly schedule
-    if (cleanupResources.monthlySchedules?.[currentMonthKey]) {
-      const weeklyTotal = calculateWeeklyTotal(schedule);
-      tooltip.appendMarkdown(`**Schedule:** ${formatMonthKeyDisplay(currentMonthKey)} (${weeklyTotal}h/week)\n\n`);
-    }
-
-    if (workload.topUrgent.length > 0) {
-      tooltip.appendMarkdown("**Top Urgent:**\n");
-      for (const issue of workload.topUrgent) {
-        tooltip.appendMarkdown(`- #${issue.id}: ${issue.daysLeft}d, ${formatHoursAsHHMM(issue.hoursLeft)} left\n`);
-      }
-    }
-
-    statusBar.tooltip = tooltip;
-    statusBar.show();
-  };
-
-  // Initialize status bar and trigger initial load
-  initializeWorkloadStatusBar();
-  updateWorkloadStatusBar();
+  // Initialize workload status bar
+  cleanupResources.workloadStatusBar = new WorkloadStatusBar({
+    fetchIssuesIfNeeded: () => projectsTree.fetchIssuesIfNeeded(),
+    getMonthlySchedules: () => cleanupResources.monthlySchedules,
+    getUserFte: () => cleanupResources.userFte,
+  });
+  cleanupResources.workloadStatusBar.update();
 
   // Update on tree refresh
   projectsTree.onDidChangeTreeData(() => {
-    if (cleanupResources.workloadStatusBar) {
-      updateWorkloadStatusBar();
-    }
+    cleanupResources.workloadStatusBar?.update();
   });
 
   // Listen for secret changes
@@ -439,7 +373,7 @@ export function activate(context: vscode.ExtensionContext): void {
             if (!isNaN(fte) && fte > 0) {
               cleanupResources.userFte = fte;
               // Trigger workload recalc with new FTE
-              updateWorkloadStatusBar();
+              cleanupResources.workloadStatusBar?.update();
             }
           }
         });
@@ -480,215 +414,22 @@ export function activate(context: vscode.ExtensionContext): void {
         }
         // Re-initialize status bar on config change
         if (event.affectsConfiguration("redmine.statusBar")) {
-          initializeWorkloadStatusBar();
-          updateWorkloadStatusBar();
+          cleanupResources.workloadStatusBar?.reinitialize();
+          cleanupResources.workloadStatusBar?.update();
         }
         // Update status bar on schedule change
         if (event.affectsConfiguration("redmine.workingHours")) {
-          updateWorkloadStatusBar();
+          cleanupResources.workloadStatusBar?.update();
         }
       }, CONFIG_DEBOUNCE_MS);
     })
   );
 
   // Register configure command
-  context.subscriptions.push(
-    vscode.commands.registerCommand("redmine.configure", async () => {
-      const config = vscode.workspace.getConfiguration("redmine");
-      const existingUrl = config.get<string>("url");
-      const existingApiKey = await secretManager.getApiKey();
-
-      let url = existingUrl;
-      let shouldUpdateApiKey = false;
-
-      // Determine what needs to be configured
-      if (existingUrl && existingApiKey) {
-        // Both exist - ask what to update
-        const choice = await vscode.window.showQuickPick(
-          [
-            {
-              label: "$(link) Update Redmine URL",
-              description: `Current: ${existingUrl}`,
-              value: "url",
-            },
-            {
-              label: "$(key) Update API Key",
-              description: "Stored securely in secrets",
-              value: "apiKey",
-            },
-            { label: "$(settings-gear) Reconfigure Both", value: "both" },
-          ],
-          {
-            title: "Redmine Configuration",
-            placeHolder: "What would you like to update?",
-          }
-        );
-
-        if (!choice) return;
-
-        if (choice.value === "url" || choice.value === "both") {
-          url = await promptForUrl(existingUrl);
-          if (!url) return;
-          await config.update("url", url, vscode.ConfigurationTarget.Global);
-        }
-
-        shouldUpdateApiKey =
-          choice.value === "apiKey" || choice.value === "both";
-      } else if (existingUrl && !existingApiKey) {
-        // URL exists, just need API key - but let them update URL too
-        const choice = await vscode.window.showQuickPick(
-          [
-            {
-              label: "$(check) Keep Current URL",
-              description: existingUrl,
-              value: "keep",
-            },
-            { label: "$(link) Change URL", value: "change" },
-          ],
-          {
-            title: "Redmine Configuration",
-            placeHolder:
-              "Your Redmine URL is configured. Do you want to change it?",
-          }
-        );
-
-        if (!choice) return;
-
-        if (choice.value === "change") {
-          url = await promptForUrl(existingUrl);
-          if (!url) return;
-          await config.update("url", url, vscode.ConfigurationTarget.Global);
-        }
-
-        shouldUpdateApiKey = true;
-      } else if (!existingUrl && existingApiKey) {
-        // Invalid state: API key exists but no URL - API key is server-specific
-        const action = await vscode.window.showWarningMessage(
-          "Invalid configuration detected",
-          {
-            modal: true,
-            detail:
-              "An API key exists but no Redmine URL is configured. API keys are specific to a Redmine server.\n\nWould you like to reconfigure from scratch?",
-          },
-          "Reconfigure",
-          "Cancel"
-        );
-
-        if (action !== "Reconfigure") return;
-
-        // Delete orphaned API key
-        await secretManager.deleteApiKey();
-
-        // Start fresh
-        url = await promptForUrl();
-        if (!url) return;
-        await config.update("url", url, vscode.ConfigurationTarget.Global);
-        shouldUpdateApiKey = true;
-      } else {
-        // Nothing configured - full flow, show security info
-        const proceed = await vscode.window.showInformationMessage(
-          "Secure Configuration",
-          {
-            modal: true,
-            detail:
-              "How your credentials are stored:\n\n• URL: User settings (settings.json)\n• API Key: Encrypted secrets storage\n  - Windows: Credential Manager\n  - macOS: Keychain\n  - Linux: libsecret\n\nAPI keys are machine-local and never synced to the cloud.",
-          },
-          "Continue",
-          "Cancel"
-        );
-
-        if (proceed !== "Continue") return;
-
-        url = await promptForUrl();
-        if (!url) return;
-        await config.update("url", url, vscode.ConfigurationTarget.Global);
-        shouldUpdateApiKey = true;
-      }
-
-      // Prompt for API Key if needed
-      if (shouldUpdateApiKey && url) {
-        const success = await promptForApiKey(secretManager, url);
-        if (!success) return;
-      }
-
-      // Update context and refresh trees
-      await updateConfiguredContext();
-
-      showStatusBarMessage("$(check) Redmine configured", 3000);
-    })
-  );
-
-  async function promptForUrl(
-    currentUrl?: string
-  ): Promise<string | undefined> {
-    const prompt = currentUrl
-      ? "Update your Redmine server URL (changing URL will require new API key)"
-      : "Step 1/2: Enter your Redmine server URL (HTTPS required)";
-
-    return await vscode.window.showInputBox({
-      prompt,
-      value: currentUrl,
-      placeHolder: "https://redmine.example.com",
-      validateInput: (value) => {
-        if (!value) return "URL cannot be empty";
-        let url: URL;
-        try {
-          url = new URL(value);
-        } catch {
-          return "Invalid URL format";
-        }
-        if (url.protocol !== "https:") {
-          return "HTTPS required. URL must start with https://";
-        }
-        return null;
-      },
-    });
-  }
-
-  async function promptForApiKey(
-    manager: RedmineSecretManager,
-    url: string
-  ): Promise<boolean> {
-    // Explain how to get API key
-    const action = await vscode.window.showInformationMessage(
-      "You need your Redmine API key",
-      {
-        modal: true,
-        detail:
-          'Your API key can be found in your Redmine account settings.\n\nClick "Open Redmine" to open your account page, then copy your API key and paste it in the next step.',
-      },
-      "Open Redmine Account",
-      "I Have My Key"
-    );
-
-    if (!action) return false;
-
-    if (action === "Open Redmine Account") {
-      await vscode.env.openExternal(vscode.Uri.parse(`${url}/my/account`));
-      await vscode.window.showInformationMessage(
-        'Copy your API key from the "API access key" section on the right side of the page.',
-        { modal: false },
-        "Got It"
-      );
-    }
-
-    // Prompt for API Key
-    const apiKey = await vscode.window.showInputBox({
-      prompt: "Paste your Redmine API key",
-      placeHolder: "e.g., a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0",
-      password: true,
-      validateInput: (value) => {
-        if (!value) return "API key cannot be empty";
-        if (value.length < 20) return "API key appears too short";
-        return null;
-      },
-    });
-
-    if (!apiKey) return false;
-
-    await manager.setApiKey(apiKey);
-    return true;
-  }
+  registerConfigureCommand(context, {
+    secretManager,
+    updateConfiguredContext,
+  });
 
   // Register set API key command
   context.subscriptions.push(
@@ -867,177 +608,6 @@ export function activate(context: vscode.ExtensionContext): void {
     myTimeEntriesTree.refresh();
   });
 
-  // Open time entry's issue in browser - registered directly to handle tooltip command URIs
-  context.subscriptions.push(
-    vscode.commands.registerCommand("redmine.openTimeEntryInBrowser", async (...args: unknown[]) => {
-      let issueId: number | undefined;
-
-      // Handle command URI (tooltip link passes [issueId] as first arg)
-      if (typeof args[0] === 'number') {
-        issueId = args[0];
-      }
-      // Handle context menu (tree node with _entry)
-      else if (args[0] && typeof args[0] === 'object' && '_entry' in args[0]) {
-        const node = args[0] as { _entry: { issue_id?: number; issue?: { id: number } } };
-        issueId = node._entry.issue_id ?? node._entry.issue?.id;
-      }
-      // Handle object with issue_id
-      else if (args[0] && typeof args[0] === 'object' && 'issue_id' in args[0]) {
-        const params = args[0] as { issue_id: number };
-        issueId = params.issue_id;
-      }
-      // Handle string
-      else if (typeof args[0] === 'string') {
-        const parsed = parseInt(args[0], 10);
-        if (!isNaN(parsed)) {
-          issueId = parsed;
-        }
-      }
-
-      if (!issueId) {
-        vscode.window.showErrorMessage('Could not determine issue ID');
-        return;
-      }
-
-      // Get URL from config
-      const config = vscode.workspace.getConfiguration("redmine");
-      const url = config.get<string>("url");
-      if (!url) {
-        vscode.window.showErrorMessage('Redmine URL not configured');
-        return;
-      }
-
-      await vscode.env.openExternal(vscode.Uri.parse(`${url}/issues/${issueId}`));
-    })
-  );
-
-  // Edit time entry
-  context.subscriptions.push(
-    vscode.commands.registerCommand("redmine.editTimeEntry", async (node: { _entry?: { id?: number; hours: string; comments: string; activity?: { id: number; name: string }; spent_on?: string; issue?: { id: number; subject: string } } }) => {
-      const entry = node?._entry;
-      if (!entry?.id) {
-        vscode.window.showErrorMessage("No time entry selected");
-        return;
-      }
-
-      const server = projectsTree.server;
-      if (!server) {
-        vscode.window.showErrorMessage("No Redmine server configured");
-        return;
-      }
-
-      // Show what to edit
-      const hoursDisplay = formatHoursAsHHMM(parseFloat(entry.hours));
-      const options = [
-        { label: `Hours: ${hoursDisplay}`, field: "hours" as const },
-        { label: `Comment: ${entry.comments || "(none)"}`, field: "comments" as const },
-        { label: `Activity: ${entry.activity?.name || "Unknown"}`, field: "activity" as const },
-        { label: `Date: ${entry.spent_on || "Unknown"}`, field: "date" as const },
-      ];
-
-      const choice = await vscode.window.showQuickPick(options, {
-        title: `Edit Time Entry #${entry.id}`,
-        placeHolder: `#${entry.issue?.id} ${entry.issue?.subject || ""}`,
-      });
-
-      if (!choice) return;
-
-      try {
-        if (choice.field === "hours") {
-          const input = await vscode.window.showInputBox({
-            title: "Edit Hours",
-            value: formatHoursAsHHMM(parseFloat(entry.hours)),
-            placeHolder: "e.g., 1:30, 1.5, 1h 30min",
-            validateInput: (v) => {
-              const parsed = parseTimeInput(v);
-              if (parsed === null || parsed <= 0) return "Enter valid hours (e.g., 1:30, 1.5, 1h 30min)";
-              return null;
-            },
-          });
-          if (input === undefined) return;
-          const hours = parseTimeInput(input)!;
-          await server.updateTimeEntry(entry.id, { hours: hours.toString() });
-        } else if (choice.field === "comments") {
-          const input = await vscode.window.showInputBox({
-            title: "Edit Comment",
-            value: entry.comments,
-            placeHolder: "Comment (optional)",
-          });
-          if (input === undefined) return;
-          await server.updateTimeEntry(entry.id, { comments: input });
-        } else if (choice.field === "activity") {
-          // Need to fetch activities for this issue's project
-          const issueResult = await server.getIssueById(entry.issue?.id || 0);
-          const projectId = issueResult.issue.project?.id;
-          if (!projectId) {
-            vscode.window.showErrorMessage("Could not determine project");
-            return;
-          }
-          const activities = await server.getProjectTimeEntryActivities(projectId);
-          const activityChoice = await vscode.window.showQuickPick(
-            activities.map((a: { name: string; id: number }) => ({ label: a.name, activityId: a.id })),
-            { title: "Select Activity", placeHolder: "Activity" }
-          );
-          if (!activityChoice) return;
-          await server.updateTimeEntry(entry.id, { activity_id: activityChoice.activityId });
-        } else if (choice.field === "date") {
-          const input = await vscode.window.showInputBox({
-            title: "Edit Date",
-            value: entry.spent_on || "",
-            placeHolder: "YYYY-MM-DD",
-            validateInput: (v) => {
-              if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return "Use YYYY-MM-DD format";
-              return null;
-            },
-          });
-          if (input === undefined) return;
-          await server.updateTimeEntry(entry.id, { spent_on: input });
-        }
-
-        showStatusBarMessage("$(check) Time entry updated", 2000);
-        myTimeEntriesTree.refresh();
-      } catch (error) {
-        vscode.window.showErrorMessage(`Failed to update: ${error}`);
-      }
-    })
-  );
-
-  // Delete time entry
-  context.subscriptions.push(
-    vscode.commands.registerCommand("redmine.deleteTimeEntry", async (node: { _entry?: { id?: number; hours: string; issue?: { id: number; subject: string }; activity?: { name: string }; spent_on?: string } }) => {
-      const entry = node?._entry;
-      if (!entry?.id) {
-        vscode.window.showErrorMessage("No time entry selected");
-        return;
-      }
-
-      const server = projectsTree.server;
-      if (!server) {
-        vscode.window.showErrorMessage("No Redmine server configured");
-        return;
-      }
-
-      const hoursDisplay = formatHoursAsHHMM(parseFloat(entry.hours));
-      const issueInfo = entry.issue ? `#${entry.issue.id} ${entry.issue.subject}` : "Unknown issue";
-      const activityInfo = entry.activity?.name ? `[${entry.activity.name}]` : "";
-      const confirm = await vscode.window.showWarningMessage(
-        "Delete time entry?",
-        { modal: true, detail: `${issueInfo}\n${hoursDisplay} ${activityInfo} on ${entry.spent_on || "?"}` },
-        "Delete"
-      );
-
-      if (confirm !== "Delete") return;
-
-      try {
-        await server.deleteTimeEntry(entry.id);
-        showStatusBarMessage("$(check) Time entry deleted", 2000);
-        myTimeEntriesTree.refresh();
-      } catch (error) {
-        vscode.window.showErrorMessage(`Failed to delete: ${error}`);
-      }
-    })
-  );
-
   // Open issue in browser (context menu for my-issues tree)
   registerCommand("openIssueInBrowser", async (props: ActionProperties, ...args: unknown[]) => {
     // Tree item passes the Issue object
@@ -1060,479 +630,21 @@ export function activate(context: vscode.ExtensionContext): void {
     await vscode.env.clipboard.writeText(url);
     showStatusBarMessage(`$(check) Copied #${issue.id} URL`, 2000);
   });
-  // Debounce refresh to prevent rapid-fire API calls
-  let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+  // Register view commands
+  registerViewCommands(context, {
+    projectsTree,
+    outputChannel,
+    updateConfiguredContext,
+  });
 
-  context.subscriptions.push(
-    vscode.commands.registerCommand("redmine.refreshIssues", () => {
-      if (refreshTimeout) {
-        clearTimeout(refreshTimeout);
-      }
-      refreshTimeout = setTimeout(() => {
-        projectsTree.clearProjects();
-        projectsTree.refresh();
-      }, CONFIG_DEBOUNCE_MS);
-    }),
-    vscode.commands.registerCommand("redmine.toggleTreeView", () => {
-      vscode.commands.executeCommand(
-        "setContext",
-        "redmine:treeViewStyle",
-        ProjectsViewStyle.LIST
-      );
-      projectsTree.setViewStyle(ProjectsViewStyle.LIST);
-    }),
-    vscode.commands.registerCommand("redmine.toggleListView", () => {
-      vscode.commands.executeCommand(
-        "setContext",
-        "redmine:treeViewStyle",
-        ProjectsViewStyle.TREE
-      );
-      projectsTree.setViewStyle(ProjectsViewStyle.TREE);
-    }),
-    vscode.commands.registerCommand("redmine.showApiOutput", () => {
-      outputChannel.show();
-    }),
-    vscode.commands.registerCommand("redmine.clearApiOutput", () => {
-      outputChannel.clear();
-      showStatusBarMessage("$(check) API output cleared", 2000);
-    }),
-    vscode.commands.registerCommand("redmine.toggleApiLogging", async () => {
-      const config = vscode.workspace.getConfiguration("redmine");
-      const currentValue = config.get<boolean>("logging.enabled") || false;
-      await config.update(
-        "logging.enabled",
-        !currentValue,
-        vscode.ConfigurationTarget.Global
-      );
-      showStatusBarMessage(
-        `$(check) API logging ${!currentValue ? "enabled" : "disabled"}`,
-        2000
-      );
-      // Refresh trees to use new server instances
-      await updateConfiguredContext();
-    }),
-
-    // Monthly working hours commands
-    vscode.commands.registerCommand("redmine.workingHours.editMonth", async () => {
-      // Get default schedule from config
-      const config = vscode.workspace.getConfiguration("redmine.workingHours");
-      const defaultSchedule = config.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
-      const overrides = cleanupResources.monthlySchedules ?? {};
-
-      // Select month
-      const monthOptions = getMonthOptions();
-      const monthItems = monthOptions.map((opt) => {
-        const existing = overrides[opt.key];
-        const weeklyHours = existing ? calculateWeeklyTotal(existing) : calculateWeeklyTotal(defaultSchedule);
-        const monthlyHours = existing
-          ? calculateMonthlyTotal(opt.key, existing)
-          : calculateMonthlyTotal(opt.key, defaultSchedule);
-        return {
-          label: `${existing ? "$(calendar)" : "$(dash)"} ${opt.label}`,
-          description: `${formatHoursAsHHMM(weeklyHours)}/week, ${formatHoursAsHHMM(monthlyHours)} total`,
-          detail: existing ? formatScheduleDisplay(existing) : "(using default)",
-          key: opt.key,
-          hasOverride: !!existing,
-        };
-      });
-
-      const selectedMonth = await vscode.window.showQuickPick(monthItems, {
-        title: "Edit Monthly Working Hours",
-        placeHolder: "Select month to configure",
-      });
-
-      if (!selectedMonth) return;
-
-      // Get current schedule for this month
-      const currentSchedule = overrides[selectedMonth.key] ?? { ...defaultSchedule };
-
-      // Quick pick for what to do
-      const actions = [
-        {
-          label: "$(edit) Edit day-by-day",
-          description: "Configure hours for each day",
-          action: "edit",
-        },
-        {
-          label: "$(files) Copy from default",
-          description: `Reset to default (${calculateWeeklyTotal(defaultSchedule)}h/week)`,
-          action: "copy",
-        },
-        {
-          label: "$(trash) Clear override",
-          description: "Use default schedule",
-          action: "clear",
-          disabled: !selectedMonth.hasOverride,
-        },
-      ].filter((a) => !a.disabled);
-
-      const selectedAction = await vscode.window.showQuickPick(actions, {
-        title: `${formatMonthKeyDisplay(selectedMonth.key)}`,
-        placeHolder: "What would you like to do?",
-      });
-
-      if (!selectedAction) return;
-
-      if (selectedAction.action === "clear") {
-        delete overrides[selectedMonth.key];
-        cleanupResources.monthlySchedules = overrides;
-        await saveMonthlySchedules(context.globalState, overrides);
-        myTimeEntriesTree.setMonthlySchedules(overrides);
-        showStatusBarMessage(
-          `$(check) ${formatMonthKeyDisplay(selectedMonth.key)} reset to default`,
-          2000
-        );
-        myTimeEntriesTree.refresh();
-        return;
-      }
-
-      if (selectedAction.action === "copy") {
-        overrides[selectedMonth.key] = { ...defaultSchedule };
-        cleanupResources.monthlySchedules = overrides;
-        await saveMonthlySchedules(context.globalState, overrides);
-        myTimeEntriesTree.setMonthlySchedules(overrides);
-        showStatusBarMessage(
-          `$(check) ${formatMonthKeyDisplay(selectedMonth.key)} set to default`,
-          2000
-        );
-        myTimeEntriesTree.refresh();
-        return;
-      }
-
-      // Edit day-by-day
-      const days: (keyof WeeklySchedule)[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-      const newSchedule = { ...currentSchedule };
-
-      for (const day of days) {
-        const input = await vscode.window.showInputBox({
-          title: `${formatMonthKeyDisplay(selectedMonth.key)} - ${day}`,
-          prompt: `Hours for ${day} (0-24)`,
-          value: String(newSchedule[day]),
-          validateInput: (v) => {
-            const num = parseFloat(v);
-            if (isNaN(num) || num < 0 || num > 24) {
-              return "Enter a number between 0 and 24";
-            }
-            return null;
-          },
-        });
-
-        if (input === undefined) {
-          // User cancelled - ask if they want to save partial changes
-          const save = await vscode.window.showWarningMessage(
-            "Save partial changes?",
-            { modal: true },
-            "Save",
-            "Discard"
-          );
-          if (save === "Save") {
-            overrides[selectedMonth.key] = newSchedule;
-            cleanupResources.monthlySchedules = overrides;
-            await saveMonthlySchedules(context.globalState, overrides);
-            myTimeEntriesTree.setMonthlySchedules(overrides);
-            showStatusBarMessage("$(check) Partial changes saved", 2000);
-            myTimeEntriesTree.refresh();
-          }
-          return;
-        }
-
-        newSchedule[day] = parseFloat(input);
-      }
-
-      // Save complete schedule
-      overrides[selectedMonth.key] = newSchedule;
-      cleanupResources.monthlySchedules = overrides;
-      await saveMonthlySchedules(context.globalState, overrides);
-      myTimeEntriesTree.setMonthlySchedules(overrides);
-
-      const weeklyTotal = calculateWeeklyTotal(newSchedule);
-      const monthlyTotal = calculateMonthlyTotal(selectedMonth.key, newSchedule);
-      showStatusBarMessage(
-        `$(check) ${formatMonthKeyDisplay(selectedMonth.key)}: ${weeklyTotal}h/week, ${monthlyTotal}h total`,
-        3000
-      );
-      myTimeEntriesTree.refresh();
-    }),
-
-    // Create test issues command
-    vscode.commands.registerCommand("redmine.createTestIssues", async () => {
-      const server = projectsTree.server;
-      if (!server) {
-        vscode.window.showErrorMessage("Redmine not configured. Run 'Redmine: Configure' first.");
-        return;
-      }
-
-      // Confirm with user
-      const confirm = await vscode.window.showWarningMessage(
-        "Create test issues for integration testing?",
-        { modal: true, detail: "This will create 10 test issues in the Operations project." },
-        "Create Issues",
-        "Cancel"
-      );
-      if (confirm !== "Create Issues") return;
-
-      await vscode.window.withProgress({
-        location: vscode.ProgressLocation.Notification,
-        title: "Creating test issues",
-        cancellable: false
-      }, async (progress) => {
-        try {
-          // Fetch required data
-          progress.report({ message: "Fetching metadata..." });
-          const [projects, trackers, statuses, priorities] = await Promise.all([
-            server.getProjects(),
-            server.getTrackers(),
-            server.getIssueStatuses(),
-            server.getPriorities()
-          ]);
-
-          // Find Operations project
-          const operationsProject = projects.find(p => {
-            const pick = p.toQuickPickItem();
-            return pick.label === "Operations" || pick.identifier === "operations";
-          });
-          if (!operationsProject) {
-            vscode.window.showErrorMessage(
-              `Operations project not found. Available: ${projects.map(p => p.toQuickPickItem().label).join(", ")}`
-            );
-            return;
-          }
-
-          // Find required IDs
-          const taskTracker = trackers.find(t => t.name.toLowerCase().includes("task"));
-          const inProgressStatus = statuses.issue_statuses.find(s => s.name.toLowerCase().includes("progress"));
-          const newStatus = statuses.issue_statuses.find(s =>
-            s.name.toLowerCase() === "new" || s.name.toLowerCase().includes("not yet")
-          );
-          const normalPriority = priorities.find(p => p.name.toLowerCase() === "normal");
-          const highPriority = priorities.find(p => p.name.toLowerCase() === "high");
-          const urgentPriority = priorities.find(p => p.name.toLowerCase() === "urgent");
-          const lowPriority = priorities.find(p => p.name.toLowerCase() === "low");
-
-          if (!taskTracker) {
-            vscode.window.showErrorMessage("Task tracker not found");
-            return;
-          }
-
-          // Date helpers
-          const today = () => new Date().toISOString().split("T")[0];
-          const addDays = (date: string, days: number) => {
-            const d = new Date(date);
-            d.setDate(d.getDate() + days);
-            return d.toISOString().split("T")[0];
-          };
-          const nextFriday = () => {
-            const d = new Date();
-            const day = d.getDay();
-            const daysUntilFriday = (5 - day + 7) % 7 || 7;
-            d.setDate(d.getDate() + daysUntilFriday);
-            return d.toISOString().split("T")[0];
-          };
-
-          const TEST_PREFIX = "[TEST]";
-          const todayStr = today();
-
-          // Define test issues
-          const testIssues = [
-            {
-              subject: `${TEST_PREFIX} High intensity task`,
-              start_date: todayStr,
-              due_date: addDays(todayStr, 2),
-              estimated_hours: 24,
-              status_id: inProgressStatus?.id,
-              priority_id: highPriority?.id,
-              description: "Test issue: 24h over 3 days = 100% intensity (8h/day)",
-            },
-            {
-              subject: `${TEST_PREFIX} Low intensity task`,
-              start_date: todayStr,
-              due_date: addDays(todayStr, 9),
-              estimated_hours: 8,
-              status_id: newStatus?.id,
-              priority_id: normalPriority?.id,
-              description: "Test issue: 8h over 10 days = ~10% intensity",
-            },
-            {
-              subject: `${TEST_PREFIX} Overbooked urgent`,
-              start_date: todayStr,
-              due_date: addDays(todayStr, 1),
-              estimated_hours: 24,
-              status_id: inProgressStatus?.id,
-              priority_id: urgentPriority?.id,
-              description: "Test issue: 24h over 2 days = 150% intensity (overbooked)",
-            },
-            {
-              subject: `${TEST_PREFIX} No estimate task`,
-              start_date: todayStr,
-              due_date: addDays(todayStr, 5),
-              estimated_hours: undefined,
-              status_id: newStatus?.id,
-              priority_id: lowPriority?.id,
-              description: "Test issue: No estimated hours - should show 0 intensity",
-            },
-            {
-              subject: `${TEST_PREFIX} Weekend spanning`,
-              start_date: nextFriday(),
-              due_date: addDays(nextFriday(), 4),
-              estimated_hours: 16,
-              status_id: inProgressStatus?.id,
-              priority_id: normalPriority?.id,
-              description: "Test issue: Spans weekend - tests weeklySchedule (0h Sat/Sun)",
-            },
-            {
-              subject: `${TEST_PREFIX} Parent task`,
-              start_date: todayStr,
-              due_date: addDays(todayStr, 14),
-              estimated_hours: 40,
-              status_id: newStatus?.id,
-              priority_id: highPriority?.id,
-              description: "Test issue: Parent task with children",
-              isParent: true,
-            },
-            {
-              subject: `${TEST_PREFIX} Child task A`,
-              start_date: todayStr,
-              due_date: addDays(todayStr, 6),
-              estimated_hours: 16,
-              status_id: inProgressStatus?.id,
-              priority_id: normalPriority?.id,
-              description: "Test issue: Child of parent task",
-              parentSubject: `${TEST_PREFIX} Parent task`,
-            },
-            {
-              subject: `${TEST_PREFIX} Child task B`,
-              start_date: addDays(todayStr, 7),
-              due_date: addDays(todayStr, 14),
-              estimated_hours: 24,
-              status_id: newStatus?.id,
-              priority_id: normalPriority?.id,
-              description: "Test issue: Child of parent task",
-              parentSubject: `${TEST_PREFIX} Parent task`,
-            },
-            {
-              subject: `${TEST_PREFIX} Blocking task`,
-              start_date: todayStr,
-              due_date: addDays(todayStr, 3),
-              estimated_hours: 8,
-              status_id: inProgressStatus?.id,
-              priority_id: highPriority?.id,
-              description: "Test issue: Blocks another task",
-              blocksSubject: `${TEST_PREFIX} Blocked task`,
-            },
-            {
-              subject: `${TEST_PREFIX} Blocked task`,
-              start_date: addDays(todayStr, 4),
-              due_date: addDays(todayStr, 7),
-              estimated_hours: 16,
-              status_id: newStatus?.id,
-              priority_id: normalPriority?.id,
-              description: "Test issue: Blocked by another task",
-            },
-          ];
-
-          // Create issues
-          const createdIssues = new Map<string, number>();
-          let created = 0;
-          let failed = 0;
-
-          for (let i = 0; i < testIssues.length; i++) {
-            const issue = testIssues[i];
-            progress.report({
-              message: `Creating ${i + 1}/${testIssues.length}: ${issue.subject}`,
-              increment: 100 / testIssues.length
-            });
-
-            // Find parent ID if needed
-            let parent_issue_id: number | undefined;
-            if ("parentSubject" in issue && issue.parentSubject) {
-              parent_issue_id = createdIssues.get(issue.parentSubject);
-            }
-
-            try {
-              const result = await server.createIssue({
-                project_id: operationsProject.id,
-                tracker_id: taskTracker.id,
-                subject: issue.subject,
-                description: issue.description,
-                status_id: issue.status_id,
-                priority_id: issue.priority_id,
-                start_date: issue.start_date,
-                due_date: issue.due_date,
-                estimated_hours: issue.estimated_hours,
-                parent_issue_id,
-              });
-              createdIssues.set(issue.subject, result.issue.id);
-              created++;
-            } catch (_e) {
-              failed++;
-            }
-          }
-
-          // Create blocking relation
-          const blockingId = createdIssues.get(`${TEST_PREFIX} Blocking task`);
-          const blockedId = createdIssues.get(`${TEST_PREFIX} Blocked task`);
-          if (blockingId && blockedId) {
-            try {
-              await server.createRelation(blockingId, blockedId, "blocks");
-            } catch {
-              // Relation creation failed - non-critical, continue
-            }
-          }
-
-          // Refresh issues
-          projectsTree.clearProjects();
-          projectsTree.refresh();
-
-          vscode.window.showInformationMessage(
-            `Created ${created} test issues${failed > 0 ? `, ${failed} failed` : ""}`
-          );
-        } catch (e) {
-          vscode.window.showErrorMessage(`Failed to create test issues: ${e}`);
-        }
-      });
-    }),
-
-    // Gantt timeline command
-    vscode.commands.registerCommand("redmine.showGantt", async () => {
-      // Ensure issues are fetched
-      const issues = await projectsTree.fetchIssuesIfNeeded();
-
-      if (issues.length === 0) {
-        vscode.window.showInformationMessage(
-          "No issues to display. Configure Redmine and assign issues to yourself."
-        );
-        return;
-      }
-
-      // Get working hours schedule for intensity calculation
-      const scheduleConfig = vscode.workspace.getConfiguration("redmine.workingHours");
-      const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", {
-        Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0, Sun: 0,
-      });
-
-      const panel = GanttPanel.createOrShow(projectsTree.server);
-      panel.updateIssues(issues, projectsTree.getFlexibilityCache(), schedule);
-    }),
-
-    // Refresh Gantt data without resetting view state
-    vscode.commands.registerCommand("redmine.refreshGanttData", async () => {
-      const panel = GanttPanel.currentPanel;
-      if (!panel) return;
-
-      // Clear cache and re-fetch
+  // Register create test issues command
+  registerCreateTestIssuesCommand(context, {
+    getServer: () => projectsTree.server,
+    refreshProjects: () => {
       projectsTree.clearProjects();
-      const issues = await projectsTree.fetchIssuesIfNeeded();
-
-      if (issues.length === 0) return;
-
-      const scheduleConfig = vscode.workspace.getConfiguration("redmine.workingHours");
-      const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", {
-        Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0, Sun: 0,
-      });
-
-      panel.updateIssues(issues, projectsTree.getFlexibilityCache(), schedule);
-    })
-  );
+      projectsTree.refresh();
+    },
+  });
 }
 
 export function deactivate(): void {
