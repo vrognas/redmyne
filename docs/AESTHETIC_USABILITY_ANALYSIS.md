@@ -756,11 +756,71 @@ Available actions:
 
 ---
 
-## 6. Testing Recommendations
+## 6. Risks & Blind Spots
+
+### 6.1 Implementation Risks
+
+| Recommendation | Risk | Mitigation |
+|---------------|------|------------|
+| 4.1 Info Density | Existing users expect current format; change may confuse | Feature flag or gradual rollout; document in changelog |
+| 4.2 Gantt Toggles | State persistence bugs could cause inconsistent views | Unit test all state transitions; validate on panel reopen |
+| 4.3 Wizard Refactor | Complex state machine introduces regression risk | High test coverage; manual QA of all wizard paths |
+| 4.4 Contextual Hints | Over-hinting creates noise; annoys power users | One-time hints only; respect "Got it" dismissals |
+| 4.5 Error States | Changing error patterns may break automated testing | Maintain error message structure; add tests first |
+
+### 6.2 Recommendation Conflicts
+
+**4.1 (Reduce Density) vs 4.4 (Add Hints)**
+- Risk: Adding hints could re-introduce density
+- Resolution: Hints go in tooltips/welcome views, NOT inline descriptions
+
+**4.2 (Progressive Disclosure) vs Discoverability**
+- Risk: Hidden features stay hidden if toggles aren't obvious
+- Resolution: Default important features ON; add legend explaining toggles
+
+**4.3 (Wizard Back Navigation) vs Simplicity**
+- Risk: Back button adds complexity to every step
+- Resolution: Only show back button after step 1; make it subtle
+
+### 6.3 Analysis Blind Spots
+
+The current analysis does NOT cover:
+
+| Gap | Why It Matters | Recommendation |
+|-----|---------------|----------------|
+| **Accessibility audit** | Color-only encoding fails WCAG; screen reader support unknown | Audit with axe-core; test with VoiceOver/NVDA |
+| **Keyboard navigation** | Tree views may lack focus indicators; shortcuts undocumented | Test Tab/Arrow navigation; add visible focus rings |
+| **Narrow viewport behavior** | Sidebar could be <200px; Gantt may not fit | Test minimum widths; add horizontal scroll indicators |
+| **First-run experience** | New users see empty trees with no guidance | Add onboarding walkthrough (already exists in package.json) |
+| **Localization** | Time formats, date formats vary by locale | Audit hardcoded strings; use VS Code l10n API |
+| **Performance at scale** | 500+ issues may cause tree render lag | Profile with large datasets; add virtualization if needed |
+
+### 6.4 Missing UX Patterns
+
+| Pattern | Current State | Risk |
+|---------|--------------|------|
+| **Undo for destructive actions** | Delete time entry has no undo | Data loss frustration |
+| **Bulk operations** | No multi-select in trees | Inefficient for batch work |
+| **Search in trees** | No filter/search capability | Finding items in large lists is slow |
+| **Confirmation dialogs** | Inconsistent: some actions confirm, some don't | Unpredictable UX |
+| **Empty state actions** | Welcome views exist but lack context | Users don't know what to do first |
+
+### 6.5 Technical Debt Considerations
+
+Before implementing recommendations, audit for:
+
+1. **Test coverage gaps**: `tree-item-factory.ts` has no unit tests currently
+2. **Type safety**: Some tree providers use `any` types that could hide bugs
+3. **Event listener cleanup**: Ensure all `onDidChange*` listeners are disposed
+4. **Memory leaks**: Gantt panel creates new HTML on every update - verify no DOM leaks
+
+---
+
+## 7. Testing Recommendations
 
 To validate whether aesthetics are masking issues, conduct:
 
-### 6.1 Think-Aloud Protocol
+### 7.1 Think-Aloud Protocol
 
 Ask users to complete tasks while verbalizing thoughts:
 - "Log 2 hours to an issue" (tests wizard flow)
@@ -772,13 +832,13 @@ Watch for:
 - Confusion masked by "it probably works"
 - Workarounds users develop
 
-### 6.2 First-Click Test
+### 7.2 First-Click Test
 
 Measure where users click first for common tasks:
 - If clicks are wrong but users persist = aesthetic tolerance
 - If clicks are wrong and users give up = true usability failure
 
-### 6.3 System Usability Scale (SUS) + Aesthetic Rating
+### 7.3 System Usability Scale (SUS) + Aesthetic Rating
 
 Correlate SUS scores with aesthetic ratings:
 - High aesthetic / Low SUS = aesthetic masking usability issues
@@ -786,7 +846,7 @@ Correlate SUS scores with aesthetic ratings:
 
 ---
 
-## 7. Implementation Roadmap
+## 8. Implementation Roadmap
 
 ### Priority Matrix
 
@@ -824,7 +884,7 @@ Correlate SUS scores with aesthetic ratings:
 
 ---
 
-## 8. Conclusion
+## 9. Conclusion
 
 Redmyne's visual design is polished and consistent with VS Code's aesthetic language, which creates positive initial impressions and increases user tolerance for friction. However, this same polish may be masking several usability issues:
 
@@ -844,7 +904,7 @@ The goal is **aesthetic-usability alignment**: designs that are both beautiful A
 
 ---
 
-## 9. References
+## 10. References
 
 Kurosu, M., & Kashimura, K. (1995). Apparent usability vs. inherent usability: experimental analysis on the determinants of the apparent usability. *CHI '95 Conference Companion*, 292-293.
 
