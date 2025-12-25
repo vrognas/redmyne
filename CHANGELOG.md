@@ -13,6 +13,7 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 - **Actionable error feedback (4.5)** - config errors show "Configure" button for quick setup
 - **Contextual hints (4.4)** - keyboard shortcuts in command titles, tips in welcome views
+- **Timer phase clarity (4.6)** - enhanced tooltips with phase explanations, dynamic tree title
 
 ## [3.14.0]
 
