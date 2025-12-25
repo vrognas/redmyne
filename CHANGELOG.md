@@ -6,6 +6,18 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ### Changed
 
+- **Tree item info density reduced (4.1)** - label now `#id Subject`, status via icon color only
+- **Gantt progressive disclosure (4.2)** - Deps/Intensity toggle buttons in toolbar
+
+### Added
+
+- **Actionable error feedback (4.5)** - config errors show "Configure" button for quick setup
+- **Contextual hints (4.4)** - keyboard shortcuts in command titles, tips in welcome views
+
+## [3.14.0]
+
+### Changed
+
 - **BaseTreeProvider abstraction** - all tree providers now extend shared base class (DRY refactor)
 - **Timer plan persists indefinitely** - no auto-clear on new day; manual clear only
 - **Rebranded** to "Redmyne" - clearer differentiation from original extension
