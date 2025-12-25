@@ -30,7 +30,7 @@ describe("error-feedback", () => {
       const mockShowErrorMessage = vi.mocked(vscode.window.showErrorMessage);
       const mockExecuteCommand = vi.mocked(vscode.commands.executeCommand);
 
-      mockShowErrorMessage.mockResolvedValue("Configure" as any);
+      mockShowErrorMessage.mockResolvedValue("Configure" as unknown as undefined);
       mockExecuteCommand.mockResolvedValue(undefined);
 
       const actions: ErrorAction[] = [
@@ -46,7 +46,7 @@ describe("error-feedback", () => {
       const mockShowErrorMessage = vi.mocked(vscode.window.showErrorMessage);
       const mockExecuteCommand = vi.mocked(vscode.commands.executeCommand);
 
-      mockShowErrorMessage.mockResolvedValue("View Issue" as any);
+      mockShowErrorMessage.mockResolvedValue("View Issue" as unknown as undefined);
       mockExecuteCommand.mockResolvedValue(undefined);
 
       const actions: ErrorAction[] = [

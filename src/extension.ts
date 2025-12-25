@@ -28,7 +28,6 @@ import {
   formatScheduleDisplay,
   calculateWeeklyTotal,
   calculateMonthlyTotal,
-  countAvailableHoursMonthly,
 } from "./utilities/monthly-schedule";
 import { formatHoursAsHHMM, formatSecondsAsMMSS, parseTimeInput } from "./utilities/time-input";
 import { GanttPanel } from "./webviews/gantt-panel";
