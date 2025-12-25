@@ -1,5 +1,10 @@
 import { vi } from "vitest";
 
+/**
+ * Creates a mock QuickPick that can be controlled for testing wizardInput
+ * Set window._nextQuickPickValue before calling createQuickPick to control the value
+ */
+let _nextQuickPickValue: string | undefined | symbol;
 export const window = {
   showQuickPick: vi.fn(),
   showInputBox: vi.fn(),
@@ -12,6 +17,67 @@ export const window = {
     hide: vi.fn(),
     dispose: vi.fn(),
   })),
+  createQuickPick: vi.fn(() => {
+    const value = _nextQuickPickValue;
+    _nextQuickPickValue = undefined;
+    let onAcceptHandler: (() => void) | undefined;
+    let onHideHandler: (() => void) | undefined;
+    let onChangeHandler: ((value: string) => void) | undefined;
+    return {
+      title: "",
+      placeholder: "",
+      items: [],
+      selectedItems: [],
+      canSelectMany: false,
+      value: "",
+      onDidChangeValue: (handler: (value: string) => void) => {
+        onChangeHandler = handler;
+        return { dispose: vi.fn() };
+      },
+      onDidAccept: (handler: () => void) => {
+        onAcceptHandler = handler;
+        return { dispose: vi.fn() };
+      },
+      onDidHide: (handler: () => void) => {
+        onHideHandler = handler;
+        return { dispose: vi.fn() };
+      },
+      show: vi.fn(() => {
+        // Simulate immediate value entry and accept
+        if (value !== undefined) {
+          if (typeof value === "symbol") {
+            // Back selected
+            const qp = { selectedItems: [{ label: "$(arrow-left) Back" }], value: "" };
+            Object.assign(qp, { hide: vi.fn() });
+            if (onAcceptHandler) {
+              const self = qp as unknown as { selectedItems: { label: string }[]; value: string; hide: () => void };
+              (window.createQuickPick as ReturnType<typeof vi.fn>).mock.results[
+                (window.createQuickPick as ReturnType<typeof vi.fn>).mock.results.length - 1
+              ].value.selectedItems = self.selectedItems;
+              onAcceptHandler();
+            }
+          } else {
+            // Normal value
+            if (onChangeHandler) onChangeHandler(value);
+            const qp = (window.createQuickPick as ReturnType<typeof vi.fn>).mock.results[
+              (window.createQuickPick as ReturnType<typeof vi.fn>).mock.results.length - 1
+            ].value;
+            qp.value = value;
+            qp.selectedItems = [{ label: `$(check) Accept: "${value}"` }];
+            if (onAcceptHandler) onAcceptHandler();
+          }
+        } else {
+          // Cancelled - call hide
+          if (onHideHandler) onHideHandler();
+        }
+      }),
+      hide: vi.fn(),
+      dispose: vi.fn(),
+    };
+  }),
+  setNextQuickPickValue: (value: string | undefined | symbol) => {
+    _nextQuickPickValue = value;
+  },
 };
 
 export const workspace = {
@@ -52,6 +118,7 @@ export const EventEmitter = class {
 export const ProgressLocation = { Notification: 15 };
 export const ConfigurationTarget = { WorkspaceFolder: 3, Global: 1 };
 export const StatusBarAlignment = { Left: 1, Right: 2 };
+export const QuickPickItemKind = { Separator: 1, Default: 0 };
 
 export const TreeItemCollapsibleState = {
   None: 0,

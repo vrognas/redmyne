@@ -5,6 +5,7 @@ import { showPlanDayDialog, pickIssueAndActivity } from "./timer-dialogs";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { playCompletionSound } from "./timer-sound";
 import { formatHoursAsHHMM } from "../utilities/time-input";
+import { showActionableError } from "../utilities/error-feedback";
 
 interface TreeItem {
   type?: string;
@@ -44,7 +45,9 @@ export function registerTimerCommands(
     vscode.commands.registerCommand("redmine.timer.planDay", async () => {
       const server = getServer();
       if (!server) {
-        vscode.window.showErrorMessage("No Redmine server configured");
+        showActionableError("No Redmine server configured", [
+          { title: "Configure", command: "redmine.configure" },
+        ]);
         return;
       }
 
@@ -154,7 +157,9 @@ export function registerTimerCommands(
 
       const server = getServer();
       if (!server) {
-        vscode.window.showErrorMessage("No Redmine server configured");
+        showActionableError("No Redmine server configured", [
+          { title: "Configure", command: "redmine.configure" },
+        ]);
         return; // Stay in logging phase, let user retry
       }
 
@@ -225,7 +230,9 @@ export function registerTimerCommands(
     vscode.commands.registerCommand("redmine.timer.addUnit", async () => {
       const server = getServer();
       if (!server) {
-        vscode.window.showErrorMessage("No Redmine server configured");
+        showActionableError("No Redmine server configured", [
+          { title: "Configure", command: "redmine.configure" },
+        ]);
         return;
       }
 
@@ -273,7 +280,9 @@ export function registerTimerCommands(
 
       const server = getServer();
       if (!server) {
-        vscode.window.showErrorMessage("No Redmine server configured");
+        showActionableError("No Redmine server configured", [
+          { title: "Configure", command: "redmine.configure" },
+        ]);
         return;
       }
 
@@ -362,7 +371,9 @@ export function registerTimerCommands(
 
       const server = getServer();
       if (!server) {
-        vscode.window.showErrorMessage("No Redmine server configured");
+        showActionableError("No Redmine server configured", [
+          { title: "Configure", command: "redmine.configure" },
+        ]);
         return;
       }
 
@@ -446,7 +457,9 @@ export function registerTimerCommands(
 
       const server = getServer();
       if (!server) {
-        vscode.window.showErrorMessage("No Redmine server configured");
+        showActionableError("No Redmine server configured", [
+          { title: "Configure", command: "redmine.configure" },
+        ]);
         return;
       }
 

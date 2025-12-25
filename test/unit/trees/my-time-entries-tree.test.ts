@@ -3,6 +3,16 @@ import { MyTimeEntriesTreeDataProvider } from "../../../src/trees/my-time-entrie
 import { TimeEntry } from "../../../src/redmine/models/time-entry";
 import * as vscode from "vscode";
 
+// Helper to get today's date string in YYYY-MM-DD format
+const getTodayStr = () => new Date().toISOString().split("T")[0];
+
+// Helper to get yesterday's date string
+const getYesterdayStr = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().split("T")[0];
+};
+
 describe("MyTimeEntriesTreeDataProvider", () => {
   let mockServer: {
     getTimeEntries: ReturnType<typeof vi.fn>;
@@ -67,14 +77,14 @@ describe("MyTimeEntriesTreeDataProvider", () => {
         activity: { id: 9, name: "Development" },
         hours: "2.5",
         comments: "Test",
-        spent_on: "2025-11-24",
+        spent_on: getTodayStr(),
       },
     ];
 
     mockServer.getTimeEntries
-      .mockResolvedValueOnce({ time_entries: todayEntries })
-      .mockResolvedValueOnce({ time_entries: [] })
-      .mockResolvedValueOnce({ time_entries: [] })
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // today
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // week
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // month
       .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     // First call returns loading state
@@ -106,7 +116,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
         activity: { id: 9, name: "Development" },
         hours: "2.5",
         comments: "Test comment",
-        spent_on: "2025-11-24",
+        spent_on: getTodayStr(),
       },
     ];
 
@@ -119,16 +129,16 @@ describe("MyTimeEntriesTreeDataProvider", () => {
         activity: { id: 10, name: "Testing" },
         hours: "1.5",
         comments: "",
-        spent_on: "2025-11-23",
+        spent_on: getYesterdayStr(),
       },
     ];
 
     const monthEntries: TimeEntry[] = [...weekEntries];
 
     mockServer.getTimeEntries
-      .mockResolvedValueOnce({ time_entries: todayEntries })
-      .mockResolvedValueOnce({ time_entries: weekEntries })
-      .mockResolvedValueOnce({ time_entries: monthEntries })
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // today
+      .mockResolvedValueOnce({ time_entries: weekEntries }) // week
+      .mockResolvedValueOnce({ time_entries: monthEntries }) // month
       .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     // First call returns loading state
@@ -160,7 +170,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
         activity: { id: 9, name: "Development" },
         hours: "2.5",
         comments: "Test comment",
-        spent_on: "2025-11-24",
+        spent_on: getTodayStr(),
       },
       {
         id: 2,
@@ -169,14 +179,14 @@ describe("MyTimeEntriesTreeDataProvider", () => {
         activity: { id: 10, name: "Testing" },
         hours: "1.5",
         comments: "",
-        spent_on: "2025-11-24",
+        spent_on: getTodayStr(),
       },
     ];
 
     mockServer.getTimeEntries
-      .mockResolvedValueOnce({ time_entries: todayEntries })
-      .mockResolvedValueOnce({ time_entries: [] })
-      .mockResolvedValueOnce({ time_entries: [] })
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // today
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // week
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // month
       .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     const groups = await getLoadedGroups();
@@ -199,7 +209,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
         activity: { id: 9, name: "Development" },
         hours: "2.5",
         comments: "",
-        spent_on: "2025-11-24",
+        spent_on: getTodayStr(),
       },
       {
         id: 2,
@@ -208,14 +218,14 @@ describe("MyTimeEntriesTreeDataProvider", () => {
         activity: { id: 10, name: "Testing" },
         hours: "1.5",
         comments: "",
-        spent_on: "2025-11-24",
+        spent_on: getTodayStr(),
       },
     ];
 
     mockServer.getTimeEntries
-      .mockResolvedValueOnce({ time_entries: todayEntries })
-      .mockResolvedValueOnce({ time_entries: todayEntries })
-      .mockResolvedValueOnce({ time_entries: todayEntries })
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // today
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // week
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // month
       .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     const groups = await getLoadedGroups();
@@ -231,9 +241,9 @@ describe("MyTimeEntriesTreeDataProvider", () => {
 
   it("shows empty state when no entries", async () => {
     mockServer.getTimeEntries
-      .mockResolvedValueOnce({ time_entries: [] })
-      .mockResolvedValueOnce({ time_entries: [] })
-      .mockResolvedValueOnce({ time_entries: [] })
+      .mockResolvedValueOnce({ time_entries: [] }) // today
+      .mockResolvedValueOnce({ time_entries: [] }) // week
+      .mockResolvedValueOnce({ time_entries: [] }) // month
       .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     const groups = await getLoadedGroups();
@@ -254,14 +264,14 @@ describe("MyTimeEntriesTreeDataProvider", () => {
         activity: { id: 9, name: "Development" },
         hours: "2.5",
         comments: "Test comment",
-        spent_on: "2025-11-24",
+        spent_on: getTodayStr(),
       },
     ];
 
     mockServer.getTimeEntries
-      .mockResolvedValueOnce({ time_entries: todayEntries })
-      .mockResolvedValueOnce({ time_entries: [] })
-      .mockResolvedValueOnce({ time_entries: [] })
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // today
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // week
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // month
       .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     const groups = await getLoadedGroups();
@@ -292,14 +302,14 @@ describe("MyTimeEntriesTreeDataProvider", () => {
         activity: { id: 9, name: "Development" },
         hours: "2.5",
         comments: "Test comment",
-        spent_on: "2025-11-24",
+        spent_on: getTodayStr(),
       },
     ];
 
     mockServer.getTimeEntries
-      .mockResolvedValueOnce({ time_entries: todayEntries })
-      .mockResolvedValueOnce({ time_entries: [] })
-      .mockResolvedValueOnce({ time_entries: [] })
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // today
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // week
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // month
       .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     mockServer.getIssueById.mockResolvedValue({
@@ -325,14 +335,14 @@ describe("MyTimeEntriesTreeDataProvider", () => {
         activity: { id: 9, name: "Development" },
         hours: "2.5",
         comments: "",
-        spent_on: "2025-11-24",
+        spent_on: getTodayStr(),
       },
     ];
 
     mockServer.getTimeEntries
-      .mockResolvedValueOnce({ time_entries: todayEntries })
-      .mockResolvedValueOnce({ time_entries: todayEntries })
-      .mockResolvedValueOnce({ time_entries: [] })
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // today
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // week
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // month
       .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     mockServer.getIssueById.mockResolvedValue({
@@ -359,7 +369,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
         activity: { id: 9, name: "Development" },
         hours: "2.5",
         comments: "",
-        spent_on: "2025-11-24",
+        spent_on: getTodayStr(),
       },
     ];
 
@@ -390,14 +400,14 @@ describe("MyTimeEntriesTreeDataProvider", () => {
         activity: { id: 9, name: "Development" },
         hours: "2.5",
         comments: "",
-        spent_on: "2025-11-24",
+        spent_on: getTodayStr(),
       },
     ];
 
     mockServer.getTimeEntries
-      .mockResolvedValueOnce({ time_entries: todayEntries })
-      .mockResolvedValueOnce({ time_entries: [] })
-      .mockResolvedValueOnce({ time_entries: [] })
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // today
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // week
+      .mockResolvedValueOnce({ time_entries: todayEntries }) // month
       .mockResolvedValueOnce({ time_entries: [] }); // last month
 
     mockServer.getIssueById.mockRejectedValue(new Error("Issue not found"));

@@ -53,7 +53,7 @@ export class TimerStatusBar {
         if (total === 0) {
           this.statusBarItem.text = "$(clock) Plan day...";
           if (phaseChanged) {
-            this.statusBarItem.tooltip = "Click to plan your work units";
+            this.statusBarItem.tooltip = this.buildIdleNoPlansTooltip();
             this.statusBarItem.command = "redmine.timer.planDay";
           }
         } else {
@@ -62,14 +62,14 @@ export class TimerStatusBar {
           if (nextUnit) {
             this.statusBarItem.text = `$(play) #${nextUnit.issueId} ready ${progress}`;
             if (phaseChanged) {
-              this.statusBarItem.tooltip = `Click to start: ${nextUnit.issueSubject}`;
+              this.statusBarItem.tooltip = this.buildIdleReadyTooltip(nextUnit, state);
               this.statusBarItem.command = "redmine.timer.start";
             }
           } else {
             // All units completed
             this.statusBarItem.text = `$(check) Done ${progress}`;
             if (phaseChanged) {
-              this.statusBarItem.tooltip = "All units completed - click to plan more";
+              this.statusBarItem.tooltip = this.buildAllDoneTooltip(state);
               this.statusBarItem.command = "redmine.timer.planDay";
             }
           }
@@ -79,7 +79,7 @@ export class TimerStatusBar {
       case "working":
         this.statusBarItem.text = `$(pulse) ${formatSecondsAsMMSS(workingUnit?.secondsLeft ?? 0)} #${workingUnit?.issueId || "?"} [${workingUnit?.activityName || "?"}] ${progress}`;
         if (phaseChanged) {
-          this.statusBarItem.tooltip = this.buildTooltip(state);
+          this.statusBarItem.tooltip = this.buildWorkingTooltip(state);
           this.statusBarItem.command = "redmine.timer.toggle";
         }
         break;
@@ -88,7 +88,7 @@ export class TimerStatusBar {
         // Use pausedUnit which may differ from currentUnitIndex
         this.statusBarItem.text = `$(debug-pause) ${formatSecondsAsMMSS(pausedUnit?.secondsLeft ?? 0)} #${pausedUnit?.issueId || "?"} [${pausedUnit?.activityName || "?"}] ${progress}`;
         if (phaseChanged) {
-          this.statusBarItem.tooltip = "Timer paused - click to resume";
+          this.statusBarItem.tooltip = this.buildPausedTooltip(pausedUnit, state);
           this.statusBarItem.command = "redmine.timer.toggle";
         }
         break;
@@ -96,7 +96,7 @@ export class TimerStatusBar {
       case "logging":
         this.statusBarItem.text = "$(bell) Log time?";
         if (phaseChanged) {
-          this.statusBarItem.tooltip = `Log ${unit?.issueSubject || "time"} to Redmine`;
+          this.statusBarItem.tooltip = this.buildLoggingTooltip(unit);
           this.statusBarItem.command = "redmine.timer.showLogDialog";
         }
         break;
@@ -104,7 +104,7 @@ export class TimerStatusBar {
       case "break":
         this.statusBarItem.text = `$(coffee) ${formatSecondsAsMMSS(breakSecondsLeft)} break`;
         if (phaseChanged) {
-          this.statusBarItem.tooltip = "Break time - click to start next unit";
+          this.statusBarItem.tooltip = this.buildBreakTooltip(state);
           this.statusBarItem.command = "redmine.timer.toggle";
         }
         break;
@@ -114,37 +114,137 @@ export class TimerStatusBar {
     this.lastUnitIndex = currentUnitIndex;
   }
 
-  private buildTooltip(state: TimerState): vscode.MarkdownString {
+  /**
+   * Tooltip when no plans exist yet
+   */
+  private buildIdleNoPlansTooltip(): vscode.MarkdownString {
+    const md = new vscode.MarkdownString();
+    md.appendMarkdown("**No plan for today**\n\n");
+    md.appendMarkdown("Click to plan your work units.\n\n");
+    md.appendMarkdown("---\n\n");
+    md.appendMarkdown("*Tip: `Ctrl+Y T` toggles timer*");
+    return md;
+  }
+
+  /**
+   * Tooltip when plan exists but timer not started
+   */
+  private buildIdleReadyTooltip(nextUnit: TimerState["plan"][0], state: TimerState): vscode.MarkdownString {
+    const md = new vscode.MarkdownString();
+    const hoursLogged = this.getTodayHoursLogged(state);
+    const completed = countCompleted(state);
+    const total = state.plan.length;
+
+    md.appendMarkdown("**Ready to start**\n\n");
+    md.appendMarkdown(`Next: #${nextUnit.issueId} - ${nextUnit.issueSubject}\n\n`);
+    md.appendMarkdown("---\n\n");
+    md.appendMarkdown(`Today: ${formatHoursAsHHMM(hoursLogged)} logged (${completed}/${total})\n\n`);
+    md.appendMarkdown("*Click to start timer*");
+    return md;
+  }
+
+  /**
+   * Tooltip when all units completed
+   */
+  private buildAllDoneTooltip(state: TimerState): vscode.MarkdownString {
+    const md = new vscode.MarkdownString();
+    const hoursLogged = this.getTodayHoursLogged(state);
+    const total = state.plan.length;
+
+    md.appendMarkdown("**All done!** ✓\n\n");
+    md.appendMarkdown(`${total} units completed\n\n`);
+    md.appendMarkdown(`${formatHoursAsHHMM(hoursLogged)} logged today\n\n`);
+    md.appendMarkdown("---\n\n");
+    md.appendMarkdown("*Click to plan more work*");
+    return md;
+  }
+
+  /**
+   * Tooltip when actively working
+   */
+  private buildWorkingTooltip(state: TimerState): vscode.MarkdownString {
     const { plan, currentUnitIndex } = state;
     const md = new vscode.MarkdownString();
 
-    // Guard against empty plan or invalid index
     if (plan.length === 0 || currentUnitIndex < 0 || currentUnitIndex >= plan.length) {
       md.appendMarkdown("No active unit");
       return md;
     }
 
     const unit = plan[currentUnitIndex];
-    const completedCount = countCompleted(state);
+    const hoursLogged = this.getTodayHoursLogged(state);
+    const completed = countCompleted(state);
     const total = plan.length;
 
-    // Calculate actual hours logged (sum of loggedHours)
-    const hoursLogged = plan
-      .filter(u => u.logged && u.loggedHours)
-      .reduce((sum, u) => sum + (u.loggedHours ?? 0), 0);
-
-    md.appendMarkdown(`**Work Unit ${currentUnitIndex + 1} of ${total}**\n\n`);
-
+    md.appendMarkdown("**Working** $(pulse)\n\n");
     if (unit) {
-      md.appendMarkdown(`Issue: #${unit.issueId} - ${unit.issueSubject}\n\n`);
+      md.appendMarkdown(`#${unit.issueId} - ${unit.issueSubject}\n\n`);
       md.appendMarkdown(`Activity: ${unit.activityName}\n\n`);
     }
-
     md.appendMarkdown("---\n\n");
-    md.appendMarkdown(`Today: ${formatHoursAsHHMM(hoursLogged)} logged (${completedCount}/${total} units)\n\n`);
-    md.appendMarkdown("Click to pause");
-
+    md.appendMarkdown(`Today: ${formatHoursAsHHMM(hoursLogged)} (${completed}/${total})\n\n`);
+    md.appendMarkdown("**Actions:**\n");
+    md.appendMarkdown("- Click to pause\n");
+    md.appendMarkdown("- Right-click for more options");
     return md;
+  }
+
+  /**
+   * Tooltip when timer is paused
+   */
+  private buildPausedTooltip(pausedUnit: TimerState["plan"][0] | undefined, state: TimerState): vscode.MarkdownString {
+    const md = new vscode.MarkdownString();
+    const hoursLogged = this.getTodayHoursLogged(state);
+
+    md.appendMarkdown("**Paused** $(debug-pause)\n\n");
+    if (pausedUnit) {
+      md.appendMarkdown(`#${pausedUnit.issueId} - ${pausedUnit.issueSubject}\n\n`);
+      md.appendMarkdown(`Remaining: ${formatSecondsAsMMSS(pausedUnit.secondsLeft)}\n\n`);
+    }
+    md.appendMarkdown("---\n\n");
+    md.appendMarkdown(`Today: ${formatHoursAsHHMM(hoursLogged)} logged\n\n`);
+    md.appendMarkdown("*Click to resume*");
+    return md;
+  }
+
+  /**
+   * Tooltip when waiting to log time
+   */
+  private buildLoggingTooltip(unit: TimerState["plan"][0] | undefined): vscode.MarkdownString {
+    const md = new vscode.MarkdownString();
+    md.appendMarkdown("**Time to log!** $(bell)\n\n");
+    if (unit) {
+      md.appendMarkdown(`#${unit.issueId} - ${unit.issueSubject}\n\n`);
+    }
+    md.appendMarkdown("---\n\n");
+    md.appendMarkdown("**Actions:**\n");
+    md.appendMarkdown("- Click to record time\n");
+    md.appendMarkdown("- Or defer to next unit");
+    return md;
+  }
+
+  /**
+   * Tooltip during break
+   */
+  private buildBreakTooltip(state: TimerState): vscode.MarkdownString {
+    const md = new vscode.MarkdownString();
+    const hoursLogged = this.getTodayHoursLogged(state);
+
+    md.appendMarkdown("**Break time** $(coffee)\n\n");
+    md.appendMarkdown("Take a moment to rest.\n\n");
+    md.appendMarkdown("---\n\n");
+    md.appendMarkdown(`Today: ${formatHoursAsHHMM(hoursLogged)} logged\n\n`);
+    md.appendMarkdown("*Click to start next unit early*");
+    return md;
+  }
+
+  /**
+   * Calculate total hours logged today
+   */
+  private getTodayHoursLogged(state: TimerState): number {
+    return state.plan
+      .filter(u => u.logged && u.loggedHours)
+      .reduce((sum, u) => sum + (u.loggedHours ?? 0), 0);
   }
 }
 

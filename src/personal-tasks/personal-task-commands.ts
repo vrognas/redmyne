@@ -6,6 +6,7 @@ import { RedmineServer } from "../redmine/redmine-server";
 import { TimerController } from "../timer/timer-controller";
 import { createWorkUnit } from "../timer/timer-state";
 import { pickActivityForProject } from "../utilities/issue-picker";
+import { showActionableError } from "../utilities/error-feedback";
 
 interface TaskTreeItem {
   task?: PersonalTask;
@@ -28,7 +29,9 @@ export function registerPersonalTaskCommands(
     vscode.commands.registerCommand("redmine.personalTasks.add", async () => {
       const server = getServer();
       if (!server) {
-        vscode.window.showErrorMessage("Redmine not configured");
+        showActionableError("Redmine not configured", [
+          { title: "Configure", command: "redmine.configure" },
+        ]);
         return;
       }
 
@@ -136,7 +139,9 @@ export function registerPersonalTaskCommands(
 
         const server = getServer();
         if (!server) {
-          vscode.window.showErrorMessage("Redmine not configured");
+          showActionableError("Redmine not configured", [
+          { title: "Configure", command: "redmine.configure" },
+        ]);
           return;
         }
 
@@ -185,7 +190,9 @@ export function registerPersonalTaskCommands(
 
         const server = getServer();
         if (!server) {
-          vscode.window.showErrorMessage("Redmine not configured");
+          showActionableError("Redmine not configured", [
+          { title: "Configure", command: "redmine.configure" },
+        ]);
           return;
         }
 

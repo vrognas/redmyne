@@ -8,6 +8,7 @@ import {
   countAvailableHoursMonthly,
   getHoursForDateMonthly,
 } from "../utilities/monthly-schedule";
+import { WeeklySchedule } from "../utilities/flexibility-calculator";
 
 export interface TimeEntryNode {
   id?: string; // Stable ID for preserving expansion state
@@ -526,7 +527,7 @@ function formatHoursWithComparison(
   return `${formatHoursAsHHMM(logged)}/${formatHoursAsHHMM(available)} (${percentage}%)`;
 }
 
-type WeeklySchedule = Record<string, number>;
+// WeeklySchedule imported from flexibility-calculator
 
 /**
  * Get weekly schedule from config, supporting both old and new format
@@ -562,7 +563,9 @@ function getWeeklySchedule(
   };
 
   workingDays.forEach((day) => {
-    defaultSchedule[day] = hoursPerDay;
+    if (day in defaultSchedule) {
+      defaultSchedule[day as keyof WeeklySchedule] = hoursPerDay;
+    }
   });
 
   return defaultSchedule;

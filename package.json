@@ -51,7 +51,7 @@
       },
       {
         "command": "redmine.quickLogTime",
-        "title": "Redmine: Quick Log Time"
+        "title": "Redmine: Quick Log Time (Ctrl+Y Y)"
       },
       {
         "command": "redmine.changeDefaultServer",
@@ -134,7 +134,7 @@
       },
       {
         "command": "redmine.quickCreateIssue",
-        "title": "Redmine: Quick Create Issue",
+        "title": "Redmine: Quick Create Issue (Ctrl+Y N)",
         "icon": "$(add)"
       },
       {
@@ -169,7 +169,7 @@
       },
       {
         "command": "redmine.timer.toggle",
-        "title": "Redmine: Toggle Timer"
+        "title": "Redmine: Toggle Timer (Ctrl+Y T)"
       },
       {
         "command": "redmine.timer.startNextUnit",
@@ -341,7 +341,7 @@
     "viewsWelcome": [
       {
         "view": "redmine-explorer-timer",
-        "contents": "No plan for today.\n[Plan Your Day](command:redmine.timer.planDay)\nPlan work units to track your time.",
+        "contents": "No plan for today.\n[Plan Your Day](command:redmine.timer.planDay)\n\n---\n\n**Tips:**\n- Right-click units for more actions\n- `Ctrl+Y T` toggles timer\n- Click a unit to start/pause",
         "when": "redmine:configured && !redmine:timerHasPlan"
       },
       {
@@ -351,7 +351,7 @@
       },
       {
         "view": "redmine-explorer-personal-tasks",
-        "contents": "No personal tasks yet.\n[Add Task](command:redmine.personalTasks.add)\nCreate local subtasks for your Redmine issues.",
+        "contents": "No personal tasks yet.\n[Add Task](command:redmine.personalTasks.add)\n\n---\n\n**Tips:**\n- Right-click tasks for actions\n- Add tasks to Today's Plan\n- Link tasks to Redmine issues",
         "when": "redmine:configured"
       },
       {

@@ -7,7 +7,7 @@
  */
 
 import * as vscode from "vscode";
-import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "./flexibility-calculator";
+import { WeeklySchedule } from "./flexibility-calculator";
 
 /** Storage key for monthly schedule overrides */
 export const MONTHLY_SCHEDULES_KEY = "redmine.monthlySchedules";
