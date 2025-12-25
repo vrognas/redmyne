@@ -81,17 +81,20 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const today = new Date().toISOString().split("T")[0];
       const weekStart = getWeekStart();
       const monthStart = getMonthStart();
+      const lastMonth = getLastMonthRange();
 
-      // Fetch entries in parallel (3 requests)
-      const [todayResult, weekResult, monthResult] = await Promise.all([
+      // Fetch entries in parallel (4 requests)
+      const [todayResult, weekResult, monthResult, lastMonthResult] = await Promise.all([
         this.server.getTimeEntries({ from: today, to: today }),
         this.server.getTimeEntries({ from: weekStart, to: today }),
         this.server.getTimeEntries({ from: monthStart, to: today }),
+        this.server.getTimeEntries({ from: lastMonth.start, to: lastMonth.end }),
       ]);
 
       const todayTotal = calculateTotal(todayResult.time_entries);
       const weekTotal = calculateTotal(weekResult.time_entries);
       const monthTotal = calculateTotal(monthResult.time_entries);
+      const lastMonthTotal = calculateTotal(lastMonthResult.time_entries);
 
       // Get working hours config (supports both old and new format)
       const config = vscode.workspace.getConfiguration("redmine.workingHours");
@@ -107,6 +110,11 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const monthAvailable = calculateAvailableHours(
         new Date(monthStart),
         new Date(today),
+        schedule
+      );
+      const lastMonthAvailable = calculateAvailableHours(
+        new Date(lastMonth.start + "T12:00:00"),
+        new Date(lastMonth.end + "T12:00:00"),
         schedule
       );
 
@@ -146,6 +154,15 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
           collapsibleState: this.getCollapsibleState("group-month", true),
           type: "month-group",
           _cachedEntries: monthResult.time_entries,
+        },
+        {
+          id: "group-last-month",
+          label: `Last Month (${lastMonth.name})`,
+          description: formatHoursWithComparison(lastMonthTotal, lastMonthAvailable),
+          tooltip: `${lastMonth.start} to ${lastMonth.end}`,
+          collapsibleState: this.getCollapsibleState("group-last-month", true),
+          type: "month-group",
+          _cachedEntries: lastMonthResult.time_entries,
         },
       ];
     } catch {
@@ -442,6 +459,17 @@ function getMonthStart(): string {
   return new Date(now.getFullYear(), now.getMonth(), 1)
     .toISOString()
     .split("T")[0];
+}
+
+function getLastMonthRange(): { start: string; end: string; name: string } {
+  const now = new Date();
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0); // Day 0 = last day of prev month
+  return {
+    start: lastMonthStart.toISOString().split("T")[0],
+    end: lastMonthEnd.toISOString().split("T")[0],
+    name: lastMonthStart.toLocaleDateString("en-US", { month: "short" }),
+  };
 }
 
 function calculateTotal(entries: TimeEntry[]): number {
