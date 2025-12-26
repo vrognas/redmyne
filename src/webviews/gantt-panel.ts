@@ -4,6 +4,7 @@ import { RedmineServer } from "../redmine/redmine-server";
 import { FlexibilityScore, WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "../utilities/flexibility-calculator";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { errorToString } from "../utilities/error-feedback";
+import { sortIssuesByRisk } from "../utilities/issue-sorting";
 
 type ZoomLevel = "day" | "week" | "month" | "quarter" | "year";
 
@@ -59,62 +60,56 @@ interface GanttRow {
   hasChildren: boolean;
 }
 
-/**
- * Get sort priority for flexibility status (lower = more urgent)
- */
-function getStatusPriority(status: FlexibilityScore["status"] | null): number {
-  switch (status) {
-    case "overbooked": return 0;
-    case "at-risk": return 1;
-    case "on-track": return 2;
-    case "completed": return 3;
-    default: return 4;
-  }
-}
 
 /**
- * Check if GanttIssue is blocked
+ * Convert Issue to GanttIssue for SVG rendering
  */
-function isGanttIssueBlocked(issue: GanttIssue): boolean {
-  return issue.relations.some((r) => r.type === "blocked");
-}
-
-/**
- * Sort issues by risk (reuses logic from issue-sorting.ts)
- */
-function sortGanttIssuesByRisk(issues: GanttIssue[]): GanttIssue[] {
-  return [...issues].sort((a, b) => {
-    // Blocked issues sink to bottom
-    const blockedA = isGanttIssueBlocked(a);
-    const blockedB = isGanttIssueBlocked(b);
-    if (blockedA && !blockedB) return 1;
-    if (!blockedA && blockedB) return -1;
-
-    // Sort by status priority
-    const priorityA = getStatusPriority(a.status);
-    const priorityB = getStatusPriority(b.status);
-    if (priorityA !== priorityB) return priorityA - priorityB;
-
-    // Same status - sort by ID (descending = newer first)
-    return b.id - a.id;
-  });
+function toGanttIssue(issue: Issue, flexibilityCache: Map<number, FlexibilityScore | null>): GanttIssue {
+  return {
+    id: issue.id,
+    subject: issue.subject,
+    start_date: issue.start_date || null,
+    due_date: issue.due_date || null,
+    status: flexibilityCache.get(issue.id)?.status ?? null,
+    project: issue.project?.name ?? "Unknown",
+    projectId: issue.project?.id ?? 0,
+    parentId: issue.parent?.id ?? null,
+    estimated_hours: issue.estimated_hours ?? null,
+    spent_hours: issue.spent_hours ?? null,
+    done_ratio: issue.done_ratio ?? 0,
+    relations: (issue.relations || [])
+      .filter((r) => !["blocked", "duplicated", "copied_from", "follows"].includes(r.relation_type))
+      .filter((r) => r.issue_to_id !== issue.id && r.issue_id !== r.issue_to_id)
+      .map((r) => ({
+        id: r.id,
+        targetId: r.issue_to_id,
+        type: r.relation_type as RelationType,
+      })),
+  };
 }
 
 /**
  * Build hierarchical rows from flat issues list
  * Groups by project (alphabetically), then organizes parent/child issues (by risk)
+ * Uses shared sortIssuesByRisk for consistent sorting with Issues pane
  * @param collapsedKeys Set of collapsed row keys to filter out children
  */
-function buildHierarchicalRows(issues: GanttIssue[], collapsedKeys: Set<string> = new Set()): GanttRow[] {
+function buildHierarchicalRows(
+  issues: Issue[],
+  flexibilityCache: Map<number, FlexibilityScore | null>,
+  collapsedKeys: Set<string> = new Set()
+): GanttRow[] {
   const rows: GanttRow[] = [];
 
   // Group issues by project
-  const byProject = new Map<number, { name: string; issues: GanttIssue[] }>();
+  const byProject = new Map<number, { name: string; issues: Issue[] }>();
   for (const issue of issues) {
-    if (!byProject.has(issue.projectId)) {
-      byProject.set(issue.projectId, { name: issue.project, issues: [] });
+    const projectId = issue.project?.id ?? 0;
+    const projectName = issue.project?.name ?? "Unknown";
+    if (!byProject.has(projectId)) {
+      byProject.set(projectId, { name: projectName, issues: [] });
     }
-    byProject.get(issue.projectId)!.issues.push(issue);
+    byProject.get(projectId)!.issues.push(issue);
   }
 
   // Sort projects alphabetically
@@ -144,11 +139,11 @@ function buildHierarchicalRows(issues: GanttIssue[], collapsedKeys: Set<string> 
 
     // Build issue tree within project
     const issueMap = new Map(projectIssues.map((i) => [i.id, i]));
-    const children = new Map<number | null, GanttIssue[]>();
+    const children = new Map<number | null, Issue[]>();
 
     // Group by parent
     for (const issue of projectIssues) {
-      const parentId = issue.parentId;
+      const parentId = issue.parent?.id ?? null;
       // Only use parentId if parent is in this project's issues
       const effectiveParent = parentId && issueMap.has(parentId) ? parentId : null;
       if (!children.has(effectiveParent)) {
@@ -157,23 +152,25 @@ function buildHierarchicalRows(issues: GanttIssue[], collapsedKeys: Set<string> 
       children.get(effectiveParent)!.push(issue);
     }
 
-    // Recursively add issues (sorted by risk at each level)
+    // Recursively add issues (sorted by risk using shared sortIssuesByRisk)
     function addIssues(parentId: number | null, parentKey: string, depth: number) {
       // Skip if parent is collapsed
       if (collapsedKeys.has(parentKey)) {
         return;
       }
-      const childIssues = sortGanttIssuesByRisk(children.get(parentId) || []);
+      // Use shared sorting logic from issue-sorting.ts
+      const childIssues = sortIssuesByRisk(children.get(parentId) || [], flexibilityCache);
       for (const issue of childIssues) {
         // Check if this issue has children (is a parent)
         const hasIssueChildren = children.has(issue.id) && children.get(issue.id)!.length > 0;
         const issueKey = `issue-${issue.id}`;
+        const ganttIssue = toGanttIssue(issue, flexibilityCache);
         rows.push({
           type: "issue",
           id: issue.id,
           label: issue.subject,
           depth,
-          issue,
+          issue: ganttIssue,
           isParent: hasIssueChildren,
           collapseKey: issueKey,
           parentKey,
@@ -300,7 +297,7 @@ function calculateDailyIntensity(
  * Returns map of date string (YYYY-MM-DD) to total intensity (hours used / hours available)
  */
 function calculateAggregateWorkload(
-  issues: GanttIssue[],
+  issues: { start_date?: string | null; due_date?: string | null; estimated_hours?: number | null }[],
   schedule: WeeklySchedule,
   minDate: Date,
   maxDate: Date
@@ -375,7 +372,8 @@ export class GanttPanel {
 
   private readonly _panel: vscode.WebviewPanel;
   private _disposables: vscode.Disposable[] = [];
-  private _issues: GanttIssue[] = [];
+  private _issues: Issue[] = [];
+  private _flexibilityCache: Map<number, FlexibilityScore | null> = new Map();
   private _server: RedmineServer | undefined;
   private _zoomLevel: ZoomLevel = "day";
   private _schedule: WeeklySchedule = DEFAULT_WEEKLY_SCHEDULE;
@@ -503,35 +501,9 @@ export class GanttPanel {
       this._schedule = schedule;
     }
 
-    // Filter issues with dates and map to Gantt format
-    this._issues = issues
-      .filter((i) => i.start_date || i.due_date)
-      .map((i) => ({
-        id: i.id,
-        subject: i.subject,
-        start_date: i.start_date || null,
-        due_date: i.due_date || null,
-        status: flexibilityCache.get(i.id)?.status ?? null,
-        project: i.project?.name ?? "Unknown",
-        projectId: i.project?.id ?? 0,
-        parentId: i.parent?.id ?? null,
-        estimated_hours: i.estimated_hours ?? null,
-        spent_hours: i.spent_hours ?? null,
-        done_ratio: i.done_ratio ?? 0,
-        relations: (i.relations || [])
-          // Filter out reverse relation types (Redmine returns both directions)
-          // Keep only "forward" types to avoid duplicate arrows
-          // Skip: blocked (reverse of blocks), duplicated (reverse of duplicates),
-          //       copied_from (reverse of copied_to), follows (reverse of precedes)
-          .filter((r) => !["blocked", "duplicated", "copied_from", "follows"].includes(r.relation_type))
-          // Skip self-referencing relations (bug protection)
-          .filter((r) => r.issue_to_id !== i.id && r.issue_id !== r.issue_to_id)
-          .map((r) => ({
-            id: r.id,
-            targetId: r.issue_to_id,
-            type: r.relation_type as RelationType,
-          })),
-      }));
+    // Store issues with dates and flexibilityCache for shared sorting
+    this._issues = issues.filter((i) => i.start_date || i.due_date);
+    this._flexibilityCache = flexibilityCache;
 
     this._updateContent();
   }
@@ -691,12 +663,12 @@ export class GanttPanel {
         relationType: string;
       } | null = null;
       for (const issue of this._issues) {
-        const rel = issue.relations.find((r) => r.id === relationId);
+        const rel = issue.relations?.find((r) => r.id === relationId);
         if (rel) {
           relationInfo = {
             issueId: issue.id,
-            targetIssueId: rel.targetId,
-            relationType: rel.type,
+            targetIssueId: rel.issue_to_id,
+            relationType: rel.relation_type,
           };
           break;
         }
@@ -721,7 +693,9 @@ export class GanttPanel {
 
       // Remove from local data and re-render
       for (const issue of this._issues) {
-        issue.relations = issue.relations.filter((r) => r.id !== relationId);
+        if (issue.relations) {
+          issue.relations = issue.relations.filter((r) => r.id !== relationId);
+        }
       }
       this._updateContent();
       showStatusBarMessage("$(check) Relation deleted", 2000);
@@ -925,7 +899,7 @@ export class GanttPanel {
     const indentSize = 16;
 
     // Build hierarchical rows
-    const rows = buildHierarchicalRows(this._issues, this._collapsedKeys);
+    const rows = buildHierarchicalRows(this._issues, this._flexibilityCache, this._collapsedKeys);
     const contentHeight = rows.length * (barHeight + barGap);
     const chevronWidth = 14;
 
@@ -1217,9 +1191,12 @@ export class GanttPanel {
         tip: "Source was copied to create target" },
     };
 
-    const dependencyArrows = this._issues
-      .flatMap((issue) =>
-        issue.relations.map((rel) => {
+    // Use rows (which have GanttIssue) for dependency arrows
+    const dependencyArrows = rows
+      .filter((row): row is GanttRow & { issue: GanttIssue } => row.type === "issue" && !!row.issue)
+      .flatMap((row) =>
+        row.issue.relations.map((rel) => {
+          const issue = row.issue;
           const source = issuePositions.get(issue.id);
           const target = issuePositions.get(rel.targetId);
           if (!source || !target) return "";
