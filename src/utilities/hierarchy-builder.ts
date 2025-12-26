@@ -76,10 +76,21 @@ export function buildProjectHierarchy(
     issuesByProject.get(projectId)!.push(issue);
   }
 
+  // Pre-compute project children map (O(n) once instead of O(n) per lookup)
+  const projectChildrenMap = new Map<number, RedmineProject[]>();
+  for (const p of projects) {
+    if (p.parent?.id) {
+      if (!projectChildrenMap.has(p.parent.id)) {
+        projectChildrenMap.set(p.parent.id, []);
+      }
+      projectChildrenMap.get(p.parent.id)!.push(p);
+    }
+  }
+
   // Count issues including subprojects (for showing parent projects)
   const countIssuesWithSubprojects = (projectId: number): number => {
     const direct = issuesByProject.get(projectId)?.length ?? 0;
-    const subprojects = projects.filter((p) => p.parent?.id === projectId);
+    const subprojects = projectChildrenMap.get(projectId) ?? [];
     const subCount = subprojects.reduce(
       (sum, sub) => sum + countIssuesWithSubprojects(sub.id),
       0
@@ -122,9 +133,9 @@ export function buildProjectHierarchy(
     // Skip projects with no issues (direct or in subprojects)
     if (totalIssues === 0) return null;
 
-    // Get subprojects
-    const subprojects = projects
-      .filter((p) => p.parent?.id === projectId)
+    // Get subprojects (from pre-computed map)
+    const subprojects = (projectChildrenMap.get(projectId) ?? [])
+      .slice()
       .sort((a, b) => a.name.localeCompare(b.name));
 
     // Build subproject nodes
