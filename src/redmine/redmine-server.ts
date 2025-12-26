@@ -294,37 +294,48 @@ export class RedmineServer {
 
   /**
    * Generic pagination helper for Redmine API endpoints
-   * Handles recursive fetching with limit/offset
+   * Fetches first page to get total_count, then remaining pages in parallel
    */
   private async paginate<TRaw, TResult = TRaw>(
     endpoint: string,
     responseKey: string,
     transform?: (items: TRaw[]) => TResult[]
   ): Promise<TResult[]> {
-    const req = async (
-      offset = 0,
-      limit = 50,
-      count: number | null = null,
-      accumulator: TResult[] = []
-    ): Promise<TResult[]> => {
-      if (count !== null && count <= offset) {
-        return accumulator;
-      }
+    const limit = 100; // Redmine max is 100
 
-      const url = `${endpoint}${endpoint.includes("?") ? "&" : "?"}limit=${limit}&offset=${offset}`;
-      const response = await this.doRequest<Record<string, unknown> & { total_count: number }>(
-        url,
-        "GET"
-      );
+    // First request to get total_count
+    const firstUrl = `${endpoint}${endpoint.includes("?") ? "&" : "?"}limit=${limit}&offset=0`;
+    const firstResponse = await this.doRequest<Record<string, unknown> & { total_count: number }>(
+      firstUrl,
+      "GET"
+    );
 
-      const rawItems = (response?.[responseKey] || []) as TRaw[];
-      const items = transform ? transform(rawItems) : (rawItems as unknown as TResult[]);
-      const totalCount = response?.total_count || 0;
+    const totalCount = firstResponse?.total_count || 0;
+    const rawFirstPage = (firstResponse?.[responseKey] || []) as TRaw[];
+    const firstPage = transform ? transform(rawFirstPage) : (rawFirstPage as unknown as TResult[]);
 
-      return req(offset + limit, limit, totalCount, accumulator.concat(items));
-    };
+    // If all items fit in first page, we're done
+    if (totalCount <= limit) {
+      return firstPage;
+    }
 
-    return req();
+    // Calculate remaining offsets and fetch in parallel
+    const remainingOffsets: number[] = [];
+    for (let offset = limit; offset < totalCount; offset += limit) {
+      remainingOffsets.push(offset);
+    }
+
+    const remainingPages = await Promise.all(
+      remainingOffsets.map(async (offset) => {
+        const pageUrl = `${endpoint}${endpoint.includes("?") ? "&" : "?"}limit=${limit}&offset=${offset}`;
+        const response = await this.doRequest<Record<string, unknown>>(pageUrl, "GET");
+        const rawItems = (response?.[responseKey] || []) as TRaw[];
+        return transform ? transform(rawItems) : (rawItems as unknown as TResult[]);
+      })
+    );
+
+    // Combine: first page + all remaining pages (flattened)
+    return firstPage.concat(...remainingPages);
   }
 
   /**
