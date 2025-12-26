@@ -4,13 +4,22 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ## [Unreleased]
 
-### Changed
-
-- **Tree item info density reduced (4.1)** - label now `#id Subject`, status via icon color only
-- **Gantt progressive disclosure (4.2)** - Deps/Intensity toggle buttons in toolbar
+## [3.15.0]
 
 ### Added
 
+- **Add to Personal Tasks** - context menu on My Issues to add issues to Personal Tasks
+- **Workflow documentation** - README now explains the planning flow
+
+### Fixed
+
+- **Add Time Entry uses clicked date** - right-clicking a date now pre-selects that date
+
+### Changed
+
+- **DRY refactor** - consolidated date utilities, getWeeklySchedule, error handling
+- **Tree item info density reduced (4.1)** - label now `#id Subject`, status via icon color only
+- **Gantt progressive disclosure (4.2)** - Deps/Intensity toggle buttons in toolbar
 - **Actionable error feedback (4.5)** - config errors show "Configure" button for quick setup
 - **Contextual hints (4.4)** - keyboard shortcuts in command titles, tips in welcome views
 - **Timer phase clarity (4.6)** - enhanced tooltips with phase explanations, dynamic tree title
