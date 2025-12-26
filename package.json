@@ -591,15 +591,6 @@
           "group": "navigation@1"
         },
         {
-          "command": "redmine.configure",
-          "when": "view == 'redmine-explorer-my-time-entries'",
-          "group": "navigation"
-        },
-        {
-          "command": "redmine.changeDefaultServer",
-          "when": "view == 'redmine-explorer-my-time-entries' && !hasSingleConfig"
-        },
-        {
           "command": "redmine.refreshTimeEntries",
           "when": "view == 'redmine-explorer-my-time-entries'",
           "group": "navigation"
