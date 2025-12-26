@@ -42,6 +42,12 @@ describe("MyTimeEntriesTreeDataProvider", () => {
           issue: { id, subject: `Test Issue ${id}`, project: { id: 1, name: "Test Project" } },
         });
       }),
+      getIssuesByIds: vi.fn().mockImplementation((ids: number[]) => {
+        // Default mock: return issues with subject and project based on ID
+        return Promise.resolve(
+          ids.map((id) => ({ id, subject: `Test Issue ${id}`, project: { id: 1, name: "Test Project" } }))
+        );
+      }),
       options: { address: "https://redmine.example.com" },
     };
 
@@ -312,9 +318,9 @@ describe("MyTimeEntriesTreeDataProvider", () => {
       .mockResolvedValueOnce({ time_entries: todayEntries }) // month
       .mockResolvedValueOnce({ time_entries: [] }); // last month
 
-    mockServer.getIssueById.mockResolvedValue({
-      issue: { id: 123, subject: "Fetched Issue Subject", project: { id: 1, name: "Test Project" } },
-    });
+    mockServer.getIssuesByIds.mockResolvedValue([
+      { id: 123, subject: "Fetched Issue Subject", project: { id: 1, name: "Test Project" } },
+    ]);
 
     const groups = await getLoadedGroups();
     const todayChildren = await provider.getChildren(groups[0]);
@@ -323,7 +329,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     // Label format: "#id comment", description: "HH:MM [activity] subject"
     expect(todayChildren[0].label).toBe("#123 Test comment");
     expect(todayChildren[0].description).toContain("Fetched Issue Subject");
-    expect(mockServer.getIssueById).toHaveBeenCalledWith(123);
+    expect(mockServer.getIssuesByIds).toHaveBeenCalledWith([123]);
   });
 
   it("caches fetched issues to avoid redundant API calls", async () => {
@@ -345,19 +351,19 @@ describe("MyTimeEntriesTreeDataProvider", () => {
       .mockResolvedValueOnce({ time_entries: todayEntries }) // month
       .mockResolvedValueOnce({ time_entries: [] }); // last month
 
-    mockServer.getIssueById.mockResolvedValue({
-      issue: { id: 123, subject: "Cached Issue", project: { id: 1, name: "Test Project" } },
-    });
+    mockServer.getIssuesByIds.mockResolvedValue([
+      { id: 123, subject: "Cached Issue", project: { id: 1, name: "Test Project" } },
+    ]);
 
     const groups = await getLoadedGroups();
 
     // First expansion - should fetch issue
     await provider.getChildren(groups[0]);
-    expect(mockServer.getIssueById).toHaveBeenCalledTimes(1);
+    expect(mockServer.getIssuesByIds).toHaveBeenCalledTimes(1);
 
     // Second expansion (This Week) - should use cache
     await provider.getChildren(groups[1]);
-    expect(mockServer.getIssueById).toHaveBeenCalledTimes(1); // Still 1, not 2
+    expect(mockServer.getIssuesByIds).toHaveBeenCalledTimes(1); // Still 1, not 2
   });
 
   it("clears issue cache on refresh", async () => {
@@ -375,20 +381,20 @@ describe("MyTimeEntriesTreeDataProvider", () => {
 
     mockServer.getTimeEntries.mockResolvedValue({ time_entries: todayEntries });
 
-    mockServer.getIssueById.mockResolvedValue({
-      issue: { id: 123, subject: "Fresh Issue", project: { id: 1, name: "Test Project" } },
-    });
+    mockServer.getIssuesByIds.mockResolvedValue([
+      { id: 123, subject: "Fresh Issue", project: { id: 1, name: "Test Project" } },
+    ]);
 
     const groups = await getLoadedGroups();
     await provider.getChildren(groups[0]);
-    expect(mockServer.getIssueById).toHaveBeenCalledTimes(1);
+    expect(mockServer.getIssuesByIds).toHaveBeenCalledTimes(1);
 
     // Refresh should clear cache
     provider.refresh();
 
     const newGroups = await getLoadedGroups();
     await provider.getChildren(newGroups[0]);
-    expect(mockServer.getIssueById).toHaveBeenCalledTimes(2); // Fetched again
+    expect(mockServer.getIssuesByIds).toHaveBeenCalledTimes(2); // Fetched again
   });
 
   it("handles issue fetch failures gracefully", async () => {
@@ -410,7 +416,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
       .mockResolvedValueOnce({ time_entries: todayEntries }) // month
       .mockResolvedValueOnce({ time_entries: [] }); // last month
 
-    mockServer.getIssueById.mockRejectedValue(new Error("Issue not found"));
+    mockServer.getIssuesByIds.mockRejectedValue(new Error("Issue not found"));
 
     const groups = await getLoadedGroups();
     const todayChildren = await provider.getChildren(groups[0]);

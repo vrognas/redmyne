@@ -408,25 +408,32 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       (id) => !this.issueCache.has(id)
     );
 
-    // Batch fetch missing issues
+    // Batch fetch missing issues in single API call
     if (missingIssueIds.length > 0 && this.server) {
-      await Promise.allSettled(
-        missingIssueIds.map(async (id) => {
-          try {
-            const { issue } = await this.server!.getIssueById(id);
-            const projectId = issue.project?.id;
-            this.issueCache.set(id, {
-              id: issue.id,
-              subject: issue.subject,
-              projectId,
-              project: issue.project?.name || "",
-            });
-          } catch {
-            // If fetch fails, cache as "Unknown Issue" to avoid retry
+      try {
+        const issues = await this.server.getIssuesByIds(missingIssueIds);
+        const foundIds = new Set<number>();
+        for (const issue of issues) {
+          foundIds.add(issue.id);
+          this.issueCache.set(issue.id, {
+            id: issue.id,
+            subject: issue.subject,
+            projectId: issue.project?.id,
+            project: issue.project?.name || "",
+          });
+        }
+        // Mark unfound issues as "Unknown" to avoid retry
+        for (const id of missingIssueIds) {
+          if (!foundIds.has(id)) {
             this.issueCache.set(id, { id, subject: "Unknown Issue", project: "" });
           }
-        })
-      );
+        }
+      } catch {
+        // On error, mark all as unknown
+        for (const id of missingIssueIds) {
+          this.issueCache.set(id, { id, subject: "Unknown Issue", project: "" });
+        }
+      }
     }
 
     // Sort entries if sort config is set
