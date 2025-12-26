@@ -4,6 +4,8 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ## [Unreleased]
 
+## [3.17.0]
+
 ### Added
 
 - **Sorting dropdown menus** - sort Issues by #ID, Subject, Assignee; sort Time Entries by #ID, Subject, Comment, User
