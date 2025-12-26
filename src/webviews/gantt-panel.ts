@@ -535,6 +535,7 @@ export class GanttPanel {
     top?: number;
     operation?: string;
     collapseKey?: string;
+    action?: string;
   }): void {
     switch (message.command) {
       case "openIssue":
@@ -598,12 +599,24 @@ export class GanttPanel {
         break;
       case "toggleCollapse":
         if (message.collapseKey) {
-          if (this._collapsedKeys.has(message.collapseKey as string)) {
-            this._collapsedKeys.delete(message.collapseKey as string);
-          } else {
-            this._collapsedKeys.add(message.collapseKey as string);
+          const key = message.collapseKey as string;
+          const isCollapsed = this._collapsedKeys.has(key);
+          // action: 'collapse' = only collapse, 'expand' = only expand, undefined = toggle
+          if (message.action === "collapse" && !isCollapsed) {
+            this._collapsedKeys.add(key);
+            this._updateContent();
+          } else if (message.action === "expand" && isCollapsed) {
+            this._collapsedKeys.delete(key);
+            this._updateContent();
+          } else if (!message.action) {
+            // Toggle
+            if (isCollapsed) {
+              this._collapsedKeys.delete(key);
+            } else {
+              this._collapsedKeys.add(key);
+            }
+            this._updateContent();
           }
-          this._updateContent();
         }
         break;
       case "scrollPosition":
@@ -917,7 +930,7 @@ export class GanttPanel {
         if (row.type === "project") {
           // Project header row
           return `
-            <g class="project-label" data-collapse-key="${row.collapseKey}">
+            <g class="project-label" data-collapse-key="${row.collapseKey}" tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
               ${chevron}
               <text x="${5 + indent + textOffset}" y="${y + barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12" font-weight="bold">
                 ${escapeHtml(row.label)}
@@ -960,13 +973,16 @@ export class GanttPanel {
         }
 
         const issue = row.issue!;
+        // Guard: skip if neither date exists (shouldn't happen due to filter)
+        if (!issue.start_date && !issue.due_date) {
+          return "";
+        }
         const isParent = row.isParent ?? false;
-        const start = issue.start_date
-          ? new Date(issue.start_date)
-          : new Date(issue.due_date!);
-        const end = issue.due_date
-          ? new Date(issue.due_date)
-          : new Date(issue.start_date!);
+        // Use existing date as fallback for missing date
+        const startDate = issue.start_date ?? issue.due_date!;
+        const dueDate = issue.due_date ?? issue.start_date!;
+        const start = new Date(startDate);
+        const end = new Date(dueDate);
 
         // Add 1 day to end to get END of due_date (not start/midnight)
         const endPlusOne = new Date(end);
@@ -2128,23 +2144,57 @@ ${style.tip}
       });
     });
 
-    // Labels click and keyboard
-    document.querySelectorAll('.issue-label').forEach(el => {
+    // Labels click and keyboard navigation
+    const allLabels = Array.from(document.querySelectorAll('.project-label, .issue-label'));
+
+    allLabels.forEach((el, index) => {
       el.addEventListener('click', (e) => {
         // Don't open issue if clicking on chevron
         if (e.target.classList?.contains('collapse-toggle')) return;
-        const issueId = parseInt(el.dataset.issueId);
-        if (issueId) {
+        const issueId = el.dataset.issueId ? parseInt(el.dataset.issueId, 10) : NaN;
+        if (!isNaN(issueId)) {
           vscode.postMessage({ command: 'openIssue', issueId });
         }
       });
+
       el.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          const issueId = parseInt(el.dataset.issueId);
-          if (issueId) {
-            vscode.postMessage({ command: 'openIssue', issueId });
-          }
+        const collapseKey = el.dataset.collapseKey;
+        const issueId = el.dataset.issueId ? parseInt(el.dataset.issueId, 10) : NaN;
+
+        switch (e.key) {
+          case 'Enter':
+          case ' ':
+            e.preventDefault();
+            if (!isNaN(issueId)) {
+              vscode.postMessage({ command: 'openIssue', issueId });
+            }
+            break;
+          case 'ArrowUp':
+            e.preventDefault();
+            if (index > 0) {
+              allLabels[index - 1].focus();
+            }
+            break;
+          case 'ArrowDown':
+            e.preventDefault();
+            if (index < allLabels.length - 1) {
+              allLabels[index + 1].focus();
+            }
+            break;
+          case 'ArrowLeft':
+            e.preventDefault();
+            // Collapse current row if it has children
+            if (collapseKey) {
+              vscode.postMessage({ command: 'toggleCollapse', collapseKey, action: 'collapse' });
+            }
+            break;
+          case 'ArrowRight':
+            e.preventDefault();
+            // Expand current row if it has children
+            if (collapseKey) {
+              vscode.postMessage({ command: 'toggleCollapse', collapseKey, action: 'expand' });
+            }
+            break;
         }
       });
     });
