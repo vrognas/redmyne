@@ -59,6 +59,17 @@ Desktop clients like RedmineX replicate Redmine's full project management interf
 - Time entries grouped by Today/Week/Month
 - Issue actions: change status, log time, quick update
 
+### Workflow
+
+The sidebar views follow a natural planning flow:
+
+**My Issues** → **Personal Tasks** → **Today's Plan** → **My Time Entries**
+
+1. **My Issues** - Issues assigned to you in Redmine
+2. **Personal Tasks** - Your staging area for planning (add issues here to work on later)
+3. **Today's Plan** - What you're working on today (timed work units)
+4. **My Time Entries** - Time logged back to Redmine
+
 ## Compatibility
 
 This extension works with both **Positron IDE** and **VS Code**.
