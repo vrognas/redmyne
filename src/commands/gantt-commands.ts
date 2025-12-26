@@ -8,11 +8,13 @@ import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE, FlexibilityScore } from "../ut
 import { GanttPanel } from "../webviews/gantt-panel";
 import { Issue } from "../redmine/models/issue";
 import { RedmineServer } from "../redmine/redmine-server";
+import { RedmineProject } from "../redmine/redmine-project";
 
 export interface GanttCommandDeps {
   getServer: () => RedmineServer | undefined;
   fetchIssuesIfNeeded: () => Promise<Issue[]>;
   getFlexibilityCache: () => Map<number, FlexibilityScore | null>;
+  getProjects: () => RedmineProject[];
   clearProjects: () => void;
 }
 
@@ -38,7 +40,7 @@ export function registerGanttCommands(
       const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
 
       const panel = GanttPanel.createOrShow(deps.getServer());
-      panel.updateIssues(issues, deps.getFlexibilityCache(), schedule);
+      panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule);
     }),
 
     // Refresh Gantt data without resetting view state
@@ -55,7 +57,7 @@ export function registerGanttCommands(
       const scheduleConfig = vscode.workspace.getConfiguration("redmine.workingHours");
       const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
 
-      panel.updateIssues(issues, deps.getFlexibilityCache(), schedule);
+      panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule);
     }),
 
     // Open specific issue in Gantt (context menu)
@@ -78,7 +80,7 @@ export function registerGanttCommands(
       const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
 
       const panel = GanttPanel.createOrShow(deps.getServer());
-      panel.updateIssues(issues, deps.getFlexibilityCache(), schedule);
+      panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule);
 
       // Wait for webview to render, then scroll to issue
       setTimeout(() => panel.scrollToIssue(issue.id), 100);

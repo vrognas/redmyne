@@ -1,10 +1,12 @@
 import * as vscode from "vscode";
 import { Issue } from "../redmine/models/issue";
 import { RedmineServer } from "../redmine/redmine-server";
+import { RedmineProject } from "../redmine/redmine-project";
 import { FlexibilityScore, WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "../utilities/flexibility-calculator";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { errorToString } from "../utilities/error-feedback";
-import { sortIssuesByRisk } from "../utilities/issue-sorting";
+import { buildProjectHierarchy, flattenHierarchy, HierarchyNode } from "../utilities/hierarchy-builder";
+import { collapseState } from "../utilities/collapse-state";
 
 type ZoomLevel = "day" | "week" | "month" | "quarter" | "year";
 
@@ -58,6 +60,8 @@ interface GanttRow {
   parentKey: string | null;
   /** True if has children (can be collapsed) */
   hasChildren: boolean;
+  /** Child issue date ranges for aggregate bar rendering (projects only) */
+  childDateRanges?: Array<{ startDate: string | null; dueDate: string | null; issueId: number }>;
 }
 
 
@@ -89,101 +93,34 @@ function toGanttIssue(issue: Issue, flexibilityCache: Map<number, FlexibilitySco
 }
 
 /**
- * Build hierarchical rows from flat issues list
- * Groups by project (alphabetically), then organizes parent/child issues (by risk)
- * Uses shared sortIssuesByRisk for consistent sorting with Issues pane
- * @param collapsedKeys Set of collapsed row keys to filter out children
+ * Convert HierarchyNode to GanttRow for SVG rendering
  */
-function buildHierarchicalRows(
-  issues: Issue[],
-  flexibilityCache: Map<number, FlexibilityScore | null>,
-  collapsedKeys: Set<string> = new Set()
-): GanttRow[] {
-  const rows: GanttRow[] = [];
-
-  // Group issues by project
-  const byProject = new Map<number, { name: string; issues: Issue[] }>();
-  for (const issue of issues) {
-    const projectId = issue.project?.id ?? 0;
-    const projectName = issue.project?.name ?? "Unknown";
-    if (!byProject.has(projectId)) {
-      byProject.set(projectId, { name: projectName, issues: [] });
-    }
-    byProject.get(projectId)!.issues.push(issue);
-  }
-
-  // Sort projects alphabetically
-  const sortedProjects = [...byProject.entries()].sort(
-    (a, b) => a[1].name.localeCompare(b[1].name)
-  );
-
-  for (const [projectId, { name, issues: projectIssues }] of sortedProjects) {
-    const projectKey = `project-${projectId}`;
-    const isProjectCollapsed = collapsedKeys.has(projectKey);
-
-    // Add project header
-    rows.push({
+function nodeToGanttRow(node: HierarchyNode, flexibilityCache: Map<number, FlexibilityScore | null>): GanttRow {
+  if (node.type === "project") {
+    return {
       type: "project",
-      id: projectId,
-      label: name,
-      depth: 0,
-      collapseKey: projectKey,
-      parentKey: null,
-      hasChildren: projectIssues.length > 0,
-    });
-
-    // Skip children if project is collapsed
-    if (isProjectCollapsed) {
-      continue;
-    }
-
-    // Build issue tree within project
-    const issueMap = new Map(projectIssues.map((i) => [i.id, i]));
-    const children = new Map<number | null, Issue[]>();
-
-    // Group by parent
-    for (const issue of projectIssues) {
-      const parentId = issue.parent?.id ?? null;
-      // Only use parentId if parent is in this project's issues
-      const effectiveParent = parentId && issueMap.has(parentId) ? parentId : null;
-      if (!children.has(effectiveParent)) {
-        children.set(effectiveParent, []);
-      }
-      children.get(effectiveParent)!.push(issue);
-    }
-
-    // Recursively add issues (sorted by risk using shared sortIssuesByRisk)
-    function addIssues(parentId: number | null, parentKey: string, depth: number) {
-      // Skip if parent is collapsed
-      if (collapsedKeys.has(parentKey)) {
-        return;
-      }
-      // Use shared sorting logic from issue-sorting.ts
-      const childIssues = sortIssuesByRisk(children.get(parentId) || [], flexibilityCache);
-      for (const issue of childIssues) {
-        // Check if this issue has children (is a parent)
-        const hasIssueChildren = children.has(issue.id) && children.get(issue.id)!.length > 0;
-        const issueKey = `issue-${issue.id}`;
-        const ganttIssue = toGanttIssue(issue, flexibilityCache);
-        rows.push({
-          type: "issue",
-          id: issue.id,
-          label: issue.subject,
-          depth,
-          issue: ganttIssue,
-          isParent: hasIssueChildren,
-          collapseKey: issueKey,
-          parentKey,
-          hasChildren: hasIssueChildren,
-        });
-        addIssues(issue.id, issueKey, depth + 1);
-      }
-    }
-
-    addIssues(null, projectKey, 1);
+      id: node.id,
+      label: node.label,
+      depth: node.depth,
+      collapseKey: node.collapseKey,
+      parentKey: node.parentKey,
+      hasChildren: node.children.length > 0,
+      childDateRanges: node.childDateRanges,
+    };
   }
 
-  return rows;
+  const issue = node.issue!;
+  return {
+    type: "issue",
+    id: node.id,
+    label: node.label,
+    depth: node.depth,
+    issue: toGanttIssue(issue, flexibilityCache),
+    isParent: node.children.length > 0,
+    collapseKey: node.collapseKey,
+    parentKey: node.parentKey,
+    hasChildren: node.children.length > 0,
+  };
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -373,6 +310,7 @@ export class GanttPanel {
   private readonly _panel: vscode.WebviewPanel;
   private _disposables: vscode.Disposable[] = [];
   private _issues: Issue[] = [];
+  private _projects: RedmineProject[] = [];
   private _flexibilityCache: Map<number, FlexibilityScore | null> = new Map();
   private _server: RedmineServer | undefined;
   private _zoomLevel: ZoomLevel = "day";
@@ -381,7 +319,6 @@ export class GanttPanel {
   private _showDependencies: boolean = true;
   private _showIntensity: boolean = false;
   private _scrollPosition: { left: number; top: number } = { left: 0, top: 0 };
-  private _collapsedKeys: Set<string> = new Set();
 
   private constructor(panel: vscode.WebviewPanel, server?: RedmineServer) {
     this._panel = panel;
@@ -391,6 +328,11 @@ export class GanttPanel {
       (message) => this._handleMessage(message),
       null,
       this._disposables
+    );
+
+    // Listen for collapse state changes from other views (Issues pane)
+    this._disposables.push(
+      collapseState.onDidChange(() => this._updateContent())
     );
   }
 
@@ -494,6 +436,7 @@ export class GanttPanel {
   public updateIssues(
     issues: Issue[],
     flexibilityCache: Map<number, FlexibilityScore | null>,
+    projects: RedmineProject[],
     schedule?: WeeklySchedule
   ): void {
     // Update schedule if provided
@@ -501,8 +444,9 @@ export class GanttPanel {
       this._schedule = schedule;
     }
 
-    // Store issues with dates and flexibilityCache for shared sorting
+    // Store issues with dates, projects, and flexibilityCache for shared sorting
     this._issues = issues.filter((i) => i.start_date || i.due_date);
+    this._projects = projects;
     this._flexibilityCache = flexibilityCache;
 
     this._updateContent();
@@ -600,23 +544,16 @@ export class GanttPanel {
       case "toggleCollapse":
         if (message.collapseKey) {
           const key = message.collapseKey as string;
-          const isCollapsed = this._collapsedKeys.has(key);
+          // Use shared collapse state (syncs with Issues pane)
           // action: 'collapse' = only collapse, 'expand' = only expand, undefined = toggle
-          if (message.action === "collapse" && !isCollapsed) {
-            this._collapsedKeys.add(key);
-            this._updateContent();
-          } else if (message.action === "expand" && isCollapsed) {
-            this._collapsedKeys.delete(key);
-            this._updateContent();
-          } else if (!message.action) {
-            // Toggle
-            if (isCollapsed) {
-              this._collapsedKeys.delete(key);
-            } else {
-              this._collapsedKeys.add(key);
-            }
-            this._updateContent();
+          if (message.action === "collapse") {
+            collapseState.collapse(key);
+          } else if (message.action === "expand") {
+            collapseState.expand(key);
+          } else {
+            collapseState.toggle(key);
           }
+          // Note: _updateContent() called via collapseState.onDidChange listener
         }
         break;
       case "scrollPosition":
@@ -911,8 +848,10 @@ export class GanttPanel {
     const headerHeight = 40;
     const indentSize = 16;
 
-    // Build hierarchical rows
-    const rows = buildHierarchicalRows(this._issues, this._flexibilityCache, this._collapsedKeys);
+    // Build hierarchical rows using shared hierarchy builder (with project hierarchy)
+    const hierarchy = buildProjectHierarchy(this._issues, this._flexibilityCache, this._projects);
+    const flatNodes = flattenHierarchy(hierarchy, collapseState.getExpandedKeys());
+    const rows = flatNodes.map((node) => nodeToGanttRow(node, this._flexibilityCache));
     const contentHeight = rows.length * (barHeight + barGap);
     const chevronWidth = 14;
 
@@ -921,7 +860,7 @@ export class GanttPanel {
       .map((row, index) => {
         const y = index * (barHeight + barGap);
         const indent = row.depth * indentSize;
-        const isCollapsed = this._collapsedKeys.has(row.collapseKey);
+        const isCollapsed = collapseState.isCollapsed(row.collapseKey);
         const chevron = row.hasChildren
           ? `<text class="collapse-toggle" data-collapse-key="${row.collapseKey}" x="${3 + indent}" y="${y + barHeight / 2 + 4}" fill="var(--vscode-foreground)" font-size="10" style="cursor: pointer; user-select: none;">${isCollapsed ? "▶" : "▼"}</text>`
           : "";
@@ -967,9 +906,35 @@ export class GanttPanel {
     // Right bars (scrollable timeline) - only for issue rows
     const bars = rows
       .map((row, index) => {
-        // Skip project headers - no bar
+        // Project headers: show aggregate bars when collapsed
         if (row.type === "project") {
-          return "";
+          const isCollapsed = collapseState.isCollapsed(row.collapseKey);
+          if (!isCollapsed || !row.childDateRanges || row.childDateRanges.length === 0) {
+            return "";
+          }
+
+          // Render aggregate bars for each child issue date range
+          const y = index * (barHeight + barGap);
+          const aggregateBars = row.childDateRanges
+            .filter(range => range.startDate || range.dueDate)
+            .map(range => {
+              const startDate = range.startDate ?? range.dueDate!;
+              const dueDate = range.dueDate ?? range.startDate!;
+              const start = new Date(startDate);
+              const end = new Date(dueDate);
+              const endPlusOne = new Date(end);
+              endPlusOne.setUTCDate(endPlusOne.getUTCDate() + 1);
+
+              const startX = ((start.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
+              const endX = ((endPlusOne.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
+              const width = Math.max(4, endX - startX);
+
+              return `<rect x="${startX}" y="${y + 4}" width="${width}" height="${barHeight - 8}"
+                            fill="var(--vscode-descriptionForeground)" opacity="0.5" rx="2" ry="2"/>`;
+            })
+            .join("");
+
+          return `<g class="aggregate-bars">${aggregateBars}</g>`;
         }
 
         const issue = row.issue!;
@@ -1508,6 +1473,17 @@ ${style.tip}
     .dependency-arrow .arrow-head { transition: filter 0.15s; }
     .dependency-arrow:hover .arrow-line { stroke-width: 3 !important; filter: brightness(1.2); }
     .dependency-arrow:hover .arrow-head { filter: brightness(1.2); }
+    /* Dependency hover - highlight connected issues, fade others */
+    .dependency-focus .issue-bar,
+    .dependency-focus .issue-label,
+    .dependency-focus .project-label,
+    .dependency-focus .aggregate-bars { opacity: 0.15; transition: opacity 0.15s ease-out; }
+    .dependency-focus .issue-bar.dependency-highlighted,
+    .dependency-focus .issue-label.dependency-highlighted { opacity: 1 !important; }
+    .dependency-focus .dependency-arrow:not(.dependency-hovered) .arrow-line,
+    .dependency-focus .dependency-arrow:not(.dependency-hovered) .arrow-head { opacity: 0.15; }
+    .dependency-focus .dependency-arrow.dependency-hovered .arrow-line { stroke-width: 3; filter: brightness(1.3) drop-shadow(0 0 4px currentColor); }
+    .dependency-focus .dependency-arrow.dependency-hovered .arrow-head { filter: brightness(1.3) drop-shadow(0 0 4px currentColor); }
     /* Relation type colors in legend */
     .relation-legend { display: flex; gap: 12px; font-size: 11px; margin-left: 12px; align-items: center; }
     .relation-legend-item { display: flex; align-items: center; gap: 4px; opacity: 0.8; }
@@ -1529,6 +1505,8 @@ ${style.tip}
     .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 0.5; opacity: 0.3; }
     .date-marker { stroke: var(--vscode-editorRuler-foreground); stroke-dasharray: 2,2; }
     .today-marker { stroke: var(--vscode-charts-red); stroke-width: 2; }
+    /* Base transitions for dependency focus fade-back */
+    .issue-bar, .issue-label, .project-label, .aggregate-bars { transition: opacity 0.15s ease-out; }
     /* Respect reduced motion preference */
     @media (prefers-reduced-motion: reduce) {
       .spinner { animation: none; }
@@ -1536,6 +1514,7 @@ ${style.tip}
       .gantt-resize-handle { transition: none; }
       .dependency-arrow .arrow-line { transition: none; }
       .dependency-arrow .arrow-head { transition: none; }
+      .issue-bar, .issue-label, .project-label, .aggregate-bars { transition: none; }
     }
   </style>
 </head>
@@ -1909,8 +1888,31 @@ ${style.tip}
       }, 0);
     }
 
-    // Right-click on dependency arrow to delete
+    // Dependency arrow interactions (hover highlight + right-click delete)
     document.querySelectorAll('.dependency-arrow').forEach(arrow => {
+      // Hover: highlight connected issues, fade others
+      arrow.addEventListener('mouseenter', () => {
+        const fromId = arrow.dataset.from;
+        const toId = arrow.dataset.to;
+        document.body.classList.add('dependency-focus');
+        arrow.classList.add('dependency-hovered');
+        // Highlight source and target bars
+        document.querySelectorAll('.issue-bar[data-issue-id="' + fromId + '"], .issue-bar[data-issue-id="' + toId + '"]').forEach(el => {
+          el.classList.add('dependency-highlighted');
+        });
+        // Highlight source and target labels
+        document.querySelectorAll('.issue-label[data-issue-id="' + fromId + '"], .issue-label[data-issue-id="' + toId + '"]').forEach(el => {
+          el.classList.add('dependency-highlighted');
+        });
+      });
+      arrow.addEventListener('mouseleave', () => {
+        document.body.classList.remove('dependency-focus');
+        arrow.classList.remove('dependency-hovered');
+        document.querySelectorAll('.dependency-highlighted').forEach(el => {
+          el.classList.remove('dependency-highlighted');
+        });
+      });
+      // Right-click: show delete option
       arrow.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         const relationId = parseInt(arrow.dataset.relationId);

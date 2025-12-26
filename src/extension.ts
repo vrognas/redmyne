@@ -13,6 +13,7 @@ import { quickLogTime } from "./commands/quick-log-time";
 import { quickCreateIssue, quickCreateSubIssue } from "./commands/quick-create-issue";
 import { ActionProperties } from "./commands/action-properties";
 import { ProjectsTree, ProjectsViewStyle } from "./trees/projects-tree";
+import { collapseState } from "./utilities/collapse-state";
 import { MyTimeEntriesTreeDataProvider } from "./trees/my-time-entries-tree";
 import { RedmineSecretManager } from "./utilities/secret-manager";
 import { setApiKey } from "./commands/set-api-key";
@@ -103,6 +104,30 @@ export function activate(context: vscode.ExtensionContext): void {
   cleanupResources.projectsTreeView = vscode.window.createTreeView("redmine-explorer-projects", {
     treeDataProvider: projectsTree,
   });
+
+  // Sync collapse state between Issues pane and Gantt
+  const getCollapseKey = (element: unknown): string | null => {
+    if (!element || typeof element !== "object") return null;
+    // ProjectNode has 'project' property with 'id'
+    if ("project" in element && element.project && typeof element.project === "object" && "id" in element.project) {
+      return `project-${(element.project as { id: number }).id}`;
+    }
+    // Issue has 'id' and 'subject'
+    if ("id" in element && "subject" in element) {
+      return `issue-${(element as { id: number }).id}`;
+    }
+    return null;
+  };
+
+  cleanupResources.projectsTreeView.onDidExpandElement((e) => {
+    const key = getCollapseKey(e.element);
+    if (key) collapseState.expand(key);
+  });
+  cleanupResources.projectsTreeView.onDidCollapseElement((e) => {
+    const key = getCollapseKey(e.element);
+    if (key) collapseState.collapse(key);
+  });
+
   cleanupResources.myTimeEntriesTreeView = vscode.window.createTreeView("redmine-explorer-my-time-entries", {
     treeDataProvider: myTimeEntriesTree,
   });
@@ -313,6 +338,7 @@ export function activate(context: vscode.ExtensionContext): void {
     getServer: () => projectsTree.server,
     fetchIssuesIfNeeded: () => projectsTree.fetchIssuesIfNeeded(),
     getFlexibilityCache: () => projectsTree.getFlexibilityCache(),
+    getProjects: () => projectsTree.getProjects(),
     clearProjects: () => projectsTree.clearProjects(),
   });
 

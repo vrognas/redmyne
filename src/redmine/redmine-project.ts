@@ -26,6 +26,10 @@ export class RedmineProject {
     return this.options.id;
   }
 
+  get name() {
+    return this.options.name;
+  }
+
   get parent() {
     return this.options.parent;
   }

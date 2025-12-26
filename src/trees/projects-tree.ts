@@ -345,6 +345,13 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   }
 
   /**
+   * Get cached projects for external use (Gantt)
+   */
+  getProjects(): RedmineProject[] {
+    return this.projects ?? [];
+  }
+
+  /**
    * Get flexibility cache for Gantt display
    */
   getFlexibilityCache(): Map<number, FlexibilityScore | null> {
