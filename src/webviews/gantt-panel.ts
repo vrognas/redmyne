@@ -1713,11 +1713,18 @@ ${style.tip}
         if (label) {
           label.scrollIntoView({ behavior: 'smooth', block: 'center' });
           label.focus();
-          // Highlight briefly
           label.classList.add('highlighted');
           setTimeout(() => label.classList.remove('highlighted'), 2000);
         }
         if (bar) {
+          // Scroll bar into view horizontally (focus on start of bar)
+          const timeline = document.querySelector('.gantt-timeline');
+          if (timeline) {
+            const barRect = bar.getBoundingClientRect();
+            const timelineRect = timeline.getBoundingClientRect();
+            const scrollLeft = timeline.scrollLeft + barRect.left - timelineRect.left - 100;
+            timeline.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' });
+          }
           bar.classList.add('highlighted');
           setTimeout(() => bar.classList.remove('highlighted'), 2000);
         }
