@@ -37,6 +37,7 @@ import { registerConfigureCommand } from "./commands/configure-command";
 import { registerViewCommands } from "./commands/view-commands";
 import { registerCreateTestIssuesCommand } from "./commands/create-test-issues";
 import { WorkloadStatusBar } from "./status-bars/workload-status-bar";
+import { autoUpdateTracker } from "./utilities/auto-update-tracker";
 
 // Constants
 const CONFIG_DEBOUNCE_MS = 300;
@@ -66,6 +67,8 @@ let cleanupResources: {
 } = {};
 
 export function activate(context: vscode.ExtensionContext): void {
+  // Initialize auto-update tracker
+  autoUpdateTracker.initialize(context);
 
   const bucket = {
     servers: [] as RedmineServer[],
@@ -742,6 +745,23 @@ export function activate(context: vscode.ExtensionContext): void {
         // Reveal the issue in the tree view
         await cleanupResources.projectsTreeView.reveal(issue, { select: true, focus: true, expand: true });
       }
+    })
+  );
+
+  // Toggle auto-update %done for issue (opt-in per issue)
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.toggleAutoUpdateDoneRatio", async (issue: { id: number } | undefined) => {
+      if (!issue?.id) {
+        vscode.window.showErrorMessage("Could not determine issue ID");
+        return;
+      }
+      const nowEnabled = autoUpdateTracker.toggle(issue.id);
+      showStatusBarMessage(
+        nowEnabled
+          ? `$(check) Auto-update %done enabled for #${issue.id}`
+          : `$(x) Auto-update %done disabled for #${issue.id}`,
+        2000
+      );
     })
   );
 

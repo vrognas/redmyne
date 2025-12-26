@@ -597,6 +597,11 @@ export class GanttPanel {
           vscode.commands.executeCommand("redmine.copyIssueUrl", { id: message.issueId });
         }
         break;
+      case "toggleAutoUpdate":
+        if (message.issueId) {
+          vscode.commands.executeCommand("redmine.toggleAutoUpdateDoneRatio", { id: message.issueId });
+        }
+        break;
     }
   }
 
@@ -2029,6 +2034,7 @@ ${style.tip}
         { icon: '📋', label: 'Show in Issues', command: 'showInIssues' },
         { icon: '⏱️', label: 'Log Time', command: 'logTime' },
         { icon: '📊', label: 'Set % Done', command: 'setDoneRatio' },
+        { icon: '🔄', label: 'Toggle Auto-update %', command: 'toggleAutoUpdate' },
         { icon: '📎', label: 'Copy URL', command: 'copyUrl' },
       ];
 

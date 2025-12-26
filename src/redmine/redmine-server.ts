@@ -466,15 +466,20 @@ export class RedmineServer {
   /**
    * Auto-update done_ratio based on spent/estimated hours
    * Rules: 0% if no estimate, cap at 99% (100% must be manual),
-   * skip if already 100%, skip if over budget (spent > estimated)
+   * skip if already 100%, skip if over budget (spent > estimated),
+   * skip if issue not opted-in
    */
   private async autoUpdateDoneRatio(issueId: number): Promise<void> {
     try {
-      // Check if auto-update is enabled
+      // Check if auto-update is enabled globally
       const config = await import("vscode").then(vscode =>
         vscode.workspace.getConfiguration("redmine")
       );
       if (!config.get<boolean>("autoUpdateDoneRatio", true)) return;
+
+      // Check if this specific issue is opted-in
+      const { autoUpdateTracker } = await import("../utilities/auto-update-tracker");
+      if (!autoUpdateTracker.isEnabled(issueId)) return;
 
       const { issue } = await this.getIssueById(issueId);
       const estimated = issue.estimated_hours ?? 0;

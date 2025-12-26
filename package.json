@@ -369,6 +369,11 @@
         "command": "redmine.personalTasks.addToPlan",
         "title": "Add to Today's Plan",
         "icon": "$(calendar)"
+      },
+      {
+        "command": "redmine.toggleAutoUpdateDoneRatio",
+        "title": "Toggle Auto-update % Done",
+        "icon": "$(sync)"
       }
     ],
     "keybindings": [
@@ -752,6 +757,10 @@
         {
           "command": "redmine.personalTasks.addToPlan",
           "when": "false"
+        },
+        {
+          "command": "redmine.toggleAutoUpdateDoneRatio",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -920,6 +929,16 @@
           "command": "redmine.quickCreateSubIssue",
           "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
           "group": "redmine@2"
+        },
+        {
+          "command": "redmine.toggleAutoUpdateDoneRatio",
+          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^issue/",
+          "group": "redmine@3"
+        },
+        {
+          "command": "redmine.toggleAutoUpdateDoneRatio",
+          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
+          "group": "redmine@3"
         },
         {
           "command": "redmine.addIssueToPersonalTasks",
