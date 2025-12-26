@@ -2030,17 +2030,18 @@ ${style.tip}
       picker.appendChild(label);
 
       const options = [
-        { icon: '🌐', label: 'Open in Browser', command: 'openInBrowser' },
-        { icon: '📋', label: 'Show in Issues', command: 'showInIssues' },
-        { icon: '⏱️', label: 'Log Time', command: 'logTime' },
-        { icon: '📊', label: 'Set % Done', command: 'setDoneRatio' },
-        { icon: '🔄', label: 'Toggle Auto-update %', command: 'toggleAutoUpdate' },
-        { icon: '📎', label: 'Copy URL', command: 'copyUrl' },
+        { label: 'Update Issue...', command: 'openIssue' },
+        { label: 'Open in Browser', command: 'openInBrowser' },
+        { label: 'Show in Issues', command: 'showInIssues' },
+        { label: 'Log Time', command: 'logTime' },
+        { label: 'Set % Done', command: 'setDoneRatio' },
+        { label: 'Toggle Auto-update %', command: 'toggleAutoUpdate' },
+        { label: 'Copy URL', command: 'copyUrl' },
       ];
 
       options.forEach(opt => {
         const btn = document.createElement('button');
-        btn.textContent = opt.icon + ' ' + opt.label;
+        btn.textContent = opt.label;
         btn.addEventListener('click', () => {
           vscode.postMessage({ command: opt.command, issueId: parseInt(issueId) });
           picker.remove();
@@ -2204,7 +2205,7 @@ ${style.tip}
       }
     }
 
-    // Handle click on bar (open issue) - attach to entire issue-bar group
+    // Handle click on bar - scroll to issue start date and highlight
     document.querySelectorAll('.issue-bar').forEach(bar => {
       bar.addEventListener('click', (e) => {
         // Ignore if clicking on drag handles or link handle
@@ -2216,8 +2217,7 @@ ${style.tip}
           return;
         }
         if (dragState || linkingState) return;
-        const issueId = parseInt(bar.dataset.issueId);
-        vscode.postMessage({ command: 'openIssue', issueId });
+        scrollToAndHighlight(bar.dataset.issueId);
       });
     });
 
@@ -2225,10 +2225,9 @@ ${style.tip}
     const issueBars = Array.from(document.querySelectorAll('.issue-bar'));
     issueBars.forEach((bar, index) => {
       bar.addEventListener('keydown', (e) => {
-        const issueId = parseInt(bar.dataset.issueId);
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          vscode.postMessage({ command: 'openIssue', issueId });
+          scrollToAndHighlight(bar.dataset.issueId);
         } else if (e.key === 'ArrowDown' && index < issueBars.length - 1) {
           e.preventDefault();
           issueBars[index + 1].focus();
@@ -2307,11 +2306,11 @@ ${style.tip}
 
     allLabels.forEach((el, index) => {
       el.addEventListener('click', (e) => {
-        // Don't open issue if clicking on chevron
+        // Don't scroll if clicking on chevron
         if (e.target.classList?.contains('collapse-toggle')) return;
-        const issueId = el.dataset.issueId ? parseInt(el.dataset.issueId, 10) : NaN;
-        if (!isNaN(issueId)) {
-          vscode.postMessage({ command: 'openIssue', issueId });
+        const issueId = el.dataset.issueId;
+        if (issueId) {
+          scrollToAndHighlight(issueId);
         }
       });
 
@@ -2554,6 +2553,26 @@ ${style.tip}
       if (timelineColumn && todayX > 0) {
         const containerWidth = timelineColumn.clientWidth;
         timelineColumn.scrollLeft = Math.max(0, todayX - containerWidth / 2);
+      }
+    }
+
+    // Scroll to and highlight an issue (for click/keyboard navigation)
+    function scrollToAndHighlight(issueId) {
+      if (!issueId) return;
+      const label = document.querySelector('.issue-label[data-issue-id="' + issueId + '"]');
+      const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
+      if (label) {
+        label.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        label.classList.add('highlighted');
+        setTimeout(() => label.classList.remove('highlighted'), 1500);
+      }
+      if (bar && timelineColumn) {
+        const barRect = bar.getBoundingClientRect();
+        const timelineRect = timelineColumn.getBoundingClientRect();
+        const scrollLeft = timelineColumn.scrollLeft + barRect.left - timelineRect.left - 100;
+        timelineColumn.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' });
+        bar.classList.add('highlighted');
+        setTimeout(() => bar.classList.remove('highlighted'), 1500);
       }
     }
 
