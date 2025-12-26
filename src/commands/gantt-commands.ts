@@ -48,8 +48,7 @@ export function registerGanttCommands(
       const panel = GanttPanel.currentPanel;
       if (!panel) return;
 
-      // Clear cache and re-fetch
-      deps.clearProjects();
+      // Use already-fetched data (don't clear cache to avoid refresh loop)
       const issues = await deps.fetchIssuesIfNeeded();
 
       if (issues.length === 0) return;
