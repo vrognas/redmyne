@@ -17,8 +17,10 @@ const ZOOM_PIXELS_PER_DAY: Record<ZoomLevel, number> = {
   year: 0.8,
 };
 
-// All Redmine relation types
-type RelationType = "relates" | "duplicates" | "blocks" | "precedes" | "follows" | "copied_to";
+// Redmine relation types (creatable via API)
+type CreatableRelationType = "relates" | "duplicates" | "blocks" | "precedes" | "follows" | "copied_to";
+// All relation types (including inverse types returned by API)
+type RelationType = CreatableRelationType | "blocked";
 
 interface GanttRelation {
   id: number;
@@ -52,8 +54,49 @@ interface GanttRow {
 }
 
 /**
+ * Get sort priority for flexibility status (lower = more urgent)
+ */
+function getStatusPriority(status: FlexibilityScore["status"] | null): number {
+  switch (status) {
+    case "overbooked": return 0;
+    case "at-risk": return 1;
+    case "on-track": return 2;
+    case "completed": return 3;
+    default: return 4;
+  }
+}
+
+/**
+ * Check if GanttIssue is blocked
+ */
+function isGanttIssueBlocked(issue: GanttIssue): boolean {
+  return issue.relations.some((r) => r.type === "blocked");
+}
+
+/**
+ * Sort issues by risk (reuses logic from issue-sorting.ts)
+ */
+function sortGanttIssuesByRisk(issues: GanttIssue[]): GanttIssue[] {
+  return [...issues].sort((a, b) => {
+    // Blocked issues sink to bottom
+    const blockedA = isGanttIssueBlocked(a);
+    const blockedB = isGanttIssueBlocked(b);
+    if (blockedA && !blockedB) return 1;
+    if (!blockedA && blockedB) return -1;
+
+    // Sort by status priority
+    const priorityA = getStatusPriority(a.status);
+    const priorityB = getStatusPriority(b.status);
+    if (priorityA !== priorityB) return priorityA - priorityB;
+
+    // Same status - sort by ID (descending = newer first)
+    return b.id - a.id;
+  });
+}
+
+/**
  * Build hierarchical rows from flat issues list
- * Groups by project, then organizes parent/child issues
+ * Groups by project (alphabetically), then organizes parent/child issues (by risk)
  */
 function buildHierarchicalRows(issues: GanttIssue[]): GanttRow[] {
   const rows: GanttRow[] = [];
@@ -67,9 +110,9 @@ function buildHierarchicalRows(issues: GanttIssue[]): GanttRow[] {
     byProject.get(issue.projectId)!.issues.push(issue);
   }
 
-  // Sort projects by issue count (descending)
+  // Sort projects alphabetically
   const sortedProjects = [...byProject.entries()].sort(
-    (a, b) => b[1].issues.length - a[1].issues.length
+    (a, b) => a[1].name.localeCompare(b[1].name)
   );
 
   for (const [projectId, { name, issues: projectIssues }] of sortedProjects) {
@@ -96,9 +139,9 @@ function buildHierarchicalRows(issues: GanttIssue[]): GanttRow[] {
       children.get(effectiveParent)!.push(issue);
     }
 
-    // Recursively add issues
+    // Recursively add issues (sorted by risk at each level)
     function addIssues(parentId: number | null, depth: number) {
-      const childIssues = children.get(parentId) || [];
+      const childIssues = sortGanttIssuesByRisk(children.get(parentId) || []);
       for (const issue of childIssues) {
         // Check if this issue has children (is a parent)
         const hasChildren = children.has(issue.id) && children.get(issue.id)!.length > 0;
@@ -488,7 +531,7 @@ export class GanttPanel {
     zoomLevel?: ZoomLevel;
     relationId?: number;
     targetIssueId?: number;
-    relationType?: RelationType;
+    relationType?: CreatableRelationType;
     left?: number;
     top?: number;
     operation?: string;
@@ -654,11 +697,11 @@ export class GanttPanel {
   private async _createRelation(
     issueId: number,
     targetIssueId: number,
-    relationType: RelationType
+    relationType: CreatableRelationType
   ): Promise<void> {
     if (!this._server) return;
 
-    const labels: Record<RelationType, string> = {
+    const labels: Record<CreatableRelationType, string> = {
       relates: "Related to",
       duplicates: "Duplicates",
       blocks: "Blocks",
@@ -738,7 +781,7 @@ export class GanttPanel {
         const response = await this._server.createRelation(
           message.issueId,
           message.targetIssueId,
-          message.relationType as RelationType
+          message.relationType as CreatableRelationType
         );
         // Send new relationId to update redo stack
         this._panel.webview.postMessage({
@@ -772,7 +815,7 @@ export class GanttPanel {
         const response = await this._server.createRelation(
           message.issueId,
           message.targetIssueId,
-          message.relationType as RelationType
+          message.relationType as CreatableRelationType
         );
         // Send new relationId to update undo stack
         this._panel.webview.postMessage({
