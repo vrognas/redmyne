@@ -33,6 +33,7 @@ import { getTaskStatus } from "./kanban/kanban-state";
 import { registerTimeEntryCommands } from "./commands/time-entry-commands";
 import { registerMonthlyScheduleCommands } from "./commands/monthly-schedule-commands";
 import { registerGanttCommands } from "./commands/gantt-commands";
+import { GanttPanel } from "./webviews/gantt-panel";
 import { registerConfigureCommand } from "./commands/configure-command";
 import { registerViewCommands } from "./commands/view-commands";
 import { registerCreateTestIssuesCommand } from "./commands/create-test-issues";
@@ -698,8 +699,8 @@ export function activate(context: vscode.ExtensionContext): void {
       try {
         await server.updateDoneRatio(issue.id, selected.value);
         showStatusBarMessage(`$(check) #${issue.id} set to ${selected.value}%`, 2000);
-        projectsTree.clearProjects();
-        projectsTree.refresh();
+        // Update only the Gantt panel if open, avoid full tree refresh
+        GanttPanel.currentPanel?.updateIssueDoneRatio(issue.id, selected.value);
       } catch (error) {
         vscode.window.showErrorMessage(`Failed to update: ${error}`);
       }

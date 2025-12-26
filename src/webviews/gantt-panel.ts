@@ -453,6 +453,17 @@ export class GanttPanel {
   }
 
   /**
+   * Update a single issue's done_ratio without full refresh
+   */
+  public updateIssueDoneRatio(issueId: number, doneRatio: number): void {
+    const issue = this._issues.find((i) => i.id === issueId);
+    if (issue) {
+      issue.done_ratio = doneRatio;
+      this._updateContent();
+    }
+  }
+
+  /**
    * Scroll to and highlight a specific issue in the Gantt chart
    */
   public scrollToIssue(issueId: number): void {
