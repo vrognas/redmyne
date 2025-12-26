@@ -16,6 +16,7 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 - **Faster time entries** - batch issue fetching replaces N+1 individual API calls
 - **Gantt click behavior** - clicking issue/bar now scrolls to bar start instead of opening update dialog
 - **Gantt context menu** - added "Update Issue..." option, removed emojis for native VS Code look
+- **Faster hierarchy building** - O(n) project children lookup instead of O(n²)
 
 ### Fixed
 
