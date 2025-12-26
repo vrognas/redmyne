@@ -38,7 +38,7 @@ describe("MyIssuesTree", () => {
       author: { id: 1, name: "Viktor Rognås" },
       project: { id: 1, name: "Test Project" },
       priority: { id: 1, name: "Normal" },
-      description: "Test description",
+      description: "",
       created_on: "2024-01-01",
       updated_on: "2024-01-01",
     };

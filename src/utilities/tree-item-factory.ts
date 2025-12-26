@@ -74,6 +74,7 @@ export function createEnhancedIssueTreeItem(
 
   const spentHours = issue.spent_hours ?? 0;
   const estHours = issue.estimated_hours ?? 0;
+  const hasDescription = !!issue.description?.trim();
 
   if (flexibility) {
     const config = STATUS_CONFIG[flexibility.status];
@@ -81,7 +82,8 @@ export function createEnhancedIssueTreeItem(
     // Reduced density: just hours and days, no status text or prefixes
     // Status is conveyed via icon color, blocked/billable in tooltip
     const baseDesc = `${formatHoursAsHHMM(spentHours)}/${formatHoursAsHHMM(estHours)} • ${flexibility.daysRemaining}d`;
-    treeItem.description = assignee ? `${baseDesc} • ${assignee}` : baseDesc;
+    const descIndicator = hasDescription ? " ⋯" : "";
+    treeItem.description = assignee ? `${baseDesc} • ${assignee}${descIndicator}` : `${baseDesc}${descIndicator}`;
 
     // Icon color conveys status (no text needed)
     const iconColor = new vscode.ThemeColor(config.color);
@@ -96,7 +98,8 @@ export function createEnhancedIssueTreeItem(
   } else {
     // No flexibility data - show hours only, neutral icon
     const baseDesc = `${formatHoursAsHHMM(spentHours)}/${formatHoursAsHHMM(estHours)}`;
-    treeItem.description = assignee ? `${baseDesc} • ${assignee}` : baseDesc;
+    const descIndicator = hasDescription ? " ⋯" : "";
+    treeItem.description = assignee ? `${baseDesc} • ${assignee}${descIndicator}` : `${baseDesc}${descIndicator}`;
     treeItem.iconPath = new vscode.ThemeIcon("circle-outline", new vscode.ThemeColor("list.deemphasizedForeground"));
     treeItem.contextValue = "issue";
 
@@ -144,6 +147,11 @@ function createFlexibilityTooltip(
 
   md.appendMarkdown(`**Status:** ${config.text}\n\n`);
 
+  // Add description if present
+  if (issue.description?.trim()) {
+    md.appendMarkdown(`---\n\n${issue.description.trim()}\n\n`);
+  }
+
   // Add relations if present
   if (issue.relations && issue.relations.length > 0) {
     const relationsText = formatRelations(issue.relations);
@@ -184,6 +192,11 @@ function createBasicTooltip(
 
   if (estHours > 0 || spentHours > 0) {
     md.appendMarkdown(`**Hours:** ${formatHoursAsHHMM(spentHours)} / ${formatHoursAsHHMM(estHours)}\n\n`);
+  }
+
+  // Add description if present
+  if (issue.description?.trim()) {
+    md.appendMarkdown(`---\n\n${issue.description.trim()}\n\n`);
   }
 
   // Add relations if present

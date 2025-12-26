@@ -62,7 +62,7 @@ describe("createEnhancedIssueTreeItem", () => {
     project: { id: 1, name: "Test Project" },
     priority: { id: 1, name: "Normal" },
     assigned_to: { id: 2, name: "Assignee" },
-    description: "Test description",
+    description: "",
     start_date: "2025-11-01",
     due_date: "2025-11-30",
     done_ratio: 50,
