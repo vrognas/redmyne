@@ -466,6 +466,16 @@ export class GanttPanel {
     this._updateContent();
   }
 
+  /**
+   * Scroll to and highlight a specific issue in the Gantt chart
+   */
+  public scrollToIssue(issueId: number): void {
+    this._panel.webview.postMessage({
+      command: "scrollToIssue",
+      issueId,
+    });
+  }
+
   private _updateContent(): void {
     this._panel.webview.html = this._getHtmlContent();
   }
@@ -1407,6 +1417,10 @@ ${style.tip}
     .issue-bar.linking-source .bar-outline { stroke-width: 3; stroke: var(--vscode-focusBorder); }
     .issue-bar.linking-source .link-handle { opacity: 1; }
     .issue-bar.link-target .bar-outline { stroke-width: 2; stroke: var(--vscode-charts-green); }
+    .issue-bar.highlighted .bar-outline, .issue-label.highlighted text { stroke: var(--vscode-focusBorder); stroke-width: 3; }
+    .issue-label.highlighted text { fill: var(--vscode-focusBorder); }
+    @keyframes highlight-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .highlighted { animation: highlight-pulse 0.5s ease-in-out 3; }
     .temp-link-arrow { pointer-events: none; }
     .dependency-arrow .arrow-line { transition: stroke-width 0.15s, filter 0.15s; }
     .dependency-arrow .arrow-head { transition: filter 0.15s; }
@@ -1690,6 +1704,22 @@ ${style.tip}
             lastAction.relationId = message.newRelationId;
             saveState();
           }
+        }
+      } else if (message.command === 'scrollToIssue') {
+        // Scroll to, focus, and highlight a specific issue
+        const issueId = message.issueId;
+        const label = document.querySelector('.issue-label[data-issue-id="' + issueId + '"]');
+        const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
+        if (label) {
+          label.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          label.focus();
+          // Highlight briefly
+          label.classList.add('highlighted');
+          setTimeout(() => label.classList.remove('highlighted'), 2000);
+        }
+        if (bar) {
+          bar.classList.add('highlighted');
+          setTimeout(() => bar.classList.remove('highlighted'), 2000);
         }
       }
     });

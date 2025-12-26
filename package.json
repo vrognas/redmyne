@@ -167,6 +167,11 @@
         "icon": "$(link-external)"
       },
       {
+        "command": "redmine.openIssueInGantt",
+        "title": "Open in Gantt",
+        "icon": "$(graph)"
+      },
+      {
         "command": "redmine.copyIssueUrl",
         "title": "Copy Issue URL",
         "icon": "$(copy)"
@@ -610,6 +615,10 @@
           "when": "false"
         },
         {
+          "command": "redmine.openIssueInGantt",
+          "when": "false"
+        },
+        {
           "command": "redmine.copyIssueUrl",
           "when": "false"
         },
@@ -832,6 +841,16 @@
           "command": "redmine.openIssueInBrowser",
           "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
           "group": "navigation@1"
+        },
+        {
+          "command": "redmine.openIssueInGantt",
+          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^issue/",
+          "group": "navigation@2"
+        },
+        {
+          "command": "redmine.openIssueInGantt",
+          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
+          "group": "navigation@2"
         },
         {
           "command": "redmine.quickLogTime",

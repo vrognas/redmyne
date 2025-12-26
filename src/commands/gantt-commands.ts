@@ -56,6 +56,32 @@ export function registerGanttCommands(
       const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
 
       panel.updateIssues(issues, deps.getFlexibilityCache(), schedule);
+    }),
+
+    // Open specific issue in Gantt (context menu)
+    vscode.commands.registerCommand("redmine.openIssueInGantt", async (issue: { id: number } | undefined) => {
+      if (!issue?.id) {
+        vscode.window.showErrorMessage("Could not determine issue ID");
+        return;
+      }
+
+      // Ensure Gantt is open and has data
+      const issues = await deps.fetchIssuesIfNeeded();
+      if (issues.length === 0) {
+        vscode.window.showInformationMessage(
+          "No issues to display. Configure Redmine and assign issues to yourself."
+        );
+        return;
+      }
+
+      const scheduleConfig = vscode.workspace.getConfiguration("redmine.workingHours");
+      const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
+
+      const panel = GanttPanel.createOrShow(deps.getServer());
+      panel.updateIssues(issues, deps.getFlexibilityCache(), schedule);
+
+      // Wait for webview to render, then scroll to issue
+      setTimeout(() => panel.scrollToIssue(issue.id), 100);
     })
   );
 }
