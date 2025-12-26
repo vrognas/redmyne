@@ -59,7 +59,7 @@
       },
       {
         "command": "redmine.refreshIssues",
-        "title": "Redmine: Refresh issues",
+        "title": "Refresh",
         "icon": "$(refresh)"
       },
       {
@@ -116,12 +116,12 @@
       },
       {
         "command": "redmine.toggleTreeView",
-        "title": "Redmine: Toggle Tree View",
+        "title": "Tree View",
         "icon": "$(list-tree)"
       },
       {
         "command": "redmine.toggleListView",
-        "title": "Redmine: Toggle List View",
+        "title": "List View",
         "icon": "$(list-flat)"
       },
       {
@@ -142,7 +142,7 @@
       },
       {
         "command": "redmine.refreshTimeEntries",
-        "title": "Redmine: Refresh time entries",
+        "title": "Refresh",
         "icon": "$(refresh)"
       },
       {
@@ -183,7 +183,7 @@
       },
       {
         "command": "redmine.showGantt",
-        "title": "Redmine: Show Gantt",
+        "title": "Show Gantt",
         "icon": "$(calendar)"
       },
       {
@@ -263,7 +263,7 @@
       },
       {
         "command": "redmine.timer.clearPlan",
-        "title": "Redmine: Clear Plan",
+        "title": "Clear Plan",
         "icon": "$(trash)"
       },
       {
