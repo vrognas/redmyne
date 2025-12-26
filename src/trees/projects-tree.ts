@@ -137,10 +137,11 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
     const subprojectIssues = totalIssuesWithSubprojects - assignedIssues.length;
 
     if (hasAssignedIssues) {
-      // Project with direct assigned issues
+      // Project with direct issues
+      const count = assignedIssues.length;
       const subNote =
         subprojectIssues > 0 ? ` +${subprojectIssues} in subprojects` : "";
-      treeItem.description = `(${assignedIssues.length} assigned${subNote})`;
+      treeItem.description = `(${count}${subNote})`;
       treeItem.iconPath = new vscode.ThemeIcon(
         "folder-opened",
         new vscode.ThemeColor("list.highlightForeground")

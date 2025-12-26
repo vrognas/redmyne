@@ -122,7 +122,7 @@ describe("ProjectsTree", () => {
 
       const treeItem = tree.getTreeItem(projectNode);
 
-      expect(treeItem.description).toBe("(1 assigned)");
+      expect(treeItem.description).toBe("(1)");
     });
   });
 });
