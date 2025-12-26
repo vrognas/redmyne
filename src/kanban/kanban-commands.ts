@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
-import { PersonalTaskController } from "./personal-task-controller";
-import { PersonalTask, TaskPriority, getTaskStatus } from "./personal-task-state";
-import { showCreateTaskDialog, showEditTaskDialog } from "./personal-task-dialogs";
+import { KanbanController } from "./kanban-controller";
+import { KanbanTask, TaskPriority, getTaskStatus } from "./kanban-state";
+import { showCreateTaskDialog, showEditTaskDialog } from "./kanban-dialogs";
 import { RedmineServer } from "../redmine/redmine-server";
 import { TimerController } from "../timer/timer-controller";
 import { createWorkUnit } from "../timer/timer-state";
@@ -9,15 +9,15 @@ import { pickActivityForProject } from "../utilities/issue-picker";
 import { showActionableError } from "../utilities/error-feedback";
 
 interface TaskTreeItem {
-  task?: PersonalTask;
+  task?: KanbanTask;
 }
 
 /**
- * Register all personal task commands
+ * Register all kanban commands
  */
-export function registerPersonalTaskCommands(
+export function registerKanbanCommands(
   _context: vscode.ExtensionContext,
-  controller: PersonalTaskController,
+  controller: KanbanController,
   getServer: () => RedmineServer | undefined,
   getTimerController: () => TimerController | undefined,
   getWorkDurationSeconds: () => number
@@ -26,7 +26,7 @@ export function registerPersonalTaskCommands(
 
   // Add Task
   disposables.push(
-    vscode.commands.registerCommand("redmine.personalTasks.add", async () => {
+    vscode.commands.registerCommand("redmine.kanban.add", async () => {
       const server = getServer();
       if (!server) {
         showActionableError("Redmine not configured", [
@@ -55,7 +55,7 @@ export function registerPersonalTaskCommands(
   // Edit Task
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.personalTasks.edit",
+      "redmine.kanban.edit",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
 
@@ -70,7 +70,7 @@ export function registerPersonalTaskCommands(
   // Delete Task
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.personalTasks.delete",
+      "redmine.kanban.delete",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
 
@@ -89,7 +89,7 @@ export function registerPersonalTaskCommands(
   // Mark Done
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.personalTasks.markDone",
+      "redmine.kanban.markDone",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
         await controller.markDone(item.task.id);
@@ -100,7 +100,7 @@ export function registerPersonalTaskCommands(
   // Reopen
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.personalTasks.reopen",
+      "redmine.kanban.reopen",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
         await controller.reopen(item.task.id);
@@ -111,7 +111,7 @@ export function registerPersonalTaskCommands(
   // Set Priority
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.personalTasks.setPriority",
+      "redmine.kanban.setPriority",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
 
@@ -133,7 +133,7 @@ export function registerPersonalTaskCommands(
   // Open Linked Issue in Browser
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.personalTasks.openInBrowser",
+      "redmine.kanban.openInBrowser",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
 
@@ -153,7 +153,7 @@ export function registerPersonalTaskCommands(
 
   // Clear Done
   disposables.push(
-    vscode.commands.registerCommand("redmine.personalTasks.clearDone", async () => {
+    vscode.commands.registerCommand("redmine.kanban.clearDone", async () => {
       const doneTasks = controller.getTasks().filter((t) => getTaskStatus(t) === "done");
       if (doneTasks.length === 0) {
         vscode.window.showInformationMessage("No done tasks to clear");
@@ -174,7 +174,7 @@ export function registerPersonalTaskCommands(
   // Add to Today's Plan
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.personalTasks.addToPlan",
+      "redmine.kanban.addToPlan",
       async (taskId: string | TaskTreeItem) => {
         const id = typeof taskId === "string" ? taskId : taskId?.task?.id;
         if (!id) return;
@@ -236,10 +236,10 @@ export function registerPersonalTaskCommands(
     )
   );
 
-  // Add issue from My Issues tree to Personal Tasks
+  // Add issue from My Issues tree to Kanban
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.addIssueToPersonalTasks",
+      "redmine.addIssueToKanban",
       async (issue: { id: number; subject: string; project?: { id: number; name: string } }) => {
         if (!issue?.id) {
           vscode.window.showErrorMessage("No issue selected");
@@ -255,7 +255,7 @@ export function registerPersonalTaskCommands(
         );
 
         vscode.window.showInformationMessage(
-          `Added #${issue.id} to Personal Tasks`
+          `Added #${issue.id} to Kanban`
         );
       }
     )

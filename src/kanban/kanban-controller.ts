@@ -1,11 +1,11 @@
 import * as vscode from "vscode";
 import {
-  PersonalTask,
+  KanbanTask,
   TaskPriority,
-  createPersonalTask,
-} from "./personal-task-state";
+  createKanbanTask,
+} from "./kanban-state";
 
-const STORAGE_KEY = "redmine.personalTasks";
+const STORAGE_KEY = "redmine.kanban";
 
 /**
  * Interface for globalState-like storage
@@ -16,10 +16,10 @@ export interface MockGlobalState {
 }
 
 /**
- * Controller for personal tasks with CRUD, persistence, and events
+ * Controller for kanban tasks with CRUD, persistence, and events
  */
-export class PersonalTaskController {
-  private tasks: PersonalTask[] = [];
+export class KanbanController {
+  private tasks: KanbanTask[] = [];
 
   private readonly _onTasksChange = new vscode.EventEmitter<void>();
   readonly onTasksChange = this._onTasksChange.event;
@@ -34,15 +34,15 @@ export class PersonalTaskController {
 
   // --- Getters ---
 
-  getTasks(): PersonalTask[] {
+  getTasks(): KanbanTask[] {
     return [...this.tasks];
   }
 
-  getTaskById(id: string): PersonalTask | undefined {
+  getTaskById(id: string): KanbanTask | undefined {
     return this.tasks.find((t) => t.id === id);
   }
 
-  getTasksByIssueId(issueId: number): PersonalTask[] {
+  getTasksByIssueId(issueId: number): KanbanTask[] {
     return this.tasks.filter((t) => t.linkedIssueId === issueId);
   }
 
@@ -59,8 +59,8 @@ export class PersonalTaskController {
       priority?: TaskPriority;
       estimatedHours?: number;
     }
-  ): Promise<PersonalTask> {
-    const task = createPersonalTask(
+  ): Promise<KanbanTask> {
+    const task = createKanbanTask(
       title,
       linkedIssueId,
       linkedIssueSubject,
@@ -76,7 +76,7 @@ export class PersonalTaskController {
 
   async updateTask(
     id: string,
-    updates: Partial<Pick<PersonalTask, "title" | "description" | "priority" | "estimatedHours">>
+    updates: Partial<Pick<KanbanTask, "title" | "description" | "priority" | "estimatedHours">>
   ): Promise<void> {
     const index = this.tasks.findIndex((t) => t.id === id);
     if (index === -1) return;
@@ -160,10 +160,10 @@ export class PersonalTaskController {
     this.tasks = this.validateAndFilter(stored);
   }
 
-  private validateAndFilter(data: unknown[]): PersonalTask[] {
+  private validateAndFilter(data: unknown[]): KanbanTask[] {
     if (!Array.isArray(data)) return [];
 
-    return data.filter((item): item is PersonalTask => {
+    return data.filter((item): item is KanbanTask => {
       if (!item || typeof item !== "object") return false;
       const obj = item as Record<string, unknown>;
       // Validate all required fields

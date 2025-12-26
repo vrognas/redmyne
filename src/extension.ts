@@ -26,10 +26,10 @@ import { TimerStatusBar } from "./timer/timer-status-bar";
 import { TimerTreeProvider } from "./timer/timer-tree-provider";
 import { registerTimerCommands } from "./timer/timer-commands";
 import { toPersistedState, fromPersistedState, PersistedTimerState } from "./timer/timer-state";
-import { PersonalTaskController } from "./personal-tasks/personal-task-controller";
-import { PersonalTasksTreeProvider } from "./personal-tasks/personal-tasks-tree-provider";
-import { registerPersonalTaskCommands } from "./personal-tasks/personal-task-commands";
-import { getTaskStatus } from "./personal-tasks/personal-task-state";
+import { KanbanController } from "./kanban/kanban-controller";
+import { KanbanTreeProvider } from "./kanban/kanban-tree-provider";
+import { registerKanbanCommands } from "./kanban/kanban-commands";
+import { getTaskStatus } from "./kanban/kanban-state";
 import { registerTimeEntryCommands } from "./commands/time-entry-commands";
 import { registerMonthlyScheduleCommands } from "./commands/monthly-schedule-commands";
 import { registerGanttCommands } from "./commands/gantt-commands";
@@ -50,14 +50,14 @@ let cleanupResources: {
   projectsTreeView?: vscode.TreeView<unknown>;
   myTimeEntriesTreeView?: vscode.TreeView<unknown>;
   timerTreeView?: vscode.TreeView<unknown>;
-  personalTasksTreeView?: vscode.TreeView<unknown>;
+  kanbanTreeView?: vscode.TreeView<unknown>;
   workloadStatusBar?: WorkloadStatusBar;
   configChangeTimeout?: ReturnType<typeof setTimeout>;
   timerController?: TimerController;
   timerStatusBar?: TimerStatusBar;
   timerTreeProvider?: TimerTreeProvider;
-  personalTaskController?: PersonalTaskController;
-  personalTasksTreeProvider?: PersonalTasksTreeProvider;
+  kanbanController?: KanbanController;
+  kanbanTreeProvider?: KanbanTreeProvider;
   bucket?: {
     servers: RedmineServer[];
     projects: RedmineProject[];
@@ -276,9 +276,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
   restoreTimerState();
 
-  // Initialize Personal Tasks (before timer commands so we can pass the callback)
-  const personalTaskController = new PersonalTaskController(context.globalState);
-  cleanupResources.personalTaskController = personalTaskController;
+  // Initialize Kanban (before timer commands so we can pass the callback)
+  const kanbanController = new KanbanController(context.globalState);
+  cleanupResources.kanbanController = kanbanController;
 
   // Register timer commands (needs server access and tree view for selection)
   registerTimerCommands(
@@ -287,36 +287,36 @@ export function activate(context: vscode.ExtensionContext): void {
     () => projectsTree.server,
     cleanupResources.timerTreeView as vscode.TreeView<{ type?: string; index?: number }>,
     {
-      onTimeLogged: async (personalTaskId, hours) => {
-        await personalTaskController.addLoggedHours(personalTaskId, hours);
+      onTimeLogged: async (kanbanTaskId, hours) => {
+        await kanbanController.addLoggedHours(kanbanTaskId, hours);
       },
     }
   );
 
-  const personalTasksTreeProvider = new PersonalTasksTreeProvider(personalTaskController);
-  cleanupResources.personalTasksTreeProvider = personalTasksTreeProvider;
+  const kanbanTreeProvider = new KanbanTreeProvider(kanbanController);
+  cleanupResources.kanbanTreeProvider = kanbanTreeProvider;
 
-  cleanupResources.personalTasksTreeView = vscode.window.createTreeView("redmine-explorer-personal-tasks", {
-    treeDataProvider: personalTasksTreeProvider,
+  cleanupResources.kanbanTreeView = vscode.window.createTreeView("redmine-explorer-kanban", {
+    treeDataProvider: kanbanTreeProvider,
   });
-  context.subscriptions.push(cleanupResources.personalTasksTreeView);
+  context.subscriptions.push(cleanupResources.kanbanTreeView);
 
   // Update context for "Clear Done" button visibility
-  const updatePersonalTasksContext = () => {
-    const tasks = personalTaskController.getTasks();
+  const updateKanbanContext = () => {
+    const tasks = kanbanController.getTasks();
     const hasDone = tasks.some((t) => getTaskStatus(t) === "done");
-    vscode.commands.executeCommand("setContext", "redmine:hasPersonalDoneTasks", hasDone);
+    vscode.commands.executeCommand("setContext", "redmine:hasKanbanDoneTasks", hasDone);
   };
-  updatePersonalTasksContext();
+  updateKanbanContext();
   context.subscriptions.push(
-    personalTaskController.onTasksChange(() => updatePersonalTasksContext())
+    kanbanController.onTasksChange(() => updateKanbanContext())
   );
 
-  // Register personal task commands
+  // Register kanban commands
   context.subscriptions.push(
-    ...registerPersonalTaskCommands(
+    ...registerKanbanCommands(
       context,
-      personalTaskController,
+      kanbanController,
       () => projectsTree.server,
       () => timerController,
       () => workDuration * 60
@@ -820,12 +820,12 @@ export function deactivate(): void {
     cleanupResources.timerController.dispose();
   }
 
-  // Dispose personal tasks resources
-  if (cleanupResources.personalTasksTreeView) {
-    cleanupResources.personalTasksTreeView.dispose();
+  // Dispose kanban resources
+  if (cleanupResources.kanbanTreeView) {
+    cleanupResources.kanbanTreeView.dispose();
   }
-  if (cleanupResources.personalTasksTreeProvider) {
-    cleanupResources.personalTasksTreeProvider.dispose();
+  if (cleanupResources.kanbanTreeProvider) {
+    cleanupResources.kanbanTreeProvider.dispose();
   }
 
   // Dispose status bar

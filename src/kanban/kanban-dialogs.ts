@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { RedmineServer } from "../redmine/redmine-server";
-import { PersonalTask, TaskPriority } from "./personal-task-state";
+import { KanbanTask, TaskPriority } from "./kanban-state";
 import { Issue } from "../redmine/models/issue";
 
 interface IssueQuickPickItem extends vscode.QuickPickItem {
@@ -20,7 +20,7 @@ export interface CreateTaskResult {
 }
 
 /**
- * Show dialog to create a new personal task
+ * Show dialog to create a new kanban task
  */
 export async function showCreateTaskDialog(
   server: RedmineServer
@@ -31,7 +31,7 @@ export async function showCreateTaskDialog(
 
   // 2. Enter title (required)
   const title = await vscode.window.showInputBox({
-    title: "Create Personal Task",
+    title: "Create Kanban Task",
     prompt: `Task title (subtask of #${selectedIssue.id})`,
     placeHolder: "e.g., Preprocess demographics",
     validateInput: (value) => (!value.trim() ? "Title is required" : undefined),
@@ -46,7 +46,7 @@ export async function showCreateTaskDialog(
       { label: "$(arrow-down) Low", priority: "low" as TaskPriority },
     ],
     {
-      title: "Create Personal Task",
+      title: "Create Kanban Task",
       placeHolder: "Priority (default: Medium)",
     }
   );
@@ -54,7 +54,7 @@ export async function showCreateTaskDialog(
 
   // 4. Estimated hours (optional)
   const hoursStr = await vscode.window.showInputBox({
-    title: "Create Personal Task",
+    title: "Create Kanban Task",
     prompt: "Estimated hours (optional)",
     placeHolder: "e.g., 2 or 1.5",
     validateInput: (value) => {
@@ -81,7 +81,7 @@ export async function showCreateTaskDialog(
  * Show dialog to edit an existing task
  */
 export async function showEditTaskDialog(
-  task: PersonalTask
+  task: KanbanTask
 ): Promise<Partial<CreateTaskResult> | undefined> {
   // 1. Edit title
   const title = await vscode.window.showInputBox({

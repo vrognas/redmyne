@@ -1,12 +1,12 @@
 import * as vscode from "vscode";
-import { PersonalTaskController } from "./personal-task-controller";
+import { KanbanController } from "./kanban-controller";
 import {
-  PersonalTask,
+  KanbanTask,
   TaskStatus,
   getTaskStatus,
   groupTasksByStatus,
   sortTasksByPriority,
-} from "./personal-task-state";
+} from "./kanban-state";
 import { formatHoursAsHHMM } from "../utilities/time-input";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
 
@@ -15,14 +15,14 @@ type TaskTreeItemType = "add-button" | "status-header" | "task";
 interface TaskTreeItem {
   type: TaskTreeItemType;
   status?: TaskStatus;
-  task?: PersonalTask;
+  task?: KanbanTask;
 }
 
 /**
- * Tree provider for "Personal Tasks" view
+ * Tree provider for "Kanban" view
  */
-export class PersonalTasksTreeProvider extends BaseTreeProvider<TaskTreeItem> {
-  constructor(private controller: PersonalTaskController) {
+export class KanbanTreeProvider extends BaseTreeProvider<TaskTreeItem> {
+  constructor(private controller: KanbanController) {
     super();
     this.disposables.push(controller.onTasksChange(() => this.refresh()));
   }
@@ -32,7 +32,7 @@ export class PersonalTasksTreeProvider extends BaseTreeProvider<TaskTreeItem> {
       const item = new vscode.TreeItem("Add task...");
       item.iconPath = new vscode.ThemeIcon("add");
       item.command = {
-        command: "redmine.personalTasks.add",
+        command: "redmine.kanban.add",
         title: "Add Task",
       };
       return item;
@@ -59,7 +59,7 @@ export class PersonalTasksTreeProvider extends BaseTreeProvider<TaskTreeItem> {
     return new vscode.TreeItem("");
   }
 
-  private createTaskTreeItem(task: PersonalTask): vscode.TreeItem {
+  private createTaskTreeItem(task: KanbanTask): vscode.TreeItem {
     const status = getTaskStatus(task);
     const item = new vscode.TreeItem(task.title);
 
@@ -102,7 +102,7 @@ export class PersonalTasksTreeProvider extends BaseTreeProvider<TaskTreeItem> {
 
     // Command to add to Today's Plan on click
     item.command = {
-      command: "redmine.personalTasks.addToPlan",
+      command: "redmine.kanban.addToPlan",
       title: "Add to Today's Plan",
       arguments: [task.id],
     };
@@ -150,7 +150,7 @@ export class PersonalTasksTreeProvider extends BaseTreeProvider<TaskTreeItem> {
     return items;
   }
 
-  private getTasksForStatus(status: TaskStatus): PersonalTask[] {
+  private getTasksForStatus(status: TaskStatus): KanbanTask[] {
     const tasks = this.controller.getTasks();
     return tasks.filter((t) => getTaskStatus(t) === status);
   }

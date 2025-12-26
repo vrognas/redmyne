@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
-  PersonalTaskController,
+  KanbanController,
   MockGlobalState,
-} from "../../../src/personal-tasks/personal-task-controller";
-import { getTaskStatus } from "../../../src/personal-tasks/personal-task-state";
+} from "../../../src/kanban/kanban-controller";
+import { getTaskStatus } from "../../../src/kanban/kanban-state";
 
 function createMockGlobalState(): MockGlobalState {
   const store: Record<string, unknown> = {};
@@ -15,13 +15,13 @@ function createMockGlobalState(): MockGlobalState {
   };
 }
 
-describe("PersonalTaskController", () => {
-  let controller: PersonalTaskController;
+describe("KanbanController", () => {
+  let controller: KanbanController;
   let mockState: MockGlobalState;
 
   beforeEach(() => {
     mockState = createMockGlobalState();
-    controller = new PersonalTaskController(mockState);
+    controller = new KanbanController(mockState);
   });
 
   describe("CRUD operations", () => {
@@ -42,7 +42,7 @@ describe("PersonalTaskController", () => {
 
       expect(controller.getTasks()).toHaveLength(1);
       expect(mockState.update).toHaveBeenCalledWith(
-        "redmine.personalTasks",
+        "redmine.kanban",
         expect.any(Array)
       );
     });
@@ -142,7 +142,7 @@ describe("PersonalTaskController", () => {
       await controller.addTask("Task 2", 2, "Issue 2", 1, "Project1");
 
       // Create new controller with same state
-      const newController = new PersonalTaskController(mockState);
+      const newController = new KanbanController(mockState);
 
       expect(newController.getTasks()).toHaveLength(2);
       expect(newController.getTasks()[0].title).toBe("Task 1");
@@ -156,7 +156,7 @@ describe("PersonalTaskController", () => {
         null,
       ];
 
-      const newController = new PersonalTaskController(mockState);
+      const newController = new KanbanController(mockState);
 
       // Should only have the valid task
       expect(newController.getTasks().length).toBeLessThanOrEqual(3);

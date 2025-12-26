@@ -4,6 +4,10 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ## [Unreleased]
 
+### Changed
+
+- **Renamed "Personal Tasks" to "Kanban"** - clearer purpose; reflects kanban-style todo/in-progress/done workflow
+
 ## [3.18.0]
 
 ### Added

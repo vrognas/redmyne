@@ -211,8 +211,8 @@
         "icon": "$(add)"
       },
       {
-        "command": "redmine.addIssueToPersonalTasks",
-        "title": "Add to Personal Tasks",
+        "command": "redmine.addIssueToKanban",
+        "title": "Add to Kanban",
         "icon": "$(checklist)"
       },
       {
@@ -326,47 +326,47 @@
         "title": "Toggle Selected Unit"
       },
       {
-        "command": "redmine.personalTasks.add",
-        "title": "Add Personal Task",
+        "command": "redmine.kanban.add",
+        "title": "Add Kanban Task",
         "icon": "$(add)"
       },
       {
-        "command": "redmine.personalTasks.edit",
+        "command": "redmine.kanban.edit",
         "title": "Edit Task",
         "icon": "$(edit)"
       },
       {
-        "command": "redmine.personalTasks.delete",
+        "command": "redmine.kanban.delete",
         "title": "Delete Task",
         "icon": "$(trash)"
       },
       {
-        "command": "redmine.personalTasks.markDone",
+        "command": "redmine.kanban.markDone",
         "title": "Mark Done",
         "icon": "$(check)"
       },
       {
-        "command": "redmine.personalTasks.reopen",
+        "command": "redmine.kanban.reopen",
         "title": "Reopen Task",
         "icon": "$(refresh)"
       },
       {
-        "command": "redmine.personalTasks.setPriority",
+        "command": "redmine.kanban.setPriority",
         "title": "Set Priority",
         "icon": "$(arrow-both)"
       },
       {
-        "command": "redmine.personalTasks.openInBrowser",
+        "command": "redmine.kanban.openInBrowser",
         "title": "Open Linked Issue in Browser",
         "icon": "$(link-external)"
       },
       {
-        "command": "redmine.personalTasks.clearDone",
+        "command": "redmine.kanban.clearDone",
         "title": "Clear Done Tasks",
         "icon": "$(trash)"
       },
       {
-        "command": "redmine.personalTasks.addToPlan",
+        "command": "redmine.kanban.addToPlan",
         "title": "Add to Today's Plan",
         "icon": "$(calendar)"
       },
@@ -403,8 +403,8 @@
           "name": "Today's Plan"
         },
         {
-          "id": "redmine-explorer-personal-tasks",
-          "name": "Personal Tasks"
+          "id": "redmine-explorer-kanban",
+          "name": "Kanban"
         },
         {
           "id": "redmine-explorer-projects",
@@ -428,12 +428,12 @@
         "when": "!redmine:configured"
       },
       {
-        "view": "redmine-explorer-personal-tasks",
-        "contents": "No personal tasks yet.\n[Add Task](command:redmine.personalTasks.add)\n\n---\n\n**Tips:**\n- Right-click tasks for actions\n- Add tasks to Today's Plan\n- Link tasks to Redmine issues",
+        "view": "redmine-explorer-kanban",
+        "contents": "No kanban tasks yet.\n[Add Task](command:redmine.kanban.add)\n\n---\n\n**Tips:**\n- Right-click tasks for actions\n- Add tasks to Today's Plan\n- Link tasks to Redmine issues",
         "when": "redmine:configured"
       },
       {
-        "view": "redmine-explorer-personal-tasks",
+        "view": "redmine-explorer-kanban",
         "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmine.configure)\nSet up your Redmine server URL and API key to get started.",
         "when": "!redmine:configured"
       },
@@ -651,7 +651,7 @@
           "when": "false"
         },
         {
-          "command": "redmine.addIssueToPersonalTasks",
+          "command": "redmine.addIssueToKanban",
           "when": "false"
         },
         {
@@ -723,39 +723,39 @@
           "when": "false"
         },
         {
-          "command": "redmine.personalTasks.add",
+          "command": "redmine.kanban.add",
           "when": "false"
         },
         {
-          "command": "redmine.personalTasks.edit",
+          "command": "redmine.kanban.edit",
           "when": "false"
         },
         {
-          "command": "redmine.personalTasks.delete",
+          "command": "redmine.kanban.delete",
           "when": "false"
         },
         {
-          "command": "redmine.personalTasks.markDone",
+          "command": "redmine.kanban.markDone",
           "when": "false"
         },
         {
-          "command": "redmine.personalTasks.reopen",
+          "command": "redmine.kanban.reopen",
           "when": "false"
         },
         {
-          "command": "redmine.personalTasks.setPriority",
+          "command": "redmine.kanban.setPriority",
           "when": "false"
         },
         {
-          "command": "redmine.personalTasks.openInBrowser",
+          "command": "redmine.kanban.openInBrowser",
           "when": "false"
         },
         {
-          "command": "redmine.personalTasks.clearDone",
+          "command": "redmine.kanban.clearDone",
           "when": "false"
         },
         {
-          "command": "redmine.personalTasks.addToPlan",
+          "command": "redmine.kanban.addToPlan",
           "when": "false"
         },
         {
@@ -775,13 +775,13 @@
           "group": "navigation@2"
         },
         {
-          "command": "redmine.personalTasks.add",
-          "when": "view == 'redmine-explorer-personal-tasks' && redmine:configured",
+          "command": "redmine.kanban.add",
+          "when": "view == 'redmine-explorer-kanban' && redmine:configured",
           "group": "navigation@1"
         },
         {
-          "command": "redmine.personalTasks.clearDone",
-          "when": "view == 'redmine-explorer-personal-tasks' && redmine:hasPersonalDoneTasks",
+          "command": "redmine.kanban.clearDone",
+          "when": "view == 'redmine-explorer-kanban' && redmine:hasKanbanDoneTasks",
           "group": "navigation@2"
         },
         {
@@ -941,7 +941,7 @@
           "group": "redmine@3"
         },
         {
-          "command": "redmine.addIssueToPersonalTasks",
+          "command": "redmine.addIssueToKanban",
           "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
           "group": "redmine@3"
         },
@@ -996,38 +996,38 @@
           "group": "timer@1"
         },
         {
-          "command": "redmine.personalTasks.addToPlan",
-          "when": "view == 'redmine-explorer-personal-tasks' && viewItem =~ /^task-(todo|in-progress)$/",
-          "group": "personal@1"
+          "command": "redmine.kanban.addToPlan",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|in-progress)$/",
+          "group": "kanban@1"
         },
         {
-          "command": "redmine.personalTasks.markDone",
-          "when": "view == 'redmine-explorer-personal-tasks' && viewItem =~ /^task-(todo|in-progress)$/",
-          "group": "personal@2"
+          "command": "redmine.kanban.markDone",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|in-progress)$/",
+          "group": "kanban@2"
         },
         {
-          "command": "redmine.personalTasks.reopen",
-          "when": "view == 'redmine-explorer-personal-tasks' && viewItem == 'task-done'",
-          "group": "personal@2"
+          "command": "redmine.kanban.reopen",
+          "when": "view == 'redmine-explorer-kanban' && viewItem == 'task-done'",
+          "group": "kanban@2"
         },
         {
-          "command": "redmine.personalTasks.setPriority",
-          "when": "view == 'redmine-explorer-personal-tasks' && viewItem =~ /^task-(todo|in-progress)$/",
-          "group": "personal@3"
+          "command": "redmine.kanban.setPriority",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|in-progress)$/",
+          "group": "kanban@3"
         },
         {
-          "command": "redmine.personalTasks.edit",
-          "when": "view == 'redmine-explorer-personal-tasks' && viewItem =~ /^task-/",
+          "command": "redmine.kanban.edit",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-/",
           "group": "edit@1"
         },
         {
-          "command": "redmine.personalTasks.delete",
-          "when": "view == 'redmine-explorer-personal-tasks' && viewItem =~ /^task-/",
+          "command": "redmine.kanban.delete",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-/",
           "group": "edit@2"
         },
         {
-          "command": "redmine.personalTasks.openInBrowser",
-          "when": "view == 'redmine-explorer-personal-tasks' && viewItem =~ /^task-/",
+          "command": "redmine.kanban.openInBrowser",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-/",
           "group": "navigation@1"
         }
       ]

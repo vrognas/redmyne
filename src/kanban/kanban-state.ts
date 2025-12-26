@@ -1,7 +1,7 @@
 /**
- * Personal task (local subtask under a Redmine issue)
+ * Kanban task (local subtask under a Redmine issue)
  */
-export interface PersonalTask {
+export interface KanbanTask {
   id: string; // UUID
   title: string; // → time entry comment
   description?: string;
@@ -33,7 +33,7 @@ export type TaskStatus = "todo" | "in-progress" | "done";
 /**
  * Get derived status for a task
  */
-export function getTaskStatus(task: PersonalTask): TaskStatus {
+export function getTaskStatus(task: KanbanTask): TaskStatus {
   if (task.completedAt) return "done";
   if (task.loggedHours > 0) return "in-progress";
   return "todo";
@@ -51,9 +51,9 @@ function generateId(): string {
 }
 
 /**
- * Create a new personal task
+ * Create a new kanban task
  */
-export function createPersonalTask(
+export function createKanbanTask(
   title: string,
   linkedIssueId: number,
   linkedIssueSubject: string,
@@ -64,7 +64,7 @@ export function createPersonalTask(
     priority?: TaskPriority;
     estimatedHours?: number;
   }
-): PersonalTask {
+): KanbanTask {
   const now = new Date().toISOString();
   return {
     id: generateId(),
@@ -85,14 +85,14 @@ export function createPersonalTask(
 /**
  * Group tasks by derived status
  */
-export function groupTasksByStatus(tasks: PersonalTask[]): {
-  todo: PersonalTask[];
-  inProgress: PersonalTask[];
-  done: PersonalTask[];
+export function groupTasksByStatus(tasks: KanbanTask[]): {
+  todo: KanbanTask[];
+  inProgress: KanbanTask[];
+  done: KanbanTask[];
 } {
-  const todo: PersonalTask[] = [];
-  const inProgress: PersonalTask[] = [];
-  const done: PersonalTask[] = [];
+  const todo: KanbanTask[] = [];
+  const inProgress: KanbanTask[] = [];
+  const done: KanbanTask[] = [];
 
   for (const task of tasks) {
     const status = getTaskStatus(task);
@@ -107,7 +107,7 @@ export function groupTasksByStatus(tasks: PersonalTask[]): {
 /**
  * Sort tasks by priority (high first), then by creation date (newest first)
  */
-export function sortTasksByPriority(tasks: PersonalTask[]): PersonalTask[] {
+export function sortTasksByPriority(tasks: KanbanTask[]): KanbanTask[] {
   const priorityOrder: Record<TaskPriority, number> = {
     high: 0,
     medium: 1,

@@ -28,9 +28,9 @@ export default defineConfig({
         "src/timer/timer-sound.ts", // Audio playback - requires mocking
         "src/timer/timer-status-bar.ts", // VS Code StatusBar - requires mocking
         "src/timer/timer-tree-provider.ts", // VS Code TreeProvider
-        "src/personal-tasks/personal-task-commands.ts", // VS Code UI heavy
-        "src/personal-tasks/personal-task-dialogs.ts", // VS Code UI heavy
-        "src/personal-tasks/personal-tasks-tree-provider.ts", // VS Code TreeProvider
+        "src/kanban/kanban-commands.ts", // VS Code UI heavy
+        "src/kanban/kanban-dialogs.ts", // VS Code UI heavy
+        "src/kanban/kanban-tree-provider.ts", // VS Code TreeProvider
         "src/utilities/issue-picker.ts", // VS Code QuickPick - requires mocking
         "src/redmine/models/**/*.ts", // Type definitions only
         "src/definitions/**/*.ts", // Type definitions only
