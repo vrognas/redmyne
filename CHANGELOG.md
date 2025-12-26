@@ -10,6 +10,10 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 - **Opt-in auto-update %done** - per-issue toggle in context menu; when enabled, logging time auto-calculates %done from spent/estimated hours (capped at 99%)
 
+### Changed
+
+- **Faster issue loading** - parallel pagination reduces "All Issues" fetch from ~13s to ~2s
+
 ### Fixed
 
 - **Gantt dependency arrows clipped** - arrows now render past timeline edge
