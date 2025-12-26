@@ -1473,17 +1473,22 @@ ${style.tip}
     .dependency-arrow .arrow-head { transition: filter 0.15s; }
     .dependency-arrow:hover .arrow-line { stroke-width: 3 !important; filter: brightness(1.2); }
     .dependency-arrow:hover .arrow-head { filter: brightness(1.2); }
-    /* Dependency hover - highlight connected issues, fade others */
-    .dependency-focus .issue-bar,
-    .dependency-focus .issue-label,
-    .dependency-focus .project-label,
-    .dependency-focus .aggregate-bars { opacity: 0.15; transition: opacity 0.15s ease-out; }
-    .dependency-focus .issue-bar.dependency-highlighted,
-    .dependency-focus .issue-label.dependency-highlighted { opacity: 1 !important; }
-    .dependency-focus .dependency-arrow:not(.dependency-hovered) .arrow-line,
-    .dependency-focus .dependency-arrow:not(.dependency-hovered) .arrow-head { opacity: 0.15; }
-    .dependency-focus .dependency-arrow.dependency-hovered .arrow-line { stroke-width: 3; filter: brightness(1.3) drop-shadow(0 0 4px currentColor); }
-    .dependency-focus .dependency-arrow.dependency-hovered .arrow-head { filter: brightness(1.3) drop-shadow(0 0 4px currentColor); }
+    /* Hover highlighting - fade non-related elements */
+    .hover-focus .issue-bar,
+    .hover-focus .issue-label,
+    .hover-focus .project-label,
+    .hover-focus .aggregate-bars,
+    .hover-focus .dependency-arrow .arrow-line,
+    .hover-focus .dependency-arrow .arrow-head { opacity: 0.15; transition: opacity 0.15s ease-out; }
+    .hover-focus .issue-bar.hover-highlighted,
+    .hover-focus .issue-label.hover-highlighted { opacity: 1 !important; }
+    .hover-focus .issue-bar.hover-highlighted .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
+    /* Dependency arrows connected to highlighted issue stay visible */
+    .hover-focus .dependency-arrow.hover-highlighted .arrow-line,
+    .hover-focus .dependency-arrow.hover-highlighted .arrow-head { opacity: 1; }
+    /* Dependency hover - extra glow on hovered arrow */
+    .hover-focus.dependency-hover .dependency-arrow.hover-source .arrow-line { stroke-width: 3; filter: brightness(1.3) drop-shadow(0 0 4px currentColor); }
+    .hover-focus.dependency-hover .dependency-arrow.hover-source .arrow-head { filter: brightness(1.3) drop-shadow(0 0 4px currentColor); }
     /* Relation type colors in legend */
     .relation-legend { display: flex; gap: 12px; font-size: 11px; margin-left: 12px; align-items: center; }
     .relation-legend-item { display: flex; align-items: center; gap: 4px; opacity: 0.8; }
@@ -1888,30 +1893,54 @@ ${style.tip}
       }, 0);
     }
 
+    // Shared hover highlight helper
+    function clearHoverHighlight() {
+      document.body.classList.remove('hover-focus', 'dependency-hover');
+      document.querySelectorAll('.hover-highlighted, .hover-source').forEach(el => {
+        el.classList.remove('hover-highlighted', 'hover-source');
+      });
+    }
+
+    function highlightIssue(issueId) {
+      document.body.classList.add('hover-focus');
+      // Highlight bar and label
+      document.querySelectorAll('.issue-bar[data-issue-id="' + issueId + '"]').forEach(el => el.classList.add('hover-highlighted'));
+      document.querySelectorAll('.issue-label[data-issue-id="' + issueId + '"]').forEach(el => el.classList.add('hover-highlighted'));
+      // Highlight connected dependency arrows
+      document.querySelectorAll('.dependency-arrow[data-from="' + issueId + '"], .dependency-arrow[data-to="' + issueId + '"]').forEach(el => el.classList.add('hover-highlighted'));
+    }
+
+    // Issue bar hover
+    document.querySelectorAll('.issue-bar').forEach(bar => {
+      bar.addEventListener('mouseenter', () => {
+        const issueId = bar.dataset.issueId;
+        if (issueId) highlightIssue(issueId);
+      });
+      bar.addEventListener('mouseleave', clearHoverHighlight);
+    });
+
+    // Issue label hover
+    document.querySelectorAll('.issue-label').forEach(label => {
+      label.addEventListener('mouseenter', () => {
+        const issueId = label.dataset.issueId;
+        if (issueId) highlightIssue(issueId);
+      });
+      label.addEventListener('mouseleave', clearHoverHighlight);
+    });
+
     // Dependency arrow interactions (hover highlight + right-click delete)
     document.querySelectorAll('.dependency-arrow').forEach(arrow => {
       // Hover: highlight connected issues, fade others
       arrow.addEventListener('mouseenter', () => {
         const fromId = arrow.dataset.from;
         const toId = arrow.dataset.to;
-        document.body.classList.add('dependency-focus');
-        arrow.classList.add('dependency-hovered');
-        // Highlight source and target bars
-        document.querySelectorAll('.issue-bar[data-issue-id="' + fromId + '"], .issue-bar[data-issue-id="' + toId + '"]').forEach(el => {
-          el.classList.add('dependency-highlighted');
-        });
-        // Highlight source and target labels
-        document.querySelectorAll('.issue-label[data-issue-id="' + fromId + '"], .issue-label[data-issue-id="' + toId + '"]').forEach(el => {
-          el.classList.add('dependency-highlighted');
-        });
+        document.body.classList.add('hover-focus', 'dependency-hover');
+        arrow.classList.add('hover-source');
+        // Highlight source and target
+        if (fromId) highlightIssue(fromId);
+        if (toId) highlightIssue(toId);
       });
-      arrow.addEventListener('mouseleave', () => {
-        document.body.classList.remove('dependency-focus');
-        arrow.classList.remove('dependency-hovered');
-        document.querySelectorAll('.dependency-highlighted').forEach(el => {
-          el.classList.remove('dependency-highlighted');
-        });
-      });
+      arrow.addEventListener('mouseleave', clearHoverHighlight);
       // Right-click: show delete option
       arrow.addEventListener('contextmenu', (e) => {
         e.preventDefault();
