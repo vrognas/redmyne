@@ -187,6 +187,16 @@
         "icon": "$(calendar)"
       },
       {
+        "command": "redmine.openProjectInBrowser",
+        "title": "Open in Browser",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "redmine.showProjectInGantt",
+        "title": "Open in Gantt",
+        "icon": "$(graph)"
+      },
+      {
         "command": "redmine.createTestIssues",
         "title": "Redmine: Create Test Issues"
       },
@@ -859,6 +869,16 @@
         {
           "command": "redmine.openIssueInGantt",
           "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
+          "group": "navigation@2"
+        },
+        {
+          "command": "redmine.openProjectInBrowser",
+          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^project/",
+          "group": "navigation@1"
+        },
+        {
+          "command": "redmine.showProjectInGantt",
+          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^project/",
           "group": "navigation@2"
         },
         {

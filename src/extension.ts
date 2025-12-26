@@ -701,6 +701,35 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  // Open project in browser (context menu)
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.openProjectInBrowser", async (node: { project?: { identifier?: string } } | undefined) => {
+      const identifier = node?.project?.identifier;
+      if (!identifier) {
+        vscode.window.showErrorMessage("Could not determine project identifier");
+        return;
+      }
+      const url = vscode.workspace.getConfiguration("redmine").get<string>("url");
+      if (!url) {
+        vscode.window.showErrorMessage("No Redmine URL configured");
+        return;
+      }
+      await vscode.env.openExternal(vscode.Uri.parse(`${url}/projects/${identifier}`));
+    })
+  );
+
+  // Show project in Gantt (context menu)
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.showProjectInGantt", async (node: { project?: { id?: number } } | undefined) => {
+      if (!node?.project?.id) {
+        vscode.window.showErrorMessage("Could not determine project ID");
+        return;
+      }
+      // Open Gantt - it will show all issues from the current filter
+      await vscode.commands.executeCommand("redmine.showGantt");
+    })
+  );
+
   // Register view commands
   registerViewCommands(context, {
     projectsTree,

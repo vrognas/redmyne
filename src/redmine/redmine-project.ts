@@ -34,6 +34,10 @@ export class RedmineProject {
     return this.options.parent;
   }
 
+  get identifier() {
+    return this.options.identifier;
+  }
+
   toQuickPickItem(): ProjectQuickPickItem {
     return {
       label: this.options.name,
