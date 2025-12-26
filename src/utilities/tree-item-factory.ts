@@ -99,6 +99,9 @@ export function createEnhancedIssueTreeItem(
     treeItem.description = assignee ? `${baseDesc} • ${assignee}` : baseDesc;
     treeItem.iconPath = new vscode.ThemeIcon("circle-outline", new vscode.ThemeColor("list.deemphasizedForeground"));
     treeItem.contextValue = "issue";
+
+    // Basic tooltip without flexibility
+    treeItem.tooltip = createBasicTooltip(issue, server);
   }
 
   treeItem.command = {
@@ -140,6 +143,48 @@ function createFlexibilityTooltip(
   }
 
   md.appendMarkdown(`**Status:** ${config.text}\n\n`);
+
+  // Add relations if present
+  if (issue.relations && issue.relations.length > 0) {
+    const relationsText = formatRelations(issue.relations);
+    if (relationsText) {
+      md.appendMarkdown(relationsText);
+    }
+  }
+
+  if (server) {
+    const baseUrl = server.options.address;
+    md.appendMarkdown(`[Open in Browser](${baseUrl}/issues/${issue.id})`);
+  }
+
+  return md;
+}
+
+/**
+ * Creates basic tooltip for issues without flexibility data
+ */
+function createBasicTooltip(
+  issue: Issue,
+  server: RedmineServer | undefined
+): vscode.MarkdownString {
+  const spentHours = issue.spent_hours ?? 0;
+  const estHours = issue.estimated_hours ?? 0;
+
+  const md = new vscode.MarkdownString();
+  md.isTrusted = true;
+  md.supportHtml = true;
+
+  md.appendMarkdown(`**#${issue.id}: ${issue.subject}**\n\n`);
+  md.appendMarkdown(`**Tracker:** ${issue.tracker?.name ?? "Unknown"}\n\n`);
+  md.appendMarkdown(`**Status:** ${issue.status?.name ?? "Unknown"}\n\n`);
+
+  if (issue.due_date) {
+    md.appendMarkdown(`**Due Date:** ${issue.due_date}\n\n`);
+  }
+
+  if (estHours > 0 || spentHours > 0) {
+    md.appendMarkdown(`**Hours:** ${formatHoursAsHHMM(spentHours)} / ${formatHoursAsHHMM(estHours)}\n\n`);
+  }
 
   // Add relations if present
   if (issue.relations && issue.relations.length > 0) {
