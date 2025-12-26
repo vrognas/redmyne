@@ -130,8 +130,8 @@ function createFlexibilityTooltip(
   md.isTrusted = true;
   md.supportHtml = true;
 
-  md.appendMarkdown(`**#${issue.id}: ${issue.subject}**\n\n`);
-  md.appendMarkdown(`**Tracker:** ${issue.tracker?.name ?? "Unknown"}\n\n`);
+  md.appendMarkdown(`**#${issue.id}: ${issue.subject.trim()}**\n\n`);
+  md.appendMarkdown(`**Tracker:** ${issue.tracker?.name?.trim() ?? "Unknown"}\n\n`);
   md.appendMarkdown(`**Progress:** ${formatHoursAsHHMM(spentHours)} / ${formatHoursAsHHMM(estHours)} (${progress}%)\n\n`);
 
   if (flexibility.status !== "completed") {
@@ -174,9 +174,9 @@ function createBasicTooltip(
   md.isTrusted = true;
   md.supportHtml = true;
 
-  md.appendMarkdown(`**#${issue.id}: ${issue.subject}**\n\n`);
-  md.appendMarkdown(`**Tracker:** ${issue.tracker?.name ?? "Unknown"}\n\n`);
-  md.appendMarkdown(`**Status:** ${issue.status?.name ?? "Unknown"}\n\n`);
+  md.appendMarkdown(`**#${issue.id}: ${issue.subject.trim()}**\n\n`);
+  md.appendMarkdown(`**Tracker:** ${issue.tracker?.name?.trim() ?? "Unknown"}\n\n`);
+  md.appendMarkdown(`**Status:** ${issue.status?.name?.trim() ?? "Unknown"}\n\n`);
 
   if (issue.due_date) {
     md.appendMarkdown(`**Due Date:** ${issue.due_date}\n\n`);
