@@ -5,7 +5,7 @@ import { formatHoursAsHHMM, formatSecondsAsMMSS } from "../utilities/time-input"
 import { BaseTreeProvider } from "../shared/base-tree-provider";
 
 interface PlanTreeItem {
-  type: "header" | "unit" | "add-button" | "completed-header";
+  type: "header" | "unit" | "add-button" | "completed-header" | "plan-day-button";
   unit?: WorkUnit;
   index?: number;
   isCurrent: boolean;
@@ -71,6 +71,16 @@ export class TimerTreeProvider extends BaseTreeProvider<PlanTreeItem> {
   }
 
   getTreeItem(element: PlanTreeItem): vscode.TreeItem {
+    if (element.type === "plan-day-button") {
+      const item = new vscode.TreeItem("Plan Your Day");
+      item.iconPath = new vscode.ThemeIcon("calendar");
+      item.command = {
+        command: "redmine.timer.addUnit",
+        title: "Plan Your Day",
+      };
+      return item;
+    }
+
     if (element.type === "add-button") {
       const item = new vscode.TreeItem("Add unit...");
       item.iconPath = new vscode.ThemeIcon("add");
@@ -229,9 +239,10 @@ export class TimerTreeProvider extends BaseTreeProvider<PlanTreeItem> {
     // Other elements have no children
     if (element) return [];
 
+    // Empty plan: show only "Plan Your Day" button
     if (plan.length === 0) {
-      this.cachedItems = [];
-      return [];
+      this.cachedItems = [{ type: "plan-day-button", isCurrent: false, isCompleted: false }];
+      return this.cachedItems;
     }
 
     // Separate active and completed units
