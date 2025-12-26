@@ -2003,6 +2003,75 @@ ${style.tip}
       });
     });
 
+    // Show context menu for issue (similar to Issues pane context menu)
+    function showIssueContextMenu(x, y, issueId) {
+      document.querySelector('.relation-picker')?.remove();
+
+      const picker = document.createElement('div');
+      picker.className = 'relation-picker';
+
+      const pickerWidth = 160;
+      const pickerHeight = 180;
+      const clampedX = Math.min(x, window.innerWidth - pickerWidth - 10);
+      const clampedY = Math.min(y, window.innerHeight - pickerHeight - 10);
+      picker.style.left = Math.max(10, clampedX) + 'px';
+      picker.style.top = Math.max(10, clampedY) + 'px';
+
+      const label = document.createElement('div');
+      label.style.padding = '6px 12px';
+      label.style.fontSize = '11px';
+      label.style.opacity = '0.7';
+      label.textContent = '#' + issueId;
+      picker.appendChild(label);
+
+      const options = [
+        { icon: '🌐', label: 'Open in Browser', command: 'openInBrowser' },
+        { icon: '📋', label: 'Show in Issues', command: 'showInIssues' },
+        { icon: '⏱️', label: 'Log Time', command: 'logTime' },
+        { icon: '📊', label: 'Set % Done', command: 'setDoneRatio' },
+        { icon: '📎', label: 'Copy URL', command: 'copyUrl' },
+      ];
+
+      options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.textContent = opt.icon + ' ' + opt.label;
+        btn.addEventListener('click', () => {
+          vscode.postMessage({ command: opt.command, issueId: parseInt(issueId) });
+          picker.remove();
+        });
+        picker.appendChild(btn);
+      });
+
+      document.body.appendChild(picker);
+
+      setTimeout(() => {
+        document.addEventListener('click', function closeHandler(e) {
+          if (!picker.contains(e.target)) {
+            picker.remove();
+            document.removeEventListener('click', closeHandler);
+          }
+        });
+      }, 0);
+    }
+
+    // Issue bar right-click context menu
+    document.querySelectorAll('.issue-bar').forEach(bar => {
+      bar.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const issueId = bar.dataset.issueId;
+        if (issueId) showIssueContextMenu(e.clientX, e.clientY, issueId);
+      });
+    });
+
+    // Issue label right-click context menu
+    document.querySelectorAll('.issue-label').forEach(label => {
+      label.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const issueId = label.dataset.issueId;
+        if (issueId) showIssueContextMenu(e.clientX, e.clientY, issueId);
+      });
+    });
+
     // Convert x position to date string (YYYY-MM-DD)
     function xToDate(x) {
       const ms = minDateMs + (x / timelineWidth) * (maxDateMs - minDateMs);

@@ -5,6 +5,7 @@ import {
 } from "./redmine/redmine-server";
 import { LoggingRedmineServer } from "./redmine/logging-redmine-server";
 import { RedmineProject } from "./redmine/redmine-project";
+import { Issue } from "./redmine/models/issue";
 import openActionsForIssue from "./commands/open-actions-for-issue";
 import openActionsForIssueUnderCursor from "./commands/open-actions-for-issue-under-cursor";
 import listOpenIssuesAssignedToMe from "./commands/list-open-issues-assigned-to-me";
@@ -727,6 +728,20 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       // Open Gantt - it will show all issues from the current filter
       await vscode.commands.executeCommand("redmine.showGantt");
+    })
+  );
+
+  // Reveal issue in tree (from Gantt context menu)
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.revealIssueInTree", async (issueId: number) => {
+      if (!issueId) return;
+      // Find the issue in the tree data
+      const issues = projectsTree.getAssignedIssues();
+      const issue = issues.find((i: Issue) => i.id === issueId);
+      if (issue && cleanupResources.projectsTreeView) {
+        // Reveal the issue in the tree view
+        await cleanupResources.projectsTreeView.reveal(issue, { select: true, focus: true, expand: true });
+      }
     })
   );
 
