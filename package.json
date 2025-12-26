@@ -172,6 +172,11 @@
         "icon": "$(graph)"
       },
       {
+        "command": "redmine.setDoneRatio",
+        "title": "Set % Done",
+        "icon": "$(checklist)"
+      },
+      {
         "command": "redmine.copyIssueUrl",
         "title": "Copy Issue URL",
         "icon": "$(copy)"
@@ -619,6 +624,10 @@
           "when": "false"
         },
         {
+          "command": "redmine.setDoneRatio",
+          "when": "false"
+        },
+        {
           "command": "redmine.copyIssueUrl",
           "when": "false"
         },
@@ -851,6 +860,16 @@
           "command": "redmine.openIssueInGantt",
           "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
           "group": "navigation@2"
+        },
+        {
+          "command": "redmine.setDoneRatio",
+          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^issue/",
+          "group": "redmine@2"
+        },
+        {
+          "command": "redmine.setDoneRatio",
+          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
+          "group": "redmine@2"
         },
         {
           "command": "redmine.quickLogTime",

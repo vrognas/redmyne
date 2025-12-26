@@ -572,6 +572,17 @@ export class RedmineServer {
   }
 
   /**
+   * Update done_ratio (% Done) for an issue
+   */
+  updateDoneRatio(issueId: number, doneRatio: number): Promise<unknown> {
+    return this.doRequest(
+      `/issues/${issueId}.json`,
+      "PUT",
+      this.encodeJson({ issue: { done_ratio: doneRatio } })
+    );
+  }
+
+  /**
    * Create a relation between two issues
    * @param relationType One of: relates, duplicates, blocks, precedes, follows, copied_to
    * @returns The created relation with its ID

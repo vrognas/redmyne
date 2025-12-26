@@ -636,6 +636,43 @@ export function activate(context: vscode.ExtensionContext): void {
       showStatusBarMessage(`$(check) Copied #${issue.id} URL`, 2000);
     })
   );
+
+  // Set done ratio (% Done) for issue (context menu)
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.setDoneRatio", async (issue: { id: number; done_ratio?: number } | undefined) => {
+      if (!issue?.id) {
+        vscode.window.showErrorMessage("Could not determine issue ID");
+        return;
+      }
+      const server = projectsTree.server;
+      if (!server) {
+        vscode.window.showErrorMessage("No Redmine server configured");
+        return;
+      }
+
+      const options = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((pct) => ({
+        label: `${pct}%`,
+        value: pct,
+        picked: issue.done_ratio === pct,
+      }));
+
+      const selected = await vscode.window.showQuickPick(options, {
+        placeHolder: `Set % Done for #${issue.id}`,
+      });
+
+      if (selected === undefined) return;
+
+      try {
+        await server.updateDoneRatio(issue.id, selected.value);
+        showStatusBarMessage(`$(check) #${issue.id} set to ${selected.value}%`, 2000);
+        projectsTree.clearProjects();
+        projectsTree.refresh();
+      } catch (error) {
+        vscode.window.showErrorMessage(`Failed to update: ${error}`);
+      }
+    })
+  );
+
   // Register view commands
   registerViewCommands(context, {
     projectsTree,
