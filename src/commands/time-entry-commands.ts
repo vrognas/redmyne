@@ -8,6 +8,7 @@ import { RedmineServer } from "../redmine/redmine-server";
 import { formatHoursAsHHMM, parseTimeInput } from "../utilities/time-input";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { validateDateInput } from "../utilities/date-picker";
+import { quickLogTime } from "./quick-log-time";
 
 /** Time entry node from tree view */
 interface TimeEntryNode {
@@ -20,6 +21,11 @@ interface TimeEntryNode {
     issue_id?: number;
     issue?: { id: number; subject: string };
   };
+}
+
+/** Day group node from tree view */
+interface DayGroupNode {
+  _date?: string; // YYYY-MM-DD
 }
 
 export interface TimeEntryCommandDeps {
@@ -196,6 +202,27 @@ export function registerTimeEntryCommands(
       } catch (error) {
         vscode.window.showErrorMessage(`Failed to delete: ${error}`);
       }
+    })
+  );
+
+  // Add time entry for a specific date (context menu on day-group)
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.addTimeEntryForDate", async (node: DayGroupNode) => {
+      const server = deps.getServer();
+      if (!server) {
+        vscode.window.showErrorMessage("No Redmine server configured");
+        return;
+      }
+
+      const config = vscode.workspace.getConfiguration("redmine");
+      const url = config.get<string>("url") || "";
+
+      await quickLogTime(
+        { server, config: { ...config, url, apiKey: "" } },
+        context,
+        node?._date
+      );
+      deps.refreshTree();
     })
   );
 }

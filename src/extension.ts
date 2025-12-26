@@ -555,12 +555,7 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   registerCommand("newIssue", newIssue);
   registerCommand("quickLogTime", (props) => quickLogTime(props, context));
-  registerCommand("addTimeEntryForDate", (props, ...args) => {
-    // Extract date from day-group node
-    const node = args[0] as { _date?: string } | undefined;
-    const date = node?._date;
-    return quickLogTime(props, context, date);
-  });
+  // addTimeEntryForDate moved to time-entry-commands.ts
   registerCommand("quickCreateIssue", async (props) => {
     const created = await quickCreateIssue(props);
     if (created) {
