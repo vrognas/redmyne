@@ -181,10 +181,17 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
     if (projectOrIssue && isProjectNode(projectOrIssue)) {
       const { project, assignedIssues, hasAssignedIssues } = projectOrIssue;
 
+      // Get subprojects if in tree view mode
+      const subprojects = this.viewStyle === ProjectsViewStyle.TREE
+        ? (this.projects ?? [])
+            .filter((p) => p.parent && p.parent.id === project.id)
+            .map((p) => this.createProjectNode(p))
+        : [];
+
       if (hasAssignedIssues) {
-        // Return only root-level issues (no parent or parent not in assigned list)
+        // Return subprojects + root-level issues
         const rootIssues = this.filterRootIssues(assignedIssues);
-        return this.sortIssues(rootIssues);
+        return [...subprojects, ...this.sortIssues(rootIssues)];
       }
 
       // No assigned issues - fall back to fetching all open issues
@@ -194,23 +201,16 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
 
       this.loadingIssuesForProject.add(project.id);
       try {
-        if (this.viewStyle === ProjectsViewStyle.TREE) {
-          const subprojects = (this.projects ?? [])
-            .filter((p) => p.parent && p.parent.id === project.id)
-            .map((p) => this.createProjectNode(p));
-          // Try to fetch issues, but don't fail if 403 (user may have access to subprojects only)
-          let issues: Issue[] = [];
-          try {
-            issues = (
-              await this.server.getOpenIssuesForProject(project.id, false)
-            ).issues;
-          } catch {
-            // 403 = no access to parent project issues, show subprojects only
-          }
-          return [...subprojects, ...issues];
+        // Fetch open issues for project
+        let issues: Issue[] = [];
+        try {
+          issues = (
+            await this.server.getOpenIssuesForProject(project.id, false)
+          ).issues;
+        } catch {
+          // 403 = no access to project issues, show subprojects only
         }
-
-        return (await this.server.getOpenIssuesForProject(project.id)).issues;
+        return [...subprojects, ...issues];
       } finally {
         this.loadingIssuesForProject.delete(project.id);
       }
