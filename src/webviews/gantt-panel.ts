@@ -1607,7 +1607,7 @@ ${style.tip}
         </svg>
       </div>
       <div class="gantt-timeline" id="ganttTimeline">
-        <svg width="${timelineWidth}" height="${bodyHeight}">
+        <svg width="${timelineWidth + 50}" height="${bodyHeight}">
           <defs>
             <pattern id="past-stripes" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
               <line x1="0" y1="0" x2="0" y2="6" stroke="var(--vscode-charts-red)" stroke-width="2" stroke-opacity="0.4"/>
