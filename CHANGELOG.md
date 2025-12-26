@@ -17,10 +17,12 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 - **Gantt click behavior** - clicking issue/bar now scrolls to bar start instead of opening update dialog
 - **Gantt context menu** - added "Update Issue..." option, removed emojis for native VS Code look
 - **Faster hierarchy building** - O(n) project children lookup instead of O(n²)
+- **Faster startup** - setContext runs parallel with server init
 
 ### Fixed
 
 - **Gantt dependency arrows clipped** - arrows now render past timeline edge
+- **Infinite refresh loop** - sorting issues no longer triggers Gantt cache clear loop
 
 ## [3.17.0]
 
