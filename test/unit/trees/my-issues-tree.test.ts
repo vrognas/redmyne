@@ -28,7 +28,7 @@ describe("MyIssuesTree", () => {
     expect(treeItem.label).toBe("#7392 Test Issue 1234");
   });
 
-  it("should format issue description as issue number when no flexibility data", () => {
+  it("should format issue description as hours when no flexibility data", () => {
     const tree = new MyIssuesTree();
     const issue: Issue = {
       id: 7392,
@@ -45,7 +45,8 @@ describe("MyIssuesTree", () => {
 
     const treeItem = tree.getTreeItem(issue);
 
-    expect(treeItem.description).toBe("#7392");
+    // Shows hours even without flexibility (0:00/0:00 when no hours set)
+    expect(treeItem.description).toBe("0:00/0:00");
   });
 
   it("should set command to open actions for issue", () => {

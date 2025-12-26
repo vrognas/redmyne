@@ -5,7 +5,7 @@ import { RedmineProject } from "../../../src/redmine/redmine-project";
 
 describe("ProjectsTree", () => {
   describe("issue formatting", () => {
-    it("should format issue label as subject only", () => {
+    it("should format issue label with ID prefix", () => {
       const tree = new ProjectsTree();
       const issue: Issue = {
         id: 7392,
@@ -22,10 +22,10 @@ describe("ProjectsTree", () => {
 
       const treeItem = tree.getTreeItem(issue);
 
-      expect(treeItem.label).toBe("Test Issue 1234");
+      expect(treeItem.label).toBe("#7392 Test Issue 1234");
     });
 
-    it("should format issue description as issue number", () => {
+    it("should format issue description as hours", () => {
       const tree = new ProjectsTree();
       const issue: Issue = {
         id: 7392,
@@ -42,7 +42,8 @@ describe("ProjectsTree", () => {
 
       const treeItem = tree.getTreeItem(issue);
 
-      expect(treeItem.description).toBe("#7392");
+      // Shows hours (0:00/0:00 when no hours set)
+      expect(treeItem.description).toBe("0:00/0:00");
     });
 
     it("should use same format as MyIssuesTree", () => {
@@ -62,8 +63,9 @@ describe("ProjectsTree", () => {
 
       const treeItem = tree.getTreeItem(issue);
 
-      expect(treeItem.label).toBe("Shared Format Test");
-      expect(treeItem.description).toBe("#123");
+      // Consistent format: #id Subject, hours in description
+      expect(treeItem.label).toBe("#123 Shared Format Test");
+      expect(treeItem.description).toBe("0:00/0:00");
     });
   });
 

@@ -4,6 +4,34 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ## [Unreleased]
 
+### Added
+
+- **Sorting dropdown menus** - sort Issues by #ID, Subject, Assignee; sort Time Entries by #ID, Subject, Comment, User
+- Toggles direction (asc/desc) when clicking same field again
+
+### Changed
+
+- **Consistent issue styling** - all issues now use enhanced format (`#id Subject` with hours) regardless of flexibility data availability
+- **Hierarchical issue display** - sub-issues now appear nested under parent issues in tree view
+
+## [3.16.0]
+
+### Added
+
+- **Issue filter presets** - quick pick with filter options:
+  - My Open Issues (default)
+  - All Open Issues
+  - My Closed Issues
+  - All Issues
+- **Time entries filter** - toggle between my time and all users' time
+- **Assignee/user display** - shows assignee on issues and user on time entries when filtered
+
+### Changed
+
+- **Renamed views** - "My Issues" → "Issues", "My Time Entries" → "Time Entries"
+- **Unified filter API** - `getFilteredIssues(filter)` consolidates issue queries
+- Filter button shows filled icon when filtered, outline for default view
+
 ## [3.15.0]
 
 ### Added

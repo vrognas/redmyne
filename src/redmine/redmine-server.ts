@@ -465,8 +465,14 @@ export class RedmineServer {
   async getTimeEntries(params?: {
     from?: string;
     to?: string;
+    allUsers?: boolean;
   }): Promise<{ time_entries: TimeEntry[] }> {
-    const queryParams = new URLSearchParams({ user_id: "me", include: "issue" });
+    const queryParams = new URLSearchParams({ include: "issue" });
+
+    // Filter by current user unless allUsers is set
+    if (!params?.allUsers) {
+      queryParams.set("user_id", "me");
+    }
 
     if (params?.from) {
       queryParams.set("from", params.from);
@@ -799,15 +805,52 @@ export class RedmineServer {
   }
 
   /**
-   * Returns promise, that resolves to list of issues assigned to api key owner
-   * Includes children and relations for hierarchy/dependency display
+   * Get issues with flexible filtering
+   * Consolidates assignee and status filters into single method
    */
-  async getIssuesAssignedToMe(): Promise<{ issues: Issue[] }> {
+  async getFilteredIssues(filter: {
+    assignee: "me" | "any";
+    status: "open" | "closed" | "any";
+  }): Promise<{ issues: Issue[] }> {
+    const params = new URLSearchParams();
+    params.set("include", "children,relations");
+
+    // Status filter
+    if (filter.status === "open") {
+      params.set("status_id", "open");
+    } else if (filter.status === "closed") {
+      params.set("status_id", "closed");
+    } else {
+      params.set("status_id", "*"); // Any status
+    }
+
+    // Assignee filter
+    if (filter.assignee === "me") {
+      params.set("assigned_to_id", "me");
+    }
+    // 'any' = no assigned_to_id param
+
     const issues = await this.paginate<Issue>(
-      "/issues.json?status_id=open&assigned_to_id=me&include=children,relations",
+      `/issues.json?${params.toString()}`,
       "issues"
     );
     return { issues };
+  }
+
+  /**
+   * Returns promise, that resolves to list of issues assigned to api key owner
+   * @deprecated Use getFilteredIssues({ assignee: 'me', status: 'open' })
+   */
+  async getIssuesAssignedToMe(): Promise<{ issues: Issue[] }> {
+    return this.getFilteredIssues({ assignee: "me", status: "open" });
+  }
+
+  /**
+   * Get all open issues (not filtered by assignee)
+   * @deprecated Use getFilteredIssues({ assignee: 'any', status: 'open' })
+   */
+  async getAllOpenIssues(): Promise<{ issues: Issue[] }> {
+    return this.getFilteredIssues({ assignee: "any", status: "open" });
   }
 
   /**

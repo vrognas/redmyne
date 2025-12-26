@@ -5,6 +5,7 @@
 
 import { Issue } from "../redmine/models/issue";
 import { FlexibilityScore } from "./flexibility-calculator";
+import { SortConfig, IssueSortField } from "../redmine/models/common";
 import { isBlocked } from "./tree-item-factory";
 
 type FlexibilityStatus = FlexibilityScore["status"];
@@ -52,5 +53,29 @@ export function sortIssuesByRisk(
 
     // Same status - sort by remaining hours (ascending)
     return flexA.remaining - flexB.remaining;
+  });
+}
+
+/**
+ * Sort issues by field
+ */
+export function sortIssuesByField(
+  issues: Issue[],
+  sort: SortConfig<IssueSortField>
+): Issue[] {
+  const dir = sort.direction === "asc" ? 1 : -1;
+  return [...issues].sort((a, b) => {
+    switch (sort.field) {
+      case "id":
+        return (a.id - b.id) * dir;
+      case "subject":
+        return a.subject.localeCompare(b.subject) * dir;
+      case "assignee":
+        const nameA = a.assigned_to?.name || "";
+        const nameB = b.assigned_to?.name || "";
+        return nameA.localeCompare(nameB) * dir;
+      default:
+        return 0;
+    }
   });
 }

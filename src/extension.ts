@@ -628,6 +628,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Register view commands
   registerViewCommands(context, {
     projectsTree,
+    timeEntriesTree: myTimeEntriesTree,
     outputChannel,
     updateConfiguredContext,
   });

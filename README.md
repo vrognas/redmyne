@@ -63,12 +63,12 @@ Desktop clients like RedmineX replicate Redmine's full project management interf
 
 The sidebar views follow a natural planning flow:
 
-**My Issues** → **Personal Tasks** → **Today's Plan** → **My Time Entries**
+**Issues** → **Personal Tasks** → **Today's Plan** → **Time Entries**
 
-1. **My Issues** - Issues assigned to you in Redmine
-2. **Personal Tasks** - Your staging area for planning (add issues here to work on later)
-3. **Today's Plan** - What you're working on today (timed work units)
-4. **My Time Entries** - Time logged back to Redmine
+1. **Issues** - Find issues to work on (toggle filter to show all or just yours)
+2. **Personal Tasks** - Stage work with comments before timing
+3. **Today's Plan** - Timer-tracked work units
+4. **Time Entries** - Logged time in Redmine (toggle filter to view team's time)
 
 ## Compatibility
 

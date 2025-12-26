@@ -7,17 +7,22 @@ import { formatHoursAsHHMM } from "./time-input";
 /**
  * Creates a VS Code TreeItem for displaying a Redmine issue
  * Format: Label="{Subject}", Description="#{id}" (reduced opacity)
+ * @param showAssignee If true, show assignee name in description
  */
 export function createIssueTreeItem(
   issue: Issue,
   server: RedmineServer | undefined,
-  commandName: string
+  commandName: string,
+  showAssignee = false
 ): vscode.TreeItem {
   const treeItem = new vscode.TreeItem(
     issue.subject,
     vscode.TreeItemCollapsibleState.None
   );
-  treeItem.description = `#${issue.id}`;
+
+  // Show assignee when viewing all issues
+  const assignee = showAssignee && issue.assigned_to?.name;
+  treeItem.description = assignee ? `#${issue.id} • ${assignee}` : `#${issue.id}`;
 
   treeItem.command = {
     command: commandName,
@@ -49,12 +54,14 @@ export function isBlocked(issue: Issue): boolean {
  * Creates an enhanced TreeItem with flexibility score and risk indicators
  * Format: Label="#id Subject", Description="spent/est • days"
  * Status conveyed via icon color, blocked/billable info in tooltip
+ * @param showAssignee If true, show assignee name in description
  */
 export function createEnhancedIssueTreeItem(
   issue: Issue,
   flexibility: FlexibilityScore | null,
   server: RedmineServer | undefined,
-  commandName: string
+  commandName: string,
+  showAssignee = false
 ): vscode.TreeItem {
   // Label always includes issue ID for scannability
   const treeItem = new vscode.TreeItem(
@@ -63,15 +70,18 @@ export function createEnhancedIssueTreeItem(
   );
 
   // Build description based on flexibility
+  const assignee = showAssignee && issue.assigned_to?.name;
+
+  const spentHours = issue.spent_hours ?? 0;
+  const estHours = issue.estimated_hours ?? 0;
+
   if (flexibility) {
     const config = STATUS_CONFIG[flexibility.status];
-    const spentHours = issue.spent_hours ?? 0;
-    const estHours = issue.estimated_hours ?? 0;
 
     // Reduced density: just hours and days, no status text or prefixes
     // Status is conveyed via icon color, blocked/billable in tooltip
-    treeItem.description =
-      `${formatHoursAsHHMM(spentHours)}/${formatHoursAsHHMM(estHours)} • ${flexibility.daysRemaining}d`;
+    const baseDesc = `${formatHoursAsHHMM(spentHours)}/${formatHoursAsHHMM(estHours)} • ${flexibility.daysRemaining}d`;
+    treeItem.description = assignee ? `${baseDesc} • ${assignee}` : baseDesc;
 
     // Icon color conveys status (no text needed)
     const iconColor = new vscode.ThemeColor(config.color);
@@ -84,8 +94,10 @@ export function createEnhancedIssueTreeItem(
     treeItem.contextValue =
       flexibility.status === "completed" ? "issue-completed" : "issue-active";
   } else {
-    // Fallback for issues without flexibility data
-    treeItem.description = `#${issue.id}`;
+    // No flexibility data - show hours only, neutral icon
+    const baseDesc = `${formatHoursAsHHMM(spentHours)}/${formatHoursAsHHMM(estHours)}`;
+    treeItem.description = assignee ? `${baseDesc} • ${assignee}` : baseDesc;
+    treeItem.iconPath = new vscode.ThemeIcon("circle-outline", new vscode.ThemeColor("list.deemphasizedForeground"));
     treeItem.contextValue = "issue";
   }
 

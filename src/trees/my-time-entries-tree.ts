@@ -18,6 +18,7 @@ import {
   getISOWeekYear,
   getWeekDateRange,
 } from "../utilities/date-utils";
+import { SortConfig, TimeEntrySortField } from "../redmine/models/common";
 
 export interface TimeEntryNode {
   id?: string; // Stable ID for preserving expansion state
@@ -41,6 +42,8 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   private cachedGroups?: TimeEntryNode[];
   private expandedIds = new Set<string>();
   private monthlySchedules: MonthlyScheduleOverrides = {};
+  private showAllUsers = false; // false = my entries only, true = all users
+  private entrySort: SortConfig<TimeEntrySortField> | null = null;
 
   constructor() {
     super();
@@ -116,12 +119,13 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const monthStart = getMonthStart();
       const lastMonth = getLastMonthRange();
 
-      // Fetch entries in parallel (4 requests)
+      // Fetch entries in parallel (4 requests) - filter by user based on showAllUsers
+      const allUsers = this.showAllUsers;
       const [todayResult, weekResult, monthResult, lastMonthResult] = await Promise.all([
-        this.server.getTimeEntries({ from: today, to: today }),
-        this.server.getTimeEntries({ from: weekStart, to: today }),
-        this.server.getTimeEntries({ from: monthStart, to: today }),
-        this.server.getTimeEntries({ from: lastMonth.start, to: lastMonth.end }),
+        this.server.getTimeEntries({ from: today, to: today, allUsers }),
+        this.server.getTimeEntries({ from: weekStart, to: today, allUsers }),
+        this.server.getTimeEntries({ from: monthStart, to: today, allUsers }),
+        this.server.getTimeEntries({ from: lastMonth.start, to: lastMonth.end, allUsers }),
       ]);
 
       const todayTotal = calculateTotal(todayResult.time_entries);
@@ -425,8 +429,11 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       );
     }
 
+    // Sort entries if sort config is set
+    const sortedEntries = this.sortEntries(entries);
+
     // Map entries using cached issue subjects
-    return entries.map((entry) => {
+    return sortedEntries.map((entry) => {
       const issueId = entry.issue?.id || entry.issue_id;
       const cached = this.issueCache.get(issueId);
       const issueSubject = cached?.subject || "Unknown Issue";
@@ -435,8 +442,10 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
 
       // Encode command arguments as JSON array for VS Code command URI
       const commandArgs = encodeURIComponent(JSON.stringify([issueId]));
+      const userLine = this.showAllUsers && entry.user?.name ? `**User:** ${entry.user.name}\n\n` : "";
       const tooltip = new vscode.MarkdownString(
         `**Issue:** #${issueId} ${issueSubject}\n\n` +
+          userLine +
           (clientName ? `**Client:** ${clientName}\n\n` : "") +
           (projectName ? `**Project:** ${projectName}\n\n` : "") +
           `**Hours:** ${formatHoursAsHHMM(parseFloat(entry.hours))}\n\n` +
@@ -449,11 +458,12 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       tooltip.isTrusted = true;
       tooltip.supportHtml = false;
 
-      // Format: "#1234 comment" with "HH:MM [activity] issue_subject" as description
+      // Format: "#1234 comment" with "HH:MM [activity] issue_subject [user]" as description
       const hours = formatHoursAsHHMM(parseFloat(entry.hours));
       const activity = entry.activity?.name ? `[${entry.activity.name}]` : "";
       const comment = entry.comments ? ` ${entry.comments}` : "";
-      const descParts = [hours, activity, issueSubject].filter(Boolean);
+      const userName = this.showAllUsers && entry.user?.name ? `• ${entry.user.name}` : "";
+      const descParts = [hours, activity, issueSubject, userName].filter(Boolean);
 
       return {
         id: `${idPrefix}-entry-${entry.id}`,
@@ -476,6 +486,71 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     treeItem.iconPath = node.iconPath;
     treeItem.contextValue = node.contextValue;
     return treeItem;
+  }
+
+  /**
+   * Set filter and refresh
+   */
+  setShowAllUsers(showAll: boolean): void {
+    if (this.showAllUsers === showAll) return;
+    this.showAllUsers = showAll;
+    this.cachedGroups = undefined;
+    this.issueCache.clear();
+    this.refresh();
+  }
+
+  /**
+   * Get current filter state
+   */
+  getShowAllUsers(): boolean {
+    return this.showAllUsers;
+  }
+
+  /**
+   * Sort time entries using current sort config
+   */
+  private sortEntries(entries: TimeEntry[]): TimeEntry[] {
+    if (!this.entrySort) return entries;
+    const dir = this.entrySort.direction === "asc" ? 1 : -1;
+    return [...entries].sort((a, b) => {
+      switch (this.entrySort!.field) {
+        case "id":
+          return ((a.issue?.id || a.issue_id) - (b.issue?.id || b.issue_id)) * dir;
+        case "subject": {
+          const subjectA = this.issueCache.get(a.issue?.id || a.issue_id)?.subject || "";
+          const subjectB = this.issueCache.get(b.issue?.id || b.issue_id)?.subject || "";
+          return subjectA.localeCompare(subjectB) * dir;
+        }
+        case "comment":
+          return (a.comments || "").localeCompare(b.comments || "") * dir;
+        case "user": {
+          const userA = a.user?.name || "";
+          const userB = b.user?.name || "";
+          return userA.localeCompare(userB) * dir;
+        }
+        default:
+          return 0;
+      }
+    });
+  }
+
+  /**
+   * Set sort field (toggles direction if same field)
+   */
+  setSort(field: TimeEntrySortField): void {
+    if (this.entrySort?.field === field) {
+      this.entrySort.direction = this.entrySort.direction === "asc" ? "desc" : "asc";
+    } else {
+      this.entrySort = { field, direction: "asc" };
+    }
+    this.refresh();
+  }
+
+  /**
+   * Get current sort config
+   */
+  getSort(): SortConfig<TimeEntrySortField> | null {
+    return this.entrySort;
   }
 }
 

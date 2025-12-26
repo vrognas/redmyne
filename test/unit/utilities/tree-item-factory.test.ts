@@ -164,7 +164,7 @@ describe("createEnhancedIssueTreeItem", () => {
     expect(treeItem.description).not.toContain("Done");
   });
 
-  it("falls back to simple display when no flexibility", () => {
+  it("falls back to hours display when no flexibility", () => {
     const treeItem = createEnhancedIssueTreeItem(
       mockIssue,
       null,
@@ -172,9 +172,9 @@ describe("createEnhancedIssueTreeItem", () => {
       "test.command"
     );
 
-    // Without flexibility, just show issue ID in description
-    expect(treeItem.description).toBe("#7392");
-    // But label should still have ID + subject
+    // Without flexibility, show hours (no days since we don't know)
+    expect(treeItem.description).toBe("20:00/40:00");
+    // Label still has ID + subject
     expect(treeItem.label).toBe("#7392 Test Issue");
   });
 

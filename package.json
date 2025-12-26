@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "3.15.0",
+  "version": "3.16.0",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -61,6 +61,58 @@
         "command": "redmine.refreshIssues",
         "title": "Redmine: Refresh issues",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "redmine.filterMyOpen",
+        "title": "My Open Issues"
+      },
+      {
+        "command": "redmine.filterAllOpen",
+        "title": "All Open Issues"
+      },
+      {
+        "command": "redmine.filterMyClosed",
+        "title": "My Closed Issues"
+      },
+      {
+        "command": "redmine.filterAll",
+        "title": "All Issues"
+      },
+      {
+        "command": "redmine.timeFilterMy",
+        "title": "My Time Entries"
+      },
+      {
+        "command": "redmine.timeFilterAll",
+        "title": "All Time Entries"
+      },
+      {
+        "command": "redmine.issueSortId",
+        "title": "Sort by #ID"
+      },
+      {
+        "command": "redmine.issueSortSubject",
+        "title": "Sort by Subject"
+      },
+      {
+        "command": "redmine.issueSortAssignee",
+        "title": "Sort by Assignee"
+      },
+      {
+        "command": "redmine.timeSortId",
+        "title": "Sort by #ID"
+      },
+      {
+        "command": "redmine.timeSortSubject",
+        "title": "Sort by Subject"
+      },
+      {
+        "command": "redmine.timeSortComment",
+        "title": "Sort by Comment"
+      },
+      {
+        "command": "redmine.timeSortUser",
+        "title": "Sort by User"
       },
       {
         "command": "redmine.toggleTreeView",
@@ -331,11 +383,11 @@
         },
         {
           "id": "redmine-explorer-projects",
-          "name": "My Issues"
+          "name": "Issues"
         },
         {
           "id": "redmine-explorer-my-time-entries",
-          "name": "My Time Entries"
+          "name": "Time Entries"
         }
       ]
     },
@@ -381,7 +433,89 @@
         }
       ]
     },
+    "submenus": [
+      {
+        "id": "redmine.issueFilterMenu",
+        "label": "Filter",
+        "icon": "$(filter)"
+      },
+      {
+        "id": "redmine.issueSortMenu",
+        "label": "Sort",
+        "icon": "$(arrow-swap)"
+      },
+      {
+        "id": "redmine.timeFilterMenu",
+        "label": "Filter",
+        "icon": "$(filter)"
+      },
+      {
+        "id": "redmine.timeSortMenu",
+        "label": "Sort",
+        "icon": "$(arrow-swap)"
+      }
+    ],
     "menus": {
+      "redmine.issueFilterMenu": [
+        {
+          "command": "redmine.filterMyOpen",
+          "group": "1_filters@1"
+        },
+        {
+          "command": "redmine.filterAllOpen",
+          "group": "1_filters@2"
+        },
+        {
+          "command": "redmine.filterMyClosed",
+          "group": "1_filters@3"
+        },
+        {
+          "command": "redmine.filterAll",
+          "group": "1_filters@4"
+        }
+      ],
+      "redmine.timeFilterMenu": [
+        {
+          "command": "redmine.timeFilterMy",
+          "group": "1_filters@1"
+        },
+        {
+          "command": "redmine.timeFilterAll",
+          "group": "1_filters@2"
+        }
+      ],
+      "redmine.issueSortMenu": [
+        {
+          "command": "redmine.issueSortId",
+          "group": "1_sort@1"
+        },
+        {
+          "command": "redmine.issueSortSubject",
+          "group": "1_sort@2"
+        },
+        {
+          "command": "redmine.issueSortAssignee",
+          "group": "1_sort@3"
+        }
+      ],
+      "redmine.timeSortMenu": [
+        {
+          "command": "redmine.timeSortId",
+          "group": "1_sort@1"
+        },
+        {
+          "command": "redmine.timeSortSubject",
+          "group": "1_sort@2"
+        },
+        {
+          "command": "redmine.timeSortComment",
+          "group": "1_sort@3"
+        },
+        {
+          "command": "redmine.timeSortUser",
+          "group": "1_sort@4"
+        }
+      ],
       "commandPalette": [
         {
           "command": "redmine.changeDefaultServer",
@@ -389,6 +523,58 @@
         },
         {
           "command": "redmine.refreshIssues",
+          "when": "false"
+        },
+        {
+          "command": "redmine.filterMyOpen",
+          "when": "false"
+        },
+        {
+          "command": "redmine.filterAllOpen",
+          "when": "false"
+        },
+        {
+          "command": "redmine.filterMyClosed",
+          "when": "false"
+        },
+        {
+          "command": "redmine.filterAll",
+          "when": "false"
+        },
+        {
+          "command": "redmine.timeFilterMy",
+          "when": "false"
+        },
+        {
+          "command": "redmine.timeFilterAll",
+          "when": "false"
+        },
+        {
+          "command": "redmine.issueSortId",
+          "when": "false"
+        },
+        {
+          "command": "redmine.issueSortSubject",
+          "when": "false"
+        },
+        {
+          "command": "redmine.issueSortAssignee",
+          "when": "false"
+        },
+        {
+          "command": "redmine.timeSortId",
+          "when": "false"
+        },
+        {
+          "command": "redmine.timeSortSubject",
+          "when": "false"
+        },
+        {
+          "command": "redmine.timeSortComment",
+          "when": "false"
+        },
+        {
+          "command": "redmine.timeSortUser",
           "when": "false"
         },
         {
@@ -586,6 +772,16 @@
           "group": "navigation"
         },
         {
+          "submenu": "redmine.issueFilterMenu",
+          "when": "view == 'redmine-explorer-projects' && redmine:configured",
+          "group": "navigation"
+        },
+        {
+          "submenu": "redmine.issueSortMenu",
+          "when": "view == 'redmine-explorer-projects' && redmine:configured",
+          "group": "navigation"
+        },
+        {
           "command": "redmine.showGantt",
           "when": "view == 'redmine-explorer-projects' && redmine:configured",
           "group": "navigation@1"
@@ -593,6 +789,16 @@
         {
           "command": "redmine.refreshTimeEntries",
           "when": "view == 'redmine-explorer-my-time-entries'",
+          "group": "navigation"
+        },
+        {
+          "submenu": "redmine.timeFilterMenu",
+          "when": "view == 'redmine-explorer-my-time-entries' && redmine:configured",
+          "group": "navigation"
+        },
+        {
+          "submenu": "redmine.timeSortMenu",
+          "when": "view == 'redmine-explorer-my-time-entries' && redmine:configured",
           "group": "navigation"
         }
       ],
