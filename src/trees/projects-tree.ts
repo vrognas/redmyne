@@ -194,14 +194,19 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
         return [...subprojects, ...this.sortIssues(rootIssues)];
       }
 
-      // No assigned issues - fall back to fetching all open issues
+      // No assigned issues - only show subprojects when filtered by "me"
+      // (don't fetch all issues as that would ignore the filter)
+      if (this.issueFilter.assignee === "me") {
+        return subprojects;
+      }
+
+      // Fetch all open issues for project (only when not filtering by assignee)
       if (this.loadingIssuesForProject.has(project.id)) {
         return [{ isLoadingPlaceholder: true, message: "Loading issues..." }];
       }
 
       this.loadingIssuesForProject.add(project.id);
       try {
-        // Fetch open issues for project
         let issues: Issue[] = [];
         try {
           issues = (
