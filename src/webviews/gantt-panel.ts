@@ -538,8 +538,8 @@ export class GanttPanel {
         this._updateContent();
         break;
       case "refresh":
-        // Refresh data without resetting view state
-        vscode.commands.executeCommand("redmine.refreshGanttData");
+        // Clear cache and refetch data (including new relations)
+        vscode.commands.executeCommand("redmine.refreshIssues");
         break;
       case "toggleCollapse":
         if (message.collapseKey) {
@@ -1734,6 +1734,8 @@ ${style.tip}
         labelsColumn.scrollTop = timelineColumn.scrollTop;
         // Sync horizontal with header
         timelineHeader.scrollLeft = timelineColumn.scrollLeft;
+        // Save state immediately so collapse/expand preserves position
+        saveState();
         // Report scroll position to extension (debounced)
         clearTimeout(scrollReportTimeout);
         scrollReportTimeout = setTimeout(() => {
