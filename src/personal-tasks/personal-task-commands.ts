@@ -236,5 +236,30 @@ export function registerPersonalTaskCommands(
     )
   );
 
+  // Add issue from My Issues tree to Personal Tasks
+  disposables.push(
+    vscode.commands.registerCommand(
+      "redmine.addIssueToPersonalTasks",
+      async (issue: { id: number; subject: string; project?: { id: number; name: string } }) => {
+        if (!issue?.id) {
+          vscode.window.showErrorMessage("No issue selected");
+          return;
+        }
+
+        await controller.addTask(
+          issue.subject,
+          issue.id,
+          issue.subject,
+          issue.project?.id ?? 0,
+          issue.project?.name ?? ""
+        );
+
+        vscode.window.showInformationMessage(
+          `Added #${issue.id} to Personal Tasks`
+        );
+      }
+    )
+  );
+
   return disposables;
 }

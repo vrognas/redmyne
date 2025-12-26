@@ -139,6 +139,11 @@
         "icon": "$(add)"
       },
       {
+        "command": "redmine.addIssueToPersonalTasks",
+        "title": "Add to Personal Tasks",
+        "icon": "$(checklist)"
+      },
+      {
         "command": "redmine.timer.planDay",
         "title": "Redmine: Plan Day",
         "icon": "$(calendar)"
@@ -427,6 +432,10 @@
           "when": "false"
         },
         {
+          "command": "redmine.addIssueToPersonalTasks",
+          "when": "false"
+        },
+        {
           "command": "redmine.timer.start",
           "when": "false"
         },
@@ -656,6 +665,11 @@
           "command": "redmine.quickCreateSubIssue",
           "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
           "group": "redmine@2"
+        },
+        {
+          "command": "redmine.addIssueToPersonalTasks",
+          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
+          "group": "redmine@3"
         },
         {
           "command": "redmine.timer.startUnit",
