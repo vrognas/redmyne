@@ -1417,10 +1417,10 @@ ${style.tip}
     .issue-bar.linking-source .bar-outline { stroke-width: 3; stroke: var(--vscode-focusBorder); }
     .issue-bar.linking-source .link-handle { opacity: 1; }
     .issue-bar.link-target .bar-outline { stroke-width: 2; stroke: var(--vscode-charts-green); }
-    .issue-bar.highlighted .bar-outline, .issue-label.highlighted text { stroke: var(--vscode-focusBorder); stroke-width: 3; }
-    .issue-label.highlighted text { fill: var(--vscode-focusBorder); }
-    @keyframes highlight-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-    .highlighted { animation: highlight-pulse 0.5s ease-in-out 3; }
+    @keyframes highlight-pulse { 0%, 100% { filter: drop-shadow(0 0 6px var(--vscode-focusBorder)); } 50% { filter: drop-shadow(0 0 12px var(--vscode-focusBorder)); } }
+    .issue-bar.highlighted .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 3; }
+    .issue-label.highlighted { animation: highlight-pulse 0.5s ease-in-out 4; }
+    .issue-bar.highlighted { animation: highlight-pulse 0.5s ease-in-out 4; }
     .temp-link-arrow { pointer-events: none; }
     .dependency-arrow .arrow-line { transition: stroke-width 0.15s, filter 0.15s; }
     .dependency-arrow .arrow-head { transition: filter 0.15s; }
