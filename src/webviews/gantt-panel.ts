@@ -51,6 +51,12 @@ interface GanttRow {
   issue?: GanttIssue;
   /** True if this issue has subtasks (dates/hours are derived) */
   isParent?: boolean;
+  /** Unique key for collapse tracking (project-{id} or issue-{id}) */
+  collapseKey: string;
+  /** Parent's collapse key (for filtering hidden rows) */
+  parentKey: string | null;
+  /** True if has children (can be collapsed) */
+  hasChildren: boolean;
 }
 
 /**
@@ -97,8 +103,9 @@ function sortGanttIssuesByRisk(issues: GanttIssue[]): GanttIssue[] {
 /**
  * Build hierarchical rows from flat issues list
  * Groups by project (alphabetically), then organizes parent/child issues (by risk)
+ * @param collapsedKeys Set of collapsed row keys to filter out children
  */
-function buildHierarchicalRows(issues: GanttIssue[]): GanttRow[] {
+function buildHierarchicalRows(issues: GanttIssue[], collapsedKeys: Set<string> = new Set()): GanttRow[] {
   const rows: GanttRow[] = [];
 
   // Group issues by project
@@ -116,13 +123,24 @@ function buildHierarchicalRows(issues: GanttIssue[]): GanttRow[] {
   );
 
   for (const [projectId, { name, issues: projectIssues }] of sortedProjects) {
+    const projectKey = `project-${projectId}`;
+    const isProjectCollapsed = collapsedKeys.has(projectKey);
+
     // Add project header
     rows.push({
       type: "project",
       id: projectId,
       label: name,
       depth: 0,
+      collapseKey: projectKey,
+      parentKey: null,
+      hasChildren: projectIssues.length > 0,
     });
+
+    // Skip children if project is collapsed
+    if (isProjectCollapsed) {
+      continue;
+    }
 
     // Build issue tree within project
     const issueMap = new Map(projectIssues.map((i) => [i.id, i]));
@@ -140,24 +158,32 @@ function buildHierarchicalRows(issues: GanttIssue[]): GanttRow[] {
     }
 
     // Recursively add issues (sorted by risk at each level)
-    function addIssues(parentId: number | null, depth: number) {
+    function addIssues(parentId: number | null, parentKey: string, depth: number) {
+      // Skip if parent is collapsed
+      if (collapsedKeys.has(parentKey)) {
+        return;
+      }
       const childIssues = sortGanttIssuesByRisk(children.get(parentId) || []);
       for (const issue of childIssues) {
         // Check if this issue has children (is a parent)
-        const hasChildren = children.has(issue.id) && children.get(issue.id)!.length > 0;
+        const hasIssueChildren = children.has(issue.id) && children.get(issue.id)!.length > 0;
+        const issueKey = `issue-${issue.id}`;
         rows.push({
           type: "issue",
           id: issue.id,
           label: issue.subject,
           depth,
           issue,
-          isParent: hasChildren,
+          isParent: hasIssueChildren,
+          collapseKey: issueKey,
+          parentKey,
+          hasChildren: hasIssueChildren,
         });
-        addIssues(issue.id, depth + 1);
+        addIssues(issue.id, issueKey, depth + 1);
       }
     }
 
-    addIssues(null, 1);
+    addIssues(null, projectKey, 1);
   }
 
   return rows;
@@ -357,6 +383,7 @@ export class GanttPanel {
   private _showDependencies: boolean = true;
   private _showIntensity: boolean = false;
   private _scrollPosition: { left: number; top: number } = { left: 0, top: 0 };
+  private _collapsedKeys: Set<string> = new Set();
 
   private constructor(panel: vscode.WebviewPanel, server?: RedmineServer) {
     this._panel = panel;
@@ -535,6 +562,7 @@ export class GanttPanel {
     left?: number;
     top?: number;
     operation?: string;
+    collapseKey?: string;
   }): void {
     switch (message.command) {
       case "openIssue":
@@ -595,6 +623,16 @@ export class GanttPanel {
       case "refresh":
         // Refresh data without resetting view state
         vscode.commands.executeCommand("redmine.refreshGanttData");
+        break;
+      case "toggleCollapse":
+        if (message.collapseKey) {
+          if (this._collapsedKeys.has(message.collapseKey as string)) {
+            this._collapsedKeys.delete(message.collapseKey as string);
+          } else {
+            this._collapsedKeys.add(message.collapseKey as string);
+          }
+          this._updateContent();
+        }
         break;
       case "scrollPosition":
         // Store scroll position for restoration after update
@@ -887,20 +925,27 @@ export class GanttPanel {
     const indentSize = 16;
 
     // Build hierarchical rows
-    const rows = buildHierarchicalRows(this._issues);
+    const rows = buildHierarchicalRows(this._issues, this._collapsedKeys);
     const contentHeight = rows.length * (barHeight + barGap);
+    const chevronWidth = 14;
 
     // Left labels (fixed column) - Y starts at 0 in body SVG (header is separate)
     const labels = rows
       .map((row, index) => {
         const y = index * (barHeight + barGap);
         const indent = row.depth * indentSize;
+        const isCollapsed = this._collapsedKeys.has(row.collapseKey);
+        const chevron = row.hasChildren
+          ? `<text class="collapse-toggle" data-collapse-key="${row.collapseKey}" x="${3 + indent}" y="${y + barHeight / 2 + 4}" fill="var(--vscode-foreground)" font-size="10" style="cursor: pointer; user-select: none;">${isCollapsed ? "▶" : "▼"}</text>`
+          : "";
+        const textOffset = row.hasChildren ? chevronWidth : 0;
 
         if (row.type === "project") {
           // Project header row
           return `
-            <g class="project-label">
-              <text x="${5 + indent}" y="${y + barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12" font-weight="bold">
+            <g class="project-label" data-collapse-key="${row.collapseKey}">
+              ${chevron}
+              <text x="${5 + indent + textOffset}" y="${y + barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12" font-weight="bold">
                 ${escapeHtml(row.label)}
               </text>
             </g>
@@ -921,8 +966,9 @@ export class GanttPanel {
         ].join("\n");
 
         return `
-          <g class="issue-label" data-issue-id="${issue.id}" tabindex="0" role="button" aria-label="Open issue #${issue.id}" style="cursor: pointer;">
-            <text x="${5 + indent}" y="${y + barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12">
+          <g class="issue-label" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" tabindex="0" role="button" aria-label="Open issue #${issue.id}" style="cursor: pointer;">
+            ${chevron}
+            <text x="${5 + indent + textOffset}" y="${y + barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12">
               #${issue.id} ${escapedSubject}
             </text>
             <title>${tooltip}</title>
@@ -1481,6 +1527,9 @@ ${style.tip}
     button:focus { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
     .issue-bar:focus-within .bar-outline, .issue-bar.focused .bar-outline { stroke-width: 3; stroke: var(--vscode-focusBorder); }
     .issue-label:focus { outline: 2px solid var(--vscode-focusBorder); outline-offset: 1px; }
+    /* Collapse toggle chevron */
+    .collapse-toggle { cursor: pointer; opacity: 0.7; }
+    .collapse-toggle:hover { opacity: 1; }
     /* Screen reader only class */
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
     .weekend-bg { fill: var(--vscode-editor-inactiveSelectionBackground); opacity: 0.3; }
@@ -2091,17 +2140,34 @@ ${style.tip}
       }
     });
 
+    // Collapse toggle click (before issue-label handler to stop propagation)
+    document.querySelectorAll('.collapse-toggle').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const collapseKey = el.dataset.collapseKey;
+        if (collapseKey) {
+          vscode.postMessage({ command: 'toggleCollapse', collapseKey });
+        }
+      });
+    });
+
     // Labels click and keyboard
     document.querySelectorAll('.issue-label').forEach(el => {
-      el.addEventListener('click', () => {
+      el.addEventListener('click', (e) => {
+        // Don't open issue if clicking on chevron
+        if (e.target.classList?.contains('collapse-toggle')) return;
         const issueId = parseInt(el.dataset.issueId);
-        vscode.postMessage({ command: 'openIssue', issueId });
+        if (issueId) {
+          vscode.postMessage({ command: 'openIssue', issueId });
+        }
       });
       el.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           const issueId = parseInt(el.dataset.issueId);
-          vscode.postMessage({ command: 'openIssue', issueId });
+          if (issueId) {
+            vscode.postMessage({ command: 'openIssue', issueId });
+          }
         }
       });
     });
