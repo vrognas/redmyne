@@ -315,7 +315,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   }
 
   /**
-   * Sort project nodes: with assigned issues first (by issue count), then without
+   * Sort project nodes alphabetically
    */
   private sortProjectNodes(nodes: ProjectNode[]): ProjectNode[] {
     // Apply tree view filtering if needed
@@ -324,23 +324,11 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
       filtered = nodes.filter((n) => !n.project.parent);
     }
 
-    return filtered.sort((a, b) => {
-      // Projects with any issues (direct or subproject) come first
-      const aHasAny = a.totalIssuesWithSubprojects > 0;
-      const bHasAny = b.totalIssuesWithSubprojects > 0;
-      if (aHasAny && !bHasAny) return -1;
-      if (!aHasAny && bHasAny) return 1;
-
-      // Among projects with issues, sort by total issue count (descending)
-      if (aHasAny && bHasAny) {
-        return b.totalIssuesWithSubprojects - a.totalIssuesWithSubprojects;
-      }
-
-      // Among projects without issues, sort alphabetically
-      return a.project.toQuickPickItem().label.localeCompare(
+    return filtered.sort((a, b) =>
+      a.project.toQuickPickItem().label.localeCompare(
         b.project.toQuickPickItem().label
-      );
-    });
+      )
+    );
   }
 
   /**
