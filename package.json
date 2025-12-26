@@ -1029,6 +1029,12 @@
           "default": true,
           "scope": "machine"
         },
+        "redmine.autoUpdateDoneRatio": {
+          "type": "boolean",
+          "description": "Auto-update % Done based on spent/estimated hours when logging time. Caps at 99% (100% must be manual). Skips if over budget.",
+          "default": true,
+          "scope": "application"
+        },
         "redmine.workingHours.hoursPerDay": {
           "type": "number",
           "default": 8,

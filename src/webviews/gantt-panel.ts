@@ -572,6 +572,31 @@ export class GanttPanel {
           this._handleRedoRelation(message as { operation: string; relationId?: number; issueId?: number; targetIssueId?: number; relationType?: string });
         }
         break;
+      case "openInBrowser":
+        if (message.issueId) {
+          vscode.commands.executeCommand("redmine.openIssueInBrowser", { id: message.issueId });
+        }
+        break;
+      case "showInIssues":
+        if (message.issueId) {
+          vscode.commands.executeCommand("redmine.revealIssueInTree", message.issueId);
+        }
+        break;
+      case "logTime":
+        if (message.issueId) {
+          vscode.commands.executeCommand("redmine.quickLogTime", { id: message.issueId });
+        }
+        break;
+      case "setDoneRatio":
+        if (message.issueId) {
+          vscode.commands.executeCommand("redmine.setDoneRatio", { id: message.issueId });
+        }
+        break;
+      case "copyUrl":
+        if (message.issueId) {
+          vscode.commands.executeCommand("redmine.copyIssueUrl", { id: message.issueId });
+        }
+        break;
     }
   }
 
@@ -929,12 +954,12 @@ export class GanttPanel {
               const endX = ((endPlusOne.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
               const width = Math.max(4, endX - startX);
 
-              return `<rect x="${startX}" y="${y + 4}" width="${width}" height="${barHeight - 8}"
+              return `<rect class="aggregate-bar" x="${startX}" y="${y + 4}" width="${width}" height="${barHeight - 8}"
                             fill="var(--vscode-descriptionForeground)" opacity="0.5" rx="2" ry="2"/>`;
             })
             .join("");
 
-          return `<g class="aggregate-bars">${aggregateBars}</g>`;
+          return `<g class="aggregate-bars" data-project-id="${row.id}" data-collapse-key="${row.collapseKey}">${aggregateBars}</g>`;
         }
 
         const issue = row.issue!;
@@ -1481,8 +1506,11 @@ ${style.tip}
     .hover-focus .dependency-arrow .arrow-line,
     .hover-focus .dependency-arrow .arrow-head { opacity: 0.15; transition: opacity 0.15s ease-out; }
     .hover-focus .issue-bar.hover-highlighted,
-    .hover-focus .issue-label.hover-highlighted { opacity: 1 !important; }
+    .hover-focus .issue-label.hover-highlighted,
+    .hover-focus .project-label.hover-highlighted,
+    .hover-focus .aggregate-bars.hover-highlighted { opacity: 1 !important; }
     .hover-focus .issue-bar.hover-highlighted .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
+    .hover-focus .aggregate-bars.hover-highlighted .aggregate-bar { opacity: 0.7; }
     /* Dependency arrows connected to highlighted issue stay visible */
     .hover-focus .dependency-arrow.hover-highlighted .arrow-line,
     .hover-focus .dependency-arrow.hover-highlighted .arrow-head { opacity: 1; }
@@ -1924,6 +1952,30 @@ ${style.tip}
       label.addEventListener('mouseenter', () => {
         const issueId = label.dataset.issueId;
         if (issueId) highlightIssue(issueId);
+      });
+      label.addEventListener('mouseleave', clearHoverHighlight);
+    });
+
+    // Aggregate bar hover (highlights project label and aggregate bars)
+    function highlightProject(collapseKey) {
+      document.body.classList.add('hover-focus');
+      document.querySelectorAll('.project-label[data-collapse-key="' + collapseKey + '"]').forEach(el => el.classList.add('hover-highlighted'));
+      document.querySelectorAll('.aggregate-bars[data-collapse-key="' + collapseKey + '"]').forEach(el => el.classList.add('hover-highlighted'));
+    }
+
+    document.querySelectorAll('.aggregate-bars').forEach(bars => {
+      bars.addEventListener('mouseenter', () => {
+        const collapseKey = bars.dataset.collapseKey;
+        if (collapseKey) highlightProject(collapseKey);
+      });
+      bars.addEventListener('mouseleave', clearHoverHighlight);
+    });
+
+    // Project label hover
+    document.querySelectorAll('.project-label').forEach(label => {
+      label.addEventListener('mouseenter', () => {
+        const collapseKey = label.dataset.collapseKey;
+        if (collapseKey) highlightProject(collapseKey);
       });
       label.addEventListener('mouseleave', clearHoverHighlight);
     });
