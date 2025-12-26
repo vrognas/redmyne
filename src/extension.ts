@@ -350,9 +350,11 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   cleanupResources.workloadStatusBar.update();
 
-  // Update on tree refresh
+  // Update on tree refresh (workload bar + Gantt if open)
   projectsTree.onDidChangeTreeData(() => {
     cleanupResources.workloadStatusBar?.update();
+    // Refresh Gantt if open
+    vscode.commands.executeCommand("redmine.refreshGanttData");
   });
 
   // Listen for secret changes

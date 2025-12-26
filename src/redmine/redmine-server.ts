@@ -451,11 +451,46 @@ export class RedmineServer {
     if (spentOn) {
       entry.spent_on = spentOn;
     }
-    return await this.doRequest<{ time_entry: TimeEntry }>(
+    const result = await this.doRequest<{ time_entry: TimeEntry }>(
       `/time_entries.json`,
       "POST",
       this.encodeJson({ time_entry: entry })
     );
+
+    // Auto-update %done based on spent/estimated hours
+    await this.autoUpdateDoneRatio(issueId);
+
+    return result;
+  }
+
+  /**
+   * Auto-update done_ratio based on spent/estimated hours
+   * Rules: 0% if no estimate, cap at 99% (100% must be manual), skip if already 100%
+   */
+  private async autoUpdateDoneRatio(issueId: number): Promise<void> {
+    try {
+      const { issue } = await this.getIssueById(issueId);
+      const estimated = issue.estimated_hours ?? 0;
+      const spent = issue.spent_hours ?? 0;
+      const current = issue.done_ratio ?? 0;
+
+      // Skip if already 100% (manual completion)
+      if (current === 100) return;
+
+      // Skip if no estimate
+      if (estimated <= 0) return;
+
+      // Calculate new %done, cap at 99%
+      const calculated = Math.round((spent / estimated) * 100);
+      const newRatio = Math.min(calculated, 99);
+
+      // Only update if different
+      if (newRatio !== current) {
+        await this.updateDoneRatio(issueId, newRatio);
+      }
+    } catch {
+      // Silent fail - don't break time entry if auto-update fails
+    }
   }
 
   /**
