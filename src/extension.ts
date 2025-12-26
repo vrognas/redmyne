@@ -603,28 +603,39 @@ export function activate(context: vscode.ExtensionContext): void {
     myTimeEntriesTree.refresh();
   });
 
-  // Open issue in browser (context menu for my-issues tree)
-  registerCommand("openIssueInBrowser", async (props: ActionProperties, ...args: unknown[]) => {
-    // Tree item passes the Issue object
-    const issue = args[0] as { id: number } | undefined;
-    if (!issue?.id) {
-      vscode.window.showErrorMessage('Could not determine issue ID');
-      return;
-    }
-    await vscode.env.openExternal(vscode.Uri.parse(`${props.server.options.address}/issues/${issue.id}`));
-  });
+  // Open issue in browser (context menu - receives tree element directly)
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.openIssueInBrowser", async (issue: { id: number } | undefined) => {
+      if (!issue?.id) {
+        vscode.window.showErrorMessage('Could not determine issue ID');
+        return;
+      }
+      const url = vscode.workspace.getConfiguration("redmine").get<string>("url");
+      if (!url) {
+        vscode.window.showErrorMessage('No Redmine URL configured');
+        return;
+      }
+      await vscode.env.openExternal(vscode.Uri.parse(`${url}/issues/${issue.id}`));
+    })
+  );
 
-  // Copy issue URL to clipboard (context menu for my-issues tree)
-  registerCommand("copyIssueUrl", async (props: ActionProperties, ...args: unknown[]) => {
-    const issue = args[0] as { id: number } | undefined;
-    if (!issue?.id) {
-      vscode.window.showErrorMessage('Could not determine issue ID');
-      return;
-    }
-    const url = `${props.server.options.address}/issues/${issue.id}`;
-    await vscode.env.clipboard.writeText(url);
-    showStatusBarMessage(`$(check) Copied #${issue.id} URL`, 2000);
-  });
+  // Copy issue URL to clipboard (context menu - receives tree element directly)
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.copyIssueUrl", async (issue: { id: number } | undefined) => {
+      if (!issue?.id) {
+        vscode.window.showErrorMessage('Could not determine issue ID');
+        return;
+      }
+      const url = vscode.workspace.getConfiguration("redmine").get<string>("url");
+      if (!url) {
+        vscode.window.showErrorMessage('No Redmine URL configured');
+        return;
+      }
+      const issueUrl = `${url}/issues/${issue.id}`;
+      await vscode.env.clipboard.writeText(issueUrl);
+      showStatusBarMessage(`$(check) Copied #${issue.id} URL`, 2000);
+    })
+  );
   // Register view commands
   registerViewCommands(context, {
     projectsTree,
