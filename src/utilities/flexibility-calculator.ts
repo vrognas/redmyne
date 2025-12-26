@@ -129,6 +129,7 @@ function calculateFlexibilityPercent(
 
 /**
  * Count working days between two dates (inclusive)
+ * Returns negative if end < start (past due)
  * Uses memoization for performance
  */
 export function countWorkingDays(
@@ -142,13 +143,19 @@ export function countWorkingDays(
     return workingDaysCache.get(key)!;
   }
 
-  let count = 0;
-  const current = new Date(start);
-  current.setHours(0, 0, 0, 0);
-  const endDate = new Date(end);
-  endDate.setHours(0, 0, 0, 0);
+  const startNorm = new Date(start);
+  startNorm.setHours(0, 0, 0, 0);
+  const endNorm = new Date(end);
+  endNorm.setHours(0, 0, 0, 0);
 
-  while (current <= endDate) {
+  // Determine direction: positive if end >= start, negative if past due
+  const isPastDue = endNorm < startNorm;
+  const [from, to] = isPastDue ? [endNorm, startNorm] : [startNorm, endNorm];
+
+  let count = 0;
+  const current = new Date(from);
+
+  while (current <= to) {
     const dayName = getDayName(current);
     if (schedule[dayName] > 0) {
       count++;
@@ -156,8 +163,11 @@ export function countWorkingDays(
     current.setDate(current.getDate() + 1);
   }
 
-  workingDaysCache.set(key, count);
-  return count;
+  // Subtract 1 to not count today, then negate if past due
+  const result = isPastDue ? -(count - 1) : count;
+
+  workingDaysCache.set(key, result);
+  return result;
 }
 
 /**
