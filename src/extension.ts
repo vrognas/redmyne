@@ -375,7 +375,8 @@ export function activate(context: vscode.ExtensionContext): void {
     const apiKey = await secretManager.getApiKey();
     const isConfigured = hasUrl && !!apiKey;
 
-    await vscode.commands.executeCommand(
+    // Set context in parallel with server init (no await needed)
+    vscode.commands.executeCommand(
       "setContext",
       "redmine:configured",
       isConfigured
