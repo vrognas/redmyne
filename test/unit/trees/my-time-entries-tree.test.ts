@@ -429,12 +429,10 @@ describe("MyTimeEntriesTreeDataProvider", () => {
   });
 
   it("groups This Week entries by day of week with empty working days", async () => {
-    // Use dates from current week (dynamic based on actual date)
-    const today = new Date();
-    const todayStr = today.toISOString().split("T")[0];
-    const todayDay = today.getDate();
+    // Use a fixed Wednesday date to ensure it's a working day
+    const testDate = "2025-12-24"; // Wednesday (working day)
 
-    // Create entries for today
+    // Create entries for the test date
     const weekEntries: TimeEntry[] = [
       {
         id: 1,
@@ -443,7 +441,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
         activity: { id: 9, name: "Development" },
         hours: "4",
         comments: "",
-        spent_on: todayStr,
+        spent_on: testDate,
       },
       {
         id: 2,
@@ -452,7 +450,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
         activity: { id: 9, name: "Development" },
         hours: "3",
         comments: "",
-        spent_on: todayStr,
+        spent_on: testDate,
       },
     ];
 
@@ -469,28 +467,27 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     // Get day groups
     const dayGroups = await provider.getChildren(thisWeek);
 
-    // Should have at least 1 day (today)
+    // Should have at least 1 day with entries
     expect(dayGroups.length).toBeGreaterThanOrEqual(1);
     expect(dayGroups[0].type).toBe("day-group");
 
-    // Find today's node
-    const todayNode = dayGroups.find((d) => d.label?.includes(String(todayDay)));
+    // Find the day with entries (Wed 24)
+    const entryNode = dayGroups.find((d) => d.label?.includes("24"));
 
-    expect(todayNode).toBeDefined();
+    expect(entryNode).toBeDefined();
 
-    // Today should show 7:00 total (4+3)
-    expect(todayNode!.description).toContain("7:00");
+    // That day should show 7:00 total (4+3)
+    expect(entryNode!.description).toContain("7:00");
 
-    // Get entries for today
-    const todayEntries = await provider.getChildren(todayNode!);
-    expect(todayEntries.length).toBe(2);
+    // Get entries for that day
+    const dayEntries = await provider.getChildren(entryNode!);
+    expect(dayEntries.length).toBe(2);
   });
 
   it("shows empty working days in week view", async () => {
     // Test that week-group includes working days even without entries
-    // Use current date for the test
-    const today = new Date();
-    const todayStr = today.toISOString().split("T")[0];
+    // Use a fixed Wednesday date to avoid weekend/timezone issues
+    const testDate = "2025-12-24"; // Wednesday
 
     const weekEntries: TimeEntry[] = [
       {
@@ -500,7 +497,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
         activity: { id: 9, name: "Development" },
         hours: "8",
         comments: "",
-        spent_on: todayStr,
+        spent_on: testDate,
       },
     ];
 
@@ -517,18 +514,16 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     // Should have at least 1 day with entry
     expect(dayGroups.length).toBeGreaterThanOrEqual(1);
 
-    // Find today's node
-    const todayNode = dayGroups.find((d) => d.label?.includes(String(today.getDate())));
-    expect(todayNode).toBeDefined();
-    expect(todayNode!.description).toContain("8:00");
+    // Find node for Dec 24
+    const entryNode = dayGroups.find((d) => d.label?.includes("24"));
+    expect(entryNode).toBeDefined();
+    expect(entryNode!.description).toContain("8:00");
   });
 
   it("shows non-working day only if has entries", async () => {
     // Test that non-working days (Sat/Sun with 0 scheduled hours) appear only when they have entries
-    // Use today's date for the test
-    const today = new Date();
-    const todayStr = today.toISOString().split("T")[0];
-    const todayDay = today.getDate();
+    // Use a fixed Wednesday date to avoid weekend/timezone issues
+    const testDate = "2025-12-24"; // Wednesday
 
     const weekEntries: TimeEntry[] = [
       {
@@ -538,7 +533,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
         activity: { id: 9, name: "Development" },
         hours: "2",
         comments: "Work entry",
-        spent_on: todayStr,
+        spent_on: testDate,
       },
     ];
 
@@ -552,13 +547,13 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     const thisWeek = groups[1];
     const dayGroups = await provider.getChildren(thisWeek);
 
-    // Find today's node - it should be present because it has an entry
-    const todayNode = dayGroups.find((d) => d.label?.includes(String(todayDay)));
+    // Find node for Dec 24 - it should be present because it has an entry
+    const entryNode = dayGroups.find((d) => d.label?.includes("24"));
 
-    expect(todayNode).toBeDefined();
-    expect(todayNode!.description).toContain("2:00");
+    expect(entryNode).toBeDefined();
+    expect(entryNode!.description).toContain("2:00");
 
-    // At minimum we should have today with entry
+    // At minimum we should have the entry day
     expect(dayGroups.length).toBeGreaterThanOrEqual(1);
   });
 

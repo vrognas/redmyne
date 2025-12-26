@@ -23,7 +23,8 @@
       "Bash(grep:*)",
       "Bash(wc:*)",
       "Bash(find:*)",
-      "Bash(sort:*)"
+      "Bash(sort:*)",
+      "Bash(git mv:*)"
     ],
     "deny": [],
     "ask": []
