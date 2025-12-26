@@ -8,6 +8,10 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 - **Opt-in auto-update %done** - per-issue toggle in context menu; when enabled, logging time auto-calculates %done from spent/estimated hours (capped at 99%)
 
+### Fixed
+
+- **Gantt dependency arrows clipped** - arrows now render past timeline edge
+
 ## [3.17.0]
 
 ### Added
