@@ -1255,8 +1255,8 @@ export class GanttPanel {
                   fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1" rx="8" ry="8"/>
             ${issue.isClosed ? `
               <!-- Closed checkmark -->
-              <text class="completed-check" x="${startX + width / 2}" y="${y + barHeight / 2 + 5}"
-                    text-anchor="middle" fill="var(--vscode-charts-green)" font-size="16" font-weight="bold">✓</text>
+              <text class="completed-check" x="${endX - 10}" y="${y + barHeight / 2 + 5}"
+                    text-anchor="end" fill="var(--vscode-charts-green)" font-size="14" font-weight="bold">✓</text>
             ` : ""}
             <rect class="drag-handle drag-left cursor-ew-resize" x="${startX}" y="${y}" width="${handleWidth}" height="${barHeight}"
                   fill="transparent"/>
