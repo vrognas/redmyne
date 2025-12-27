@@ -4,9 +4,25 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 
 ## [Unreleased]
 
+## [3.19.0]
+
+### Added
+
+- **Gantt multi-select** - Ctrl+click toggles, Shift+click selects range, Ctrl+A selects all, bulk drag moves all
+- **Gantt minimap** - fixed bottom panel with full timeline, viewport indicator, click/drag to navigate
+- **Gantt critical path** - toggle to highlight longest blocking chain (blocks/precedes relations)
+- **Gantt drag bar to move** - drag bar body to shift both start/due dates together
+- **Gantt %done display** - shows done percentage on non-closed issue bars
+- **Gantt overdue indicator** - red outline/glow on overdue issues (past due, not closed, <100%)
+
 ### Changed
 
-- **Renamed "Personal Tasks" to "Kanban"** - clearer purpose; reflects kanban-style todo/in-progress/done workflow
+- **Renamed "Personal Tasks" to "Kanban"** - clearer purpose; reflects kanban-style workflow
+
+### Security
+
+- **Cryptographic nonce** - replaced Math.random with crypto.randomBytes for CSP nonces
+- **CSP compliance** - removed unsafe-inline; all styles use nonces, inline styles converted to classes
 
 ## [3.18.0]
 
