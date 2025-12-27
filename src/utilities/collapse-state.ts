@@ -57,6 +57,20 @@ class CollapseStateManager {
     this.setCollapsed(key, false);
   }
 
+  /** Expand all given keys */
+  expandAll(keys?: string[]): void {
+    if (keys) {
+      keys.forEach((key) => this._expandedKeys.add(key));
+    }
+    this._onDidChange.fire({ key: "*", collapsed: false });
+  }
+
+  /** Collapse all (clear expanded set) */
+  collapseAll(): void {
+    this._expandedKeys.clear();
+    this._onDidChange.fire({ key: "*", collapsed: true });
+  }
+
   /** Clear all expand state (everything becomes collapsed) */
   clear(): void {
     this._expandedKeys.clear();

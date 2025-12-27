@@ -532,6 +532,7 @@ export class GanttPanel {
     operation?: string;
     collapseKey?: string;
     action?: string;
+    keys?: string[];
   }): void {
     switch (message.command) {
       case "openIssue":
@@ -607,6 +608,12 @@ export class GanttPanel {
           }
           // Note: _updateContent() called via collapseState.onDidChange listener
         }
+        break;
+      case "expandAll":
+        collapseState.expandAll(message.keys);
+        break;
+      case "collapseAll":
+        collapseState.collapseAll();
         break;
       case "scrollPosition":
         // Store scroll position for restoration after update
@@ -1104,7 +1111,7 @@ export class GanttPanel {
               // Use clip-path for proper corner rounding on first/last
               return `<rect x="${segX}" y="${y}" width="${segmentWidth + 0.5}" height="${barHeight}"
                             fill="${color}" opacity="${opacity.toFixed(2)}"
-                            ${isFirst ? 'rx="4" ry="4"' : isLast ? 'rx="4" ry="4"' : ""}/>`;
+                            ${isFirst ? 'rx="8" ry="8"' : isLast ? 'rx="8" ry="8"' : ""}/>`;
             })
             .join("");
 
@@ -1182,21 +1189,21 @@ export class GanttPanel {
             ` : `
               <!-- Fallback: solid bar when no intensity data -->
               <rect class="bar-main" x="${startX}" y="${y}" width="${width}" height="${barHeight}"
-                    fill="${color}" rx="4" ry="4" opacity="0.3"/>
+                    fill="${color}" rx="8" ry="8" opacity="0.85" filter="url(#barShadow)"/>
             `}
             ${hasPastPortion ? `
               <!-- Past portion overlay with diagonal stripes -->
               <rect class="past-overlay" x="${startX}" y="${y}" width="${pastWidth}" height="${barHeight}"
-                    fill="url(#past-stripes)" rx="4" ry="4"/>
+                    fill="url(#past-stripes)" rx="8" ry="8"/>
             ` : ""}
             ${doneRatio > 0 && doneRatio < 100 ? `
               <!-- Progress fill showing done_ratio -->
               <rect class="progress-fill" x="${startX}" y="${y}" width="${doneWidth}" height="${barHeight}"
-                    fill="${color}" rx="4" ry="4" opacity="0.5"/>
+                    fill="${color}" rx="8" ry="8" opacity="0.95" filter="url(#barShadow)"/>
             ` : ""}
             <!-- Border/outline -->
             <rect class="bar-outline" x="${startX}" y="${y}" width="${width}" height="${barHeight}"
-                  fill="none" stroke="${color}" stroke-width="1" rx="4" ry="4" opacity="0.8" style="cursor: pointer;"/>
+                  fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1" rx="8" ry="8" style="cursor: pointer;"/>
             <rect class="drag-handle drag-left" x="${startX}" y="${y}" width="${handleWidth}" height="${barHeight}"
                   fill="transparent" style="cursor: ew-resize;"/>
             <rect class="drag-handle drag-right" x="${startX + width - handleWidth}" y="${y}" width="${handleWidth}" height="${barHeight}"
@@ -1481,7 +1488,10 @@ ${style.tip}
       display: flex;
       flex-direction: column;
     }
-    .gantt-left-header {
+    .gantt-left-header { display: flex; gap: 4px; padding: 4px 8px; }
+    .gantt-left-header button { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 10px; }
+    .gantt-left-header button:hover { background: var(--vscode-button-secondaryHoverBackground); }
+    .gantt-left-header-placeholder {
       height: ${headerHeight}px;
       flex-shrink: 0;
       background: var(--vscode-editor-background);
@@ -1592,7 +1602,7 @@ ${style.tip}
     /* Screen reader only class */
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
     .weekend-bg { fill: var(--vscode-editor-inactiveSelectionBackground); opacity: 0.3; }
-    .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 1; opacity: 0.5; }
+    .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 1; opacity: 0.15; }
     .date-marker { stroke: var(--vscode-editorRuler-foreground); stroke-dasharray: 2,2; }
     .today-marker { stroke: var(--vscode-charts-red); stroke-width: 2; }
     /* Base transitions for dependency focus fade-back */
@@ -1644,7 +1654,10 @@ ${style.tip}
   </div>
   <div class="gantt-container">
     <div class="gantt-left" id="ganttLeft">
-      <div class="gantt-left-header"></div>
+      <div class="gantt-left-header">
+        <button id="expandAllBtn" title="Expand all">▼</button>
+        <button id="collapseAllBtn" title="Collapse all">▶</button>
+      </div>
       <div class="gantt-labels" id="ganttLabels">
         <svg width="${labelWidth}" height="${bodyHeight}">
           ${labels}
@@ -1664,6 +1677,9 @@ ${style.tip}
             <pattern id="past-stripes" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
               <line x1="0" y1="0" x2="0" y2="6" stroke="var(--vscode-charts-red)" stroke-width="2" stroke-opacity="0.4"/>
             </pattern>
+            <filter id="barShadow" x="-10%" y="-10%" width="120%" height="120%">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+            </filter>
           </defs>
           ${dateMarkers.body}
           <!-- Arrows below bars so link-handles remain clickable -->
@@ -2358,6 +2374,17 @@ ${style.tip}
     });
 
     // Collapse toggle click (before issue-label handler to stop propagation)
+    // Expand/collapse all buttons
+    document.getElementById('expandAllBtn')?.addEventListener('click', () => {
+      const keys = [...document.querySelectorAll('[data-collapse-key]')]
+        .map(el => el.dataset.collapseKey)
+        .filter((k, i, arr) => k && arr.indexOf(k) === i);
+      vscode.postMessage({ command: 'expandAll', keys });
+    });
+    document.getElementById('collapseAllBtn')?.addEventListener('click', () => {
+      vscode.postMessage({ command: 'collapseAll' });
+    });
+
     document.querySelectorAll('.collapse-toggle').forEach(el => {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
