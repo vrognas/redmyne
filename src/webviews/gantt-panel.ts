@@ -1621,6 +1621,12 @@ ${style.tip}
     .issue-bar.bar-past:hover { filter: saturate(0.6) opacity(0.85); }
     .issue-bar.bar-overdue .bar-outline { stroke: var(--vscode-charts-red) !important; stroke-width: 2; filter: drop-shadow(0 0 4px var(--vscode-charts-red)); }
     .issue-bar.bar-overdue:hover .bar-outline { stroke-width: 3; filter: drop-shadow(0 0 6px var(--vscode-charts-red)); }
+    .critical-path-mode .issue-bar { opacity: 0.3; }
+    .critical-path-mode .issue-bar.critical-path { opacity: 1; }
+    .critical-path-mode .issue-bar.critical-path .bar-outline { stroke: var(--vscode-charts-orange) !important; stroke-width: 3; filter: drop-shadow(0 0 6px var(--vscode-charts-orange)); }
+    .critical-path-mode .dependency-arrow { opacity: 0.15; }
+    .critical-path-mode .dependency-arrow.critical-path { opacity: 1; }
+    .critical-path-mode .dependency-arrow.critical-path .arrow-line { stroke: var(--vscode-charts-orange) !important; stroke-width: 3; }
     .issue-bar.parent-bar { opacity: 0.7; }
     .issue-bar.parent-bar:hover { opacity: 1; }
     .past-overlay { pointer-events: none; }
@@ -1727,6 +1733,7 @@ ${style.tip}
       <button id="heatmapBtn" class="${this._showWorkloadHeatmap ? "active" : ""}" title="Toggle workload heatmap" aria-pressed="${this._showWorkloadHeatmap}">Heatmap</button>
       <button id="depsBtn" class="${this._showDependencies ? "active" : ""}" title="Toggle dependency arrows" aria-pressed="${this._showDependencies}">Deps</button>
       <button id="intensityBtn" class="${this._showIntensity ? "active" : ""}" title="Toggle daily intensity" aria-pressed="${this._showIntensity}">Intensity</button>
+      <button id="criticalPathBtn" title="Highlight critical path (longest blocking chain)" aria-pressed="false">Critical</button>
       <div class="heatmap-legend${this._showWorkloadHeatmap ? "" : " hidden"}">
         <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-green"></span>&lt;80%</span>
         <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-yellow"></span>80-100%</span>
@@ -2040,6 +2047,100 @@ ${style.tip}
       saveState();
       vscode.postMessage({ command: 'toggleIntensity' });
     });
+
+    // Critical path toggle
+    let criticalPathEnabled = false;
+    const criticalPathBtn = document.getElementById('criticalPathBtn');
+    const ganttContainer = document.querySelector('.gantt-container');
+
+    // Build blocking graph from dependency arrows
+    function buildBlockingGraph() {
+      const graph = new Map(); // issueId -> [targetIds that this issue blocks/precedes]
+      const reverseGraph = new Map(); // issueId -> [sourceIds that block/precede this issue]
+      document.querySelectorAll('.dependency-arrow').forEach(arrow => {
+        const relType = arrow.classList.contains('rel-blocks') || arrow.classList.contains('rel-precedes');
+        if (!relType) return;
+        const fromId = arrow.dataset.from;
+        const toId = arrow.dataset.to;
+        if (!graph.has(fromId)) graph.set(fromId, []);
+        graph.get(fromId).push(toId);
+        if (!reverseGraph.has(toId)) reverseGraph.set(toId, []);
+        reverseGraph.get(toId).push(fromId);
+      });
+      return { graph, reverseGraph };
+    }
+
+    // Find longest path using DFS with memoization
+    function findLongestPath(graph, reverseGraph) {
+      const allNodes = new Set([...graph.keys(), ...reverseGraph.keys()]);
+      const memo = new Map();
+
+      function dfs(node, visited) {
+        if (memo.has(node)) return memo.get(node);
+        if (visited.has(node)) return { length: 0, path: [] }; // cycle detection
+
+        visited.add(node);
+        const neighbors = graph.get(node) || [];
+        let longest = { length: 0, path: [] };
+
+        for (const neighbor of neighbors) {
+          const result = dfs(neighbor, new Set(visited));
+          if (result.length + 1 > longest.length) {
+            longest = { length: result.length + 1, path: [neighbor, ...result.path] };
+          }
+        }
+
+        memo.set(node, longest);
+        return longest;
+      }
+
+      // Find the longest path starting from any node
+      let criticalPath = [];
+      let maxLength = 0;
+      for (const node of allNodes) {
+        const result = dfs(node, new Set());
+        if (result.length > maxLength) {
+          maxLength = result.length;
+          criticalPath = [node, ...result.path];
+        }
+      }
+      return criticalPath;
+    }
+
+    function toggleCriticalPath() {
+      criticalPathEnabled = !criticalPathEnabled;
+      criticalPathBtn.classList.toggle('active', criticalPathEnabled);
+      criticalPathBtn.setAttribute('aria-pressed', criticalPathEnabled);
+
+      // Clear previous highlights
+      document.querySelectorAll('.critical-path').forEach(el => el.classList.remove('critical-path'));
+      ganttContainer.classList.toggle('critical-path-mode', criticalPathEnabled);
+
+      if (criticalPathEnabled) {
+        const { graph, reverseGraph } = buildBlockingGraph();
+        const criticalPath = findLongestPath(graph, reverseGraph);
+
+        // Highlight issues on critical path
+        const criticalSet = new Set(criticalPath);
+        document.querySelectorAll('.issue-bar').forEach(bar => {
+          if (criticalSet.has(bar.dataset.issueId)) {
+            bar.classList.add('critical-path');
+          }
+        });
+
+        // Highlight arrows on critical path
+        for (let i = 0; i < criticalPath.length - 1; i++) {
+          const from = criticalPath[i];
+          const to = criticalPath[i + 1];
+          const arrow = document.querySelector(\`.dependency-arrow[data-from="\${from}"][data-to="\${to}"]\`);
+          if (arrow) arrow.classList.add('critical-path');
+        }
+
+        announce(\`Critical path: \${criticalPath.length} issues in longest blocking chain\`);
+      }
+    }
+
+    criticalPathBtn.addEventListener('click', toggleCriticalPath);
 
     // Refresh button handler
     document.getElementById('refreshBtn').addEventListener('click', () => {
