@@ -1257,7 +1257,11 @@ export class GanttPanel {
               <!-- Closed checkmark -->
               <text class="completed-check" x="${endX - 10}" y="${y + barHeight / 2 + 5}"
                     text-anchor="end" fill="var(--vscode-charts-green)" font-size="14" font-weight="bold">✓</text>
-            ` : ""}
+            ` : `
+              <!-- Done ratio -->
+              <text class="done-ratio" x="${endX - 10}" y="${y + barHeight / 2 + 4}"
+                    text-anchor="end" fill="var(--vscode-foreground)" font-size="11" opacity="0.8">${doneRatio}%</text>
+            `}
             <rect class="drag-handle drag-left cursor-ew-resize" x="${startX}" y="${y}" width="${handleWidth}" height="${barHeight}"
                   fill="transparent"/>
             <rect class="drag-handle drag-right cursor-ew-resize" x="${startX + width - handleWidth}" y="${y}" width="${handleWidth}" height="${barHeight}"
@@ -1622,6 +1626,7 @@ ${style.tip}
     .past-overlay { pointer-events: none; }
     .progress-fill { pointer-events: none; }
     .completed-check { pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+    .done-ratio { pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
     .bar-assignee { pointer-events: none; opacity: 0.8; }
     .issue-bar .drag-handle:hover { fill: var(--vscode-list-hoverBackground); }
     .issue-bar:hover .link-handle { opacity: 0.7; }
