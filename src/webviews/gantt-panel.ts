@@ -44,6 +44,7 @@ interface GanttIssue {
   spent_hours: number | null;
   done_ratio: number;
   relations: GanttRelation[];
+  assignee: string | null;
 }
 
 interface GanttRow {
@@ -89,6 +90,7 @@ function toGanttIssue(issue: Issue, flexibilityCache: Map<number, FlexibilitySco
         targetId: r.issue_to_id,
         type: r.relation_type as RelationType,
       })),
+    assignee: issue.assigned_to?.name ?? null,
   };
 }
 
@@ -1220,6 +1222,11 @@ export class GanttPanel {
             <!-- Border/outline -->
             <rect class="bar-outline" x="${startX}" y="${y}" width="${width}" height="${barHeight}"
                   fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1" rx="8" ry="8" style="cursor: pointer;"/>
+            ${issue.status === "completed" || doneRatio === 100 ? `
+              <!-- Completed checkmark -->
+              <text class="completed-check" x="${startX + width / 2}" y="${y + barHeight / 2 + 5}"
+                    text-anchor="middle" fill="var(--vscode-charts-green)" font-size="16" font-weight="bold">✓</text>
+            ` : ""}
             <rect class="drag-handle drag-left" x="${startX}" y="${y}" width="${handleWidth}" height="${barHeight}"
                   fill="transparent" style="cursor: ew-resize;"/>
             <rect class="drag-handle drag-right" x="${startX + width - handleWidth}" y="${y}" width="${handleWidth}" height="${barHeight}"
@@ -1228,6 +1235,11 @@ export class GanttPanel {
             <circle class="link-handle" cx="${endX + 8}" cy="${y + barHeight / 2}" r="5"
                     fill="var(--vscode-button-background)" stroke="var(--vscode-button-foreground)"
                     stroke-width="1" opacity="0" style="cursor: crosshair;"/>
+            ${issue.assignee ? `
+              <!-- Assignee -->
+              <text class="bar-assignee" x="${endX + 20}" y="${y + barHeight / 2 + 4}"
+                    fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(issue.assignee)}</text>
+            ` : ""}
             <title>${tooltip}</title>
           </g>
         `;
@@ -1574,6 +1586,8 @@ ${style.tip}
     .issue-bar.parent-bar:hover { opacity: 1; }
     .past-overlay { pointer-events: none; }
     .progress-fill { pointer-events: none; }
+    .completed-check { pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+    .bar-assignee { pointer-events: none; opacity: 0.8; }
     .issue-bar .drag-handle:hover { fill: var(--vscode-list-hoverBackground); }
     .issue-bar:hover .link-handle { opacity: 0.7; }
     .issue-bar .link-handle:hover { opacity: 1; transform-origin: center; }
