@@ -1619,6 +1619,7 @@ ${style.tip}
       overflow: hidden;
       background: var(--vscode-editor-background);
       border-bottom: 1px solid var(--vscode-panel-border);
+      box-sizing: border-box;
     }
     .gantt-timeline-header::-webkit-scrollbar {
       display: none;
