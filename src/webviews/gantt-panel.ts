@@ -1251,7 +1251,7 @@ export class GanttPanel {
                     fill="${color}" rx="8" ry="8" opacity="0.95" filter="url(#barShadow)"/>
             ` : ""}
             <!-- Border/outline -->
-            <rect class="bar-outline cursor-pointer" x="${startX}" y="${y}" width="${width}" height="${barHeight}"
+            <rect class="bar-outline cursor-move" x="${startX}" y="${y}" width="${width}" height="${barHeight}"
                   fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1" rx="8" ry="8"/>
             ${issue.isClosed ? `
               <!-- Closed checkmark -->
@@ -1688,6 +1688,7 @@ ${style.tip}
     .cursor-pointer { cursor: pointer; }
     .cursor-ew-resize { cursor: ew-resize; }
     .cursor-crosshair { cursor: crosshair; }
+    .cursor-move { cursor: move; }
     .user-select-none { user-select: none; }
     .opacity-02 { opacity: 0.2; }
     .w-45 { width: 45%; }
@@ -2272,12 +2273,49 @@ ${style.tip}
         dragState = {
           issueId,
           isLeft,
+          isMove: false,
           initialMouseX: e.clientX,
           startX,
           endX,
           oldStartDate,
           oldDueDate,
           barOutline,
+          barMain,
+          leftHandle,
+          rightHandle,
+          bar
+        };
+      });
+    });
+
+    // Handle drag start on bar body (move entire bar)
+    document.querySelectorAll('.bar-outline').forEach(outline => {
+      outline.addEventListener('mousedown', (e) => {
+        // Skip if clicking on drag handles (they're on top)
+        if (e.target.classList.contains('drag-handle')) return;
+        e.stopPropagation();
+        const bar = outline.closest('.issue-bar');
+        if (!bar) return;
+        const issueId = parseInt(bar.dataset.issueId);
+        const startX = parseFloat(bar.dataset.startX);
+        const endX = parseFloat(bar.dataset.endX);
+        const oldStartDate = bar.dataset.startDate || null;
+        const oldDueDate = bar.dataset.dueDate || null;
+        const barMain = bar.querySelector('.bar-main');
+        const leftHandle = bar.querySelector('.drag-left');
+        const rightHandle = bar.querySelector('.drag-right');
+
+        bar.classList.add('dragging');
+        dragState = {
+          issueId,
+          isLeft: false,
+          isMove: true,
+          initialMouseX: e.clientX,
+          startX,
+          endX,
+          oldStartDate,
+          oldDueDate,
+          barOutline: outline,
           barMain,
           leftHandle,
           rightHandle,
@@ -2385,12 +2423,13 @@ ${style.tip}
     // Handle click on bar - scroll to issue start date and highlight
     document.querySelectorAll('.issue-bar').forEach(bar => {
       bar.addEventListener('click', (e) => {
-        // Ignore if clicking on drag handles or link handle
+        // Ignore if clicking on drag handles, link handle, or bar-outline (for move drag)
         const target = e.target;
         if (target.classList.contains('drag-handle') ||
             target.classList.contains('drag-left') ||
             target.classList.contains('drag-right') ||
-            target.classList.contains('link-handle')) {
+            target.classList.contains('link-handle') ||
+            target.classList.contains('bar-outline')) {
           return;
         }
         if (dragState || linkingState) return;
@@ -2544,15 +2583,20 @@ ${style.tip}
       });
     });
 
-    // Handle drag move (resizing and linking)
+    // Handle drag move (resizing, moving, and linking)
     addDocListener('mousemove', (e) => {
-      // Handle resize drag
+      // Handle resize/move drag
       if (dragState) {
         const delta = e.clientX - dragState.initialMouseX;
         let newStartX = dragState.startX;
         let newEndX = dragState.endX;
+        const barWidth = dragState.endX - dragState.startX;
 
-        if (dragState.isLeft) {
+        if (dragState.isMove) {
+          // Move entire bar: shift both start and end by same delta
+          newStartX = snapToDay(Math.max(0, Math.min(dragState.startX + delta, timelineWidth - barWidth)));
+          newEndX = newStartX + barWidth;
+        } else if (dragState.isLeft) {
           newStartX = snapToDay(Math.max(0, Math.min(dragState.startX + delta, dragState.endX - dayWidth)));
         } else {
           newEndX = snapToDay(Math.max(dragState.startX + dayWidth, Math.min(dragState.endX + delta, timelineWidth)));
@@ -2598,16 +2642,29 @@ ${style.tip}
       }
     });
 
-    // Handle drag end (resizing and linking)
+    // Handle drag end (resizing, moving, and linking)
     addDocListener('mouseup', (e) => {
-      // Handle resize drag end
+      // Handle resize/move drag end
       if (dragState) {
-        const { issueId, isLeft, newStartX, newEndX, bar, startX, endX, oldStartDate, oldDueDate } = dragState;
+        const { issueId, isLeft, isMove, newStartX, newEndX, bar, startX, endX, oldStartDate, oldDueDate } = dragState;
         bar.classList.remove('dragging');
 
         if (newStartX !== undefined || newEndX !== undefined) {
-          const calcStartDate = isLeft && newStartX !== startX ? xToDate(newStartX) : null;
-          const calcDueDate = !isLeft && newEndX !== endX ? xToDate(newEndX) : null;
+          let calcStartDate = null;
+          let calcDueDate = null;
+
+          if (isMove) {
+            // Move: update both dates if position changed
+            if (newStartX !== startX) {
+              calcStartDate = xToDate(newStartX);
+              calcDueDate = xToDate(newEndX);
+            }
+          } else if (isLeft) {
+            calcStartDate = newStartX !== startX ? xToDate(newStartX) : null;
+          } else {
+            calcDueDate = newEndX !== endX ? xToDate(newEndX) : null;
+          }
+
           const newStartDate = calcStartDate && calcStartDate !== oldStartDate ? calcStartDate : null;
           const newDueDate = calcDueDate && calcDueDate !== oldDueDate ? calcDueDate : null;
 
