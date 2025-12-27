@@ -1582,7 +1582,7 @@ ${style.tip}
     /* Screen reader only class */
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
     .weekend-bg { fill: var(--vscode-editor-inactiveSelectionBackground); opacity: 0.3; }
-    .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 0.5; opacity: 0.3; }
+    .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 1; opacity: 0.5; }
     .date-marker { stroke: var(--vscode-editorRuler-foreground); stroke-dasharray: 2,2; }
     .today-marker { stroke: var(--vscode-charts-red); stroke-width: 2; }
     /* Base transitions for dependency focus fade-back */
