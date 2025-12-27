@@ -1069,18 +1069,25 @@ export class GanttPanel {
         const escapedSubject = escapeHtml(issue.subject);
         const escapedProject = escapeHtml(issue.project);
         const doneRatio = issue.done_ratio;
+        // Visual progress: fallback to spent/estimated when done_ratio is 0
+        let visualDoneRatio = doneRatio;
+        let isFallbackProgress = false;
+        if (doneRatio === 0 && issue.spent_hours && issue.spent_hours > 0 && issue.estimated_hours && issue.estimated_hours > 0) {
+          visualDoneRatio = Math.min(100, Math.round((issue.spent_hours / issue.estimated_hours) * 100));
+          isFallbackProgress = true;
+        }
         const tooltip = [
           `#${issue.id} ${escapedSubject}`,
           `Project: ${escapedProject}`,
           `Start: ${formatDateWithWeekday(issue.start_date)}`,
           `Due: ${formatDateWithWeekday(issue.due_date)}`,
-          `Progress: ${doneRatio}%`,
+          `Progress: ${doneRatio}%${isFallbackProgress ? ` (showing ${visualDoneRatio}% from time)` : ""}`,
           `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
           `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
         ].join("\n");
 
         // Calculate done portion width for progress visualization
-        const doneWidth = (doneRatio / 100) * width;
+        const doneWidth = (visualDoneRatio / 100) * width;
 
         const handleWidth = 8;
 
@@ -1196,7 +1203,7 @@ export class GanttPanel {
               <rect class="past-overlay" x="${startX}" y="${y}" width="${pastWidth}" height="${barHeight}"
                     fill="url(#past-stripes)" rx="8" ry="8"/>
             ` : ""}
-            ${doneRatio > 0 && doneRatio < 100 ? `
+            ${visualDoneRatio > 0 && visualDoneRatio < 100 ? `
               <!-- Progress fill showing done_ratio -->
               <rect class="progress-fill" x="${startX}" y="${y}" width="${doneWidth}" height="${barHeight}"
                     fill="${color}" rx="8" ry="8" opacity="0.95" filter="url(#barShadow)"/>
@@ -1602,7 +1609,7 @@ ${style.tip}
     /* Screen reader only class */
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
     .weekend-bg { fill: var(--vscode-editor-inactiveSelectionBackground); opacity: 0.3; }
-    .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 1; opacity: 0.15; }
+    .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 1; opacity: 0.25; }
     .date-marker { stroke: var(--vscode-editorRuler-foreground); stroke-dasharray: 2,2; }
     .today-marker { stroke: var(--vscode-charts-red); stroke-width: 2; }
     /* Base transitions for dependency focus fade-back */
