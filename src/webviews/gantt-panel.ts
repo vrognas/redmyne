@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as crypto from "crypto";
 import { Issue, IssueRelation } from "../redmine/models/issue";
 import { RedmineServer } from "../redmine/redmine-server";
 import { RedmineProject } from "../redmine/redmine-project";
@@ -3012,11 +3013,5 @@ ${style.tip}
 }
 
 function getNonce(): string {
-  let text = "";
-  const possible =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  for (let i = 0; i < 32; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-  return text;
+  return crypto.randomBytes(16).toString("base64");
 }
