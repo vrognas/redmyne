@@ -1096,6 +1096,7 @@ export class GanttPanel {
         const y = index * (barHeight + barGap); // Y starts at 0 in body SVG
         const color = isParent ? "var(--vscode-descriptionForeground)" : this._getStatusColor(issue.status);
         const isPast = end < today;
+        const isOverdue = !isParent && !issue.isClosed && issue.done_ratio < 100 && end < today;
 
         // Calculate past portion (from start to today)
         const todayX =
@@ -1224,11 +1225,11 @@ export class GanttPanel {
         }
 
         return `
-          <g class="issue-bar${isPast ? " bar-past" : ""}" data-issue-id="${issue.id}"
+          <g class="issue-bar${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}" data-issue-id="${issue.id}"
              data-start-date="${issue.start_date || ""}"
              data-due-date="${issue.due_date || ""}"
              data-start-x="${startX}" data-end-x="${endX}"
-             tabindex="0" role="button" aria-label="#${issue.id} ${escapedSubject}">
+             tabindex="0" role="button" aria-label="#${issue.id} ${escapedSubject}${isOverdue ? " (overdue)" : ""}">
             ${hasIntensity ? `
               <!-- Intensity segments -->
               <g class="bar-intensity">${intensitySegments}</g>
@@ -1612,6 +1613,8 @@ ${style.tip}
     .issue-bar:hover .bar-intensity rect { filter: brightness(1.1); }
     .issue-bar.bar-past { filter: saturate(0.4) opacity(0.7); }
     .issue-bar.bar-past:hover { filter: saturate(0.6) opacity(0.85); }
+    .issue-bar.bar-overdue .bar-outline { stroke: var(--vscode-charts-red) !important; stroke-width: 2; filter: drop-shadow(0 0 4px var(--vscode-charts-red)); }
+    .issue-bar.bar-overdue:hover .bar-outline { stroke-width: 3; filter: drop-shadow(0 0 6px var(--vscode-charts-red)); }
     .issue-bar.parent-bar { opacity: 0.7; }
     .issue-bar.parent-bar:hover { opacity: 1; }
     .past-overlay { pointer-events: none; }
