@@ -1698,7 +1698,16 @@ ${style.tip}
     /* Focus indicators for accessibility */
     button:focus { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
     .issue-bar:focus-within .bar-outline, .issue-bar.focused .bar-outline { stroke-width: 3; stroke: var(--vscode-focusBorder); }
-    .issue-label:focus { outline: 2px solid var(--vscode-focusBorder); outline-offset: 1px; }
+    .issue-label:focus, .project-label:focus {
+      outline: 2px solid var(--vscode-focusBorder);
+      outline-offset: 1px;
+      background: var(--vscode-list-activeSelectionBackground);
+      border-radius: 3px;
+    }
+    .issue-label.active, .project-label.active {
+      background: var(--vscode-list-inactiveSelectionBackground);
+      border-radius: 3px;
+    }
     /* Collapse toggle chevron */
     .collapse-toggle { cursor: pointer; opacity: 0.7; }
     .collapse-toggle:hover { opacity: 1; }
@@ -2905,15 +2914,31 @@ ${style.tip}
 
     // Labels click and keyboard navigation
     const allLabels = Array.from(document.querySelectorAll('.project-label, .issue-label'));
+    let activeLabel = null;
+
+    function setActiveLabel(label) {
+      if (activeLabel) activeLabel.classList.remove('active');
+      activeLabel = label;
+      if (label) {
+        label.classList.add('active');
+        label.focus();
+      }
+    }
 
     allLabels.forEach((el, index) => {
       el.addEventListener('click', (e) => {
         // Don't scroll if clicking on chevron
         if (e.target.classList?.contains('collapse-toggle')) return;
+        setActiveLabel(el);
         const issueId = el.dataset.issueId;
         if (issueId) {
           scrollToAndHighlight(issueId);
         }
+      });
+
+      el.addEventListener('focus', () => {
+        // Ensure focused element is visible
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       });
 
       el.addEventListener('keydown', (e) => {
@@ -2931,13 +2956,13 @@ ${style.tip}
           case 'ArrowUp':
             e.preventDefault();
             if (index > 0) {
-              allLabels[index - 1].focus();
+              setActiveLabel(allLabels[index - 1]);
             }
             break;
           case 'ArrowDown':
             e.preventDefault();
             if (index < allLabels.length - 1) {
-              allLabels[index + 1].focus();
+              setActiveLabel(allLabels[index + 1]);
             }
             break;
           case 'ArrowLeft':
@@ -2953,6 +2978,14 @@ ${style.tip}
             if (collapseKey) {
               vscode.postMessage({ command: 'toggleCollapse', collapseKey, action: 'expand' });
             }
+            break;
+          case 'Home':
+            e.preventDefault();
+            setActiveLabel(allLabels[0]);
+            break;
+          case 'End':
+            e.preventDefault();
+            setActiveLabel(allLabels[allLabels.length - 1]);
             break;
         }
       });
