@@ -381,13 +381,14 @@ export class GanttPanel {
   }
 
   private _showLoadingSkeleton(): void {
+    const nonce = getNonce();
     this._panel.webview.html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}';">
   <title>Redmine Gantt</title>
-  <style>
+  <style nonce="${nonce}">
     body {
       margin: 0;
       padding: 16px;
@@ -431,6 +432,10 @@ export class GanttPanel {
       gap: 10px;
       margin-top: 20px;
     }
+    .w-45 { width: 45%; }
+    .w-60 { width: 60%; }
+    .w-70 { width: 70%; }
+    .w-80 { width: 80%; }
   </style>
 </head>
 <body>
@@ -440,10 +445,10 @@ export class GanttPanel {
     <span>Loading issues...</span>
   </div>
   <div class="skeleton-container">
-    <div class="skeleton-bar" style="width: 60%;"></div>
-    <div class="skeleton-bar" style="width: 80%;"></div>
-    <div class="skeleton-bar" style="width: 45%;"></div>
-    <div class="skeleton-bar" style="width: 70%;"></div>
+    <div class="skeleton-bar w-60"></div>
+    <div class="skeleton-bar w-80"></div>
+    <div class="skeleton-bar w-45"></div>
+    <div class="skeleton-bar w-70"></div>
   </div>
 </body>
 </html>`;
@@ -987,7 +992,7 @@ export class GanttPanel {
         const indent = row.depth * indentSize;
         const isCollapsed = collapseState.isCollapsed(row.collapseKey);
         const chevron = row.hasChildren
-          ? `<text class="collapse-toggle" data-collapse-key="${row.collapseKey}" x="${3 + indent}" y="${y + barHeight / 2 + 4}" fill="var(--vscode-foreground)" font-size="10" style="cursor: pointer; user-select: none;">${isCollapsed ? "▶" : "▼"}</text>`
+          ? `<text class="collapse-toggle user-select-none" data-collapse-key="${row.collapseKey}" x="${3 + indent}" y="${y + barHeight / 2 + 4}" fill="var(--vscode-foreground)" font-size="10">${isCollapsed ? "▶" : "▼"}</text>`
           : "";
         const textOffset = row.hasChildren ? chevronWidth : 0;
 
@@ -1017,7 +1022,7 @@ export class GanttPanel {
         ].join("\n");
 
         return `
-          <g class="issue-label" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" tabindex="0" role="button" aria-label="Open issue #${issue.id}" style="cursor: pointer;">
+          <g class="issue-label cursor-pointer" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" tabindex="0" role="button" aria-label="Open issue #${issue.id}">
             ${chevron}
             <text x="${5 + indent + textOffset}" y="${y + barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12">
               #${issue.id} ${escapedSubject}
@@ -1206,7 +1211,7 @@ export class GanttPanel {
                     M ${endX - 4} ${y + barHeight * 0.3}
                     L ${endX - 4} ${y + barHeight * 0.7}
                     L ${endX} ${y + barHeight}"
-                    fill="none" stroke="${color}" stroke-width="2" opacity="0.8" style="cursor: pointer;"/>
+                    fill="none" stroke="${color}" stroke-width="2" opacity="0.8" class="cursor-pointer"/>
               ${doneRatio > 0 ? `
                 <!-- Progress line showing done_ratio on parent -->
                 <line class="parent-progress" x1="${startX + 4}" y1="${y + barHeight * 0.5}"
@@ -1245,21 +1250,21 @@ export class GanttPanel {
                     fill="${color}" rx="8" ry="8" opacity="0.95" filter="url(#barShadow)"/>
             ` : ""}
             <!-- Border/outline -->
-            <rect class="bar-outline" x="${startX}" y="${y}" width="${width}" height="${barHeight}"
-                  fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1" rx="8" ry="8" style="cursor: pointer;"/>
+            <rect class="bar-outline cursor-pointer" x="${startX}" y="${y}" width="${width}" height="${barHeight}"
+                  fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1" rx="8" ry="8"/>
             ${issue.isClosed ? `
               <!-- Closed checkmark -->
               <text class="completed-check" x="${startX + width / 2}" y="${y + barHeight / 2 + 5}"
                     text-anchor="middle" fill="var(--vscode-charts-green)" font-size="16" font-weight="bold">✓</text>
             ` : ""}
-            <rect class="drag-handle drag-left" x="${startX}" y="${y}" width="${handleWidth}" height="${barHeight}"
-                  fill="transparent" style="cursor: ew-resize;"/>
-            <rect class="drag-handle drag-right" x="${startX + width - handleWidth}" y="${y}" width="${handleWidth}" height="${barHeight}"
-                  fill="transparent" style="cursor: ew-resize;"/>
+            <rect class="drag-handle drag-left cursor-ew-resize" x="${startX}" y="${y}" width="${handleWidth}" height="${barHeight}"
+                  fill="transparent"/>
+            <rect class="drag-handle drag-right cursor-ew-resize" x="${startX + width - handleWidth}" y="${y}" width="${handleWidth}" height="${barHeight}"
+                  fill="transparent"/>
             <!-- Link handle for creating relations -->
-            <circle class="link-handle" cx="${endX + 8}" cy="${y + barHeight / 2}" r="5"
+            <circle class="link-handle cursor-crosshair" cx="${endX + 8}" cy="${y + barHeight / 2}" r="5"
                     fill="var(--vscode-button-background)" stroke="var(--vscode-button-foreground)"
-                    stroke-width="1" opacity="0" style="cursor: crosshair;"/>
+                    stroke-width="1" opacity="0"/>
             ${issue.assignee ? `
               <!-- Assignee -->
               <text class="bar-assignee" x="${endX + 20}" y="${y + barHeight / 2 + 4}"
@@ -1395,7 +1400,7 @@ export class GanttPanel {
           const dashAttr = style.dash ? `stroke-dasharray="${style.dash}"` : "";
 
           return `
-            <g class="dependency-arrow rel-${rel.type}" data-relation-id="${rel.id}" data-from="${issue.id}" data-to="${rel.targetId}" style="cursor: pointer;">
+            <g class="dependency-arrow rel-${rel.type} cursor-pointer" data-relation-id="${rel.id}" data-from="${issue.id}" data-to="${rel.targetId}">
               <!-- Wide invisible hit area for easier clicking -->
               <path class="arrow-hit-area" d="${path}" stroke="transparent" stroke-width="16" fill="none"/>
               <path class="arrow-line" d="${path}" stroke="${style.color}" stroke-width="2" fill="none" ${dashAttr}/>
@@ -1437,9 +1442,9 @@ ${style.tip}
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
   <title>Redmine Gantt</title>
-  <style>
+  <style nonce="${nonce}">
     body {
       margin: 0;
       padding: 16px;
@@ -1672,6 +1677,27 @@ ${style.tip}
       .dependency-arrow .arrow-head { transition: none; }
       .issue-bar, .issue-label, .project-label, .aggregate-bars { transition: none; }
     }
+    /* Utility classes for CSP compliance */
+    .hidden { display: none; }
+    .cursor-pointer { cursor: pointer; }
+    .cursor-ew-resize { cursor: ew-resize; }
+    .cursor-crosshair { cursor: crosshair; }
+    .user-select-none { user-select: none; }
+    .opacity-02 { opacity: 0.2; }
+    .w-45 { width: 45%; }
+    .w-60 { width: 60%; }
+    .w-70 { width: 70%; }
+    .w-80 { width: 80%; }
+    .heatmap-color-green { background: var(--vscode-charts-green); }
+    .heatmap-color-yellow { background: var(--vscode-charts-yellow); }
+    .heatmap-color-orange { background: var(--vscode-charts-orange); }
+    .heatmap-color-red { background: var(--vscode-charts-red); }
+    .rel-line-blocks { background: #e74c3c; }
+    .rel-line-precedes { background: #9b59b6; }
+    .rel-line-relates { background: #7f8c8d; border-style: dashed; }
+    .rel-line-duplicates { background: #e67e22; border-style: dotted; }
+    .rel-line-copied { background: #1abc9c; border-style: dashed; }
+    .color-swatch { display: inline-block; width: 12px; height: 3px; margin-right: 8px; vertical-align: middle; }
   </style>
 </head>
 <body>
@@ -1689,18 +1715,18 @@ ${style.tip}
       <button id="heatmapBtn" class="${this._showWorkloadHeatmap ? "active" : ""}" title="Toggle workload heatmap" aria-pressed="${this._showWorkloadHeatmap}">Heatmap</button>
       <button id="depsBtn" class="${this._showDependencies ? "active" : ""}" title="Toggle dependency arrows" aria-pressed="${this._showDependencies}">Deps</button>
       <button id="intensityBtn" class="${this._showIntensity ? "active" : ""}" title="Toggle daily intensity" aria-pressed="${this._showIntensity}">Intensity</button>
-      <div class="heatmap-legend" style="${this._showWorkloadHeatmap ? "" : "display: none;"}">
-        <span class="heatmap-legend-item"><span class="heatmap-legend-color" style="background: var(--vscode-charts-green);"></span>&lt;80%</span>
-        <span class="heatmap-legend-item"><span class="heatmap-legend-color" style="background: var(--vscode-charts-yellow);"></span>80-100%</span>
-        <span class="heatmap-legend-item"><span class="heatmap-legend-color" style="background: var(--vscode-charts-orange);"></span>100-120%</span>
-        <span class="heatmap-legend-item"><span class="heatmap-legend-color" style="background: var(--vscode-charts-red);"></span>&gt;120%</span>
+      <div class="heatmap-legend${this._showWorkloadHeatmap ? "" : " hidden"}">
+        <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-green"></span>&lt;80%</span>
+        <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-yellow"></span>80-100%</span>
+        <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-orange"></span>100-120%</span>
+        <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-red"></span>&gt;120%</span>
       </div>
-      <div class="relation-legend" style="${this._showDependencies ? "" : "display: none;"}" title="Relation types (drag from link handle to create)">
-        <span class="relation-legend-item"><span class="relation-legend-line" style="background: #e74c3c;"></span>blocks</span>
-        <span class="relation-legend-item"><span class="relation-legend-line" style="background: #9b59b6;"></span>precedes</span>
-        <span class="relation-legend-item"><span class="relation-legend-line" style="background: #7f8c8d; border-style: dashed;"></span>relates</span>
-        <span class="relation-legend-item"><span class="relation-legend-line" style="background: #e67e22; border-style: dotted;"></span>duplicates</span>
-        <span class="relation-legend-item"><span class="relation-legend-line" style="background: #1abc9c; border-style: dashed;"></span>copied</span>
+      <div class="relation-legend${this._showDependencies ? "" : " hidden"}" title="Relation types (drag from link handle to create)">
+        <span class="relation-legend-item"><span class="relation-legend-line rel-line-blocks"></span>blocks</span>
+        <span class="relation-legend-item"><span class="relation-legend-line rel-line-precedes"></span>precedes</span>
+        <span class="relation-legend-item"><span class="relation-legend-line rel-line-relates"></span>relates</span>
+        <span class="relation-legend-item"><span class="relation-legend-line rel-line-duplicates"></span>duplicates</span>
+        <span class="relation-legend-item"><span class="relation-legend-line rel-line-copied"></span>copied</span>
       </div>
       <button id="refreshBtn" title="Refresh issues">↻ Refresh</button>
       <button id="todayBtn" title="Jump to Today">Today</button>
@@ -1741,7 +1767,7 @@ ${style.tip}
           ${zebraStripes}
           ${dateMarkers.body}
           <!-- Arrows below bars so link-handles remain clickable -->
-          <g class="dependency-layer" style="${this._showDependencies ? "" : "display: none;"}">${dependencyArrows}</g>
+          <g class="dependency-layer${this._showDependencies ? "" : " hidden"}">${dependencyArrows}</g>
           ${bars}
         </svg>
       </div>
@@ -2310,7 +2336,11 @@ ${style.tip}
 
       types.forEach(t => {
         const btn = document.createElement('button');
-        btn.innerHTML = '<span style="display:inline-block;width:12px;height:3px;background:' + t.color + ';margin-right:8px;vertical-align:middle;"></span>' + t.label;
+        const swatch = document.createElement('span');
+        swatch.className = 'color-swatch';
+        swatch.style.backgroundColor = t.color;
+        btn.appendChild(swatch);
+        btn.appendChild(document.createTextNode(t.label));
         btn.title = t.tooltip;
         btn.addEventListener('click', () => {
           saveState();
@@ -2792,13 +2822,14 @@ ${style.tip}
   }
 
   private _getEmptyHtml(): string {
+    const nonce = getNonce();
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}';">
   <title>Redmine Gantt</title>
-  <style>
+  <style nonce="${nonce}">
     body {
       padding: 20px;
       background: var(--vscode-editor-background);
@@ -2912,7 +2943,7 @@ ${style.tip}
         `);
         if (month !== 0) { // Don't double line on Jan 1
           bodyGridLines.push(`
-            <line x1="${x}" y1="0" x2="${x}" y2="100%" class="day-grid" style="opacity: 0.2"/>
+            <line x1="${x}" y1="0" x2="${x}" y2="100%" class="day-grid opacity-02"/>
           `);
         }
       }
@@ -3002,8 +3033,8 @@ ${style.tip}
     }
 
     // Wrap backgrounds in groups for CSS-based visibility toggle
-    const heatmapGroup = `<g class="heatmap-layer" style="${showHeatmap ? "" : "display: none;"}">${heatmapBackgrounds.join("")}</g>`;
-    const weekendGroup = `<g class="weekend-layer" style="${showHeatmap ? "display: none;" : ""}">${weekendBackgrounds.join("")}</g>`;
+    const heatmapGroup = `<g class="heatmap-layer${showHeatmap ? "" : " hidden"}">${heatmapBackgrounds.join("")}</g>`;
+    const weekendGroup = `<g class="weekend-layer${showHeatmap ? " hidden" : ""}">${weekendBackgrounds.join("")}</g>`;
 
     return {
       header: headerContent.join(""),
