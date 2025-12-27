@@ -437,4 +437,39 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
       this.issueFilter.assignee !== "me" || this.issueFilter.status !== "open"
     );
   }
+
+  /**
+   * Get parent element for tree reveal functionality
+   */
+  getParent(element: TreeItem): TreeItem | null {
+    if (isLoadingPlaceholder(element)) {
+      return null;
+    }
+
+    if (isIssue(element)) {
+      // If issue has a parent issue in our set, return it
+      if (element.parent?.id) {
+        const parentIssue = this.assignedIssues.find(i => i.id === element.parent!.id);
+        if (parentIssue) {
+          return parentIssue;
+        }
+      }
+      // Otherwise, parent is the project node
+      if (element.project?.id) {
+        return this.projectNodes.find(n => n.project.id === element.project!.id) ?? null;
+      }
+      return null;
+    }
+
+    if (isProjectNode(element)) {
+      // If project has a parent project, find its node
+      if (element.project.parent?.id) {
+        return this.projectNodes.find(n => n.project.id === element.project.parent!.id) ?? null;
+      }
+      // Root-level project has no parent
+      return null;
+    }
+
+    return null;
+  }
 }
