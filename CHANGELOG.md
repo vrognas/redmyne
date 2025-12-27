@@ -15,7 +15,8 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 - **Gantt %done display** - shows done percentage on non-closed issue bars
 - **Gantt overdue indicator** - red outline/glow on overdue issues (past due, not closed, <100%)
 - **Gantt keyboard navigation** - Home/End keys, visible active state, auto-scroll to focused item
-- **Gantt project filter** - checkbox next to each project to show/hide its issues
+- **Gantt project filter** - checkbox column to show/hide project issues; separate column with synced scroll
+- **Gantt dynamic date range** - timeline min/max dates adjust to visible issues only
 
 ### Changed
 
