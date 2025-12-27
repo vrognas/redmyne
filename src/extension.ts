@@ -698,6 +698,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
       try {
         await server.updateDoneRatio(issue.id, selected.value);
+        // Disable auto-update for this issue since user manually set %done
+        autoUpdateTracker.disable(issue.id);
         showStatusBarMessage(`$(check) #${issue.id} set to ${selected.value}%`, 2000);
         // Update only the Gantt panel if open, avoid full tree refresh
         GanttPanel.currentPanel?.updateIssueDoneRatio(issue.id, selected.value);
