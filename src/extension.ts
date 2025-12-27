@@ -347,6 +347,23 @@ export function activate(context: vscode.ExtensionContext): void {
     clearProjects: () => projectsTree.clearProjects(),
   });
 
+  // Register Gantt panel serializer for window reload persistence
+  vscode.window.registerWebviewPanelSerializer("redmineGantt", {
+    async deserializeWebviewPanel(panel: vscode.WebviewPanel) {
+      // Restore panel with loading skeleton
+      const ganttPanel = GanttPanel.restore(panel, projectsTree.server);
+      // Fetch and populate data
+      const issues = await projectsTree.fetchIssuesIfNeeded();
+      if (issues.length > 0) {
+        await ganttPanel.updateIssues(
+          issues,
+          projectsTree.getFlexibilityCache(),
+          projectsTree.getProjects()
+        );
+      }
+    },
+  });
+
   // Initialize workload status bar
   cleanupResources.workloadStatusBar = new WorkloadStatusBar({
     fetchIssuesIfNeeded: () => projectsTree.fetchIssuesIfNeeded(),

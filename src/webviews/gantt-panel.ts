@@ -370,6 +370,15 @@ export class GanttPanel {
     return GanttPanel.currentPanel;
   }
 
+  /**
+   * Restore panel from serialized state (after window reload)
+   */
+  public static restore(panel: vscode.WebviewPanel, server?: RedmineServer): GanttPanel {
+    GanttPanel.currentPanel = new GanttPanel(panel, server);
+    GanttPanel.currentPanel._showLoadingSkeleton();
+    return GanttPanel.currentPanel;
+  }
+
   private _showLoadingSkeleton(): void {
     this._panel.webview.html = `<!DOCTYPE html>
 <html lang="en">
