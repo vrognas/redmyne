@@ -1627,6 +1627,10 @@ ${style.tip}
     .critical-path-mode .dependency-arrow { opacity: 0.15; }
     .critical-path-mode .dependency-arrow.critical-path { opacity: 1; }
     .critical-path-mode .dependency-arrow.critical-path .arrow-line { stroke: var(--vscode-charts-orange) !important; stroke-width: 3; }
+    .issue-bar.selected .bar-outline { stroke: var(--vscode-focusBorder) !important; stroke-width: 2; }
+    .issue-bar.selected .bar-main { filter: brightness(1.1); }
+    .multi-select-mode .issue-bar { cursor: pointer; }
+    .selection-count { margin-left: 8px; font-size: 11px; color: var(--vscode-descriptionForeground); }
     .issue-bar.parent-bar { opacity: 0.7; }
     .issue-bar.parent-bar:hover { opacity: 1; }
     .past-overlay { pointer-events: none; }
@@ -1751,6 +1755,7 @@ ${style.tip}
       <button id="todayBtn" title="Jump to Today">Today</button>
       <button id="undoBtn" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
       <button id="redoBtn" disabled title="Redo (Ctrl+Shift+Z)">↪ Redo</button>
+      <span id="selectionCount" class="selection-count hidden"></span>
     </div>
   </div>
   <div class="gantt-container">
@@ -2142,6 +2147,98 @@ ${style.tip}
 
     criticalPathBtn.addEventListener('click', toggleCriticalPath);
 
+    // Multi-select state
+    const selectedIssues = new Set();
+    let lastClickedIssueId = null;
+    const selectionCountEl = document.getElementById('selectionCount');
+    const allIssueBars = Array.from(document.querySelectorAll('.issue-bar'));
+
+    function updateSelectionUI() {
+      // Update visual selection on bars
+      allIssueBars.forEach(bar => {
+        bar.classList.toggle('selected', selectedIssues.has(bar.dataset.issueId));
+      });
+      // Update selection count
+      if (selectedIssues.size > 0) {
+        selectionCountEl.textContent = \`\${selectedIssues.size} selected\`;
+        selectionCountEl.classList.remove('hidden');
+        ganttContainer.classList.add('multi-select-mode');
+      } else {
+        selectionCountEl.classList.add('hidden');
+        ganttContainer.classList.remove('multi-select-mode');
+      }
+    }
+
+    function clearSelection() {
+      selectedIssues.clear();
+      lastClickedIssueId = null;
+      updateSelectionUI();
+    }
+
+    function toggleSelection(issueId) {
+      if (selectedIssues.has(issueId)) {
+        selectedIssues.delete(issueId);
+      } else {
+        selectedIssues.add(issueId);
+      }
+      lastClickedIssueId = issueId;
+      updateSelectionUI();
+    }
+
+    function selectRange(fromId, toId) {
+      const fromIndex = allIssueBars.findIndex(b => b.dataset.issueId === fromId);
+      const toIndex = allIssueBars.findIndex(b => b.dataset.issueId === toId);
+      if (fromIndex === -1 || toIndex === -1) return;
+      const start = Math.min(fromIndex, toIndex);
+      const end = Math.max(fromIndex, toIndex);
+      for (let i = start; i <= end; i++) {
+        selectedIssues.add(allIssueBars[i].dataset.issueId);
+      }
+      updateSelectionUI();
+    }
+
+    function selectAll() {
+      allIssueBars.forEach(bar => selectedIssues.add(bar.dataset.issueId));
+      updateSelectionUI();
+      announce(\`Selected all \${selectedIssues.size} issues\`);
+    }
+
+    // Handle Ctrl+click and Shift+click on bars for selection
+    allIssueBars.forEach(bar => {
+      bar.addEventListener('mousedown', (e) => {
+        // Only handle Ctrl or Shift clicks for selection
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey) return;
+
+        // Don't interfere with drag handles
+        if (e.target.classList.contains('drag-handle') ||
+            e.target.classList.contains('link-handle')) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const issueId = bar.dataset.issueId;
+        if (e.shiftKey && lastClickedIssueId) {
+          // Shift+click: range selection
+          selectRange(lastClickedIssueId, issueId);
+        } else {
+          // Ctrl/Cmd+click: toggle selection
+          toggleSelection(issueId);
+        }
+      });
+    });
+
+    // Ctrl+A to select all, Escape to clear
+    addDocListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        e.preventDefault();
+        selectAll();
+      }
+      if (e.key === 'Escape' && selectedIssues.size > 0) {
+        clearSelection();
+        announce('Selection cleared');
+      }
+    });
+
     // Refresh button handler
     document.getElementById('refreshBtn').addEventListener('click', () => {
       vscode.postMessage({ command: 'refresh' });
@@ -2394,37 +2491,55 @@ ${style.tip}
       });
     });
 
-    // Handle drag start on bar body (move entire bar)
+    // Handle drag start on bar body (move entire bar or bulk move)
     document.querySelectorAll('.bar-outline').forEach(outline => {
       outline.addEventListener('mousedown', (e) => {
         // Skip if clicking on drag handles (they're on top)
         if (e.target.classList.contains('drag-handle')) return;
+        // Skip if Ctrl/Shift held (selection mode)
+        if (e.ctrlKey || e.metaKey || e.shiftKey) return;
         e.stopPropagation();
         const bar = outline.closest('.issue-bar');
         if (!bar) return;
-        const issueId = parseInt(bar.dataset.issueId);
-        const startX = parseFloat(bar.dataset.startX);
-        const endX = parseFloat(bar.dataset.endX);
-        const oldStartDate = bar.dataset.startDate || null;
-        const oldDueDate = bar.dataset.dueDate || null;
-        const barMain = bar.querySelector('.bar-main');
-        const leftHandle = bar.querySelector('.drag-left');
-        const rightHandle = bar.querySelector('.drag-right');
+        const issueId = bar.dataset.issueId;
 
-        bar.classList.add('dragging');
+        // Check if this bar is part of a selection for bulk drag
+        const isBulkDrag = selectedIssues.size > 1 && selectedIssues.has(issueId);
+        const barsToMove = isBulkDrag
+          ? allIssueBars.filter(b => selectedIssues.has(b.dataset.issueId))
+          : [bar];
+
+        // Collect data for all bars to move
+        const bulkBars = barsToMove.map(b => ({
+          issueId: b.dataset.issueId,
+          startX: parseFloat(b.dataset.startX),
+          endX: parseFloat(b.dataset.endX),
+          oldStartDate: b.dataset.startDate || null,
+          oldDueDate: b.dataset.dueDate || null,
+          barOutline: b.querySelector('.bar-outline'),
+          barMain: b.querySelector('.bar-main'),
+          leftHandle: b.querySelector('.drag-left'),
+          rightHandle: b.querySelector('.drag-right'),
+          bar: b
+        }));
+
+        bulkBars.forEach(b => b.bar.classList.add('dragging'));
+
         dragState = {
-          issueId,
+          issueId: parseInt(issueId),
           isLeft: false,
           isMove: true,
+          isBulkDrag,
+          bulkBars,
           initialMouseX: e.clientX,
-          startX,
-          endX,
-          oldStartDate,
-          oldDueDate,
+          startX: parseFloat(bar.dataset.startX),
+          endX: parseFloat(bar.dataset.endX),
+          oldStartDate: bar.dataset.startDate || null,
+          oldDueDate: bar.dataset.dueDate || null,
           barOutline: outline,
-          barMain,
-          leftHandle,
-          rightHandle,
+          barMain: bar.querySelector('.bar-main'),
+          leftHandle: bar.querySelector('.drag-left'),
+          rightHandle: bar.querySelector('.drag-right'),
           bar
         };
       });
@@ -2694,31 +2809,55 @@ ${style.tip}
       // Handle resize/move drag
       if (dragState) {
         const delta = e.clientX - dragState.initialMouseX;
-        let newStartX = dragState.startX;
-        let newEndX = dragState.endX;
-        const barWidth = dragState.endX - dragState.startX;
 
-        if (dragState.isMove) {
-          // Move entire bar: shift both start and end by same delta
-          newStartX = snapToDay(Math.max(0, Math.min(dragState.startX + delta, timelineWidth - barWidth)));
-          newEndX = newStartX + barWidth;
-        } else if (dragState.isLeft) {
-          newStartX = snapToDay(Math.max(0, Math.min(dragState.startX + delta, dragState.endX - dayWidth)));
+        if (dragState.isMove && dragState.isBulkDrag && dragState.bulkBars) {
+          // Bulk move: update all selected bars
+          const snappedDelta = snapToDay(delta) - snapToDay(0); // Snap the delta itself
+          dragState.bulkBars.forEach(b => {
+            const barWidth = b.endX - b.startX;
+            const newStartX = Math.max(0, Math.min(b.startX + snappedDelta, timelineWidth - barWidth));
+            const newEndX = newStartX + barWidth;
+            const width = newEndX - newStartX;
+            b.barOutline.setAttribute('x', newStartX);
+            b.barOutline.setAttribute('width', width);
+            if (b.barMain) {
+              b.barMain.setAttribute('x', newStartX);
+              b.barMain.setAttribute('width', width);
+            }
+            b.leftHandle.setAttribute('x', newStartX);
+            b.rightHandle.setAttribute('x', newEndX - 8);
+            b.newStartX = newStartX;
+            b.newEndX = newEndX;
+          });
+          dragState.snappedDelta = snappedDelta;
         } else {
-          newEndX = snapToDay(Math.max(dragState.startX + dayWidth, Math.min(dragState.endX + delta, timelineWidth)));
-        }
+          // Single bar drag
+          let newStartX = dragState.startX;
+          let newEndX = dragState.endX;
+          const barWidth = dragState.endX - dragState.startX;
 
-        const width = newEndX - newStartX;
-        dragState.barOutline.setAttribute('x', newStartX);
-        dragState.barOutline.setAttribute('width', width);
-        if (dragState.barMain) {
-          dragState.barMain.setAttribute('x', newStartX);
-          dragState.barMain.setAttribute('width', width);
+          if (dragState.isMove) {
+            // Move entire bar: shift both start and end by same delta
+            newStartX = snapToDay(Math.max(0, Math.min(dragState.startX + delta, timelineWidth - barWidth)));
+            newEndX = newStartX + barWidth;
+          } else if (dragState.isLeft) {
+            newStartX = snapToDay(Math.max(0, Math.min(dragState.startX + delta, dragState.endX - dayWidth)));
+          } else {
+            newEndX = snapToDay(Math.max(dragState.startX + dayWidth, Math.min(dragState.endX + delta, timelineWidth)));
+          }
+
+          const width = newEndX - newStartX;
+          dragState.barOutline.setAttribute('x', newStartX);
+          dragState.barOutline.setAttribute('width', width);
+          if (dragState.barMain) {
+            dragState.barMain.setAttribute('x', newStartX);
+            dragState.barMain.setAttribute('width', width);
+          }
+          dragState.leftHandle.setAttribute('x', newStartX);
+          dragState.rightHandle.setAttribute('x', newEndX - 8);
+          dragState.newStartX = newStartX;
+          dragState.newEndX = newEndX;
         }
-        dragState.leftHandle.setAttribute('x', newStartX);
-        dragState.rightHandle.setAttribute('x', newEndX - 8);
-        dragState.newStartX = newStartX;
-        dragState.newEndX = newEndX;
       }
 
       // Handle linking drag
@@ -2752,7 +2891,46 @@ ${style.tip}
     addDocListener('mouseup', (e) => {
       // Handle resize/move drag end
       if (dragState) {
-        const { issueId, isLeft, isMove, newStartX, newEndX, bar, startX, endX, oldStartDate, oldDueDate } = dragState;
+        const { issueId, isLeft, isMove, isBulkDrag, bulkBars, newStartX, newEndX, bar, startX, endX, oldStartDate, oldDueDate } = dragState;
+
+        // Handle bulk drag end
+        if (isBulkDrag && bulkBars && isMove) {
+          // Remove dragging class from all bars
+          bulkBars.forEach(b => b.bar.classList.remove('dragging'));
+
+          // Collect all date changes
+          const changes = [];
+          bulkBars.forEach(b => {
+            if (b.newStartX !== undefined && b.newStartX !== b.startX) {
+              const newStart = xToDate(b.newStartX);
+              const newDue = xToDate(b.newEndX);
+              if (newStart !== b.oldStartDate || newDue !== b.oldDueDate) {
+                changes.push({
+                  issueId: parseInt(b.issueId),
+                  oldStartDate: b.oldStartDate,
+                  oldDueDate: b.oldDueDate,
+                  newStartDate: newStart,
+                  newDueDate: newDue
+                });
+              }
+            }
+          });
+
+          if (changes.length > 0) {
+            // Push bulk change to undo stack
+            undoStack.push({ type: 'bulk', changes });
+            redoStack.length = 0;
+            updateUndoRedoButtons();
+            // Send update for each bar
+            changes.forEach(c => {
+              vscode.postMessage({ command: 'updateDates', issueId: c.issueId, startDate: c.newStartDate, dueDate: c.newDueDate });
+            });
+          }
+          dragState = null;
+          return;
+        }
+
+        // Single bar drag end
         bar.classList.remove('dragging');
 
         if (newStartX !== undefined || newEndX !== undefined) {
@@ -2832,6 +3010,16 @@ ${style.tip}
             relationType: action.relationType
           });
         }
+      } else if (action.type === 'bulk') {
+        // Undo bulk date changes - revert all to old dates
+        action.changes.forEach(c => {
+          vscode.postMessage({
+            command: 'updateDates',
+            issueId: c.issueId,
+            startDate: c.oldStartDate,
+            dueDate: c.oldDueDate
+          });
+        });
       } else {
         // Date change action
         vscode.postMessage({
@@ -2870,6 +3058,16 @@ ${style.tip}
             relationId: action.relationId
           });
         }
+      } else if (action.type === 'bulk') {
+        // Redo bulk date changes - apply all new dates
+        action.changes.forEach(c => {
+          vscode.postMessage({
+            command: 'updateDates',
+            issueId: c.issueId,
+            startDate: c.newStartDate,
+            dueDate: c.newDueDate
+          });
+        });
       } else {
         // Date change action
         vscode.postMessage({
