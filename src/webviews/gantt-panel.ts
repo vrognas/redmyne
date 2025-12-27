@@ -326,6 +326,7 @@ export class GanttPanel {
   private _scrollPosition: { left: number; top: number } = { left: 0, top: 0 };
   private _extendedRelationTypes: boolean = false;
   private _closedStatusIds: Set<number> = new Set();
+  private _hiddenProjects: Set<number> = new Set(); // Projects hidden from view
 
   private constructor(panel: vscode.WebviewPanel, server?: RedmineServer) {
     this._panel = panel;
@@ -565,6 +566,7 @@ export class GanttPanel {
     collapseKey?: string;
     action?: string;
     keys?: string[];
+    projectId?: number;
   }): void {
     switch (message.command) {
       case "openIssue":
@@ -646,6 +648,17 @@ export class GanttPanel {
         break;
       case "collapseAll":
         collapseState.collapseAll();
+        break;
+      case "toggleProjectVisibility":
+        if (message.projectId !== undefined) {
+          const projectId = message.projectId as number;
+          if (this._hiddenProjects.has(projectId)) {
+            this._hiddenProjects.delete(projectId);
+          } else {
+            this._hiddenProjects.add(projectId);
+          }
+          this._updateContent();
+        }
         break;
       case "scrollPosition":
         // Store scroll position for restoration after update
@@ -972,7 +985,22 @@ export class GanttPanel {
     // Build hierarchical rows using shared hierarchy builder (with project hierarchy)
     const hierarchy = buildProjectHierarchy(this._issues, this._flexibilityCache, this._projects);
     const flatNodes = flattenHierarchy(hierarchy, collapseState.getExpandedKeys());
-    const rows = flatNodes.map((node) => nodeToGanttRow(node, this._flexibilityCache, this._closedStatusIds));
+    const allRows = flatNodes.map((node) => nodeToGanttRow(node, this._flexibilityCache, this._closedStatusIds));
+
+    // Filter out issues under hidden projects (keep project rows visible for toggling)
+    const hiddenProjects = this._hiddenProjects;
+    const rows = allRows.filter(row => {
+      // Always show project rows (so they can be toggled)
+      if (row.type === "project") {
+        return true;
+      }
+      // For issues, check if their project is hidden
+      if (row.issue?.projectId) {
+        return !hiddenProjects.has(row.issue.projectId);
+      }
+      return true;
+    });
+
     const contentHeight = rows.length * (barHeight + barGap);
     const chevronWidth = 14;
 
@@ -997,11 +1025,21 @@ export class GanttPanel {
         const textOffset = row.hasChildren ? chevronWidth : 0;
 
         if (row.type === "project") {
-          // Project header row
+          // Project header row with visibility checkbox
+          const isVisible = !this._hiddenProjects.has(row.id);
+          const checkboxX = 5 + indent + textOffset;
+          const checkboxY = y + barHeight / 2 - 6;
+          const checkboxSize = 12;
           return `
-            <g class="project-label" data-collapse-key="${row.collapseKey}" tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
+            <g class="project-label" data-collapse-key="${row.collapseKey}" data-project-id="${row.id}" tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
               ${chevron}
-              <text x="${5 + indent + textOffset}" y="${y + barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12" font-weight="bold">
+              <g class="project-checkbox cursor-pointer" data-project-id="${row.id}" role="checkbox" aria-checked="${isVisible}">
+                <rect x="${checkboxX}" y="${checkboxY}" width="${checkboxSize}" height="${checkboxSize}"
+                      fill="${isVisible ? "var(--vscode-checkbox-background)" : "transparent"}"
+                      stroke="var(--vscode-checkbox-border)" stroke-width="1" rx="2"/>
+                ${isVisible ? `<text x="${checkboxX + checkboxSize / 2}" y="${checkboxY + checkboxSize - 2}" text-anchor="middle" fill="var(--vscode-checkbox-foreground)" font-size="10" font-weight="bold">✓</text>` : ""}
+              </g>
+              <text x="${checkboxX + checkboxSize + 6}" y="${y + barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12" font-weight="bold">
                 ${escapeHtml(row.label)}
               </text>
             </g>
@@ -1036,10 +1074,9 @@ export class GanttPanel {
     // Right bars (scrollable timeline) - only for issue rows
     const bars = rows
       .map((row, index) => {
-        // Project headers: show aggregate bars when collapsed
+        // Project headers: always show aggregate bars
         if (row.type === "project") {
-          const isCollapsed = collapseState.isCollapsed(row.collapseKey);
-          if (!isCollapsed || !row.childDateRanges || row.childDateRanges.length === 0) {
+          if (!row.childDateRanges || row.childDateRanges.length === 0) {
             return "";
           }
 
@@ -1711,6 +1748,9 @@ ${style.tip}
     /* Collapse toggle chevron */
     .collapse-toggle { cursor: pointer; opacity: 0.7; }
     .collapse-toggle:hover { opacity: 1; }
+    /* Project visibility checkbox */
+    .project-checkbox:hover rect { stroke: var(--vscode-focusBorder); }
+    .project-checkbox rect { transition: stroke 0.1s; }
     /* Screen reader only class */
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
     .weekend-bg { fill: var(--vscode-editor-inactiveSelectionBackground); opacity: 0.3; }
@@ -2908,6 +2948,17 @@ ${style.tip}
         const collapseKey = el.dataset.collapseKey;
         if (collapseKey) {
           vscode.postMessage({ command: 'toggleCollapse', collapseKey });
+        }
+      });
+    });
+
+    // Project visibility checkbox click
+    document.querySelectorAll('.project-checkbox').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const projectId = parseInt(el.dataset.projectId);
+        if (!isNaN(projectId)) {
+          vscode.postMessage({ command: 'toggleProjectVisibility', projectId });
         }
       });
     });
