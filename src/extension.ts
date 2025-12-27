@@ -101,7 +101,7 @@ export function activate(context: vscode.ExtensionContext): void {
     return new RedmineServer(options);
   };
 
-  const projectsTree = new ProjectsTree();
+  const projectsTree = new ProjectsTree(context.globalState);
   const myTimeEntriesTree = new MyTimeEntriesTreeDataProvider();
   cleanupResources.projectsTree = projectsTree;
   cleanupResources.myTimeEntriesTree = myTimeEntriesTree;

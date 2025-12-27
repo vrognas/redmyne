@@ -55,6 +55,9 @@ function isIssue(item: TreeItem): item is Issue {
 }
 
 
+const FILTER_KEY = "redmine.issueFilter";
+const SORT_KEY = "redmine.issueSort";
+
 export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   server?: RedmineServer;
   viewStyle: ProjectsViewStyle;
@@ -68,10 +71,24 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   private issuesByProject = new Map<number, Issue[]>();
   private issuesByParent = new Map<number, Issue[]>(); // parent issue ID → child issues
   private flexibilityCache = new Map<number, FlexibilityScore | null>();
+  private globalState?: vscode.Memento;
 
-  constructor() {
+  constructor(globalState?: vscode.Memento) {
     super();
+    this.globalState = globalState;
     this.viewStyle = ProjectsViewStyle.TREE;
+
+    // Restore saved filter/sort
+    if (globalState) {
+      const savedFilter = globalState.get<IssueFilter>(FILTER_KEY);
+      if (savedFilter) {
+        this.issueFilter = { ...DEFAULT_ISSUE_FILTER, ...savedFilter };
+      }
+      const savedSort = globalState.get<SortConfig<IssueSortField>>(SORT_KEY);
+      if (savedSort) {
+        this.issueSort = savedSort;
+      }
+    }
 
     // Listen for config changes
     this.disposables.push(
@@ -399,6 +416,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
    */
   setFilter(filter: IssueFilter): void {
     this.issueFilter = { ...filter };
+    this.globalState?.update(FILTER_KEY, this.issueFilter);
     this.clearProjects();
     this.refresh();
   }
@@ -419,6 +437,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
     } else {
       this.issueSort = { field, direction: "asc" };
     }
+    this.globalState?.update(SORT_KEY, this.issueSort);
     this.refresh();
   }
 
