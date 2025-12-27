@@ -1446,6 +1446,7 @@ ${style.tip}
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
   <title>Redmine Gantt</title>
   <style nonce="${nonce}">
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     body {
       margin: 0;
       padding: 16px;
@@ -1455,6 +1456,7 @@ ${style.tip}
       overflow: hidden;
       height: 100vh;
       box-sizing: border-box;
+      animation: fadeIn 0.15s ease-out;
     }
     .gantt-header {
       display: flex;
@@ -1673,6 +1675,7 @@ ${style.tip}
     .issue-bar, .issue-label, .project-label, .aggregate-bars { transition: opacity 0.15s ease-out; }
     /* Respect reduced motion preference */
     @media (prefers-reduced-motion: reduce) {
+      body { animation: none; }
       .spinner { animation: none; }
       .skeleton-bar { animation: none; opacity: 0.5; }
       .gantt-resize-handle { transition: none; }
