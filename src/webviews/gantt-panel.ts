@@ -1767,14 +1767,14 @@ ${style.tip}
       opacity: 0.3;
     }
     .minimap-viewport {
-      fill: var(--vscode-focusBorder);
-      fill-opacity: 0.15;
-      stroke: var(--vscode-focusBorder);
-      stroke-width: 1;
+      fill: var(--vscode-editor-foreground);
+      fill-opacity: 0.08;
+      stroke: none;
       cursor: grab;
     }
     .minimap-viewport:active {
       cursor: grabbing;
+      fill-opacity: 0.12;
     }
     .minimap-today {
       stroke: var(--vscode-charts-red);
@@ -1938,23 +1938,51 @@ ${style.tip}
       minimapViewport.setAttribute('width', viewportWidth.toString());
     }
 
-    // Handle minimap click to scroll
+    // Handle minimap click/drag to scroll
     let minimapDragging = false;
-    function scrollFromMinimap(e) {
-      if (!timelineColumn || !minimapSvg) return;
+    let minimapDragOffset = 0; // Offset within viewport where drag started
+
+    function scrollFromMinimap(e, useOffset = false) {
+      if (!timelineColumn || !minimapSvg || !minimapViewport) return;
       const rect = minimapSvg.getBoundingClientRect();
-      const clickRatio = (e.clientX - rect.left) / rect.width;
+      const viewportWidth = parseFloat(minimapViewport.getAttribute('width') || '0');
+      const viewportWidthPx = (viewportWidth / 100) * rect.width;
+
+      // Calculate target position, accounting for drag offset if dragging viewport
+      let targetX = e.clientX - rect.left;
+      if (useOffset) {
+        targetX -= minimapDragOffset;
+      } else {
+        // Center viewport on click position
+        targetX -= viewportWidthPx / 2;
+      }
+
+      const clickRatio = targetX / (rect.width - viewportWidthPx);
       const maxScroll = timelineColumn.scrollWidth - timelineColumn.clientWidth;
-      timelineColumn.scrollLeft = clickRatio * maxScroll;
+      timelineColumn.scrollLeft = Math.max(0, Math.min(maxScroll, clickRatio * maxScroll));
     }
 
-    if (minimapSvg) {
-      minimapSvg.addEventListener('mousedown', (e) => {
+    if (minimapSvg && minimapViewport) {
+      // Clicking on viewport - drag from current position
+      minimapViewport.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
         minimapDragging = true;
-        scrollFromMinimap(e);
+        const rect = minimapSvg.getBoundingClientRect();
+        const viewportX = parseFloat(minimapViewport.getAttribute('x') || '0');
+        const viewportXPx = (viewportX / 100) * rect.width;
+        minimapDragOffset = e.clientX - rect.left - viewportXPx;
       });
+
+      // Clicking outside viewport - jump to position
+      minimapSvg.addEventListener('mousedown', (e) => {
+        if (e.target === minimapViewport) return;
+        minimapDragging = true;
+        minimapDragOffset = 0;
+        scrollFromMinimap(e, false);
+      });
+
       addDocListener('mousemove', (e) => {
-        if (minimapDragging) scrollFromMinimap(e);
+        if (minimapDragging) scrollFromMinimap(e, true);
       });
       addDocListener('mouseup', () => {
         minimapDragging = false;
