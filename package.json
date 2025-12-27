@@ -168,7 +168,7 @@
       },
       {
         "command": "redmine.openIssueInGantt",
-        "title": "Open in Gantt",
+        "title": "Show in Gantt",
         "icon": "$(graph)"
       },
       {
@@ -193,7 +193,7 @@
       },
       {
         "command": "redmine.showProjectInGantt",
-        "title": "Open in Gantt",
+        "title": "Show in Gantt",
         "icon": "$(graph)"
       },
       {
