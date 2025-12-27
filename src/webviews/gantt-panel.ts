@@ -383,6 +383,48 @@ export class GanttPanel {
 
   private _showLoadingSkeleton(): void {
     const nonce = getNonce();
+    const labelWidth = 250;
+    const headerHeight = 40;
+    const barHeight = 30;
+    const barGap = 10;
+    const rowCount = 8;
+
+    // Generate skeleton rows
+    const skeletonRows = Array.from({ length: rowCount }, (_, i) => {
+      const y = i * (barHeight + barGap);
+      const isProject = i % 3 === 0;
+      const indent = isProject ? 0 : 16;
+      // Vary bar positions and widths for visual interest
+      const barStart = 50 + (i * 37) % 200;
+      const barWidth = 80 + (i * 53) % 150;
+      return {
+        y,
+        isProject,
+        indent,
+        barStart,
+        barWidth,
+        delay: i * 0.1
+      };
+    });
+
+    const labelsSvg = skeletonRows.map(r => `
+      <g class="skeleton-label" style="animation-delay: ${r.delay}s">
+        <rect x="${5 + r.indent}" y="${r.y + 8}" width="${r.isProject ? 120 : 160}" height="14" rx="3" fill="var(--vscode-panel-border)"/>
+      </g>
+    `).join("");
+
+    const barsSvg = skeletonRows.map(r => `
+      <g class="skeleton-bar-group" style="animation-delay: ${r.delay}s">
+        <rect x="${r.barStart}" y="${r.y + 4}" width="${r.barWidth}" height="${barHeight - 8}" rx="4"
+              fill="var(--vscode-panel-border)" class="skeleton-timeline-bar"/>
+      </g>
+    `).join("");
+
+    const zebraStripes = skeletonRows
+      .filter((_, i) => i % 2 === 1)
+      .map(r => `<rect x="0" y="${r.y}" width="100%" height="${barHeight + barGap}" fill="var(--vscode-list-hoverBackground)" opacity="0.3"/>`)
+      .join("");
+
     this._panel.webview.html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -390,6 +432,7 @@ export class GanttPanel {
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}';">
   <title>Redmine Gantt</title>
   <style nonce="${nonce}">
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       padding: 16px;
@@ -397,60 +440,155 @@ export class GanttPanel {
       color: var(--vscode-foreground);
       font-family: var(--vscode-font-family);
     }
-    .loading {
+    .gantt-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .gantt-header h2 { margin: 0; font-size: 16px; }
+    .gantt-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .gantt-actions button {
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: none;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .zoom-toggle {
+      display: flex;
+      gap: 2px;
+      background: var(--vscode-input-background);
+      padding: 2px;
+      border-radius: 4px;
+    }
+    .gantt-container {
+      display: flex;
+      overflow: hidden;
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+      height: calc(100vh - 150px);
+    }
+    .gantt-left {
+      width: ${labelWidth}px;
+      flex-shrink: 0;
       display: flex;
       flex-direction: column;
+      border-right: 1px solid var(--vscode-panel-border);
+    }
+    .gantt-left-header {
+      height: ${headerHeight}px;
+      display: flex;
       align-items: center;
-      justify-content: center;
-      height: 200px;
-      gap: 16px;
+      padding: 4px 8px;
+      gap: 4px;
+      border-bottom: 1px solid var(--vscode-panel-border);
     }
-    .spinner {
-      width: 32px;
-      height: 32px;
-      border: 3px solid var(--vscode-panel-border);
-      border-top-color: var(--vscode-focusBorder);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    .skeleton-bar {
-      height: 30px;
-      background: var(--vscode-panel-border);
+    .gantt-left-header button {
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: none;
+      padding: 2px 8px;
       border-radius: 4px;
+      font-size: 10px;
       opacity: 0.5;
+    }
+    .gantt-labels {
+      flex-grow: 1;
+      overflow: hidden;
+    }
+    .gantt-right {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .gantt-timeline-header {
+      height: ${headerHeight}px;
+      background: var(--vscode-editor-background);
+      border-bottom: 1px solid var(--vscode-panel-border);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+    }
+    .loading-text {
+      font-size: 12px;
+      opacity: 0.7;
       animation: pulse 1.5s ease-in-out infinite;
     }
+    .gantt-timeline {
+      flex-grow: 1;
+      overflow: hidden;
+    }
+    svg { display: block; }
     @keyframes pulse {
       0%, 100% { opacity: 0.3; }
-      50% { opacity: 0.6; }
+      50% { opacity: 0.7; }
     }
-    .skeleton-container {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      margin-top: 20px;
+    .skeleton-label, .skeleton-bar-group {
+      animation: pulse 1.5s ease-in-out infinite;
     }
-    .w-45 { width: 45%; }
-    .w-60 { width: 60%; }
-    .w-70 { width: 70%; }
-    .w-80 { width: 80%; }
+    .skeleton-timeline-bar {
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .minimap-container {
+      height: 50px;
+      background: var(--vscode-sideBar-background);
+      border-top: 1px solid var(--vscode-panel-border);
+    }
   </style>
 </head>
 <body>
-  <h2>Timeline</h2>
-  <div class="loading">
-    <div class="spinner"></div>
-    <span>Loading issues...</span>
+  <div class="gantt-header">
+    <h2>Timeline</h2>
+    <div class="gantt-actions">
+      <div class="zoom-toggle">
+        <button>Day</button>
+        <button>Week</button>
+        <button>Month</button>
+        <button>Quarter</button>
+        <button>Year</button>
+      </div>
+      <button>Heatmap</button>
+      <button>Deps</button>
+      <button>Intensity</button>
+      <button>Critical</button>
+      <button>Today</button>
+    </div>
   </div>
-  <div class="skeleton-container">
-    <div class="skeleton-bar w-60"></div>
-    <div class="skeleton-bar w-80"></div>
-    <div class="skeleton-bar w-45"></div>
-    <div class="skeleton-bar w-70"></div>
+  <div class="gantt-container">
+    <div class="gantt-left">
+      <div class="gantt-left-header">
+        <button>▼</button>
+        <button>▶</button>
+      </div>
+      <div class="gantt-labels">
+        <svg width="${labelWidth}" height="${rowCount * (barHeight + barGap)}">
+          ${zebraStripes}
+          ${labelsSvg}
+        </svg>
+      </div>
+    </div>
+    <div class="gantt-right">
+      <div class="gantt-timeline-header">
+        <span class="loading-text">Loading issues...</span>
+      </div>
+      <div class="gantt-timeline">
+        <svg width="100%" height="${rowCount * (barHeight + barGap)}">
+          ${zebraStripes}
+          ${barsSvg}
+        </svg>
+      </div>
+    </div>
   </div>
+  <div class="minimap-container"></div>
 </body>
 </html>`;
   }
