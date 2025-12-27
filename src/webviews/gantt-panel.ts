@@ -1504,7 +1504,7 @@ ${style.tip}
       display: flex;
       flex-direction: column;
     }
-    .gantt-left-header { display: flex; gap: 4px; padding: 4px 8px; }
+    .gantt-left-header { display: flex; gap: 4px; padding: 4px 8px; height: ${headerHeight}px; box-sizing: border-box; align-items: center; border-bottom: 1px solid var(--vscode-panel-border); }
     .gantt-left-header button { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 10px; }
     .gantt-left-header button:hover { background: var(--vscode-button-secondaryHoverBackground); }
     .gantt-left-header-placeholder {
