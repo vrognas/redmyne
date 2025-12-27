@@ -37,6 +37,7 @@ interface GanttIssue {
   start_date: string | null;
   due_date: string | null;
   status: FlexibilityScore["status"] | null;
+  isClosed: boolean;
   project: string;
   projectId: number;
   parentId: number | null;
@@ -69,13 +70,14 @@ interface GanttRow {
 /**
  * Convert Issue to GanttIssue for SVG rendering
  */
-function toGanttIssue(issue: Issue, flexibilityCache: Map<number, FlexibilityScore | null>): GanttIssue {
+function toGanttIssue(issue: Issue, flexibilityCache: Map<number, FlexibilityScore | null>, closedStatusIds: Set<number>): GanttIssue {
   return {
     id: issue.id,
     subject: issue.subject,
     start_date: issue.start_date || null,
     due_date: issue.due_date || null,
     status: flexibilityCache.get(issue.id)?.status ?? null,
+    isClosed: closedStatusIds.has(issue.status?.id ?? 0),
     project: issue.project?.name ?? "Unknown",
     projectId: issue.project?.id ?? 0,
     parentId: issue.parent?.id ?? null,
@@ -97,7 +99,7 @@ function toGanttIssue(issue: Issue, flexibilityCache: Map<number, FlexibilitySco
 /**
  * Convert HierarchyNode to GanttRow for SVG rendering
  */
-function nodeToGanttRow(node: HierarchyNode, flexibilityCache: Map<number, FlexibilityScore | null>): GanttRow {
+function nodeToGanttRow(node: HierarchyNode, flexibilityCache: Map<number, FlexibilityScore | null>, closedStatusIds: Set<number>): GanttRow {
   if (node.type === "project") {
     return {
       type: "project",
@@ -117,7 +119,7 @@ function nodeToGanttRow(node: HierarchyNode, flexibilityCache: Map<number, Flexi
     id: node.id,
     label: node.label,
     depth: node.depth,
-    issue: toGanttIssue(issue, flexibilityCache),
+    issue: toGanttIssue(issue, flexibilityCache, closedStatusIds),
     isParent: node.children.length > 0,
     collapseKey: node.collapseKey,
     parentKey: node.parentKey,
@@ -322,6 +324,7 @@ export class GanttPanel {
   private _showIntensity: boolean = false;
   private _scrollPosition: { left: number; top: number } = { left: 0, top: 0 };
   private _extendedRelationTypes: boolean = false;
+  private _closedStatusIds: Set<number> = new Set();
 
   private constructor(panel: vscode.WebviewPanel, server?: RedmineServer) {
     this._panel = panel;
@@ -436,12 +439,12 @@ export class GanttPanel {
 </html>`;
   }
 
-  public updateIssues(
+  public async updateIssues(
     issues: Issue[],
     flexibilityCache: Map<number, FlexibilityScore | null>,
     projects: RedmineProject[],
     schedule?: WeeklySchedule
-  ): void {
+  ): Promise<void> {
     // Update schedule if provided
     if (schedule) {
       this._schedule = schedule;
@@ -451,6 +454,18 @@ export class GanttPanel {
     this._issues = issues.filter((i) => i.start_date || i.due_date);
     this._projects = projects;
     this._flexibilityCache = flexibilityCache;
+
+    // Fetch closed status IDs if not cached
+    if (this._closedStatusIds.size === 0 && this._server) {
+      try {
+        const statuses = await this._server.getIssueStatuses();
+        this._closedStatusIds = new Set(
+          statuses.issue_statuses.filter(s => s.is_closed).map(s => s.id)
+        );
+      } catch {
+        // Ignore errors, just won't show closed status
+      }
+    }
 
     this._updateContent();
   }
@@ -942,7 +957,7 @@ export class GanttPanel {
     // Build hierarchical rows using shared hierarchy builder (with project hierarchy)
     const hierarchy = buildProjectHierarchy(this._issues, this._flexibilityCache, this._projects);
     const flatNodes = flattenHierarchy(hierarchy, collapseState.getExpandedKeys());
-    const rows = flatNodes.map((node) => nodeToGanttRow(node, this._flexibilityCache));
+    const rows = flatNodes.map((node) => nodeToGanttRow(node, this._flexibilityCache, this._closedStatusIds));
     const contentHeight = rows.length * (barHeight + barGap);
     const chevronWidth = 14;
 
@@ -1222,8 +1237,8 @@ export class GanttPanel {
             <!-- Border/outline -->
             <rect class="bar-outline" x="${startX}" y="${y}" width="${width}" height="${barHeight}"
                   fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1" rx="8" ry="8" style="cursor: pointer;"/>
-            ${issue.status === "completed" || doneRatio === 100 ? `
-              <!-- Completed checkmark -->
+            ${issue.isClosed ? `
+              <!-- Closed checkmark -->
               <text class="completed-check" x="${startX + width / 2}" y="${y + barHeight / 2 + 5}"
                     text-anchor="middle" fill="var(--vscode-charts-green)" font-size="16" font-weight="bold">✓</text>
             ` : ""}
