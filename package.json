@@ -1132,6 +1132,12 @@
           "default": true,
           "scope": "application",
           "description": "Show timer in status bar"
+        },
+        "redmine.gantt.extendedRelationTypes": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "markdownDescription": "**Enable extended scheduling relation types**\n\nAdds support for Gantt plugin dependency types:\n- Finish-to-Start (FS)\n- Start-to-Start (SS)\n- Finish-to-Finish (FF)\n- Start-to-Finish (SF)\n\nDisable if your server doesn't have a Gantt plugin."
         }
       }
     },

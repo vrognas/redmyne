@@ -40,8 +40,13 @@ export interface IssueRelation {
     | "precedes"
     | "follows"
     | "copied_to"
-    | "copied_from";
-  delay?: number; // days, for precedes/follows
+    | "copied_from"
+    // Extended scheduling types (requires Gantt plugin)
+    | "finish_to_start"
+    | "start_to_start"
+    | "finish_to_finish"
+    | "start_to_finish";
+  delay?: number; // days, for scheduling types
 }
 
 /**

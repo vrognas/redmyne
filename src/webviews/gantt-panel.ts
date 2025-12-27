@@ -319,6 +319,7 @@ export class GanttPanel {
   private _showDependencies: boolean = true;
   private _showIntensity: boolean = false;
   private _scrollPosition: { left: number; top: number } = { left: 0, top: 0 };
+  private _extendedRelationTypes: boolean = false;
 
   private constructor(panel: vscode.WebviewPanel, server?: RedmineServer) {
     this._panel = panel;
@@ -1251,6 +1252,15 @@ export class GanttPanel {
         tip: "Closing target auto-closes source" },
       copied_to: { color: "#1abc9c", dash: "6,2", label: "copied to",
         tip: "Source was copied to create target" },
+      // Extended scheduling types (requires Gantt plugin)
+      finish_to_start: { color: "#3498db", dash: "", label: "FS",
+        tip: "Finish-to-Start: Target starts after source finishes" },
+      start_to_start: { color: "#2ecc71", dash: "4,2", label: "SS",
+        tip: "Start-to-Start: Target starts when source starts" },
+      finish_to_finish: { color: "#f39c12", dash: "4,2", label: "FF",
+        tip: "Finish-to-Finish: Target finishes when source finishes" },
+      start_to_finish: { color: "#9b59b6", dash: "2,4", label: "SF",
+        tip: "Start-to-Finish: Target finishes when source starts" },
     };
 
     // Use rows (which have GanttIssue) for dependency arrows
@@ -1267,13 +1277,13 @@ export class GanttPanel {
           const arrowSize = 6;
           const sameRow = Math.abs(source.y - target.y) < 5;
 
-          // Temporal relations (blocks, precedes): end → start
+          // Temporal relations: end → start (or based on type for extended)
           // Non-temporal relations (relates, duplicates, copied_to): center → center
-          const isTemporal = rel.type === "blocks" || rel.type === "precedes";
+          const isScheduling = ["blocks", "precedes", "finish_to_start", "start_to_start", "finish_to_finish", "start_to_finish"].includes(rel.type);
 
           let x1: number, y1: number, x2: number, y2: number;
 
-          if (isTemporal) {
+          if (isScheduling) {
             // End of source → start of target
             x1 = source.endX + 2;
             y1 = source.y;
@@ -1670,6 +1680,7 @@ ${style.tip}
     const maxDateMs = ${maxDate.getTime()};
     const totalDays = ${totalDays};
     const dayWidth = timelineWidth / totalDays;
+    const extendedRelationTypes = ${this._extendedRelationTypes};
 
     // Cleanup previous event listeners (prevents accumulation on re-render)
     if (window._ganttCleanup) {
@@ -2199,7 +2210,7 @@ ${style.tip}
       picker.style.left = Math.max(10, clampedX) + 'px';
       picker.style.top = Math.max(10, clampedY) + 'px';
 
-      const types = [
+      const baseTypes = [
         { value: 'blocks', label: '🚫 Blocks', color: '#e74c3c',
           tooltip: 'Target cannot be closed until this issue is closed' },
         { value: 'precedes', label: '➡️ Precedes', color: '#9b59b6',
@@ -2211,6 +2222,17 @@ ${style.tip}
         { value: 'copied_to', label: '📄 Copied to', color: '#1abc9c',
           tooltip: 'This issue was copied to create the target issue' }
       ];
+      const extendedTypes = [
+        { value: 'finish_to_start', label: '⏩ Finish→Start', color: '#3498db',
+          tooltip: 'Target starts after this issue finishes (FS)' },
+        { value: 'start_to_start', label: '▶️ Start→Start', color: '#2ecc71',
+          tooltip: 'Target starts when this issue starts (SS)' },
+        { value: 'finish_to_finish', label: '⏹️ Finish→Finish', color: '#f39c12',
+          tooltip: 'Target finishes when this issue finishes (FF)' },
+        { value: 'start_to_finish', label: '⏪ Start→Finish', color: '#9b59b6',
+          tooltip: 'Target finishes when this issue starts (SF)' }
+      ];
+      const types = extendedRelationTypes ? [...baseTypes, ...extendedTypes] : baseTypes;
 
       types.forEach(t => {
         const btn = document.createElement('button');
