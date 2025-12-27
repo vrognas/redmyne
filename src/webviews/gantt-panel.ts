@@ -1554,23 +1554,14 @@ ${style.tip}
     .dependency-arrow .arrow-head { transition: filter 0.15s; }
     .dependency-arrow:hover .arrow-line { stroke-width: 3 !important; filter: brightness(1.2); }
     .dependency-arrow:hover .arrow-head { filter: brightness(1.2); }
-    /* Hover highlighting - fade non-related elements */
-    .hover-focus .issue-bar,
+    /* Hover highlighting - fade only left column labels, not bars/arrows */
     .hover-focus .issue-label,
-    .hover-focus .project-label,
-    .hover-focus .aggregate-bars,
-    .hover-focus .dependency-arrow .arrow-line,
-    .hover-focus .dependency-arrow .arrow-head { opacity: 0.15; transition: opacity 0.15s ease-out; }
-    .hover-focus .issue-bar.hover-highlighted,
+    .hover-focus .project-label { opacity: 0.15; transition: opacity 0.15s ease-out; }
     .hover-focus .issue-label.hover-highlighted,
-    .hover-focus .project-label.hover-highlighted,
-    .hover-focus .aggregate-bars.hover-highlighted { opacity: 1 !important; }
+    .hover-focus .project-label.hover-highlighted { opacity: 1 !important; }
+    /* Highlight hovered bar */
     .hover-focus .issue-bar.hover-highlighted .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
-    .hover-focus .aggregate-bars.hover-highlighted .aggregate-bar { opacity: 0.7; }
-    /* Dependency arrows connected to highlighted issue stay visible */
-    .hover-focus .dependency-arrow.hover-highlighted .arrow-line,
-    .hover-focus .dependency-arrow.hover-highlighted .arrow-head { opacity: 1; }
-    /* Dependency hover - extra glow on hovered arrow */
+    /* Dependency hover - glow on hovered arrow */
     .hover-focus.dependency-hover .dependency-arrow.hover-source .arrow-line { stroke-width: 3; filter: brightness(1.3) drop-shadow(0 0 4px currentColor); }
     .hover-focus.dependency-hover .dependency-arrow.hover-source .arrow-head { filter: brightness(1.3) drop-shadow(0 0 4px currentColor); }
     /* Relation type colors in legend */
