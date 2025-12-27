@@ -944,6 +944,15 @@ export class GanttPanel {
     const contentHeight = rows.length * (barHeight + barGap);
     const chevronWidth = 14;
 
+    // Generate zebra stripe backgrounds for alternating rows
+    const zebraStripes = rows
+      .map((_, index) => {
+        if (index % 2 === 0) return ""; // Only odd rows get background
+        const y = index * (barHeight + barGap);
+        return `<rect class="zebra-stripe" x="0" y="${y}" width="100%" height="${barHeight + barGap}" />`;
+      })
+      .join("");
+
     // Left labels (fixed column) - Y starts at 0 in body SVG (header is separate)
     const labels = rows
       .map((row, index) => {
@@ -1609,6 +1618,7 @@ ${style.tip}
     /* Screen reader only class */
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
     .weekend-bg { fill: var(--vscode-editor-inactiveSelectionBackground); opacity: 0.3; }
+    .zebra-stripe { fill: var(--vscode-list-hoverBackground); opacity: 0.3; pointer-events: none; }
     .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 1; opacity: 0.25; }
     .date-marker { stroke: var(--vscode-editorRuler-foreground); stroke-dasharray: 2,2; }
     .today-marker { stroke: var(--vscode-charts-red); stroke-width: 2; }
@@ -1667,6 +1677,7 @@ ${style.tip}
       </div>
       <div class="gantt-labels" id="ganttLabels">
         <svg width="${labelWidth}" height="${bodyHeight}">
+          ${zebraStripes}
           ${labels}
         </svg>
       </div>
@@ -1688,6 +1699,7 @@ ${style.tip}
               <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.3"/>
             </filter>
           </defs>
+          ${zebraStripes}
           ${dateMarkers.body}
           <!-- Arrows below bars so link-handles remain clickable -->
           <g class="dependency-layer" style="${this._showDependencies ? "" : "display: none;"}">${dependencyArrows}</g>
