@@ -327,6 +327,8 @@ export class GanttPanel {
   private _extendedRelationTypes: boolean = false;
   private _closedStatusIds: Set<number> = new Set();
   private _hiddenProjects: Set<number> = new Set(); // Projects hidden from view
+  private _collapseDebounceTimer?: ReturnType<typeof setTimeout>;
+  private _cachedHierarchy?: HierarchyNode[];
 
   private constructor(panel: vscode.WebviewPanel, server?: RedmineServer) {
     this._panel = panel;
@@ -339,8 +341,12 @@ export class GanttPanel {
     );
 
     // Listen for collapse state changes from other views (Issues pane)
+    // Debounced to prevent rapid re-renders during fast expand/collapse
     this._disposables.push(
-      collapseState.onDidChange(() => this._updateContent())
+      collapseState.onDidChange(() => {
+        clearTimeout(this._collapseDebounceTimer);
+        this._collapseDebounceTimer = setTimeout(() => this._updateContent(), 50);
+      })
     );
   }
 
@@ -608,6 +614,9 @@ export class GanttPanel {
     this._issues = issues.filter((i) => i.start_date || i.due_date);
     this._projects = projects;
     this._flexibilityCache = flexibilityCache;
+
+    // Invalidate hierarchy cache when data changes
+    this._cachedHierarchy = undefined;
 
     // Fetch closed status IDs if not cached
     if (this._closedStatusIds.size === 0 && this._server) {
@@ -1074,6 +1083,7 @@ export class GanttPanel {
 
   public dispose(): void {
     GanttPanel.currentPanel = undefined;
+    clearTimeout(this._collapseDebounceTimer);
     this._panel.dispose();
     while (this._disposables.length) {
       const x = this._disposables.pop();
@@ -1128,18 +1138,21 @@ export class GanttPanel {
     const indentSize = 16;
 
     // Build hierarchical rows using shared hierarchy builder (with project hierarchy)
-    const hierarchy = buildProjectHierarchy(this._issues, this._flexibilityCache, this._projects);
-    const flatNodes = flattenHierarchy(hierarchy, collapseState.getExpandedKeys());
+    // Cache hierarchy to avoid rebuilding on collapse/expand
+    if (!this._cachedHierarchy) {
+      this._cachedHierarchy = buildProjectHierarchy(this._issues, this._flexibilityCache, this._projects);
+    }
+    const flatNodes = flattenHierarchy(this._cachedHierarchy, collapseState.getExpandedKeys());
     const allRows = flatNodes.map((node) => nodeToGanttRow(node, this._flexibilityCache, this._closedStatusIds));
 
-    // Filter out issues under hidden projects (keep project rows visible for toggling)
+    // Filter out hidden projects and their issues entirely
     const hiddenProjects = this._hiddenProjects;
     const rows = allRows.filter(row => {
-      // Always show project rows (so they can be toggled)
+      // Hide project rows when deselected
       if (row.type === "project") {
-        return true;
+        return !hiddenProjects.has(row.id);
       }
-      // For issues, check if their project is hidden
+      // Hide issues under hidden projects
       if (row.issue?.projectId) {
         return !hiddenProjects.has(row.issue.projectId);
       }
@@ -1158,12 +1171,13 @@ export class GanttPanel {
       })
       .join("");
 
-    // Checkbox column (separate from labels)
+    // Checkbox column (separate from labels) - shows ALL projects for toggling
     const checkboxColumnWidth = 24;
     const checkboxSize = 14;
-    const checkboxes = rows
+    const projectRows = allRows.filter(r => r.type === "project");
+    const checkboxHeight = projectRows.length * (barHeight + barGap);
+    const checkboxes = projectRows
       .map((row, index) => {
-        if (row.type !== "project") return "";
         const y = index * (barHeight + barGap);
         const isVisible = !this._hiddenProjects.has(row.id);
         const checkboxX = (checkboxColumnWidth - checkboxSize) / 2;
@@ -1174,6 +1188,7 @@ export class GanttPanel {
                   fill="${isVisible ? "var(--vscode-checkbox-background)" : "transparent"}"
                   stroke="var(--vscode-checkbox-border)" stroke-width="1" rx="2"/>
             ${isVisible ? `<text x="${checkboxX + checkboxSize / 2}" y="${checkboxY + checkboxSize - 3}" text-anchor="middle" fill="var(--vscode-checkbox-foreground)" font-size="11" font-weight="bold">✓</text>` : ""}
+            <title>${escapeHtml(row.label)}</title>
           </g>
         `;
       })
@@ -1762,7 +1777,10 @@ ${style.tip}
     }
     .gantt-checkbox-column {
       flex-shrink: 0;
+      flex-grow: 0;
       width: ${checkboxColumnWidth}px;
+      min-width: ${checkboxColumnWidth}px;
+      max-width: ${checkboxColumnWidth}px;
       display: flex;
       flex-direction: column;
       border-right: 1px solid var(--vscode-panel-border);
@@ -2057,7 +2075,7 @@ ${style.tip}
     <div class="gantt-checkbox-column" id="ganttCheckboxColumn">
       <div class="gantt-checkbox-header"></div>
       <div class="gantt-checkboxes" id="ganttCheckboxes">
-        <svg width="${checkboxColumnWidth}" height="${bodyHeight}">
+        <svg width="${checkboxColumnWidth}" height="${checkboxHeight}">
           ${checkboxes}
         </svg>
       </div>
@@ -2295,7 +2313,7 @@ ${style.tip}
     }
 
     // Synchronize scrolling:
-    // - Vertical: checkboxes <-> labels <-> timeline body
+    // - Vertical: labels <-> timeline body (checkbox column scrolls independently)
     // - Horizontal: timeline header <-> timeline body
     let scrollSyncing = false;
     let scrollReportTimeout = null;
@@ -2303,9 +2321,8 @@ ${style.tip}
       timelineColumn.addEventListener('scroll', () => {
         if (scrollSyncing) return;
         scrollSyncing = true;
-        // Sync vertical with labels and checkboxes
+        // Sync vertical with labels
         labelsColumn.scrollTop = timelineColumn.scrollTop;
-        if (checkboxColumn) checkboxColumn.scrollTop = timelineColumn.scrollTop;
         // Sync horizontal with header
         timelineHeader.scrollLeft = timelineColumn.scrollLeft;
         // Update minimap viewport
@@ -2328,18 +2345,8 @@ ${style.tip}
         if (scrollSyncing) return;
         scrollSyncing = true;
         timelineColumn.scrollTop = labelsColumn.scrollTop;
-        if (checkboxColumn) checkboxColumn.scrollTop = labelsColumn.scrollTop;
         requestAnimationFrame(() => { scrollSyncing = false; });
       });
-      if (checkboxColumn) {
-        checkboxColumn.addEventListener('scroll', () => {
-          if (scrollSyncing) return;
-          scrollSyncing = true;
-          timelineColumn.scrollTop = checkboxColumn.scrollTop;
-          labelsColumn.scrollTop = checkboxColumn.scrollTop;
-          requestAnimationFrame(() => { scrollSyncing = false; });
-        });
-      }
     }
 
     // Initial button state

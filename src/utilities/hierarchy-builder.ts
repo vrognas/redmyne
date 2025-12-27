@@ -452,3 +452,44 @@ export function flattenHierarchy(
   traverse(nodes, true);
   return result;
 }
+
+/**
+ * Node with visibility info for client-side collapse management
+ */
+export interface FlatNodeWithVisibility extends HierarchyNode {
+  /** Whether this node is visible (based on parent expand state) */
+  isVisible: boolean;
+  /** Whether this node itself is expanded */
+  isExpanded: boolean;
+}
+
+/**
+ * Flatten hierarchy returning ALL nodes with visibility flags
+ * Used for client-side collapse/expand to avoid full re-renders
+ */
+export function flattenHierarchyAll(
+  nodes: HierarchyNode[],
+  expandedKeys: Set<string> = new Set()
+): FlatNodeWithVisibility[] {
+  const result: FlatNodeWithVisibility[] = [];
+
+  function traverse(nodeList: HierarchyNode[], parentVisible: boolean) {
+    for (const node of nodeList) {
+      const isExpanded = expandedKeys.has(node.collapseKey);
+      result.push({
+        ...node,
+        isVisible: parentVisible,
+        isExpanded,
+      });
+
+      if (node.children.length > 0) {
+        // Children visible only if this node is visible AND expanded
+        traverse(node.children, parentVisible && isExpanded);
+      }
+    }
+  }
+
+  // Top-level nodes are always visible
+  traverse(nodes, true);
+  return result;
+}
