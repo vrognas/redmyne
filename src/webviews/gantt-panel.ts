@@ -1420,6 +1420,28 @@ ${style.tip}
       .filter(Boolean)
       .join("");
 
+    // Generate minimap bars (simplified representation)
+    const minimapBarHeight = 3;
+    const minimapHeight = 50;
+    const minimapBars = rows
+      .filter(r => r.type === "issue" && r.issue && (r.issue.start_date || r.issue.due_date))
+      .map((row) => {
+        const issue = row.issue!;
+        const startDate = issue.start_date ?? issue.due_date!;
+        const dueDate = issue.due_date ?? issue.start_date!;
+        const start = new Date(startDate);
+        const end = new Date(dueDate);
+        const endPlusOne = new Date(end);
+        endPlusOne.setUTCDate(endPlusOne.getUTCDate() + 1);
+        const startPct = (start.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime());
+        const endPct = (endPlusOne.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime());
+        const isPast = end < today;
+        const isOverdue = !issue.isClosed && issue.done_ratio < 100 && end < today;
+        const classes = ["minimap-bar", isPast ? "bar-past" : "", isOverdue ? "bar-overdue" : ""].filter(Boolean).join(" ");
+        return { startPct, endPct, classes };
+      });
+    const minimapBarsJson = JSON.stringify(minimapBars);
+
     // Always calculate aggregate workload (needed for heatmap toggle without re-render)
     const workloadMap = calculateAggregateWorkload(this._issues, this._schedule, minDate, maxDate);
 
@@ -1720,6 +1742,44 @@ ${style.tip}
     .rel-line-duplicates { background: #e67e22; border-style: dotted; }
     .rel-line-copied { background: #1abc9c; border-style: dashed; }
     .color-swatch { display: inline-block; width: 12px; height: 3px; margin-right: 8px; vertical-align: middle; }
+
+    /* Minimap */
+    .minimap-container {
+      position: relative;
+      height: 50px;
+      background: var(--vscode-sideBar-background);
+      border-top: 1px solid var(--vscode-panel-border);
+      overflow: hidden;
+    }
+    .minimap-container svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .minimap-bar {
+      fill: var(--vscode-charts-blue);
+      opacity: 0.6;
+    }
+    .minimap-bar.bar-overdue {
+      fill: var(--vscode-charts-red);
+    }
+    .minimap-bar.bar-past {
+      opacity: 0.3;
+    }
+    .minimap-viewport {
+      fill: var(--vscode-focusBorder);
+      fill-opacity: 0.15;
+      stroke: var(--vscode-focusBorder);
+      stroke-width: 1;
+      cursor: grab;
+    }
+    .minimap-viewport:active {
+      cursor: grabbing;
+    }
+    .minimap-today {
+      stroke: var(--vscode-charts-red);
+      stroke-width: 1;
+    }
   </style>
 </head>
 <body>
@@ -1797,6 +1857,13 @@ ${style.tip}
       </div>
     </div>
   </div>
+  <div class="minimap-container" id="minimapContainer">
+    <svg id="minimapSvg" viewBox="0 0 100 ${minimapHeight}" preserveAspectRatio="none">
+      <!-- Bars will be rendered by JS -->
+      <line class="minimap-today" x1="${(todayX / timelineWidth) * 100}" y1="0" x2="${(todayX / timelineWidth) * 100}" y2="${minimapHeight}"/>
+      <rect class="minimap-viewport" id="minimapViewport" x="0" y="0" width="20" height="${minimapHeight}" rx="2"/>
+    </svg>
+  </div>
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
     const timelineWidth = ${timelineWidth};
@@ -1837,6 +1904,62 @@ ${style.tip}
     const timelineHeader = document.getElementById('ganttTimelineHeader');
     const undoBtn = document.getElementById('undoBtn');
     const redoBtn = document.getElementById('redoBtn');
+    const minimapSvg = document.getElementById('minimapSvg');
+    const minimapViewport = document.getElementById('minimapViewport');
+
+    // Minimap setup
+    const minimapBarsData = ${minimapBarsJson};
+    const minimapHeight = ${minimapHeight};
+    const minimapBarHeight = ${minimapBarHeight};
+
+    // Render minimap bars
+    if (minimapSvg) {
+      const barSpacing = minimapHeight / (minimapBarsData.length + 1);
+      minimapBarsData.forEach((bar, i) => {
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('class', bar.classes);
+        rect.setAttribute('x', (bar.startPct * 100).toString());
+        rect.setAttribute('y', (barSpacing * (i + 0.5)).toString());
+        rect.setAttribute('width', Math.max(0.5, (bar.endPct - bar.startPct) * 100).toString());
+        rect.setAttribute('height', minimapBarHeight.toString());
+        rect.setAttribute('rx', '1');
+        minimapSvg.insertBefore(rect, minimapViewport);
+      });
+    }
+
+    // Update minimap viewport on scroll
+    function updateMinimapViewport() {
+      if (!timelineColumn || !minimapViewport) return;
+      const scrollRatio = timelineColumn.scrollLeft / (timelineColumn.scrollWidth - timelineColumn.clientWidth || 1);
+      const viewportRatio = timelineColumn.clientWidth / timelineColumn.scrollWidth;
+      const viewportWidth = Math.max(2, viewportRatio * 100);
+      const viewportX = scrollRatio * (100 - viewportWidth);
+      minimapViewport.setAttribute('x', viewportX.toString());
+      minimapViewport.setAttribute('width', viewportWidth.toString());
+    }
+
+    // Handle minimap click to scroll
+    let minimapDragging = false;
+    function scrollFromMinimap(e) {
+      if (!timelineColumn || !minimapSvg) return;
+      const rect = minimapSvg.getBoundingClientRect();
+      const clickRatio = (e.clientX - rect.left) / rect.width;
+      const maxScroll = timelineColumn.scrollWidth - timelineColumn.clientWidth;
+      timelineColumn.scrollLeft = clickRatio * maxScroll;
+    }
+
+    if (minimapSvg) {
+      minimapSvg.addEventListener('mousedown', (e) => {
+        minimapDragging = true;
+        scrollFromMinimap(e);
+      });
+      addDocListener('mousemove', (e) => {
+        if (minimapDragging) scrollFromMinimap(e);
+      });
+      addDocListener('mouseup', () => {
+        minimapDragging = false;
+      });
+    }
 
     // Restore state from previous session (use extension-stored position as fallback)
     const extScrollLeft = ${this._scrollPosition.left};
@@ -1912,6 +2035,8 @@ ${style.tip}
         labelsColumn.scrollTop = timelineColumn.scrollTop;
         // Sync horizontal with header
         timelineHeader.scrollLeft = timelineColumn.scrollLeft;
+        // Update minimap viewport
+        updateMinimapViewport();
         // Save state immediately so collapse/expand preserves position
         saveState();
         // Report scroll position to extension (debounced)
@@ -3147,6 +3272,8 @@ ${style.tip}
     } else {
       scrollToToday();
     }
+    // Initialize minimap viewport
+    updateMinimapViewport();
 
     // Today button handler
     document.getElementById('todayBtn').addEventListener('click', scrollToToday);
