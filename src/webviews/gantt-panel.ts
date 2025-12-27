@@ -1084,13 +1084,20 @@ export class GanttPanel {
   private _getHtmlContent(): string {
     const nonce = getNonce();
 
-    // Calculate date range
-    const dates = this._issues.flatMap((i) =>
+    // Filter issues by hidden projects for date range calculation
+    const visibleIssues = this._issues.filter(
+      (i) => !this._hiddenProjects.has(i.project.id)
+    );
+
+    // Calculate date range from visible issues only
+    const dates = visibleIssues.flatMap((i) =>
       [i.start_date, i.due_date].filter(Boolean)
     ) as string[];
 
     if (dates.length === 0) {
-      return this._getEmptyHtml();
+      // Check if all projects are hidden vs no issues at all
+      const allHidden = this._issues.length > 0 && this._hiddenProjects.size > 0;
+      return this._getEmptyHtml(allHidden);
     }
 
     const minDate = new Date(
@@ -1151,6 +1158,27 @@ export class GanttPanel {
       })
       .join("");
 
+    // Checkbox column (separate from labels)
+    const checkboxColumnWidth = 24;
+    const checkboxSize = 14;
+    const checkboxes = rows
+      .map((row, index) => {
+        if (row.type !== "project") return "";
+        const y = index * (barHeight + barGap);
+        const isVisible = !this._hiddenProjects.has(row.id);
+        const checkboxX = (checkboxColumnWidth - checkboxSize) / 2;
+        const checkboxY = y + (barHeight - checkboxSize) / 2;
+        return `
+          <g class="project-checkbox cursor-pointer" data-project-id="${row.id}" role="checkbox" aria-checked="${isVisible}" aria-label="Show/hide ${escapeHtml(row.label)}">
+            <rect x="${checkboxX}" y="${checkboxY}" width="${checkboxSize}" height="${checkboxSize}"
+                  fill="${isVisible ? "var(--vscode-checkbox-background)" : "transparent"}"
+                  stroke="var(--vscode-checkbox-border)" stroke-width="1" rx="2"/>
+            ${isVisible ? `<text x="${checkboxX + checkboxSize / 2}" y="${checkboxY + checkboxSize - 3}" text-anchor="middle" fill="var(--vscode-checkbox-foreground)" font-size="11" font-weight="bold">✓</text>` : ""}
+          </g>
+        `;
+      })
+      .join("");
+
     // Left labels (fixed column) - Y starts at 0 in body SVG (header is separate)
     const labels = rows
       .map((row, index) => {
@@ -1163,21 +1191,11 @@ export class GanttPanel {
         const textOffset = row.hasChildren ? chevronWidth : 0;
 
         if (row.type === "project") {
-          // Project header row with visibility checkbox
-          const isVisible = !this._hiddenProjects.has(row.id);
-          const checkboxX = 5 + indent + textOffset;
-          const checkboxY = y + barHeight / 2 - 6;
-          const checkboxSize = 12;
+          // Project header row (checkbox is in separate column)
           return `
             <g class="project-label" data-collapse-key="${row.collapseKey}" data-project-id="${row.id}" tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
               ${chevron}
-              <g class="project-checkbox cursor-pointer" data-project-id="${row.id}" role="checkbox" aria-checked="${isVisible}">
-                <rect x="${checkboxX}" y="${checkboxY}" width="${checkboxSize}" height="${checkboxSize}"
-                      fill="${isVisible ? "var(--vscode-checkbox-background)" : "transparent"}"
-                      stroke="var(--vscode-checkbox-border)" stroke-width="1" rx="2"/>
-                ${isVisible ? `<text x="${checkboxX + checkboxSize / 2}" y="${checkboxY + checkboxSize - 2}" text-anchor="middle" fill="var(--vscode-checkbox-foreground)" font-size="10" font-weight="bold">✓</text>` : ""}
-              </g>
-              <text x="${checkboxX + checkboxSize + 6}" y="${y + barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12" font-weight="bold">
+              <text x="${5 + indent + textOffset}" y="${y + barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12" font-weight="bold">
                 ${escapeHtml(row.label)}
               </text>
             </g>
@@ -1742,6 +1760,35 @@ ${style.tip}
       border-radius: 4px;
       height: calc(100vh - 100px);
     }
+    .gantt-checkbox-column {
+      flex-shrink: 0;
+      width: ${checkboxColumnWidth}px;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--vscode-panel-border);
+    }
+    .gantt-checkbox-header {
+      height: ${headerHeight}px;
+      flex-shrink: 0;
+      background: var(--vscode-editor-background);
+      border-bottom: 1px solid var(--vscode-panel-border);
+      box-sizing: border-box;
+    }
+    .gantt-checkboxes {
+      flex-grow: 1;
+      background: var(--vscode-editor-background);
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    .gantt-checkboxes::-webkit-scrollbar {
+      width: 0;
+    }
+    .gantt-checkboxes svg {
+      display: block;
+    }
+    .project-checkbox:hover rect {
+      stroke: var(--vscode-focusBorder);
+    }
     .gantt-left {
       flex-shrink: 0;
       width: ${labelWidth}px;
@@ -2007,6 +2054,14 @@ ${style.tip}
     </div>
   </div>
   <div class="gantt-container">
+    <div class="gantt-checkbox-column" id="ganttCheckboxColumn">
+      <div class="gantt-checkbox-header"></div>
+      <div class="gantt-checkboxes" id="ganttCheckboxes">
+        <svg width="${checkboxColumnWidth}" height="${bodyHeight}">
+          ${checkboxes}
+        </svg>
+      </div>
+    </div>
     <div class="gantt-left" id="ganttLeft">
       <div class="gantt-left-header">
         <button id="expandAllBtn" title="Expand all">▼</button>
@@ -2087,6 +2142,7 @@ ${style.tip}
 
     // Get DOM elements
     const ganttLeft = document.getElementById('ganttLeft');
+    const checkboxColumn = document.getElementById('ganttCheckboxes');
     const labelsColumn = document.getElementById('ganttLabels');
     const timelineColumn = document.getElementById('ganttTimeline');
     const timelineHeader = document.getElementById('ganttTimelineHeader');
@@ -2239,7 +2295,7 @@ ${style.tip}
     }
 
     // Synchronize scrolling:
-    // - Vertical: labels <-> timeline body
+    // - Vertical: checkboxes <-> labels <-> timeline body
     // - Horizontal: timeline header <-> timeline body
     let scrollSyncing = false;
     let scrollReportTimeout = null;
@@ -2247,8 +2303,9 @@ ${style.tip}
       timelineColumn.addEventListener('scroll', () => {
         if (scrollSyncing) return;
         scrollSyncing = true;
-        // Sync vertical with labels
+        // Sync vertical with labels and checkboxes
         labelsColumn.scrollTop = timelineColumn.scrollTop;
+        if (checkboxColumn) checkboxColumn.scrollTop = timelineColumn.scrollTop;
         // Sync horizontal with header
         timelineHeader.scrollLeft = timelineColumn.scrollLeft;
         // Update minimap viewport
@@ -2271,8 +2328,18 @@ ${style.tip}
         if (scrollSyncing) return;
         scrollSyncing = true;
         timelineColumn.scrollTop = labelsColumn.scrollTop;
+        if (checkboxColumn) checkboxColumn.scrollTop = labelsColumn.scrollTop;
         requestAnimationFrame(() => { scrollSyncing = false; });
       });
+      if (checkboxColumn) {
+        checkboxColumn.addEventListener('scroll', () => {
+          if (scrollSyncing) return;
+          scrollSyncing = true;
+          timelineColumn.scrollTop = checkboxColumn.scrollTop;
+          labelsColumn.scrollTop = checkboxColumn.scrollTop;
+          requestAnimationFrame(() => { scrollSyncing = false; });
+        });
+      }
     }
 
     // Initial button state
@@ -3566,8 +3633,11 @@ ${style.tip}
 </html>`;
   }
 
-  private _getEmptyHtml(): string {
+  private _getEmptyHtml(allProjectsHidden = false): string {
     const nonce = getNonce();
+    const message = allProjectsHidden
+      ? "All projects are hidden. Use the checkboxes to show projects."
+      : "No issues with dates to display. Add start_date or due_date to your issues.";
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3584,7 +3654,7 @@ ${style.tip}
 </head>
 <body>
   <h2>Timeline</h2>
-  <p>No issues with dates to display. Add start_date or due_date to your issues.</p>
+  <p>${message}</p>
 </body>
 </html>`;
   }
