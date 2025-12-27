@@ -14,10 +14,16 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 - **Gantt drag bar to move** - drag bar body to shift both start/due dates together
 - **Gantt %done display** - shows done percentage on non-closed issue bars
 - **Gantt overdue indicator** - red outline/glow on overdue issues (past due, not closed, <100%)
+- **Gantt keyboard navigation** - Home/End keys, visible active state, auto-scroll to focused item
 
 ### Changed
 
 - **Renamed "Personal Tasks" to "Kanban"** - clearer purpose; reflects kanban-style workflow
+- **Gantt minimap styling** - subtle shaded viewport like VS Code minimap; drag without jumping
+
+### Fixed
+
+- **Gantt zebra stripe alignment** - fixed 1px misalignment between left column and timeline
 
 ### Security
 
