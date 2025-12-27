@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { Issue } from "../redmine/models/issue";
+import { Issue, IssueRelation } from "../redmine/models/issue";
 import { RedmineServer } from "../redmine/redmine-server";
 import { RedmineProject } from "../redmine/redmine-project";
 import { FlexibilityScore, WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "../utilities/flexibility-calculator";
@@ -464,6 +464,46 @@ export class GanttPanel {
   }
 
   /**
+   * Add a relation to local issue data without full refresh
+   */
+  private _addRelationLocally(
+    issueId: number,
+    targetIssueId: number,
+    relationType: string,
+    relationId: number
+  ): void {
+    const issue = this._issues.find((i) => i.id === issueId);
+    if (issue) {
+      if (!issue.relations) {
+        issue.relations = [];
+      }
+      issue.relations.push({
+        id: relationId,
+        issue_id: issueId,
+        issue_to_id: targetIssueId,
+        relation_type: relationType as IssueRelation["relation_type"],
+      });
+      this._updateContent();
+    }
+  }
+
+  /**
+   * Remove a relation from local issue data without full refresh
+   */
+  private _removeRelationLocally(relationId: number): void {
+    for (const issue of this._issues) {
+      if (issue.relations) {
+        const idx = issue.relations.findIndex((r) => r.id === relationId);
+        if (idx !== -1) {
+          issue.relations.splice(idx, 1);
+          this._updateContent();
+          return;
+        }
+      }
+    }
+  }
+
+  /**
    * Scroll to and highlight a specific issue in the Gantt chart
    */
   public scrollToIssue(issueId: number): void {
@@ -728,7 +768,7 @@ export class GanttPanel {
 
       showStatusBarMessage(`$(check) ${labels[relationType]} relation created`, 2000);
 
-      // Send undo action to webview before refreshing
+      // Send undo action to webview
       this._panel.webview.postMessage({
         command: "pushUndoAction",
         action: {
@@ -742,8 +782,8 @@ export class GanttPanel {
         },
       });
 
-      // Refresh data without resetting view
-      vscode.commands.executeCommand("redmine.refreshGanttData");
+      // Update local data and re-render (no full refresh)
+      this._addRelationLocally(issueId, targetIssueId, relationType, relationId);
     } catch (error) {
       const msg = errorToString(error);
       // Map Redmine validation errors to user-friendly messages
@@ -778,6 +818,7 @@ export class GanttPanel {
       if (message.operation === "delete" && message.relationId) {
         // Undo create = delete the relation
         await this._server.deleteRelation(message.relationId);
+        this._removeRelationLocally(message.relationId);
         showStatusBarMessage("$(check) Relation undone", 2000);
       } else if (message.operation === "create" && message.issueId && message.targetIssueId && message.relationType) {
         // Undo delete = recreate the relation
@@ -792,10 +833,9 @@ export class GanttPanel {
           stack: "redo",
           newRelationId: response.relation.id,
         });
+        this._addRelationLocally(message.issueId, message.targetIssueId, message.relationType, response.relation.id);
         showStatusBarMessage("$(check) Relation restored", 2000);
       }
-      // Refresh to show updated state
-      vscode.commands.executeCommand("redmine.refreshGanttData");
     } catch (error) {
       vscode.window.showErrorMessage(
         `Failed to undo relation: ${errorToString(error)}`
@@ -826,14 +866,14 @@ export class GanttPanel {
           stack: "undo",
           newRelationId: response.relation.id,
         });
+        this._addRelationLocally(message.issueId, message.targetIssueId, message.relationType, response.relation.id);
         showStatusBarMessage("$(check) Relation recreated", 2000);
       } else if (message.operation === "delete" && message.relationId) {
         // Redo delete = delete the relation again
         await this._server.deleteRelation(message.relationId);
+        this._removeRelationLocally(message.relationId);
         showStatusBarMessage("$(check) Relation deleted", 2000);
       }
-      // Refresh to show updated state
-      vscode.commands.executeCommand("redmine.refreshGanttData");
     } catch (error) {
       vscode.window.showErrorMessage(
         `Failed to redo relation: ${errorToString(error)}`
@@ -1625,8 +1665,9 @@ ${style.tip}
             </pattern>
           </defs>
           ${dateMarkers.body}
-          ${bars}
+          <!-- Arrows below bars so link-handles remain clickable -->
           <g class="dependency-layer" style="${this._showDependencies ? "" : "display: none;"}">${dependencyArrows}</g>
+          ${bars}
         </svg>
       </div>
     </div>
