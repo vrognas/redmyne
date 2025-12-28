@@ -322,8 +322,16 @@ function getHeatmapColor(utilization: number): string {
  * Gantt timeline webview panel
  * Shows issues as horizontal bars on a timeline
  */
+const HIDDEN_PROJECTS_KEY = "redmine.gantt.hiddenProjects";
+
 export class GanttPanel {
   public static currentPanel: GanttPanel | undefined;
+  private static _globalState: vscode.Memento | undefined;
+
+  /** Initialize GanttPanel with globalState for persistence */
+  public static initialize(globalState: vscode.Memento): void {
+    GanttPanel._globalState = globalState;
+  }
 
   private readonly _panel: vscode.WebviewPanel;
   private _disposables: vscode.Disposable[] = [];
@@ -339,7 +347,7 @@ export class GanttPanel {
   private _scrollPosition: { left: number; top: number } = { left: 0, top: 0 };
   private _extendedRelationTypes: boolean = false;
   private _closedStatusIds: Set<number> = new Set();
-  private _hiddenProjects: Set<number> = new Set(); // Projects hidden from view
+  private _hiddenProjects: Set<number> = new Set(); // Projects hidden from view (persisted)
   private _collapseDebounceTimer?: ReturnType<typeof setTimeout>;
   private _cachedHierarchy?: HierarchyNode[];
   private _skipCollapseRerender = false; // Skip re-render when collapse is from client-side
@@ -353,6 +361,12 @@ export class GanttPanel {
       null,
       this._disposables
     );
+
+    // Restore hidden projects from globalState
+    if (GanttPanel._globalState) {
+      const saved = GanttPanel._globalState.get<number[]>(HIDDEN_PROJECTS_KEY, []);
+      this._hiddenProjects = new Set(saved);
+    }
 
     // Listen for collapse state changes from other views (Issues pane)
     // Debounced to prevent rapid re-renders during fast expand/collapse
@@ -836,6 +850,8 @@ export class GanttPanel {
           } else {
             this._hiddenProjects.add(projectId);
           }
+          // Persist hidden projects to globalState
+          GanttPanel._globalState?.update(HIDDEN_PROJECTS_KEY, [...this._hiddenProjects]);
           this._updateContent();
         }
         break;

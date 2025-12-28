@@ -106,6 +106,9 @@ export function activate(context: vscode.ExtensionContext): void {
   cleanupResources.projectsTree = projectsTree;
   cleanupResources.myTimeEntriesTree = myTimeEntriesTree;
 
+  // Initialize GanttPanel with globalState for persistence
+  GanttPanel.initialize(context.globalState);
+
   cleanupResources.projectsTreeView = vscode.window.createTreeView("redmine-explorer-projects", {
     treeDataProvider: projectsTree,
   });
