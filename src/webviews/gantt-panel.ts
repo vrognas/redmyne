@@ -355,6 +355,7 @@ export class GanttPanel {
   private _debouncedCollapseUpdate: DebouncedFunction<() => void>;
   private _cachedHierarchy?: HierarchyNode[];
   private _skipCollapseRerender = false; // Skip re-render when collapse is from client-side
+  private _renderKey = 0; // Incremented on each render to force SVG re-creation
 
   private constructor(panel: vscode.WebviewPanel, server?: RedmineServer) {
     this._panel = panel;
@@ -376,13 +377,14 @@ export class GanttPanel {
     this._debouncedCollapseUpdate = debounce(COLLAPSE_DEBOUNCE_MS, () => this._updateContent());
 
     // Listen for collapse state changes from other views (Issues pane)
-    // Skip re-render if triggered by our own client-side collapse
+    // Skip re-render if triggered by our own collapse (we update directly)
     this._disposables.push(
       collapseState.onDidChange(() => {
         if (this._skipCollapseRerender) {
           this._skipCollapseRerender = false;
           return;
         }
+        // Debounced update for external changes (e.g., from Issues pane)
         this._debouncedCollapseUpdate();
       })
     );
@@ -735,6 +737,7 @@ export class GanttPanel {
   }
 
   private _updateContent(): void {
+    this._renderKey++; // Force SVG re-creation on each render
     this._panel.webview.html = this._getHtmlContent();
   }
 
@@ -819,6 +822,8 @@ export class GanttPanel {
       case "toggleCollapse":
         if (message.collapseKey) {
           const key = message.collapseKey as string;
+          // Skip the debounced update from onDidChange - we'll update directly
+          this._skipCollapseRerender = true;
           // Use shared collapse state (syncs with Issues pane)
           // action: 'collapse' = only collapse, 'expand' = only expand, undefined = toggle
           if (message.action === "collapse") {
@@ -828,14 +833,19 @@ export class GanttPanel {
           } else {
             collapseState.toggle(key);
           }
-          // Note: _updateContent() called via collapseState.onDidChange listener
+          // Immediate update to ensure zebra stripes align with new visible rows
+          this._updateContent();
         }
         break;
       case "expandAll":
+        this._skipCollapseRerender = true;
         collapseState.expandAll(message.keys);
+        this._updateContent();
         break;
       case "collapseAll":
+        this._skipCollapseRerender = true;
         collapseState.collapseAll();
+        this._updateContent();
         break;
       case "collapseStateSync":
         // Client-side collapse already done, just sync state for persistence
@@ -1980,8 +1990,6 @@ ${style.tip}
       display: none; /* Hidden - minimap provides navigation */
     }
     svg { display: block; }
-    .row-collapsed { display: none; }
-    .gantt-row[data-collapsed="true"] { display: none; }
     .issue-bar:hover .bar-main, .issue-bar:hover .bar-outline, .issue-label:hover { opacity: 1; }
     .issue-bar:hover .bar-intensity rect { filter: brightness(1.1); }
     .issue-bar.bar-past { filter: saturate(0.4) opacity(0.7); }
@@ -2214,22 +2222,22 @@ ${style.tip}
       </div>
     </div>
     <div class="gantt-body-wrapper" id="ganttBodyWrapper">
-      <div class="gantt-body-scroll" id="ganttBodyScroll">
+      <div class="gantt-body-scroll" id="ganttBodyScroll" data-render-key="${this._renderKey}">
         <div class="gantt-checkboxes" id="ganttCheckboxes">
-          <svg width="${checkboxColumnWidth}" height="${bodyHeight}">
+          <svg width="${checkboxColumnWidth}" height="${bodyHeight}" data-render-key="${this._renderKey}">
             ${checkboxZebraStripes}
             ${checkboxes}
           </svg>
         </div>
         <div class="gantt-labels" id="ganttLabels">
-          <svg width="${labelWidth}" height="${bodyHeight}">
+          <svg width="${labelWidth}" height="${bodyHeight}" data-render-key="${this._renderKey}">
             ${zebraStripes}
             ${labels}
           </svg>
         </div>
         <div class="gantt-resize-handle" id="resizeHandle"></div>
         <div class="gantt-timeline" id="ganttTimeline">
-        <svg width="${timelineWidth + 50}" height="${bodyHeight}">
+        <svg width="${timelineWidth + 50}" height="${bodyHeight}" data-render-key="${this._renderKey}">
           <defs>
             <pattern id="past-stripes" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
               <line x1="0" y1="0" x2="0" y2="6" stroke="var(--vscode-charts-red)" stroke-width="2" stroke-opacity="0.4"/>
