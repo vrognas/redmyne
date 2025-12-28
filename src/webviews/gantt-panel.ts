@@ -2093,6 +2093,30 @@ ${style.tip}
     }
     /* Utility classes for CSP compliance */
     .hidden { display: none; }
+    /* Loading overlay */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--vscode-editor-background);
+      opacity: 0.8;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    .loading-overlay.visible { display: flex; }
+    .loading-spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--vscode-foreground);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .cursor-pointer { cursor: pointer; }
     .cursor-ew-resize { cursor: ew-resize; }
     .cursor-crosshair { cursor: crosshair; }
@@ -2155,6 +2179,7 @@ ${style.tip}
   </style>
 </head>
 <body>
+  <div id="loadingOverlay" class="loading-overlay"><div class="loading-spinner"></div></div>
   <div id="liveRegion" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
   <div class="gantt-header">
     <h2>Timeline</h2>
@@ -2819,6 +2844,7 @@ ${style.tip}
 
     // Refresh button handler
     document.getElementById('refreshBtn').addEventListener('click', () => {
+      document.getElementById('loadingOverlay').classList.add('visible');
       vscode.postMessage({ command: 'refresh' });
     });
 
