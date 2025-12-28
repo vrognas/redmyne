@@ -1233,6 +1233,14 @@ export class GanttPanel {
     const checkboxSize = 14;
     const projectRows = allRows.filter(r => r.type === "project");
     const checkboxHeight = projectRows.length * (barHeight + barGap);
+    // Zebra stripes for checkbox column (matches its own row spacing)
+    const checkboxZebraStripes = projectRows
+      .map((_, idx) => {
+        if (idx % 2 === 0) return "";
+        const y = idx * (barHeight + barGap);
+        return `<rect class="zebra-stripe" x="0" y="${y}" width="100%" height="${barHeight + barGap}" />`;
+      })
+      .join("");
     const checkboxes = projectRows
       .map((row, index) => {
         const y = index * (barHeight + barGap);
@@ -2140,6 +2148,7 @@ ${style.tip}
       <div class="gantt-checkbox-header"></div>
       <div class="gantt-checkboxes" id="ganttCheckboxes">
         <svg width="${checkboxColumnWidth}" height="${checkboxHeight}">
+          ${checkboxZebraStripes}
           ${checkboxes}
         </svg>
       </div>
@@ -2254,10 +2263,13 @@ ${style.tip}
     }
 
     // Update minimap viewport on scroll
+    // Use timelineWidth (content width) not scrollWidth (includes padding)
     function updateMinimapViewport() {
       if (!timelineColumn || !minimapViewport) return;
-      const scrollRatio = timelineColumn.scrollLeft / (timelineColumn.scrollWidth - timelineColumn.clientWidth || 1);
-      const viewportRatio = timelineColumn.clientWidth / timelineColumn.scrollWidth;
+      const contentWidth = timelineWidth; // Bars span from 0 to timelineWidth
+      const scrollableRange = Math.max(1, contentWidth - timelineColumn.clientWidth);
+      const scrollRatio = Math.min(1, timelineColumn.scrollLeft / scrollableRange);
+      const viewportRatio = Math.min(1, timelineColumn.clientWidth / contentWidth);
       const viewportWidth = Math.max(2, viewportRatio * 100);
       const viewportX = scrollRatio * (100 - viewportWidth);
       minimapViewport.setAttribute('x', viewportX.toString());
@@ -2283,9 +2295,10 @@ ${style.tip}
         targetX -= viewportWidthPx / 2;
       }
 
-      const clickRatio = targetX / (rect.width - viewportWidthPx);
-      const maxScroll = timelineColumn.scrollWidth - timelineColumn.clientWidth;
-      timelineColumn.scrollLeft = Math.max(0, Math.min(maxScroll, clickRatio * maxScroll));
+      // Use timelineWidth for content-based scroll calculation
+      const clickRatio = Math.max(0, Math.min(1, targetX / (rect.width - viewportWidthPx)));
+      const scrollableRange = Math.max(0, timelineWidth - timelineColumn.clientWidth);
+      timelineColumn.scrollLeft = clickRatio * scrollableRange;
     }
 
     if (minimapSvg && minimapViewport) {
