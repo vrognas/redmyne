@@ -16,7 +16,8 @@ import { BaseTreeProvider } from "../shared/base-tree-provider";
 import {
   LoadingPlaceholder,
   isLoadingPlaceholder,
-  createLoadingTreeItem,
+  createSkeletonPlaceholders,
+  createSkeletonTreeItem,
 } from "../shared/loading-placeholder";
 
 export enum ProjectsViewStyle {
@@ -104,7 +105,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
 
   getTreeItem(item: TreeItem): vscode.TreeItem | Thenable<vscode.TreeItem> {
     if (isLoadingPlaceholder(item)) {
-      return createLoadingTreeItem(item.message);
+      return createSkeletonTreeItem(item);
     }
 
     if (isProjectNode(item)) {
@@ -220,7 +221,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
 
       // Fetch all open issues for project (only when not filtering by assignee)
       if (this.loadingIssuesForProject.has(project.id)) {
-        return [{ isLoadingPlaceholder: true, message: "Loading issues..." }];
+        return createSkeletonPlaceholders(3);
       }
 
       this.loadingIssuesForProject.add(project.id);
@@ -241,7 +242,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
 
     // Root level - fetch projects and assigned issues
     if (this.isLoadingProjects) {
-      return [{ isLoadingPlaceholder: true, message: "Loading projects..." }];
+      return createSkeletonPlaceholders(5);
     }
 
     if (!this.projects) {

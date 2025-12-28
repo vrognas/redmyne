@@ -11,7 +11,7 @@ import {
 import { groupBy } from "../utilities/collection-utils";
 import { sortIssuesByRisk } from "../utilities/issue-sorting";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
-import { LoadingPlaceholder, isLoadingPlaceholder, createLoadingTreeItem } from "../shared/loading-placeholder";
+import { LoadingPlaceholder, isLoadingPlaceholder, createSkeletonPlaceholders, createSkeletonTreeItem } from "../shared/loading-placeholder";
 
 /**
  * Container for unassigned parent issues (parent not in assigned list)
@@ -63,7 +63,7 @@ export class MyIssuesTree extends BaseTreeProvider<TreeItem> {
 
   getTreeItem(item: TreeItem): vscode.TreeItem | Thenable<vscode.TreeItem> {
     if (isLoadingPlaceholder(item)) {
-      return createLoadingTreeItem("Loading issues...");
+      return createSkeletonTreeItem(item);
     }
 
     if (isParentContainer(item)) {
@@ -136,7 +136,7 @@ export class MyIssuesTree extends BaseTreeProvider<TreeItem> {
 
     // Top-level: fetch and build hierarchy
     if (this.isLoading) {
-      return [{ isLoadingPlaceholder: true }];
+      return createSkeletonPlaceholders(5);
     }
 
     this.isLoading = true;
