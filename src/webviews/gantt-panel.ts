@@ -852,15 +852,20 @@ export class GanttPanel {
       case "toggleProjectVisibility":
         if (message.projectId !== undefined) {
           const projectId = message.projectId as number;
-          if (this._hiddenProjects.has(projectId)) {
+          const wasHidden = this._hiddenProjects.has(projectId);
+          if (wasHidden) {
             this._hiddenProjects.delete(projectId);
           } else {
             this._hiddenProjects.add(projectId);
           }
           // Persist hidden projects to globalState
           GanttPanel._globalState?.update(HIDDEN_PROJECTS_KEY, [...this._hiddenProjects]);
-          // Defer re-render to avoid blocking UI
-          setImmediate(() => this._updateContent());
+          // Send visibility update to webview (no full re-render)
+          this._panel.webview.postMessage({
+            command: "updateProjectVisibility",
+            projectId,
+            hidden: !wasHidden,
+          });
         }
         break;
       case "scrollPosition":
@@ -1150,22 +1155,16 @@ export class GanttPanel {
   private _getHtmlContent(): string {
     const nonce = getNonce();
 
-    // Filter issues by hidden projects for date range calculation
-    const visibleIssues = this._issues.filter(
-      (i) => !this._hiddenProjects.has(i.project.id)
-    );
-    // Set of visible issue IDs for filtering aggregate bars
-    const visibleIssueIds = new Set(visibleIssues.map(i => i.id));
-
-    // Calculate date range from visible issues only
-    const dates = visibleIssues.flatMap((i) =>
+    // Calculate date range from ALL issues (not filtered by hidden projects)
+    // This prevents timeline scale from shifting when toggling project visibility
+    const dates = this._issues.flatMap((i) =>
       [i.start_date, i.due_date].filter(Boolean)
     ) as string[];
 
     if (dates.length === 0) {
-      // Check if all projects are hidden vs no issues at all
-      const allHidden = this._issues.length > 0 && this._hiddenProjects.size > 0;
-      return this._getEmptyHtml(allHidden);
+      // No issues with dates - show empty state
+      // Note: "All projects hidden" case no longer reaches here since we use ALL issues for dates
+      return this._getEmptyHtml(false);
     }
 
     const minDate = new Date(
@@ -1231,17 +1230,9 @@ export class GanttPanel {
       return result;
     };
 
-    // Sort: non-hidden trees first, then hidden trees (preserving hierarchy within each)
-    const nonHiddenRows: GanttRow[] = [];
-    const hiddenRows: GanttRow[] = [];
-    for (const row of allRows) {
-      if (isInHiddenTreeCached(row)) {
-        hiddenRows.push(row);
-      } else {
-        nonHiddenRows.push(row);
-      }
-    }
-    const rows = [...nonHiddenRows, ...hiddenRows];
+    // Keep original hierarchy order (no sorting for hidden projects)
+    // Visibility is handled via CSS classes for client-side toggling
+    const rows = allRows;
 
     // Filter visible rows ONCE upfront (avoid multiple .filter() calls)
     const visibleRows = rows.filter(r => r.isVisible);
@@ -1342,25 +1333,22 @@ export class GanttPanel {
       .join("");
 
     // Right bars (scrollable timeline) - only visible rows for performance
-    // Skip bars for rows in hidden project trees (labels still shown)
+    // Hidden project bars get CSS class for client-side visibility toggling
     const bars = visibleRows
       .map((row, idx) => {
         const y = idx * (barHeight + barGap);
+        const isHidden = isInHiddenTreeCached(row);
+        const hiddenClass = isHidden ? " bar-hidden" : "";
 
-        // Skip bars for hidden project trees (labels visible, bars hidden)
-        if (isInHiddenTreeCached(row)) {
-          return "";
-        }
-
-        // Project headers: always show aggregate bars
+        // Project headers: always render aggregate bars (with visibility class)
         if (row.type === "project") {
           if (!row.childDateRanges || row.childDateRanges.length === 0) {
             return "";
           }
 
-          // Render aggregate bars for each child issue date range (only visible issues)
+          // Render aggregate bars for each child issue date range
           const aggregateBars = row.childDateRanges
-            .filter(range => (range.startDate || range.dueDate) && visibleIssueIds.has(range.issueId))
+            .filter(range => range.startDate || range.dueDate)
             .map(range => {
               const startDate = range.startDate ?? range.dueDate!;
               const dueDate = range.dueDate ?? range.startDate!;
@@ -1378,7 +1366,7 @@ export class GanttPanel {
             })
             .join("");
 
-          return `<g class="aggregate-bars gantt-row" data-project-id="${row.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" transform="translate(0, ${y})">${aggregateBars}</g>`;
+          return `<g class="aggregate-bars gantt-row${hiddenClass}" data-project-id="${row.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" transform="translate(0, ${y})">${aggregateBars}</g>`;
         }
 
         const issue = row.issue!;
@@ -1512,7 +1500,8 @@ export class GanttPanel {
           // Parent done_ratio is weighted average of subtasks
           const parentDoneWidth = (doneRatio / 100) * (endX - startX - 8);
           return `
-            <g class="issue-bar parent-bar gantt-row" data-issue-id="${issue.id}"
+            <g class="issue-bar parent-bar gantt-row${hiddenClass}" data-issue-id="${issue.id}"
+               data-project-id="${issue.projectId}"
                data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
                data-start-date="${issue.start_date || ""}"
                data-due-date="${issue.due_date || ""}"
@@ -1541,7 +1530,8 @@ export class GanttPanel {
         }
 
         return `
-          <g class="issue-bar gantt-row${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}" data-issue-id="${issue.id}"
+          <g class="issue-bar gantt-row${hiddenClass}${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}" data-issue-id="${issue.id}"
+             data-project-id="${issue.projectId}"
              data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
              data-start-date="${issue.start_date || ""}"
              data-due-date="${issue.due_date || ""}"
@@ -2010,6 +2000,8 @@ ${style.tip}
     .issue-bar.bar-past:hover { filter: saturate(0.6) opacity(0.85); }
     .issue-bar.bar-overdue .bar-outline { stroke: var(--vscode-charts-red) !important; stroke-width: 2; filter: drop-shadow(0 0 4px var(--vscode-charts-red)); }
     .issue-bar.bar-overdue:hover .bar-outline { stroke-width: 3; filter: drop-shadow(0 0 6px var(--vscode-charts-red)); }
+    /* Hidden project bars (toggled via checkbox) */
+    .bar-hidden { display: none; }
     .critical-path-mode .issue-bar { opacity: 0.3; }
     .critical-path-mode .issue-bar.critical-path { opacity: 1; }
     .critical-path-mode .issue-bar.critical-path .bar-outline { stroke: var(--vscode-charts-orange) !important; stroke-width: 3; filter: drop-shadow(0 0 6px var(--vscode-charts-orange)); }
@@ -2555,6 +2547,47 @@ ${style.tip}
           bar.classList.add('highlighted');
           setTimeout(() => bar.classList.remove('highlighted'), 2000);
         }
+      } else if (message.command === 'updateProjectVisibility') {
+        // Toggle bar visibility without full re-render
+        const projectId = message.projectId;
+        const hidden = message.hidden;
+
+        // Update checkbox visual state
+        const checkbox = document.querySelector('.project-checkbox[data-project-id="' + projectId + '"]');
+        if (checkbox) {
+          checkbox.setAttribute('aria-checked', !hidden);
+          const checkRect = checkbox.querySelector('rect');
+          const checkText = checkbox.querySelector('text');
+          if (checkRect) {
+            checkRect.setAttribute('fill', hidden ? 'transparent' : 'var(--vscode-checkbox-background)');
+          }
+          if (hidden && checkText) {
+            checkText.remove();
+          } else if (!hidden && !checkText && checkRect) {
+            const x = parseFloat(checkRect.getAttribute('x') || '0');
+            const y = parseFloat(checkRect.getAttribute('y') || '0');
+            const size = parseFloat(checkRect.getAttribute('width') || '14');
+            const newCheck = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            newCheck.setAttribute('x', (x + size / 2).toString());
+            newCheck.setAttribute('y', (y + size - 3).toString());
+            newCheck.setAttribute('text-anchor', 'middle');
+            newCheck.setAttribute('fill', 'var(--vscode-checkbox-foreground)');
+            newCheck.setAttribute('font-size', '11');
+            newCheck.setAttribute('font-weight', 'bold');
+            newCheck.textContent = '✓';
+            checkbox.appendChild(newCheck);
+          }
+        }
+
+        // Toggle bar visibility: select bars by project ID directly (O(1) attribute selector)
+        const selector = '.aggregate-bars[data-project-id="' + projectId + '"], .issue-bar[data-project-id="' + projectId + '"]';
+        document.querySelectorAll(selector).forEach(el => {
+          if (hidden) {
+            el.classList.add('bar-hidden');
+          } else {
+            el.classList.remove('bar-hidden');
+          }
+        });
       }
     });
 
