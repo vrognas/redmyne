@@ -374,7 +374,8 @@ export function activate(context: vscode.ExtensionContext): void {
     getMonthlySchedules: () => cleanupResources.monthlySchedules,
     getUserFte: () => cleanupResources.userFte,
   });
-  cleanupResources.workloadStatusBar.update();
+  // Defer initial update to avoid blocking activation
+  setImmediate(() => cleanupResources.workloadStatusBar?.update());
 
   // Update on tree refresh (workload bar + Gantt if open)
   projectsTree.onDidChangeTreeData(() => {

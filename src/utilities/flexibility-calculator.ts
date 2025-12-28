@@ -127,10 +127,13 @@ function calculateFlexibilityPercent(
   return (available / needed - 1) * 100;
 }
 
+// Day index to schedule key mapping (0=Sun, 1=Mon, ..., 6=Sat)
+const DAY_KEYS: (keyof WeeklySchedule)[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
 /**
  * Count working days between two dates (inclusive)
  * Returns negative if end < start (past due)
- * Uses memoization for performance
+ * Uses O(1) week-based math instead of day-by-day iteration
  */
 export function countWorkingDays(
   start: Date,
@@ -152,15 +155,24 @@ export function countWorkingDays(
   const isPastDue = endNorm < startNorm;
   const [from, to] = isPastDue ? [endNorm, startNorm] : [startNorm, endNorm];
 
-  let count = 0;
-  const current = new Date(from);
+  // Calculate total days (inclusive)
+  const totalDays = Math.floor((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
-  while (current <= to) {
-    const dayName = getDayName(current);
-    if (schedule[dayName] > 0) {
+  // Pre-compute working days per week from schedule
+  const workingDaysPerWeek = DAY_KEYS.reduce((sum, day) => sum + (schedule[day] > 0 ? 1 : 0), 0);
+
+  // Full weeks contribute a fixed number of working days
+  const fullWeeks = Math.floor(totalDays / 7);
+  let count = fullWeeks * workingDaysPerWeek;
+
+  // Handle remaining days (0-6)
+  const remainingDays = totalDays % 7;
+  const startDayIndex = from.getDay();
+  for (let i = 0; i < remainingDays; i++) {
+    const dayIndex = (startDayIndex + fullWeeks * 7 + i) % 7;
+    if (schedule[DAY_KEYS[dayIndex]] > 0) {
       count++;
     }
-    current.setDate(current.getDate() + 1);
   }
 
   // Subtract 1 to not count today, then negate if past due
@@ -172,6 +184,7 @@ export function countWorkingDays(
 
 /**
  * Count available working hours between two dates (inclusive)
+ * Uses O(1) week-based math instead of day-by-day iteration
  */
 export function countAvailableHours(
   start: Date,
@@ -184,16 +197,33 @@ export function countAvailableHours(
     return workingDaysCache.get(key)!;
   }
 
-  let hours = 0;
-  const current = new Date(start);
-  current.setHours(0, 0, 0, 0);
-  const endDate = new Date(end);
-  endDate.setHours(0, 0, 0, 0);
+  const startNorm = new Date(start);
+  startNorm.setHours(0, 0, 0, 0);
+  const endNorm = new Date(end);
+  endNorm.setHours(0, 0, 0, 0);
 
-  while (current <= endDate) {
-    const dayName = getDayName(current);
-    hours += schedule[dayName];
-    current.setDate(current.getDate() + 1);
+  // Handle case where end < start (return 0 hours)
+  if (endNorm < startNorm) {
+    workingDaysCache.set(key, 0);
+    return 0;
+  }
+
+  // Calculate total days (inclusive)
+  const totalDays = Math.floor((endNorm.getTime() - startNorm.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+  // Pre-compute hours per week from schedule
+  const hoursPerWeek = DAY_KEYS.reduce((sum, day) => sum + schedule[day], 0);
+
+  // Full weeks contribute a fixed number of hours
+  const fullWeeks = Math.floor(totalDays / 7);
+  let hours = fullWeeks * hoursPerWeek;
+
+  // Handle remaining days (0-6)
+  const remainingDays = totalDays % 7;
+  const startDayIndex = startNorm.getDay();
+  for (let i = 0; i < remainingDays; i++) {
+    const dayIndex = (startDayIndex + fullWeeks * 7 + i) % 7;
+    hours += schedule[DAY_KEYS[dayIndex]];
   }
 
   workingDaysCache.set(key, hours);

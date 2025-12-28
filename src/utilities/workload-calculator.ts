@@ -65,8 +65,13 @@ export function calculateWorkload(
   const buffer = availableThisWeek - remaining;
 
   // Top 3 urgent (open issues with due dates, sorted by days remaining)
-  const topUrgent = issues
+  // Optimization: pre-sort by raw due_date (cheap), then only compute daysLeft for top candidates
+  const withDueDates = issues
     .filter((i) => i.due_date && i.done_ratio !== 100)
+    .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())
+    .slice(0, 6); // Take top 6 candidates (due date order approximates urgency)
+
+  const topUrgent = withDueDates
     .map((i) => ({
       id: i.id,
       subject: i.subject,
