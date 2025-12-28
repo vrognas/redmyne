@@ -1161,12 +1161,24 @@ export class GanttPanel {
   private _getHtmlContent(): string {
     const nonce = getNonce();
 
+    // Today for calculations (start of today UTC)
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
     // Filter issues by visible projects for date range calculation
     const visibleIssues = this._issues.filter(
       (i) => !this._hiddenProjects.has(i.project.id)
     );
 
-    const dates = visibleIssues.flatMap((i) =>
+    // Focus on active work: exclude completed issues with past dates
+    const activeIssues = visibleIssues.filter((i) =>
+      i.done_ratio !== 100 ||
+      (i.due_date && new Date(i.due_date) >= today)
+    );
+
+    // Use active issues for range, fall back to all visible if none active
+    const rangeIssues = activeIssues.length > 0 ? activeIssues : visibleIssues;
+    const dates = rangeIssues.flatMap((i) =>
       [i.start_date, i.due_date].filter(Boolean)
     ) as string[];
 
@@ -1184,12 +1196,8 @@ export class GanttPanel {
     );
 
     // Add padding days (use UTC to avoid timezone issues)
-    minDate.setUTCDate(minDate.getUTCDate() - 7);
+    minDate.setUTCDate(minDate.getUTCDate() - 3);
     maxDate.setUTCDate(maxDate.getUTCDate() + 7);
-
-    // Today for past-bar detection (start of today UTC)
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
 
     const totalDays = Math.ceil(
       (maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)
@@ -2388,12 +2396,15 @@ ${style.tip}
         minimapDragOffset = e.clientX - rect.left - viewportXPx;
       });
 
-      // Clicking outside viewport - jump to position
+      // Clicking outside viewport - jump to position (center viewport on click)
       minimapSvg.addEventListener('mousedown', (e) => {
         if (e.target === minimapViewport) return;
         minimapDragging = true;
-        minimapDragOffset = 0;
-        scrollFromMinimap(e, false);
+        // Set offset to viewport center so dragging maintains centering (like VS Code)
+        const rect = minimapSvg.getBoundingClientRect();
+        const viewportWidth = parseFloat(minimapViewport.getAttribute('width') || '0');
+        minimapDragOffset = (viewportWidth / 100) * rect.width / 2;
+        scrollFromMinimap(e, true);
       });
 
       addDocListener('mousemove', (e) => {
