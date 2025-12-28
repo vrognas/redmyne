@@ -336,6 +336,7 @@ export class GanttPanel {
   private readonly _panel: vscode.WebviewPanel;
   private _disposables: vscode.Disposable[] = [];
   private _issues: Issue[] = [];
+  private _issueById: Map<number, Issue> = new Map(); // O(1) lookup cache
   private _projects: RedmineProject[] = [];
   private _flexibilityCache: Map<number, FlexibilityScore | null> = new Map();
   private _server: RedmineServer | undefined;
@@ -645,6 +646,8 @@ export class GanttPanel {
 
     // Store issues with dates, projects, and flexibilityCache for shared sorting
     this._issues = issues.filter((i) => i.start_date || i.due_date);
+    // Build O(1) lookup map
+    this._issueById = new Map(this._issues.map(i => [i.id, i]));
     this._projects = projects;
     this._flexibilityCache = flexibilityCache;
 
@@ -670,7 +673,7 @@ export class GanttPanel {
    * Update a single issue's done_ratio without full refresh
    */
   public updateIssueDoneRatio(issueId: number, doneRatio: number): void {
-    const issue = this._issues.find((i) => i.id === issueId);
+    const issue = this._issueById.get(issueId);
     if (issue) {
       issue.done_ratio = doneRatio;
       this._updateContent();
@@ -686,7 +689,7 @@ export class GanttPanel {
     relationType: string,
     relationId: number
   ): void {
-    const issue = this._issues.find((i) => i.id === issueId);
+    const issue = this._issueById.get(issueId);
     if (issue) {
       if (!issue.relations) {
         issue.relations = [];
@@ -914,7 +917,7 @@ export class GanttPanel {
     try {
       await this._server.updateIssueDates(issueId, startDate, dueDate);
       // Update local data
-      const issue = this._issues.find((i) => i.id === issueId);
+      const issue = this._issueById.get(issueId);
       if (issue) {
         if (startDate !== null) issue.start_date = startDate;
         if (dueDate !== null) issue.due_date = dueDate;
@@ -1003,8 +1006,8 @@ export class GanttPanel {
 
     try {
       // Capture dates before creation (Redmine may adjust dates for precedes/blocks)
-      const sourceIssue = this._issues.find((i) => i.id === issueId);
-      const targetIssue = this._issues.find((i) => i.id === targetIssueId);
+      const sourceIssue = this._issueById.get(issueId);
+      const targetIssue = this._issueById.get(targetIssueId);
       const datesBefore = {
         source: { start: sourceIssue?.start_date, due: sourceIssue?.due_date },
         target: { start: targetIssue?.start_date, due: targetIssue?.due_date },
@@ -2393,6 +2396,7 @@ ${style.tip}
     // Synchronize scrolling:
     // - Vertical: checkbox, labels, timeline body all sync together
     // - Horizontal: timeline header <-> timeline body
+    // Use synchronous reset for instant scroll sync (RAF caused 16ms lag)
     let scrollSyncing = false;
     let scrollReportTimeout = null;
     if (labelsColumn && timelineColumn && timelineHeader) {
@@ -2417,16 +2421,15 @@ ${style.tip}
             top: timelineColumn.scrollTop
           });
         }, 100);
-        // Delay reset to prevent cascade from synced scroll events
-        requestAnimationFrame(() => { scrollSyncing = false; });
-      });
+        scrollSyncing = false;
+      }, { passive: true });
       labelsColumn.addEventListener('scroll', () => {
         if (scrollSyncing) return;
         scrollSyncing = true;
         timelineColumn.scrollTop = labelsColumn.scrollTop;
         if (checkboxColumn) checkboxColumn.scrollTop = labelsColumn.scrollTop;
-        requestAnimationFrame(() => { scrollSyncing = false; });
-      });
+        scrollSyncing = false;
+      }, { passive: true });
       // Sync from checkbox column scroll as well
       if (checkboxColumn) {
         checkboxColumn.addEventListener('scroll', () => {
@@ -2434,8 +2437,8 @@ ${style.tip}
           scrollSyncing = true;
           timelineColumn.scrollTop = checkboxColumn.scrollTop;
           labelsColumn.scrollTop = checkboxColumn.scrollTop;
-          requestAnimationFrame(() => { scrollSyncing = false; });
-        });
+          scrollSyncing = false;
+        }, { passive: true });
       }
     }
 
