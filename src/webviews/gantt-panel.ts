@@ -1203,20 +1203,44 @@ export class GanttPanel {
     const flatNodes = flattenHierarchyAll(this._cachedHierarchy, collapseState.getExpandedKeys());
     const allRows = flatNodes.map((node) => nodeToGanttRow(node, this._flexibilityCache, this._closedStatusIds));
 
-    // Filter out hidden projects and their issues entirely (project visibility checkbox)
-    // Note: Collapse visibility is handled client-side, project visibility is server-side
+    // Hidden projects: don't filter out, just sort to bottom and hide their bars
+    // This allows users to still see and expand hidden projects, just no timeline bars
     const hiddenProjects = this._hiddenProjects;
-    const rows = allRows.filter(row => {
-      // Hide project rows when deselected via checkbox
-      if (row.type === "project") {
-        return !hiddenProjects.has(row.id);
+
+    // Build lookup for faster ancestor checks
+    const rowByCollapseKey = new Map(allRows.map(r => [r.collapseKey, r]));
+    const hiddenTreeCache = new Map<string, boolean>();
+
+    const isInHiddenTreeCached = (row: GanttRow): boolean => {
+      const cached = hiddenTreeCache.get(row.collapseKey);
+      if (cached !== undefined) return cached;
+
+      let result = false;
+      if (row.type === "project" && hiddenProjects.has(row.id)) {
+        result = true;
+      } else if (row.issue?.projectId && hiddenProjects.has(row.issue.projectId)) {
+        result = true;
+      } else if (row.parentKey) {
+        const parentRow = rowByCollapseKey.get(row.parentKey);
+        if (parentRow) {
+          result = isInHiddenTreeCached(parentRow);
+        }
       }
-      // Hide issues under hidden projects
-      if (row.issue?.projectId) {
-        return !hiddenProjects.has(row.issue.projectId);
+      hiddenTreeCache.set(row.collapseKey, result);
+      return result;
+    };
+
+    // Sort: non-hidden trees first, then hidden trees (preserving hierarchy within each)
+    const nonHiddenRows: GanttRow[] = [];
+    const hiddenRows: GanttRow[] = [];
+    for (const row of allRows) {
+      if (isInHiddenTreeCached(row)) {
+        hiddenRows.push(row);
+      } else {
+        nonHiddenRows.push(row);
       }
-      return true;
-    });
+    }
+    const rows = [...nonHiddenRows, ...hiddenRows];
 
     // Filter visible rows ONCE upfront (avoid multiple .filter() calls)
     const visibleRows = rows.filter(r => r.isVisible);
@@ -1237,9 +1261,9 @@ export class GanttPanel {
       })
       .join("");
 
-    // Checkbox column - shows checkboxes ONLY for visible projects at their row position
+    // Checkbox column - shows checkboxes for ALL visible projects
+    // Checked = bars visible, Unchecked = project moved to bottom, bars hidden
     // Checkboxes align 1:1 with project rows in the labels column
-    // Hidden projects don't get checkboxes (use Refresh to reset all)
     const checkboxColumnWidth = 32;
     const checkboxSize = 14;
 
@@ -1317,9 +1341,15 @@ export class GanttPanel {
       .join("");
 
     // Right bars (scrollable timeline) - only visible rows for performance
+    // Skip bars for rows in hidden project trees (labels still shown)
     const bars = visibleRows
       .map((row, idx) => {
         const y = idx * (barHeight + barGap);
+
+        // Skip bars for hidden project trees (labels visible, bars hidden)
+        if (isInHiddenTreeCached(row)) {
+          return "";
+        }
 
         // Project headers: always show aggregate bars
         if (row.type === "project") {
