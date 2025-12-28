@@ -1146,6 +1146,8 @@ export class GanttPanel {
     const visibleIssues = this._issues.filter(
       (i) => !this._hiddenProjects.has(i.project.id)
     );
+    // Set of visible issue IDs for filtering aggregate bars
+    const visibleIssueIds = new Set(visibleIssues.map(i => i.id));
 
     // Calculate date range from visible issues only
     const dates = visibleIssues.flatMap((i) =>
@@ -1232,27 +1234,26 @@ export class GanttPanel {
     const checkboxColumnWidth = 32;
     const checkboxSize = 14;
     const projectRows = allRows.filter(r => r.type === "project");
-    const checkboxHeight = projectRows.length * (barHeight + barGap);
-    // Zebra stripes for checkbox column (matches its own row spacing)
-    const checkboxZebraStripes = projectRows
-      .map((_, idx) => {
-        if (idx % 2 === 0) return "";
-        const y = idx * (barHeight + barGap);
-        return `<rect class="zebra-stripe" x="0" y="${y}" width="100%" height="${barHeight + barGap}" />`;
-      })
-      .join("");
+    // Zebra stripes for checkbox column - use same pattern as labels/timeline for alignment
+    const checkboxZebraStripes = zebraStripes;
+    // Position checkboxes: visible projects at their row Y, hidden projects at the bottom
+    const hiddenProjectCount = projectRows.filter(r => !rowVisibleIndices.has(r.collapseKey)).length;
+    const checkboxTotalHeight = contentHeight + hiddenProjectCount * (barHeight + barGap);
+    let hiddenIdx = 0;
     const checkboxes = projectRows
-      .map((row, index) => {
-        const y = index * (barHeight + barGap);
-        const isVisible = !this._hiddenProjects.has(row.id);
+      .map((row) => {
+        const isProjectVisible = !this._hiddenProjects.has(row.id);
+        // Get Y from visible row index, or stack hidden projects at bottom
+        const visibleIdx = rowVisibleIndices.get(row.collapseKey);
+        const y = visibleIdx !== undefined ? visibleIdx * (barHeight + barGap) : contentHeight + (hiddenIdx++) * (barHeight + barGap);
         const checkboxX = (checkboxColumnWidth - checkboxSize) / 2;
         const checkboxY = y + (barHeight - checkboxSize) / 2;
         return `
-          <g class="project-checkbox cursor-pointer" data-project-id="${row.id}" role="checkbox" aria-checked="${isVisible}" aria-label="Show/hide ${escapeHtml(row.label)}">
+          <g class="project-checkbox cursor-pointer" data-project-id="${row.id}" role="checkbox" aria-checked="${isProjectVisible}" aria-label="Show/hide ${escapeHtml(row.label)}">
             <rect x="${checkboxX}" y="${checkboxY}" width="${checkboxSize}" height="${checkboxSize}"
-                  fill="${isVisible ? "var(--vscode-checkbox-background)" : "transparent"}"
+                  fill="${isProjectVisible ? "var(--vscode-checkbox-background)" : "transparent"}"
                   stroke="var(--vscode-checkbox-border)" stroke-width="1" rx="2"/>
-            ${isVisible ? `<text x="${checkboxX + checkboxSize / 2}" y="${checkboxY + checkboxSize - 3}" text-anchor="middle" fill="var(--vscode-checkbox-foreground)" font-size="11" font-weight="bold">✓</text>` : ""}
+            ${isProjectVisible ? `<text x="${checkboxX + checkboxSize / 2}" y="${checkboxY + checkboxSize - 3}" text-anchor="middle" fill="var(--vscode-checkbox-foreground)" font-size="11" font-weight="bold">✓</text>` : ""}
             <title>${escapeHtml(row.label)}</title>
           </g>
         `;
@@ -1318,9 +1319,9 @@ export class GanttPanel {
             return "";
           }
 
-          // Render aggregate bars for each child issue date range
+          // Render aggregate bars for each child issue date range (only visible issues)
           const aggregateBars = row.childDateRanges
-            .filter(range => range.startDate || range.dueDate)
+            .filter(range => (range.startDate || range.dueDate) && visibleIssueIds.has(range.issueId))
             .map(range => {
               const startDate = range.startDate ?? range.dueDate!;
               const dueDate = range.dueDate ?? range.startDate!;
@@ -2147,7 +2148,7 @@ ${style.tip}
     <div class="gantt-checkbox-column" id="ganttCheckboxColumn">
       <div class="gantt-checkbox-header"></div>
       <div class="gantt-checkboxes" id="ganttCheckboxes">
-        <svg width="${checkboxColumnWidth}" height="${checkboxHeight}">
+        <svg width="${checkboxColumnWidth}" height="${checkboxTotalHeight}">
           ${checkboxZebraStripes}
           ${checkboxes}
         </svg>
