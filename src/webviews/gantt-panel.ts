@@ -2324,18 +2324,20 @@ ${style.tip}
     const minimapHeight = ${minimapHeight};
     const minimapBarHeight = ${minimapBarHeight};
 
-    // Render minimap bars
+    // Render minimap bars (deferred to avoid blocking initial paint)
     if (minimapSvg) {
-      const barSpacing = minimapHeight / (minimapBarsData.length + 1);
-      minimapBarsData.forEach((bar, i) => {
-        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        rect.setAttribute('class', bar.classes);
-        rect.setAttribute('x', (bar.startPct * 100).toString());
-        rect.setAttribute('y', (barSpacing * (i + 0.5)).toString());
-        rect.setAttribute('width', Math.max(0.5, (bar.endPct - bar.startPct) * 100).toString());
-        rect.setAttribute('height', minimapBarHeight.toString());
-        rect.setAttribute('rx', '1');
-        minimapSvg.insertBefore(rect, minimapViewport);
+      requestAnimationFrame(() => {
+        const barSpacing = minimapHeight / (minimapBarsData.length + 1);
+        minimapBarsData.forEach((bar, i) => {
+          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+          rect.setAttribute('class', bar.classes);
+          rect.setAttribute('x', (bar.startPct * 100).toString());
+          rect.setAttribute('y', (barSpacing * (i + 0.5)).toString());
+          rect.setAttribute('width', Math.max(0.5, (bar.endPct - bar.startPct) * 100).toString());
+          rect.setAttribute('height', minimapBarHeight.toString());
+          rect.setAttribute('rx', '1');
+          minimapSvg.insertBefore(rect, minimapViewport);
+        });
       });
     }
 
@@ -2496,8 +2498,8 @@ ${style.tip}
       }, { passive: true });
     }
 
-    // Initial button state
-    updateUndoRedoButtons();
+    // Initial button state (defer to avoid forced reflow after style writes)
+    requestAnimationFrame(() => updateUndoRedoButtons());
 
     // Handle messages from extension (for state updates without full re-render)
     addWinListener('message', event => {
@@ -2897,52 +2899,64 @@ ${style.tip}
     }
 
     // Build lookup maps for O(1) hover highlight (instead of repeated querySelectorAll)
+    // Deferred to avoid blocking initial render
     const issueBarsByIssueId = new Map();
     const issueLabelsByIssueId = new Map();
     const arrowsByIssueId = new Map(); // arrows connected to an issue
     const projectLabelsByKey = new Map();
     const aggregateBarsByKey = new Map();
+    let mapsReady = false;
 
-    document.querySelectorAll('.issue-bar').forEach(bar => {
-      const id = bar.dataset.issueId;
-      if (id) {
-        if (!issueBarsByIssueId.has(id)) issueBarsByIssueId.set(id, []);
-        issueBarsByIssueId.get(id).push(bar);
-      }
-    });
-    document.querySelectorAll('.issue-label').forEach(label => {
-      const id = label.dataset.issueId;
-      if (id) {
-        if (!issueLabelsByIssueId.has(id)) issueLabelsByIssueId.set(id, []);
-        issueLabelsByIssueId.get(id).push(label);
-      }
-    });
-    document.querySelectorAll('.dependency-arrow').forEach(arrow => {
-      const fromId = arrow.dataset.from;
-      const toId = arrow.dataset.to;
-      if (fromId) {
-        if (!arrowsByIssueId.has(fromId)) arrowsByIssueId.set(fromId, []);
-        arrowsByIssueId.get(fromId).push(arrow);
-      }
-      if (toId) {
-        if (!arrowsByIssueId.has(toId)) arrowsByIssueId.set(toId, []);
-        arrowsByIssueId.get(toId).push(arrow);
-      }
-    });
-    document.querySelectorAll('.project-label').forEach(label => {
-      const key = label.dataset.collapseKey;
-      if (key) {
-        if (!projectLabelsByKey.has(key)) projectLabelsByKey.set(key, []);
-        projectLabelsByKey.get(key).push(label);
-      }
-    });
-    document.querySelectorAll('.aggregate-bars').forEach(bars => {
-      const key = bars.dataset.collapseKey;
-      if (key) {
-        if (!aggregateBarsByKey.has(key)) aggregateBarsByKey.set(key, []);
-        aggregateBarsByKey.get(key).push(bars);
-      }
-    });
+    function buildLookupMaps() {
+      document.querySelectorAll('.issue-bar').forEach(bar => {
+        const id = bar.dataset.issueId;
+        if (id) {
+          if (!issueBarsByIssueId.has(id)) issueBarsByIssueId.set(id, []);
+          issueBarsByIssueId.get(id).push(bar);
+        }
+      });
+      document.querySelectorAll('.issue-label').forEach(label => {
+        const id = label.dataset.issueId;
+        if (id) {
+          if (!issueLabelsByIssueId.has(id)) issueLabelsByIssueId.set(id, []);
+          issueLabelsByIssueId.get(id).push(label);
+        }
+      });
+      document.querySelectorAll('.dependency-arrow').forEach(arrow => {
+        const fromId = arrow.dataset.from;
+        const toId = arrow.dataset.to;
+        if (fromId) {
+          if (!arrowsByIssueId.has(fromId)) arrowsByIssueId.set(fromId, []);
+          arrowsByIssueId.get(fromId).push(arrow);
+        }
+        if (toId) {
+          if (!arrowsByIssueId.has(toId)) arrowsByIssueId.set(toId, []);
+          arrowsByIssueId.get(toId).push(arrow);
+        }
+      });
+      document.querySelectorAll('.project-label').forEach(label => {
+        const key = label.dataset.collapseKey;
+        if (key) {
+          if (!projectLabelsByKey.has(key)) projectLabelsByKey.set(key, []);
+          projectLabelsByKey.get(key).push(label);
+        }
+      });
+      document.querySelectorAll('.aggregate-bars').forEach(bars => {
+        const key = bars.dataset.collapseKey;
+        if (key) {
+          if (!aggregateBarsByKey.has(key)) aggregateBarsByKey.set(key, []);
+          aggregateBarsByKey.get(key).push(bars);
+        }
+      });
+      mapsReady = true;
+    }
+
+    // Defer map building to after initial render
+    if (typeof requestIdleCallback !== 'undefined') {
+      requestIdleCallback(() => buildLookupMaps(), { timeout: 100 });
+    } else {
+      setTimeout(buildLookupMaps, 0);
+    }
 
     // Track currently highlighted elements for fast clear
     let highlightedElements = [];
@@ -2955,31 +2969,26 @@ ${style.tip}
 
     function highlightIssue(issueId) {
       document.body.classList.add('hover-focus');
-      // Use cached lookups (O(1) instead of DOM query)
-      (issueBarsByIssueId.get(issueId) || []).forEach(el => {
-        el.classList.add('hover-highlighted');
-        highlightedElements.push(el);
-      });
-      (issueLabelsByIssueId.get(issueId) || []).forEach(el => {
-        el.classList.add('hover-highlighted');
-        highlightedElements.push(el);
-      });
-      (arrowsByIssueId.get(issueId) || []).forEach(el => {
-        el.classList.add('hover-highlighted');
-        highlightedElements.push(el);
-      });
+      // Use cached lookups if ready, otherwise fall back to DOM query
+      const bars = mapsReady ? (issueBarsByIssueId.get(issueId) || [])
+        : document.querySelectorAll('.issue-bar[data-issue-id="' + issueId + '"]');
+      const labels = mapsReady ? (issueLabelsByIssueId.get(issueId) || [])
+        : document.querySelectorAll('.issue-label[data-issue-id="' + issueId + '"]');
+      const arrows = mapsReady ? (arrowsByIssueId.get(issueId) || [])
+        : document.querySelectorAll('.dependency-arrow[data-from="' + issueId + '"], .dependency-arrow[data-to="' + issueId + '"]');
+      bars.forEach(el => { el.classList.add('hover-highlighted'); highlightedElements.push(el); });
+      labels.forEach(el => { el.classList.add('hover-highlighted'); highlightedElements.push(el); });
+      arrows.forEach(el => { el.classList.add('hover-highlighted'); highlightedElements.push(el); });
     }
 
     function highlightProject(collapseKey) {
       document.body.classList.add('hover-focus');
-      (projectLabelsByKey.get(collapseKey) || []).forEach(el => {
-        el.classList.add('hover-highlighted');
-        highlightedElements.push(el);
-      });
-      (aggregateBarsByKey.get(collapseKey) || []).forEach(el => {
-        el.classList.add('hover-highlighted');
-        highlightedElements.push(el);
-      });
+      const labels = mapsReady ? (projectLabelsByKey.get(collapseKey) || [])
+        : document.querySelectorAll('.project-label[data-collapse-key="' + collapseKey + '"]');
+      const bars = mapsReady ? (aggregateBarsByKey.get(collapseKey) || [])
+        : document.querySelectorAll('.aggregate-bars[data-collapse-key="' + collapseKey + '"]');
+      labels.forEach(el => { el.classList.add('hover-highlighted'); highlightedElements.push(el); });
+      bars.forEach(el => { el.classList.add('hover-highlighted'); highlightedElements.push(el); });
     }
 
     // Use event delegation for hover events (single listener instead of N listeners)
@@ -3860,30 +3869,33 @@ ${style.tip}
     }
 
     // Restore scroll position or scroll to today on initial load
-    if (savedCenterDateMs !== null && timelineColumn) {
-      // Zoom change: restore by centering on saved date
-      scrollToCenterDate(savedCenterDateMs);
-      if (hScroll) hScroll.scrollLeft = timelineColumn.scrollLeft;
-      if (savedScrollTop !== null && bodyScroll) {
-        bodyScroll.scrollTop = savedScrollTop;
+    // Defer to next frame to avoid blocking initial paint and batch layout reads
+    requestAnimationFrame(() => {
+      if (savedCenterDateMs !== null && timelineColumn) {
+        // Zoom change: restore by centering on saved date
+        scrollToCenterDate(savedCenterDateMs);
+        if (hScroll) hScroll.scrollLeft = timelineColumn.scrollLeft;
+        if (savedScrollTop !== null && bodyScroll) {
+          bodyScroll.scrollTop = savedScrollTop;
+        }
+        savedCenterDateMs = null;
+        savedScrollTop = null;
+      } else if (savedScrollLeft !== null && timelineColumn) {
+        // Other operations: restore pixel position
+        timelineColumn.scrollLeft = savedScrollLeft;
+        if (hScroll) hScroll.scrollLeft = savedScrollLeft;
+        if (savedScrollTop !== null && bodyScroll) {
+          bodyScroll.scrollTop = savedScrollTop;
+        }
+        savedScrollLeft = null;
+        savedScrollTop = null;
+      } else {
+        scrollToToday();
+        if (hScroll) hScroll.scrollLeft = timelineColumn?.scrollLeft ?? 0;
       }
-      savedCenterDateMs = null;
-      savedScrollTop = null;
-    } else if (savedScrollLeft !== null && timelineColumn) {
-      // Other operations: restore pixel position
-      timelineColumn.scrollLeft = savedScrollLeft;
-      if (hScroll) hScroll.scrollLeft = savedScrollLeft;
-      if (savedScrollTop !== null && bodyScroll) {
-        bodyScroll.scrollTop = savedScrollTop;
-      }
-      savedScrollLeft = null;
-      savedScrollTop = null;
-    } else {
-      scrollToToday();
-      if (hScroll) hScroll.scrollLeft = timelineColumn?.scrollLeft ?? 0;
-    }
-    // Initialize minimap viewport
-    updateMinimapViewport();
+      // Initialize minimap viewport (batched with scroll restoration)
+      updateMinimapViewport();
+    });
 
     // Today button handler
     document.getElementById('todayBtn').addEventListener('click', scrollToToday);
