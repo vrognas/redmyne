@@ -1241,7 +1241,6 @@ export class GanttPanel {
     const checkboxZebraStripes = zebraStripes;
     // Position checkboxes: visible projects at their row Y, hidden projects at the bottom
     const hiddenProjectCount = projectRows.filter(r => !rowVisibleIndices.has(r.collapseKey)).length;
-    const checkboxTotalHeight = contentHeight + hiddenProjectCount * (barHeight + barGap);
     let hiddenIdx = 0;
     const checkboxes = projectRows
       .map((row) => {
@@ -1744,7 +1743,8 @@ ${style.tip}
         (maxDate.getTime() - minDate.getTime())) *
       timelineWidth;
 
-    const bodyHeight = contentHeight;
+    // Include space for hidden project checkboxes at the bottom
+    const bodyHeight = contentHeight + hiddenProjectCount * (barHeight + barGap);
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -1844,73 +1844,80 @@ ${style.tip}
     }
     .gantt-container {
       display: flex;
+      flex-direction: column;
       overflow: hidden;
       border: 1px solid var(--vscode-panel-border);
       border-radius: 4px;
       height: calc(100vh - 100px);
     }
-    .gantt-checkbox-column {
-      flex-shrink: 0;
-      flex-grow: 0;
-      width: ${checkboxColumnWidth}px;
-      min-width: ${checkboxColumnWidth}px;
-      max-width: ${checkboxColumnWidth}px;
+    .gantt-header-row {
       display: flex;
-      flex-direction: column;
-      border-right: 1px solid var(--vscode-panel-border);
+      flex-shrink: 0;
+      height: ${headerHeight}px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      background: var(--vscode-editor-background);
     }
     .gantt-checkbox-header {
-      height: ${headerHeight}px;
       flex-shrink: 0;
-      background: var(--vscode-editor-background);
-      border-bottom: 1px solid var(--vscode-panel-border);
+      width: ${checkboxColumnWidth}px;
+      border-right: 1px solid var(--vscode-panel-border);
       box-sizing: border-box;
     }
-    .gantt-checkboxes {
-      flex-grow: 1;
-      background: var(--vscode-editor-background);
-      overflow-y: auto;
-      overflow-x: hidden;
-    }
-    .gantt-checkboxes::-webkit-scrollbar {
-      width: 0;
-    }
-    .gantt-checkboxes svg {
-      display: block;
-    }
-    .project-checkbox:hover rect {
-      stroke: var(--vscode-focusBorder);
-    }
-    .gantt-left {
+    .gantt-left-header {
       flex-shrink: 0;
       width: ${labelWidth}px;
       min-width: 150px;
       max-width: 500px;
       display: flex;
-      flex-direction: column;
+      gap: 4px;
+      padding: 4px 8px;
+      box-sizing: border-box;
+      align-items: center;
     }
-    .gantt-left-header { display: flex; gap: 4px; padding: 4px 8px; height: ${headerHeight}px; box-sizing: border-box; align-items: center; border-bottom: 1px solid var(--vscode-panel-border); }
     .gantt-left-header button { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 10px; }
     .gantt-left-header button:hover { background: var(--vscode-button-secondaryHoverBackground); }
-    .gantt-left-header-placeholder {
-      height: ${headerHeight}px;
+    .gantt-resize-handle-header {
+      width: 6px;
+      background: var(--vscode-panel-border);
+      cursor: col-resize;
       flex-shrink: 0;
-      background: var(--vscode-editor-background);
-      border-bottom: 1px solid var(--vscode-panel-border);
     }
-    .gantt-labels {
+    .gantt-timeline-header {
       flex-grow: 1;
-      background: var(--vscode-editor-background);
-      z-index: 1;
+      overflow: hidden;
+    }
+    .gantt-timeline-header::-webkit-scrollbar { display: none; }
+    .gantt-body-wrapper {
+      display: flex;
+      flex-grow: 1;
       overflow-y: auto;
       overflow-x: hidden;
     }
-    .gantt-labels svg {
-      width: 100%;
+    .gantt-body-wrapper::-webkit-scrollbar {
+      width: 8px;
     }
-    .gantt-labels::-webkit-scrollbar {
-      width: 0;
+    .gantt-body-wrapper::-webkit-scrollbar-thumb {
+      background: var(--vscode-scrollbarSlider-background);
+      border-radius: 4px;
     }
+    .gantt-checkboxes {
+      flex-shrink: 0;
+      width: ${checkboxColumnWidth}px;
+      background: var(--vscode-editor-background);
+      border-right: 1px solid var(--vscode-panel-border);
+    }
+    .gantt-checkboxes svg { display: block; }
+    .project-checkbox:hover rect {
+      stroke: var(--vscode-focusBorder);
+    }
+    .gantt-labels {
+      flex-shrink: 0;
+      width: ${labelWidth}px;
+      min-width: 150px;
+      max-width: 500px;
+      background: var(--vscode-editor-background);
+    }
+    .gantt-labels svg { width: 100%; }
     .gantt-resize-handle {
       width: 6px;
       background: var(--vscode-panel-border);
@@ -1921,30 +1928,12 @@ ${style.tip}
     .gantt-resize-handle:hover, .gantt-resize-handle.dragging {
       background: var(--vscode-focusBorder);
     }
-    .gantt-right {
-      flex-grow: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    .gantt-timeline-header {
-      height: ${headerHeight}px;
-      flex-shrink: 0;
-      overflow: hidden;
-      background: var(--vscode-editor-background);
-      border-bottom: 1px solid var(--vscode-panel-border);
-      box-sizing: border-box;
-    }
-    .gantt-timeline-header::-webkit-scrollbar {
-      display: none;
-    }
     .gantt-timeline {
       flex-grow: 1;
       overflow-x: auto;
-      overflow-y: auto;
+      overflow-y: hidden;
     }
     .gantt-timeline::-webkit-scrollbar {
-      width: 8px;
       height: 8px;
     }
     .gantt-timeline::-webkit-scrollbar-thumb {
@@ -2148,19 +2137,25 @@ ${style.tip}
     </div>
   </div>
   <div class="gantt-container">
-    <div class="gantt-checkbox-column" id="ganttCheckboxColumn">
+    <div class="gantt-header-row">
       <div class="gantt-checkbox-header"></div>
-      <div class="gantt-checkboxes" id="ganttCheckboxes">
-        <svg width="${checkboxColumnWidth}" height="${checkboxTotalHeight}">
-          ${checkboxZebraStripes}
-          ${checkboxes}
+      <div class="gantt-left-header" id="ganttLeftHeader">
+        <button id="expandAllBtn" title="Expand all">▼</button>
+        <button id="collapseAllBtn" title="Collapse all">▶</button>
+      </div>
+      <div class="gantt-resize-handle-header"></div>
+      <div class="gantt-timeline-header" id="ganttTimelineHeader">
+        <svg width="${timelineWidth}" height="${headerHeight}">
+          ${dateMarkers.header}
         </svg>
       </div>
     </div>
-    <div class="gantt-left" id="ganttLeft">
-      <div class="gantt-left-header">
-        <button id="expandAllBtn" title="Expand all">▼</button>
-        <button id="collapseAllBtn" title="Collapse all">▶</button>
+    <div class="gantt-body-wrapper" id="ganttBodyWrapper">
+      <div class="gantt-checkboxes" id="ganttCheckboxes">
+        <svg width="${checkboxColumnWidth}" height="${bodyHeight}">
+          ${checkboxZebraStripes}
+          ${checkboxes}
+        </svg>
       </div>
       <div class="gantt-labels" id="ganttLabels">
         <svg width="${labelWidth}" height="${bodyHeight}">
@@ -2168,14 +2163,7 @@ ${style.tip}
           ${labels}
         </svg>
       </div>
-    </div>
-    <div class="gantt-resize-handle" id="resizeHandle"></div>
-    <div class="gantt-right">
-      <div class="gantt-timeline-header" id="ganttTimelineHeader">
-        <svg width="${timelineWidth}" height="${headerHeight}">
-          ${dateMarkers.header}
-        </svg>
-      </div>
+      <div class="gantt-resize-handle" id="resizeHandle"></div>
       <div class="gantt-timeline" id="ganttTimeline">
         <svg width="${timelineWidth + 50}" height="${bodyHeight}">
           <defs>
@@ -2236,8 +2224,8 @@ ${style.tip}
     }
 
     // Get DOM elements
-    const ganttLeft = document.getElementById('ganttLeft');
-    const checkboxColumn = document.getElementById('ganttCheckboxes');
+    const ganttLeftHeader = document.getElementById('ganttLeftHeader');
+    const bodyWrapper = document.getElementById('ganttBodyWrapper');
     const labelsColumn = document.getElementById('ganttLabels');
     const timelineColumn = document.getElementById('ganttTimeline');
     const timelineHeader = document.getElementById('ganttTimelineHeader');
@@ -2363,9 +2351,9 @@ ${style.tip}
       vscode.setState({
         undoStack,
         redoStack,
-        labelWidth: ganttLeft?.offsetWidth || ${labelWidth},
+        labelWidth: labelsColumn?.offsetWidth || ${labelWidth},
         scrollLeft: timelineColumn?.scrollLeft ?? null,
-        scrollTop: timelineColumn?.scrollTop ?? null,
+        scrollTop: bodyWrapper?.scrollTop ?? null,
         centerDateMs: null
       });
     }
@@ -2375,9 +2363,9 @@ ${style.tip}
       vscode.setState({
         undoStack,
         redoStack,
-        labelWidth: ganttLeft?.offsetWidth || ${labelWidth},
+        labelWidth: labelsColumn?.offsetWidth || ${labelWidth},
         scrollLeft: null,
-        scrollTop: timelineColumn?.scrollTop ?? null,
+        scrollTop: bodyWrapper?.scrollTop ?? null,
         centerDateMs: getCenterDateMs()
       });
     }
@@ -2389,27 +2377,18 @@ ${style.tip}
     }
 
     // Apply saved label width
-    if (previousState.labelWidth && ganttLeft) {
-      ganttLeft.style.width = previousState.labelWidth + 'px';
+    if (previousState.labelWidth && ganttLeftHeader && labelsColumn) {
+      ganttLeftHeader.style.width = previousState.labelWidth + 'px';
+      labelsColumn.style.width = previousState.labelWidth + 'px';
     }
 
-    // Synchronize scrolling:
-    // - Vertical: checkbox, labels, timeline body all sync together
-    // - Horizontal: timeline header <-> timeline body
-    // CRITICAL: Only scrollTop/scrollLeft sync happens synchronously
-    // Everything else (minimap, save, report) is deferred to avoid jank
-    let scrollSyncing = false;
+    // Scrolling: Single body wrapper handles vertical scroll (no sync needed!)
+    // Only horizontal scroll needs sync: timeline body → timeline header
     let deferredScrollUpdate = null;
-    if (labelsColumn && timelineColumn && timelineHeader) {
+    if (bodyWrapper && timelineColumn && timelineHeader) {
+      // Horizontal scroll: sync timeline header with timeline body
       timelineColumn.addEventListener('scroll', () => {
-        if (scrollSyncing) return;
-        scrollSyncing = true;
-        // Sync vertical with labels and checkbox column - SYNCHRONOUS
-        labelsColumn.scrollTop = timelineColumn.scrollTop;
-        if (checkboxColumn) checkboxColumn.scrollTop = timelineColumn.scrollTop;
-        // Sync horizontal with header - SYNCHRONOUS
         timelineHeader.scrollLeft = timelineColumn.scrollLeft;
-        scrollSyncing = false;
         // Defer non-critical updates
         cancelAnimationFrame(deferredScrollUpdate);
         deferredScrollUpdate = requestAnimationFrame(() => {
@@ -2417,23 +2396,14 @@ ${style.tip}
           saveState();
         });
       }, { passive: true });
-      labelsColumn.addEventListener('scroll', () => {
-        if (scrollSyncing) return;
-        scrollSyncing = true;
-        timelineColumn.scrollTop = labelsColumn.scrollTop;
-        if (checkboxColumn) checkboxColumn.scrollTop = labelsColumn.scrollTop;
-        scrollSyncing = false;
+      // Vertical scroll: just update minimap and save state
+      bodyWrapper.addEventListener('scroll', () => {
+        cancelAnimationFrame(deferredScrollUpdate);
+        deferredScrollUpdate = requestAnimationFrame(() => {
+          updateMinimapViewport();
+          saveState();
+        });
       }, { passive: true });
-      // Sync from checkbox column scroll as well
-      if (checkboxColumn) {
-        checkboxColumn.addEventListener('scroll', () => {
-          if (scrollSyncing) return;
-          scrollSyncing = true;
-          timelineColumn.scrollTop = checkboxColumn.scrollTop;
-          labelsColumn.scrollTop = checkboxColumn.scrollTop;
-          scrollSyncing = false;
-        }, { passive: true });
-      }
     }
 
     // Initial button state
@@ -3761,20 +3731,16 @@ ${style.tip}
     if (savedCenterDateMs !== null && timelineColumn) {
       // Zoom change: restore by centering on saved date
       scrollToCenterDate(savedCenterDateMs);
-      if (savedScrollTop !== null) {
-        timelineColumn.scrollTop = savedScrollTop;
-        if (labelsColumn) labelsColumn.scrollTop = savedScrollTop;
-        if (checkboxColumn) checkboxColumn.scrollTop = savedScrollTop;
+      if (savedScrollTop !== null && bodyWrapper) {
+        bodyWrapper.scrollTop = savedScrollTop;
       }
       savedCenterDateMs = null;
       savedScrollTop = null;
     } else if (savedScrollLeft !== null && timelineColumn) {
       // Other operations: restore pixel position
       timelineColumn.scrollLeft = savedScrollLeft;
-      if (savedScrollTop !== null) {
-        timelineColumn.scrollTop = savedScrollTop;
-        if (labelsColumn) labelsColumn.scrollTop = savedScrollTop;
-        if (checkboxColumn) checkboxColumn.scrollTop = savedScrollTop;
+      if (savedScrollTop !== null && bodyWrapper) {
+        bodyWrapper.scrollTop = savedScrollTop;
       }
       savedScrollLeft = null;
       savedScrollTop = null;
@@ -3796,7 +3762,7 @@ ${style.tip}
     resizeHandle.addEventListener('mousedown', (e) => {
       isResizing = true;
       resizeStartX = e.clientX;
-      resizeStartWidth = ganttLeft.offsetWidth;
+      resizeStartWidth = labelsColumn.offsetWidth;
       resizeHandle.classList.add('dragging');
       document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
@@ -3816,7 +3782,9 @@ ${style.tip}
         if (!lastResizeEvent) return;
         const delta = lastResizeEvent.clientX - resizeStartX;
         const newWidth = Math.min(500, Math.max(150, resizeStartWidth + delta));
-        ganttLeft.style.width = newWidth + 'px';
+        // Resize both header and body labels columns
+        if (ganttLeftHeader) ganttLeftHeader.style.width = newWidth + 'px';
+        if (labelsColumn) labelsColumn.style.width = newWidth + 'px';
       });
     });
 
