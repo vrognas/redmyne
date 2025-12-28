@@ -859,7 +859,8 @@ export class GanttPanel {
           }
           // Persist hidden projects to globalState
           GanttPanel._globalState?.update(HIDDEN_PROJECTS_KEY, [...this._hiddenProjects]);
-          this._updateContent();
+          // Defer re-render to avoid blocking UI
+          setImmediate(() => this._updateContent());
         }
         break;
       case "scrollPosition":
@@ -1787,7 +1788,7 @@ ${style.tip}
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}' 'unsafe-inline'; script-src 'nonce-${nonce}';">
   <title>Redmine Gantt</title>
   <style nonce="${nonce}">
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -2103,6 +2104,7 @@ ${style.tip}
     .cursor-pointer { cursor: pointer; }
     .cursor-ew-resize { cursor: ew-resize; }
     .cursor-crosshair { cursor: crosshair; }
+    .cursor-col-resize { cursor: col-resize; }
     .cursor-move { cursor: move; }
     .user-select-none { user-select: none; }
     .opacity-02 { opacity: 0.2; }
@@ -2490,15 +2492,15 @@ ${style.tip}
         const heatmapLegend = document.querySelector('.heatmap-legend');
 
         if (message.enabled) {
-          if (heatmapLayer) heatmapLayer.style.display = '';
-          if (weekendLayer) weekendLayer.style.display = 'none';
+          if (heatmapLayer) heatmapLayer.classList.remove('hidden');
+          if (weekendLayer) weekendLayer.classList.add('hidden');
           if (heatmapBtn) heatmapBtn.classList.add('active');
-          if (heatmapLegend) heatmapLegend.style.display = '';
+          if (heatmapLegend) heatmapLegend.classList.remove('hidden');
         } else {
-          if (heatmapLayer) heatmapLayer.style.display = 'none';
-          if (weekendLayer) weekendLayer.style.display = '';
+          if (heatmapLayer) heatmapLayer.classList.add('hidden');
+          if (weekendLayer) weekendLayer.classList.remove('hidden');
           if (heatmapBtn) heatmapBtn.classList.remove('active');
-          if (heatmapLegend) heatmapLegend.style.display = 'none';
+          if (heatmapLegend) heatmapLegend.classList.add('hidden');
         }
       } else if (message.command === 'setDependenciesState') {
         const dependencyLayer = document.querySelector('.dependency-layer');
@@ -2506,13 +2508,13 @@ ${style.tip}
         const relationLegend = document.querySelector('.relation-legend');
 
         if (message.enabled) {
-          if (dependencyLayer) dependencyLayer.style.display = '';
+          if (dependencyLayer) dependencyLayer.classList.remove('hidden');
           if (depsBtn) depsBtn.classList.add('active');
-          if (relationLegend) relationLegend.style.display = '';
+          if (relationLegend) relationLegend.classList.remove('hidden');
         } else {
-          if (dependencyLayer) dependencyLayer.style.display = 'none';
+          if (dependencyLayer) dependencyLayer.classList.add('hidden');
           if (depsBtn) depsBtn.classList.remove('active');
-          if (relationLegend) relationLegend.style.display = 'none';
+          if (relationLegend) relationLegend.classList.add('hidden');
         }
       } else if (message.command === 'pushUndoAction') {
         // Push relation action to undo stack
@@ -3175,7 +3177,7 @@ ${style.tip}
       if (tempArrow) { tempArrow.remove(); tempArrow = null; }
       linkingState = null;
       currentTarget = null;
-      document.body.style.cursor = '';
+      document.body.classList.remove('cursor-crosshair');
     }
 
     function showRelationPicker(x, y, fromId, toId) {
@@ -3306,7 +3308,7 @@ ${style.tip}
         const cy = parseFloat(handle.getAttribute('cy'));
 
         bar.classList.add('linking-source');
-        document.body.style.cursor = 'crosshair';
+        document.body.classList.add('cursor-crosshair');
 
         // Create temp arrow in SVG with arrowhead marker
         const svg = document.querySelector('#ganttTimeline svg');
@@ -3838,8 +3840,7 @@ ${style.tip}
       resizeStartX = e.clientX;
       resizeStartWidth = labelsColumn.offsetWidth;
       resizeHandle.classList.add('dragging');
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
+      document.body.classList.add('cursor-col-resize', 'user-select-none');
       e.preventDefault();
     });
 
@@ -3866,8 +3867,7 @@ ${style.tip}
       if (isResizing) {
         isResizing = false;
         resizeHandle.classList.remove('dragging');
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
+        document.body.classList.remove('cursor-col-resize', 'user-select-none');
         saveState(); // Persist new column width
       }
     });
