@@ -453,14 +453,14 @@ export class GanttPanel {
       };
     });
 
-    const labelsSvg = skeletonRows.map(r => `
-      <g class="skeleton-label" style="animation-delay: ${r.delay}s">
+    const labelsSvg = skeletonRows.map((r, i) => `
+      <g class="skeleton-label delay-${Math.min(i, 7)}">
         <rect x="${5 + r.indent}" y="${r.y + 8}" width="${r.isProject ? 120 : 160}" height="14" rx="3" fill="var(--vscode-panel-border)"/>
       </g>
     `).join("");
 
-    const barsSvg = skeletonRows.map(r => `
-      <g class="skeleton-bar-group" style="animation-delay: ${r.delay}s">
+    const barsSvg = skeletonRows.map((r, i) => `
+      <g class="skeleton-bar-group delay-${Math.min(i, 7)}">
         <rect x="${r.barStart}" y="${r.y + 4}" width="${r.barWidth}" height="${barHeight - 8}" rx="4"
               fill="var(--vscode-panel-border)" class="skeleton-timeline-bar"/>
       </g>
@@ -584,6 +584,15 @@ export class GanttPanel {
     .skeleton-timeline-bar {
       animation: pulse 1.5s ease-in-out infinite;
     }
+    /* Animation delay classes to avoid inline styles (CSP compliance) */
+    .delay-0 { animation-delay: 0s; }
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+    .delay-4 { animation-delay: 0.4s; }
+    .delay-5 { animation-delay: 0.5s; }
+    .delay-6 { animation-delay: 0.6s; }
+    .delay-7 { animation-delay: 0.7s; }
     .minimap-container {
       height: 50px;
       background: var(--vscode-sideBar-background);
@@ -2267,7 +2276,7 @@ ${style.tip}
         </div>
       </div>
       <div class="gantt-hscroll" id="ganttHScroll">
-        <div class="gantt-hscroll-content" style="width: ${timelineWidth + 50}px;"></div>
+        <div class="gantt-hscroll-content" id="ganttHScrollContent"></div>
       </div>
     </div>
   </div>
@@ -2318,10 +2327,16 @@ ${style.tip}
     const timelineColumn = document.getElementById('ganttTimeline');
     const timelineHeader = document.getElementById('ganttTimelineHeader');
     const hScroll = document.getElementById('ganttHScroll');
+    const hScrollContent = document.getElementById('ganttHScrollContent');
     const undoBtn = document.getElementById('undoBtn');
     const redoBtn = document.getElementById('redoBtn');
     const minimapSvg = document.getElementById('minimapSvg');
     const minimapViewport = document.getElementById('minimapViewport');
+
+    // Set hScroll content width via JS (CSP compliance - no inline styles)
+    if (hScrollContent) {
+      hScrollContent.style.width = (timelineWidth + 50) + 'px';
+    }
 
     // Minimap setup
     const minimapBarsData = ${minimapBarsJson};
