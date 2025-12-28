@@ -860,12 +860,8 @@ export class GanttPanel {
           }
           // Persist hidden projects to globalState
           GanttPanel._globalState?.update(HIDDEN_PROJECTS_KEY, [...this._hiddenProjects]);
-          // Send visibility update to webview (no full re-render)
-          this._panel.webview.postMessage({
-            command: "updateProjectVisibility",
-            projectId,
-            hidden: !wasHidden,
-          });
+          // Full re-render to update date range and minimap
+          this._updateContent();
         }
         break;
       case "scrollPosition":
@@ -1155,16 +1151,19 @@ export class GanttPanel {
   private _getHtmlContent(): string {
     const nonce = getNonce();
 
-    // Calculate date range from ALL issues (not filtered by hidden projects)
-    // This prevents timeline scale from shifting when toggling project visibility
-    const dates = this._issues.flatMap((i) =>
+    // Filter issues by visible projects for date range calculation
+    const visibleIssues = this._issues.filter(
+      (i) => !this._hiddenProjects.has(i.project.id)
+    );
+
+    const dates = visibleIssues.flatMap((i) =>
       [i.start_date, i.due_date].filter(Boolean)
     ) as string[];
 
     if (dates.length === 0) {
-      // No issues with dates - show empty state
-      // Note: "All projects hidden" case no longer reaches here since we use ALL issues for dates
-      return this._getEmptyHtml(false);
+      // No visible issues with dates - show empty state
+      const allHidden = this._issues.length > 0 && visibleIssues.length === 0;
+      return this._getEmptyHtml(allHidden);
     }
 
     const minDate = new Date(
@@ -1728,11 +1727,11 @@ ${style.tip}
       .filter(Boolean)
       .join("");
 
-    // Generate minimap bars (simplified representation)
+    // Generate minimap bars (simplified representation) - only for visible projects
     const minimapBarHeight = 3;
     const minimapHeight = 50;
     const minimapBars = rows
-      .filter(r => r.type === "issue" && r.issue && (r.issue.start_date || r.issue.due_date))
+      .filter(r => r.type === "issue" && r.issue && (r.issue.start_date || r.issue.due_date) && !isInHiddenTreeCached(r))
       .map((row) => {
         const issue = row.issue!;
         const startDate = issue.start_date ?? issue.due_date!;
@@ -1746,7 +1745,9 @@ ${style.tip}
         const isPast = end < today;
         const isOverdue = !issue.isClosed && issue.done_ratio < 100 && end < today;
         const classes = ["minimap-bar", isPast ? "bar-past" : "", isOverdue ? "bar-overdue" : ""].filter(Boolean).join(" ");
-        return { startPct, endPct, classes };
+        // Use same status color as main view
+        const color = this._getStatusColor(issue.status);
+        return { startPct, endPct, classes, color };
       });
     const minimapBarsJson = JSON.stringify(minimapBars);
 
@@ -1977,19 +1978,7 @@ ${style.tip}
       height: 0;
     }
     .gantt-hscroll {
-      flex-shrink: 0;
-      overflow-x: auto;
-      overflow-y: hidden;
-    }
-    .gantt-hscroll::-webkit-scrollbar {
-      height: 8px;
-    }
-    .gantt-hscroll::-webkit-scrollbar-thumb {
-      background: var(--vscode-scrollbarSlider-background);
-      border-radius: 4px;
-    }
-    .gantt-hscroll-content {
-      height: 1px;
+      display: none; /* Hidden - minimap provides navigation */
     }
     svg { display: block; }
     .row-collapsed { display: none; }
@@ -2153,11 +2142,7 @@ ${style.tip}
       height: 100%;
     }
     .minimap-bar {
-      fill: var(--vscode-charts-blue);
       opacity: 0.6;
-    }
-    .minimap-bar.bar-overdue {
-      fill: var(--vscode-charts-red);
     }
     .minimap-bar.bar-past {
       opacity: 0.3;
@@ -2336,6 +2321,7 @@ ${style.tip}
           rect.setAttribute('width', Math.max(0.5, (bar.endPct - bar.startPct) * 100).toString());
           rect.setAttribute('height', minimapBarHeight.toString());
           rect.setAttribute('rx', '1');
+          rect.setAttribute('fill', bar.color); // Use status color from main view
           minimapSvg.insertBefore(rect, minimapViewport);
         });
       });
@@ -2574,47 +2560,6 @@ ${style.tip}
           bar.classList.add('highlighted');
           setTimeout(() => bar.classList.remove('highlighted'), 2000);
         }
-      } else if (message.command === 'updateProjectVisibility') {
-        // Toggle bar visibility without full re-render
-        const projectId = message.projectId;
-        const hidden = message.hidden;
-
-        // Update checkbox visual state
-        const checkbox = document.querySelector('.project-checkbox[data-project-id="' + projectId + '"]');
-        if (checkbox) {
-          checkbox.setAttribute('aria-checked', !hidden);
-          const checkRect = checkbox.querySelector('rect');
-          const checkText = checkbox.querySelector('text');
-          if (checkRect) {
-            checkRect.setAttribute('fill', hidden ? 'transparent' : 'var(--vscode-checkbox-background)');
-          }
-          if (hidden && checkText) {
-            checkText.remove();
-          } else if (!hidden && !checkText && checkRect) {
-            const x = parseFloat(checkRect.getAttribute('x') || '0');
-            const y = parseFloat(checkRect.getAttribute('y') || '0');
-            const size = parseFloat(checkRect.getAttribute('width') || '14');
-            const newCheck = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            newCheck.setAttribute('x', (x + size / 2).toString());
-            newCheck.setAttribute('y', (y + size - 3).toString());
-            newCheck.setAttribute('text-anchor', 'middle');
-            newCheck.setAttribute('fill', 'var(--vscode-checkbox-foreground)');
-            newCheck.setAttribute('font-size', '11');
-            newCheck.setAttribute('font-weight', 'bold');
-            newCheck.textContent = '✓';
-            checkbox.appendChild(newCheck);
-          }
-        }
-
-        // Toggle bar visibility: select bars by project ID directly (O(1) attribute selector)
-        const selector = '.aggregate-bars[data-project-id="' + projectId + '"], .issue-bar[data-project-id="' + projectId + '"]';
-        document.querySelectorAll(selector).forEach(el => {
-          if (hidden) {
-            el.classList.add('bar-hidden');
-          } else {
-            el.classList.remove('bar-hidden');
-          }
-        });
       }
     });
 
