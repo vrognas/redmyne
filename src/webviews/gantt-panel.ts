@@ -1970,12 +1970,11 @@ ${style.tip}
     }
     .gantt-timeline {
       flex-grow: 1;
-      overflow-y: auto;
+      overflow-y: hidden;
       overflow-x: auto;
     }
     .gantt-timeline::-webkit-scrollbar {
-      width: 0;
-      height: 0;
+      height: 0; /* Hidden - minimap provides horizontal nav */
     }
     .gantt-hscroll {
       display: none; /* Hidden - minimap provides navigation */
