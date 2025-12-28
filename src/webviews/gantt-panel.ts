@@ -6,7 +6,7 @@ import { RedmineProject } from "../redmine/redmine-project";
 import { FlexibilityScore, WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "../utilities/flexibility-calculator";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { errorToString } from "../utilities/error-feedback";
-import { buildProjectHierarchy, flattenHierarchy, HierarchyNode } from "../utilities/hierarchy-builder";
+import { buildProjectHierarchy, flattenHierarchyAll, FlatNodeWithVisibility, HierarchyNode } from "../utilities/hierarchy-builder";
 import { collapseState } from "../utilities/collapse-state";
 
 type ZoomLevel = "day" | "week" | "month" | "quarter" | "year";
@@ -65,6 +65,10 @@ interface GanttRow {
   hasChildren: boolean;
   /** Child issue date ranges for aggregate bar rendering (projects only) */
   childDateRanges?: Array<{ startDate: string | null; dueDate: string | null; issueId: number }>;
+  /** Whether this row is visible (based on parent collapse state) - for client-side collapse */
+  isVisible: boolean;
+  /** Whether this row is expanded (if it has children) - for client-side collapse */
+  isExpanded: boolean;
 }
 
 
@@ -98,9 +102,9 @@ function toGanttIssue(issue: Issue, flexibilityCache: Map<number, FlexibilitySco
 }
 
 /**
- * Convert HierarchyNode to GanttRow for SVG rendering
+ * Convert FlatNodeWithVisibility to GanttRow for SVG rendering
  */
-function nodeToGanttRow(node: HierarchyNode, flexibilityCache: Map<number, FlexibilityScore | null>, closedStatusIds: Set<number>): GanttRow {
+function nodeToGanttRow(node: FlatNodeWithVisibility, flexibilityCache: Map<number, FlexibilityScore | null>, closedStatusIds: Set<number>): GanttRow {
   if (node.type === "project") {
     return {
       type: "project",
@@ -111,6 +115,8 @@ function nodeToGanttRow(node: HierarchyNode, flexibilityCache: Map<number, Flexi
       parentKey: node.parentKey,
       hasChildren: node.children.length > 0,
       childDateRanges: node.childDateRanges,
+      isVisible: node.isVisible,
+      isExpanded: node.isExpanded,
     };
   }
 
@@ -125,6 +131,8 @@ function nodeToGanttRow(node: HierarchyNode, flexibilityCache: Map<number, Flexi
     collapseKey: node.collapseKey,
     parentKey: node.parentKey,
     hasChildren: node.children.length > 0,
+    isVisible: node.isVisible,
+    isExpanded: node.isExpanded,
   };
 }
 
@@ -329,6 +337,7 @@ export class GanttPanel {
   private _hiddenProjects: Set<number> = new Set(); // Projects hidden from view
   private _collapseDebounceTimer?: ReturnType<typeof setTimeout>;
   private _cachedHierarchy?: HierarchyNode[];
+  private _skipCollapseRerender = false; // Skip re-render when collapse is from client-side
 
   private constructor(panel: vscode.WebviewPanel, server?: RedmineServer) {
     this._panel = panel;
@@ -342,8 +351,13 @@ export class GanttPanel {
 
     // Listen for collapse state changes from other views (Issues pane)
     // Debounced to prevent rapid re-renders during fast expand/collapse
+    // Skip re-render if triggered by our own client-side collapse
     this._disposables.push(
       collapseState.onDidChange(() => {
+        if (this._skipCollapseRerender) {
+          this._skipCollapseRerender = false;
+          return;
+        }
         clearTimeout(this._collapseDebounceTimer);
         this._collapseDebounceTimer = setTimeout(() => this._updateContent(), 50);
       })
@@ -714,6 +728,7 @@ export class GanttPanel {
     action?: string;
     keys?: string[];
     projectId?: number;
+    isExpanded?: boolean; // For collapseStateSync
   }): void {
     switch (message.command) {
       case "openIssue":
@@ -795,6 +810,18 @@ export class GanttPanel {
         break;
       case "collapseAll":
         collapseState.collapseAll();
+        break;
+      case "collapseStateSync":
+        // Client-side collapse already done, just sync state for persistence
+        // Set flag to skip re-render since client already updated UI
+        if (message.collapseKey) {
+          this._skipCollapseRerender = true;
+          if (message.isExpanded) {
+            collapseState.expand(message.collapseKey);
+          } else {
+            collapseState.collapse(message.collapseKey);
+          }
+        }
         break;
       case "toggleProjectVisibility":
         if (message.projectId !== undefined) {
@@ -1142,13 +1169,15 @@ export class GanttPanel {
     if (!this._cachedHierarchy) {
       this._cachedHierarchy = buildProjectHierarchy(this._issues, this._flexibilityCache, this._projects);
     }
-    const flatNodes = flattenHierarchy(this._cachedHierarchy, collapseState.getExpandedKeys());
+    // Get ALL nodes with visibility flags for client-side collapse management
+    const flatNodes = flattenHierarchyAll(this._cachedHierarchy, collapseState.getExpandedKeys());
     const allRows = flatNodes.map((node) => nodeToGanttRow(node, this._flexibilityCache, this._closedStatusIds));
 
-    // Filter out hidden projects and their issues entirely
+    // Filter out hidden projects and their issues entirely (project visibility checkbox)
+    // Note: Collapse visibility is handled client-side, project visibility is server-side
     const hiddenProjects = this._hiddenProjects;
     const rows = allRows.filter(row => {
-      // Hide project rows when deselected
+      // Hide project rows when deselected via checkbox
       if (row.type === "project") {
         return !hiddenProjects.has(row.id);
       }
@@ -1159,15 +1188,27 @@ export class GanttPanel {
       return true;
     });
 
-    const contentHeight = rows.length * (barHeight + barGap);
+    // Calculate visible row count (respects collapse state)
+    const visibleRowCount = rows.filter(r => r.isVisible).length;
+    const contentHeight = visibleRowCount * (barHeight + barGap);
+
+    // Pre-calculate visible indices for each row
+    let visibleIndex = 0;
+    const rowVisibleIndices = new Map<string, number>();
+    for (const row of rows) {
+      if (row.isVisible) {
+        rowVisibleIndices.set(row.collapseKey, visibleIndex++);
+      }
+    }
     const chevronWidth = 14;
 
-    // Generate zebra stripe backgrounds for alternating rows
+    // Generate zebra stripe backgrounds for visible rows only
     const zebraStripes = rows
-      .map((_, index) => {
-        if (index % 2 === 0) return ""; // Only odd rows get background
-        const y = index * (barHeight + barGap);
-        return `<rect class="zebra-stripe" x="0" y="${y}" width="100%" height="${barHeight + barGap}" />`;
+      .filter(r => r.isVisible)
+      .map((row, idx) => {
+        if (idx % 2 === 0) return ""; // Only odd rows get background
+        const y = idx * (barHeight + barGap);
+        return `<rect class="zebra-stripe" data-stripe-for="${row.collapseKey}" x="0" y="${y}" width="100%" height="${barHeight + barGap}" />`;
       })
       .join("");
 
@@ -1194,23 +1235,25 @@ export class GanttPanel {
       })
       .join("");
 
-    // Left labels (fixed column) - Y starts at 0 in body SVG (header is separate)
+    // Left labels (fixed column) - includes ALL rows for client-side collapse
     const labels = rows
-      .map((row, index) => {
-        const y = index * (barHeight + barGap);
+      .map((row) => {
+        // Use visible index for Y position; hidden rows get display:none via CSS
+        const visIdx = rowVisibleIndices.get(row.collapseKey) ?? 0;
+        const y = visIdx * (barHeight + barGap);
         const indent = row.depth * indentSize;
-        const isCollapsed = collapseState.isCollapsed(row.collapseKey);
+        const hiddenClass = row.isVisible ? "" : " row-collapsed";
         const chevron = row.hasChildren
-          ? `<text class="collapse-toggle user-select-none" data-collapse-key="${row.collapseKey}" x="${3 + indent}" y="${y + barHeight / 2 + 4}" fill="var(--vscode-foreground)" font-size="10">${isCollapsed ? "▶" : "▼"}</text>`
+          ? `<text class="collapse-toggle user-select-none" x="${3 + indent}" y="${barHeight / 2 + 4}" fill="var(--vscode-foreground)" font-size="10">${row.isExpanded ? "▼" : "▶"}</text>`
           : "";
         const textOffset = row.hasChildren ? chevronWidth : 0;
 
         if (row.type === "project") {
           // Project header row (checkbox is in separate column)
           return `
-            <g class="project-label" data-collapse-key="${row.collapseKey}" data-project-id="${row.id}" tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
+            <g class="project-label gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
               ${chevron}
-              <text x="${5 + indent + textOffset}" y="${y + barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12" font-weight="bold">
+              <text x="${5 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12" font-weight="bold">
                 ${escapeHtml(row.label)}
               </text>
             </g>
@@ -1231,9 +1274,9 @@ export class GanttPanel {
         ].join("\n");
 
         return `
-          <g class="issue-label cursor-pointer" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" tabindex="0" role="button" aria-label="Open issue #${issue.id}">
+          <g class="issue-label gantt-row cursor-pointer${hiddenClass}" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Open issue #${issue.id}">
             ${chevron}
-            <text x="${5 + indent + textOffset}" y="${y + barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12">
+            <text x="${5 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12">
               #${issue.id} ${escapedSubject}
             </text>
             <title>${tooltip}</title>
@@ -1242,9 +1285,14 @@ export class GanttPanel {
       })
       .join("");
 
-    // Right bars (scrollable timeline) - only for issue rows
+    // Right bars (scrollable timeline) - includes ALL rows for client-side collapse
     const bars = rows
-      .map((row, index) => {
+      .map((row) => {
+        // Use visible index for Y position; hidden rows get display:none via CSS
+        const visIdx = rowVisibleIndices.get(row.collapseKey) ?? 0;
+        const y = visIdx * (barHeight + barGap);
+        const hiddenClass = row.isVisible ? "" : " row-collapsed";
+
         // Project headers: always show aggregate bars
         if (row.type === "project") {
           if (!row.childDateRanges || row.childDateRanges.length === 0) {
@@ -1252,7 +1300,6 @@ export class GanttPanel {
           }
 
           // Render aggregate bars for each child issue date range
-          const y = index * (barHeight + barGap);
           const aggregateBars = row.childDateRanges
             .filter(range => range.startDate || range.dueDate)
             .map(range => {
@@ -1267,12 +1314,12 @@ export class GanttPanel {
               const endX = ((endPlusOne.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
               const width = Math.max(4, endX - startX);
 
-              return `<rect class="aggregate-bar" x="${startX}" y="${y + 4}" width="${width}" height="${barHeight - 8}"
+              return `<rect class="aggregate-bar" x="${startX}" y="4" width="${width}" height="${barHeight - 8}"
                             fill="var(--vscode-descriptionForeground)" opacity="0.5" rx="2" ry="2"/>`;
             })
             .join("");
 
-          return `<g class="aggregate-bars" data-project-id="${row.id}" data-collapse-key="${row.collapseKey}">${aggregateBars}</g>`;
+          return `<g class="aggregate-bars gantt-row${hiddenClass}" data-project-id="${row.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" transform="translate(0, ${y})">${aggregateBars}</g>`;
         }
 
         const issue = row.issue!;
@@ -1301,7 +1348,7 @@ export class GanttPanel {
           timelineWidth;
 
         const width = Math.max(10, endX - startX);
-        const y = index * (barHeight + barGap); // Y starts at 0 in body SVG
+        // Note: y is now used for transform, internal positions are 0-based
         const color = isParent ? "var(--vscode-descriptionForeground)" : this._getStatusColor(issue.status);
         const isPast = end < today;
         const isOverdue = !isParent && !issue.isClosed && issue.done_ratio < 100 && end < today;
@@ -1354,7 +1401,7 @@ export class GanttPanel {
           const dayCount = intensities.length;
           const segmentWidth = width / dayCount;
 
-          // Generate day segments with varying opacity
+          // Generate day segments with varying opacity (0-based Y, transform handles positioning)
           // Scale intensity to 0-1 range where 1.5 (max stored) = full opacity
           const maxIntensityForOpacity = 1.5;
           intensitySegments = intensities
@@ -1366,7 +1413,7 @@ export class GanttPanel {
               const isFirst = i === 0;
               const isLast = i === dayCount - 1;
               // Use clip-path for proper corner rounding on first/last
-              return `<rect x="${segX}" y="${y}" width="${segmentWidth + 0.5}" height="${barHeight}"
+              return `<rect x="${segX}" y="0" width="${segmentWidth + 0.5}" height="${barHeight}"
                             fill="${color}" opacity="${opacity.toFixed(2)}"
                             ${isFirst ? 'rx="8" ry="8"' : isLast ? 'rx="8" ry="8"' : ""}/>`;
             })
@@ -1379,9 +1426,9 @@ export class GanttPanel {
           intensities.forEach((d, i) => {
             const dayStartX = startX + i * segmentWidth;
             const dayEndX = startX + (i + 1) * segmentWidth;
-            // Line Y: bottom of bar minus normalized intensity * bar height
+            // Line Y: bottom of bar minus normalized intensity * bar height (0-based)
             const normalizedIntensity = Math.min(d.intensity, maxIntensity) / maxIntensity;
-            const py = y + barHeight - normalizedIntensity * (barHeight - 4);
+            const py = barHeight - normalizedIntensity * (barHeight - 4);
             if (i === 0) {
               // Move to start of first day
               stepPoints.push(`M ${dayStartX.toFixed(1)},${py.toFixed(1)}`);
@@ -1391,7 +1438,7 @@ export class GanttPanel {
             // Step to next day's height (if not last day)
             if (i < intensities.length - 1) {
               const nextNormalized = Math.min(intensities[i + 1].intensity, maxIntensity) / maxIntensity;
-              const nextPy = y + barHeight - nextNormalized * (barHeight - 4);
+              const nextPy = barHeight - nextNormalized * (barHeight - 4);
               stepPoints.push(`V ${nextPy.toFixed(1)}`);
             }
           });
@@ -1406,25 +1453,27 @@ export class GanttPanel {
           // Parent done_ratio is weighted average of subtasks
           const parentDoneWidth = (doneRatio / 100) * (endX - startX - 8);
           return `
-            <g class="issue-bar parent-bar" data-issue-id="${issue.id}"
+            <g class="issue-bar parent-bar gantt-row${hiddenClass}" data-issue-id="${issue.id}"
+               data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
                data-start-date="${issue.start_date || ""}"
                data-due-date="${issue.due_date || ""}"
                data-start-x="${startX}" data-end-x="${endX}"
+               transform="translate(0, ${y})"
                tabindex="0" role="button" aria-label="#${issue.id} ${escapedSubject} (parent, ${doneRatio}% done)">
-              <!-- Summary bar: bracket-style with downward arrows at ends -->
-              <path class="bar-outline" d="M ${startX + 4} ${y + barHeight * 0.3}
-                    L ${startX + 4} ${y + barHeight * 0.7}
-                    L ${startX} ${y + barHeight}
-                    M ${startX + 4} ${y + barHeight * 0.5}
+              <!-- Summary bar: bracket-style with downward arrows at ends (0-based Y) -->
+              <path class="bar-outline" d="M ${startX + 4} ${barHeight * 0.3}
+                    L ${startX + 4} ${barHeight * 0.7}
+                    L ${startX} ${barHeight}
+                    M ${startX + 4} ${barHeight * 0.5}
                     H ${endX - 4}
-                    M ${endX - 4} ${y + barHeight * 0.3}
-                    L ${endX - 4} ${y + barHeight * 0.7}
-                    L ${endX} ${y + barHeight}"
+                    M ${endX - 4} ${barHeight * 0.3}
+                    L ${endX - 4} ${barHeight * 0.7}
+                    L ${endX} ${barHeight}"
                     fill="none" stroke="${color}" stroke-width="2" opacity="0.8" class="cursor-pointer"/>
               ${doneRatio > 0 ? `
                 <!-- Progress line showing done_ratio on parent -->
-                <line class="parent-progress" x1="${startX + 4}" y1="${y + barHeight * 0.5}"
-                      x2="${startX + 4 + parentDoneWidth}" y2="${y + barHeight * 0.5}"
+                <line class="parent-progress" x1="${startX + 4}" y1="${barHeight * 0.5}"
+                      x2="${startX + 4 + parentDoneWidth}" y2="${barHeight * 0.5}"
                       stroke="var(--vscode-charts-green)" stroke-width="3" opacity="0.8"/>
               ` : ""}
               <title>${tooltip} (parent - ${doneRatio}% done)</title>
@@ -1433,10 +1482,12 @@ export class GanttPanel {
         }
 
         return `
-          <g class="issue-bar${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}" data-issue-id="${issue.id}"
+          <g class="issue-bar gantt-row${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hiddenClass}" data-issue-id="${issue.id}"
+             data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
              data-start-date="${issue.start_date || ""}"
              data-due-date="${issue.due_date || ""}"
              data-start-x="${startX}" data-end-x="${endX}"
+             transform="translate(0, ${y})"
              tabindex="0" role="button" aria-label="#${issue.id} ${escapedSubject}${isOverdue ? " (overdue)" : ""}">
             ${hasIntensity ? `
               <!-- Intensity segments -->
@@ -1444,43 +1495,43 @@ export class GanttPanel {
               <!-- Intensity line chart -->
               ${intensityLine}
             ` : `
-              <!-- Fallback: solid bar when no intensity data -->
-              <rect class="bar-main" x="${startX}" y="${y}" width="${width}" height="${barHeight}"
+              <!-- Fallback: solid bar when no intensity data (0-based Y) -->
+              <rect class="bar-main" x="${startX}" y="0" width="${width}" height="${barHeight}"
                     fill="${color}" rx="8" ry="8" opacity="0.85" filter="url(#barShadow)"/>
             `}
             ${hasPastPortion ? `
               <!-- Past portion overlay with diagonal stripes -->
-              <rect class="past-overlay" x="${startX}" y="${y}" width="${pastWidth}" height="${barHeight}"
+              <rect class="past-overlay" x="${startX}" y="0" width="${pastWidth}" height="${barHeight}"
                     fill="url(#past-stripes)" rx="8" ry="8"/>
             ` : ""}
             ${visualDoneRatio > 0 && visualDoneRatio < 100 ? `
               <!-- Progress fill showing done_ratio -->
-              <rect class="progress-fill" x="${startX}" y="${y}" width="${doneWidth}" height="${barHeight}"
+              <rect class="progress-fill" x="${startX}" y="0" width="${doneWidth}" height="${barHeight}"
                     fill="${color}" rx="8" ry="8" opacity="0.95" filter="url(#barShadow)"/>
             ` : ""}
             <!-- Border/outline -->
-            <rect class="bar-outline cursor-move" x="${startX}" y="${y}" width="${width}" height="${barHeight}"
+            <rect class="bar-outline cursor-move" x="${startX}" y="0" width="${width}" height="${barHeight}"
                   fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1" rx="8" ry="8"/>
             ${issue.isClosed ? `
               <!-- Closed checkmark -->
-              <text class="completed-check" x="${endX - 10}" y="${y + barHeight / 2 + 5}"
+              <text class="completed-check" x="${endX - 10}" y="${barHeight / 2 + 5}"
                     text-anchor="end" fill="var(--vscode-charts-green)" font-size="14" font-weight="bold">✓</text>
             ` : `
               <!-- Done ratio -->
-              <text class="done-ratio" x="${endX - 10}" y="${y + barHeight / 2 + 4}"
+              <text class="done-ratio" x="${endX - 10}" y="${barHeight / 2 + 4}"
                     text-anchor="end" fill="var(--vscode-foreground)" font-size="11" opacity="0.8">${doneRatio}%</text>
             `}
-            <rect class="drag-handle drag-left cursor-ew-resize" x="${startX}" y="${y}" width="${handleWidth}" height="${barHeight}"
+            <rect class="drag-handle drag-left cursor-ew-resize" x="${startX}" y="0" width="${handleWidth}" height="${barHeight}"
                   fill="transparent"/>
-            <rect class="drag-handle drag-right cursor-ew-resize" x="${startX + width - handleWidth}" y="${y}" width="${handleWidth}" height="${barHeight}"
+            <rect class="drag-handle drag-right cursor-ew-resize" x="${startX + width - handleWidth}" y="0" width="${handleWidth}" height="${barHeight}"
                   fill="transparent"/>
             <!-- Link handle for creating relations -->
-            <circle class="link-handle cursor-crosshair" cx="${endX + 8}" cy="${y + barHeight / 2}" r="5"
+            <circle class="link-handle cursor-crosshair" cx="${endX + 8}" cy="${barHeight / 2}" r="5"
                     fill="var(--vscode-button-background)" stroke="var(--vscode-button-foreground)"
                     stroke-width="1" opacity="0"/>
             ${issue.assignee ? `
               <!-- Assignee -->
-              <text class="bar-assignee" x="${endX + 20}" y="${y + barHeight / 2 + 4}"
+              <text class="bar-assignee" x="${endX + 20}" y="${barHeight / 2 + 4}"
                     fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(issue.assignee)}</text>
             ` : ""}
             <title>${tooltip}</title>
@@ -1490,10 +1541,13 @@ export class GanttPanel {
       .join("");
 
     // Dependency arrows - draw from end of source to start of target
+    // Only include visible rows for proper Y positioning
     const issuePositions = new Map<number, { startX: number; endX: number; y: number }>();
-    rows.forEach((row, index) => {
-      if (row.type === "issue" && row.issue) {
+    for (const row of rows) {
+      if (row.type === "issue" && row.issue && row.isVisible) {
         const issue = row.issue;
+        const visIdx = rowVisibleIndices.get(row.collapseKey);
+        if (visIdx === undefined) continue;
         const start = issue.start_date
           ? new Date(issue.start_date)
           : new Date(issue.due_date!);
@@ -1511,10 +1565,10 @@ export class GanttPanel {
           ((endPlusOne.getTime() - minDate.getTime()) /
             (maxDate.getTime() - minDate.getTime())) *
           timelineWidth;
-        const y = index * (barHeight + barGap) + barHeight / 2; // Y starts at 0 in body SVG
+        const y = visIdx * (barHeight + barGap) + barHeight / 2;
         issuePositions.set(issue.id, { startX, endX, y });
       }
-    });
+    }
 
     // Relation type styling - only forward types (reverse types are filtered out)
     // blocks/precedes/relates/duplicates/copied_to are shown
@@ -1878,6 +1932,8 @@ ${style.tip}
       border-radius: 4px;
     }
     svg { display: block; }
+    .row-collapsed { display: none; }
+    .gantt-row[data-collapsed="true"] { display: none; }
     .issue-bar:hover .bar-main, .issue-bar:hover .bar-outline, .issue-label:hover { opacity: 1; }
     .issue-bar:hover .bar-intensity rect { filter: brightness(1.1); }
     .issue-bar.bar-past { filter: saturate(0.4) opacity(0.7); }
@@ -2133,6 +2189,162 @@ ${style.tip}
     const totalDays = ${totalDays};
     const dayWidth = timelineWidth / totalDays;
     const extendedRelationTypes = ${this._extendedRelationTypes};
+    const barHeight = ${barHeight};
+    const barGap = ${barGap};
+    const rowHeight = barHeight + barGap;
+
+    // Client-side collapse state tracking
+    const expandedKeys = new Set(${JSON.stringify([...collapseState.getExpandedKeys()])});
+
+    /**
+     * Toggle collapse state for a row client-side, then notify extension
+     * @param {string} collapseKey - The key of the row to toggle
+     * @param {string} action - 'toggle', 'collapse', or 'expand'
+     */
+    function toggleCollapseClientSide(collapseKey, action = 'toggle') {
+      const wasExpanded = expandedKeys.has(collapseKey);
+      let isExpanding;
+
+      if (action === 'collapse') {
+        isExpanding = false;
+      } else if (action === 'expand') {
+        isExpanding = true;
+      } else {
+        isExpanding = !wasExpanded;
+      }
+
+      // Update local state
+      if (isExpanding) {
+        expandedKeys.add(collapseKey);
+      } else {
+        expandedKeys.delete(collapseKey);
+      }
+
+      // Update chevron icon on the toggled row
+      const toggledLabels = document.querySelectorAll(\`[data-collapse-key="\${collapseKey}"].project-label, [data-collapse-key="\${collapseKey}"].issue-label\`);
+      toggledLabels.forEach(label => {
+        const chevron = label.querySelector('.collapse-toggle');
+        if (chevron) {
+          chevron.textContent = isExpanding ? '▼' : '▶';
+        }
+        label.dataset.expanded = isExpanding.toString();
+      });
+
+      // Find all descendant rows and toggle visibility
+      updateDescendantVisibility(collapseKey, isExpanding);
+
+      // Recalculate Y positions for all visible rows
+      recalculateRowPositions();
+
+      // Notify extension for persistence (don't wait for response)
+      vscode.postMessage({ command: 'collapseStateSync', collapseKey, isExpanded: isExpanding, action });
+    }
+
+    /**
+     * Update visibility of all descendants of a row
+     */
+    function updateDescendantVisibility(parentKey, parentVisible) {
+      // Find all rows that are direct children of this parent
+      const directChildren = document.querySelectorAll(\`[data-parent-key="\${parentKey}"].gantt-row\`);
+
+      directChildren.forEach(child => {
+        const childKey = child.dataset.collapseKey;
+        const isVisible = parentVisible;
+
+        if (isVisible) {
+          child.classList.remove('row-collapsed');
+        } else {
+          child.classList.add('row-collapsed');
+        }
+
+        // Recursively update grandchildren (if this child is expanded)
+        if (childKey) {
+          const childIsExpanded = expandedKeys.has(childKey);
+          // Grandchildren visible only if this child is visible AND expanded
+          updateDescendantVisibility(childKey, isVisible && childIsExpanded);
+        }
+      });
+    }
+
+    /**
+     * Recalculate Y positions for all visible rows in labels and bars
+     */
+    function recalculateRowPositions() {
+      // Get all gantt-row elements from labels and bars
+      const labelRows = Array.from(document.querySelectorAll('.gantt-labels .gantt-row'));
+      const barRows = Array.from(document.querySelectorAll('.gantt-timeline .gantt-row'));
+
+      // Calculate visible index for each row
+      let visibleIndex = 0;
+      const collapseKeyToIndex = new Map();
+
+      labelRows.forEach(row => {
+        const key = row.dataset.collapseKey;
+        if (!row.classList.contains('row-collapsed')) {
+          collapseKeyToIndex.set(key, visibleIndex++);
+        }
+      });
+
+      // Apply new Y positions to labels
+      labelRows.forEach(row => {
+        const key = row.dataset.collapseKey;
+        const idx = collapseKeyToIndex.get(key);
+        if (idx !== undefined) {
+          row.setAttribute('transform', \`translate(0, \${idx * rowHeight})\`);
+        }
+      });
+
+      // Apply new Y positions to bars
+      barRows.forEach(row => {
+        const key = row.dataset.collapseKey;
+        const idx = collapseKeyToIndex.get(key);
+        if (idx !== undefined) {
+          row.setAttribute('transform', \`translate(0, \${idx * rowHeight})\`);
+        }
+      });
+
+      // Update SVG heights
+      const visibleCount = visibleIndex;
+      const newHeight = visibleCount * rowHeight;
+      const labelsSvg = document.querySelector('.gantt-labels svg');
+      const barsSvg = document.querySelector('.gantt-timeline svg');
+      if (labelsSvg) labelsSvg.setAttribute('height', newHeight.toString());
+      if (barsSvg) barsSvg.setAttribute('height', newHeight.toString());
+
+      // Update zebra stripes (regenerate for proper alternation)
+      updateZebraStripes(visibleCount);
+    }
+
+    /**
+     * Update zebra stripe backgrounds for proper alternation
+     */
+    function updateZebraStripes(visibleCount) {
+      // Remove existing zebra stripes
+      document.querySelectorAll('.zebra-stripe').forEach(s => s.remove());
+
+      // Add new stripes (only for visible rows)
+      const barsSvg = document.querySelector('.gantt-timeline svg');
+      if (!barsSvg) return;
+
+      // Find the zebra group or create one
+      let zebraGroup = barsSvg.querySelector('.zebra-stripes-group');
+      if (!zebraGroup) {
+        zebraGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        zebraGroup.setAttribute('class', 'zebra-stripes-group');
+        barsSvg.insertBefore(zebraGroup, barsSvg.firstChild);
+      }
+
+      // Add stripes for odd rows
+      for (let i = 1; i < visibleCount; i += 2) {
+        const stripe = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        stripe.setAttribute('class', 'zebra-stripe');
+        stripe.setAttribute('x', '0');
+        stripe.setAttribute('y', (i * rowHeight).toString());
+        stripe.setAttribute('width', '100%');
+        stripe.setAttribute('height', rowHeight.toString());
+        zebraGroup.appendChild(stripe);
+      }
+    }
 
     // Cleanup previous event listeners (prevents accumulation on re-render)
     if (window._ganttCleanup) {
@@ -3143,25 +3355,58 @@ ${style.tip}
     });
 
     // Collapse toggle click (before issue-label handler to stop propagation)
-    // Expand/collapse all buttons
+    // Uses client-side collapse for instant feedback
+    document.querySelectorAll('.collapse-toggle').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Get collapse key from parent label element
+        const label = el.closest('[data-collapse-key]');
+        const collapseKey = label?.dataset.collapseKey;
+        if (collapseKey) {
+          toggleCollapseClientSide(collapseKey);
+        }
+      });
+    });
+
+    // Expand/collapse all buttons - still use server-side for full refresh
     document.getElementById('expandAllBtn')?.addEventListener('click', () => {
       const keys = [...document.querySelectorAll('[data-collapse-key]')]
         .map(el => el.dataset.collapseKey)
         .filter((k, i, arr) => k && arr.indexOf(k) === i);
+      // Expand all client-side
+      keys.forEach(key => {
+        if (key && !expandedKeys.has(key)) {
+          expandedKeys.add(key);
+        }
+      });
+      // Update visibility for all rows
+      document.querySelectorAll('.gantt-row.row-collapsed').forEach(row => {
+        row.classList.remove('row-collapsed');
+      });
+      document.querySelectorAll('.collapse-toggle').forEach(chevron => {
+        chevron.textContent = '▼';
+      });
+      document.querySelectorAll('[data-expanded]').forEach(el => {
+        el.dataset.expanded = 'true';
+      });
+      recalculateRowPositions();
       vscode.postMessage({ command: 'expandAll', keys });
     });
     document.getElementById('collapseAllBtn')?.addEventListener('click', () => {
-      vscode.postMessage({ command: 'collapseAll' });
-    });
-
-    document.querySelectorAll('.collapse-toggle').forEach(el => {
-      el.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const collapseKey = el.dataset.collapseKey;
-        if (collapseKey) {
-          vscode.postMessage({ command: 'toggleCollapse', collapseKey });
-        }
+      // Collapse all client-side
+      expandedKeys.clear();
+      // Hide all non-top-level rows
+      document.querySelectorAll('.gantt-row[data-parent-key]:not([data-parent-key=""])').forEach(row => {
+        row.classList.add('row-collapsed');
       });
+      document.querySelectorAll('.collapse-toggle').forEach(chevron => {
+        chevron.textContent = '▶';
+      });
+      document.querySelectorAll('[data-expanded]').forEach(el => {
+        el.dataset.expanded = 'false';
+      });
+      recalculateRowPositions();
+      vscode.postMessage({ command: 'collapseAll' });
     });
 
     // Project visibility checkbox click
@@ -3230,16 +3475,16 @@ ${style.tip}
             break;
           case 'ArrowLeft':
             e.preventDefault();
-            // Collapse current row if it has children
+            // Collapse current row if it has children (client-side)
             if (collapseKey) {
-              vscode.postMessage({ command: 'toggleCollapse', collapseKey, action: 'collapse' });
+              toggleCollapseClientSide(collapseKey, 'collapse');
             }
             break;
           case 'ArrowRight':
             e.preventDefault();
-            // Expand current row if it has children
+            // Expand current row if it has children (client-side)
             if (collapseKey) {
-              vscode.postMessage({ command: 'toggleCollapse', collapseKey, action: 'expand' });
+              toggleCollapseClientSide(collapseKey, 'expand');
             }
             break;
           case 'Home':
