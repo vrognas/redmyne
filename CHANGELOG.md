@@ -7,6 +7,7 @@ All notable changes to the "vscode-redmine" extension will be documented in this
 ### Changed
 
 - **Gantt collapse performance** - collapse/expand now client-side without HTML regeneration; debounced + cached hierarchy
+- **Debounce utility** - extracted shared `debounce()` function; refactored 5 manual debounce patterns
 
 ## [3.19.0]
 
