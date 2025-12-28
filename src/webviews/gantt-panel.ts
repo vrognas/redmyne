@@ -90,8 +90,13 @@ function toGanttIssue(issue: Issue, flexibilityCache: Map<number, FlexibilitySco
     spent_hours: issue.spent_hours ?? null,
     done_ratio: issue.done_ratio ?? 0,
     relations: (issue.relations || [])
-      .filter((r) => !["blocked", "duplicated", "copied_from", "follows"].includes(r.relation_type))
-      .filter((r) => r.issue_to_id !== issue.id && r.issue_id !== r.issue_to_id)
+      .filter((r) => {
+        // Combined filter: exclude reverse relation types AND self-references
+        const type = r.relation_type;
+        return type !== "blocked" && type !== "duplicated" &&
+               type !== "copied_from" && type !== "follows" &&
+               r.issue_to_id !== issue.id && r.issue_id !== r.issue_to_id;
+      })
       .map((r) => ({
         id: r.id,
         targetId: r.issue_to_id,
@@ -1188,23 +1193,18 @@ export class GanttPanel {
       return true;
     });
 
-    // Calculate visible row count (respects collapse state)
-    const visibleRowCount = rows.filter(r => r.isVisible).length;
+    // Filter visible rows ONCE upfront (avoid multiple .filter() calls)
+    const visibleRows = rows.filter(r => r.isVisible);
+    const visibleRowCount = visibleRows.length;
     const contentHeight = visibleRowCount * (barHeight + barGap);
 
     // Pre-calculate visible indices for each row
-    let visibleIndex = 0;
     const rowVisibleIndices = new Map<string, number>();
-    for (const row of rows) {
-      if (row.isVisible) {
-        rowVisibleIndices.set(row.collapseKey, visibleIndex++);
-      }
-    }
+    visibleRows.forEach((row, idx) => rowVisibleIndices.set(row.collapseKey, idx));
     const chevronWidth = 14;
 
     // Generate zebra stripe backgrounds for visible rows only
-    const zebraStripes = rows
-      .filter(r => r.isVisible)
+    const zebraStripes = visibleRows
       .map((row, idx) => {
         if (idx % 2 === 0) return ""; // Only odd rows get background
         const y = idx * (barHeight + barGap);
@@ -1235,9 +1235,7 @@ export class GanttPanel {
       })
       .join("");
 
-    // Left labels (fixed column) - includes ALL rows for client-side collapse
-    // Only render VISIBLE rows for performance (hidden rows not in DOM)
-    const visibleRows = rows.filter(r => r.isVisible);
+    // Left labels (fixed column) - visible rows only for performance
 
     const labels = visibleRows
       .map((row, idx) => {
@@ -2918,15 +2916,13 @@ ${style.tip}
       timelineSvg.addEventListener('contextmenu', (e) => {
         const arrow = e.target.closest('.dependency-arrow');
         if (!arrow) return;
-      // Right-click: show delete option
-      arrow.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         const relationId = parseInt(arrow.dataset.relationId);
         const fromId = arrow.dataset.from;
         const toId = arrow.dataset.to;
         showDeletePicker(e.clientX, e.clientY, relationId, fromId, toId);
       });
-    });
+    }
 
     // Show context menu for issue (similar to Issues pane context menu)
     function showIssueContextMenu(x, y, issueId) {
@@ -3780,11 +3776,21 @@ ${style.tip}
       e.preventDefault();
     });
 
+    // RAF throttle for smooth column resize
+    let resizeRafPending = false;
+    let lastResizeEvent = null;
     addDocListener('mousemove', (e) => {
       if (!isResizing) return;
-      const delta = e.clientX - resizeStartX;
-      const newWidth = Math.min(500, Math.max(150, resizeStartWidth + delta));
-      ganttLeft.style.width = newWidth + 'px';
+      lastResizeEvent = e;
+      if (resizeRafPending) return;
+      resizeRafPending = true;
+      requestAnimationFrame(() => {
+        resizeRafPending = false;
+        if (!lastResizeEvent) return;
+        const delta = lastResizeEvent.clientX - resizeStartX;
+        const newWidth = Math.min(500, Math.max(150, resizeStartWidth + delta));
+        ganttLeft.style.width = newWidth + 'px';
+      });
     });
 
     addDocListener('mouseup', () => {
@@ -3875,6 +3881,9 @@ ${style.tip}
     let lastQuarter = -1;
     let lastYear = -1;
 
+    // Cache month names to avoid expensive toLocaleString() calls in loop
+    const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
     while (current <= maxDate) {
       const x =
         leftMargin +
@@ -3934,7 +3943,7 @@ ${style.tip}
       // Month markers (for month/quarter/year zoom)
       if ((zoomLevel === "month" || zoomLevel === "quarter" || zoomLevel === "year") && dayOfMonth === 1 && lastMonth !== month) {
         lastMonth = month;
-        const monthLabel = current.toLocaleString("en", { month: "short" });
+        const monthLabel = MONTH_SHORT[month];
         if (zoomLevel === "month") {
           headerContent.push(`
             <line x1="${x}" y1="0" x2="${x}" y2="40" class="date-marker"/>
@@ -3956,9 +3965,9 @@ ${style.tip}
         const weekEnd = new Date(current);
         weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
         const startDay = dayOfMonth;
-        const startMonth = current.toLocaleString("en", { month: "short", timeZone: "UTC" });
+        const startMonth = MONTH_SHORT[current.getUTCMonth()];
         const endDay = weekEnd.getUTCDate();
-        const endMonth = weekEnd.toLocaleString("en", { month: "short", timeZone: "UTC" });
+        const endMonth = MONTH_SHORT[weekEnd.getUTCMonth()];
         const dateRange = startMonth === endMonth
           ? `${startDay}-${endDay} ${endMonth}`
           : `${startDay} ${startMonth} - ${endDay} ${endMonth}`;
