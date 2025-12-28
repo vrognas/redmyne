@@ -1237,14 +1237,24 @@ export class GanttPanel {
       })
       .join("");
 
-    // Checkbox column (separate from labels) - shows ALL projects for toggling
+    // Checkbox column - shows checkboxes for:
+    // 1. Visible projects (at their row position)
+    // 2. Hidden projects (at bottom, so user can re-enable them)
+    // NOT: collapsed subprojects (parent must be expanded first)
     const checkboxColumnWidth = 32;
     const checkboxSize = 14;
-    const projectRows = allRows.filter(r => r.type === "project");
+
+    // Projects visible in main view (from filtered rows, not collapsed)
+    const visibleProjectRows = rows.filter(r => r.type === "project" && r.isVisible);
+    // Projects hidden via checkbox (need checkbox at bottom to re-enable)
+    const hiddenProjectRows = allRows.filter(r => r.type === "project" && this._hiddenProjects.has(r.id));
+    // Combine: visible projects + hidden projects
+    const projectRows = [...visibleProjectRows, ...hiddenProjectRows];
+
     // Zebra stripes for checkbox column - use same pattern as labels/timeline for alignment
     const checkboxZebraStripes = zebraStripes;
-    // Position checkboxes: visible projects at their row Y, hidden projects at the bottom
-    const hiddenProjectCount = projectRows.filter(r => !rowVisibleIndices.has(r.collapseKey)).length;
+    // Hidden project count is ONLY explicitly hidden projects (not collapsed ones)
+    const hiddenProjectCount = hiddenProjectRows.length;
     let hiddenIdx = 0;
     const checkboxes = projectRows
       .map((row) => {
