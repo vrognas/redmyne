@@ -195,7 +195,7 @@ export function buildProjectHierarchy(
     const projectIssues = issuesByProject.get(projectId) ?? [];
     const issueNodes = buildIssueTree(projectIssues, flexibilityCache, projectKey, 1);
 
-    return {
+    const node: HierarchyNode = {
       type: "project" as const,
       id: projectId,
       label: name,
@@ -204,6 +204,11 @@ export function buildProjectHierarchy(
       collapseKey: projectKey,
       parentKey: null,
     };
+
+    // Collect child date ranges for aggregate bar rendering
+    node.childDateRanges = collectChildDateRanges(node);
+
+    return node;
   });
 }
 
