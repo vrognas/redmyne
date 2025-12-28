@@ -39,6 +39,7 @@ import { registerViewCommands } from "./commands/view-commands";
 import { registerCreateTestIssuesCommand } from "./commands/create-test-issues";
 import { WorkloadStatusBar } from "./status-bars/workload-status-bar";
 import { autoUpdateTracker } from "./utilities/auto-update-tracker";
+import { debounce, DebouncedFunction } from "./utilities/debounce";
 
 // Constants
 const CONFIG_DEBOUNCE_MS = 300;
@@ -53,7 +54,7 @@ let cleanupResources: {
   timerTreeView?: vscode.TreeView<unknown>;
   kanbanTreeView?: vscode.TreeView<unknown>;
   workloadStatusBar?: WorkloadStatusBar;
-  configChangeTimeout?: ReturnType<typeof setTimeout>;
+  debouncedConfigChange?: DebouncedFunction<(event: vscode.ConfigurationChangeEvent) => void>;
   timerController?: TimerController;
   timerStatusBar?: TimerStatusBar;
   timerTreeProvider?: TimerTreeProvider;
@@ -447,35 +448,34 @@ export function activate(context: vscode.ExtensionContext): void {
   // Initial check
   updateConfiguredContext();
 
-  // Listen for configuration changes
+  // Listen for configuration changes (debounced)
+  cleanupResources.debouncedConfigChange = debounce(
+    CONFIG_DEBOUNCE_MS,
+    async (event: vscode.ConfigurationChangeEvent) => {
+      // Only update server context for server-related config changes
+      // Skip for UI-only configs (statusBar, workingHours)
+      if (
+        !event.affectsConfiguration("redmine.statusBar") &&
+        !event.affectsConfiguration("redmine.workingHours")
+      ) {
+        await updateConfiguredContext();
+      }
+      // Re-initialize status bar on config change
+      if (event.affectsConfiguration("redmine.statusBar")) {
+        cleanupResources.workloadStatusBar?.reinitialize();
+        cleanupResources.workloadStatusBar?.update();
+      }
+      // Update status bar on schedule change
+      if (event.affectsConfiguration("redmine.workingHours")) {
+        cleanupResources.workloadStatusBar?.update();
+      }
+    }
+  );
+
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (!event.affectsConfiguration("redmine")) return;
-
-      // Clear pending timeout
-      if (cleanupResources.configChangeTimeout) {
-        clearTimeout(cleanupResources.configChangeTimeout);
-      }
-
-      cleanupResources.configChangeTimeout = setTimeout(async () => {
-        // Only update server context for server-related config changes
-        // Skip for UI-only configs (statusBar, workingHours)
-        if (
-          !event.affectsConfiguration("redmine.statusBar") &&
-          !event.affectsConfiguration("redmine.workingHours")
-        ) {
-          await updateConfiguredContext();
-        }
-        // Re-initialize status bar on config change
-        if (event.affectsConfiguration("redmine.statusBar")) {
-          cleanupResources.workloadStatusBar?.reinitialize();
-          cleanupResources.workloadStatusBar?.update();
-        }
-        // Update status bar on schedule change
-        if (event.affectsConfiguration("redmine.workingHours")) {
-          cleanupResources.workloadStatusBar?.update();
-        }
-      }, CONFIG_DEBOUNCE_MS);
+      cleanupResources.debouncedConfigChange?.(event);
     })
   );
 
@@ -808,10 +808,8 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 export function deactivate(): void {
-  // Clear pending config change timeout
-  if (cleanupResources.configChangeTimeout) {
-    clearTimeout(cleanupResources.configChangeTimeout);
-  }
+  // Cancel pending debounced config change
+  cleanupResources.debouncedConfigChange?.cancel();
 
   // Dispose tree providers
   if (cleanupResources.projectsTree) {

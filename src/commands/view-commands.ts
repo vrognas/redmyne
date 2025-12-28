@@ -7,8 +7,9 @@ import * as vscode from "vscode";
 import { ProjectsTree, ProjectsViewStyle } from "../trees/projects-tree";
 import { MyTimeEntriesTreeDataProvider } from "../trees/my-time-entries-tree";
 import { showStatusBarMessage } from "../utilities/status-bar";
+import { debounce } from "../utilities/debounce";
 
-const CONFIG_DEBOUNCE_MS = 300;
+const REFRESH_DEBOUNCE_MS = 300;
 
 export interface ViewCommandDeps {
   projectsTree: ProjectsTree;
@@ -21,18 +22,13 @@ export function registerViewCommands(
   context: vscode.ExtensionContext,
   deps: ViewCommandDeps
 ): void {
-  let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+  const debouncedRefresh = debounce(REFRESH_DEBOUNCE_MS, () => {
+    deps.projectsTree.clearProjects();
+    deps.projectsTree.refresh();
+  });
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("redmine.refreshIssues", () => {
-      if (refreshTimeout) {
-        clearTimeout(refreshTimeout);
-      }
-      refreshTimeout = setTimeout(() => {
-        deps.projectsTree.clearProjects();
-        deps.projectsTree.refresh();
-      }, CONFIG_DEBOUNCE_MS);
-    }),
+    vscode.commands.registerCommand("redmine.refreshIssues", debouncedRefresh),
 
     vscode.commands.registerCommand("redmine.toggleTreeView", () => {
       vscode.commands.executeCommand(

@@ -2,6 +2,9 @@ import * as vscode from "vscode";
 import { RedmineServer } from "../redmine/redmine-server";
 import { KanbanTask, TaskPriority } from "./kanban-state";
 import { Issue } from "../redmine/models/issue";
+import { debounce } from "../utilities/debounce";
+
+const SEARCH_DEBOUNCE_MS = 300;
 
 interface IssueQuickPickItem extends vscode.QuickPickItem {
   issue?: Issue;
@@ -165,7 +168,6 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
     quickPick.items = items;
     quickPick.matchOnDescription = true;
 
-    let searchTimeout: ReturnType<typeof setTimeout> | undefined;
     let resolved = false;
     let searchVersion = 0;
 
@@ -181,50 +183,51 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
       return false;
     };
 
-    quickPick.onDidChangeValue(async (value) => {
-      if (searchTimeout) clearTimeout(searchTimeout);
-      if (!value.trim()) {
+    const debouncedSearch = debounce(SEARCH_DEBOUNCE_MS, async (query: string) => {
+      if (query.length < 2) return;
+
+      const thisSearchVersion = ++searchVersion;
+      quickPick.busy = true;
+
+      try {
+        const searchResults = await server.searchIssues(query, 10);
+        if (thisSearchVersion !== searchVersion || resolved) return;
+
+        const seenIds = new Set(issues.map((i) => i.id));
+        const resultItems: IssueQuickPickItem[] = [];
+
+        for (const issue of searchResults) {
+          if (!seenIds.has(issue.id)) {
+            resultItems.push({
+              label: `$(search) #${issue.id} ${issue.subject}`,
+              description: issue.project?.name,
+              issue,
+            });
+          }
+        }
+
+        quickPick.items = [
+          ...resultItems,
+          { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
+          ...items,
+        ];
+      } catch {
+        // Search failed, keep local items
+      } finally {
+        if (thisSearchVersion === searchVersion) {
+          quickPick.busy = false;
+        }
+      }
+    });
+
+    quickPick.onDidChangeValue((value) => {
+      const query = value.trim();
+      if (!query) {
+        debouncedSearch.cancel();
         quickPick.items = items;
         return;
       }
-
-      searchTimeout = setTimeout(async () => {
-        const query = value.trim();
-        if (!query || query.length < 2) return;
-
-        const thisSearchVersion = ++searchVersion;
-        quickPick.busy = true;
-
-        try {
-          const searchResults = await server.searchIssues(query, 10);
-          if (thisSearchVersion !== searchVersion || resolved) return;
-
-          const seenIds = new Set(issues.map((i) => i.id));
-          const resultItems: IssueQuickPickItem[] = [];
-
-          for (const issue of searchResults) {
-            if (!seenIds.has(issue.id)) {
-              resultItems.push({
-                label: `$(search) #${issue.id} ${issue.subject}`,
-                description: issue.project?.name,
-                issue,
-              });
-            }
-          }
-
-          quickPick.items = [
-            ...resultItems,
-            { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
-            ...items,
-          ];
-        } catch {
-          // Search failed, keep local items
-        } finally {
-          if (thisSearchVersion === searchVersion) {
-            quickPick.busy = false;
-          }
-        }
-      }, 300);
+      debouncedSearch(query);
     });
 
     quickPick.onDidAccept(() => {
@@ -237,7 +240,7 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
     });
 
     quickPick.onDidHide(() => {
-      if (searchTimeout) clearTimeout(searchTimeout);
+      debouncedSearch.cancel();
       if (!resolved) {
         resolved = true;
         resolve(undefined);

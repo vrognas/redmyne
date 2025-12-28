@@ -8,6 +8,9 @@ import { showStatusBarMessage } from "../utilities/status-bar";
 import { errorToString } from "../utilities/error-feedback";
 import { buildProjectHierarchy, flattenHierarchyAll, FlatNodeWithVisibility, HierarchyNode } from "../utilities/hierarchy-builder";
 import { collapseState } from "../utilities/collapse-state";
+import { debounce, DebouncedFunction } from "../utilities/debounce";
+
+const COLLAPSE_DEBOUNCE_MS = 50;
 
 type ZoomLevel = "day" | "week" | "month" | "quarter" | "year";
 
@@ -349,7 +352,7 @@ export class GanttPanel {
   private _extendedRelationTypes: boolean = false;
   private _closedStatusIds: Set<number> = new Set();
   private _hiddenProjects: Set<number> = new Set(); // Projects hidden from view (persisted)
-  private _collapseDebounceTimer?: ReturnType<typeof setTimeout>;
+  private _debouncedCollapseUpdate: DebouncedFunction<() => void>;
   private _cachedHierarchy?: HierarchyNode[];
   private _skipCollapseRerender = false; // Skip re-render when collapse is from client-side
 
@@ -369,8 +372,10 @@ export class GanttPanel {
       this._hiddenProjects = new Set(saved);
     }
 
+    // Create debounced collapse update to prevent rapid re-renders
+    this._debouncedCollapseUpdate = debounce(COLLAPSE_DEBOUNCE_MS, () => this._updateContent());
+
     // Listen for collapse state changes from other views (Issues pane)
-    // Debounced to prevent rapid re-renders during fast expand/collapse
     // Skip re-render if triggered by our own client-side collapse
     this._disposables.push(
       collapseState.onDidChange(() => {
@@ -378,8 +383,7 @@ export class GanttPanel {
           this._skipCollapseRerender = false;
           return;
         }
-        clearTimeout(this._collapseDebounceTimer);
-        this._collapseDebounceTimer = setTimeout(() => this._updateContent(), 50);
+        this._debouncedCollapseUpdate();
       })
     );
   }
@@ -1134,7 +1138,7 @@ export class GanttPanel {
 
   public dispose(): void {
     GanttPanel.currentPanel = undefined;
-    clearTimeout(this._collapseDebounceTimer);
+    this._debouncedCollapseUpdate.cancel();
     this._panel.dispose();
     while (this._disposables.length) {
       const x = this._disposables.pop();

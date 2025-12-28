@@ -70,10 +70,11 @@ export function sortIssuesByField(
         return (a.id - b.id) * dir;
       case "subject":
         return a.subject.localeCompare(b.subject) * dir;
-      case "assignee":
+      case "assignee": {
         const nameA = a.assigned_to?.name || "";
         const nameB = b.assigned_to?.name || "";
         return nameA.localeCompare(nameB) * dir;
+      }
       default:
         return 0;
     }

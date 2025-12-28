@@ -2,6 +2,9 @@ import * as vscode from "vscode";
 import { RedmineServer } from "../redmine/redmine-server";
 import { Issue } from "../redmine/models/issue";
 import { TimeEntryActivity } from "../redmine/models/common";
+import { debounce } from "./debounce";
+
+const SEARCH_DEBOUNCE_MS = 300;
 
 interface IssueQuickPickItem extends vscode.QuickPickItem {
   issue?: Issue;
@@ -115,7 +118,6 @@ export async function pickIssueWithSearch(
     quickPick.items = baseItems;
     quickPick.matchOnDescription = true;
 
-    let searchTimeout: ReturnType<typeof setTimeout> | undefined;
     let resolved = false;
     let searchVersion = 0;
 
@@ -145,174 +147,173 @@ export async function pickIssueWithSearch(
       return false;
     };
 
-    quickPick.onDidChangeValue(async (value) => {
-      if (searchTimeout) clearTimeout(searchTimeout);
+    const debouncedSearch = debounce(SEARCH_DEBOUNCE_MS, async (query: string) => {
+      if (query.length < 2) return;
 
-      if (!value.trim()) {
-        quickPick.items = baseItems;
-        return;
-      }
+      const thisSearchVersion = ++searchVersion;
+      quickPick.busy = true;
 
-      // Debounce search (300ms)
-      searchTimeout = setTimeout(async () => {
-        const query = value.trim();
-        if (!query || query.length < 2) return;
+      try {
+        const lowerQuery = query.toLowerCase();
+        const cleanQuery = query.replace(/^#/, "");
+        const possibleId = parseInt(cleanQuery, 10);
+        const isNumericQuery = !isNaN(possibleId) && cleanQuery === String(possibleId);
 
-        const thisSearchVersion = ++searchVersion;
-        quickPick.busy = true;
+        // 1. Search local assigned issues
+        const localMatches = issues.filter((issue) =>
+          String(issue.id).includes(cleanQuery) ||
+          issue.subject.toLowerCase().includes(lowerQuery) ||
+          issue.project?.name?.toLowerCase().includes(lowerQuery)
+        );
 
-        try {
-          const lowerQuery = query.toLowerCase();
-          const cleanQuery = query.replace(/^#/, "");
-          const possibleId = parseInt(cleanQuery, 10);
-          const isNumericQuery = !isNaN(possibleId) && cleanQuery === String(possibleId);
+        // 2. Parallel: exact ID fetch + server text search
+        type SearchResult = {
+          exactMatch: Issue | null;
+          exactMatchError: string | null;
+          serverResults: Issue[];
+        };
 
-          // 1. Search local assigned issues
-          const localMatches = issues.filter((issue) =>
-            String(issue.id).includes(cleanQuery) ||
-            issue.subject.toLowerCase().includes(lowerQuery) ||
-            issue.project?.name?.toLowerCase().includes(lowerQuery)
-          );
+        const searchResult: SearchResult = { exactMatch: null, exactMatchError: null, serverResults: [] };
 
-          // 2. Parallel: exact ID fetch + server text search
-          type SearchResult = {
-            exactMatch: Issue | null;
-            exactMatchError: string | null;
-            serverResults: Issue[];
-          };
-
-          const searchResult: SearchResult = { exactMatch: null, exactMatchError: null, serverResults: [] };
-
-          await Promise.all([
-            (async () => {
-              if (isNumericQuery) {
-                try {
-                  const result = await server.getIssueById(possibleId);
-                  searchResult.exactMatch = result.issue;
-                } catch (error: unknown) {
-                  if (error instanceof Error) {
-                    searchResult.exactMatchError = error.message.includes("403") ? "no access" :
-                                     error.message.includes("404") ? "not found" : null;
-                  }
+        await Promise.all([
+          (async () => {
+            if (isNumericQuery) {
+              try {
+                const result = await server.getIssueById(possibleId);
+                searchResult.exactMatch = result.issue;
+              } catch (error: unknown) {
+                if (error instanceof Error) {
+                  searchResult.exactMatchError = error.message.includes("403") ? "no access" :
+                                   error.message.includes("404") ? "not found" : null;
                 }
               }
-            })(),
-            (async () => {
-              searchResult.serverResults = await server.searchIssues(query, 10);
-            })(),
-          ]);
-
-          const { exactMatch, exactMatchError, serverResults } = searchResult;
-
-          // 3. Merge results
-          const seenIds = new Set<number>();
-          const allResults: Issue[] = [];
-
-          if (exactMatch) {
-            allResults.push(exactMatch);
-            seenIds.add(exactMatch.id);
-          }
-          for (const issue of localMatches) {
-            if (!seenIds.has(issue.id)) {
-              allResults.push(issue);
-              seenIds.add(issue.id);
             }
-          }
-          for (const issue of serverResults) {
-            if (!seenIds.has(issue.id)) {
-              allResults.push(issue);
-              seenIds.add(issue.id);
-            }
-          }
+          })(),
+          (async () => {
+            searchResult.serverResults = await server.searchIssues(query, 10);
+          })(),
+        ]);
 
-          // 4. Check time tracking for new projects
-          const newProjectIds = [...new Set(
-            allResults
-              .map(i => i.project?.id)
-              .filter((id): id is number => id !== null && id !== undefined && !timeTrackingByProject.has(id))
-          )];
+        const { exactMatch, exactMatchError, serverResults } = searchResult;
 
-          if (newProjectIds.length > 0) {
-            await Promise.all(
-              newProjectIds.map(async (projectId) => {
-                try {
-                  const enabled = await server.isTimeTrackingEnabled(projectId);
-                  timeTrackingByProject.set(projectId, enabled);
-                } catch {
-                  timeTrackingByProject.set(projectId, false);
-                }
-              })
-            );
+        // 3. Merge results
+        const seenIds = new Set<number>();
+        const allResults: Issue[] = [];
+
+        if (exactMatch) {
+          allResults.push(exactMatch);
+          seenIds.add(exactMatch.id);
+        }
+        for (const issue of localMatches) {
+          if (!seenIds.has(issue.id)) {
+            allResults.push(issue);
+            seenIds.add(issue.id);
           }
+        }
+        for (const issue of serverResults) {
+          if (!seenIds.has(issue.id)) {
+            allResults.push(issue);
+            seenIds.add(issue.id);
+          }
+        }
 
-          // 5. Filter to trackable issues
-          const assignedIds = new Set(issues.map(i => i.id));
-          const trackableResults = allResults.filter((issue) => {
-            const projectId = issue.project?.id;
-            return projectId !== null && projectId !== undefined && timeTrackingByProject.get(projectId) === true;
+        // 4. Check time tracking for new projects
+        const newProjectIds = [...new Set(
+          allResults
+            .map(i => i.project?.id)
+            .filter((id): id is number => id !== null && id !== undefined && !timeTrackingByProject.has(id))
+        )];
+
+        if (newProjectIds.length > 0) {
+          await Promise.all(
+            newProjectIds.map(async (projectId) => {
+              try {
+                const enabled = await server.isTimeTrackingEnabled(projectId);
+                timeTrackingByProject.set(projectId, enabled);
+              } catch {
+                timeTrackingByProject.set(projectId, false);
+              }
+            })
+          );
+        }
+
+        // 5. Filter to trackable issues
+        const assignedIds = new Set(issues.map(i => i.id));
+        const trackableResults = allResults.filter((issue) => {
+          const projectId = issue.project?.id;
+          return projectId !== null && projectId !== undefined && timeTrackingByProject.get(projectId) === true;
+        });
+
+        // Sort: assigned issues first
+        trackableResults.sort((a, b) => {
+          const aAssigned = assignedIds.has(a.id);
+          const bAssigned = assignedIds.has(b.id);
+          if (aAssigned && !bAssigned) return -1;
+          if (!aAssigned && bAssigned) return 1;
+          return b.id - a.id;
+        });
+
+        // 6. Check if results are still relevant
+        if (thisSearchVersion !== searchVersion || resolved) return;
+
+        // 7. Build result items
+        const limitedResults = trackableResults.slice(0, 15);
+        const resultItems: IssueQuickPickItem[] = [];
+
+        if (isNumericQuery && exactMatchError && limitedResults.length === 0) {
+          resultItems.push({
+            label: `$(error) #${possibleId} ${exactMatchError}`,
+            disabled: true,
           });
+        }
 
-          // Sort: assigned issues first
-          trackableResults.sort((a, b) => {
-            const aAssigned = assignedIds.has(a.id);
-            const bAssigned = assignedIds.has(b.id);
-            if (aAssigned && !bAssigned) return -1;
-            if (!aAssigned && bAssigned) return 1;
-            return b.id - a.id;
+        if (limitedResults.length === 0 && resultItems.length === 0) {
+          resultItems.push({
+            label: `$(info) No results for "${query}"`,
+            disabled: true,
           });
+        }
 
-          // 6. Check if results are still relevant
-          if (thisSearchVersion !== searchVersion || resolved) return;
+        for (const issue of limitedResults) {
+          const isAssigned = assignedIds.has(issue.id);
+          const icon = isAssigned ? "$(account)" : "$(search)";
+          const assignedTag = isAssigned ? " (assigned)" : "";
+          resultItems.push({
+            label: `${icon} #${issue.id} ${issue.subject}`,
+            description: `${issue.project?.name ?? ""}${assignedTag}`,
+            detail: issue.status?.name,
+            issue,
+          });
+        }
 
-          // 7. Build result items
-          const limitedResults = trackableResults.slice(0, 15);
-          const resultItems: IssueQuickPickItem[] = [];
-
-          if (isNumericQuery && exactMatchError && limitedResults.length === 0) {
-            resultItems.push({
-              label: `$(error) #${possibleId} ${exactMatchError}`,
-              disabled: true,
-            });
-          }
-
-          if (limitedResults.length === 0 && resultItems.length === 0) {
-            resultItems.push({
-              label: `$(info) No results for "${query}"`,
-              disabled: true,
-            });
-          }
-
-          for (const issue of limitedResults) {
-            const isAssigned = assignedIds.has(issue.id);
-            const icon = isAssigned ? "$(account)" : "$(search)";
-            const assignedTag = isAssigned ? " (assigned)" : "";
-            resultItems.push({
-              label: `${icon} #${issue.id} ${issue.subject}`,
-              description: `${issue.project?.name ?? ""}${assignedTag}`,
-              detail: issue.status?.name,
-              issue,
-            });
-          }
-
+        quickPick.items = [
+          ...resultItems,
+          { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
+          ...baseItems,
+        ];
+      } catch {
+        if (thisSearchVersion === searchVersion && !resolved) {
           quickPick.items = [
-            ...resultItems,
+            { label: `$(error) Search failed`, disabled: true },
             { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
             ...baseItems,
           ];
-        } catch {
-          if (thisSearchVersion === searchVersion && !resolved) {
-            quickPick.items = [
-              { label: `$(error) Search failed`, disabled: true },
-              { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
-              ...baseItems,
-            ];
-          }
-        } finally {
-          if (thisSearchVersion === searchVersion) {
-            quickPick.busy = false;
-          }
         }
-      }, 300);
+      } finally {
+        if (thisSearchVersion === searchVersion) {
+          quickPick.busy = false;
+        }
+      }
+    });
+
+    quickPick.onDidChangeValue((value) => {
+      const query = value.trim();
+      if (!query) {
+        debouncedSearch.cancel();
+        quickPick.items = baseItems;
+        return;
+      }
+      debouncedSearch(query);
     });
 
     quickPick.onDidAccept(() => {
@@ -325,7 +326,7 @@ export async function pickIssueWithSearch(
     });
 
     quickPick.onDidHide(() => {
-      if (searchTimeout) clearTimeout(searchTimeout);
+      debouncedSearch.cancel();
       if (!resolved) {
         resolved = true;
         resolve(undefined);
