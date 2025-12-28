@@ -38,13 +38,13 @@ export function createLoadingTreeItem(message = "Loading..."): vscode.TreeItem {
   return item;
 }
 
-/** Skeleton bar patterns using light shade blocks for softer appearance */
+/** Skeleton bar patterns using Braille characters for modern appearance */
 const SKELETON_PATTERNS = [
-  "░░░░░░░░░░░░░░░░░░░░░░░░",
-  "░░░░░░░░░░░░░░░░",
-  "░░░░░░░░░░░░░░░░░░░░░░░░░░░░",
-  "░░░░░░░░░░░░░░",
-  "░░░░░░░░░░░░░░░░░░░░",
+  "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿",
+  "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿",
+  "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿",
+  "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿",
+  "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿",
 ];
 
 /**
