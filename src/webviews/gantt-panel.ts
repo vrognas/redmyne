@@ -1213,7 +1213,7 @@ export class GanttPanel {
       .join("");
 
     // Checkbox column (separate from labels) - shows ALL projects for toggling
-    const checkboxColumnWidth = 24;
+    const checkboxColumnWidth = 32;
     const checkboxSize = 14;
     const projectRows = allRows.filter(r => r.type === "project");
     const checkboxHeight = projectRows.length * (barHeight + barGap);
@@ -1236,13 +1236,13 @@ export class GanttPanel {
       .join("");
 
     // Left labels (fixed column) - includes ALL rows for client-side collapse
-    const labels = rows
-      .map((row) => {
-        // Use visible index for Y position; hidden rows get display:none via CSS
-        const visIdx = rowVisibleIndices.get(row.collapseKey) ?? 0;
-        const y = visIdx * (barHeight + barGap);
+    // Only render VISIBLE rows for performance (hidden rows not in DOM)
+    const visibleRows = rows.filter(r => r.isVisible);
+
+    const labels = visibleRows
+      .map((row, idx) => {
+        const y = idx * (barHeight + barGap);
         const indent = row.depth * indentSize;
-        const hiddenClass = row.isVisible ? "" : " row-collapsed";
         const chevron = row.hasChildren
           ? `<text class="collapse-toggle user-select-none" x="${3 + indent}" y="${barHeight / 2 + 4}" fill="var(--vscode-foreground)" font-size="10">${row.isExpanded ? "▼" : "▶"}</text>`
           : "";
@@ -1251,7 +1251,7 @@ export class GanttPanel {
         if (row.type === "project") {
           // Project header row (checkbox is in separate column)
           return `
-            <g class="project-label gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
+            <g class="project-label gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
               ${chevron}
               <text x="${5 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12" font-weight="bold">
                 ${escapeHtml(row.label)}
@@ -1274,7 +1274,7 @@ export class GanttPanel {
         ].join("\n");
 
         return `
-          <g class="issue-label gantt-row cursor-pointer${hiddenClass}" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Open issue #${issue.id}">
+          <g class="issue-label gantt-row cursor-pointer" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Open issue #${issue.id}">
             ${chevron}
             <text x="${5 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12">
               #${issue.id} ${escapedSubject}
@@ -1285,13 +1285,10 @@ export class GanttPanel {
       })
       .join("");
 
-    // Right bars (scrollable timeline) - includes ALL rows for client-side collapse
-    const bars = rows
-      .map((row) => {
-        // Use visible index for Y position; hidden rows get display:none via CSS
-        const visIdx = rowVisibleIndices.get(row.collapseKey) ?? 0;
-        const y = visIdx * (barHeight + barGap);
-        const hiddenClass = row.isVisible ? "" : " row-collapsed";
+    // Right bars (scrollable timeline) - only visible rows for performance
+    const bars = visibleRows
+      .map((row, idx) => {
+        const y = idx * (barHeight + barGap);
 
         // Project headers: always show aggregate bars
         if (row.type === "project") {
@@ -1319,7 +1316,7 @@ export class GanttPanel {
             })
             .join("");
 
-          return `<g class="aggregate-bars gantt-row${hiddenClass}" data-project-id="${row.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" transform="translate(0, ${y})">${aggregateBars}</g>`;
+          return `<g class="aggregate-bars gantt-row" data-project-id="${row.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" transform="translate(0, ${y})">${aggregateBars}</g>`;
         }
 
         const issue = row.issue!;
@@ -1453,7 +1450,7 @@ export class GanttPanel {
           // Parent done_ratio is weighted average of subtasks
           const parentDoneWidth = (doneRatio / 100) * (endX - startX - 8);
           return `
-            <g class="issue-bar parent-bar gantt-row${hiddenClass}" data-issue-id="${issue.id}"
+            <g class="issue-bar parent-bar gantt-row" data-issue-id="${issue.id}"
                data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
                data-start-date="${issue.start_date || ""}"
                data-due-date="${issue.due_date || ""}"
@@ -1482,7 +1479,7 @@ export class GanttPanel {
         }
 
         return `
-          <g class="issue-bar gantt-row${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hiddenClass}" data-issue-id="${issue.id}"
+          <g class="issue-bar gantt-row${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}" data-issue-id="${issue.id}"
              data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
              data-start-date="${issue.start_date || ""}"
              data-due-date="${issue.due_date || ""}"
@@ -1541,13 +1538,10 @@ export class GanttPanel {
       .join("");
 
     // Dependency arrows - draw from end of source to start of target
-    // Only include visible rows for proper Y positioning
     const issuePositions = new Map<number, { startX: number; endX: number; y: number }>();
-    for (const row of rows) {
-      if (row.type === "issue" && row.issue && row.isVisible) {
+    visibleRows.forEach((row, idx) => {
+      if (row.type === "issue" && row.issue) {
         const issue = row.issue;
-        const visIdx = rowVisibleIndices.get(row.collapseKey);
-        if (visIdx === undefined) continue;
         const start = issue.start_date
           ? new Date(issue.start_date)
           : new Date(issue.due_date!);
@@ -1565,10 +1559,10 @@ export class GanttPanel {
           ((endPlusOne.getTime() - minDate.getTime()) /
             (maxDate.getTime() - minDate.getTime())) *
           timelineWidth;
-        const y = visIdx * (barHeight + barGap) + barHeight / 2;
+        const y = idx * (barHeight + barGap) + barHeight / 2;
         issuePositions.set(issue.id, { startX, endX, y });
       }
-    }
+    });
 
     // Relation type styling - only forward types (reverse types are filtered out)
     // blocks/precedes/relates/duplicates/copied_to are shown
@@ -2189,162 +2183,6 @@ ${style.tip}
     const totalDays = ${totalDays};
     const dayWidth = timelineWidth / totalDays;
     const extendedRelationTypes = ${this._extendedRelationTypes};
-    const barHeight = ${barHeight};
-    const barGap = ${barGap};
-    const rowHeight = barHeight + barGap;
-
-    // Client-side collapse state tracking
-    const expandedKeys = new Set(${JSON.stringify([...collapseState.getExpandedKeys()])});
-
-    /**
-     * Toggle collapse state for a row client-side, then notify extension
-     * @param {string} collapseKey - The key of the row to toggle
-     * @param {string} action - 'toggle', 'collapse', or 'expand'
-     */
-    function toggleCollapseClientSide(collapseKey, action = 'toggle') {
-      const wasExpanded = expandedKeys.has(collapseKey);
-      let isExpanding;
-
-      if (action === 'collapse') {
-        isExpanding = false;
-      } else if (action === 'expand') {
-        isExpanding = true;
-      } else {
-        isExpanding = !wasExpanded;
-      }
-
-      // Update local state
-      if (isExpanding) {
-        expandedKeys.add(collapseKey);
-      } else {
-        expandedKeys.delete(collapseKey);
-      }
-
-      // Update chevron icon on the toggled row
-      const toggledLabels = document.querySelectorAll(\`[data-collapse-key="\${collapseKey}"].project-label, [data-collapse-key="\${collapseKey}"].issue-label\`);
-      toggledLabels.forEach(label => {
-        const chevron = label.querySelector('.collapse-toggle');
-        if (chevron) {
-          chevron.textContent = isExpanding ? '▼' : '▶';
-        }
-        label.dataset.expanded = isExpanding.toString();
-      });
-
-      // Find all descendant rows and toggle visibility
-      updateDescendantVisibility(collapseKey, isExpanding);
-
-      // Recalculate Y positions for all visible rows
-      recalculateRowPositions();
-
-      // Notify extension for persistence (don't wait for response)
-      vscode.postMessage({ command: 'collapseStateSync', collapseKey, isExpanded: isExpanding, action });
-    }
-
-    /**
-     * Update visibility of all descendants of a row
-     */
-    function updateDescendantVisibility(parentKey, parentVisible) {
-      // Find all rows that are direct children of this parent
-      const directChildren = document.querySelectorAll(\`[data-parent-key="\${parentKey}"].gantt-row\`);
-
-      directChildren.forEach(child => {
-        const childKey = child.dataset.collapseKey;
-        const isVisible = parentVisible;
-
-        if (isVisible) {
-          child.classList.remove('row-collapsed');
-        } else {
-          child.classList.add('row-collapsed');
-        }
-
-        // Recursively update grandchildren (if this child is expanded)
-        if (childKey) {
-          const childIsExpanded = expandedKeys.has(childKey);
-          // Grandchildren visible only if this child is visible AND expanded
-          updateDescendantVisibility(childKey, isVisible && childIsExpanded);
-        }
-      });
-    }
-
-    /**
-     * Recalculate Y positions for all visible rows in labels and bars
-     */
-    function recalculateRowPositions() {
-      // Get all gantt-row elements from labels and bars
-      const labelRows = Array.from(document.querySelectorAll('.gantt-labels .gantt-row'));
-      const barRows = Array.from(document.querySelectorAll('.gantt-timeline .gantt-row'));
-
-      // Calculate visible index for each row
-      let visibleIndex = 0;
-      const collapseKeyToIndex = new Map();
-
-      labelRows.forEach(row => {
-        const key = row.dataset.collapseKey;
-        if (!row.classList.contains('row-collapsed')) {
-          collapseKeyToIndex.set(key, visibleIndex++);
-        }
-      });
-
-      // Apply new Y positions to labels
-      labelRows.forEach(row => {
-        const key = row.dataset.collapseKey;
-        const idx = collapseKeyToIndex.get(key);
-        if (idx !== undefined) {
-          row.setAttribute('transform', \`translate(0, \${idx * rowHeight})\`);
-        }
-      });
-
-      // Apply new Y positions to bars
-      barRows.forEach(row => {
-        const key = row.dataset.collapseKey;
-        const idx = collapseKeyToIndex.get(key);
-        if (idx !== undefined) {
-          row.setAttribute('transform', \`translate(0, \${idx * rowHeight})\`);
-        }
-      });
-
-      // Update SVG heights
-      const visibleCount = visibleIndex;
-      const newHeight = visibleCount * rowHeight;
-      const labelsSvg = document.querySelector('.gantt-labels svg');
-      const barsSvg = document.querySelector('.gantt-timeline svg');
-      if (labelsSvg) labelsSvg.setAttribute('height', newHeight.toString());
-      if (barsSvg) barsSvg.setAttribute('height', newHeight.toString());
-
-      // Update zebra stripes (regenerate for proper alternation)
-      updateZebraStripes(visibleCount);
-    }
-
-    /**
-     * Update zebra stripe backgrounds for proper alternation
-     */
-    function updateZebraStripes(visibleCount) {
-      // Remove existing zebra stripes
-      document.querySelectorAll('.zebra-stripe').forEach(s => s.remove());
-
-      // Add new stripes (only for visible rows)
-      const barsSvg = document.querySelector('.gantt-timeline svg');
-      if (!barsSvg) return;
-
-      // Find the zebra group or create one
-      let zebraGroup = barsSvg.querySelector('.zebra-stripes-group');
-      if (!zebraGroup) {
-        zebraGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        zebraGroup.setAttribute('class', 'zebra-stripes-group');
-        barsSvg.insertBefore(zebraGroup, barsSvg.firstChild);
-      }
-
-      // Add stripes for odd rows
-      for (let i = 1; i < visibleCount; i += 2) {
-        const stripe = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        stripe.setAttribute('class', 'zebra-stripe');
-        stripe.setAttribute('x', '0');
-        stripe.setAttribute('y', (i * rowHeight).toString());
-        stripe.setAttribute('width', '100%');
-        stripe.setAttribute('height', rowHeight.toString());
-        zebraGroup.appendChild(stripe);
-      }
-    }
 
     // Cleanup previous event listeners (prevents accumulation on re-render)
     if (window._ganttCleanup) {
@@ -2525,7 +2363,7 @@ ${style.tip}
     }
 
     // Synchronize scrolling:
-    // - Vertical: labels <-> timeline body (checkbox column scrolls independently)
+    // - Vertical: checkbox, labels, timeline body all sync together
     // - Horizontal: timeline header <-> timeline body
     let scrollSyncing = false;
     let scrollReportTimeout = null;
@@ -2533,8 +2371,9 @@ ${style.tip}
       timelineColumn.addEventListener('scroll', () => {
         if (scrollSyncing) return;
         scrollSyncing = true;
-        // Sync vertical with labels
+        // Sync vertical with labels and checkbox column
         labelsColumn.scrollTop = timelineColumn.scrollTop;
+        if (checkboxColumn) checkboxColumn.scrollTop = timelineColumn.scrollTop;
         // Sync horizontal with header
         timelineHeader.scrollLeft = timelineColumn.scrollLeft;
         // Update minimap viewport
@@ -2557,8 +2396,19 @@ ${style.tip}
         if (scrollSyncing) return;
         scrollSyncing = true;
         timelineColumn.scrollTop = labelsColumn.scrollTop;
+        if (checkboxColumn) checkboxColumn.scrollTop = labelsColumn.scrollTop;
         requestAnimationFrame(() => { scrollSyncing = false; });
       });
+      // Sync from checkbox column scroll as well
+      if (checkboxColumn) {
+        checkboxColumn.addEventListener('scroll', () => {
+          if (scrollSyncing) return;
+          scrollSyncing = true;
+          timelineColumn.scrollTop = checkboxColumn.scrollTop;
+          labelsColumn.scrollTop = checkboxColumn.scrollTop;
+          requestAnimationFrame(() => { scrollSyncing = false; });
+        });
+      }
     }
 
     // Initial button state
@@ -2919,78 +2769,155 @@ ${style.tip}
       }, 0);
     }
 
-    // Shared hover highlight helper
+    // Build lookup maps for O(1) hover highlight (instead of repeated querySelectorAll)
+    const issueBarsByIssueId = new Map();
+    const issueLabelsByIssueId = new Map();
+    const arrowsByIssueId = new Map(); // arrows connected to an issue
+    const projectLabelsByKey = new Map();
+    const aggregateBarsByKey = new Map();
+
+    document.querySelectorAll('.issue-bar').forEach(bar => {
+      const id = bar.dataset.issueId;
+      if (id) {
+        if (!issueBarsByIssueId.has(id)) issueBarsByIssueId.set(id, []);
+        issueBarsByIssueId.get(id).push(bar);
+      }
+    });
+    document.querySelectorAll('.issue-label').forEach(label => {
+      const id = label.dataset.issueId;
+      if (id) {
+        if (!issueLabelsByIssueId.has(id)) issueLabelsByIssueId.set(id, []);
+        issueLabelsByIssueId.get(id).push(label);
+      }
+    });
+    document.querySelectorAll('.dependency-arrow').forEach(arrow => {
+      const fromId = arrow.dataset.from;
+      const toId = arrow.dataset.to;
+      if (fromId) {
+        if (!arrowsByIssueId.has(fromId)) arrowsByIssueId.set(fromId, []);
+        arrowsByIssueId.get(fromId).push(arrow);
+      }
+      if (toId) {
+        if (!arrowsByIssueId.has(toId)) arrowsByIssueId.set(toId, []);
+        arrowsByIssueId.get(toId).push(arrow);
+      }
+    });
+    document.querySelectorAll('.project-label').forEach(label => {
+      const key = label.dataset.collapseKey;
+      if (key) {
+        if (!projectLabelsByKey.has(key)) projectLabelsByKey.set(key, []);
+        projectLabelsByKey.get(key).push(label);
+      }
+    });
+    document.querySelectorAll('.aggregate-bars').forEach(bars => {
+      const key = bars.dataset.collapseKey;
+      if (key) {
+        if (!aggregateBarsByKey.has(key)) aggregateBarsByKey.set(key, []);
+        aggregateBarsByKey.get(key).push(bars);
+      }
+    });
+
+    // Track currently highlighted elements for fast clear
+    let highlightedElements = [];
+
     function clearHoverHighlight() {
       document.body.classList.remove('hover-focus', 'dependency-hover');
-      document.querySelectorAll('.hover-highlighted, .hover-source').forEach(el => {
-        el.classList.remove('hover-highlighted', 'hover-source');
-      });
+      highlightedElements.forEach(el => el.classList.remove('hover-highlighted', 'hover-source'));
+      highlightedElements = [];
     }
 
     function highlightIssue(issueId) {
       document.body.classList.add('hover-focus');
-      // Highlight bar and label
-      document.querySelectorAll('.issue-bar[data-issue-id="' + issueId + '"]').forEach(el => el.classList.add('hover-highlighted'));
-      document.querySelectorAll('.issue-label[data-issue-id="' + issueId + '"]').forEach(el => el.classList.add('hover-highlighted'));
-      // Highlight connected dependency arrows
-      document.querySelectorAll('.dependency-arrow[data-from="' + issueId + '"], .dependency-arrow[data-to="' + issueId + '"]').forEach(el => el.classList.add('hover-highlighted'));
+      // Use cached lookups (O(1) instead of DOM query)
+      (issueBarsByIssueId.get(issueId) || []).forEach(el => {
+        el.classList.add('hover-highlighted');
+        highlightedElements.push(el);
+      });
+      (issueLabelsByIssueId.get(issueId) || []).forEach(el => {
+        el.classList.add('hover-highlighted');
+        highlightedElements.push(el);
+      });
+      (arrowsByIssueId.get(issueId) || []).forEach(el => {
+        el.classList.add('hover-highlighted');
+        highlightedElements.push(el);
+      });
     }
 
-    // Issue bar hover
-    document.querySelectorAll('.issue-bar').forEach(bar => {
-      bar.addEventListener('mouseenter', () => {
-        const issueId = bar.dataset.issueId;
-        if (issueId) highlightIssue(issueId);
-      });
-      bar.addEventListener('mouseleave', clearHoverHighlight);
-    });
-
-    // Issue label hover
-    document.querySelectorAll('.issue-label').forEach(label => {
-      label.addEventListener('mouseenter', () => {
-        const issueId = label.dataset.issueId;
-        if (issueId) highlightIssue(issueId);
-      });
-      label.addEventListener('mouseleave', clearHoverHighlight);
-    });
-
-    // Aggregate bar hover (highlights project label and aggregate bars)
     function highlightProject(collapseKey) {
       document.body.classList.add('hover-focus');
-      document.querySelectorAll('.project-label[data-collapse-key="' + collapseKey + '"]').forEach(el => el.classList.add('hover-highlighted'));
-      document.querySelectorAll('.aggregate-bars[data-collapse-key="' + collapseKey + '"]').forEach(el => el.classList.add('hover-highlighted'));
+      (projectLabelsByKey.get(collapseKey) || []).forEach(el => {
+        el.classList.add('hover-highlighted');
+        highlightedElements.push(el);
+      });
+      (aggregateBarsByKey.get(collapseKey) || []).forEach(el => {
+        el.classList.add('hover-highlighted');
+        highlightedElements.push(el);
+      });
     }
 
-    document.querySelectorAll('.aggregate-bars').forEach(bars => {
-      bars.addEventListener('mouseenter', () => {
-        const collapseKey = bars.dataset.collapseKey;
-        if (collapseKey) highlightProject(collapseKey);
-      });
-      bars.addEventListener('mouseleave', clearHoverHighlight);
-    });
+    // Use event delegation for hover events (single listener instead of N listeners)
+    const timelineSvg = document.querySelector('.gantt-timeline svg');
+    const labelsSvg = document.querySelector('.gantt-labels svg');
 
-    // Project label hover
-    document.querySelectorAll('.project-label').forEach(label => {
-      label.addEventListener('mouseenter', () => {
-        const collapseKey = label.dataset.collapseKey;
-        if (collapseKey) highlightProject(collapseKey);
-      });
-      label.addEventListener('mouseleave', clearHoverHighlight);
-    });
+    if (timelineSvg) {
+      timelineSvg.addEventListener('mouseenter', (e) => {
+        const bar = e.target.closest('.issue-bar');
+        const aggBar = e.target.closest('.aggregate-bars');
+        const arrow = e.target.closest('.dependency-arrow');
+        if (bar) {
+          const issueId = bar.dataset.issueId;
+          if (issueId) highlightIssue(issueId);
+        } else if (aggBar) {
+          const key = aggBar.dataset.collapseKey;
+          if (key) highlightProject(key);
+        } else if (arrow) {
+          const fromId = arrow.dataset.from;
+          const toId = arrow.dataset.to;
+          document.body.classList.add('dependency-hover');
+          arrow.classList.add('hover-source');
+          highlightedElements.push(arrow);
+          if (fromId) highlightIssue(fromId);
+          if (toId) highlightIssue(toId);
+        }
+      }, true); // capture phase for delegation
 
-    // Dependency arrow interactions (hover highlight + right-click delete)
-    document.querySelectorAll('.dependency-arrow').forEach(arrow => {
-      // Hover: highlight connected issues, fade others
-      arrow.addEventListener('mouseenter', () => {
-        const fromId = arrow.dataset.from;
-        const toId = arrow.dataset.to;
-        document.body.classList.add('hover-focus', 'dependency-hover');
-        arrow.classList.add('hover-source');
-        // Highlight source and target
-        if (fromId) highlightIssue(fromId);
-        if (toId) highlightIssue(toId);
-      });
-      arrow.addEventListener('mouseleave', clearHoverHighlight);
+      timelineSvg.addEventListener('mouseleave', (e) => {
+        const bar = e.target.closest('.issue-bar');
+        const aggBar = e.target.closest('.aggregate-bars');
+        const arrow = e.target.closest('.dependency-arrow');
+        if (bar || aggBar || arrow) {
+          clearHoverHighlight();
+        }
+      }, true);
+    }
+
+    if (labelsSvg) {
+      labelsSvg.addEventListener('mouseenter', (e) => {
+        const label = e.target.closest('.issue-label');
+        const projectLabel = e.target.closest('.project-label');
+        if (label) {
+          const issueId = label.dataset.issueId;
+          if (issueId) highlightIssue(issueId);
+        } else if (projectLabel) {
+          const key = projectLabel.dataset.collapseKey;
+          if (key) highlightProject(key);
+        }
+      }, true);
+
+      labelsSvg.addEventListener('mouseleave', (e) => {
+        const label = e.target.closest('.issue-label');
+        const projectLabel = e.target.closest('.project-label');
+        if (label || projectLabel) {
+          clearHoverHighlight();
+        }
+      }, true);
+    }
+
+    // Dependency arrow right-click delete (delegated)
+    if (timelineSvg) {
+      timelineSvg.addEventListener('contextmenu', (e) => {
+        const arrow = e.target.closest('.dependency-arrow');
+        if (!arrow) return;
       // Right-click: show delete option
       arrow.addEventListener('contextmenu', (e) => {
         e.preventDefault();
@@ -3355,7 +3282,6 @@ ${style.tip}
     });
 
     // Collapse toggle click (before issue-label handler to stop propagation)
-    // Uses client-side collapse for instant feedback
     document.querySelectorAll('.collapse-toggle').forEach(el => {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -3363,49 +3289,19 @@ ${style.tip}
         const label = el.closest('[data-collapse-key]');
         const collapseKey = label?.dataset.collapseKey;
         if (collapseKey) {
-          toggleCollapseClientSide(collapseKey);
+          vscode.postMessage({ command: 'toggleCollapse', collapseKey });
         }
       });
     });
 
-    // Expand/collapse all buttons - still use server-side for full refresh
+    // Expand/collapse all buttons
     document.getElementById('expandAllBtn')?.addEventListener('click', () => {
       const keys = [...document.querySelectorAll('[data-collapse-key]')]
         .map(el => el.dataset.collapseKey)
         .filter((k, i, arr) => k && arr.indexOf(k) === i);
-      // Expand all client-side
-      keys.forEach(key => {
-        if (key && !expandedKeys.has(key)) {
-          expandedKeys.add(key);
-        }
-      });
-      // Update visibility for all rows
-      document.querySelectorAll('.gantt-row.row-collapsed').forEach(row => {
-        row.classList.remove('row-collapsed');
-      });
-      document.querySelectorAll('.collapse-toggle').forEach(chevron => {
-        chevron.textContent = '▼';
-      });
-      document.querySelectorAll('[data-expanded]').forEach(el => {
-        el.dataset.expanded = 'true';
-      });
-      recalculateRowPositions();
       vscode.postMessage({ command: 'expandAll', keys });
     });
     document.getElementById('collapseAllBtn')?.addEventListener('click', () => {
-      // Collapse all client-side
-      expandedKeys.clear();
-      // Hide all non-top-level rows
-      document.querySelectorAll('.gantt-row[data-parent-key]:not([data-parent-key=""])').forEach(row => {
-        row.classList.add('row-collapsed');
-      });
-      document.querySelectorAll('.collapse-toggle').forEach(chevron => {
-        chevron.textContent = '▶';
-      });
-      document.querySelectorAll('[data-expanded]').forEach(el => {
-        el.dataset.expanded = 'false';
-      });
-      recalculateRowPositions();
       vscode.postMessage({ command: 'collapseAll' });
     });
 
@@ -3475,16 +3371,16 @@ ${style.tip}
             break;
           case 'ArrowLeft':
             e.preventDefault();
-            // Collapse current row if it has children (client-side)
+            // Collapse current row if it has children
             if (collapseKey) {
-              toggleCollapseClientSide(collapseKey, 'collapse');
+              vscode.postMessage({ command: 'toggleCollapse', collapseKey, action: 'collapse' });
             }
             break;
           case 'ArrowRight':
             e.preventDefault();
-            // Expand current row if it has children (client-side)
+            // Expand current row if it has children
             if (collapseKey) {
-              toggleCollapseClientSide(collapseKey, 'expand');
+              vscode.postMessage({ command: 'toggleCollapse', collapseKey, action: 'expand' });
             }
             break;
           case 'Home':
@@ -3500,10 +3396,27 @@ ${style.tip}
     });
 
     // Handle drag move (resizing, moving, and linking)
+    // Use requestAnimationFrame to throttle updates for smooth 60fps
+    let dragRafPending = false;
+    let lastMouseEvent = null;
+
     addDocListener('mousemove', (e) => {
-      // Handle resize/move drag
-      if (dragState) {
-        const delta = e.clientX - dragState.initialMouseX;
+      // Early exit if no drag in progress
+      if (!dragState && !linkingState) return;
+
+      // Store latest event and schedule RAF if not pending
+      lastMouseEvent = e;
+      if (dragRafPending) return;
+      dragRafPending = true;
+
+      requestAnimationFrame(() => {
+        dragRafPending = false;
+        const evt = lastMouseEvent;
+        if (!evt) return;
+
+        // Handle resize/move drag
+        if (dragState) {
+          const delta = evt.clientX - dragState.initialMouseX;
 
         if (dragState.isMove && dragState.isBulkDrag && dragState.bulkBars) {
           // Bulk move: update all selected bars
@@ -3555,32 +3468,33 @@ ${style.tip}
         }
       }
 
-      // Handle linking drag
-      if (linkingState && tempArrow) {
-        // Use container rect + scroll to get SVG coordinates
-        const rect = timelineColumn.getBoundingClientRect();
-        const scrollLeft = timelineColumn.scrollLeft;
-        const scrollTop = timelineColumn.scrollTop;
-        const endX = e.clientX - rect.left + scrollLeft;
-        const endY = e.clientY - rect.top + scrollTop;
+        // Handle linking drag
+        if (linkingState && tempArrow) {
+          // Use container rect + scroll to get SVG coordinates
+          const rect = timelineColumn.getBoundingClientRect();
+          const scrollLeft = timelineColumn.scrollLeft;
+          const scrollTop = timelineColumn.scrollTop;
+          const endX = evt.clientX - rect.left + scrollLeft;
+          const endY = evt.clientY - rect.top + scrollTop;
 
-        // Draw dashed line from start to cursor
-        const path = \`M \${linkingState.startX} \${linkingState.startY} L \${endX} \${endY}\`;
-        tempArrow.setAttribute('d', path);
+          // Draw dashed line from start to cursor
+          const path = \`M \${linkingState.startX} \${linkingState.startY} L \${endX} \${endY}\`;
+          tempArrow.setAttribute('d', path);
 
-        // Find target bar under cursor
-        const targetBar = document.elementFromPoint(e.clientX, e.clientY)?.closest('.issue-bar');
-        if (currentTarget && currentTarget !== targetBar) {
-          currentTarget.classList.remove('link-target');
+          // Find target bar under cursor
+          const targetBar = document.elementFromPoint(evt.clientX, evt.clientY)?.closest('.issue-bar');
+          if (currentTarget && currentTarget !== targetBar) {
+            currentTarget.classList.remove('link-target');
+          }
+          if (targetBar && targetBar !== linkingState.fromBar) {
+            targetBar.classList.add('link-target');
+            currentTarget = targetBar;
+          } else {
+            currentTarget = null;
+          }
         }
-        if (targetBar && targetBar !== linkingState.fromBar) {
-          targetBar.classList.add('link-target');
-          currentTarget = targetBar;
-        } else {
-          currentTarget = null;
-        }
-      }
-    });
+      }); // end RAF
+    }); // end mousemove
 
     // Handle drag end (resizing, moving, and linking)
     addDocListener('mouseup', (e) => {
@@ -3827,6 +3741,7 @@ ${style.tip}
       if (savedScrollTop !== null) {
         timelineColumn.scrollTop = savedScrollTop;
         if (labelsColumn) labelsColumn.scrollTop = savedScrollTop;
+        if (checkboxColumn) checkboxColumn.scrollTop = savedScrollTop;
       }
       savedCenterDateMs = null;
       savedScrollTop = null;
@@ -3836,6 +3751,7 @@ ${style.tip}
       if (savedScrollTop !== null) {
         timelineColumn.scrollTop = savedScrollTop;
         if (labelsColumn) labelsColumn.scrollTop = savedScrollTop;
+        if (checkboxColumn) checkboxColumn.scrollTop = savedScrollTop;
       }
       savedScrollLeft = null;
       savedScrollTop = null;
