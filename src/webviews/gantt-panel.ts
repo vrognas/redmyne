@@ -1925,16 +1925,20 @@ ${style.tip}
     .gantt-timeline-header::-webkit-scrollbar { display: none; }
     .gantt-body-wrapper {
       display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+      overflow: hidden;
+    }
+    .gantt-body-scroll {
+      display: flex;
       flex-grow: 1;
       overflow-y: auto;
       overflow-x: hidden;
-      /* Children align to top, but timeline stretches for scrollbar at bottom */
-      align-items: flex-start;
     }
-    .gantt-body-wrapper::-webkit-scrollbar {
+    .gantt-body-scroll::-webkit-scrollbar {
       width: 8px;
     }
-    .gantt-body-wrapper::-webkit-scrollbar-thumb {
+    .gantt-body-scroll::-webkit-scrollbar-thumb {
       background: var(--vscode-scrollbarSlider-background);
       border-radius: 4px;
     }
@@ -1966,29 +1970,35 @@ ${style.tip}
     .gantt-resize-handle:hover, .gantt-resize-handle.dragging {
       background: var(--vscode-focusBorder);
     }
-    .gantt-timeline {
+    .gantt-timeline-wrapper {
       flex-grow: 1;
-      overflow-x: auto;
-      overflow-y: hidden;
-      /* Stretch to fill body-wrapper height so scrollbar is at visual bottom */
-      align-self: stretch;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
-    .gantt-timeline svg {
-      flex-shrink: 0;
-    }
-    .gantt-timeline::after {
-      /* Spacer to push scrollbar to bottom when content is short */
-      content: '';
+    .gantt-timeline {
       flex-grow: 1;
+      overflow-y: auto;
+      overflow-x: auto;
     }
     .gantt-timeline::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
+    .gantt-hscroll {
+      flex-shrink: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+    .gantt-hscroll::-webkit-scrollbar {
       height: 8px;
     }
-    .gantt-timeline::-webkit-scrollbar-thumb {
+    .gantt-hscroll::-webkit-scrollbar-thumb {
       background: var(--vscode-scrollbarSlider-background);
       border-radius: 4px;
+    }
+    .gantt-hscroll-content {
+      height: 1px;
     }
     svg { display: block; }
     .row-collapsed { display: none; }
@@ -2201,20 +2211,21 @@ ${style.tip}
       </div>
     </div>
     <div class="gantt-body-wrapper" id="ganttBodyWrapper">
-      <div class="gantt-checkboxes" id="ganttCheckboxes">
-        <svg width="${checkboxColumnWidth}" height="${bodyHeight}">
-          ${checkboxZebraStripes}
-          ${checkboxes}
-        </svg>
-      </div>
-      <div class="gantt-labels" id="ganttLabels">
-        <svg width="${labelWidth}" height="${bodyHeight}">
-          ${zebraStripes}
-          ${labels}
-        </svg>
-      </div>
-      <div class="gantt-resize-handle" id="resizeHandle"></div>
-      <div class="gantt-timeline" id="ganttTimeline">
+      <div class="gantt-body-scroll" id="ganttBodyScroll">
+        <div class="gantt-checkboxes" id="ganttCheckboxes">
+          <svg width="${checkboxColumnWidth}" height="${bodyHeight}">
+            ${checkboxZebraStripes}
+            ${checkboxes}
+          </svg>
+        </div>
+        <div class="gantt-labels" id="ganttLabels">
+          <svg width="${labelWidth}" height="${bodyHeight}">
+            ${zebraStripes}
+            ${labels}
+          </svg>
+        </div>
+        <div class="gantt-resize-handle" id="resizeHandle"></div>
+        <div class="gantt-timeline" id="ganttTimeline">
         <svg width="${timelineWidth + 50}" height="${bodyHeight}">
           <defs>
             <pattern id="past-stripes" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
@@ -2230,6 +2241,10 @@ ${style.tip}
           <g class="dependency-layer${this._showDependencies ? "" : " hidden"}">${dependencyArrows}</g>
           ${bars}
         </svg>
+        </div>
+      </div>
+      <div class="gantt-hscroll" id="ganttHScroll">
+        <div class="gantt-hscroll-content" style="width: ${timelineWidth + 50}px;"></div>
       </div>
     </div>
   </div>
@@ -2275,10 +2290,11 @@ ${style.tip}
 
     // Get DOM elements
     const ganttLeftHeader = document.getElementById('ganttLeftHeader');
-    const bodyWrapper = document.getElementById('ganttBodyWrapper');
+    const bodyScroll = document.getElementById('ganttBodyScroll');
     const labelsColumn = document.getElementById('ganttLabels');
     const timelineColumn = document.getElementById('ganttTimeline');
     const timelineHeader = document.getElementById('ganttTimelineHeader');
+    const hScroll = document.getElementById('ganttHScroll');
     const undoBtn = document.getElementById('undoBtn');
     const redoBtn = document.getElementById('redoBtn');
     const minimapSvg = document.getElementById('minimapSvg');
@@ -2403,7 +2419,7 @@ ${style.tip}
         redoStack,
         labelWidth: labelsColumn?.offsetWidth || ${labelWidth},
         scrollLeft: timelineColumn?.scrollLeft ?? null,
-        scrollTop: bodyWrapper?.scrollTop ?? null,
+        scrollTop: bodyScroll?.scrollTop ?? null,
         centerDateMs: null
       });
     }
@@ -2415,7 +2431,7 @@ ${style.tip}
         redoStack,
         labelWidth: labelsColumn?.offsetWidth || ${labelWidth},
         scrollLeft: null,
-        scrollTop: bodyWrapper?.scrollTop ?? null,
+        scrollTop: bodyScroll?.scrollTop ?? null,
         centerDateMs: getCenterDateMs()
       });
     }
@@ -2432,13 +2448,13 @@ ${style.tip}
       labelsColumn.style.width = previousState.labelWidth + 'px';
     }
 
-    // Scrolling: Single body wrapper handles vertical scroll (no sync needed!)
-    // Only horizontal scroll needs sync: timeline body → timeline header
+    // Scrolling: bodyScroll handles vertical, hScroll handles horizontal
     let deferredScrollUpdate = null;
-    if (bodyWrapper && timelineColumn && timelineHeader) {
-      // Horizontal scroll: sync timeline header with timeline body
-      timelineColumn.addEventListener('scroll', () => {
-        timelineHeader.scrollLeft = timelineColumn.scrollLeft;
+    if (bodyScroll && timelineColumn && timelineHeader && hScroll) {
+      // Horizontal scroll from hScroll → sync to timeline and header
+      hScroll.addEventListener('scroll', () => {
+        timelineColumn.scrollLeft = hScroll.scrollLeft;
+        timelineHeader.scrollLeft = hScroll.scrollLeft;
         // Defer non-critical updates
         cancelAnimationFrame(deferredScrollUpdate);
         deferredScrollUpdate = requestAnimationFrame(() => {
@@ -2446,8 +2462,13 @@ ${style.tip}
           saveState();
         });
       }, { passive: true });
+      // Horizontal scroll from timeline (e.g. via keyboard) → sync to hScroll and header
+      timelineColumn.addEventListener('scroll', () => {
+        hScroll.scrollLeft = timelineColumn.scrollLeft;
+        timelineHeader.scrollLeft = timelineColumn.scrollLeft;
+      }, { passive: true });
       // Vertical scroll: just update minimap and save state
-      bodyWrapper.addEventListener('scroll', () => {
+      bodyScroll.addEventListener('scroll', () => {
         cancelAnimationFrame(deferredScrollUpdate);
         deferredScrollUpdate = requestAnimationFrame(() => {
           updateMinimapViewport();
@@ -3781,21 +3802,24 @@ ${style.tip}
     if (savedCenterDateMs !== null && timelineColumn) {
       // Zoom change: restore by centering on saved date
       scrollToCenterDate(savedCenterDateMs);
-      if (savedScrollTop !== null && bodyWrapper) {
-        bodyWrapper.scrollTop = savedScrollTop;
+      if (hScroll) hScroll.scrollLeft = timelineColumn.scrollLeft;
+      if (savedScrollTop !== null && bodyScroll) {
+        bodyScroll.scrollTop = savedScrollTop;
       }
       savedCenterDateMs = null;
       savedScrollTop = null;
     } else if (savedScrollLeft !== null && timelineColumn) {
       // Other operations: restore pixel position
       timelineColumn.scrollLeft = savedScrollLeft;
-      if (savedScrollTop !== null && bodyWrapper) {
-        bodyWrapper.scrollTop = savedScrollTop;
+      if (hScroll) hScroll.scrollLeft = savedScrollLeft;
+      if (savedScrollTop !== null && bodyScroll) {
+        bodyScroll.scrollTop = savedScrollTop;
       }
       savedScrollLeft = null;
       savedScrollTop = null;
     } else {
       scrollToToday();
+      if (hScroll) hScroll.scrollLeft = timelineColumn?.scrollLeft ?? 0;
     }
     // Initialize minimap viewport
     updateMinimapViewport();
