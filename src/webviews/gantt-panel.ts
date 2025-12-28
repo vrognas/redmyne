@@ -1947,23 +1947,26 @@ ${style.tip}
     .gantt-checkboxes {
       flex-shrink: 0;
       width: ${checkboxColumnWidth}px;
+      height: ${bodyHeight}px;
       background: var(--vscode-editor-background);
       border-right: 1px solid var(--vscode-panel-border);
     }
-    .gantt-checkboxes svg { display: block; }
+    .gantt-checkboxes svg { display: block; height: 100%; }
     .project-checkbox:hover rect {
       stroke: var(--vscode-focusBorder);
     }
     .gantt-labels {
       flex-shrink: 0;
       width: ${labelWidth}px;
+      height: ${bodyHeight}px;
       min-width: 150px;
       max-width: 500px;
       background: var(--vscode-editor-background);
     }
-    .gantt-labels svg { width: 100%; }
+    .gantt-labels svg { width: 100%; height: 100%; }
     .gantt-resize-handle {
       width: 6px;
+      height: ${bodyHeight}px;
       background: var(--vscode-panel-border);
       cursor: col-resize;
       flex-shrink: 0;
@@ -1980,6 +1983,7 @@ ${style.tip}
     }
     .gantt-timeline {
       flex-grow: 1;
+      height: ${bodyHeight}px;
       overflow-y: hidden;
       overflow-x: auto;
     }
