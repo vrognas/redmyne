@@ -38,13 +38,13 @@ export function createLoadingTreeItem(message = "Loading..."): vscode.TreeItem {
   return item;
 }
 
-/** Skeleton bar patterns (varying widths for visual variety) */
+/** Skeleton bar patterns using light shade blocks for softer appearance */
 const SKELETON_PATTERNS = [
-  "━━━━━━━━━━━━━━━━━━━━",
-  "━━━━━━━━━━━━━━",
-  "━━━━━━━━━━━━━━━━━━━━━━━━",
-  "━━━━━━━━━━━━",
-  "━━━━━━━━━━━━━━━━━━",
+  "░░░░░░░░░░░░░░░░░░░░░░░░",
+  "░░░░░░░░░░░░░░░░",
+  "░░░░░░░░░░░░░░░░░░░░░░░░░░░░",
+  "░░░░░░░░░░░░░░",
+  "░░░░░░░░░░░░░░░░░░░░",
 ];
 
 /**
@@ -60,7 +60,7 @@ export function createSkeletonPlaceholders(count = 5): LoadingPlaceholder[] {
 
 /**
  * Create a VS Code TreeItem for skeleton loading state.
- * Uses faded bar characters to simulate content loading.
+ * Uses light shade blocks with animated icon for pulsating effect.
  */
 export function createSkeletonTreeItem(placeholder: LoadingPlaceholder): vscode.TreeItem {
   const index = placeholder.skeletonIndex ?? 0;
@@ -70,12 +70,11 @@ export function createSkeletonTreeItem(placeholder: LoadingPlaceholder): vscode.
     pattern,
     vscode.TreeItemCollapsibleState.None
   );
-  // Use a faded/dimmed icon to reinforce loading state
+  // Animated icon for pulsating effect
   item.iconPath = new vscode.ThemeIcon(
-    "circle-outline",
+    "loading~spin",
     new vscode.ThemeColor("disabledForeground")
   );
-  // Make the label appear faded
   item.description = "";
   return item;
 }
