@@ -2491,10 +2491,15 @@ ${style.tip}
           saveState();
         });
       }, { passive: true });
-      // Horizontal scroll from timeline (e.g. via keyboard) → sync to hScroll and header
+      // Horizontal scroll from timeline (e.g. via keyboard, wheel) → sync to hScroll, header, minimap
       timelineColumn.addEventListener('scroll', () => {
         hScroll.scrollLeft = timelineColumn.scrollLeft;
         timelineHeader.scrollLeft = timelineColumn.scrollLeft;
+        cancelAnimationFrame(deferredScrollUpdate);
+        deferredScrollUpdate = requestAnimationFrame(() => {
+          updateMinimapViewport();
+          saveState();
+        });
       }, { passive: true });
       // Vertical scroll: just update minimap and save state
       bodyScroll.addEventListener('scroll', () => {
