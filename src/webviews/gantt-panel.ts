@@ -2396,32 +2396,26 @@ ${style.tip}
     // Synchronize scrolling:
     // - Vertical: checkbox, labels, timeline body all sync together
     // - Horizontal: timeline header <-> timeline body
-    // Use synchronous reset for instant scroll sync (RAF caused 16ms lag)
+    // CRITICAL: Only scrollTop/scrollLeft sync happens synchronously
+    // Everything else (minimap, save, report) is deferred to avoid jank
     let scrollSyncing = false;
-    let scrollReportTimeout = null;
+    let deferredScrollUpdate = null;
     if (labelsColumn && timelineColumn && timelineHeader) {
       timelineColumn.addEventListener('scroll', () => {
         if (scrollSyncing) return;
         scrollSyncing = true;
-        // Sync vertical with labels and checkbox column
+        // Sync vertical with labels and checkbox column - SYNCHRONOUS
         labelsColumn.scrollTop = timelineColumn.scrollTop;
         if (checkboxColumn) checkboxColumn.scrollTop = timelineColumn.scrollTop;
-        // Sync horizontal with header
+        // Sync horizontal with header - SYNCHRONOUS
         timelineHeader.scrollLeft = timelineColumn.scrollLeft;
-        // Update minimap viewport
-        updateMinimapViewport();
-        // Save state immediately so collapse/expand preserves position
-        saveState();
-        // Report scroll position to extension (debounced)
-        clearTimeout(scrollReportTimeout);
-        scrollReportTimeout = setTimeout(() => {
-          vscode.postMessage({
-            command: 'scrollPosition',
-            left: timelineColumn.scrollLeft,
-            top: timelineColumn.scrollTop
-          });
-        }, 100);
         scrollSyncing = false;
+        // Defer non-critical updates
+        cancelAnimationFrame(deferredScrollUpdate);
+        deferredScrollUpdate = requestAnimationFrame(() => {
+          updateMinimapViewport();
+          saveState();
+        });
       }, { passive: true });
       labelsColumn.addEventListener('scroll', () => {
         if (scrollSyncing) return;
