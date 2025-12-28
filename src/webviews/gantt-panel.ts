@@ -1928,6 +1928,8 @@ ${style.tip}
       flex-grow: 1;
       overflow-y: auto;
       overflow-x: hidden;
+      /* Children align to top, but timeline stretches for scrollbar at bottom */
+      align-items: flex-start;
     }
     .gantt-body-wrapper::-webkit-scrollbar {
       width: 8px;
@@ -1968,6 +1970,18 @@ ${style.tip}
       flex-grow: 1;
       overflow-x: auto;
       overflow-y: hidden;
+      /* Stretch to fill body-wrapper height so scrollbar is at visual bottom */
+      align-self: stretch;
+      display: flex;
+      flex-direction: column;
+    }
+    .gantt-timeline svg {
+      flex-shrink: 0;
+    }
+    .gantt-timeline::after {
+      /* Spacer to push scrollbar to bottom when content is short */
+      content: '';
+      flex-grow: 1;
     }
     .gantt-timeline::-webkit-scrollbar {
       height: 8px;
