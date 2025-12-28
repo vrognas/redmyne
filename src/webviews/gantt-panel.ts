@@ -1237,39 +1237,31 @@ export class GanttPanel {
       })
       .join("");
 
-    // Checkbox column - shows checkboxes for:
-    // 1. Visible projects (at their row position)
-    // 2. Hidden projects (at bottom, so user can re-enable them)
-    // NOT: collapsed subprojects (parent must be expanded first)
+    // Checkbox column - shows checkboxes ONLY for visible projects at their row position
+    // Checkboxes align 1:1 with project rows in the labels column
+    // Hidden projects don't get checkboxes (use Refresh to reset all)
     const checkboxColumnWidth = 32;
     const checkboxSize = 14;
 
-    // Projects visible in main view (from filtered rows, not collapsed)
-    const visibleProjectRows = rows.filter(r => r.type === "project" && r.isVisible);
-    // Projects hidden via checkbox (need checkbox at bottom to re-enable)
-    const hiddenProjectRows = allRows.filter(r => r.type === "project" && this._hiddenProjects.has(r.id));
-    // Combine: visible projects + hidden projects
-    const projectRows = [...visibleProjectRows, ...hiddenProjectRows];
+    // Only visible projects get checkboxes (aligned with their label row)
+    const projectRows = visibleRows.filter(r => r.type === "project");
 
     // Zebra stripes for checkbox column - use same pattern as labels/timeline for alignment
     const checkboxZebraStripes = zebraStripes;
-    // Hidden project count is ONLY explicitly hidden projects (not collapsed ones)
-    const hiddenProjectCount = hiddenProjectRows.length;
-    let hiddenIdx = 0;
     const checkboxes = projectRows
       .map((row) => {
-        const isProjectVisible = !this._hiddenProjects.has(row.id);
-        // Get Y from visible row index, or stack hidden projects at bottom
-        const visibleIdx = rowVisibleIndices.get(row.collapseKey);
-        const y = visibleIdx !== undefined ? visibleIdx * (barHeight + barGap) : contentHeight + (hiddenIdx++) * (barHeight + barGap);
+        // Get Y from visible row index - guaranteed to exist since we filtered visibleRows
+        const visibleIdx = rowVisibleIndices.get(row.collapseKey)!;
+        const y = visibleIdx * (barHeight + barGap);
         const checkboxX = (checkboxColumnWidth - checkboxSize) / 2;
         const checkboxY = y + (barHeight - checkboxSize) / 2;
+        const isChecked = !this._hiddenProjects.has(row.id);
         return `
-          <g class="project-checkbox cursor-pointer" data-project-id="${row.id}" role="checkbox" aria-checked="${isProjectVisible}" aria-label="Show/hide ${escapeHtml(row.label)}">
+          <g class="project-checkbox cursor-pointer" data-project-id="${row.id}" role="checkbox" aria-checked="${isChecked}" aria-label="Show/hide ${escapeHtml(row.label)}">
             <rect x="${checkboxX}" y="${checkboxY}" width="${checkboxSize}" height="${checkboxSize}"
-                  fill="${isProjectVisible ? "var(--vscode-checkbox-background)" : "transparent"}"
+                  fill="${isChecked ? "var(--vscode-checkbox-background)" : "transparent"}"
                   stroke="var(--vscode-checkbox-border)" stroke-width="1" rx="2"/>
-            ${isProjectVisible ? `<text x="${checkboxX + checkboxSize / 2}" y="${checkboxY + checkboxSize - 3}" text-anchor="middle" fill="var(--vscode-checkbox-foreground)" font-size="11" font-weight="bold">✓</text>` : ""}
+            ${isChecked ? `<text x="${checkboxX + checkboxSize / 2}" y="${checkboxY + checkboxSize - 3}" text-anchor="middle" fill="var(--vscode-checkbox-foreground)" font-size="11" font-weight="bold">✓</text>` : ""}
             <title>${escapeHtml(row.label)}</title>
           </g>
         `;
@@ -1757,8 +1749,8 @@ ${style.tip}
         (maxDate.getTime() - minDate.getTime())) *
       timelineWidth;
 
-    // Include space for hidden project checkboxes at the bottom
-    const bodyHeight = contentHeight + hiddenProjectCount * (barHeight + barGap);
+    // Body height matches visible content (no hidden project checkboxes at bottom)
+    const bodyHeight = contentHeight;
 
     return `<!DOCTYPE html>
 <html lang="en">
