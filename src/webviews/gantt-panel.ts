@@ -1970,7 +1970,8 @@ ${style.tip}
       background: var(--vscode-dropdown-listBackground);
     }
     .filter-toggle select:focus {
-      background: var(--vscode-focusBorder);
+      outline: 1px solid var(--vscode-focusBorder);
+      outline-offset: -1px;
     }
     .filter-toggle label {
       font-size: 10px;
