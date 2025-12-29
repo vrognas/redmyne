@@ -2,8 +2,6 @@
 
 **Personal workload management for Redmine** — log time, track capacity, stay in flow.
 
-<!-- TODO: Add screenshot/GIF here for marketplace -->
-
 ## Quick Start
 
 ```
@@ -12,16 +10,7 @@
 3. Enter URL + API key
 ```
 
-That's it. Your issues appear in the sidebar.
-
-## What You Can Do
-
-| Action | How |
-|--------|-----|
-| **Log time** | `Ctrl+Y Ctrl+Y` → pick issue → enter hours |
-| **Create issue** | `Ctrl+Y Ctrl+N` → wizard without leaving IDE |
-| **Start timer** | `Ctrl+Y Ctrl+T` → plan work units for the day |
-| **See workload** | Click calendar icon → Gantt with heatmap |
+Your issues appear in the sidebar. Start logging time.
 
 ## Keyboard Shortcuts
 
@@ -33,91 +22,184 @@ That's it. Your issues appear in the sidebar.
 
 *(Mac: use `Cmd` instead of `Ctrl`)*
 
-## Sidebar Views
+## Features
 
-| View | Purpose |
-|------|---------|
-| **Issues** | Your assigned issues by project. Filter, sort, right-click for actions. |
-| **Kanban** | Stage tasks with notes before timing. Optional. |
-| **Today's Plan** | Timer work units. 45min work + 15min break. |
-| **Time Entries** | Logged time: Today, This Week, This Month. |
+### Issues View
 
-## Workload Visualization
+Browse your assigned issues grouped by project.
 
-### Issue Colors
-- 🔴 **Overbooked** — not enough hours before due date
-- 🟡 **At risk** — tight schedule
-- 🟢 **On track** — comfortable buffer
+**Filters:**
+- My Open Issues *(default)*
+- All Open Issues
+- My Closed Issues
+- All Issues
 
-### Status Bar
-Enable `redmine.statusBar.showWorkload` to see: **"25h left, +8h buffer"**
+**Sorting:** By #ID, Subject, or Assignee (click to toggle direction)
+
+**View modes:** Tree (hierarchy) or List (flat)
+
+**Actions (right-click):**
+- Quick Update (status + assignee + comment in one step)
+- Log Time
+- Set % Done
+- Create Sub-Issue
+- Show in Gantt
+- Open in Browser
+- Copy URL
+
+**Colors:**
+- 🔴 Overbooked — not enough hours before due date
+- 🟡 At risk — tight schedule
+- 🟢 On track — comfortable buffer
+
+### Time Entries View
+
+See logged time grouped by **Today**, **This Week**, **This Month**.
+
+**Filters:** My Time, All Users
+
+**Sorting:** By #ID, Subject, Comment, or User
+
+**Actions (right-click):**
+- Edit Time Entry
+- Delete Time Entry
+- Open in Browser
+
+**Add entries:** Right-click any date → Add Time Entry
 
 ### Gantt Chart
-- Drag edges to adjust dates, drag bar to move both
-- Multi-select with Ctrl+click, Shift+click, Ctrl+A
-- Minimap for large projects
-- Heatmap shows daily utilization (green → red)
-- Critical path highlights blocking chains
-- Dependency arrows (right-click to remove)
+
+Interactive timeline for workload visualization.
+
+**Editing:**
+- Drag bar edges → adjust start or due date
+- Drag bar body → move both dates together
+- Right-click bar → Update issue dialog
+
+**Selection:**
+- Click → select single issue
+- Ctrl+click → toggle selection
+- Shift+click → select range
+- Ctrl+A → select all
+- Drag selected → bulk move
+
+**Navigation:**
+- Arrow keys → move focus
+- Home/End → first/last issue
+- Enter → open issue actions
+- Minimap (bottom) → click/drag to navigate
+
+**Visualization:**
+- Zoom: Day / Week / Month / Quarter / Year
+- Heatmap toggle → daily utilization (green → red)
+- Critical path toggle → highlight blocking chains
+- % Done shown on bars
+- Overdue issues → red outline
+- Project filter → checkboxes to show/hide
+
+**Dependencies:**
+- Drag from circle → create relation
+- Right-click arrow → remove relation
+- Relation types: blocks, precedes, follows, relates, duplicates, copied
+
+**Other:**
 - Undo/redo for all edits
+- Project bars show aggregate dates
 
-## Timer (Optional)
+### Timer (Pomodoro)
 
-For structured work sessions:
+Structured work sessions with auto-logging.
 
 1. `Ctrl+Y Ctrl+T` → choose number of units
-2. Assign issues to each unit
+2. Assign issues/activities to each unit
 3. Work 45min → break 15min → repeat
 4. Time auto-logged when unit completes
 
-State persists across restarts. Sound notification on completion.
+**Features:**
+- Status bar countdown
+- Sound notification
+- State persists across restarts
+- Add/remove/reorder units
+- Skip break option
 
-## Settings
+### Kanban Board
+
+Stage tasks before timing them.
+
+- Add standalone tasks or link to Redmine issues
+- Priority levels: High / Medium / Low
+- Status: Todo → In Progress → Done
+- Add to Today's Plan when ready
+
+### Quick Actions
+
+| Action | How |
+|--------|-----|
+| Log time | `Ctrl+Y Ctrl+Y` → pick issue → enter hours (`2h`, `1:30`, `1.5`) |
+| Create issue | `Ctrl+Y Ctrl+N` → project → tracker → subject → done |
+| Create sub-issue | Right-click issue → Create Sub-Issue |
+| Quick update | Right-click issue → Quick Update (batch changes) |
+| View history | Right-click issue → View History |
+
+### Status Bar
+
+**Timer:** Shows countdown, issue number, progress (e.g., `32:15 #1234 [Dev] (3/6)`)
+
+**Workload:** Enable to see `25h left, +8h buffer` *(opt-in)*
+
+## All Settings
 
 ### Connection
 
-| Setting | Default |
-|---------|---------|
-| `redmine.url` | *(required)* |
-| `redmine.identifier` | `""` |
-| `redmine.additionalHeaders` | `{}` |
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `redmine.url` | Redmine server URL (HTTPS required) | — |
+| `redmine.identifier` | Default project identifier | `""` |
+| `redmine.additionalHeaders` | Custom HTTP headers for auth proxies | `{}` |
+
+API keys stored via `Redmine: Set API Key` command (encrypted keychain).
 
 ### Working Hours
 
-| Setting | Default |
-|---------|---------|
-| `redmine.workingHours.weeklySchedule` | 8h Mon-Fri |
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `redmine.workingHours.weeklySchedule` | Hours per day for capacity calculations | 8h Mon-Fri |
 
 ```json
 "redmine.workingHours.weeklySchedule": {
-  "Mon": 10, "Tue": 10, "Wed": 10, "Thu": 10,
-  "Fri": 0, "Sat": 0, "Sun": 0
+  "Mon": 8, "Tue": 8, "Wed": 8, "Thu": 8, "Fri": 8,
+  "Sat": 0, "Sun": 0
 }
 ```
 
-Monthly overrides: `Redmine: Edit Monthly Working Hours`
+**Monthly overrides:** `Redmine: Edit Monthly Working Hours` for varying FTE per month.
+
+### Status Bar
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `redmine.statusBar.showWorkload` | Show workload summary ("25h left, +8h buffer") | `false` |
+| `redmine.timer.showInStatusBar` | Show timer countdown | `true` |
 
 ### Behavior
 
-| Setting | Default |
-|---------|---------|
-| `redmine.statusBar.showWorkload` | `false` |
-| `redmine.timer.showInStatusBar` | `true` |
-| `redmine.autoUpdateDoneRatio` | `true` |
-| `redmine.logging.enabled` | `true` |
-| `redmine.gantt.extendedRelationTypes` | `false` |
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `redmine.autoUpdateDoneRatio` | Auto-update % Done when logging time (caps at 99%) | `true` |
+| `redmine.logging.enabled` | Log API requests to output channel for debugging | `true` |
+| `redmine.gantt.extendedRelationTypes` | Enable Gantt plugin relation types (FS/SS/FF/SF) | `false` |
 
 ## Requirements
 
 - VS Code 1.105+ or Positron 2025.06+
-- Redmine with REST API enabled
+- Redmine with REST API enabled (`/settings` → API tab)
 - API key from My Account → API access key
 
 ## Security
 
-- API keys in encrypted system keychain
-- HTTPS required
-- Sensitive data redacted in logs
+- API keys stored in encrypted system keychain (Windows Credential Manager / macOS Keychain / Linux libsecret)
+- HTTPS required — HTTP connections rejected
+- Sensitive data redacted in API logs
 
 ---
 
@@ -134,6 +216,22 @@ This extension is for developers: *"How is MY workload doing?"*
 Stay in your IDE. Stay in flow.
 
 ---
+
+<details>
+<summary>Commands Reference</summary>
+
+| Command | Description |
+|---------|-------------|
+| `Redmine: Set API Key` | Configure server URL and API key |
+| `Redmine: Quick Log Time` | Log time with keyboard (Ctrl+Y Ctrl+Y) |
+| `Redmine: Quick Create Issue` | Create issue wizard (Ctrl+Y Ctrl+N) |
+| `Redmine: Plan Day` | Set up timer work units (Ctrl+Y Ctrl+T) |
+| `Redmine: Show Gantt` | Open Gantt chart |
+| `Redmine: Edit Monthly Working Hours` | Configure FTE per month |
+| `Redmine: Show API Output` | View API request/response log |
+| `Redmine: Toggle API Logging` | Enable/disable request logging |
+
+</details>
 
 <details>
 <summary>Development</summary>
