@@ -1203,6 +1203,23 @@ export class GanttPanel {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
 
+    // Build hierarchical rows FIRST - needed to know which projects have rows
+    // Cache hierarchy to avoid rebuilding on collapse/expand
+    if (!this._cachedHierarchy) {
+      this._cachedHierarchy = buildProjectHierarchy(this._issues, this._flexibilityCache, this._projects);
+    }
+    // Get ALL nodes with visibility flags for client-side collapse management
+    const flatNodes = flattenHierarchyAll(this._cachedHierarchy, collapseState.getExpandedKeys());
+    const allRows = flatNodes.map((node) => nodeToGanttRow(node, this._flexibilityCache, this._closedStatusIds));
+
+    // Extract project IDs that have rows (only these should affect date range)
+    const projectIdsWithRows = new Set<number>();
+    for (const row of allRows) {
+      if (row.type === "project") {
+        projectIdsWithRows.add(row.id);
+      }
+    }
+
     // Build effective hidden projects set (includes children of hidden projects)
     const effectiveHiddenProjects = new Set(this._hiddenProjects);
     if (this._projects.length > 0) {
@@ -1229,9 +1246,10 @@ export class GanttPanel {
       }
     }
 
-    // Filter issues by visible projects for date range calculation
+    // Filter issues: must have a row AND not be hidden
+    // This fixes the bug where issues from projects without rows affected date range
     const visibleIssues = this._issues.filter(
-      (i) => !effectiveHiddenProjects.has(i.project.id)
+      (i) => projectIdsWithRows.has(i.project.id) && !effectiveHiddenProjects.has(i.project.id)
     );
 
     // Focus on active work: exclude completed issues with past dates
@@ -1265,6 +1283,21 @@ export class GanttPanel {
 
     // String format for open-ended bars (issues with start but no due date)
     const maxDateStr = maxDate.toISOString().slice(0, 10);
+    const minDateStr = minDate.toISOString().slice(0, 10);
+
+    // Debug info for troubleshooting date range issues
+    const debugInfo = {
+      totalIssues: this._issues.length,
+      projectsCount: this._projects.length,
+      projectIdsWithRows: [...projectIdsWithRows],
+      hiddenProjects: [...this._hiddenProjects],
+      effectiveHiddenProjects: [...effectiveHiddenProjects],
+      visibleIssuesCount: visibleIssues.length,
+      activeIssuesCount: activeIssues.length,
+      rangeBasisCount: rangeBasis.length,
+      minDate: minDateStr,
+      maxDate: maxDateStr,
+    };
 
     const totalDays = Math.max(1, Math.ceil(
       (maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)
@@ -1277,15 +1310,6 @@ export class GanttPanel {
     const barGap = 10;
     const headerHeight = 40;
     const indentSize = 16;
-
-    // Build hierarchical rows using shared hierarchy builder (with project hierarchy)
-    // Cache hierarchy to avoid rebuilding on collapse/expand
-    if (!this._cachedHierarchy) {
-      this._cachedHierarchy = buildProjectHierarchy(this._issues, this._flexibilityCache, this._projects);
-    }
-    // Get ALL nodes with visibility flags for client-side collapse management
-    const flatNodes = flattenHierarchyAll(this._cachedHierarchy, collapseState.getExpandedKeys());
-    const allRows = flatNodes.map((node) => nodeToGanttRow(node, this._flexibilityCache, this._closedStatusIds));
 
     // Hidden projects: use effectiveHiddenProjects (consistent with date range calculation)
     // Build lookup for faster ancestor checks
@@ -2328,6 +2352,7 @@ ${style.tip}
         <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-orange"></span>100-120%</span>
         <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-red"></span>&gt;120%</span>
       </div>
+      <span class="debug-range" style="font-size:10px; color:var(--vscode-descriptionForeground); margin-left:16px;" title="Date range from ${rangeBasis.length} issues">Range: ${minDateStr} → ${maxDateStr}</span>
       <div class="relation-legend${this._showDependencies ? "" : " hidden"}" title="Relation types (drag from link handle to create)">
         <span class="relation-legend-item"><span class="relation-legend-line rel-line-blocks"></span>blocks</span>
         <span class="relation-legend-item"><span class="relation-legend-line rel-line-precedes"></span>precedes</span>
@@ -2402,6 +2427,9 @@ ${style.tip}
     </svg>
   </div>
   <script nonce="${nonce}">
+    // DEBUG: Date range calculation info
+    console.log('[Gantt Debug]', ${JSON.stringify(debugInfo)});
+
     const vscode = acquireVsCodeApi();
     const timelineWidth = ${timelineWidth};
     const minDateMs = ${minDate.getTime()};
