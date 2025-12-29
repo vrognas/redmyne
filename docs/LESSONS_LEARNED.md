@@ -1,5 +1,15 @@
 # Lessons Learned
 
+Quick reference of key patterns. Details in sections below.
+
+**Testing**: DI over module mocks, 60% coverage realistic for VS Code extensions
+**Async**: Re-check state after await, deduplicate concurrent fetches
+**TypeScript**: Strict mode catches bugs, delete unused code (don't prefix `_`)
+**Performance**: Lazy load, cache rarely-changing data, progress for >200ms ops
+**State machines**: Find by state not index, deep clone persisted data, validate on restore
+
+---
+
 ## Code Quality Assessment (2025-11-24)
 
 ### Error Handling
