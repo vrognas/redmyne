@@ -1,13 +1,28 @@
-## Your Personal Timeline
+## Track & Review
 
-See **your assigned issues** on a Gantt-style timeline. Unlike Redmine's project Gantt, this shows only your workload — helping you answer "Am I overbooked?"
+### Time Entries View
 
-### Features
+See logged time grouped by **Today**, **This Week**, **This Month**.
 
-- **Drag bar edges** - Adjust start/due dates
-- **Drag from circle** - Create relations between issues
-- **Heatmap toggle** - See your daily utilization (green/yellow/orange/red)
-- **Progress bars** - Show done_ratio on each issue
-- **Zoom levels** - Day, Week, Month, Quarter, Year
+- Filter: My Time or All Users
+- Sort: By #ID, Subject, Comment, User
+- Right-click: Edit, delete, open in browser
 
-Past portions show diagonal stripes. Parent issues appear as summary bars.
+### Gantt Chart
+
+Visualize your workload on a timeline:
+
+- **Drag edges** - Adjust start/due dates
+- **Drag bar** - Move both dates together
+- **Multi-select** - Ctrl+click, Shift+click, Ctrl+A
+- **Minimap** - Navigate large timelines
+- **Heatmap** - See daily utilization (green→red)
+- **Critical path** - Highlight blocking chains
+
+Open via: Click calendar icon in Issues title bar, or `Redmine: Show Gantt`.
+
+### Status Bar
+
+Enable workload summary: `redmine.statusBar.showWorkload`
+
+Shows: "25h left, +8h buffer"

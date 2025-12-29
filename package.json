@@ -1144,13 +1144,13 @@
     "walkthroughs": [
       {
         "id": "redmine.getStarted",
-        "title": "Get Started with Redmine",
-        "description": "Learn how to connect to Redmine and manage your issues",
+        "title": "Get Started with Redmyne",
+        "description": "Personal workload management: Issues → Kanban → Plan → Time Entries",
         "steps": [
           {
             "id": "redmine.configure",
             "title": "Connect to Redmine",
-            "description": "Enter your Redmine server URL and API key to get started.\n\n[Configure Redmine](command:redmine.configure)",
+            "description": "Enter your Redmine server URL and API key.\n\n[Configure Redmine](command:redmine.configure)",
             "media": {
               "markdown": "media/walkthrough/configure.md"
             },
@@ -1158,26 +1158,26 @@
           },
           {
             "id": "redmine.viewIssues",
-            "title": "View Your Issues",
-            "description": "Open the Redmine sidebar to see issues assigned to you, organized by project.\n\n[Open Redmine Sidebar](command:workbench.view.extension.redmine-explorer)",
+            "title": "Find Your Work",
+            "description": "Browse issues, filter by status, add to Kanban.\n\n[Open Sidebar](command:workbench.view.extension.redmine-explorer)",
             "media": {
               "markdown": "media/walkthrough/view-issues.md"
             },
             "completionEvents": ["onView:redmine-explorer-projects"]
           },
           {
-            "id": "redmine.logTime",
-            "title": "Log Time Quickly",
-            "description": "Use the keyboard shortcut to log time without leaving your editor.\n\n**Shortcut:** `Ctrl+Y Ctrl+Y` (Mac: `Cmd+Y Cmd+Y`)\n\n[Log Time Now](command:redmine.quickLogTime)",
+            "id": "redmine.planDay",
+            "title": "Plan Your Day",
+            "description": "Use the timer for focused work sessions, or quick-log time directly.\n\n**Timer:** `Ctrl+Y Ctrl+T`\n**Quick Log:** `Ctrl+Y Ctrl+Y`\n\n[Plan Day](command:redmine.timer.planDay)",
             "media": {
               "markdown": "media/walkthrough/log-time.md"
             },
-            "completionEvents": ["onCommand:redmine.quickLogTime"]
+            "completionEvents": ["onCommand:redmine.timer.planDay"]
           },
           {
-            "id": "redmine.timeline",
-            "title": "Explore the Timeline",
-            "description": "View your issues on a Gantt chart with drag-to-edit dates and workload heatmap.\n\n[Open Timeline](command:redmine.showGantt)",
+            "id": "redmine.trackReview",
+            "title": "Track & Review",
+            "description": "View logged time, visualize workload on the Gantt chart.\n\n[Open Gantt](command:redmine.showGantt)",
             "media": {
               "markdown": "media/walkthrough/timeline.md"
             },

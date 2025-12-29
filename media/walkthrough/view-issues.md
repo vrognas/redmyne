@@ -1,11 +1,18 @@
-## My Issues
+## Find Your Work
 
-The sidebar shows **issues assigned to you** — not all project issues. This keeps focus on your personal task list.
+The **Issues** view shows issues grouped by project with risk indicators.
 
-### Features
+### Filter & Sort
 
-- **Tree View** - Your issues grouped by project hierarchy
-- **Risk Indicators** - Color-coded by schedule status (at-risk, overbooked)
-- **Quick Actions** - Click to update status, log time, or open in browser
+- **Filter** - My Open, All Open, My Closed, All Issues
+- **Sort** - By #ID, Subject, or Assignee
+- **View** - Tree (hierarchy) or List (flat)
 
-Projects with your assigned issues appear highlighted at the top.
+### Actions
+
+- Click issue → Update status, log time, quick update
+- Right-click → Create sub-issue, add to Kanban, show in Gantt
+
+### Next Step
+
+Found something to work on? Right-click → **Add to Kanban** to stage it.
