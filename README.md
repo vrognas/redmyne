@@ -112,19 +112,41 @@ Works with **VS Code** and **Positron IDE**.
 
 ## Extension Settings
 
-| Setting | Description |
-|---------|-------------|
-| `redmine.url` | Redmine server URL (HTTPS required) |
-| `redmine.identifier` | Default project identifier |
-| `redmine.additionalHeaders` | Custom HTTP headers |
-| `redmine.workingHours.weeklySchedule` | Hours per day (Mon-Sun) for capacity |
-| `redmine.statusBar.showWorkload` | Show workload summary in status bar |
-| `redmine.timer.showInStatusBar` | Show timer countdown in status bar |
-| `redmine.autoUpdateDoneRatio` | Auto-update %done when logging time |
+### Connection
 
-API keys: `Redmine: Set API Key` command.
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `redmine.url` | Redmine server URL (HTTPS required) | - |
+| `redmine.identifier` | Default project identifier | `""` |
+| `redmine.additionalHeaders` | Custom HTTP headers (e.g., auth proxy) | `{}` |
 
-Monthly schedules: `Redmine: Edit Monthly Working Hours` for varying FTE.
+API keys stored securely via `Redmine: Set API Key` command.
+
+### Working Hours
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `redmine.workingHours.weeklySchedule` | Hours per day (Mon-Sun) for capacity calculations | 8h Mon-Fri |
+
+Example for 4-day week:
+```json
+"redmine.workingHours.weeklySchedule": {
+  "Mon": 10, "Tue": 10, "Wed": 10, "Thu": 10,
+  "Fri": 0, "Sat": 0, "Sun": 0
+}
+```
+
+Monthly overrides: `Redmine: Edit Monthly Working Hours` command.
+
+### UI & Behavior
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `redmine.statusBar.showWorkload` | Show "25h left, +8h buffer" in status bar | `false` |
+| `redmine.timer.showInStatusBar` | Show timer countdown in status bar | `true` |
+| `redmine.autoUpdateDoneRatio` | Auto-update %done when logging time (caps at 99%) | `true` |
+| `redmine.logging.enabled` | Log API requests to output channel | `true` |
+| `redmine.gantt.extendedRelationTypes` | Enable Gantt plugin relation types (FS/SS/FF/SF) | `false` |
 
 ## Development
 
