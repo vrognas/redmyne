@@ -1263,15 +1263,12 @@ export class GanttPanel {
       Math.max(...dates.map((d) => new Date(d).getTime()))
     );
 
-    // Add padding days (use UTC to avoid timezone issues)
-    minDate.setUTCDate(minDate.getUTCDate() - 3);
-    maxDate.setUTCDate(maxDate.getUTCDate() + 7);
     // String format for open-ended bars (issues with start but no due date)
     const maxDateStr = maxDate.toISOString().slice(0, 10);
 
-    const totalDays = Math.ceil(
+    const totalDays = Math.max(1, Math.ceil(
       (maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)
-    );
+    ));
 
     const pixelsPerDay = ZOOM_PIXELS_PER_DAY[this._zoomLevel];
     const timelineWidth = Math.max(600, totalDays * pixelsPerDay);
