@@ -1203,9 +1203,35 @@ export class GanttPanel {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
 
+    // Build effective hidden projects set (includes children of hidden projects)
+    const effectiveHiddenProjects = new Set(this._hiddenProjects);
+    if (this._projects.length > 0) {
+      // Build parent→children map
+      const childrenMap = new Map<number, number[]>();
+      for (const p of this._projects) {
+        if (p.parent?.id) {
+          const siblings = childrenMap.get(p.parent.id) ?? [];
+          siblings.push(p.id);
+          childrenMap.set(p.parent.id, siblings);
+        }
+      }
+      // Recursively add children of hidden projects
+      const addChildren = (projectId: number) => {
+        for (const childId of childrenMap.get(projectId) ?? []) {
+          if (!effectiveHiddenProjects.has(childId)) {
+            effectiveHiddenProjects.add(childId);
+            addChildren(childId);
+          }
+        }
+      };
+      for (const hiddenId of this._hiddenProjects) {
+        addChildren(hiddenId);
+      }
+    }
+
     // Filter issues by visible projects for date range calculation
     const visibleIssues = this._issues.filter(
-      (i) => !this._hiddenProjects.has(i.project.id)
+      (i) => !effectiveHiddenProjects.has(i.project.id)
     );
 
     // Focus on active work: exclude completed issues with past dates
@@ -2546,27 +2572,20 @@ ${style.tip}
     }
 
     function saveState() {
+      // Always save centerDateMs for date-based scroll restoration
+      // This ensures correct position when date range changes (e.g., visibility toggle)
       vscode.setState({
         undoStack,
         redoStack,
         labelWidth: labelsColumn?.offsetWidth || ${labelWidth},
-        scrollLeft: timelineColumn?.scrollLeft ?? null,
-        scrollTop: bodyScroll?.scrollTop ?? null,
-        centerDateMs: null
-      });
-    }
-
-    // Save state with center date for zoom changes (preserves view center across zoom levels)
-    function saveStateForZoom() {
-      vscode.setState({
-        undoStack,
-        redoStack,
-        labelWidth: labelsColumn?.offsetWidth || ${labelWidth},
-        scrollLeft: null,
+        scrollLeft: null, // Deprecated: use centerDateMs instead
         scrollTop: bodyScroll?.scrollTop ?? null,
         centerDateMs: getCenterDateMs()
       });
     }
+
+    // Alias for backward compatibility (zoom changes now use same logic)
+    const saveStateForZoom = saveState;
 
     function updateUndoRedoButtons() {
       undoBtn.disabled = undoStack.length === 0;
@@ -3957,8 +3976,15 @@ ${style.tip}
     // Defer to next frame to avoid blocking initial paint and batch layout reads
     requestAnimationFrame(() => {
       if (savedCenterDateMs !== null && timelineColumn) {
-        // Zoom change: restore by centering on saved date
-        scrollToCenterDate(savedCenterDateMs);
+        // Date-based restore: works correctly when date range changes
+        // Clamp to current date range if saved date is outside
+        const clampedDateMs = Math.max(minDateMs, Math.min(maxDateMs, savedCenterDateMs));
+        if (clampedDateMs !== savedCenterDateMs) {
+          // Saved date was outside new range - scroll to today instead
+          scrollToToday();
+        } else {
+          scrollToCenterDate(savedCenterDateMs);
+        }
         if (hScroll) hScroll.scrollLeft = timelineColumn.scrollLeft;
         if (savedScrollTop !== null && bodyScroll) {
           bodyScroll.scrollTop = savedScrollTop;
@@ -3966,7 +3992,7 @@ ${style.tip}
         savedCenterDateMs = null;
         savedScrollTop = null;
       } else if (savedScrollLeft !== null && timelineColumn) {
-        // Other operations: restore pixel position
+        // Legacy pixel position (deprecated, kept for backward compat)
         timelineColumn.scrollLeft = savedScrollLeft;
         if (hScroll) hScroll.scrollLeft = savedScrollLeft;
         if (savedScrollTop !== null && bodyScroll) {
