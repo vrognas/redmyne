@@ -1145,39 +1145,39 @@
       {
         "id": "redmine.getStarted",
         "title": "Get Started with Redmyne",
-        "description": "Personal workload management for Redmine",
+        "description": "Log time without leaving your IDE",
         "steps": [
           {
             "id": "redmine.configure",
             "title": "Connect to Redmine",
-            "description": "Enter your server URL and API key.\n\n[Configure](command:redmine.configure)",
+            "description": "One-time setup. Enter URL and API key.\n\n[Configure](command:redmine.configure)",
             "media": {
               "markdown": "media/walkthrough/configure.md"
             },
             "completionEvents": ["onSettingChanged:redmine.url"]
           },
           {
-            "id": "redmine.viewIssues",
-            "title": "Find Your Work",
-            "description": "Browse issues assigned to you, filter and sort.\n\n[Open Sidebar](command:workbench.view.extension.redmine-explorer)",
-            "media": {
-              "markdown": "media/walkthrough/view-issues.md"
-            },
-            "completionEvents": ["onView:redmine-explorer-projects"]
-          },
-          {
             "id": "redmine.logTime",
-            "title": "Log Your Time",
-            "description": "**Quick Log:** `Ctrl+Y Ctrl+Y` — fastest way\n\n**Timer:** `Ctrl+Y Ctrl+T` — structured sessions\n\n[Log Time](command:redmine.quickLogTime)",
+            "title": "Log Your First Entry",
+            "description": "Try it: **Ctrl+Y Ctrl+Y** → pick issue → enter hours → done.\n\n[Log Time Now](command:redmine.quickLogTime)",
             "media": {
               "markdown": "media/walkthrough/log-time.md"
             },
             "completionEvents": ["onCommand:redmine.quickLogTime"]
           },
           {
-            "id": "redmine.review",
-            "title": "Review Your Work",
-            "description": "See logged time, visualize workload on Gantt.\n\n[Open Gantt](command:redmine.showGantt)",
+            "id": "redmine.viewIssues",
+            "title": "Browse Your Issues",
+            "description": "See what's assigned to you. Color = schedule risk.\n\n[Open Sidebar](command:workbench.view.extension.redmine-explorer)",
+            "media": {
+              "markdown": "media/walkthrough/view-issues.md"
+            },
+            "completionEvents": ["onView:redmine-explorer-projects"]
+          },
+          {
+            "id": "redmine.goDeeper",
+            "title": "Go Deeper",
+            "description": "Gantt chart, Timer, Kanban — when you're ready.\n\n[Open Gantt](command:redmine.showGantt)",
             "media": {
               "markdown": "media/walkthrough/timeline.md"
             },

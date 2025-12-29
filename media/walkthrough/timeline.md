@@ -1,26 +1,19 @@
-## Review Your Work
-
-### Time Entries
-
-See logged time grouped by **Today**, **This Week**, **This Month**.
-
-- Hours totals and utilization percentages
-- Filter: My Time or All Users
-- Right-click to edit or delete entries
+## Go Deeper
 
 ### Gantt Chart
 
-Visualize your workload on a timeline:
+Visualize your workload. Drag bars to adjust dates. Toggle heatmap to see capacity.
 
-- **Drag edges** to adjust dates
-- **Drag bar** to move both dates
-- **Heatmap** shows daily utilization
-- **Critical path** highlights blocking chains
+Open: Click the calendar icon in Issues title bar.
 
-Open: Calendar icon in Issues title bar
+### Timer (Ctrl+Y Ctrl+T)
 
-### Status Bar (Optional)
+Work in focused sessions. 45min work → 15min break → auto-log.
 
-Enable `redmine.statusBar.showWorkload` to see:
+### Time Entries
 
-**"25h left, +8h buffer"** — at a glance capacity
+See what you've logged today, this week, this month. Edit or delete entries.
+
+### Kanban
+
+Stage tasks with notes before timing them. Your personal planning board.

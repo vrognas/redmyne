@@ -1,20 +1,18 @@
-## Find Your Work
+## Your Issues at a Glance
 
-The **Issues** view shows your assigned issues grouped by project.
+The sidebar shows issues **assigned to you**, grouped by project.
 
-### Filter & Sort
+### What the Colors Mean
 
-- **Filter** - My Open, All Open, My Closed, All Issues
-- **Sort** - By #ID, Subject, or Assignee
-- **View** - Tree (hierarchy) or List (flat)
+- 🟢 **Green** — On track
+- 🟡 **Yellow** — At risk (tight schedule)
+- 🔴 **Red** — Overbooked (not enough time)
 
 ### Quick Actions
 
-- **Click issue** → Update status, log time, quick update
-- **Right-click** → Create sub-issue, show in Gantt, copy URL
+- **Click** any issue → update status, log time
+- **Right-click** → create sub-issue, show in Gantt
 
-### Color Indicators
+### Filter & Sort
 
-- 🔴 **Red** - Overbooked (not enough time)
-- 🟡 **Yellow** - At risk (tight schedule)
-- 🟢 **Green** - On track
+Use the toolbar icons to filter (My Open, All, Closed) and sort (ID, Subject, Assignee).
