@@ -1,13 +1,19 @@
-## Your Personal Timeline
+## Go Deeper
 
-See **your assigned issues** on a Gantt-style timeline. Unlike Redmine's project Gantt, this shows only your workload — helping you answer "Am I overbooked?"
+### Gantt Chart
 
-### Features
+Visualize your workload. Drag bars to adjust dates. Toggle heatmap to see capacity.
 
-- **Drag bar edges** - Adjust start/due dates
-- **Drag from circle** - Create relations between issues
-- **Heatmap toggle** - See your daily utilization (green/yellow/orange/red)
-- **Progress bars** - Show done_ratio on each issue
-- **Zoom levels** - Day, Week, Month, Quarter, Year
+Open: Click the calendar icon in Issues title bar.
 
-Past portions show diagonal stripes. Parent issues appear as summary bars.
+### Timer (Ctrl+Y Ctrl+T)
+
+Work in focused sessions. 45min work → 15min break → auto-log.
+
+### Time Entries
+
+See what you've logged today, this week, this month. Edit or delete entries.
+
+### Kanban
+
+Stage tasks with notes before timing them. Your personal planning board.

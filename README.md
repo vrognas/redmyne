@@ -1,154 +1,261 @@
 # Redmyne
 
-> **⚠️ This is a fork** of [vscode-redmine](https://github.com/rozpuszczalny/vscode-redmine) by Tomasz Domański (MIT licensed).
-> This extension adds **personal workload management features** not present in the original.
-
-**Personal workload management for developers using Redmine.**
-
-## Why This Extension?
-
-Redmine's web UI asks: *"How is the PROJECT doing?"* — release status, team activity, where time is being spent. It's built for project managers and stakeholders.
-
-**This extension asks a different question: *"How is MY WORKLOAD doing?"***
-
-- What's assigned to me?
-- Am I overbooked this week?
-- What should I work on next?
-- How much time did I log today?
-
-If you're a **developer** using Redmine, you don't need another project dashboard — you need **personal productivity tools** integrated into your IDE where you already work.
-
-### Why not just use Redmine's web UI?
-
-The web UI is great for project-level oversight, but switching contexts between your IDE and browser breaks flow. This extension keeps your task list, time logging, and timeline **right next to your code**.
-
-### Why not RedmineX or other clients?
-
-Desktop clients like RedmineX replicate Redmine's full project management interface. They're powerful, but they're still project-focused tools. This extension is intentionally focused on **your personal workflow** — minimal UI, fast actions, IDE integration.
-
-**Think of it as:** Redmine for *you*, not Redmine for your *project*.
-
-## What's Different From the Original?
-
-| Feature | Original | This Fork |
-|---------|----------|-----------|
-| **Gantt Chart** | ❌ | ✅ Interactive timeline with drag-to-edit |
-| **Workload Heatmap** | ❌ | ✅ Visual capacity utilization |
-| **Quick Time Logging** | ❌ | ✅ Ctrl+Y Ctrl+Y shortcut |
-| **Quick Create Issue** | ❌ | ✅ Ctrl+Y Ctrl+N wizard |
-| **Flexibility Scoring** | ❌ | ✅ Overbooked/at-risk/on-track indicators |
-| **Status Bar Workload** | ❌ | ✅ "25h left, +8h buffer" |
-| **Sub-Issue Creation** | ❌ | ✅ Right-click context menu |
-| **Time Entry View** | ❌ | ✅ Today/Week/Month grouping |
-
-## Features
-
-### Workload Visualization
-- **Gantt Chart** - interactive timeline with drag-to-edit dates, dependency arrows, undo/redo
-- **Workload Heatmap** - color-coded daily utilization (green → red)
-- **Flexibility Scoring** - issues marked as overbooked/at-risk/on-track
-- **Status Bar** - "25h left, +8h buffer" at a glance
-
-### Quick Actions
-- **Quick Time Logging** (Ctrl+Y Ctrl+Y) - flexible formats: `2.5`, `1:45`, `1h 45min`
-- **Quick Create Issue** (Ctrl+Y Ctrl+N) - full wizard without leaving IDE
-- **Create Sub-Issue** - right-click context menu
-
-### Sidebar
-- Issues assigned to you, grouped by project
-- Time entries grouped by Today/Week/Month
-- Issue actions: change status, log time, quick update
-
-### Workflow
-
-The sidebar views follow a natural planning flow:
-
-**Issues** → **Personal Tasks** → **Today's Plan** → **Time Entries**
-
-1. **Issues** - Find issues to work on (toggle filter to show all or just yours)
-2. **Personal Tasks** - Stage work with comments before timing
-3. **Today's Plan** - Timer-tracked work units
-4. **Time Entries** - Logged time in Redmine (toggle filter to view team's time)
-
-## Compatibility
-
-This extension works with both **Positron IDE** and **VS Code**.
-
-## Requirements
-
-- VS Code 1.106.0+
-- Redmine with REST API enabled (`/settings?tab=api`, requires admin)
-- API key from Redmine account (`/my/account`)
+**Personal workload management for Redmine** — log time, track capacity, stay in flow.
 
 ## Quick Start
 
+```
 1. Install extension
-2. Run: `Redmine: Set API Key`
-3. Enter URL and API key
-4. Done!
+2. Ctrl+Shift+P → "Redmine: Set API Key"
+3. Enter URL + API key
+```
+
+Your issues appear in the sidebar. Start logging time.
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+Y Ctrl+Y` | Quick log time |
+| `Ctrl+Y Ctrl+N` | Quick create issue |
+| `Ctrl+Y Ctrl+T` | Plan day / toggle timer |
+
+*(Mac: use `Cmd` instead of `Ctrl`)*
+
+## Features
+
+### Issues View
+
+Browse your assigned issues grouped by project.
+
+**Filters:**
+- My Open Issues *(default)*
+- All Open Issues
+- My Closed Issues
+- All Issues
+
+**Sorting:** By #ID, Subject, or Assignee (click to toggle direction)
+
+**View modes:** Tree (hierarchy) or List (flat)
+
+**Actions (right-click):**
+- Quick Update (status + assignee + comment in one step)
+- Log Time
+- Set % Done
+- Create Sub-Issue
+- Show in Gantt
+- Open in Browser
+- Copy URL
+
+**Colors:**
+- 🔴 Overbooked — not enough hours before due date
+- 🟡 At risk — tight schedule
+- 🟢 On track — comfortable buffer
+
+### Time Entries View
+
+See logged time grouped by **Today**, **This Week**, **This Month**.
+
+**Filters:** My Time, All Users
+
+**Sorting:** By #ID, Subject, Comment, or User
+
+**Actions (right-click):**
+- Edit Time Entry
+- Delete Time Entry
+- Open in Browser
+
+**Add entries:** Right-click any date → Add Time Entry
+
+### Gantt Chart
+
+Interactive timeline for workload visualization.
+
+**Editing:**
+- Drag bar edges → adjust start or due date
+- Drag bar body → move both dates together
+- Right-click bar → Update issue dialog
+
+**Selection:**
+- Click → select single issue
+- Ctrl+click → toggle selection
+- Shift+click → select range
+- Ctrl+A → select all
+- Drag selected → bulk move
+
+**Navigation:**
+- Arrow keys → move focus
+- Home/End → first/last issue
+- Enter → open issue actions
+- Minimap (bottom) → click/drag to navigate
+
+**Visualization:**
+- Zoom: Day / Week / Month / Quarter / Year
+- Heatmap toggle → daily utilization (green → red)
+- Critical path toggle → highlight blocking chains
+- % Done shown on bars
+- Overdue issues → red outline
+- Project filter → checkboxes to show/hide
+
+**Dependencies:**
+- Drag from circle → create relation
+- Right-click arrow → remove relation
+- Relation types: blocks, precedes, follows, relates, duplicates, copied
+
+**Other:**
+- Undo/redo for all edits
+- Project bars show aggregate dates
+
+### Timer (Pomodoro)
+
+Structured work sessions with auto-logging.
+
+1. `Ctrl+Y Ctrl+T` → choose number of units
+2. Assign issues/activities to each unit
+3. Work 45min → break 15min → repeat
+4. Time auto-logged when unit completes
+
+**Features:**
+- Status bar countdown
+- Sound notification
+- State persists across restarts
+- Add/remove/reorder units
+- Skip break option
+
+### Kanban Board
+
+Stage tasks before timing them.
+
+- Add standalone tasks or link to Redmine issues
+- Priority levels: High / Medium / Low
+- Status: Todo → In Progress → Done
+- Add to Today's Plan when ready
+
+### Quick Actions
+
+| Action | How |
+|--------|-----|
+| Log time | `Ctrl+Y Ctrl+Y` → pick issue → enter hours (`2h`, `1:30`, `1.5`) |
+| Create issue | `Ctrl+Y Ctrl+N` → project → tracker → subject → done |
+| Create sub-issue | Right-click issue → Create Sub-Issue |
+| Quick update | Right-click issue → Quick Update (batch changes) |
+| View history | Right-click issue → View History |
+
+### Status Bar
+
+**Timer:** Shows countdown, issue number, progress (e.g., `32:15 #1234 [Dev] (3/6)`)
+
+**Workload:** Enable to see `25h left, +8h buffer` *(opt-in)*
+
+## All Settings
+
+### Connection
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `redmine.url` | Redmine server URL (HTTPS required) | — |
+| `redmine.identifier` | Default project identifier | `""` |
+| `redmine.additionalHeaders` | Custom HTTP headers for auth proxies | `{}` |
+
+API keys stored via `Redmine: Set API Key` command (encrypted keychain).
+
+### Working Hours
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `redmine.workingHours.weeklySchedule` | Hours per day for capacity calculations | 8h Mon-Fri |
+
+```json
+"redmine.workingHours.weeklySchedule": {
+  "Mon": 8, "Tue": 8, "Wed": 8, "Thu": 8, "Fri": 8,
+  "Sat": 0, "Sun": 0
+}
+```
+
+**Monthly overrides:** `Redmine: Edit Monthly Working Hours` for varying FTE per month.
+
+### Status Bar
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `redmine.statusBar.showWorkload` | Show workload summary ("25h left, +8h buffer") | `false` |
+| `redmine.timer.showInStatusBar` | Show timer countdown | `true` |
+
+### Behavior
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `redmine.autoUpdateDoneRatio` | Auto-update % Done when logging time (caps at 99%) | `true` |
+| `redmine.logging.enabled` | Log API requests to output channel for debugging | `true` |
+| `redmine.gantt.extendedRelationTypes` | Enable Gantt plugin relation types (FS/SS/FF/SF) | `false` |
+
+## Requirements
+
+- VS Code 1.105+ or Positron 2025.06+
+- Redmine with REST API enabled (`/settings` → API tab)
+- API key from My Account → API access key
 
 ## Security
 
-API keys stored in VS Code Secrets (encrypted, machine-local).
+- API keys stored in encrypted system keychain (Windows Credential Manager / macOS Keychain / Linux libsecret)
+- HTTPS required — HTTP connections rejected
+- Sensitive data redacted in API logs
 
-## Migrating from v2.x
+---
 
-See [Migration Guide](./MIGRATION_GUIDE.md).
+## Why This Extension?
 
-## Extension Settings
+Redmine's web UI is for project managers: *"How is the project doing?"*
 
-| Setting | Description |
+This extension is for developers: *"How is MY workload doing?"*
+
+- What's assigned to me?
+- Am I overbooked?
+- How much did I log today?
+
+Stay in your IDE. Stay in flow.
+
+---
+
+<details>
+<summary>Commands Reference</summary>
+
+| Command | Description |
 |---------|-------------|
-| `redmine.url` | Redmine server URL (HTTPS required) |
-| `redmine.identifier` | Default project identifier |
-| `redmine.additionalHeaders` | Custom HTTP headers |
-| `redmine.workingHours.weeklySchedule` | Hours per day for capacity calculations |
-| `redmine.statusBar.showWorkload` | Show workload summary in status bar |
+| `Redmine: Set API Key` | Configure server URL and API key |
+| `Redmine: Quick Log Time` | Log time with keyboard (Ctrl+Y Ctrl+Y) |
+| `Redmine: Quick Create Issue` | Create issue wizard (Ctrl+Y Ctrl+N) |
+| `Redmine: Plan Day` | Set up timer work units (Ctrl+Y Ctrl+T) |
+| `Redmine: Show Gantt` | Open Gantt chart |
+| `Redmine: Edit Monthly Working Hours` | Configure FTE per month |
+| `Redmine: Show API Output` | View API request/response log |
+| `Redmine: Toggle API Logging` | Enable/disable request logging |
 
-API keys are stored securely via `Redmine: Set API Key` command.
+</details>
 
-## Development Setup
-
-After cloning:
+<details>
+<summary>Development</summary>
 
 ```bash
-npm install
-npm run install-hooks
+npm install        # deps + git hooks
+npm run compile    # build
+npm test           # tests
+npm run ci         # lint + typecheck + test
 ```
 
-Git hooks validate commit messages (subject ≤50 chars, body ≤72 chars).
+See [CONTRIBUTING.md](./CONTRIBUTING.md)
 
-## Contribution
+</details>
 
-If you want to contribute to the project, please read [contributing guide](./CONTRIBUTING.md) guide.
+<details>
+<summary>Attributions</summary>
 
-## Known Issues
+Fork of [vscode-redmine](https://github.com/rozpuszczalny/vscode-redmine) by Tomasz Domański (MIT).
 
-No known issues yet. If you found one, feel free to open an issue!
+Contributors: Doğan Özdoğan (tree view), Markus Amshove (quick update).
 
-## Release Notes
+Logo remixed from Redmine Logo © 2009 Martin Herr ([CC BY-SA 2.5](http://creativecommons.org/licenses/by-sa/2.5/)).
 
-See [change log](./CHANGELOG.md)
+</details>
 
-## Contributors
-
-This extension builds upon the excellent work of:
-
-- **Tomasz Domański** ([@rozpuszczalny](https://github.com/rozpuszczalny)) - Original author
-- **Doğan Özdoğan** - Tree view feature
-- **Markus Amshove** - Quick update feature
-
-## Attributions
-
-### Original Project
-
-This extension is a fork of [vscode-redmine](https://github.com/rozpuszczalny/vscode-redmine) by Tomasz Domański.
-
-Copyright 2018 Tomasz Domański. Licensed under the MIT License.
-
-### Logo
-
-Logo is remixed version of original Redmine Logo.
-
-Redmine Logo is Copyright (C) 2009 Martin Herr and is licensed under the Creative Commons Attribution-Share Alike 2.5 Generic license.
-See http://creativecommons.org/licenses/by-sa/2.5/ for more details.
+[Changelog](./CHANGELOG.md) · [Issues](https://github.com/vrognas/redmyne/issues)

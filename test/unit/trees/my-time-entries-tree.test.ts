@@ -13,6 +13,19 @@ const getYesterdayStr = () => {
   return d.toISOString().split("T")[0];
 };
 
+// Helper to get a weekday (Mon-Fri) within current week
+const getWeekdayThisWeek = () => {
+  const d = new Date();
+  const day = d.getDay(); // 0=Sun, 6=Sat
+  // If weekend, go back to Friday
+  if (day === 0) d.setDate(d.getDate() - 2); // Sun -> Fri
+  else if (day === 6) d.setDate(d.getDate() - 1); // Sat -> Fri
+  return d.toISOString().split("T")[0];
+};
+
+// Get day of month from date string
+const getDayOfMonth = (dateStr: string) => parseInt(dateStr.split("-")[2], 10);
+
 describe("MyTimeEntriesTreeDataProvider", () => {
   let mockServer: {
     getTimeEntries: ReturnType<typeof vi.fn>;
@@ -429,8 +442,9 @@ describe("MyTimeEntriesTreeDataProvider", () => {
   });
 
   it("groups This Week entries by day of week with empty working days", async () => {
-    // Use a fixed Wednesday date to ensure it's a working day
-    const testDate = "2025-12-24"; // Wednesday (working day)
+    // Use a dynamic weekday within current week
+    const testDate = getWeekdayThisWeek();
+    const dayNum = getDayOfMonth(testDate).toString();
 
     // Create entries for the test date
     const weekEntries: TimeEntry[] = [
@@ -471,8 +485,8 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     expect(dayGroups.length).toBeGreaterThanOrEqual(1);
     expect(dayGroups[0].type).toBe("day-group");
 
-    // Find the day with entries (Wed 24)
-    const entryNode = dayGroups.find((d) => d.label?.includes("24"));
+    // Find the day with entries
+    const entryNode = dayGroups.find((d) => d.label?.includes(dayNum));
 
     expect(entryNode).toBeDefined();
 
@@ -486,8 +500,9 @@ describe("MyTimeEntriesTreeDataProvider", () => {
 
   it("shows empty working days in week view", async () => {
     // Test that week-group includes working days even without entries
-    // Use a fixed Wednesday date to avoid weekend/timezone issues
-    const testDate = "2025-12-24"; // Wednesday
+    // Use a dynamic weekday within current week
+    const testDate = getWeekdayThisWeek();
+    const dayNum = getDayOfMonth(testDate).toString();
 
     const weekEntries: TimeEntry[] = [
       {
@@ -514,16 +529,17 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     // Should have at least 1 day with entry
     expect(dayGroups.length).toBeGreaterThanOrEqual(1);
 
-    // Find node for Dec 24
-    const entryNode = dayGroups.find((d) => d.label?.includes("24"));
+    // Find node for the test date
+    const entryNode = dayGroups.find((d) => d.label?.includes(dayNum));
     expect(entryNode).toBeDefined();
     expect(entryNode!.description).toContain("8:00");
   });
 
   it("shows non-working day only if has entries", async () => {
     // Test that non-working days (Sat/Sun with 0 scheduled hours) appear only when they have entries
-    // Use a fixed Wednesday date to avoid weekend/timezone issues
-    const testDate = "2025-12-24"; // Wednesday
+    // Use a dynamic weekday within current week
+    const testDate = getWeekdayThisWeek();
+    const dayNum = getDayOfMonth(testDate).toString();
 
     const weekEntries: TimeEntry[] = [
       {
@@ -547,8 +563,8 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     const thisWeek = groups[1];
     const dayGroups = await provider.getChildren(thisWeek);
 
-    // Find node for Dec 24 - it should be present because it has an entry
-    const entryNode = dayGroups.find((d) => d.label?.includes("24"));
+    // Find node for test date - it should be present because it has an entry
+    const entryNode = dayGroups.find((d) => d.label?.includes(dayNum));
 
     expect(entryNode).toBeDefined();
     expect(entryNode!.description).toContain("2:00");

@@ -1,10 +1,10 @@
-## Personal Workload Management
+## Stay in Flow
 
-This extension focuses on **your** work, not project-level oversight. Think of it as your personal Redmine dashboard — see your issues, log your time, plan your week.
+Stop context-switching to the browser. Log time, check issues, plan work — all from your IDE.
 
-### Setup Requirements
+### What You Need
 
-1. **Redmine URL** - Your server's HTTPS address (e.g., `https://redmine.example.com`)
-2. **API Key** - Found in Redmine under *My Account* → *API access key*
+1. **Redmine URL** — Your server's HTTPS address
+2. **API Key** — *My Account* → *API access key* in Redmine
 
-Your credentials are stored securely in your system's encrypted keychain.
+That's it. Your credentials are encrypted in your system keychain.

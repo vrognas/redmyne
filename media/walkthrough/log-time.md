@@ -1,12 +1,17 @@
-## Log Time Without Leaving Your IDE
+## Your First Quick Log
 
-Track your time without switching to the browser. Stay in flow.
+Try it now:
 
-### Quick Log (Ctrl+Y Ctrl+Y)
+1. Press **Ctrl+Y Ctrl+Y** (Mac: Cmd+Y Cmd+Y)
+2. Pick an issue
+3. Enter hours: `2h`, `30m`, or `1.5`
+4. Done.
 
-1. Press `Ctrl+Y Ctrl+Y` (or `Cmd+Y Cmd+Y` on Mac)
-2. Select from recent issues or search
-3. Enter hours (e.g., `2h`, `30m`, `1.5`)
-4. Optional: Add activity and comment
+No browser. No page loads. Just logged.
 
-Your entries appear in the *My Time Entries* sidebar view.
+### Time Formats
+
+All of these work:
+- `2` or `2h` → 2 hours
+- `30m` → 30 minutes
+- `1:30` or `1h 30m` → 1.5 hours

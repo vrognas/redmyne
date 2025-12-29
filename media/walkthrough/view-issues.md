@@ -1,11 +1,18 @@
-## My Issues
+## Your Issues at a Glance
 
-The sidebar shows **issues assigned to you** — not all project issues. This keeps focus on your personal task list.
+The sidebar shows issues **assigned to you**, grouped by project.
 
-### Features
+### What the Colors Mean
 
-- **Tree View** - Your issues grouped by project hierarchy
-- **Risk Indicators** - Color-coded by schedule status (at-risk, overbooked)
-- **Quick Actions** - Click to update status, log time, or open in browser
+- 🟢 **Green** — On track
+- 🟡 **Yellow** — At risk (tight schedule)
+- 🔴 **Red** — Overbooked (not enough time)
 
-Projects with your assigned issues appear highlighted at the top.
+### Quick Actions
+
+- **Click** any issue → update status, log time
+- **Right-click** → create sub-issue, show in Gantt
+
+### Filter & Sort
+
+Use the toolbar icons to filter (My Open, All, Closed) and sort (ID, Subject, Assignee).
