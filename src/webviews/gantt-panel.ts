@@ -1287,10 +1287,7 @@ export class GanttPanel {
     const flatNodes = flattenHierarchyAll(this._cachedHierarchy, collapseState.getExpandedKeys());
     const allRows = flatNodes.map((node) => nodeToGanttRow(node, this._flexibilityCache, this._closedStatusIds));
 
-    // Hidden projects: don't filter out, just sort to bottom and hide their bars
-    // This allows users to still see and expand hidden projects, just no timeline bars
-    const hiddenProjects = this._hiddenProjects;
-
+    // Hidden projects: use effectiveHiddenProjects (consistent with date range calculation)
     // Build lookup for faster ancestor checks
     const rowByCollapseKey = new Map(allRows.map(r => [r.collapseKey, r]));
     const hiddenTreeCache = new Map<string, boolean>();
@@ -1300,9 +1297,9 @@ export class GanttPanel {
       if (cached !== undefined) return cached;
 
       let result = false;
-      if (row.type === "project" && hiddenProjects.has(row.id)) {
+      if (row.type === "project" && effectiveHiddenProjects.has(row.id)) {
         result = true;
-      } else if (row.issue?.projectId && hiddenProjects.has(row.issue.projectId)) {
+      } else if (row.issue?.projectId && effectiveHiddenProjects.has(row.issue.projectId)) {
         result = true;
       } else if (row.parentKey) {
         const parentRow = rowByCollapseKey.get(row.parentKey);
