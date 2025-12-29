@@ -1,16 +1,14 @@
 ## Personal Workload Management
 
-This extension focuses on **your** work, not project-level oversight. Your personal Redmine dashboard — find issues, plan work, log time.
+This extension focuses on **your** work, not project-level oversight.
 
-### Setup Requirements
+- See issues assigned to you
+- Log time without leaving your IDE
+- Track your capacity and schedule
 
-1. **Redmine URL** - Your server's HTTPS address (e.g., `https://redmine.example.com`)
-2. **API Key** - Found in Redmine under *My Account* → *API access key*
+### Setup
 
-Credentials stored securely in your system's encrypted keychain.
+1. **Redmine URL** - Your server's HTTPS address
+2. **API Key** - Found in *My Account* → *API access key*
 
-### The Workflow
-
-**Issues** → **Kanban** → **Today's Plan** → **Time Entries**
-
-Find work, stage it, time it, log it.
+Credentials stored in your system's encrypted keychain.

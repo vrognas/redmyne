@@ -1,6 +1,6 @@
 ## Find Your Work
 
-The **Issues** view shows issues grouped by project with risk indicators.
+The **Issues** view shows your assigned issues grouped by project.
 
 ### Filter & Sort
 
@@ -8,11 +8,13 @@ The **Issues** view shows issues grouped by project with risk indicators.
 - **Sort** - By #ID, Subject, or Assignee
 - **View** - Tree (hierarchy) or List (flat)
 
-### Actions
+### Quick Actions
 
-- Click issue → Update status, log time, quick update
-- Right-click → Create sub-issue, add to Kanban, show in Gantt
+- **Click issue** → Update status, log time, quick update
+- **Right-click** → Create sub-issue, show in Gantt, copy URL
 
-### Next Step
+### Color Indicators
 
-Found something to work on? Right-click → **Add to Kanban** to stage it.
+- 🔴 **Red** - Overbooked (not enough time)
+- 🟡 **Yellow** - At risk (tight schedule)
+- 🟢 **Green** - On track

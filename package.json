@@ -1145,12 +1145,12 @@
       {
         "id": "redmine.getStarted",
         "title": "Get Started with Redmyne",
-        "description": "Personal workload management: Issues → Kanban → Plan → Time Entries",
+        "description": "Personal workload management for Redmine",
         "steps": [
           {
             "id": "redmine.configure",
             "title": "Connect to Redmine",
-            "description": "Enter your Redmine server URL and API key.\n\n[Configure Redmine](command:redmine.configure)",
+            "description": "Enter your server URL and API key.\n\n[Configure](command:redmine.configure)",
             "media": {
               "markdown": "media/walkthrough/configure.md"
             },
@@ -1159,25 +1159,25 @@
           {
             "id": "redmine.viewIssues",
             "title": "Find Your Work",
-            "description": "Browse issues, filter by status, add to Kanban.\n\n[Open Sidebar](command:workbench.view.extension.redmine-explorer)",
+            "description": "Browse issues assigned to you, filter and sort.\n\n[Open Sidebar](command:workbench.view.extension.redmine-explorer)",
             "media": {
               "markdown": "media/walkthrough/view-issues.md"
             },
             "completionEvents": ["onView:redmine-explorer-projects"]
           },
           {
-            "id": "redmine.planDay",
-            "title": "Plan Your Day",
-            "description": "Use the timer for focused work sessions, or quick-log time directly.\n\n**Timer:** `Ctrl+Y Ctrl+T`\n**Quick Log:** `Ctrl+Y Ctrl+Y`\n\n[Plan Day](command:redmine.timer.planDay)",
+            "id": "redmine.logTime",
+            "title": "Log Your Time",
+            "description": "**Quick Log:** `Ctrl+Y Ctrl+Y` — fastest way\n\n**Timer:** `Ctrl+Y Ctrl+T` — structured sessions\n\n[Log Time](command:redmine.quickLogTime)",
             "media": {
               "markdown": "media/walkthrough/log-time.md"
             },
-            "completionEvents": ["onCommand:redmine.timer.planDay"]
+            "completionEvents": ["onCommand:redmine.quickLogTime"]
           },
           {
-            "id": "redmine.trackReview",
-            "title": "Track & Review",
-            "description": "View logged time, visualize workload on the Gantt chart.\n\n[Open Gantt](command:redmine.showGantt)",
+            "id": "redmine.review",
+            "title": "Review Your Work",
+            "description": "See logged time, visualize workload on Gantt.\n\n[Open Gantt](command:redmine.showGantt)",
             "media": {
               "markdown": "media/walkthrough/timeline.md"
             },
