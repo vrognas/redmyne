@@ -173,43 +173,9 @@ export function buildProjectHierarchy(
       .filter((p) => !p.parent)
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    const nodes = rootProjects
+    return rootProjects
       .map((p) => buildProjectNode(p, null, 0))
       .filter((n): n is HierarchyNode => n !== null);
-
-    // Also add projects from issues that aren't in the projects list
-    // (e.g., closed/archived projects that still have issues)
-    const projectIdsInList = new Set(projects.map((p) => p.id));
-    const orphanProjects = new Map<number, string>();
-    for (const issue of issues) {
-      if (issue.project?.id && !projectIdsInList.has(issue.project.id)) {
-        orphanProjects.set(issue.project.id, issue.project.name);
-      }
-    }
-
-    // Add orphan projects as root nodes
-    const orphanNodes = [...orphanProjects.entries()]
-      .sort((a, b) => a[1].localeCompare(b[1]))
-      .map(([projectId, name]) => {
-        const projectKey = `project-${projectId}`;
-        const projectIssues = issuesByProject.get(projectId) ?? [];
-        const issueNodes = buildIssueTree(projectIssues, flexibilityCache, projectKey, 1);
-
-        const node: HierarchyNode = {
-          type: "project" as const,
-          id: projectId,
-          label: name,
-          depth: 0,
-          children: issueNodes,
-          collapseKey: projectKey,
-          parentKey: null,
-        };
-
-        node.childDateRanges = collectChildDateRanges(node);
-        return node;
-      });
-
-    return [...nodes, ...orphanNodes].sort((a, b) => a.label.localeCompare(b.label));
   }
 
   // Fallback: no project hierarchy, group by issue.project (old behavior)
