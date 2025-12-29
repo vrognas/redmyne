@@ -9,6 +9,7 @@ import { errorToString } from "../utilities/error-feedback";
 import { buildProjectHierarchy, flattenHierarchyAll, FlatNodeWithVisibility, HierarchyNode } from "../utilities/hierarchy-builder";
 import { collapseState } from "../utilities/collapse-state";
 import { debounce, DebouncedFunction } from "../utilities/debounce";
+import { IssueFilter, DEFAULT_ISSUE_FILTER } from "../redmine/models/common";
 
 const COLLAPSE_DEBOUNCE_MS = 50;
 
@@ -356,6 +357,8 @@ export class GanttPanel {
   private _cachedHierarchy?: HierarchyNode[];
   private _skipCollapseRerender = false; // Skip re-render when collapse is from client-side
   private _renderKey = 0; // Incremented on each render to force SVG re-creation
+  private _currentFilter: IssueFilter = { ...DEFAULT_ISSUE_FILTER };
+  private _filterChangeCallback?: (filter: IssueFilter) => void;
 
   private constructor(panel: vscode.WebviewPanel, server?: RedmineServer) {
     this._panel = panel;
@@ -652,11 +655,16 @@ export class GanttPanel {
     issues: Issue[],
     flexibilityCache: Map<number, FlexibilityScore | null>,
     projects: RedmineProject[],
-    schedule?: WeeklySchedule
+    schedule?: WeeklySchedule,
+    filter?: IssueFilter
   ): Promise<void> {
     // Update schedule if provided
     if (schedule) {
       this._schedule = schedule;
+    }
+    // Update filter if provided
+    if (filter) {
+      this._currentFilter = { ...filter };
     }
 
     // Store issues with dates, projects, and flexibilityCache for shared sorting
@@ -745,6 +753,13 @@ export class GanttPanel {
     });
   }
 
+  /**
+   * Set callback for when filter changes in Gantt UI
+   */
+  public setFilterChangeCallback(callback: (filter: IssueFilter) => void): void {
+    this._filterChangeCallback = callback;
+  }
+
   private _updateContent(): void {
     this._renderKey++; // Force SVG re-creation on each render
     this._panel.webview.html = this._getHtmlContent();
@@ -767,6 +782,7 @@ export class GanttPanel {
     keys?: string[];
     projectId?: number;
     isExpanded?: boolean; // For collapseStateSync
+    filter?: { assignee?: string; status?: string }; // For setFilter
   }): void {
     switch (message.command) {
       case "openIssue":
@@ -927,6 +943,19 @@ export class GanttPanel {
       case "toggleAutoUpdate":
         if (message.issueId) {
           vscode.commands.executeCommand("redmine.toggleAutoUpdateDoneRatio", { id: message.issueId });
+        }
+        break;
+      case "setFilter":
+        if (message.filter) {
+          const newFilter: IssueFilter = {
+            assignee: (message.filter.assignee as "me" | "any") ?? this._currentFilter.assignee,
+            status: (message.filter.status as "open" | "closed" | "any") ?? this._currentFilter.status,
+          };
+          this._currentFilter = newFilter;
+          // Notify callback to sync with ProjectsTree (triggers data refresh)
+          if (this._filterChangeCallback) {
+            this._filterChangeCallback(newFilter);
+          }
         }
         break;
     }
@@ -1211,6 +1240,8 @@ export class GanttPanel {
     // Add padding days (use UTC to avoid timezone issues)
     minDate.setUTCDate(minDate.getUTCDate() - 3);
     maxDate.setUTCDate(maxDate.getUTCDate() + 7);
+    // String format for open-ended bars (issues with start but no due date)
+    const maxDateStr = maxDate.toISOString().slice(0, 10);
 
     const totalDays = Math.ceil(
       (maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)
@@ -1405,9 +1436,11 @@ export class GanttPanel {
           return "";
         }
         const isParent = row.isParent ?? false;
-        // Use existing date as fallback for missing date
+        // Open-ended bars: start_date but no due_date stretches to window end
+        const hasOnlyStart = issue.start_date && !issue.due_date;
         const startDate = issue.start_date ?? issue.due_date!;
-        const dueDate = issue.due_date ?? issue.start_date!;
+        // For open-ended bars (no due_date), use maxDate - 1 day as end
+        const dueDate = issue.due_date ?? (hasOnlyStart ? maxDateStr : issue.start_date!);
         const start = new Date(startDate);
         const end = new Date(dueDate);
 
@@ -1454,7 +1487,7 @@ export class GanttPanel {
           `#${issue.id} ${escapedSubject}`,
           `Project: ${escapedProject}`,
           `Start: ${formatDateWithWeekday(issue.start_date)}`,
-          `Due: ${formatDateWithWeekday(issue.due_date)}`,
+          `Due: ${hasOnlyStart ? "(no due date)" : formatDateWithWeekday(issue.due_date)}`,
           `Progress: ${doneRatio}%${isFallbackProgress ? ` (showing ${visualDoneRatio}% from time)` : ""}`,
           `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
           `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
@@ -1560,7 +1593,7 @@ export class GanttPanel {
         }
 
         return `
-          <g class="issue-bar gantt-row${hiddenClass}${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}" data-issue-id="${issue.id}"
+          <g class="issue-bar gantt-row${hiddenClass}${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}" data-issue-id="${issue.id}"
              data-project-id="${issue.projectId}"
              data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
              data-start-date="${issue.start_date || ""}"
@@ -1765,16 +1798,18 @@ ${style.tip}
       .filter(r => r.type === "issue" && r.issue && (r.issue.start_date || r.issue.due_date) && !isInHiddenTreeCached(r))
       .map((row) => {
         const issue = row.issue!;
+        // Open-ended bars: start_date but no due_date stretches to window end
+        const hasOnlyStart = issue.start_date && !issue.due_date;
         const startDate = issue.start_date ?? issue.due_date!;
-        const dueDate = issue.due_date ?? issue.start_date!;
+        const dueDate = issue.due_date ?? (hasOnlyStart ? maxDateStr : issue.start_date!);
         const start = new Date(startDate);
         const end = new Date(dueDate);
         const endPlusOne = new Date(end);
         endPlusOne.setUTCDate(endPlusOne.getUTCDate() + 1);
         const startPct = (start.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime());
         const endPct = (endPlusOne.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime());
-        const isPast = end < today;
-        const isOverdue = !issue.isClosed && issue.done_ratio < 100 && end < today;
+        const isPast = !hasOnlyStart && end < today;
+        const isOverdue = !hasOnlyStart && !issue.isClosed && issue.done_ratio < 100 && end < today;
         const classes = ["minimap-bar", isPast ? "bar-past" : "", isOverdue ? "bar-overdue" : ""].filter(Boolean).join(" ");
         // Use same status color as main view
         const color = this._getStatusColor(issue.status);
@@ -1881,6 +1916,40 @@ ${style.tip}
     .zoom-toggle button.active {
       background: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
+    }
+    .filter-toggle {
+      display: flex;
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-left: 4px;
+    }
+    .filter-toggle select {
+      background: var(--vscode-dropdown-background);
+      color: var(--vscode-dropdown-foreground);
+      border: none;
+      border-right: 1px solid var(--vscode-panel-border);
+      padding: 4px 8px;
+      cursor: pointer;
+      font-size: 12px;
+      outline: none;
+    }
+    .filter-toggle select:last-child {
+      border-right: none;
+    }
+    .filter-toggle select:hover {
+      background: var(--vscode-dropdown-listBackground);
+    }
+    .filter-toggle select:focus {
+      background: var(--vscode-focusBorder);
+    }
+    .filter-toggle label {
+      font-size: 10px;
+      color: var(--vscode-descriptionForeground);
+      padding: 2px 6px;
+      display: flex;
+      align-items: center;
+      background: var(--vscode-input-background);
     }
     .heatmap-legend {
       display: inline-flex;
@@ -2019,6 +2088,8 @@ ${style.tip}
     .issue-bar:hover .bar-intensity rect { filter: brightness(1.1); }
     .issue-bar.bar-past { filter: saturate(0.4) opacity(0.7); }
     .issue-bar.bar-past:hover { filter: saturate(0.6) opacity(0.85); }
+    .issue-bar.bar-open-ended .bar-outline { stroke-dasharray: 6, 3; stroke-dashoffset: -6; }
+    .issue-bar.bar-open-ended .bar-main { mask-image: linear-gradient(90deg, black 80%, transparent 100%); -webkit-mask-image: linear-gradient(90deg, black 80%, transparent 100%); }
     .issue-bar.bar-overdue .bar-outline { stroke: var(--vscode-charts-red) !important; stroke-width: 2; filter: drop-shadow(0 0 4px var(--vscode-charts-red)); }
     .issue-bar.bar-overdue:hover .bar-outline { stroke-width: 3; filter: drop-shadow(0 0 6px var(--vscode-charts-red)); }
     /* Hidden project bars (toggled via checkbox) */
@@ -2207,6 +2278,19 @@ ${style.tip}
         <button id="zoomMonth" class="${this._zoomLevel === "month" ? "active" : ""}" title="Month view">Month</button>
         <button id="zoomQuarter" class="${this._zoomLevel === "quarter" ? "active" : ""}" title="Quarter view">Quarter</button>
         <button id="zoomYear" class="${this._zoomLevel === "year" ? "active" : ""}" title="Year view">Year</button>
+      </div>
+      <div class="filter-toggle" role="group" aria-label="Issue filter">
+        <label>Assignee:</label>
+        <select id="filterAssignee" title="Filter by assignee">
+          <option value="me"${this._currentFilter.assignee === "me" ? " selected" : ""}>Me</option>
+          <option value="any"${this._currentFilter.assignee === "any" ? " selected" : ""}>Anyone</option>
+        </select>
+        <label>Status:</label>
+        <select id="filterStatus" title="Filter by status">
+          <option value="open"${this._currentFilter.status === "open" ? " selected" : ""}>Open</option>
+          <option value="closed"${this._currentFilter.status === "closed" ? " selected" : ""}>Closed</option>
+          <option value="any"${this._currentFilter.status === "any" ? " selected" : ""}>Any</option>
+        </select>
       </div>
       <button id="heatmapBtn" class="${this._showWorkloadHeatmap ? "active" : ""}" title="Toggle workload heatmap" aria-pressed="${this._showWorkloadHeatmap}">Heatmap</button>
       <button id="depsBtn" class="${this._showDependencies ? "active" : ""}" title="Toggle dependency arrows" aria-pressed="${this._showDependencies}">Deps</button>
@@ -2629,6 +2713,16 @@ ${style.tip}
     document.getElementById('zoomYear').addEventListener('click', () => {
       saveStateForZoom();
       vscode.postMessage({ command: 'setZoom', zoomLevel: 'year' });
+    });
+
+    // Filter dropdown handlers
+    document.getElementById('filterAssignee').addEventListener('change', (e) => {
+      const value = e.target.value;
+      vscode.postMessage({ command: 'setFilter', filter: { assignee: value } });
+    });
+    document.getElementById('filterStatus').addEventListener('change', (e) => {
+      const value = e.target.value;
+      vscode.postMessage({ command: 'setFilter', filter: { status: value } });
     });
 
     // Heatmap toggle handler

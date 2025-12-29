@@ -9,6 +9,7 @@ import { GanttPanel } from "../webviews/gantt-panel";
 import { Issue } from "../redmine/models/issue";
 import { RedmineServer } from "../redmine/redmine-server";
 import { RedmineProject } from "../redmine/redmine-project";
+import { IssueFilter } from "../redmine/models/common";
 
 export interface GanttCommandDeps {
   getServer: () => RedmineServer | undefined;
@@ -16,6 +17,8 @@ export interface GanttCommandDeps {
   getFlexibilityCache: () => Map<number, FlexibilityScore | null>;
   getProjects: () => RedmineProject[];
   clearProjects: () => void;
+  getFilter: () => IssueFilter;
+  setFilter: (filter: IssueFilter) => void;
 }
 
 export function registerGanttCommands(
@@ -40,7 +43,8 @@ export function registerGanttCommands(
       const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
 
       const panel = GanttPanel.createOrShow(deps.getServer());
-      panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule);
+      panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule, deps.getFilter());
+      panel.setFilterChangeCallback((filter) => deps.setFilter(filter));
     }),
 
     // Refresh Gantt data without resetting view state
@@ -56,7 +60,7 @@ export function registerGanttCommands(
       const scheduleConfig = vscode.workspace.getConfiguration("redmine.workingHours");
       const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
 
-      panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule);
+      panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule, deps.getFilter());
     }),
 
     // Open specific issue in Gantt (context menu)
@@ -79,7 +83,8 @@ export function registerGanttCommands(
       const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
 
       const panel = GanttPanel.createOrShow(deps.getServer());
-      panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule);
+      panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule, deps.getFilter());
+      panel.setFilterChangeCallback((filter) => deps.setFilter(filter));
 
       // Wait for webview to render, then scroll to issue
       setTimeout(() => panel.scrollToIssue(issue.id), 100);

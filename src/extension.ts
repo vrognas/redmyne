@@ -349,6 +349,8 @@ export function activate(context: vscode.ExtensionContext): void {
     getFlexibilityCache: () => projectsTree.getFlexibilityCache(),
     getProjects: () => projectsTree.getProjects(),
     clearProjects: () => projectsTree.clearProjects(),
+    getFilter: () => projectsTree.getFilter(),
+    setFilter: (filter) => projectsTree.setFilter(filter),
   });
 
   // Register Gantt panel serializer for window reload persistence
