@@ -1358,13 +1358,16 @@ export class GanttPanel {
         const y = visibleIdx * (barHeight + barGap);
         const checkboxX = (checkboxColumnWidth - checkboxSize) / 2;
         const checkboxY = y + (barHeight - checkboxSize) / 2;
-        const isChecked = !this._hiddenProjects.has(row.id);
+        // Use effective visibility (includes parent hidden state) for checkbox visual
+        const isEffectivelyVisible = !effectiveHiddenProjects.has(row.id);
+        // Check if hidden because parent is hidden (for dimmed styling)
+        const isInheritedHidden = !this._hiddenProjects.has(row.id) && effectiveHiddenProjects.has(row.id);
         return `
-          <g class="project-checkbox cursor-pointer" data-project-id="${row.id}" role="checkbox" aria-checked="${isChecked}" aria-label="Show/hide ${escapeHtml(row.label)}">
+          <g class="project-checkbox cursor-pointer${isInheritedHidden ? " inherited-hidden" : ""}" data-project-id="${row.id}" role="checkbox" aria-checked="${isEffectivelyVisible}" aria-label="Show/hide ${escapeHtml(row.label)}">
             <rect x="${checkboxX}" y="${checkboxY}" width="${checkboxSize}" height="${checkboxSize}"
-                  fill="${isChecked ? "var(--vscode-checkbox-background)" : "transparent"}"
+                  fill="${isEffectivelyVisible ? "var(--vscode-checkbox-background)" : "transparent"}"
                   stroke="var(--vscode-checkbox-border)" stroke-width="1" rx="2"/>
-            ${isChecked ? `<text x="${checkboxX + checkboxSize / 2}" y="${checkboxY + checkboxSize - 3}" text-anchor="middle" fill="var(--vscode-checkbox-foreground)" font-size="11" font-weight="bold">✓</text>` : ""}
+            ${isEffectivelyVisible ? `<text x="${checkboxX + checkboxSize / 2}" y="${checkboxY + checkboxSize - 3}" text-anchor="middle" fill="var(--vscode-checkbox-foreground)" font-size="11" font-weight="bold">✓</text>` : ""}
             <title>${escapeHtml(row.label)}</title>
           </g>
         `;
@@ -2190,6 +2193,8 @@ ${style.tip}
     /* Project visibility checkbox */
     .project-checkbox:hover rect { stroke: var(--vscode-focusBorder); }
     .project-checkbox rect { transition: stroke 0.1s; }
+    .project-checkbox.inherited-hidden { opacity: 0.5; }
+    .project-checkbox.inherited-hidden rect { stroke-dasharray: 3, 2; }
     /* Screen reader only class */
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
     .weekend-bg { fill: var(--vscode-editor-inactiveSelectionBackground); opacity: 0.3; }
@@ -3979,12 +3984,8 @@ ${style.tip}
         // Date-based restore: works correctly when date range changes
         // Clamp to current date range if saved date is outside
         const clampedDateMs = Math.max(minDateMs, Math.min(maxDateMs, savedCenterDateMs));
-        if (clampedDateMs !== savedCenterDateMs) {
-          // Saved date was outside new range - scroll to today instead
-          scrollToToday();
-        } else {
-          scrollToCenterDate(savedCenterDateMs);
-        }
+        // Always scroll to clamped date (nearest edge if out of range)
+        scrollToCenterDate(clampedDateMs);
         if (hScroll) hScroll.scrollLeft = timelineColumn.scrollLeft;
         if (savedScrollTop !== null && bodyScroll) {
           bodyScroll.scrollTop = savedScrollTop;
