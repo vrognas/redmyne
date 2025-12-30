@@ -87,17 +87,6 @@ export function buildProjectHierarchy(
     }
   }
 
-  // Count issues including subprojects (for showing parent projects)
-  const countIssuesWithSubprojects = (projectId: number): number => {
-    const direct = issuesByProject.get(projectId)?.length ?? 0;
-    const subprojects = projectChildrenMap.get(projectId) ?? [];
-    const subCount = subprojects.reduce(
-      (sum, sub) => sum + countIssuesWithSubprojects(sub.id),
-      0
-    );
-    return direct + subCount;
-  };
-
   // Collect all child issue date ranges (recursive)
   const collectChildDateRanges = (node: HierarchyNode): Array<{ startDate: string | null; dueDate: string | null; issueId: number }> => {
     const ranges: Array<{ startDate: string | null; dueDate: string | null; issueId: number }> = [];
@@ -124,14 +113,10 @@ export function buildProjectHierarchy(
     project: RedmineProject,
     parentKey: string | null,
     depth: number
-  ): HierarchyNode | null => {
+  ): HierarchyNode => {
     const projectId = project.id;
     const projectKey = `project-${projectId}`;
     const projectIssues = issuesByProject.get(projectId) ?? [];
-    const totalIssues = countIssuesWithSubprojects(projectId);
-
-    // Skip projects with no issues (direct or in subprojects)
-    if (totalIssues === 0) return null;
 
     // Get subprojects (from pre-computed map)
     const subprojects = (projectChildrenMap.get(projectId) ?? [])
@@ -140,8 +125,7 @@ export function buildProjectHierarchy(
 
     // Build subproject nodes
     const subprojectNodes = subprojects
-      .map((sub) => buildProjectNode(sub, projectKey, depth + 1))
-      .filter((n): n is HierarchyNode => n !== null);
+      .map((sub) => buildProjectNode(sub, projectKey, depth + 1));
 
     // Build issue tree for this project
     const issueNodes = buildIssueTree(projectIssues, flexibilityCache, projectKey, depth + 1);
@@ -173,9 +157,7 @@ export function buildProjectHierarchy(
       .filter((p) => !p.parent)
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    return rootProjects
-      .map((p) => buildProjectNode(p, null, 0))
-      .filter((n): n is HierarchyNode => n !== null);
+    return rootProjects.map((p) => buildProjectNode(p, null, 0));
   }
 
   // Fallback: no project hierarchy, group by issue.project (old behavior)

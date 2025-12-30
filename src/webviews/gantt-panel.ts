@@ -781,6 +781,8 @@ export class GanttPanel {
     action?: string;
     keys?: string[];
     projectId?: number;
+    projectIds?: number[]; // For setAllProjectsVisibility
+    visible?: boolean; // For setAllProjectsVisibility
     isExpanded?: boolean; // For collapseStateSync
     filter?: { assignee?: string; status?: string }; // For setFilter
   }): void {
@@ -896,6 +898,23 @@ export class GanttPanel {
           // Persist hidden projects to globalState
           GanttPanel._globalState?.update(HIDDEN_PROJECTS_KEY, [...this._hiddenProjects]);
           // Full re-render to update date range and minimap
+          this._updateContent();
+        }
+        break;
+      case "setAllProjectsVisibility":
+        if (message.visible !== undefined && Array.isArray(message.projectIds)) {
+          if (message.visible) {
+            // Show all - remove from hidden set
+            for (const id of message.projectIds) {
+              this._hiddenProjects.delete(id);
+            }
+          } else {
+            // Hide all - add to hidden set
+            for (const id of message.projectIds) {
+              this._hiddenProjects.add(id);
+            }
+          }
+          GanttPanel._globalState?.update(HIDDEN_PROJECTS_KEY, [...this._hiddenProjects]);
           this._updateContent();
         }
         break;
@@ -1366,6 +1385,12 @@ export class GanttPanel {
 
     // Only visible projects get checkboxes (aligned with their label row)
     const projectRows = visibleRows.filter(r => r.type === "project");
+
+    // Calculate "select all" state: all checked, none checked, or indeterminate
+    const checkedCount = projectRows.filter(r => !effectiveHiddenProjects.has(r.id)).length;
+    const allChecked = checkedCount === projectRows.length;
+    const noneChecked = checkedCount === 0;
+    const selectAllState = allChecked ? "checked" : noneChecked ? "unchecked" : "indeterminate";
 
     // Zebra stripes for checkbox column - use same pattern as labels/timeline for alignment
     const checkboxZebraStripes = zebraStripes;
@@ -2038,6 +2063,15 @@ ${style.tip}
       width: ${checkboxColumnWidth}px;
       border-right: 1px solid var(--vscode-panel-border);
       box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .select-all-checkbox {
+      cursor: pointer;
+    }
+    .select-all-checkbox:hover rect {
+      stroke: var(--vscode-focusBorder);
     }
     .gantt-left-header {
       flex-shrink: 0;
@@ -2369,7 +2403,15 @@ ${style.tip}
   </div>
   <div class="gantt-container">
     <div class="gantt-header-row">
-      <div class="gantt-checkbox-header"></div>
+      <div class="gantt-checkbox-header">
+        <svg width="${checkboxColumnWidth}" height="${headerHeight}" class="select-all-checkbox" role="checkbox" aria-checked="${selectAllState === "checked"}" aria-label="Select/deselect all projects" tabindex="0">
+          <rect x="${(checkboxColumnWidth - checkboxSize) / 2}" y="${(headerHeight - checkboxSize) / 2}" width="${checkboxSize}" height="${checkboxSize}"
+                fill="${selectAllState === "checked" ? "var(--vscode-checkbox-background)" : "transparent"}"
+                stroke="var(--vscode-checkbox-border)" stroke-width="1" rx="2"/>
+          ${selectAllState === "checked" ? `<text x="${checkboxColumnWidth / 2}" y="${(headerHeight + checkboxSize) / 2 - 3}" text-anchor="middle" fill="var(--vscode-checkbox-foreground)" font-size="11" font-weight="bold">✓</text>` : ""}
+          ${selectAllState === "indeterminate" ? `<rect x="${(checkboxColumnWidth - 8) / 2}" y="${(headerHeight - 2) / 2}" width="8" height="2" fill="var(--vscode-checkbox-foreground)"/>` : ""}
+        </svg>
+      </div>
       <div class="gantt-left-header" id="ganttLeftHeader">
         <button id="expandAllBtn" title="Expand all">▼</button>
         <button id="collapseAllBtn" title="Collapse all">▶</button>
@@ -3581,6 +3623,23 @@ ${style.tip}
         }
       });
     });
+
+    // Select all checkbox click
+    const selectAllCheckbox = document.querySelector('.select-all-checkbox');
+    if (selectAllCheckbox) {
+      selectAllCheckbox.addEventListener('click', () => {
+        const allProjectIds = Array.from(document.querySelectorAll('.project-checkbox'))
+          .map(el => parseInt(el.dataset.projectId))
+          .filter(id => !isNaN(id));
+        const isCurrentlyAllChecked = selectAllCheckbox.getAttribute('aria-checked') === 'true';
+        // If all checked, uncheck all; otherwise check all
+        vscode.postMessage({
+          command: 'setAllProjectsVisibility',
+          projectIds: allProjectIds,
+          visible: !isCurrentlyAllChecked
+        });
+      });
+    }
 
     // Labels click and keyboard navigation
     const allLabels = Array.from(document.querySelectorAll('.project-label, .issue-label'));
