@@ -638,7 +638,7 @@ export class GanttPanel {
         <button>▶</button>
       </div>
       <div class="gantt-labels">
-        <svg width="${labelWidth}" height="${rowCount * (barHeight + barGap)}">
+        <svg width="${labelWidth * 2}" height="${rowCount * (barHeight + barGap)}">
           ${zebraStripes}
           ${labelsSvg}
         </svg>
@@ -2475,7 +2475,7 @@ ${style.tip}
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
     .weekend-bg { fill: var(--vscode-editor-inactiveSelectionBackground); opacity: 0.3; }
     .zebra-stripe { fill: var(--vscode-list-hoverBackground); opacity: 0.3; pointer-events: none; }
-    .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 1; opacity: 0.25; }
+    .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 1; opacity: 0.5; }
     .date-marker { stroke: var(--vscode-editorRuler-foreground); stroke-dasharray: 2,2; }
     .today-marker { stroke: var(--vscode-charts-red); stroke-width: 2; }
     /* Base transitions for dependency focus fade-back */
@@ -2654,7 +2654,7 @@ ${style.tip}
           </svg>
         </div>
         <div class="gantt-labels" id="ganttLabels">
-          <svg width="${labelWidth}" height="${bodyHeight}" data-render-key="${this._renderKey}">
+          <svg width="${labelWidth * 2}" height="${bodyHeight}" data-render-key="${this._renderKey}">
             ${zebraStripes}
             ${labels}
           </svg>
@@ -2890,11 +2890,19 @@ ${style.tip}
 
     // Scrolling: bodyScroll handles vertical, hScroll handles horizontal
     let deferredScrollUpdate = null;
+    // Get the SVG inside header for transform-based sync (GPU-accelerated, no lag)
+    const headerSvg = timelineHeader?.querySelector('svg');
+    function syncHeaderToTimeline() {
+      if (headerSvg && timelineColumn) {
+        // Use transform for lag-free sync (GPU-accelerated)
+        headerSvg.style.transform = 'translateX(' + (-timelineColumn.scrollLeft) + 'px)';
+      }
+    }
     if (bodyScroll && timelineColumn && timelineHeader && hScroll) {
       // Horizontal scroll from hScroll → sync to timeline and header
       hScroll.addEventListener('scroll', () => {
         timelineColumn.scrollLeft = hScroll.scrollLeft;
-        timelineHeader.scrollLeft = hScroll.scrollLeft;
+        syncHeaderToTimeline();
         // Defer non-critical updates
         cancelAnimationFrame(deferredScrollUpdate);
         deferredScrollUpdate = requestAnimationFrame(() => {
@@ -2905,7 +2913,7 @@ ${style.tip}
       // Horizontal scroll from timeline (e.g. via keyboard, wheel) → sync to hScroll, header, minimap
       timelineColumn.addEventListener('scroll', () => {
         hScroll.scrollLeft = timelineColumn.scrollLeft;
-        timelineHeader.scrollLeft = timelineColumn.scrollLeft;
+        syncHeaderToTimeline();
         cancelAnimationFrame(deferredScrollUpdate);
         deferredScrollUpdate = requestAnimationFrame(() => {
           updateMinimapViewport();
