@@ -1287,18 +1287,26 @@ export class GanttPanel {
       [i.start_date, i.due_date].filter(Boolean)
     ) as string[];
 
-    if (dates.length === 0) {
-      // No visible issues with dates - show empty state
-      const allHidden = this._issues.length > 0 && visibleIssues.length === 0;
-      return this._getEmptyHtml(allHidden);
+    // If no issues at all (not just hidden), show empty state
+    if (this._issues.length === 0) {
+      return this._getEmptyHtml(false);
     }
 
-    const minDate = new Date(
-      Math.min(...dates.map((d) => new Date(d).getTime()))
-    );
-    const maxDate = new Date(
-      Math.max(...dates.map((d) => new Date(d).getTime()))
-    );
+    // When no visible dates (all hidden), use today +/- 30 days as default range
+    // This keeps checkboxes visible so user can re-enable projects
+    let minDate: Date;
+    let maxDate: Date;
+
+    if (dates.length === 0) {
+      // No visible issues - use default range centered on today
+      minDate = new Date(today);
+      minDate.setDate(minDate.getDate() - 7);
+      maxDate = new Date(today);
+      maxDate.setDate(maxDate.getDate() + 30);
+    } else {
+      minDate = new Date(Math.min(...dates.map((d) => new Date(d).getTime())));
+      maxDate = new Date(Math.max(...dates.map((d) => new Date(d).getTime())));
+    }
 
     // String format for open-ended bars (issues with start but no due date)
     const maxDateStr = maxDate.toISOString().slice(0, 10);
