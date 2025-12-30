@@ -446,7 +446,8 @@ export class GanttPanel {
     const headerHeight = 40;
     const barHeight = 30;
     const barGap = 10;
-    const rowCount = 8;
+    const rowCount = 10;
+    const checkboxColumnWidth = 28;
 
     // Generate skeleton rows
     const skeletonRows = Array.from({ length: rowCount }, (_, i) => {
@@ -456,25 +457,22 @@ export class GanttPanel {
       // Vary bar positions and widths for visual interest
       const barStart = 50 + (i * 37) % 200;
       const barWidth = 80 + (i * 53) % 150;
-      return {
-        y,
-        isProject,
-        indent,
-        barStart,
-        barWidth,
-        delay: i * 0.1
-      };
+      return { y, isProject, indent, barStart, barWidth };
     });
+
+    const checkboxesSvg = skeletonRows.map((r, i) => `
+      <rect class="skeleton-checkbox delay-${Math.min(i, 7)}" x="6" y="${r.y + 9}" width="12" height="12" rx="2" fill="var(--vscode-panel-border)"/>
+    `).join("");
 
     const labelsSvg = skeletonRows.map((r, i) => `
       <g class="skeleton-label delay-${Math.min(i, 7)}">
-        <rect x="${5 + r.indent}" y="${r.y + 8}" width="${r.isProject ? 120 : 160}" height="14" rx="3" fill="var(--vscode-panel-border)"/>
+        <rect x="${5 + r.indent}" y="${r.y + 8}" width="${r.isProject ? 100 : 140}" height="14" rx="2" fill="var(--vscode-panel-border)"/>
       </g>
     `).join("");
 
     const barsSvg = skeletonRows.map((r, i) => `
       <g class="skeleton-bar-group delay-${Math.min(i, 7)}">
-        <rect x="${r.barStart}" y="${r.y + 4}" width="${r.barWidth}" height="${barHeight - 8}" rx="4"
+        <rect x="${r.barStart}" y="${r.y + 4}" width="${r.barWidth}" height="${barHeight - 8}" rx="8"
               fill="var(--vscode-panel-border)" class="skeleton-timeline-bar"/>
       </g>
     `).join("");
@@ -483,6 +481,8 @@ export class GanttPanel {
       .filter((_, i) => i % 2 === 1)
       .map(r => `<rect x="0" y="${r.y}" width="100%" height="${barHeight + barGap}" fill="var(--vscode-list-hoverBackground)" opacity="0.3"/>`)
       .join("");
+
+    const bodyHeight = rowCount * (barHeight + barGap);
 
     this._panel.webview.html = `<!DOCTYPE html>
 <html lang="en">
@@ -494,93 +494,154 @@ export class GanttPanel {
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      padding: 16px;
+      padding: 8px;
       background: var(--vscode-editor-background);
       color: var(--vscode-foreground);
       font-family: var(--vscode-font-family);
+      font-size: 13px;
+      overflow: hidden;
+      height: 100vh;
     }
     .gantt-header {
       display: flex;
+      justify-content: flex-end;
       align-items: center;
-      justify-content: space-between;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
     }
-    .gantt-header h2 { margin: 0; font-size: 16px; }
     .gantt-actions {
       display: flex;
-      gap: 8px;
+      gap: 4px;
       align-items: center;
     }
-    .gantt-actions button {
-      background: var(--vscode-button-secondaryBackground);
-      color: var(--vscode-button-secondaryForeground);
-      border: none;
-      padding: 4px 10px;
-      border-radius: 4px;
-      font-size: 12px;
-      opacity: 0.5;
-      cursor: not-allowed;
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .toolbar-separator {
+      width: 1px;
+      height: 20px;
+      background: var(--vscode-panel-border);
+      margin: 0 8px;
     }
     .zoom-toggle {
       display: flex;
-      gap: 2px;
-      background: var(--vscode-input-background);
-      padding: 2px;
-      border-radius: 4px;
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .zoom-toggle button {
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: none;
+      border-right: 1px solid var(--vscode-panel-border);
+      padding: 4px 8px;
+      font-size: 11px;
+      opacity: 0.5;
+    }
+    .zoom-toggle button:last-child { border-right: none; }
+    .zoom-toggle button.active {
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      opacity: 1;
+    }
+    .filter-toggle {
+      display: flex;
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .filter-toggle select {
+      background: var(--vscode-dropdown-background);
+      color: var(--vscode-dropdown-foreground);
+      border: none;
+      border-right: 1px solid var(--vscode-panel-border);
+      padding: 4px 8px;
+      font-size: 11px;
+      opacity: 0.5;
+    }
+    .filter-toggle select:last-child { border-right: none; }
+    .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: none;
+      padding: 4px 8px;
+      border-radius: 2px;
+      font-size: 13px;
+      opacity: 0.5;
+    }
+    .icon-btn svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
     }
     .gantt-container {
       display: flex;
+      flex-direction: column;
       overflow: hidden;
       border: 1px solid var(--vscode-panel-border);
-      border-radius: 4px;
-      height: calc(100vh - 150px);
+      border-radius: 2px;
+      height: calc(100vh - 70px);
     }
-    .gantt-left {
-      width: ${labelWidth}px;
-      flex-shrink: 0;
+    .gantt-header-row {
       display: flex;
-      flex-direction: column;
+      flex-shrink: 0;
+      height: ${headerHeight}px;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      background: var(--vscode-editor-background);
+    }
+    .gantt-checkbox-header {
+      flex-shrink: 0;
+      width: ${checkboxColumnWidth}px;
       border-right: 1px solid var(--vscode-panel-border);
     }
     .gantt-left-header {
-      height: ${headerHeight}px;
+      flex-shrink: 0;
+      width: ${labelWidth}px;
       display: flex;
       align-items: center;
       padding: 4px 8px;
       gap: 4px;
-      border-bottom: 1px solid var(--vscode-panel-border);
     }
-    .gantt-left-header button {
-      background: var(--vscode-button-secondaryBackground);
-      color: var(--vscode-button-secondaryForeground);
-      border: none;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 10px;
-      opacity: 0.5;
-    }
-    .gantt-labels {
-      flex-grow: 1;
-      overflow: hidden;
-    }
-    .gantt-right {
-      flex-grow: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
+    .gantt-resize-handle-header {
+      width: 6px;
+      background: var(--vscode-panel-border);
+      flex-shrink: 0;
     }
     .gantt-timeline-header {
-      height: ${headerHeight}px;
-      background: var(--vscode-editor-background);
-      border-bottom: 1px solid var(--vscode-panel-border);
+      flex-grow: 1;
       display: flex;
       align-items: center;
       padding: 0 16px;
     }
     .loading-text {
-      font-size: 12px;
+      font-size: 11px;
       opacity: 0.7;
       animation: pulse 1.5s ease-in-out infinite;
+    }
+    .gantt-body-scroll {
+      display: flex;
+      flex-grow: 1;
+      overflow: hidden;
+    }
+    .gantt-checkboxes {
+      flex-shrink: 0;
+      width: ${checkboxColumnWidth}px;
+      background: var(--vscode-editor-background);
+      border-right: 1px solid var(--vscode-panel-border);
+    }
+    .gantt-labels {
+      flex-shrink: 0;
+      width: ${labelWidth}px;
+      background: var(--vscode-editor-background);
+    }
+    .gantt-resize-handle {
+      width: 6px;
+      background: var(--vscode-panel-border);
+      flex-shrink: 0;
     }
     .gantt-timeline {
       flex-grow: 1;
@@ -591,13 +652,9 @@ export class GanttPanel {
       0%, 100% { opacity: 0.3; }
       50% { opacity: 0.7; }
     }
-    .skeleton-label, .skeleton-bar-group {
+    .skeleton-checkbox, .skeleton-label, .skeleton-bar-group {
       animation: pulse 1.5s ease-in-out infinite;
     }
-    .skeleton-timeline-bar {
-      animation: pulse 1.5s ease-in-out infinite;
-    }
-    /* Animation delay classes to avoid inline styles (CSP compliance) */
     .delay-0 { animation-delay: 0s; }
     .delay-1 { animation-delay: 0.1s; }
     .delay-2 { animation-delay: 0.2s; }
@@ -607,49 +664,83 @@ export class GanttPanel {
     .delay-6 { animation-delay: 0.6s; }
     .delay-7 { animation-delay: 0.7s; }
     .minimap-container {
-      height: 50px;
-      background: var(--vscode-sideBar-background);
+      height: 44px;
+      background: var(--vscode-minimap-background, var(--vscode-editor-background));
       border-top: 1px solid var(--vscode-panel-border);
     }
   </style>
 </head>
 <body>
   <div class="gantt-header">
-    <h2>Timeline</h2>
     <div class="gantt-actions">
-      <div class="zoom-toggle">
-        <button>Day</button>
-        <button>Week</button>
-        <button>Month</button>
-        <button>Quarter</button>
-        <button>Year</button>
+      <div class="toolbar-group">
+        <div class="zoom-toggle">
+          <button>Day</button>
+          <button>Week</button>
+          <button class="active">Month</button>
+          <button>Qtr</button>
+          <button>Year</button>
+        </div>
       </div>
-      <button>Heatmap</button>
-      <button>Deps</button>
-      <button>Intensity</button>
-      <button>Critical</button>
-      <button>Today</button>
+      <div class="toolbar-separator"></div>
+      <div class="toolbar-group">
+        <div class="filter-toggle">
+          <select disabled><option>Me</option></select>
+          <select disabled><option>Open</option></select>
+        </div>
+      </div>
+      <div class="toolbar-separator"></div>
+      <div class="toolbar-group">
+        <button class="icon-btn">
+          <svg viewBox="0 0 16 16"><path d="M8 1a3 3 0 0 0-3 3v2.5a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/></svg>
+          Heatmap
+        </button>
+        <button class="icon-btn">
+          <svg viewBox="0 0 16 16"><circle cx="3.5" cy="3.5" r="1.5"/><circle cx="10" cy="3.5" r="1.5"/></svg>
+          Relations
+        </button>
+        <button class="icon-btn">
+          <svg viewBox="0 0 16 16"><path d="M2 14v-3h1v2h2v1H2z"/></svg>
+          Intensity
+        </button>
+      </div>
+      <div class="toolbar-separator"></div>
+      <div class="toolbar-group">
+        <button class="icon-btn">
+          <svg viewBox="0 0 16 16"><path d="M13.451 5.609l-.579-.939-1.068.812-.076.094z"/></svg>
+          Refresh
+        </button>
+        <button class="icon-btn">
+          <svg viewBox="0 0 16 16"><path d="M14 2H2v12h12V2z"/></svg>
+          Today
+        </button>
+      </div>
     </div>
   </div>
   <div class="gantt-container">
-    <div class="gantt-left">
-      <div class="gantt-left-header">
-        <button>▼</button>
-        <button>▶</button>
+    <div class="gantt-header-row">
+      <div class="gantt-checkbox-header"></div>
+      <div class="gantt-left-header"></div>
+      <div class="gantt-resize-handle-header"></div>
+      <div class="gantt-timeline-header">
+        <span class="loading-text">Loading issues...</span>
+      </div>
+    </div>
+    <div class="gantt-body-scroll">
+      <div class="gantt-checkboxes">
+        <svg width="${checkboxColumnWidth}" height="${bodyHeight}">
+          ${checkboxesSvg}
+        </svg>
       </div>
       <div class="gantt-labels">
-        <svg width="${labelWidth * 2}" height="${rowCount * (barHeight + barGap)}">
+        <svg width="${labelWidth * 2}" height="${bodyHeight}">
           ${zebraStripes}
           ${labelsSvg}
         </svg>
       </div>
-    </div>
-    <div class="gantt-right">
-      <div class="gantt-timeline-header">
-        <span class="loading-text">Loading issues...</span>
-      </div>
+      <div class="gantt-resize-handle"></div>
       <div class="gantt-timeline">
-        <svg width="100%" height="${rowCount * (barHeight + barGap)}">
+        <svg width="100%" height="${bodyHeight}">
           ${zebraStripes}
           ${barsSvg}
         </svg>
