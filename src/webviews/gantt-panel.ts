@@ -2245,24 +2245,102 @@ ${style.tip}
       align-items: center;
       background: var(--vscode-input-background);
     }
-    .heatmap-legend {
+    /* Toolbar groups with separators */
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .toolbar-separator {
+      width: 1px;
+      height: 20px;
+      background: var(--vscode-panel-border);
+      margin: 0 8px;
+    }
+    /* Icon buttons */
+    .icon-btn {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      margin-left: 8px;
+      gap: 4px;
+    }
+    .icon-btn svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+    /* Legend row (below toolbar) */
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 6px 16px;
+      background: var(--vscode-editor-background);
+      border-bottom: 1px solid var(--vscode-panel-border);
       font-size: 11px;
       color: var(--vscode-descriptionForeground);
     }
-    .heatmap-legend-item {
+    .legend-row.hidden { display: none; }
+    .heatmap-legend, .relation-legend {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .heatmap-legend-item, .relation-legend-item {
       display: inline-flex;
       align-items: center;
-      gap: 3px;
+      gap: 4px;
     }
     .heatmap-legend-color {
       width: 12px;
       height: 12px;
       border-radius: 2px;
       opacity: 0.7;
+    }
+    .relation-legend-line {
+      width: 20px;
+      height: 2px;
+    }
+    /* Overflow menu */
+    .overflow-menu-container {
+      position: relative;
+    }
+    .overflow-menu {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 4px;
+      background: var(--vscode-dropdown-background);
+      border: 1px solid var(--vscode-dropdown-border);
+      border-radius: 4px;
+      padding: 4px 0;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      min-width: 160px;
+    }
+    .overflow-menu.hidden { display: none; }
+    .overflow-menu button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 6px 12px;
+      border: none;
+      background: transparent;
+      color: var(--vscode-dropdown-foreground);
+      text-align: left;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .overflow-menu button:hover {
+      background: var(--vscode-list-hoverBackground);
+    }
+    .overflow-menu button.active {
+      background: var(--vscode-list-activeSelectionBackground);
+    }
+    .overflow-menu-divider {
+      height: 1px;
+      background: var(--vscode-panel-border);
+      margin: 4px 0;
     }
     .gantt-container {
       display: flex;
@@ -2531,11 +2609,11 @@ ${style.tip}
     .heatmap-color-yellow { background: var(--vscode-charts-yellow); }
     .heatmap-color-orange { background: var(--vscode-charts-orange); }
     .heatmap-color-red { background: var(--vscode-charts-red); }
-    .rel-line-blocks { background: #e74c3c; }
-    .rel-line-precedes { background: #9b59b6; }
-    .rel-line-relates { background: #7f8c8d; border-style: dashed; }
-    .rel-line-duplicates { background: #e67e22; border-style: dotted; }
-    .rel-line-copied { background: #1abc9c; border-style: dashed; }
+    .rel-line-blocks { background: var(--vscode-charts-red); }
+    .rel-line-precedes { background: var(--vscode-charts-purple); }
+    .rel-line-relates { background: var(--vscode-charts-lines); border-style: dashed; }
+    .rel-line-duplicates { background: var(--vscode-charts-orange); border-style: dotted; }
+    .rel-line-copied { background: var(--vscode-charts-green); border-style: dashed; }
     .color-swatch { display: inline-block; width: 12px; height: 3px; margin-right: 8px; vertical-align: middle; }
 
     /* Minimap */
@@ -2579,48 +2657,108 @@ ${style.tip}
   <div class="gantt-header">
     <h2>Timeline</h2>
     <div class="gantt-actions">
-      <div class="zoom-toggle" role="group" aria-label="Zoom level">
-        <button id="zoomDay" class="${this._zoomLevel === "day" ? "active" : ""}" title="Day view">Day</button>
-        <button id="zoomWeek" class="${this._zoomLevel === "week" ? "active" : ""}" title="Week view">Week</button>
-        <button id="zoomMonth" class="${this._zoomLevel === "month" ? "active" : ""}" title="Month view">Month</button>
-        <button id="zoomQuarter" class="${this._zoomLevel === "quarter" ? "active" : ""}" title="Quarter view">Quarter</button>
-        <button id="zoomYear" class="${this._zoomLevel === "year" ? "active" : ""}" title="Year view">Year</button>
+      <!-- Zoom group -->
+      <div class="toolbar-group">
+        <div class="zoom-toggle" role="group" aria-label="Zoom level">
+          <button id="zoomDay" class="${this._zoomLevel === "day" ? "active" : ""}" title="Day view">Day</button>
+          <button id="zoomWeek" class="${this._zoomLevel === "week" ? "active" : ""}" title="Week view">Week</button>
+          <button id="zoomMonth" class="${this._zoomLevel === "month" ? "active" : ""}" title="Month view">Month</button>
+          <button id="zoomQuarter" class="${this._zoomLevel === "quarter" ? "active" : ""}" title="Qtr view">Qtr</button>
+          <button id="zoomYear" class="${this._zoomLevel === "year" ? "active" : ""}" title="Year view">Year</button>
+        </div>
       </div>
-      <div class="filter-toggle" role="group" aria-label="Issue filter">
-        <label>Assignee:</label>
-        <select id="filterAssignee" title="Filter by assignee">
-          <option value="me"${this._currentFilter.assignee === "me" ? " selected" : ""}>Me</option>
-          <option value="any"${this._currentFilter.assignee === "any" ? " selected" : ""}>Anyone</option>
-        </select>
-        <label>Status:</label>
-        <select id="filterStatus" title="Filter by status">
-          <option value="open"${this._currentFilter.status === "open" ? " selected" : ""}>Open</option>
-          <option value="closed"${this._currentFilter.status === "closed" ? " selected" : ""}>Closed</option>
-          <option value="any"${this._currentFilter.status === "any" ? " selected" : ""}>Any</option>
-        </select>
+      <div class="toolbar-separator"></div>
+      <!-- Filter group -->
+      <div class="toolbar-group">
+        <div class="filter-toggle" role="group" aria-label="Issue filter">
+          <label>Assignee:</label>
+          <select id="filterAssignee" title="Filter by assignee">
+            <option value="me"${this._currentFilter.assignee === "me" ? " selected" : ""}>Me</option>
+            <option value="any"${this._currentFilter.assignee === "any" ? " selected" : ""}>Anyone</option>
+          </select>
+          <label>Status:</label>
+          <select id="filterStatus" title="Filter by status">
+            <option value="open"${this._currentFilter.status === "open" ? " selected" : ""}>Open</option>
+            <option value="closed"${this._currentFilter.status === "closed" ? " selected" : ""}>Closed</option>
+            <option value="any"${this._currentFilter.status === "any" ? " selected" : ""}>Any</option>
+          </select>
+        </div>
       </div>
-      <button id="heatmapBtn" class="${this._showWorkloadHeatmap ? "active" : ""}" title="Toggle workload heatmap" aria-pressed="${this._showWorkloadHeatmap}">Heatmap</button>
-      <button id="depsBtn" class="${this._showDependencies ? "active" : ""}" title="Toggle dependency arrows" aria-pressed="${this._showDependencies}">Deps</button>
-      <button id="intensityBtn" class="${this._showIntensity ? "active" : ""}" title="Toggle daily intensity" aria-pressed="${this._showIntensity}">Intensity</button>
-      <button id="criticalPathBtn" title="Highlight critical path (longest blocking chain)" aria-pressed="false">Critical</button>
-      <div class="heatmap-legend${this._showWorkloadHeatmap ? "" : " hidden"}">
-        <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-green"></span>&lt;80%</span>
-        <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-yellow"></span>80-100%</span>
-        <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-orange"></span>100-120%</span>
-        <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-red"></span>&gt;120%</span>
+      <div class="toolbar-separator"></div>
+      <!-- View toggles group -->
+      <div class="toolbar-group">
+        <button id="heatmapBtn" class="icon-btn${this._showWorkloadHeatmap ? " active" : ""}" title="Toggle workload heatmap" aria-pressed="${this._showWorkloadHeatmap}">
+          <svg viewBox="0 0 16 16"><path d="M8 1a3 3 0 0 0-3 3v2.5a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zm4 5.5a4 4 0 1 1-8 0V4a4 4 0 1 1 8 0v2.5zM8 11a5 5 0 0 1-5-5H2a6 6 0 0 0 5 5.91V14H5v1h6v-1H9v-2.09A6 6 0 0 0 14 6h-1a5 5 0 0 1-5 5z"/></svg>
+          Heatmap
+        </button>
+        <button id="depsBtn" class="icon-btn${this._showDependencies ? " active" : ""}" title="Toggle dependency arrows" aria-pressed="${this._showDependencies}">
+          <svg viewBox="0 0 16 16"><path d="M5 3.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm-6.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM10 8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM5.354 4.354l1.5 1.5-.708.707-1.5-1.5.708-.707zm4.792 5.292l1.5 1.5-.707.708-1.5-1.5.707-.708z"/></svg>
+          Deps
+        </button>
+        <button id="intensityBtn" class="icon-btn${this._showIntensity ? " active" : ""}" title="Toggle daily intensity" aria-pressed="${this._showIntensity}">
+          <svg viewBox="0 0 16 16"><path d="M11.5 11.5L13 10l-3-3 3-3-1.5-1.5L8 6l1.5 1.5L6 11l5.5.5zM2 14v-3h1v2h2v1H2zm12-12v3h-1V3h-2V2h3z"/></svg>
+          Intensity
+        </button>
       </div>
-      <div class="relation-legend${this._showDependencies ? "" : " hidden"}" title="Relation types (drag from link handle to create)">
-        <span class="relation-legend-item"><span class="relation-legend-line rel-line-blocks"></span>blocks</span>
-        <span class="relation-legend-item"><span class="relation-legend-line rel-line-precedes"></span>precedes</span>
-        <span class="relation-legend-item"><span class="relation-legend-line rel-line-relates"></span>relates</span>
-        <span class="relation-legend-item"><span class="relation-legend-line rel-line-duplicates"></span>duplicates</span>
-        <span class="relation-legend-item"><span class="relation-legend-line rel-line-copied"></span>copied</span>
+      <div class="toolbar-separator"></div>
+      <!-- Actions group -->
+      <div class="toolbar-group">
+        <button id="refreshBtn" class="icon-btn" title="Refresh issues">
+          <svg viewBox="0 0 16 16"><path d="M13.451 5.609l-.579-.939-1.068.812-.076.094c-.335.415-.927 1.341-1.124 2.876l-.021.165-.033.167a4.5 4.5 0 1 1-4.05-5.258l.066-.004.073.004-1.024 1.024 1.414 1.414 3.536-3.536L7.029.893 5.615 2.307l.982.982a5.5 5.5 0 1 0 5.537 6.124c.196-1.627.857-2.64 1.317-3.243V5.609z"/></svg>
+          Refresh
+        </button>
+        <button id="todayBtn" class="icon-btn" title="Jump to Today">
+          <svg viewBox="0 0 16 16"><path d="M14 2H2v12h12V2zm-1 11H3V5h10v8zM4 1h1v1H4V1zm7 0h1v1h-1V1zM4 8h2v2H4V8z"/></svg>
+          Today
+        </button>
+        <button id="undoBtn" class="icon-btn" disabled title="Undo (Ctrl+Z)">
+          <svg viewBox="0 0 16 16"><path d="M3 8.5l4-4v3h5a3 3 0 0 1 0 6H8v-1h4a2 2 0 0 0 0-4H7v3l-4-4z"/></svg>
+          Undo
+        </button>
+        <button id="redoBtn" class="icon-btn" disabled title="Redo (Ctrl+Shift+Z)">
+          <svg viewBox="0 0 16 16"><path d="M13 8.5l-4-4v3H4a3 3 0 0 0 0 6h4v-1H4a2 2 0 0 1 0-4h5v3l4-4z"/></svg>
+          Redo
+        </button>
       </div>
-      <button id="refreshBtn" title="Refresh issues">↻ Refresh</button>
-      <button id="todayBtn" title="Jump to Today">Today</button>
-      <button id="undoBtn" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
-      <button id="redoBtn" disabled title="Redo (Ctrl+Shift+Z)">↪ Redo</button>
+      <div class="toolbar-separator"></div>
+      <!-- Overflow menu -->
+      <div class="toolbar-group overflow-menu-container">
+        <button id="overflowBtn" class="icon-btn" title="More options" aria-haspopup="true" aria-expanded="false">
+          <svg viewBox="0 0 16 16"><circle cx="8" cy="3" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="8" cy="13" r="1.5"/></svg>
+        </button>
+        <div id="overflowMenu" class="overflow-menu hidden">
+          <button id="criticalPathBtn" title="Highlight critical path (longest blocking chain)" aria-pressed="false">
+            <svg viewBox="0 0 16 16"><path d="M8 1l1 3h3l-2.5 2 1 3L8 7l-2.5 2 1-3L4 4h3l1-3z"/></svg>
+            Critical Path
+          </button>
+          <div class="overflow-menu-divider"></div>
+          <button id="expandAllBtn" title="Expand all">
+            <svg viewBox="0 0 16 16"><path d="M5 8l3 3 3-3H5z"/></svg>
+            Expand All
+          </button>
+          <button id="collapseAllBtn" title="Collapse all">
+            <svg viewBox="0 0 16 16"><path d="M6 5l3 3-3 3V5z"/></svg>
+            Collapse All
+          </button>
+        </div>
+      </div>
       <span id="selectionCount" class="selection-count hidden"></span>
+    </div>
+  </div>
+  <!-- Legend row (shown when heatmap or deps enabled) -->
+  <div id="legendRow" class="legend-row${this._showWorkloadHeatmap || this._showDependencies ? "" : " hidden"}">
+    <div id="heatmapLegend" class="heatmap-legend${this._showWorkloadHeatmap ? "" : " hidden"}">
+      <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-green"></span>&lt;80%</span>
+      <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-yellow"></span>80-100%</span>
+      <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-orange"></span>100-120%</span>
+      <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-red"></span>&gt;120%</span>
+    </div>
+    <div id="relationLegend" class="relation-legend${this._showDependencies ? "" : " hidden"}" title="Relation types (drag from link handle to create)">
+      <span class="relation-legend-item"><span class="relation-legend-line rel-line-blocks"></span>blocks</span>
+      <span class="relation-legend-item"><span class="relation-legend-line rel-line-precedes"></span>precedes</span>
+      <span class="relation-legend-item"><span class="relation-legend-line rel-line-relates"></span>relates</span>
+      <span class="relation-legend-item"><span class="relation-legend-line rel-line-duplicates"></span>duplicates</span>
+      <span class="relation-legend-item"><span class="relation-legend-line rel-line-copied"></span>copied</span>
     </div>
   </div>
   <div class="gantt-container">
@@ -2635,8 +2773,7 @@ ${style.tip}
         </svg>
       </div>
       <div class="gantt-left-header" id="ganttLeftHeader">
-        <button id="expandAllBtn" title="Expand all">▼</button>
-        <button id="collapseAllBtn" title="Collapse all">▶</button>
+        <!-- Expand/Collapse buttons moved to overflow menu -->
       </div>
       <div class="gantt-resize-handle-header"></div>
       <div class="gantt-timeline-header" id="ganttTimelineHeader">
@@ -2936,11 +3073,27 @@ ${style.tip}
     // Handle messages from extension (for state updates without full re-render)
     addWinListener('message', event => {
       const message = event.data;
+      // Helper to update legend row visibility
+      function updateLegendRow() {
+        const legendRow = document.getElementById('legendRow');
+        const heatmapLegend = document.getElementById('heatmapLegend');
+        const relationLegend = document.getElementById('relationLegend');
+        const heatmapVisible = heatmapLegend && !heatmapLegend.classList.contains('hidden');
+        const depsVisible = relationLegend && !relationLegend.classList.contains('hidden');
+        if (legendRow) {
+          if (heatmapVisible || depsVisible) {
+            legendRow.classList.remove('hidden');
+          } else {
+            legendRow.classList.add('hidden');
+          }
+        }
+      }
+
       if (message.command === 'setHeatmapState') {
         const heatmapLayer = document.querySelector('.heatmap-layer');
         const weekendLayer = document.querySelector('.weekend-layer');
         const heatmapBtn = document.getElementById('heatmapBtn');
-        const heatmapLegend = document.querySelector('.heatmap-legend');
+        const heatmapLegend = document.getElementById('heatmapLegend');
 
         if (message.enabled) {
           if (heatmapLayer) heatmapLayer.classList.remove('hidden');
@@ -2953,10 +3106,11 @@ ${style.tip}
           if (heatmapBtn) heatmapBtn.classList.remove('active');
           if (heatmapLegend) heatmapLegend.classList.add('hidden');
         }
+        updateLegendRow();
       } else if (message.command === 'setDependenciesState') {
         const dependencyLayer = document.querySelector('.dependency-layer');
         const depsBtn = document.getElementById('depsBtn');
-        const relationLegend = document.querySelector('.relation-legend');
+        const relationLegend = document.getElementById('relationLegend');
 
         if (message.enabled) {
           if (dependencyLayer) dependencyLayer.classList.remove('hidden');
@@ -2967,6 +3121,7 @@ ${style.tip}
           if (depsBtn) depsBtn.classList.remove('active');
           if (relationLegend) relationLegend.classList.add('hidden');
         }
+        updateLegendRow();
       } else if (message.command === 'pushUndoAction') {
         // Push relation action to undo stack
         undoStack.push(message.action);
@@ -3250,6 +3405,25 @@ ${style.tip}
       document.getElementById('loadingOverlay').classList.add('visible');
       vscode.postMessage({ command: 'refresh' });
     });
+
+    // Overflow menu handlers
+    const overflowBtn = document.getElementById('overflowBtn');
+    const overflowMenu = document.getElementById('overflowMenu');
+    if (overflowBtn && overflowMenu) {
+      overflowBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = !overflowMenu.classList.contains('hidden');
+        overflowMenu.classList.toggle('hidden');
+        overflowBtn.setAttribute('aria-expanded', String(!isOpen));
+      });
+      // Close on click outside
+      document.addEventListener('click', (e) => {
+        if (!overflowMenu.contains(e.target) && e.target !== overflowBtn) {
+          overflowMenu.classList.add('hidden');
+          overflowBtn.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
 
     // Show delete confirmation picker
     function showDeletePicker(x, y, relationId, fromId, toId) {
