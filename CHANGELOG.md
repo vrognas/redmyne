@@ -14,7 +14,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 ### Changed
 
-- **Gantt bar labels outside** - %done badge and assignee now appear after bar for better legibility
+- **Gantt bar labels outside** - %done badge and assignee now appear after bar; adaptive positioning flips to left when near edge
 - **Gantt toolbar redesign** - grouped controls, SVG icons, collapsible legend row, overflow menu
 - **Gantt default zoom** - changed from Day to Month level
 - **Gantt collapse performance** - collapse/expand now client-side without HTML regeneration; debounced + cached hierarchy
