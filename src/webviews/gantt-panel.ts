@@ -2268,14 +2268,6 @@ ${style.tip}
       outline: 1px solid var(--vscode-focusBorder);
       outline-offset: -1px;
     }
-    .filter-toggle label {
-      font-size: 10px;
-      color: var(--vscode-descriptionForeground);
-      padding: 2px 6px;
-      display: flex;
-      align-items: center;
-      background: var(--vscode-input-background);
-    }
     /* Toolbar groups with separators */
     .toolbar-group {
       display: flex;
@@ -2703,12 +2695,10 @@ ${style.tip}
       <!-- Filter group -->
       <div class="toolbar-group">
         <div class="filter-toggle" role="group" aria-label="Issue filter">
-          <label>Assignee:</label>
           <select id="filterAssignee" title="Filter by assignee">
             <option value="me"${this._currentFilter.assignee === "me" ? " selected" : ""}>Me</option>
             <option value="any"${this._currentFilter.assignee === "any" ? " selected" : ""}>Anyone</option>
           </select>
-          <label>Status:</label>
           <select id="filterStatus" title="Filter by status">
             <option value="open"${this._currentFilter.status === "open" ? " selected" : ""}>Open</option>
             <option value="closed"${this._currentFilter.status === "closed" ? " selected" : ""}>Closed</option>
