@@ -2175,10 +2175,11 @@ ${style.tip}
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     body {
       margin: 0;
-      padding: 16px;
+      padding: 8px;
       background: var(--vscode-editor-background);
       color: var(--vscode-foreground);
       font-family: var(--vscode-font-family);
+      font-size: 13px;
       overflow: hidden;
       height: 100vh;
       box-sizing: border-box;
@@ -2186,11 +2187,10 @@ ${style.tip}
     }
     .gantt-header {
       display: flex;
-      justify-content: space-between;
+      justify-content: flex-end;
       align-items: center;
-      margin-bottom: 16px;
+      margin-bottom: 8px;
     }
-    .gantt-header h2 { margin: 0; }
     .gantt-actions {
       display: flex;
       gap: 4px;
@@ -2200,9 +2200,9 @@ ${style.tip}
       color: var(--vscode-button-secondaryForeground);
       border: none;
       padding: 4px 8px;
-      border-radius: 4px;
+      border-radius: 2px;
       cursor: pointer;
-      font-size: 14px;
+      font-size: 13px;
     }
     .gantt-actions button:hover:not(:disabled) {
       background: var(--vscode-button-secondaryHoverBackground);
@@ -2218,7 +2218,7 @@ ${style.tip}
     .zoom-toggle {
       display: flex;
       border: 1px solid var(--vscode-panel-border);
-      border-radius: 4px;
+      border-radius: 2px;
       overflow: hidden;
       margin-right: 8px;
     }
@@ -2227,9 +2227,9 @@ ${style.tip}
       color: var(--vscode-button-secondaryForeground);
       border: none;
       border-right: 1px solid var(--vscode-panel-border);
-      padding: 4px 10px;
+      padding: 4px 8px;
       cursor: pointer;
-      font-size: 12px;
+      font-size: 11px;
     }
     .zoom-toggle button:last-child {
       border-right: none;
@@ -2244,7 +2244,7 @@ ${style.tip}
     .filter-toggle {
       display: flex;
       border: 1px solid var(--vscode-panel-border);
-      border-radius: 4px;
+      border-radius: 2px;
       overflow: hidden;
       margin-left: 4px;
     }
@@ -2255,7 +2255,7 @@ ${style.tip}
       border-right: 1px solid var(--vscode-panel-border);
       padding: 4px 8px;
       cursor: pointer;
-      font-size: 12px;
+      font-size: 11px;
       outline: none;
     }
     .filter-toggle select:last-child {
@@ -2332,12 +2332,12 @@ ${style.tip}
       top: 100%;
       right: 0;
       margin-top: 4px;
-      background: var(--vscode-dropdown-background);
-      border: 1px solid var(--vscode-dropdown-border);
-      border-radius: 4px;
+      background: var(--vscode-menu-background);
+      border: 1px solid var(--vscode-menu-border);
+      border-radius: 2px;
       padding: 4px 0;
       z-index: 1000;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      box-shadow: 0 2px 8px var(--vscode-widget-shadow);
       min-width: 160px;
     }
     .overflow-menu.hidden { display: none; }
@@ -2346,16 +2346,17 @@ ${style.tip}
       align-items: center;
       gap: 8px;
       width: 100%;
-      padding: 6px 12px;
+      padding: 4px 12px;
       border: none;
       background: transparent;
-      color: var(--vscode-dropdown-foreground);
+      color: var(--vscode-menu-foreground);
       text-align: left;
       cursor: pointer;
-      font-size: 12px;
+      font-size: 13px;
     }
     .overflow-menu button:hover {
-      background: var(--vscode-list-hoverBackground);
+      background: var(--vscode-menu-selectionBackground);
+      color: var(--vscode-menu-selectionForeground);
     }
     .overflow-menu button.active {
       background: var(--vscode-list-activeSelectionBackground);
@@ -2370,8 +2371,8 @@ ${style.tip}
       flex-direction: column;
       overflow: hidden;
       border: 1px solid var(--vscode-panel-border);
-      border-radius: 4px;
-      height: calc(100vh - 100px);
+      border-radius: 2px;
+      height: calc(100vh - 70px);
     }
     .gantt-header-row {
       display: flex;
@@ -2549,9 +2550,9 @@ ${style.tip}
     .relation-legend-item { display: flex; align-items: center; gap: 4px; opacity: 0.8; }
     .relation-legend-item:hover { opacity: 1; }
     .relation-legend-line { width: 20px; height: 2px; }
-    .relation-picker { position: fixed; background: var(--vscode-dropdown-background); border: 1px solid var(--vscode-dropdown-border); border-radius: 4px; padding: 4px 0; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
-    .relation-picker button { display: block; width: 100%; padding: 6px 12px; border: none; background: transparent; color: var(--vscode-dropdown-foreground); text-align: left; cursor: pointer; font-size: 12px; }
-    .relation-picker button:hover, .relation-picker button:focus { background: var(--vscode-list-hoverBackground); }
+    .relation-picker { position: fixed; background: var(--vscode-menu-background); border: 1px solid var(--vscode-menu-border); border-radius: 2px; padding: 4px 0; z-index: 1000; box-shadow: 0 2px 8px var(--vscode-widget-shadow); }
+    .relation-picker button { display: block; width: 100%; padding: 4px 12px; border: none; background: transparent; color: var(--vscode-menu-foreground); text-align: left; cursor: pointer; font-size: 13px; }
+    .relation-picker button:hover, .relation-picker button:focus { background: var(--vscode-menu-selectionBackground); color: var(--vscode-menu-selectionForeground); }
     /* Focus indicators for accessibility */
     button:focus { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
     .issue-bar:focus-within .bar-outline, .issue-bar.focused .bar-outline { stroke-width: 3; stroke: var(--vscode-focusBorder); }
@@ -2679,7 +2680,6 @@ ${style.tip}
   <div id="loadingOverlay" class="loading-overlay${this._isRefreshing ? " visible" : ""}"><div class="loading-spinner"></div></div>
   <div id="liveRegion" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
   <div class="gantt-header">
-    <h2>Timeline</h2>
     <div class="gantt-actions">
       <!-- Zoom group -->
       <div class="toolbar-group">
