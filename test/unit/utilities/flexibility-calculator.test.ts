@@ -132,4 +132,47 @@ describe("calculateFlexibility", () => {
     expect(result).not.toBeNull();
     expect(result!.status).toBe("completed");
   });
+
+  it("uses done_ratio for remaining work when over budget", () => {
+    // Issue #7359 scenario: 32h estimated, 51h spent, 80% done
+    // Should NOT be "on-track" - still has work remaining
+    vi.setSystemTime(new Date("2025-11-10")); // Monday, 5 days left = 40h
+
+    const issue = createMockIssue({
+      start_date: "2025-11-03",
+      due_date: "2025-11-14",
+      estimated_hours: 32,
+      spent_hours: 51, // Over budget!
+    });
+    (issue as { done_ratio: number }).done_ratio = 80; // Only 80% done
+
+    const result = calculateFlexibility(issue, defaultSchedule);
+
+    expect(result).not.toBeNull();
+    // Remaining work = 32h × 0.2 = 6.4h
+    // Available = 40h, so flexibility = (40/6.4 - 1) × 100 = ~525%
+    expect(result!.hoursRemaining).toBeCloseTo(6.4, 1);
+    expect(result!.status).toBe("on-track"); // Has enough time for remaining 20%
+  });
+
+  it("marks over-budget issue as overbooked when not enough time", () => {
+    // Over budget with tight deadline
+    vi.setSystemTime(new Date("2025-11-13")); // Thursday, 2 days = 16h
+
+    const issue = createMockIssue({
+      start_date: "2025-11-03",
+      due_date: "2025-11-14",
+      estimated_hours: 100,
+      spent_hours: 120, // Way over budget
+    });
+    (issue as { done_ratio: number }).done_ratio = 50; // Only half done
+
+    const result = calculateFlexibility(issue, defaultSchedule);
+
+    expect(result).not.toBeNull();
+    // Remaining work = 100h × 0.5 = 50h
+    // Available = 16h → overbooked
+    expect(result!.hoursRemaining).toBe(50);
+    expect(result!.status).toBe("overbooked");
+  });
 });
