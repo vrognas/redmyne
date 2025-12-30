@@ -1769,15 +1769,17 @@ export class GanttPanel {
         tip: "Start-to-Finish: Target finishes when source starts" },
     };
 
-    // Use rows (which have GanttIssue) for dependency arrows
+    // Use rows (which have GanttIssue) for dependency arrows - only for visible projects
     const dependencyArrows = rows
-      .filter((row): row is GanttRow & { issue: GanttIssue } => row.type === "issue" && !!row.issue)
+      .filter((row): row is GanttRow & { issue: GanttIssue } => row.type === "issue" && !!row.issue && !isInHiddenTreeCached(row))
       .flatMap((row) =>
         row.issue.relations.map((rel) => {
           const issue = row.issue;
           const source = issuePositions.get(issue.id);
           const target = issuePositions.get(rel.targetId);
-          if (!source || !target) return "";
+          // Skip if source/target missing OR target is in hidden project
+          const targetRow = rowByCollapseKey.get(`issue-${rel.targetId}`);
+          if (!source || !target || (targetRow && isInHiddenTreeCached(targetRow))) return "";
 
           const style = relationStyles[rel.type] || relationStyles.relates;
           const arrowSize = 6;
