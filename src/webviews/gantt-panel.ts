@@ -2116,8 +2116,8 @@ ${style.tip}
       .join("");
 
     // Generate minimap bars (simplified representation) - only for visible projects
-    const minimapBarHeight = 3;
-    const minimapHeight = 50;
+    const minimapBarHeight = 4;
+    const minimapHeight = 44;
     const minimapBars = rows
       .filter(r => r.type === "issue" && r.issue && (r.issue.start_date || r.issue.due_date) && !isInHiddenTreeCached(r))
       .map((row) => {
@@ -2644,8 +2644,8 @@ ${style.tip}
     /* Minimap */
     .minimap-container {
       position: relative;
-      height: 50px;
-      background: var(--vscode-sideBar-background);
+      height: 44px;
+      background: var(--vscode-minimap-background, var(--vscode-editor-background));
       border-top: 1px solid var(--vscode-panel-border);
       overflow: hidden;
     }
@@ -2655,24 +2655,28 @@ ${style.tip}
       height: 100%;
     }
     .minimap-bar {
-      opacity: 0.6;
+      opacity: 0.85;
     }
     .minimap-bar.bar-past {
-      opacity: 0.3;
+      opacity: 0.4;
     }
     .minimap-viewport {
-      fill: var(--vscode-editor-foreground);
-      fill-opacity: 0.08;
-      stroke: none;
+      fill: var(--vscode-minimap-selectionHighlight, var(--vscode-editor-foreground));
+      fill-opacity: 0.15;
+      stroke: var(--vscode-minimapSlider-background, var(--vscode-scrollbarSlider-background));
+      stroke-width: 1;
       cursor: grab;
+    }
+    .minimap-viewport:hover {
+      fill-opacity: 0.2;
     }
     .minimap-viewport:active {
       cursor: grabbing;
-      fill-opacity: 0.12;
+      fill-opacity: 0.25;
     }
     .minimap-today {
       stroke: var(--vscode-charts-red);
-      stroke-width: 1;
+      stroke-width: 1.5;
     }
   </style>
 </head>
@@ -2715,7 +2719,7 @@ ${style.tip}
         </button>
         <button id="depsBtn" class="icon-btn${this._showDependencies ? " active" : ""}" title="Toggle dependency arrows" aria-pressed="${this._showDependencies}">
           <svg viewBox="0 0 16 16"><path d="M5 3.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm-6.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM10 8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM5.354 4.354l1.5 1.5-.708.707-1.5-1.5.708-.707zm4.792 5.292l1.5 1.5-.707.708-1.5-1.5.707-.708z"/></svg>
-          Deps
+          Relations
         </button>
         <button id="intensityBtn" class="icon-btn${this._showIntensity ? " active" : ""}" title="Toggle daily intensity" aria-pressed="${this._showIntensity}">
           <svg viewBox="0 0 16 16"><path d="M11.5 11.5L13 10l-3-3 3-3-1.5-1.5L8 6l1.5 1.5L6 11l5.5.5zM2 14v-3h1v2h2v1H2zm12-12v3h-1V3h-2V2h3z"/></svg>
