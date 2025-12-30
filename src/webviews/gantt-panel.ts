@@ -893,11 +893,33 @@ export class GanttPanel {
       case "toggleProjectVisibility":
         if (message.projectId !== undefined) {
           const projectId = message.projectId as number;
-          const wasHidden = this._hiddenProjects.has(projectId);
-          if (wasHidden) {
+          const wasDirectlyHidden = this._hiddenProjects.has(projectId);
+          if (wasDirectlyHidden) {
+            // Directly hidden - just show it
             this._hiddenProjects.delete(projectId);
           } else {
-            this._hiddenProjects.add(projectId);
+            // Check if inherited hidden (ancestor is hidden)
+            const projectMap = new Map(this._projects.map(p => [p.id, p]));
+            const getAncestors = (id: number): number[] => {
+              const ancestors: number[] = [];
+              let current = projectMap.get(id);
+              while (current?.parent?.id) {
+                ancestors.push(current.parent.id);
+                current = projectMap.get(current.parent.id);
+              }
+              return ancestors;
+            };
+            const ancestors = getAncestors(projectId);
+            const hiddenAncestor = ancestors.find(id => this._hiddenProjects.has(id));
+            if (hiddenAncestor !== undefined) {
+              // Inherited hidden - show by unhiding ancestors
+              for (const ancestorId of ancestors) {
+                this._hiddenProjects.delete(ancestorId);
+              }
+            } else {
+              // Not hidden at all - hide it
+              this._hiddenProjects.add(projectId);
+            }
           }
           // Persist hidden projects to globalState
           GanttPanel._globalState?.update(HIDDEN_PROJECTS_KEY, [...this._hiddenProjects]);
