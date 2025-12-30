@@ -1614,7 +1614,9 @@ export class GanttPanel {
           visualDoneRatio = Math.min(100, Math.round((issue.spent_hours / issue.estimated_hours) * 100));
           isFallbackProgress = true;
         }
+        const statusDesc = this._getStatusDescription(issue.status);
         const tooltip = [
+          statusDesc,
           `#${issue.id} ${escapedSubject}`,
           `Project: ${escapedProject}`,
           `Start: ${formatDateWithWeekday(issue.start_date)}`,
@@ -1622,7 +1624,7 @@ export class GanttPanel {
           `Progress: ${doneRatio}%${isFallbackProgress ? ` (showing ${visualDoneRatio}% from time)` : ""}`,
           `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
           `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
-        ].join("\n");
+        ].filter(Boolean).join("\n");
 
         // Calculate done portion width for progress visualization
         const doneWidth = (visualDoneRatio / 100) * width;
@@ -1752,9 +1754,9 @@ export class GanttPanel {
               <rect class="progress-fill" x="${startX}" y="0" width="${doneWidth}" height="${barHeight}"
                     fill="${color}" rx="8" ry="8" opacity="0.95" filter="url(#barShadow)"/>
             ` : ""}
-            <!-- Border/outline -->
+            <!-- Border/outline - pointer-events:all so clicks work even with fill:none -->
             <rect class="bar-outline cursor-move" x="${startX}" y="0" width="${width}" height="${barHeight}"
-                  fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1" rx="8" ry="8"/>
+                  fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1" rx="8" ry="8" pointer-events="all"/>
             ${issue.isClosed ? `
               <!-- Closed checkmark -->
               <text class="completed-check" x="${endX - 10}" y="${barHeight / 2 + 5}"
@@ -4258,6 +4260,23 @@ ${style.tip}
         return "var(--vscode-charts-blue)";
       default:
         return "var(--vscode-charts-foreground)";
+    }
+  }
+
+  private _getStatusDescription(
+    status: FlexibilityScore["status"] | null
+  ): string {
+    switch (status) {
+      case "overbooked":
+        return "⚠️ Overbooked: Not enough time to complete before due date";
+      case "at-risk":
+        return "⏰ At Risk: Tight schedule with little buffer";
+      case "on-track":
+        return "✅ On Track: Sufficient time remaining";
+      case "completed":
+        return "🎉 Completed: Issue is done";
+      default:
+        return "";
     }
   }
 
