@@ -1310,21 +1310,6 @@ export class GanttPanel {
 
     // String format for open-ended bars (issues with start but no due date)
     const maxDateStr = maxDate.toISOString().slice(0, 10);
-    const minDateStr = minDate.toISOString().slice(0, 10);
-
-    // Debug info for troubleshooting date range issues
-    const debugInfo = {
-      totalIssues: this._issues.length,
-      projectsCount: this._projects.length,
-      projectIdsWithRows: [...projectIdsWithRows],
-      hiddenProjects: [...this._hiddenProjects],
-      effectiveHiddenProjects: [...effectiveHiddenProjects],
-      visibleIssuesCount: visibleIssues.length,
-      activeIssuesCount: activeIssues.length,
-      rangeBasisCount: rangeBasis.length,
-      minDate: minDateStr,
-      maxDate: maxDateStr,
-    };
 
     const totalDays = Math.max(1, Math.ceil(
       (maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)
@@ -1396,7 +1381,7 @@ export class GanttPanel {
 
     // Calculate "select all" state: all checked, none checked, or indeterminate
     const checkedCount = projectRows.filter(r => !effectiveHiddenProjects.has(r.id)).length;
-    const allChecked = checkedCount === projectRows.length;
+    const allChecked = projectRows.length > 0 && checkedCount === projectRows.length;
     const noneChecked = checkedCount === 0;
     const selectAllState = allChecked ? "checked" : noneChecked ? "unchecked" : "indeterminate";
 
@@ -2394,7 +2379,6 @@ ${style.tip}
         <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-orange"></span>100-120%</span>
         <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-red"></span>&gt;120%</span>
       </div>
-      <span class="debug-range" style="font-size:10px; color:var(--vscode-descriptionForeground); margin-left:16px;" title="Date range from ${rangeBasis.length} issues">Range: ${minDateStr} → ${maxDateStr}</span>
       <div class="relation-legend${this._showDependencies ? "" : " hidden"}" title="Relation types (drag from link handle to create)">
         <span class="relation-legend-item"><span class="relation-legend-line rel-line-blocks"></span>blocks</span>
         <span class="relation-legend-item"><span class="relation-legend-line rel-line-precedes"></span>precedes</span>
@@ -2477,9 +2461,6 @@ ${style.tip}
     </svg>
   </div>
   <script nonce="${nonce}">
-    // DEBUG: Date range calculation info
-    console.log('[Gantt Debug]', ${JSON.stringify(debugInfo)});
-
     const vscode = acquireVsCodeApi();
     const timelineWidth = ${timelineWidth};
     const minDateMs = ${minDate.getTime()};
