@@ -336,7 +336,11 @@ export function activate(context: vscode.ExtensionContext): void {
   // Register time entry commands
   registerTimeEntryCommands(context, {
     getServer: () => projectsTree.server,
-    refreshTree: () => myTimeEntriesTree.refresh(),
+    refreshTree: () => {
+      myTimeEntriesTree.refresh();
+      // Also refresh Gantt if open (time entries affect contribution data)
+      vscode.commands.executeCommand("redmine.refreshGanttData");
+    },
   });
 
   // Register monthly schedule commands

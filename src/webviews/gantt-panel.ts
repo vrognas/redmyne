@@ -349,7 +349,7 @@ export class GanttPanel {
   private _projects: RedmineProject[] = [];
   private _flexibilityCache: Map<number, FlexibilityScore | null> = new Map();
   private _server: RedmineServer | undefined;
-  private _zoomLevel: ZoomLevel = "day";
+  private _zoomLevel: ZoomLevel = "month";
   private _schedule: WeeklySchedule = DEFAULT_WEEKLY_SCHEDULE;
   private _showWorkloadHeatmap: boolean = false;
   private _showDependencies: boolean = true;
@@ -1122,6 +1122,18 @@ export class GanttPanel {
       case "toggleAutoUpdate":
         if (message.issueId) {
           vscode.commands.executeCommand("redmine.toggleAutoUpdateDoneRatio", { id: message.issueId });
+        }
+        break;
+      case "toggleAdHoc":
+        if (message.issueId) {
+          const isNowAdHoc = adHocTracker.toggle(message.issueId);
+          showStatusBarMessage(
+            isNowAdHoc ? `$(check) #${message.issueId} tagged as ad-hoc` : `$(check) #${message.issueId} ad-hoc tag removed`,
+            2000
+          );
+          // Refresh Gantt to update contribution data
+          this._isRefreshing = true;
+          vscode.commands.executeCommand("redmine.refreshIssues");
         }
         break;
       case "setFilter":
@@ -3478,6 +3490,7 @@ ${style.tip}
         { label: 'Log Time', command: 'logTime' },
         { label: 'Set % Done', command: 'setDoneRatio' },
         { label: 'Toggle Auto-update %', command: 'toggleAutoUpdate' },
+        { label: 'Toggle Ad-hoc Budget', command: 'toggleAdHoc' },
         { label: 'Copy URL', command: 'copyUrl' },
       ];
 
