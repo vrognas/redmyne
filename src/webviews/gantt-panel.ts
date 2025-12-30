@@ -894,30 +894,57 @@ export class GanttPanel {
         if (message.projectId !== undefined) {
           const projectId = message.projectId as number;
           const wasDirectlyHidden = this._hiddenProjects.has(projectId);
+
+          // Build project hierarchy helpers
+          const projectMap = new Map(this._projects.map(p => [p.id, p]));
+          const childrenMap = new Map<number, number[]>();
+          for (const p of this._projects) {
+            if (p.parent?.id) {
+              const siblings = childrenMap.get(p.parent.id) ?? [];
+              siblings.push(p.id);
+              childrenMap.set(p.parent.id, siblings);
+            }
+          }
+          const getAncestors = (id: number): number[] => {
+            const ancestors: number[] = [];
+            let current = projectMap.get(id);
+            while (current?.parent?.id) {
+              ancestors.push(current.parent.id);
+              current = projectMap.get(current.parent.id);
+            }
+            return ancestors;
+          };
+          const getDescendants = (id: number): number[] => {
+            const descendants: number[] = [];
+            const stack = childrenMap.get(id) ?? [];
+            while (stack.length > 0) {
+              const childId = stack.pop()!;
+              descendants.push(childId);
+              stack.push(...(childrenMap.get(childId) ?? []));
+            }
+            return descendants;
+          };
+
           if (wasDirectlyHidden) {
-            // Directly hidden - just show it
+            // Show project + all descendants
             this._hiddenProjects.delete(projectId);
+            for (const descendantId of getDescendants(projectId)) {
+              this._hiddenProjects.delete(descendantId);
+            }
           } else {
             // Check if inherited hidden (ancestor is hidden)
-            const projectMap = new Map(this._projects.map(p => [p.id, p]));
-            const getAncestors = (id: number): number[] => {
-              const ancestors: number[] = [];
-              let current = projectMap.get(id);
-              while (current?.parent?.id) {
-                ancestors.push(current.parent.id);
-                current = projectMap.get(current.parent.id);
-              }
-              return ancestors;
-            };
             const ancestors = getAncestors(projectId);
             const hiddenAncestor = ancestors.find(id => this._hiddenProjects.has(id));
             if (hiddenAncestor !== undefined) {
-              // Inherited hidden - show by unhiding ancestors
+              // Inherited hidden - show by unhiding ancestors + this project's descendants
               for (const ancestorId of ancestors) {
                 this._hiddenProjects.delete(ancestorId);
               }
+              for (const descendantId of getDescendants(projectId)) {
+                this._hiddenProjects.delete(descendantId);
+              }
             } else {
-              // Not hidden at all - hide it
+              // Not hidden at all - hide it (children auto-hidden via effectiveHiddenProjects)
               this._hiddenProjects.add(projectId);
             }
           }
