@@ -357,6 +357,7 @@ export class GanttPanel {
   private _cachedHierarchy?: HierarchyNode[];
   private _skipCollapseRerender = false; // Skip re-render when collapse is from client-side
   private _renderKey = 0; // Incremented on each render to force SVG re-creation
+  private _isRefreshing = false; // Show loading overlay during data refresh
   private _currentFilter: IssueFilter = { ...DEFAULT_ISSUE_FILTER };
   private _filterChangeCallback?: (filter: IssueFilter) => void;
 
@@ -763,6 +764,7 @@ export class GanttPanel {
   private _updateContent(): void {
     this._renderKey++; // Force SVG re-creation on each render
     this._panel.webview.html = this._getHtmlContent();
+    this._isRefreshing = false; // Reset after render
   }
 
   private _handleMessage(message: {
@@ -843,6 +845,8 @@ export class GanttPanel {
         this._updateContent();
         break;
       case "refresh":
+        // Set refreshing flag so next render shows loading overlay
+        this._isRefreshing = true;
         // Clear cache and refetch data (including new relations)
         vscode.commands.executeCommand("redmine.refreshIssues");
         break;
@@ -1694,9 +1698,9 @@ export class GanttPanel {
               <text class="completed-check" x="${endX - 10}" y="${barHeight / 2 + 5}"
                     text-anchor="end" fill="var(--vscode-charts-green)" font-size="14" font-weight="bold">✓</text>
             ` : `
-              <!-- Done ratio -->
+              <!-- Done ratio (~ prefix indicates fallback from spent/estimated hours) -->
               <text class="done-ratio" x="${endX - 10}" y="${barHeight / 2 + 4}"
-                    text-anchor="end" fill="var(--vscode-foreground)" font-size="11" opacity="0.8">${doneRatio}%</text>
+                    text-anchor="end" fill="var(--vscode-foreground)" font-size="11" opacity="0.8">${isFallbackProgress ? "~" : ""}${visualDoneRatio}%</text>
             `}
             <rect class="drag-handle drag-left cursor-ew-resize" x="${startX}" y="0" width="${handleWidth}" height="${barHeight}"
                   fill="transparent"/>
@@ -2204,11 +2208,11 @@ ${style.tip}
     .dependency-arrow .arrow-head { transition: filter 0.15s; }
     .dependency-arrow:hover .arrow-line { stroke-width: 3 !important; filter: brightness(1.2); }
     .dependency-arrow:hover .arrow-head { filter: brightness(1.2); }
-    /* Hover highlighting - fade only left column labels, not bars/arrows */
-    .hover-focus .issue-label,
-    .hover-focus .project-label { opacity: 0.15; transition: opacity 0.15s ease-out; }
-    .hover-focus .issue-label.hover-highlighted,
-    .hover-focus .project-label.hover-highlighted { opacity: 1 !important; }
+    /* Hover highlighting - fade labels only for dependency arrow hovers */
+    .hover-focus.dependency-hover .issue-label,
+    .hover-focus.dependency-hover .project-label { opacity: 0.15; transition: opacity 0.15s ease-out; }
+    .hover-focus.dependency-hover .issue-label.hover-highlighted,
+    .hover-focus.dependency-hover .project-label.hover-highlighted { opacity: 1 !important; }
     /* Highlight hovered bar */
     .hover-focus .issue-bar.hover-highlighted .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
     /* Dependency hover - glow on hovered arrow */
@@ -2346,7 +2350,7 @@ ${style.tip}
   </style>
 </head>
 <body>
-  <div id="loadingOverlay" class="loading-overlay"><div class="loading-spinner"></div></div>
+  <div id="loadingOverlay" class="loading-overlay${this._isRefreshing ? " visible" : ""}"><div class="loading-spinner"></div></div>
   <div id="liveRegion" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
   <div class="gantt-header">
     <h2>Timeline</h2>
@@ -4126,6 +4130,11 @@ ${style.tip}
         document.body.classList.remove('cursor-col-resize', 'user-select-none');
         saveState(); // Persist new column width
       }
+    });
+
+    // Auto-hide loading overlay after content renders
+    requestAnimationFrame(() => {
+      document.getElementById('loadingOverlay').classList.remove('visible');
     });
   </script>
 </body>
