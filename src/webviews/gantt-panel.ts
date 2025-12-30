@@ -1878,6 +1878,13 @@ export class GanttPanel {
                       x2="${startX + 4 + parentDoneWidth}" y2="${barHeight * 0.5}"
                       stroke="var(--vscode-charts-green)" stroke-width="3" opacity="0.8"/>
               ` : ""}
+              <!-- Status badge for parent -->
+              <g class="bar-labels">
+                <rect class="status-badge-bg" x="${endX + 8}" y="${barHeight / 2 - 8}" width="${doneRatio === 100 ? 32 : doneRatio >= 10 ? 28 : 22}" height="16" rx="3"
+                      fill="var(--vscode-badge-background)" opacity="0.9"/>
+                <text class="status-badge" x="${endX + 8 + (doneRatio === 100 ? 16 : doneRatio >= 10 ? 14 : 11)}" y="${barHeight / 2 + 4}"
+                      text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${doneRatio}%</text>
+              </g>
               <title>${tooltip} (parent - ${doneRatio}% done)</title>
             </g>
           `;
@@ -1915,15 +1922,6 @@ export class GanttPanel {
             <!-- Border/outline - pointer-events:all so clicks work even with fill:none -->
             <rect class="bar-outline cursor-move" x="${startX}" y="0" width="${width}" height="${barHeight}"
                   fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1" rx="8" ry="8" pointer-events="all"/>
-            ${issue.isClosed ? `
-              <!-- Closed checkmark -->
-              <text class="completed-check" x="${endX - 10}" y="${barHeight / 2 + 5}"
-                    text-anchor="end" fill="var(--vscode-charts-green)" font-size="14" font-weight="bold">✓</text>
-            ` : `
-              <!-- Done ratio (~ prefix indicates fallback from spent/estimated hours) -->
-              <text class="done-ratio" x="${endX - 10}" y="${barHeight / 2 + 4}"
-                    text-anchor="end" fill="var(--vscode-foreground)" font-size="11" opacity="0.8">${isFallbackProgress ? "~" : ""}${visualDoneRatio}%</text>
-            `}
             <rect class="drag-handle drag-left cursor-ew-resize" x="${startX}" y="0" width="${handleWidth}" height="${barHeight}"
                   fill="transparent"/>
             <rect class="drag-handle drag-right cursor-ew-resize" x="${startX + width - handleWidth}" y="0" width="${handleWidth}" height="${barHeight}"
@@ -1932,11 +1930,27 @@ export class GanttPanel {
             <circle class="link-handle cursor-crosshair" cx="${endX + 8}" cy="${barHeight / 2}" r="5"
                     fill="var(--vscode-button-background)" stroke="var(--vscode-button-foreground)"
                     stroke-width="1" opacity="0"/>
-            ${issue.assignee ? `
-              <!-- Assignee -->
-              <text class="bar-assignee" x="${endX + 20}" y="${barHeight / 2 + 4}"
-                    fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(issue.assignee)}</text>
-            ` : ""}
+            <!-- Labels outside bar: status + assignee -->
+            <g class="bar-labels">
+              ${issue.isClosed ? `
+                <!-- Closed checkmark badge -->
+                <rect class="status-badge-bg" x="${endX + 16}" y="${barHeight / 2 - 8}" width="18" height="16" rx="3"
+                      fill="var(--vscode-charts-green)" opacity="0.2"/>
+                <text class="status-badge" x="${endX + 25}" y="${barHeight / 2 + 4}"
+                      text-anchor="middle" fill="var(--vscode-charts-green)" font-size="12" font-weight="bold">✓</text>
+              ` : `
+                <!-- Done ratio badge -->
+                <rect class="status-badge-bg" x="${endX + 16}" y="${barHeight / 2 - 8}" width="${visualDoneRatio === 100 ? 32 : visualDoneRatio >= 10 ? 28 : 22}" height="16" rx="3"
+                      fill="var(--vscode-badge-background)" opacity="0.9"/>
+                <text class="status-badge" x="${endX + 16 + (visualDoneRatio === 100 ? 16 : visualDoneRatio >= 10 ? 14 : 11)}" y="${barHeight / 2 + 4}"
+                      text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${isFallbackProgress ? "~" : ""}${visualDoneRatio}%</text>
+              `}
+              ${issue.assignee ? `
+                <!-- Assignee (truncated) -->
+                <text class="bar-assignee" x="${endX + (issue.isClosed ? 38 : visualDoneRatio === 100 ? 52 : visualDoneRatio >= 10 ? 48 : 42)}" y="${barHeight / 2 + 4}"
+                      fill="var(--vscode-descriptionForeground)" font-size="11" textLength="80" lengthAdjust="spacingAndGlyphs">${escapeHtml(issue.assignee.length > 12 ? issue.assignee.substring(0, 11) + "…" : issue.assignee)}</text>
+              ` : ""}
+            </g>
             <title>${tooltip}</title>
           </g>
         `;
@@ -2491,9 +2505,10 @@ ${style.tip}
     .issue-bar.parent-bar:hover { opacity: 1; }
     .past-overlay { pointer-events: none; }
     .progress-fill { pointer-events: none; }
-    .completed-check { pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
-    .done-ratio { pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
-    .bar-assignee { pointer-events: none; opacity: 0.8; }
+    .bar-labels { pointer-events: none; }
+    .status-badge-bg { pointer-events: none; }
+    .status-badge { pointer-events: none; font-weight: 500; }
+    .bar-assignee { pointer-events: none; opacity: 0.85; }
     .issue-bar .drag-handle:hover { fill: var(--vscode-list-hoverBackground); }
     .issue-bar:hover .link-handle { opacity: 0.7; }
     .issue-bar .link-handle:hover { opacity: 1; transform-origin: center; }
