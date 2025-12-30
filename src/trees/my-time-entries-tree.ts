@@ -3,6 +3,8 @@ import { RedmineServer } from "../redmine/redmine-server";
 import { TimeEntry } from "../redmine/models/time-entry";
 import { formatHoursAsHHMM } from "../utilities/time-input";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
+import { adHocTracker } from "../utilities/adhoc-tracker";
+import { parseTargetIssueId } from "../utilities/contribution-calculator";
 import {
   MonthlyScheduleOverrides,
   countAvailableHoursMonthly,
@@ -37,7 +39,7 @@ export interface TimeEntryNode {
 
 export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNode> {
   private isLoading = false;
-  private server?: RedmineServer;
+  server?: RedmineServer;
   private issueCache = new Map<number, { id: number; subject: string; projectId?: number; project: string; client?: string }>();
   private cachedGroups?: TimeEntryNode[];
   private expandedIds = new Set<string>();
@@ -472,6 +474,13 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const userName = this.showAllUsers && entry.user?.name ? `• ${entry.user.name}` : "";
       const descParts = [hours, activity, issueSubject, userName].filter(Boolean);
 
+      // Determine contextValue for ad-hoc contributions
+      let contextValue = "time-entry";
+      if (adHocTracker.isAdHoc(issueId)) {
+        const targetId = parseTargetIssueId(entry.comments);
+        contextValue = targetId ? "time-entry-adhoc-linked" : "time-entry-adhoc";
+      }
+
       return {
         id: `${idPrefix}-entry-${entry.id}`,
         label: `#${issueId}${comment}`,
@@ -479,7 +488,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         tooltip,
         collapsibleState: vscode.TreeItemCollapsibleState.None,
         type: "entry" as const,
-        contextValue: "time-entry",
+        contextValue,
         _entry: entry,
       };
     });

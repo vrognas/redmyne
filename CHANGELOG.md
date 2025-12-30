@@ -4,6 +4,12 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Ad-hoc budget transfers** - tag issues as ad-hoc budget pools; time entries on ad-hoc issues can contribute hours to other issues via `#<id>` in comments
+- **Gantt contribution display** - tooltip shows contributed hours breakdown (direct + from ad-hoc)
+- **Time entry contribution commands** - right-click time entries on ad-hoc issues to set/remove contribution target
+
 ### Changed
 
 - **Gantt collapse performance** - collapse/expand now client-side without HTML regeneration; debounced + cached hierarchy

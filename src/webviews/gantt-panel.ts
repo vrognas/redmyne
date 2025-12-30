@@ -3,7 +3,9 @@ import * as crypto from "crypto";
 import { Issue, IssueRelation } from "../redmine/models/issue";
 import { RedmineServer } from "../redmine/redmine-server";
 import { RedmineProject } from "../redmine/redmine-project";
-import { FlexibilityScore, WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "../utilities/flexibility-calculator";
+import { FlexibilityScore, WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE, calculateFlexibility, ContributionData } from "../utilities/flexibility-calculator";
+import { calculateContributions } from "../utilities/contribution-calculator";
+import { adHocTracker } from "../utilities/adhoc-tracker";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { errorToString } from "../utilities/error-feedback";
 import { buildProjectHierarchy, flattenHierarchyAll, FlatNodeWithVisibility, HierarchyNode } from "../utilities/hierarchy-builder";
@@ -363,6 +365,10 @@ export class GanttPanel {
   private _isRefreshing = false; // Show loading overlay during data refresh
   private _currentFilter: IssueFilter = { ...DEFAULT_ISSUE_FILTER };
   private _filterChangeCallback?: (filter: IssueFilter) => void;
+  // Ad-hoc budget contribution tracking
+  private _contributionData?: ContributionData;
+  private _contributionSources?: Map<number, { fromIssueId: number; hours: number }[]>;
+  private _donationTargets?: Map<number, { toIssueId: number; hours: number }[]>;
 
   private constructor(panel: vscode.WebviewPanel, server?: RedmineServer) {
     this._panel = panel;
@@ -694,6 +700,94 @@ export class GanttPanel {
     }
 
     this._updateContent();
+
+    // Load contributions if any ad-hoc issues exist
+    this._loadContributions();
+  }
+
+  /**
+   * Load time entries and calculate contributions for ad-hoc budget issues.
+   * Rebuilds flexibility cache with effective spent hours.
+   */
+  private async _loadContributions(): Promise<void> {
+    if (!this._server || this._issues.length === 0) return;
+
+    // Get unique project IDs from displayed issues
+    const projectIds = new Set<number>();
+    for (const issue of this._issues) {
+      if (issue.project?.id) {
+        projectIds.add(issue.project.id);
+      }
+    }
+
+    if (projectIds.size === 0) return;
+
+    // Check if any displayed issues are ad-hoc
+    const adHocIssueIds = new Set(adHocTracker.getAll());
+    const hasAdHocIssues = this._issues.some(i => adHocIssueIds.has(i.id));
+    if (!hasAdHocIssues && adHocIssueIds.size === 0) return;
+
+    try {
+      // Fetch time entries for all projects in parallel
+      const timeEntriesArrays = await Promise.all(
+        Array.from(projectIds).map(id => this._server!.getProjectTimeEntries(id))
+      );
+      const allTimeEntries = timeEntriesArrays.flat();
+
+      // Calculate contributions
+      const contributions = calculateContributions(allTimeEntries);
+
+      // Build contribution data for flexibility calculation
+      const contributionData: ContributionData = {
+        contributedTo: contributions.contributedTo,
+        donatedFrom: contributions.donatedFrom,
+        adHocIssues: adHocIssueIds,
+      };
+
+      // Store contribution data for tooltip display
+      this._contributionData = contributionData;
+      this._contributionSources = contributions.contributionSources;
+      this._donationTargets = contributions.donationTargets;
+
+      // Rebuild flexibility cache with contributions
+      for (const issue of this._issues) {
+        const spentHours = issue.spent_hours ?? 0;
+        let effectiveSpent: number | undefined;
+
+        if (adHocIssueIds.has(issue.id)) {
+          // Ad-hoc issue: show negative (donated hours)
+          const donated = contributions.donatedFrom.get(issue.id) ?? 0;
+          effectiveSpent = -donated;
+        } else {
+          // Normal issue: add contributed hours
+          const contributed = contributions.contributedTo.get(issue.id) ?? 0;
+          if (contributed > 0) {
+            effectiveSpent = spentHours + contributed;
+          }
+        }
+
+        if (effectiveSpent !== undefined) {
+          const newFlexibility = calculateFlexibility(
+            {
+              start_date: issue.start_date || "",
+              due_date: issue.due_date || null,
+              estimated_hours: issue.estimated_hours ?? null,
+              spent_hours: issue.spent_hours,
+              done_ratio: issue.done_ratio,
+            },
+            this._schedule,
+            effectiveSpent
+          );
+          this._flexibilityCache.set(issue.id, newFlexibility);
+        }
+      }
+
+      // Re-render with updated flexibility data
+      this._cachedHierarchy = undefined;
+      this._updateContent();
+    } catch {
+      // Silently fail - contributions are optional enhancement
+    }
   }
 
   /**
@@ -1503,14 +1597,42 @@ export class GanttPanel {
         const issue = row.issue!;
         const escapedSubject = escapeHtml(issue.subject);
         const escapedProject = escapeHtml(issue.project);
-        const tooltip = [
+
+        // Build tooltip with contribution info if available
+        const tooltipLines = [
           `#${issue.id} ${escapedSubject}`,
           `Project: ${escapedProject}`,
           `Start: ${formatDateWithWeekday(issue.start_date)}`,
           `Due: ${formatDateWithWeekday(issue.due_date)}`,
           `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
-          `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
-        ].join("\n");
+        ];
+
+        // Check for contributions
+        const isAdHoc = this._contributionData?.adHocIssues.has(issue.id);
+        const donated = this._donationTargets?.get(issue.id);
+        const received = this._contributionSources?.get(issue.id);
+
+        if (isAdHoc && donated && donated.length > 0) {
+          // Ad-hoc issue: show donations
+          const donatedDetails = donated.map(d => `  → #${d.toIssueId}: ${formatHoursAsTime(d.hours)}`).join("\n");
+          const totalDonated = donated.reduce((sum, d) => sum + d.hours, 0);
+          tooltipLines.push(`Spent: ${formatHoursAsTime(issue.spent_hours)}`);
+          tooltipLines.push(`Donated: ${formatHoursAsTime(totalDonated)}`);
+          tooltipLines.push(donatedDetails);
+        } else if (received && received.length > 0) {
+          // Normal issue receiving contributions
+          const receivedDetails = received.map(r => `  ← #${r.fromIssueId}: ${formatHoursAsTime(r.hours)}`).join("\n");
+          const totalReceived = received.reduce((sum, r) => sum + r.hours, 0);
+          const directSpent = issue.spent_hours ?? 0;
+          tooltipLines.push(`Direct: ${formatHoursAsTime(directSpent)}`);
+          tooltipLines.push(`Contributed: +${formatHoursAsTime(totalReceived)}`);
+          tooltipLines.push(receivedDetails);
+          tooltipLines.push(`Total: ${formatHoursAsTime(directSpent + totalReceived)}`);
+        } else {
+          tooltipLines.push(`Spent: ${formatHoursAsTime(issue.spent_hours)}`);
+        }
+
+        const tooltip = tooltipLines.join("\n");
 
         return `
           <g class="issue-label gantt-row cursor-pointer" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Open issue #${issue.id}">
@@ -1615,7 +1737,9 @@ export class GanttPanel {
           isFallbackProgress = true;
         }
         const statusDesc = this._getStatusDescription(issue.status);
-        const tooltip = [
+
+        // Build tooltip with contribution info
+        const barTooltipLines = [
           statusDesc,
           `#${issue.id} ${escapedSubject}`,
           `Project: ${escapedProject}`,
@@ -1623,8 +1747,30 @@ export class GanttPanel {
           `Due: ${hasOnlyStart ? "(no due date)" : formatDateWithWeekday(issue.due_date)}`,
           `Progress: ${doneRatio}%${isFallbackProgress ? ` (showing ${visualDoneRatio}% from time)` : ""}`,
           `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
-          `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
-        ].filter(Boolean).join("\n");
+        ];
+
+        // Check for contributions
+        const barIsAdHoc = this._contributionData?.adHocIssues.has(issue.id);
+        const barDonated = this._donationTargets?.get(issue.id);
+        const barReceived = this._contributionSources?.get(issue.id);
+
+        if (barIsAdHoc && barDonated && barDonated.length > 0) {
+          // Ad-hoc issue: show donations
+          const totalDonated = barDonated.reduce((sum, d) => sum + d.hours, 0);
+          barTooltipLines.push(`Spent: ${formatHoursAsTime(issue.spent_hours)}`);
+          barTooltipLines.push(`Donated: ${formatHoursAsTime(totalDonated)} to ${barDonated.length} issue(s)`);
+        } else if (barReceived && barReceived.length > 0) {
+          // Normal issue receiving contributions
+          const totalReceived = barReceived.reduce((sum, r) => sum + r.hours, 0);
+          const directSpent = issue.spent_hours ?? 0;
+          barTooltipLines.push(`Direct: ${formatHoursAsTime(directSpent)}`);
+          barTooltipLines.push(`+ ${formatHoursAsTime(totalReceived)} from ad-hoc`);
+          barTooltipLines.push(`Total: ${formatHoursAsTime(directSpent + totalReceived)}`);
+        } else {
+          barTooltipLines.push(`Spent: ${formatHoursAsTime(issue.spent_hours)}`);
+        }
+
+        const tooltip = barTooltipLines.filter(Boolean).join("\n");
 
         // Calculate done portion width for progress visualization
         const doneWidth = (visualDoneRatio / 100) * width;

@@ -39,6 +39,8 @@ import { registerViewCommands } from "./commands/view-commands";
 import { registerCreateTestIssuesCommand } from "./commands/create-test-issues";
 import { WorkloadStatusBar } from "./status-bars/workload-status-bar";
 import { autoUpdateTracker } from "./utilities/auto-update-tracker";
+import { adHocTracker } from "./utilities/adhoc-tracker";
+import { toggleAdHoc, contributeToIssue, removeContribution } from "./commands/adhoc-commands";
 import { debounce, DebouncedFunction } from "./utilities/debounce";
 
 // Constants
@@ -71,6 +73,9 @@ let cleanupResources: {
 export function activate(context: vscode.ExtensionContext): void {
   // Initialize auto-update tracker
   autoUpdateTracker.initialize(context);
+
+  // Initialize ad-hoc budget tracker
+  adHocTracker.initialize(context);
 
   const bucket = {
     servers: [] as RedmineServer[],
@@ -828,6 +833,25 @@ export function activate(context: vscode.ExtensionContext): void {
         2000
       );
     })
+  );
+
+  // Toggle ad-hoc budget tag for issue
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.toggleAdHoc", toggleAdHoc)
+  );
+
+  // Contribute time entry hours to another issue
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.contributeToIssue", (item) =>
+      contributeToIssue(item, myTimeEntriesTree.server, () => myTimeEntriesTree.refresh())
+    )
+  );
+
+  // Remove contribution from time entry
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.removeContribution", (item) =>
+      removeContribution(item, myTimeEntriesTree.server, () => myTimeEntriesTree.refresh())
+    )
   );
 
   // Register view commands

@@ -549,6 +549,18 @@ export class RedmineServer {
   }
 
   /**
+   * Returns all time entries for a project (all users, all time)
+   * Used for ad-hoc budget contribution calculation
+   * @param projectId Project ID or identifier
+   */
+  async getProjectTimeEntries(projectId: number | string): Promise<TimeEntry[]> {
+    return this.paginate<TimeEntry>(
+      `/time_entries.json?project_id=${projectId}`,
+      "time_entries"
+    );
+  }
+
+  /**
    * Update an existing time entry
    * @param id Time entry ID
    * @param updates Fields to update (hours, comments, activity_id, spent_on)

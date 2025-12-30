@@ -374,6 +374,21 @@
         "command": "redmine.toggleAutoUpdateDoneRatio",
         "title": "Toggle Auto-update % Done",
         "icon": "$(sync)"
+      },
+      {
+        "command": "redmine.toggleAdHoc",
+        "title": "Toggle Ad-hoc Budget",
+        "icon": "$(package)"
+      },
+      {
+        "command": "redmine.contributeToIssue",
+        "title": "Contribute to Issue...",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "redmine.removeContribution",
+        "title": "Remove Contribution",
+        "icon": "$(close)"
       }
     ],
     "keybindings": [
@@ -761,6 +776,18 @@
         {
           "command": "redmine.toggleAutoUpdateDoneRatio",
           "when": "false"
+        },
+        {
+          "command": "redmine.toggleAdHoc",
+          "when": "false"
+        },
+        {
+          "command": "redmine.contributeToIssue",
+          "when": "false"
+        },
+        {
+          "command": "redmine.removeContribution",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -856,6 +883,16 @@
           "group": "2_navigation@1"
         },
         {
+          "command": "redmine.contributeToIssue",
+          "when": "view == 'redmine-explorer-my-time-entries' && viewItem == 'time-entry-adhoc'",
+          "group": "3_adhoc@1"
+        },
+        {
+          "command": "redmine.removeContribution",
+          "when": "view == 'redmine-explorer-my-time-entries' && viewItem == 'time-entry-adhoc-linked'",
+          "group": "3_adhoc@2"
+        },
+        {
           "command": "redmine.addTimeEntryForDate",
           "when": "view == 'redmine-explorer-my-time-entries' && viewItem == 'day-group'",
           "group": "1_edit@1"
@@ -939,6 +976,16 @@
           "command": "redmine.toggleAutoUpdateDoneRatio",
           "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
           "group": "redmine@3"
+        },
+        {
+          "command": "redmine.toggleAdHoc",
+          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^issue/",
+          "group": "redmine@4"
+        },
+        {
+          "command": "redmine.toggleAdHoc",
+          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
+          "group": "redmine@4"
         },
         {
           "command": "redmine.addIssueToKanban",

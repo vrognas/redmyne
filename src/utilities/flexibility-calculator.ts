@@ -56,10 +56,12 @@ const workingDaysCache = new Map<string, number>();
 /**
  * Calculate flexibility score for an issue.
  * Returns null if issue lacks required data (due_date, estimated_hours).
+ * @param effectiveSpentHours Optional override for spent hours (for ad-hoc budget contributions)
  */
 export function calculateFlexibility(
   issue: FlexibilityIssue,
-  schedule: WeeklySchedule
+  schedule: WeeklySchedule,
+  effectiveSpentHours?: number
 ): FlexibilityScore | null {
   // Can't calculate without due date or estimate
   if (!issue.due_date || !issue.estimated_hours) {
@@ -71,7 +73,8 @@ export function calculateFlexibility(
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const spentHours = issue.spent_hours ?? 0;
+  // Use effective spent hours if provided (for ad-hoc contributions)
+  const spentHours = effectiveSpentHours ?? issue.spent_hours ?? 0;
   const doneRatio = issue.done_ratio ?? 0;
 
   // Calculate remaining work hours
@@ -265,18 +268,49 @@ export function clearFlexibilityCache(): void {
 }
 
 /**
+ * Contribution data for effective spent hours calculation
+ */
+export interface ContributionData {
+  /** Hours contributed TO each issue (from ad-hoc pools) */
+  contributedTo: Map<number, number>;
+  /** Hours donated FROM each ad-hoc issue */
+  donatedFrom: Map<number, number>;
+  /** Set of ad-hoc issue IDs */
+  adHocIssues: Set<number>;
+}
+
+/**
  * Build flexibility cache for a set of issues
  * Common pattern used by tree providers
+ * @param contributions Optional contribution data for ad-hoc budget calculations
  */
 export function buildFlexibilityCache(
   issues: FlexibilityIssue[],
   cache: Map<number, FlexibilityScore | null>,
-  schedule: WeeklySchedule
+  schedule: WeeklySchedule,
+  contributions?: ContributionData
 ): void {
   cache.clear();
   for (const issue of issues) {
     const issueWithId = issue as FlexibilityIssue & { id: number };
-    cache.set(issueWithId.id, calculateFlexibility(issue, schedule));
+    const issueId = issueWithId.id;
+
+    // Calculate effective spent hours if contributions provided
+    let effectiveSpent: number | undefined;
+    if (contributions) {
+      const spentHours = issue.spent_hours ?? 0;
+      if (contributions.adHocIssues.has(issueId)) {
+        // Ad-hoc issue: show negative (donated hours as spent)
+        const donated = contributions.donatedFrom.get(issueId) ?? 0;
+        effectiveSpent = -donated;
+      } else {
+        // Normal issue: add contributed hours
+        const contributed = contributions.contributedTo.get(issueId) ?? 0;
+        effectiveSpent = spentHours + contributed;
+      }
+    }
+
+    cache.set(issueId, calculateFlexibility(issue, schedule, effectiveSpent));
   }
 }
 
