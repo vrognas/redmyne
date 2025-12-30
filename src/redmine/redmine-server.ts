@@ -563,7 +563,7 @@ export class RedmineServer {
   /**
    * Update an existing time entry
    * @param id Time entry ID
-   * @param updates Fields to update (hours, comments, activity_id, spent_on)
+   * @param updates Fields to update (hours, comments, activity_id, spent_on, issue_id)
    */
   async updateTimeEntry(
     id: number,
@@ -572,6 +572,7 @@ export class RedmineServer {
       comments?: string;
       activity_id?: number;
       spent_on?: string;
+      issue_id?: number;
     }
   ): Promise<void> {
     await this.doRequest(

@@ -9,6 +9,7 @@ import { formatHoursAsHHMM, parseTimeInput } from "../utilities/time-input";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { validateDateInput } from "../utilities/date-picker";
 import { quickLogTime } from "./quick-log-time";
+import { pickIssue } from "../utilities/issue-picker";
 
 /** Time entry node from tree view */
 interface TimeEntryNode {
@@ -98,7 +99,9 @@ export function registerTimeEntryCommands(
 
       // Show what to edit
       const hoursDisplay = formatHoursAsHHMM(parseFloat(entry.hours));
+      const issueDisplay = entry.issue ? `#${entry.issue.id} ${entry.issue.subject}` : `#${entry.issue_id || "?"}`;
       const options = [
+        { label: `Issue: ${issueDisplay}`, field: "issue" as const },
         { label: `Hours: ${hoursDisplay}`, field: "hours" as const },
         { label: `Comment: ${entry.comments || "(none)"}`, field: "comments" as const },
         { label: `Activity: ${entry.activity?.name || "Unknown"}`, field: "activity" as const },
@@ -113,7 +116,16 @@ export function registerTimeEntryCommands(
       if (!choice) return;
 
       try {
-        if (choice.field === "hours") {
+        if (choice.field === "issue") {
+          const newIssue = await pickIssue(server, "Move Time Entry to Issue");
+          if (!newIssue) return;
+          if (newIssue.id === (entry.issue?.id || entry.issue_id)) {
+            vscode.window.showInformationMessage("Same issue selected, no change made");
+            return;
+          }
+          await server.updateTimeEntry(entry.id, { issue_id: newIssue.id });
+          showStatusBarMessage(`$(check) Moved to #${newIssue.id}`, 2000);
+        } else if (choice.field === "hours") {
           const input = await vscode.window.showInputBox({
             title: "Edit Hours",
             value: formatHoursAsHHMM(parseFloat(entry.hours)),

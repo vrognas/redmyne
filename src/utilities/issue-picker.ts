@@ -393,6 +393,182 @@ export async function pickIssueWithSearch(
 }
 
 /**
+ * Pick an issue with inline search (no activity selection)
+ * Used for moving time entries to another issue
+ */
+export async function pickIssue(
+  server: RedmineServer,
+  title: string
+): Promise<Issue | undefined> {
+  // Get assigned issues
+  let issues: Issue[];
+  try {
+    const result = await server.getIssuesAssignedToMe();
+    issues = result.issues;
+  } catch (error) {
+    vscode.window.showErrorMessage(`Failed to fetch issues: ${error}`);
+    return undefined;
+  }
+
+  // Build base items from assigned issues
+  const baseItems: IssueQuickPickItem[] = issues.map((issue) => ({
+    label: `#${issue.id} ${issue.subject}`,
+    description: issue.project?.name,
+    issue,
+  }));
+
+  // Use createQuickPick for inline search
+  return new Promise<Issue | undefined>((resolve) => {
+    const quickPick = vscode.window.createQuickPick<IssueQuickPickItem>();
+    quickPick.title = title;
+    quickPick.placeholder = "Type to search, or select from list";
+    quickPick.items = baseItems;
+    quickPick.matchOnDescription = true;
+
+    let resolved = false;
+    let searchVersion = 0;
+
+    const handleSelection = (selected: IssueQuickPickItem): boolean => {
+      if (resolved) return false;
+      if (selected.disabled) return false;
+      if (selected.issue) {
+        resolved = true;
+        quickPick.dispose();
+        resolve(selected.issue);
+        return true;
+      }
+      return false;
+    };
+
+    const debouncedSearch = debounce(SEARCH_DEBOUNCE_MS, async (query: string) => {
+      if (query.length < 2) return;
+
+      const thisSearchVersion = ++searchVersion;
+      quickPick.busy = true;
+
+      try {
+        const lowerQuery = query.toLowerCase();
+        const cleanQuery = query.replace(/^#/, "");
+        const possibleId = parseInt(cleanQuery, 10);
+        const isNumericQuery = !isNaN(possibleId) && cleanQuery === String(possibleId);
+
+        // Search local + server in parallel
+        const localMatches = issues.filter((issue) =>
+          String(issue.id).includes(cleanQuery) ||
+          issue.subject.toLowerCase().includes(lowerQuery) ||
+          issue.project?.name?.toLowerCase().includes(lowerQuery)
+        );
+
+        type SearchResult = { exactMatch: Issue | null; serverResults: Issue[] };
+        const searchResult: SearchResult = { exactMatch: null, serverResults: [] };
+
+        await Promise.all([
+          (async () => {
+            if (isNumericQuery) {
+              try {
+                const result = await server.getIssueById(possibleId);
+                searchResult.exactMatch = result.issue;
+              } catch { /* ignore */ }
+            }
+          })(),
+          (async () => {
+            searchResult.serverResults = await server.searchIssues(query, 10);
+          })(),
+        ]);
+
+        // Merge results
+        const seenIds = new Set<number>();
+        const allResults: Issue[] = [];
+
+        if (searchResult.exactMatch) {
+          allResults.push(searchResult.exactMatch);
+          seenIds.add(searchResult.exactMatch.id);
+        }
+        for (const issue of localMatches) {
+          if (!seenIds.has(issue.id)) {
+            allResults.push(issue);
+            seenIds.add(issue.id);
+          }
+        }
+        for (const issue of searchResult.serverResults) {
+          if (!seenIds.has(issue.id)) {
+            allResults.push(issue);
+            seenIds.add(issue.id);
+          }
+        }
+
+        if (thisSearchVersion !== searchVersion || resolved) return;
+
+        // Build result items
+        const assignedIds = new Set(issues.map(i => i.id));
+        const limitedResults = allResults.slice(0, 15);
+
+        const resultItems: IssueQuickPickItem[] = limitedResults.length === 0
+          ? [{ label: `$(info) No results for "${query}"`, disabled: true }]
+          : limitedResults.map((issue) => {
+              const isAssigned = assignedIds.has(issue.id);
+              const icon = isAssigned ? "$(account)" : "$(search)";
+              return {
+                label: `${icon} #${issue.id} ${issue.subject}`,
+                description: `${issue.project?.name ?? ""}${isAssigned ? " (assigned)" : ""}`,
+                detail: issue.status?.name,
+                issue,
+              };
+            });
+
+        quickPick.items = [
+          ...resultItems,
+          { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
+          ...baseItems,
+        ];
+      } catch {
+        if (thisSearchVersion === searchVersion && !resolved) {
+          quickPick.items = [
+            { label: `$(error) Search failed`, disabled: true },
+            { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
+            ...baseItems,
+          ];
+        }
+      } finally {
+        if (thisSearchVersion === searchVersion) {
+          quickPick.busy = false;
+        }
+      }
+    });
+
+    quickPick.onDidChangeValue((value) => {
+      const query = value.trim();
+      if (!query) {
+        debouncedSearch.cancel();
+        quickPick.items = baseItems;
+        return;
+      }
+      debouncedSearch(query);
+    });
+
+    quickPick.onDidAccept(() => {
+      const selected = quickPick.activeItems[0];
+      if (selected) handleSelection(selected);
+    });
+
+    quickPick.onDidChangeSelection((items) => {
+      if (items.length > 0) handleSelection(items[0]);
+    });
+
+    quickPick.onDidHide(() => {
+      debouncedSearch.cancel();
+      if (!resolved) {
+        resolved = true;
+        resolve(undefined);
+      }
+      quickPick.dispose();
+    });
+
+    quickPick.show();
+  });
+}
+
+/**
  * Pick activity for a known project (skip issue selection)
  * Used when issue is already known (e.g., personal tasks)
  */
