@@ -1878,13 +1878,19 @@ export class GanttPanel {
                       x2="${startX + 4 + parentDoneWidth}" y2="${barHeight * 0.5}"
                       stroke="var(--vscode-charts-green)" stroke-width="3" opacity="0.8"/>
               ` : ""}
-              <!-- Status badge for parent -->
-              <g class="bar-labels">
-                <rect class="status-badge-bg" x="${endX + 8}" y="${barHeight / 2 - 8}" width="${doneRatio === 100 ? 32 : doneRatio >= 10 ? 28 : 22}" height="16" rx="3"
-                      fill="var(--vscode-badge-background)" opacity="0.9"/>
-                <text class="status-badge" x="${endX + 8 + (doneRatio === 100 ? 16 : doneRatio >= 10 ? 14 : 11)}" y="${barHeight / 2 + 4}"
-                      text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${doneRatio}%</text>
-              </g>
+              <!-- Status badge for parent (adaptive positioning) -->
+              ${(() => {
+                const badgeW = doneRatio === 100 ? 32 : doneRatio >= 10 ? 28 : 22;
+                const onLeft = endX + badgeW + 16 > timelineWidth;
+                const labelX = onLeft ? startX - 8 : endX + 8;
+                const badgeCenterX = onLeft ? labelX - badgeW / 2 : labelX + badgeW / 2;
+                return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
+                  <rect class="status-badge-bg" x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" rx="3"
+                        fill="var(--vscode-badge-background)" opacity="0.9"/>
+                  <text class="status-badge" x="${badgeCenterX}" y="${barHeight / 2 + 4}"
+                        text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${doneRatio}%</text>
+                </g>`;
+              })()}
               <title>${tooltip} (parent - ${doneRatio}% done)</title>
             </g>
           `;
@@ -1930,27 +1936,38 @@ export class GanttPanel {
             <circle class="link-handle cursor-crosshair" cx="${endX + 8}" cy="${barHeight / 2}" r="5"
                     fill="var(--vscode-button-background)" stroke="var(--vscode-button-foreground)"
                     stroke-width="1" opacity="0"/>
-            <!-- Labels outside bar: status + assignee -->
-            <g class="bar-labels">
-              ${issue.isClosed ? `
-                <!-- Closed checkmark badge -->
-                <rect class="status-badge-bg" x="${endX + 16}" y="${barHeight / 2 - 8}" width="18" height="16" rx="3"
-                      fill="var(--vscode-charts-green)" opacity="0.2"/>
-                <text class="status-badge" x="${endX + 25}" y="${barHeight / 2 + 4}"
-                      text-anchor="middle" fill="var(--vscode-charts-green)" font-size="12" font-weight="bold">✓</text>
-              ` : `
-                <!-- Done ratio badge -->
-                <rect class="status-badge-bg" x="${endX + 16}" y="${barHeight / 2 - 8}" width="${visualDoneRatio === 100 ? 32 : visualDoneRatio >= 10 ? 28 : 22}" height="16" rx="3"
+            <!-- Labels outside bar: adaptive positioning (left if near edge, else right) -->
+            ${(() => {
+              const badgeW = issue.isClosed ? 18 : (visualDoneRatio === 100 ? 32 : visualDoneRatio >= 10 ? 28 : 22);
+              const assigneeW = issue.assignee ? 90 : 0;
+              const totalLabelW = badgeW + assigneeW + 24;
+              const onLeft = endX + totalLabelW > timelineWidth;
+              const labelX = onLeft ? startX - 8 : endX + 16;
+
+              if (issue.isClosed) {
+                const checkX = onLeft ? labelX - 9 : labelX + 9;
+                const assigneeX = onLeft ? labelX - 22 : labelX + 38;
+                return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
+                  <rect class="status-badge-bg" x="${onLeft ? labelX - 18 : labelX}" y="${barHeight / 2 - 8}" width="18" height="16" rx="3"
+                        fill="var(--vscode-charts-green)" opacity="0.2"/>
+                  <text class="status-badge" x="${checkX}" y="${barHeight / 2 + 4}"
+                        text-anchor="middle" fill="var(--vscode-charts-green)" font-size="12" font-weight="bold">✓</text>
+                  ${issue.assignee ? `<text class="bar-assignee" x="${assigneeX}" y="${barHeight / 2 + 4}"
+                        text-anchor="${onLeft ? "end" : "start"}" fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(issue.assignee.length > 12 ? issue.assignee.substring(0, 11) + "…" : issue.assignee)}</text>` : ""}
+                </g>`;
+              }
+
+              const badgeCenterX = onLeft ? labelX - badgeW / 2 : labelX + badgeW / 2;
+              const assigneeX = onLeft ? labelX - badgeW - 6 : labelX + badgeW + 6;
+              return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
+                <rect class="status-badge-bg" x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" rx="3"
                       fill="var(--vscode-badge-background)" opacity="0.9"/>
-                <text class="status-badge" x="${endX + 16 + (visualDoneRatio === 100 ? 16 : visualDoneRatio >= 10 ? 14 : 11)}" y="${barHeight / 2 + 4}"
+                <text class="status-badge" x="${badgeCenterX}" y="${barHeight / 2 + 4}"
                       text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${isFallbackProgress ? "~" : ""}${visualDoneRatio}%</text>
-              `}
-              ${issue.assignee ? `
-                <!-- Assignee (truncated) -->
-                <text class="bar-assignee" x="${endX + (issue.isClosed ? 38 : visualDoneRatio === 100 ? 52 : visualDoneRatio >= 10 ? 48 : 42)}" y="${barHeight / 2 + 4}"
-                      fill="var(--vscode-descriptionForeground)" font-size="11" textLength="80" lengthAdjust="spacingAndGlyphs">${escapeHtml(issue.assignee.length > 12 ? issue.assignee.substring(0, 11) + "…" : issue.assignee)}</text>
-              ` : ""}
-            </g>
+                ${issue.assignee ? `<text class="bar-assignee" x="${assigneeX}" y="${barHeight / 2 + 4}"
+                      text-anchor="${onLeft ? "end" : "start"}" fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(issue.assignee.length > 12 ? issue.assignee.substring(0, 11) + "…" : issue.assignee)}</text>` : ""}
+              </g>`;
+            })()}
             <title>${tooltip}</title>
           </g>
         `;
