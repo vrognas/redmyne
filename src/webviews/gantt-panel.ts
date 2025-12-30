@@ -2182,8 +2182,10 @@ ${style.tip}
       min-width: 150px;
       max-width: 500px;
       background: var(--vscode-editor-background);
+      overflow-x: auto;
+      overflow-y: hidden;
     }
-    .gantt-labels svg { width: 100%; height: 100%; }
+    .gantt-labels svg { min-width: 100%; height: 100%; }
     .gantt-resize-handle {
       width: 6px;
       height: ${bodyHeight}px;
