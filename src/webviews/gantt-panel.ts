@@ -80,13 +80,16 @@ interface GanttRow {
  * Convert Issue to GanttIssue for SVG rendering
  */
 function toGanttIssue(issue: Issue, flexibilityCache: Map<number, FlexibilityScore | null>, closedStatusIds: Set<number>): GanttIssue {
+  // Check if closed via status ID, or fallback to status name containing "closed"
+  const isClosedById = closedStatusIds.has(issue.status?.id ?? 0);
+  const isClosedByName = issue.status?.name?.toLowerCase().includes("closed") ?? false;
   return {
     id: issue.id,
     subject: issue.subject,
     start_date: issue.start_date || null,
     due_date: issue.due_date || null,
     status: flexibilityCache.get(issue.id)?.status ?? null,
-    isClosed: closedStatusIds.has(issue.status?.id ?? 0),
+    isClosed: isClosedById || isClosedByName,
     project: issue.project?.name ?? "Unknown",
     projectId: issue.project?.id ?? 0,
     parentId: issue.parent?.id ?? null,
