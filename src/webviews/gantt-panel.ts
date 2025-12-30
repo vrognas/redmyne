@@ -1574,6 +1574,10 @@ export class GanttPanel {
     } else {
       minDate = new Date(Math.min(...dates.map((d) => new Date(d).getTime())));
       maxDate = new Date(Math.max(...dates.map((d) => new Date(d).getTime())));
+      // Add padding based on zoom level for breathing room
+      const paddingDays = { day: 1, week: 7, month: 30, quarter: 90, year: 365 }[this._zoomLevel] || 7;
+      minDate.setDate(minDate.getDate() - paddingDays);
+      maxDate.setDate(maxDate.getDate() + paddingDays);
     }
 
     // String format for open-ended bars (issues with start but no due date)
@@ -2100,25 +2104,26 @@ export class GanttPanel {
     // Relation type styling - only forward types (reverse types are filtered out)
     // blocks/precedes/relates/duplicates/copied_to are shown
     // blocked/follows/duplicated/copied_from are auto-generated reverses, filtered
-    const relationStyles: Record<string, { color: string; dash: string; label: string; tip: string }> = {
-      blocks: { color: "#e74c3c", dash: "", label: "blocks",
+    // Colors use CSS classes for VS Code theming; dash patterns differentiate within color groups
+    const relationStyles: Record<string, { dash: string; label: string; tip: string }> = {
+      blocks: { dash: "", label: "blocks",
         tip: "Target cannot be closed until source is closed" },
-      precedes: { color: "#9b59b6", dash: "", label: "precedes",
+      precedes: { dash: "", label: "precedes",
         tip: "Source must complete before target can start" },
-      relates: { color: "#7f8c8d", dash: "4,3", label: "relates to",
+      relates: { dash: "4,3", label: "relates to",
         tip: "Simple link (no constraints)" },
-      duplicates: { color: "#e67e22", dash: "2,2", label: "duplicates",
+      duplicates: { dash: "2,2", label: "duplicates",
         tip: "Closing target auto-closes source" },
-      copied_to: { color: "#1abc9c", dash: "6,2", label: "copied to",
+      copied_to: { dash: "6,2", label: "copied to",
         tip: "Source was copied to create target" },
       // Extended scheduling types (requires Gantt plugin)
-      finish_to_start: { color: "#3498db", dash: "", label: "FS",
+      finish_to_start: { dash: "4,2", label: "FS",
         tip: "Finish-to-Start: Target starts after source finishes" },
-      start_to_start: { color: "#2ecc71", dash: "4,2", label: "SS",
+      start_to_start: { dash: "4,2", label: "SS",
         tip: "Start-to-Start: Target starts when source starts" },
-      finish_to_finish: { color: "#f39c12", dash: "4,2", label: "FF",
+      finish_to_finish: { dash: "4,2", label: "FF",
         tip: "Finish-to-Finish: Target finishes when source finishes" },
-      start_to_finish: { color: "#9b59b6", dash: "2,4", label: "SF",
+      start_to_finish: { dash: "2,4", label: "SF",
         tip: "Start-to-Finish: Target finishes when source starts" },
     };
 
@@ -2199,8 +2204,8 @@ export class GanttPanel {
             <g class="dependency-arrow rel-${rel.type} cursor-pointer" data-relation-id="${rel.id}" data-from="${issue.id}" data-to="${rel.targetId}">
               <!-- Wide invisible hit area for easier clicking -->
               <path class="arrow-hit-area" d="${path}" stroke="transparent" stroke-width="16" fill="none"/>
-              <path class="arrow-line" d="${path}" stroke="${style.color}" stroke-width="2" fill="none" ${dashAttr}/>
-              <path class="arrow-head" d="${arrowHead}" fill="${style.color}"/>
+              <path class="arrow-line" d="${path}" stroke-width="2" fill="none" ${dashAttr}/>
+              <path class="arrow-head" d="${arrowHead}"/>
               <title>#${issue.id} ${style.label} #${rel.targetId}
 ${style.tip}
 (right-click to delete)</title>
@@ -2735,11 +2740,34 @@ ${style.tip}
     .heatmap-color-yellow { background: var(--vscode-charts-yellow); }
     .heatmap-color-orange { background: var(--vscode-charts-orange); }
     .heatmap-color-red { background: var(--vscode-charts-red); }
+    /* Relation legend line colors */
     .rel-line-blocks { background: var(--vscode-charts-red); }
-    .rel-line-precedes { background: var(--vscode-charts-purple); }
+    .rel-line-precedes { background: var(--vscode-charts-blue); }
     .rel-line-relates { background: var(--vscode-charts-lines); border-style: dashed; }
-    .rel-line-duplicates { background: var(--vscode-charts-orange); border-style: dotted; }
-    .rel-line-copied { background: var(--vscode-charts-green); border-style: dashed; }
+    .rel-line-duplicates { background: var(--vscode-charts-lines); border-style: dotted; }
+    .rel-line-copied { background: var(--vscode-charts-lines); border-style: dashed; border-width: 2px; }
+    .rel-line-ss { background: var(--vscode-charts-green); border-style: dashed; }
+    .rel-line-ff { background: var(--vscode-charts-orange); border-style: dashed; }
+    .rel-line-sf { background: var(--vscode-charts-purple); border-style: dashed; }
+    /* SVG arrow colors - grouped by semantic meaning, differentiated by dash pattern */
+    .rel-blocks .arrow-line { stroke: var(--vscode-charts-red); }
+    .rel-blocks .arrow-head { fill: var(--vscode-charts-red); }
+    .rel-precedes .arrow-line { stroke: var(--vscode-charts-blue); }
+    .rel-precedes .arrow-head { fill: var(--vscode-charts-blue); }
+    .rel-relates .arrow-line { stroke: var(--vscode-charts-lines); }
+    .rel-relates .arrow-head { fill: var(--vscode-charts-lines); }
+    .rel-duplicates .arrow-line { stroke: var(--vscode-charts-lines); }
+    .rel-duplicates .arrow-head { fill: var(--vscode-charts-lines); }
+    .rel-copied_to .arrow-line { stroke: var(--vscode-charts-lines); }
+    .rel-copied_to .arrow-head { fill: var(--vscode-charts-lines); }
+    .rel-finish_to_start .arrow-line { stroke: var(--vscode-charts-blue); }
+    .rel-finish_to_start .arrow-head { fill: var(--vscode-charts-blue); }
+    .rel-start_to_start .arrow-line { stroke: var(--vscode-charts-green); }
+    .rel-start_to_start .arrow-head { fill: var(--vscode-charts-green); }
+    .rel-finish_to_finish .arrow-line { stroke: var(--vscode-charts-orange); }
+    .rel-finish_to_finish .arrow-head { fill: var(--vscode-charts-orange); }
+    .rel-start_to_finish .arrow-line { stroke: var(--vscode-charts-purple); }
+    .rel-start_to_finish .arrow-head { fill: var(--vscode-charts-purple); }
     .color-swatch { display: inline-block; width: 12px; height: 3px; margin-right: 8px; vertical-align: middle; }
 
     /* Minimap */
@@ -3981,25 +4009,25 @@ ${style.tip}
       picker.style.top = Math.max(10, clampedY) + 'px';
 
       const baseTypes = [
-        { value: 'blocks', label: '🚫 Blocks', color: '#e74c3c',
+        { value: 'blocks', label: '🚫 Blocks', cssClass: 'rel-line-blocks',
           tooltip: 'Target cannot be closed until this issue is closed' },
-        { value: 'precedes', label: '➡️ Precedes', color: '#9b59b6',
+        { value: 'precedes', label: '➡️ Precedes', cssClass: 'rel-line-precedes',
           tooltip: 'This issue must complete before target can start' },
-        { value: 'relates', label: '🔗 Relates to', color: '#7f8c8d',
+        { value: 'relates', label: '🔗 Relates to', cssClass: 'rel-line-relates',
           tooltip: 'Simple link between issues (no constraints)' },
-        { value: 'duplicates', label: '📋 Duplicates', color: '#e67e22',
+        { value: 'duplicates', label: '📋 Duplicates', cssClass: 'rel-line-duplicates',
           tooltip: 'Closing target will automatically close this issue' },
-        { value: 'copied_to', label: '📄 Copied to', color: '#1abc9c',
+        { value: 'copied_to', label: '📄 Copied to', cssClass: 'rel-line-copied',
           tooltip: 'This issue was copied to create the target issue' }
       ];
       const extendedTypes = [
-        { value: 'finish_to_start', label: '⏩ Finish→Start', color: '#3498db',
+        { value: 'finish_to_start', label: '⏩ Finish→Start', cssClass: 'rel-line-precedes',
           tooltip: 'Target starts after this issue finishes (FS)' },
-        { value: 'start_to_start', label: '▶️ Start→Start', color: '#2ecc71',
+        { value: 'start_to_start', label: '▶️ Start→Start', cssClass: 'rel-line-ss',
           tooltip: 'Target starts when this issue starts (SS)' },
-        { value: 'finish_to_finish', label: '⏹️ Finish→Finish', color: '#f39c12',
+        { value: 'finish_to_finish', label: '⏹️ Finish→Finish', cssClass: 'rel-line-ff',
           tooltip: 'Target finishes when this issue finishes (FF)' },
-        { value: 'start_to_finish', label: '⏪ Start→Finish', color: '#9b59b6',
+        { value: 'start_to_finish', label: '⏪ Start→Finish', cssClass: 'rel-line-sf',
           tooltip: 'Target finishes when this issue starts (SF)' }
       ];
       const types = extendedRelationTypes ? [...baseTypes, ...extendedTypes] : baseTypes;
@@ -4007,8 +4035,7 @@ ${style.tip}
       types.forEach(t => {
         const btn = document.createElement('button');
         const swatch = document.createElement('span');
-        swatch.className = 'color-swatch';
-        swatch.style.backgroundColor = t.color;
+        swatch.className = 'color-swatch ' + t.cssClass;
         btn.appendChild(swatch);
         btn.appendChild(document.createTextNode(t.label));
         btn.title = t.tooltip;
@@ -4848,13 +4875,27 @@ ${style.tip}
             <line x1="${x}" y1="0" x2="${x}" y2="40" class="date-marker"/>
             <text x="${x + 4}" y="14" fill="var(--vscode-foreground)" font-size="11" font-weight="bold">${monthLabel} ${year}</text>
           `);
-          bodyGridLines.push(`
-            <line x1="${x}" y1="0" x2="${x}" y2="100%" class="day-grid"/>
+          // Month zoom: use week gridlines only for even spacing (skip month gridlines in body)
+        } else if (zoomLevel === "quarter") {
+          headerContent.push(`
+            <text x="${x + 2}" y="30" fill="var(--vscode-descriptionForeground)" font-size="9">${monthLabel}</text>
           `);
+          // Quarter zoom: add month gridlines (lighter)
+          if (month % 3 !== 0) { // Don't double line on Q boundaries
+            bodyGridLines.push(`
+              <line x1="${x}" y1="0" x2="${x}" y2="100%" class="day-grid opacity-02"/>
+            `);
+          }
         } else if (zoomLevel === "year") {
           headerContent.push(`
             <text x="${x + 2}" y="30" fill="var(--vscode-descriptionForeground)" font-size="9">${monthLabel}</text>
           `);
+          // Year zoom: add month gridlines
+          if (month !== 0) { // Don't double line on Jan 1
+            bodyGridLines.push(`
+              <line x1="${x}" y1="0" x2="${x}" y2="100%" class="day-grid opacity-02"/>
+            `);
+          }
         }
       }
 
