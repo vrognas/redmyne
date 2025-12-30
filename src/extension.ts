@@ -732,6 +732,44 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  // Bulk set done ratio for multiple issues (Gantt multi-select)
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.bulkSetDoneRatio", async (issueIds: number[]) => {
+      if (!issueIds || issueIds.length === 0) {
+        vscode.window.showErrorMessage("No issues selected");
+        return;
+      }
+      const server = projectsTree.server;
+      if (!server) {
+        vscode.window.showErrorMessage("No Redmine server configured");
+        return;
+      }
+
+      const options = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((pct) => ({
+        label: `${pct}%`,
+        value: pct,
+      }));
+
+      const selected = await vscode.window.showQuickPick(options, {
+        placeHolder: `Set % Done for ${issueIds.length} issues`,
+      });
+
+      if (selected === undefined) return;
+
+      try {
+        // Update all issues in parallel
+        await Promise.all(issueIds.map(id => server.updateDoneRatio(id, selected.value)));
+        // Disable auto-update for all these issues
+        issueIds.forEach(id => autoUpdateTracker.disable(id));
+        showStatusBarMessage(`$(check) ${issueIds.length} issues set to ${selected.value}%`, 2000);
+        // Update Gantt panel for each issue
+        issueIds.forEach(id => GanttPanel.currentPanel?.updateIssueDoneRatio(id, selected.value));
+      } catch (error) {
+        vscode.window.showErrorMessage(`Failed to update: ${error}`);
+      }
+    })
+  );
+
   // Open project in browser (context menu)
   context.subscriptions.push(
     vscode.commands.registerCommand("redmine.openProjectInBrowser", async (node: { project?: { identifier?: string } } | undefined) => {

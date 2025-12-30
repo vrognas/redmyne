@@ -770,6 +770,7 @@ export class GanttPanel {
   private _handleMessage(message: {
     command: string;
     issueId?: number;
+    issueIds?: number[]; // For bulk operations
     startDate?: string | null;
     dueDate?: string | null;
     zoomLevel?: ZoomLevel;
@@ -1005,6 +1006,11 @@ export class GanttPanel {
       case "setDoneRatio":
         if (message.issueId) {
           vscode.commands.executeCommand("redmine.setDoneRatio", { id: message.issueId });
+        }
+        break;
+      case "bulkSetDoneRatio":
+        if (message.issueIds && message.issueIds.length > 0) {
+          vscode.commands.executeCommand("redmine.bulkSetDoneRatio", message.issueIds);
         }
         break;
       case "copyUrl":
@@ -3286,6 +3292,10 @@ ${style.tip}
     function showIssueContextMenu(x, y, issueId) {
       document.querySelector('.relation-picker')?.remove();
 
+      // Check if this is a bulk operation (multiple selected and clicked is part of selection)
+      const isBulkMode = selectedIssues.size > 1 && selectedIssues.has(issueId);
+      const targetIds = isBulkMode ? Array.from(selectedIssues).map(id => parseInt(id)) : [parseInt(issueId)];
+
       const picker = document.createElement('div');
       picker.className = 'relation-picker';
 
@@ -3300,10 +3310,13 @@ ${style.tip}
       label.style.padding = '6px 12px';
       label.style.fontSize = '11px';
       label.style.opacity = '0.7';
-      label.textContent = '#' + issueId;
+      label.textContent = isBulkMode ? targetIds.length + ' issues selected' : '#' + issueId;
       picker.appendChild(label);
 
-      const options = [
+      const options = isBulkMode ? [
+        { label: 'Set % Done...', command: 'bulkSetDoneRatio', bulk: true },
+        { label: 'Clear Selection', command: 'clearSelection', local: true },
+      ] : [
         { label: 'Update Issue...', command: 'openIssue' },
         { label: 'Open in Browser', command: 'openInBrowser' },
         { label: 'Show in Issues', command: 'showInIssues' },
@@ -3317,7 +3330,13 @@ ${style.tip}
         const btn = document.createElement('button');
         btn.textContent = opt.label;
         btn.addEventListener('click', () => {
-          vscode.postMessage({ command: opt.command, issueId: parseInt(issueId) });
+          if (opt.local) {
+            clearSelection();
+          } else if (opt.bulk) {
+            vscode.postMessage({ command: opt.command, issueIds: targetIds });
+          } else {
+            vscode.postMessage({ command: opt.command, issueId: parseInt(issueId) });
+          }
           picker.remove();
         });
         picker.appendChild(btn);
