@@ -795,12 +795,16 @@ export class GanttPanel {
     switch (message.command) {
       case "openIssue":
         if (message.issueId && this._server) {
+          // Open issue actions, then refresh Gantt when done
           vscode.commands.executeCommand(
             "redmine.openActionsForIssue",
             false,
             { server: this._server },
             String(message.issueId)
-          );
+          ).then(() => {
+            // Refresh after user completes action (they may have updated issue)
+            vscode.commands.executeCommand("redmine.refreshGanttData");
+          });
         }
         break;
       case "updateDates":
