@@ -501,12 +501,15 @@ export class GanttPanel {
       font-size: 13px;
       overflow: hidden;
       height: 100vh;
+      display: flex;
+      flex-direction: column;
     }
     .gantt-header {
       display: flex;
       justify-content: flex-end;
       align-items: center;
       margin-bottom: 8px;
+      flex-shrink: 0;
     }
     .gantt-actions {
       display: flex;
@@ -584,7 +587,8 @@ export class GanttPanel {
       overflow: hidden;
       border: 1px solid var(--vscode-panel-border);
       border-radius: 2px;
-      height: calc(100vh - 70px);
+      flex-grow: 1;
+      min-height: 0;
     }
     .gantt-header-row {
       display: flex;
@@ -665,6 +669,7 @@ export class GanttPanel {
     .delay-7 { animation-delay: 0.7s; }
     .minimap-container {
       height: 44px;
+      flex-shrink: 0;
       background: var(--vscode-minimap-background, var(--vscode-editor-background));
       border-top: 1px solid var(--vscode-panel-border);
     }
@@ -2275,12 +2280,15 @@ ${style.tip}
       height: 100vh;
       box-sizing: border-box;
       animation: fadeIn 0.15s ease-out;
+      display: flex;
+      flex-direction: column;
     }
     .gantt-header {
       display: flex;
       justify-content: flex-end;
       align-items: center;
       margin-bottom: 8px;
+      flex-shrink: 0;
     }
     .gantt-actions {
       display: flex;
@@ -2387,11 +2395,12 @@ ${style.tip}
       display: flex;
       align-items: center;
       gap: 16px;
-      padding: 6px 16px;
+      padding: 4px 16px;
       background: var(--vscode-editor-background);
       border-bottom: 1px solid var(--vscode-panel-border);
       font-size: 11px;
       color: var(--vscode-descriptionForeground);
+      flex-shrink: 0;
     }
     .legend-row.hidden { display: none; }
     .heatmap-legend, .relation-legend {
@@ -2463,7 +2472,8 @@ ${style.tip}
       overflow: hidden;
       border: 1px solid var(--vscode-panel-border);
       border-radius: 2px;
-      height: calc(100vh - 70px);
+      flex-grow: 1;
+      min-height: 0;
     }
     .gantt-header-row {
       display: flex;
@@ -2736,6 +2746,7 @@ ${style.tip}
     .minimap-container {
       position: relative;
       height: 44px;
+      flex-shrink: 0;
       background: var(--vscode-minimap-background, var(--vscode-editor-background));
       border-top: 1px solid var(--vscode-panel-border);
       overflow: hidden;
