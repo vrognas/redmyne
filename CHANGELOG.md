@@ -9,11 +9,21 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Ad-hoc budget transfers** - tag issues as ad-hoc budget pools; time entries on ad-hoc issues can contribute hours to other issues via `#<id>` in comments
 - **Gantt contribution display** - tooltip shows contributed hours breakdown (direct + from ad-hoc)
 - **Time entry contribution commands** - right-click time entries on ad-hoc issues to set/remove contribution target
+- **Gantt toggle ad-hoc** - right-click context menu to tag/untag issues as ad-hoc budget
+- **Gantt left column scroll** - horizontal scroll for issue/project names, hover shows full name
 
 ### Changed
 
+- **Gantt bar labels outside** - %done badge and assignee now appear after bar for better legibility
+- **Gantt toolbar redesign** - grouped controls, SVG icons, collapsible legend row, overflow menu
+- **Gantt default zoom** - changed from Day to Month level
 - **Gantt collapse performance** - collapse/expand now client-side without HTML regeneration; debounced + cached hierarchy
 - **Debounce utility** - extracted shared `debounce()` function; refactored 5 manual debounce patterns
+- **Gantt gridlines visibility** - increased opacity for clearer day/week markers
+
+### Fixed
+
+- **Gantt refresh on time entry changes** - Gantt now refreshes when time entries are added/edited/deleted
 
 ## [3.19.0]
 
