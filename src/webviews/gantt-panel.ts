@@ -1881,6 +1881,11 @@ export class GanttPanel {
         } else {
           barTooltipLines.push(`Spent: ${formatHoursAsTime(issue.spent_hours)}`);
         }
+        // Keyboard hints for date editing (only for non-parent issues)
+        if (!isParent) {
+          barTooltipLines.push(`───`);
+          barTooltipLines.push(`←/→: Move  Shift+←/→: Resize end  Alt+←/→: Resize start`);
+        }
 
         const tooltip = barTooltipLines.filter(Boolean).join("\n");
 
@@ -4618,6 +4623,50 @@ ${style.tip}
       // Action shortcuts
       else if (e.key.toLowerCase() === 'r') { document.getElementById('refreshBtn')?.click(); }
       else if (e.key.toLowerCase() === 't') { document.getElementById('todayBtn')?.click(); }
+      // Arrow key date nudging for focused issue bars
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        const focusedBar = document.activeElement?.closest('.issue-bar:not(.parent-bar)');
+        if (!focusedBar) return;
+        e.preventDefault();
+        const issueId = parseInt(focusedBar.dataset.issueId);
+        const startDate = focusedBar.dataset.startDate;
+        const dueDate = focusedBar.dataset.dueDate;
+        if (!startDate && !dueDate) return;
+
+        const delta = e.key === 'ArrowRight' ? 1 : -1;
+        const addDays = (dateStr, days) => {
+          const d = new Date(dateStr + 'T00:00:00');
+          d.setDate(d.getDate() + days);
+          return d.toISOString().slice(0, 10);
+        };
+
+        let newStart = null, newDue = null;
+        if (e.shiftKey && dueDate) {
+          // Shift+Arrow: resize end date only
+          newDue = addDays(dueDate, delta);
+        } else if (e.altKey && startDate) {
+          // Alt+Arrow: resize start date only
+          newStart = addDays(startDate, delta);
+        } else {
+          // Plain Arrow: move entire bar
+          if (startDate) newStart = addDays(startDate, delta);
+          if (dueDate) newDue = addDays(dueDate, delta);
+        }
+
+        if (newStart || newDue) {
+          saveState();
+          undoStack.push({
+            issueId,
+            oldStartDate: newStart ? startDate : null,
+            oldDueDate: newDue ? dueDate : null,
+            newStartDate: newStart,
+            newDueDate: newDue
+          });
+          redoStack.length = 0;
+          updateUndoRedoButtons();
+          vscode.postMessage({ command: 'updateDates', issueId, startDate: newStart, dueDate: newDue });
+        }
+      }
     });
 
     // Scroll to today marker (centered)
