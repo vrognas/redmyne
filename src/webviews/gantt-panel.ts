@@ -677,9 +677,9 @@ export class GanttPanel {
 </head>
 <body>
   <div class="gantt-header">
-    <div class="gantt-actions">
+    <div class="gantt-actions" role="toolbar" aria-label="Gantt chart controls">
       <div class="toolbar-group">
-        <div class="zoom-toggle">
+        <div class="zoom-toggle" role="group" aria-label="Zoom level">
           <button>Day</button>
           <button>Week</button>
           <button class="active">Month</button>
@@ -2314,6 +2314,10 @@ ${style.tip}
     .gantt-actions button:hover:not(:disabled) {
       background: var(--vscode-button-secondaryHoverBackground);
     }
+    .gantt-actions button:focus-visible {
+      outline: 2px solid var(--vscode-focusBorder);
+      outline-offset: -1px;
+    }
     .gantt-actions button:disabled {
       opacity: 0.4;
       cursor: not-allowed;
@@ -2369,6 +2373,11 @@ ${style.tip}
     }
     .zoom-toggle button:hover {
       background: var(--vscode-button-secondaryHoverBackground);
+    }
+    .zoom-toggle button:focus-visible {
+      outline: 2px solid var(--vscode-focusBorder);
+      outline-offset: -1px;
+      z-index: 1;
     }
     .zoom-toggle button.active {
       background: var(--vscode-button-background);
@@ -2498,6 +2507,10 @@ ${style.tip}
     .overflow-menu button:hover {
       background: var(--vscode-menu-selectionBackground);
       color: var(--vscode-menu-selectionForeground);
+    }
+    .overflow-menu button:focus-visible {
+      outline: 2px solid var(--vscode-focusBorder);
+      outline-offset: -2px;
     }
     .overflow-menu button[aria-pressed="true"] {
       color: var(--vscode-textLink-foreground);
@@ -2824,15 +2837,15 @@ ${style.tip}
   <div id="loadingOverlay" class="loading-overlay${this._isRefreshing ? " visible" : ""}"><div class="loading-spinner"></div></div>
   <div id="liveRegion" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
   <div class="gantt-header">
-    <div class="gantt-actions">
+    <div class="gantt-actions" role="toolbar" aria-label="Gantt chart controls">
       <!-- Zoom group -->
       <div class="toolbar-group">
         <div class="zoom-toggle" role="group" aria-label="Zoom level">
-          <button id="zoomDay" class="${this._zoomLevel === "day" ? "active" : ""}" title="Day view">Day</button>
-          <button id="zoomWeek" class="${this._zoomLevel === "week" ? "active" : ""}" title="Week view">Week</button>
-          <button id="zoomMonth" class="${this._zoomLevel === "month" ? "active" : ""}" title="Month view">Month</button>
-          <button id="zoomQuarter" class="${this._zoomLevel === "quarter" ? "active" : ""}" title="Qtr view">Qtr</button>
-          <button id="zoomYear" class="${this._zoomLevel === "year" ? "active" : ""}" title="Year view">Year</button>
+          <button id="zoomDay" class="${this._zoomLevel === "day" ? "active" : ""}" title="Day view (1)">Day</button>
+          <button id="zoomWeek" class="${this._zoomLevel === "week" ? "active" : ""}" title="Week view (2)">Week</button>
+          <button id="zoomMonth" class="${this._zoomLevel === "month" ? "active" : ""}" title="Month view (3)">Month</button>
+          <button id="zoomQuarter" class="${this._zoomLevel === "quarter" ? "active" : ""}" title="Quarter view (4)">Qtr</button>
+          <button id="zoomYear" class="${this._zoomLevel === "year" ? "active" : ""}" title="Year view (5)">Year</button>
         </div>
       </div>
       <div class="toolbar-separator"></div>
@@ -2853,15 +2866,15 @@ ${style.tip}
       <div class="toolbar-separator"></div>
       <!-- View toggles group -->
       <div class="toolbar-group">
-        <button id="heatmapBtn" class="icon-btn${this._showWorkloadHeatmap ? " active" : ""}" title="Toggle workload heatmap" aria-pressed="${this._showWorkloadHeatmap}">
+        <button id="heatmapBtn" class="icon-btn${this._showWorkloadHeatmap ? " active" : ""}" title="Toggle workload heatmap (H)" aria-pressed="${this._showWorkloadHeatmap}">
           <svg viewBox="0 0 16 16"><path d="M8 1a3 3 0 0 0-3 3v2.5a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zm4 5.5a4 4 0 1 1-8 0V4a4 4 0 1 1 8 0v2.5zM8 11a5 5 0 0 1-5-5H2a6 6 0 0 0 5 5.91V14H5v1h6v-1H9v-2.09A6 6 0 0 0 14 6h-1a5 5 0 0 1-5 5z"/></svg>
           Heatmap
         </button>
-        <button id="depsBtn" class="icon-btn${this._showDependencies ? " active" : ""}" title="Toggle dependency arrows" aria-pressed="${this._showDependencies}">
+        <button id="depsBtn" class="icon-btn${this._showDependencies ? " active" : ""}" title="Toggle dependency arrows (D)" aria-pressed="${this._showDependencies}">
           <svg viewBox="0 0 16 16"><path d="M5 3.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm-6.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM10 8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM5.354 4.354l1.5 1.5-.708.707-1.5-1.5.708-.707zm4.792 5.292l1.5 1.5-.707.708-1.5-1.5.707-.708z"/></svg>
           Relations
         </button>
-        <button id="intensityBtn" class="icon-btn${this._showIntensity ? " active" : ""}" title="Toggle daily intensity" aria-pressed="${this._showIntensity}">
+        <button id="intensityBtn" class="icon-btn${this._showIntensity ? " active" : ""}" title="Toggle daily intensity (I)" aria-pressed="${this._showIntensity}">
           <svg viewBox="0 0 16 16"><path d="M11.5 11.5L13 10l-3-3 3-3-1.5-1.5L8 6l1.5 1.5L6 11l5.5.5zM2 14v-3h1v2h2v1H2zm12-12v3h-1V3h-2V2h3z"/></svg>
           Intensity
         </button>
@@ -2869,11 +2882,11 @@ ${style.tip}
       <div class="toolbar-separator"></div>
       <!-- Actions group -->
       <div class="toolbar-group">
-        <button id="refreshBtn" class="icon-btn" title="Refresh issues">
+        <button id="refreshBtn" class="icon-btn" title="Refresh issues (R)">
           <svg viewBox="0 0 16 16"><path d="M13.451 5.609l-.579-.939-1.068.812-.076.094c-.335.415-.927 1.341-1.124 2.876l-.021.165-.033.167a4.5 4.5 0 1 1-4.05-5.258l.066-.004.073.004-1.024 1.024 1.414 1.414 3.536-3.536L7.029.893 5.615 2.307l.982.982a5.5 5.5 0 1 0 5.537 6.124c.196-1.627.857-2.64 1.317-3.243V5.609z"/></svg>
           Refresh
         </button>
-        <button id="todayBtn" class="icon-btn" title="Jump to Today">
+        <button id="todayBtn" class="icon-btn" title="Jump to today (T)">
           <svg viewBox="0 0 16 16"><path d="M14 2H2v12h12V2zm-1 11H3V5h10v8zM4 1h1v1H4V1zm7 0h1v1h-1V1zM4 8h2v2H4V8z"/></svg>
           Today
         </button>
@@ -4559,6 +4572,8 @@ ${style.tip}
     addDocListener('keydown', (e) => {
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
       const modKey = isMac ? e.metaKey : e.ctrlKey;
+      // Skip if user is typing in an input/select
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
 
       if (modKey && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
@@ -4570,6 +4585,19 @@ ${style.tip}
         e.preventDefault();
         redoBtn.click();
       }
+      // Zoom shortcuts (1-5)
+      else if (e.key === '1') { document.getElementById('zoomDay')?.click(); }
+      else if (e.key === '2') { document.getElementById('zoomWeek')?.click(); }
+      else if (e.key === '3') { document.getElementById('zoomMonth')?.click(); }
+      else if (e.key === '4') { document.getElementById('zoomQuarter')?.click(); }
+      else if (e.key === '5') { document.getElementById('zoomYear')?.click(); }
+      // Toggle shortcuts
+      else if (e.key.toLowerCase() === 'h') { document.getElementById('heatmapBtn')?.click(); }
+      else if (e.key.toLowerCase() === 'd') { document.getElementById('depsBtn')?.click(); }
+      else if (e.key.toLowerCase() === 'i') { document.getElementById('intensityBtn')?.click(); }
+      // Action shortcuts
+      else if (e.key.toLowerCase() === 'r') { document.getElementById('refreshBtn')?.click(); }
+      else if (e.key.toLowerCase() === 't') { document.getElementById('todayBtn')?.click(); }
     });
 
     // Scroll to today marker (centered)
