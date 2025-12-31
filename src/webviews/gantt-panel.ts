@@ -2032,10 +2032,13 @@ export class GanttPanel {
                   fill="transparent"/>
             <rect class="drag-handle drag-right cursor-ew-resize" x="${startX + width - handleWidth}" y="0" width="${handleWidth}" height="${barHeight}"
                   fill="transparent"/>
-            <!-- Link handle for creating relations -->
-            <circle class="link-handle cursor-crosshair" cx="${endX + 8}" cy="${barHeight / 2}" r="5"
-                    fill="var(--vscode-button-background)" stroke="var(--vscode-button-foreground)"
-                    stroke-width="1" opacity="0"/>
+            <!-- Link handle for creating relations (larger hit area for Fitts's Law) -->
+            <g class="link-handle cursor-crosshair" data-cx="${endX + 8}" data-cy="${barHeight / 2}">
+              <circle cx="${endX + 8}" cy="${barHeight / 2}" r="14" fill="transparent" pointer-events="all"/>
+              <circle class="link-handle-visual" cx="${endX + 8}" cy="${barHeight / 2}" r="5"
+                      fill="var(--vscode-button-background)" stroke="var(--vscode-button-foreground)"
+                      stroke-width="1" pointer-events="none"/>
+            </g>
             <!-- Labels outside bar: adaptive positioning (left if near edge, else right) -->
             ${(() => {
               const badgeW = issue.isClosed ? 18 : (visualDoneRatio === 100 ? 32 : visualDoneRatio >= 10 ? 28 : 22);
@@ -2312,12 +2315,38 @@ ${style.tip}
       background: var(--vscode-button-secondaryHoverBackground);
     }
     .gantt-actions button:disabled {
-      opacity: 0.5;
+      opacity: 0.4;
       cursor: not-allowed;
+    }
+    /* Minimize disabled undo/redo (Hick's Law: reduce visual choices) */
+    #undoBtn:disabled, #redoBtn:disabled {
+      opacity: 0.25;
+      padding: 4px;
+      font-size: 0;
+      gap: 0;
+    }
+    #undoBtn:not(:disabled), #redoBtn:not(:disabled) {
+      transition: opacity 0.15s, padding 0.15s;
     }
     .gantt-actions button.active {
       background: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
+    }
+    /* Toggle buttons (distinct from action buttons) */
+    .gantt-actions button[aria-pressed] {
+      background: transparent;
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+    }
+    .gantt-actions button[aria-pressed]:hover:not(:disabled) {
+      background: var(--vscode-list-hoverBackground);
+      border-color: var(--vscode-focusBorder);
+    }
+    .gantt-actions button[aria-pressed="true"],
+    .gantt-actions button[aria-pressed].active {
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border-color: var(--vscode-button-background);
     }
     .zoom-toggle {
       display: flex;
@@ -2607,11 +2636,11 @@ ${style.tip}
     .status-badge { pointer-events: none; font-weight: 500; }
     .bar-assignee { pointer-events: none; opacity: 0.85; }
     .issue-bar .drag-handle:hover { fill: var(--vscode-list-hoverBackground); }
-    .issue-bar:hover .link-handle { opacity: 0.7; }
-    .issue-bar .link-handle:hover { opacity: 1; transform-origin: center; }
+    .issue-bar:hover .link-handle-visual { opacity: 0.7; }
+    .issue-bar .link-handle:hover .link-handle-visual { opacity: 1; transform-origin: center; }
     .issue-bar.dragging .bar-main, .issue-bar.dragging .bar-intensity { opacity: 0.5; }
     .issue-bar.linking-source .bar-outline { stroke-width: 3; stroke: var(--vscode-focusBorder); }
-    .issue-bar.linking-source .link-handle { opacity: 1; }
+    .issue-bar.linking-source .link-handle-visual { opacity: 1; }
     .issue-bar.link-target .bar-outline { stroke-width: 2; stroke: var(--vscode-charts-green); }
     @keyframes highlight-pulse { 0%, 100% { filter: drop-shadow(0 0 6px var(--vscode-focusBorder)); } 50% { filter: drop-shadow(0 0 12px var(--vscode-focusBorder)); } }
     .issue-bar.highlighted .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 3; }
@@ -4060,8 +4089,8 @@ ${style.tip}
         e.preventDefault();
         const bar = handle.closest('.issue-bar');
         const issueId = parseInt(bar.dataset.issueId);
-        const cx = parseFloat(handle.getAttribute('cx'));
-        const cy = parseFloat(handle.getAttribute('cy'));
+        const cx = parseFloat(handle.dataset.cx);
+        const cy = parseFloat(handle.dataset.cy);
 
         bar.classList.add('linking-source');
         document.body.classList.add('cursor-crosshair');
