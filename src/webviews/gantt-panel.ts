@@ -611,7 +611,7 @@ export class GanttPanel {
       gap: 4px;
     }
     .gantt-resize-handle-header {
-      width: 6px;
+      width: 10px;
       background: var(--vscode-panel-border);
       flex-shrink: 0;
     }
@@ -643,7 +643,7 @@ export class GanttPanel {
       background: var(--vscode-editor-background);
     }
     .gantt-resize-handle {
-      width: 6px;
+      width: 10px;
       background: var(--vscode-panel-border);
       flex-shrink: 0;
     }
@@ -1887,7 +1887,7 @@ export class GanttPanel {
         // Calculate done portion width for progress visualization
         const doneWidth = (visualDoneRatio / 100) * width;
 
-        const handleWidth = 8;
+        const handleWidth = 16;
 
         // Calculate daily intensity for this issue (skip for parent issues - work is in subtasks)
         // Only compute if intensity display is enabled globally
@@ -2588,10 +2588,19 @@ ${style.tip}
     .gantt-left-header button { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 10px; }
     .gantt-left-header button:hover { background: var(--vscode-button-secondaryHoverBackground); }
     .gantt-resize-handle-header {
-      width: 6px;
+      width: 10px;
       background: var(--vscode-panel-border);
       cursor: col-resize;
       flex-shrink: 0;
+      position: relative;
+    }
+    .gantt-resize-handle-header::before {
+      content: '';
+      position: absolute;
+      left: -4px;
+      right: -4px;
+      top: 0;
+      bottom: 0;
     }
     .gantt-timeline-header { flex-shrink: 0; }
     .gantt-checkboxes {
@@ -2611,11 +2620,20 @@ ${style.tip}
     }
     .gantt-labels svg { min-width: 100%; }
     .gantt-resize-handle {
-      width: 6px;
+      width: 10px;
       background: var(--vscode-panel-border);
       cursor: col-resize;
       flex-shrink: 0;
       transition: background 0.15s;
+      position: relative;
+    }
+    .gantt-resize-handle::before {
+      content: '';
+      position: absolute;
+      left: -4px;
+      right: -4px;
+      top: 0;
+      bottom: 0;
     }
     .gantt-resize-handle:hover, .gantt-resize-handle.dragging { background: var(--vscode-focusBorder); }
     .gantt-timeline { flex-shrink: 0; }
@@ -2648,7 +2666,8 @@ ${style.tip}
     .status-badge-bg { pointer-events: none; }
     .status-badge { pointer-events: none; font-weight: 500; }
     .bar-assignee { pointer-events: none; opacity: 0.85; }
-    .issue-bar .drag-handle:hover { fill: var(--vscode-list-hoverBackground); }
+    .issue-bar .drag-handle:hover { fill: var(--vscode-focusBorder); opacity: 0.5; }
+    .issue-bar:hover .drag-handle { fill: var(--vscode-list-hoverBackground); opacity: 0.3; }
     .issue-bar:hover .link-handle-visual { opacity: 0.7; }
     .issue-bar .link-handle:hover .link-handle-visual { opacity: 1; transform-origin: center; }
     .issue-bar.dragging .bar-main, .issue-bar.dragging .bar-intensity { opacity: 0.5; }
