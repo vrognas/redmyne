@@ -479,7 +479,7 @@ export class GanttPanel {
 
     const zebraStripes = skeletonRows
       .filter((_, i) => i % 2 === 1)
-      .map(r => `<rect x="0" y="${r.y}" width="100%" height="${barHeight + barGap}" fill="var(--vscode-list-hoverBackground)" opacity="0.3"/>`)
+      .map(r => `<rect x="0" y="${r.y}" width="100%" height="${barHeight + barGap}" fill="var(--vscode-list-hoverBackground)" opacity="0.15"/>`)
       .join("");
 
     const bodyHeight = rowCount * (barHeight + barGap);
@@ -1990,7 +1990,7 @@ export class GanttPanel {
                 const labelX = onLeft ? startX - 8 : endX + 8;
                 const badgeCenterX = onLeft ? labelX - badgeW / 2 : labelX + badgeW / 2;
                 return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
-                  <rect class="status-badge-bg" x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" rx="3"
+                  <rect class="status-badge-bg" x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" rx="2"
                         fill="var(--vscode-badge-background)" opacity="0.9"/>
                   <text class="status-badge" x="${badgeCenterX}" y="${barHeight / 2 + 4}"
                         text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${doneRatio}%</text>
@@ -2056,7 +2056,7 @@ export class GanttPanel {
                 const checkX = onLeft ? labelX - 9 : labelX + 9;
                 const assigneeX = onLeft ? labelX - 22 : labelX + 38;
                 return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
-                  <rect class="status-badge-bg" x="${onLeft ? labelX - 18 : labelX}" y="${barHeight / 2 - 8}" width="18" height="16" rx="3"
+                  <rect class="status-badge-bg" x="${onLeft ? labelX - 18 : labelX}" y="${barHeight / 2 - 8}" width="18" height="16" rx="2"
                         fill="var(--vscode-charts-green)" opacity="0.2"/>
                   <text class="status-badge" x="${checkX}" y="${barHeight / 2 + 4}"
                         text-anchor="middle" fill="var(--vscode-charts-green)" font-size="12" font-weight="bold">✓</text>
@@ -2068,7 +2068,7 @@ export class GanttPanel {
               const badgeCenterX = onLeft ? labelX - badgeW / 2 : labelX + badgeW / 2;
               const assigneeX = onLeft ? labelX - badgeW - 6 : labelX + badgeW + 6;
               return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
-                <rect class="status-badge-bg" x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" rx="3"
+                <rect class="status-badge-bg" x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" rx="2"
                       fill="var(--vscode-badge-background)" opacity="0.9"/>
                 <text class="status-badge" x="${badgeCenterX}" y="${barHeight / 2 + 4}"
                       text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${isFallbackProgress ? "~" : ""}${visualDoneRatio}%</text>
@@ -2713,11 +2713,11 @@ ${style.tip}
       outline: 2px solid var(--vscode-focusBorder);
       outline-offset: 1px;
       background: var(--vscode-list-activeSelectionBackground);
-      border-radius: 3px;
+      border-radius: 4px;
     }
     .issue-label.active, .project-label.active {
       background: var(--vscode-list-inactiveSelectionBackground);
-      border-radius: 3px;
+      border-radius: 4px;
     }
     /* Collapse toggle chevron */
     .collapse-toggle { cursor: pointer; opacity: 0.7; }
@@ -2730,8 +2730,8 @@ ${style.tip}
     /* Screen reader only class */
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
     .weekend-bg { fill: var(--vscode-editor-inactiveSelectionBackground); opacity: 0.3; }
-    .zebra-stripe { fill: var(--vscode-list-hoverBackground); opacity: 0.3; pointer-events: none; }
-    .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 1; opacity: 0.5; }
+    .zebra-stripe { fill: var(--vscode-list-hoverBackground); opacity: 0.15; pointer-events: none; }
+    .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 1; opacity: 0.25; }
     .date-marker { stroke: var(--vscode-editorRuler-foreground); stroke-dasharray: 2,2; }
     .today-marker { stroke: var(--vscode-charts-red); stroke-width: 2; }
     /* Base transitions for dependency focus fade-back */
