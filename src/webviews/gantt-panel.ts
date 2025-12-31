@@ -2893,9 +2893,9 @@ ${style.tip}
           <svg viewBox="0 0 16 16"><path d="M5 3.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm-6.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM10 8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM5.354 4.354l1.5 1.5-.708.707-1.5-1.5.708-.707zm4.792 5.292l1.5 1.5-.707.708-1.5-1.5.707-.708z"/></svg>
           Relations
         </button>
-        <button id="intensityBtn" class="icon-btn${this._showIntensity ? " active" : ""}" title="Toggle daily intensity (I)" aria-pressed="${this._showIntensity}">
-          <svg viewBox="0 0 16 16"><path d="M11.5 11.5L13 10l-3-3 3-3-1.5-1.5L8 6l1.5 1.5L6 11l5.5.5zM2 14v-3h1v2h2v1H2zm12-12v3h-1V3h-2V2h3z"/></svg>
-          Intensity
+        <button id="criticalPathBtn" class="icon-btn" title="Toggle critical path (C)" aria-pressed="false">
+          <svg viewBox="0 0 16 16"><path d="M7.56 1.44l.94 2.81 2.97.01-2.4 1.74.91 2.81-2.42-1.74L5.14 8.8l.92-2.8-2.4-1.75h2.97l.93-2.81zm.44 3.56L7.65 6.1l1.07.78-.4-1.27.41-1.27-1.07.78L6.6 4.04l1.32.01.08.95z" fill-rule="evenodd"/></svg>
+          Critical
         </button>
       </div>
       <div class="toolbar-separator"></div>
@@ -2925,9 +2925,9 @@ ${style.tip}
           <svg viewBox="0 0 16 16"><circle cx="8" cy="3" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="8" cy="13" r="1.5"/></svg>
         </button>
         <div id="overflowMenu" class="overflow-menu hidden">
-          <button id="criticalPathBtn" title="Highlight critical path (longest blocking chain)" aria-pressed="false">
-            <svg viewBox="0 0 16 16"><path d="M7.56 1.44l.94 2.81 2.97.01-2.4 1.74.91 2.81-2.42-1.74L5.14 8.8l.92-2.8-2.4-1.75h2.97l.93-2.81zm.44 3.56L7.65 6.1l1.07.78-.4-1.27.41-1.27-1.07.78L6.6 4.04l1.32.01.08.95z" fill-rule="evenodd"/></svg>
-            Critical Path
+          <button id="intensityBtn" title="Toggle daily intensity (I)" aria-pressed="${this._showIntensity}">
+            <svg viewBox="0 0 16 16"><path d="M11.5 11.5L13 10l-3-3 3-3-1.5-1.5L8 6l1.5 1.5L6 11l5.5.5zM2 14v-3h1v2h2v1H2zm12-12v3h-1V3h-2V2h3z"/></svg>
+            Intensity
           </button>
           <div class="overflow-menu-divider"></div>
           <button id="expandAllBtn" title="Expand all">
@@ -4613,6 +4613,7 @@ ${style.tip}
       // Toggle shortcuts
       else if (e.key.toLowerCase() === 'h') { document.getElementById('heatmapBtn')?.click(); }
       else if (e.key.toLowerCase() === 'd') { document.getElementById('depsBtn')?.click(); }
+      else if (e.key.toLowerCase() === 'c') { document.getElementById('criticalPathBtn')?.click(); }
       else if (e.key.toLowerCase() === 'i') { document.getElementById('intensityBtn')?.click(); }
       // Action shortcuts
       else if (e.key.toLowerCase() === 'r') { document.getElementById('refreshBtn')?.click(); }
