@@ -2451,20 +2451,30 @@ ${style.tip}
       align-items: center;
       gap: 8px;
       width: 100%;
-      padding: 4px 12px;
+      padding: 6px 12px;
       border: none;
       background: transparent;
       color: var(--vscode-menu-foreground);
       text-align: left;
       cursor: pointer;
       font-size: 13px;
+      font-family: var(--vscode-font-family);
+    }
+    .overflow-menu button svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+      flex-shrink: 0;
     }
     .overflow-menu button:hover {
       background: var(--vscode-menu-selectionBackground);
       color: var(--vscode-menu-selectionForeground);
     }
-    .overflow-menu button.active {
-      background: var(--vscode-list-activeSelectionBackground);
+    .overflow-menu button[aria-pressed="true"] {
+      color: var(--vscode-textLink-foreground);
+    }
+    .overflow-menu button[aria-pressed="true"] svg {
+      fill: var(--vscode-textLink-foreground);
     }
     .overflow-menu-divider {
       height: 1px;
@@ -2480,12 +2490,36 @@ ${style.tip}
       flex-grow: 1;
       min-height: 0;
     }
+    /* Single scroll container - no JS sync needed */
+    .gantt-scroll {
+      flex-grow: 1;
+      overflow: auto;
+      min-height: 0;
+    }
+    .gantt-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+    .gantt-scroll::-webkit-scrollbar-thumb { background: var(--vscode-scrollbarSlider-background); border-radius: 4px; }
+    .gantt-scroll::-webkit-scrollbar-corner { background: var(--vscode-editor-background); }
     .gantt-header-row {
       display: flex;
-      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      z-index: 10;
       height: ${headerHeight}px;
       border-bottom: 1px solid var(--vscode-panel-border);
       background: var(--vscode-editor-background);
+    }
+    .gantt-body {
+      display: flex;
+    }
+    .gantt-sticky-left {
+      display: flex;
+      position: sticky;
+      left: 0;
+      z-index: 5;
+      background: var(--vscode-editor-background);
+    }
+    .gantt-corner {
+      z-index: 15; /* Above both sticky header and sticky left */
     }
     .gantt-checkbox-header {
       flex-shrink: 0;
@@ -2496,12 +2530,8 @@ ${style.tip}
       align-items: center;
       justify-content: center;
     }
-    .select-all-checkbox {
-      cursor: pointer;
-    }
-    .select-all-checkbox:hover rect {
-      stroke: var(--vscode-focusBorder);
-    }
+    .select-all-checkbox { cursor: pointer; }
+    .select-all-checkbox:hover rect { stroke: var(--vscode-focusBorder); }
     .gantt-left-header {
       flex-shrink: 0;
       width: ${labelWidth}px;
@@ -2521,81 +2551,32 @@ ${style.tip}
       cursor: col-resize;
       flex-shrink: 0;
     }
-    .gantt-timeline-header {
-      flex-grow: 1;
-      overflow: hidden;
-    }
-    .gantt-timeline-header::-webkit-scrollbar { display: none; }
-    .gantt-body-wrapper {
-      display: flex;
-      flex-direction: column;
-      flex-grow: 1;
-      overflow: hidden;
-    }
-    .gantt-body-scroll {
-      display: flex;
-      flex-grow: 1;
-      overflow-y: auto;
-      overflow-x: hidden;
-    }
-    .gantt-body-scroll::-webkit-scrollbar {
-      width: 8px;
-    }
-    .gantt-body-scroll::-webkit-scrollbar-thumb {
-      background: var(--vscode-scrollbarSlider-background);
-      border-radius: 4px;
-    }
+    .gantt-timeline-header { flex-shrink: 0; }
     .gantt-checkboxes {
       flex-shrink: 0;
       width: ${checkboxColumnWidth}px;
-      height: ${bodyHeight}px;
-      background: var(--vscode-editor-background);
       border-right: 1px solid var(--vscode-panel-border);
     }
-    .gantt-checkboxes svg { display: block; height: 100%; }
-    .project-checkbox:hover rect {
-      stroke: var(--vscode-focusBorder);
-    }
+    .gantt-checkboxes svg { display: block; }
+    .project-checkbox:hover rect { stroke: var(--vscode-focusBorder); }
     .gantt-labels {
       flex-shrink: 0;
       width: ${labelWidth}px;
-      height: ${bodyHeight}px;
       min-width: 150px;
       max-width: 500px;
-      background: var(--vscode-editor-background);
       overflow-x: auto;
       overflow-y: hidden;
     }
-    .gantt-labels svg { min-width: 100%; height: 100%; }
+    .gantt-labels svg { min-width: 100%; }
     .gantt-resize-handle {
       width: 6px;
-      height: ${bodyHeight}px;
       background: var(--vscode-panel-border);
       cursor: col-resize;
       flex-shrink: 0;
       transition: background 0.15s;
     }
-    .gantt-resize-handle:hover, .gantt-resize-handle.dragging {
-      background: var(--vscode-focusBorder);
-    }
-    .gantt-timeline-wrapper {
-      flex-grow: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    .gantt-timeline {
-      flex-grow: 1;
-      height: ${bodyHeight}px;
-      overflow-y: hidden;
-      overflow-x: auto;
-    }
-    .gantt-timeline::-webkit-scrollbar {
-      height: 0; /* Hidden - minimap provides horizontal nav */
-    }
-    .gantt-hscroll {
-      display: none; /* Hidden - minimap provides navigation */
-    }
+    .gantt-resize-handle:hover, .gantt-resize-handle.dragging { background: var(--vscode-focusBorder); }
+    .gantt-timeline { flex-shrink: 0; }
     svg { display: block; }
     .issue-bar:hover .bar-main, .issue-bar:hover .bar-outline, .issue-label:hover { opacity: 1; }
     .issue-bar:hover .bar-intensity rect { filter: brightness(1.1); }
@@ -2884,16 +2865,16 @@ ${style.tip}
         </button>
         <div id="overflowMenu" class="overflow-menu hidden">
           <button id="criticalPathBtn" title="Highlight critical path (longest blocking chain)" aria-pressed="false">
-            <svg viewBox="0 0 16 16"><path d="M8 1l1 3h3l-2.5 2 1 3L8 7l-2.5 2 1-3L4 4h3l1-3z"/></svg>
+            <svg viewBox="0 0 16 16"><path d="M7.56 1.44l.94 2.81 2.97.01-2.4 1.74.91 2.81-2.42-1.74L5.14 8.8l.92-2.8-2.4-1.75h2.97l.93-2.81zm.44 3.56L7.65 6.1l1.07.78-.4-1.27.41-1.27-1.07.78L6.6 4.04l1.32.01.08.95z" fill-rule="evenodd"/></svg>
             Critical Path
           </button>
           <div class="overflow-menu-divider"></div>
           <button id="expandAllBtn" title="Expand all">
-            <svg viewBox="0 0 16 16"><path d="M5 8l3 3 3-3H5z"/></svg>
+            <svg viewBox="0 0 16 16"><path d="M11 10H5.344L8 12.656 10.656 10H11zm-6 1h6v1H5v-1zM8 3L5.344 6H10.656L8 3zm0 1.344L9.313 6H6.688L8 4.344z" fill-rule="evenodd"/></svg>
             Expand All
           </button>
           <button id="collapseAllBtn" title="Collapse all">
-            <svg viewBox="0 0 16 16"><path d="M6 5l3 3-3 3V5z"/></svg>
+            <svg viewBox="0 0 16 16"><path d="M11 6H5.344L8 3.344 10.656 6H11zm-6-1h6V4H5v1zm3 7l2.656-3H5.344L8 12zm0-1.344L6.688 9h2.625L8 10.656z" fill-rule="evenodd"/></svg>
             Collapse All
           </button>
         </div>
@@ -2918,61 +2899,62 @@ ${style.tip}
     </div>
   </div>
   <div class="gantt-container">
-    <div class="gantt-header-row">
-      <div class="gantt-checkbox-header">
-        <svg width="${checkboxColumnWidth}" height="${headerHeight}" class="select-all-checkbox" role="checkbox" aria-checked="${selectAllState === "checked"}" aria-label="Select/deselect all projects" tabindex="0">
-          <rect x="${(checkboxColumnWidth - checkboxSize) / 2}" y="${(headerHeight - checkboxSize) / 2}" width="${checkboxSize}" height="${checkboxSize}"
-                fill="${selectAllState === "checked" ? "var(--vscode-checkbox-background)" : "transparent"}"
-                stroke="var(--vscode-checkbox-border)" stroke-width="1" rx="2"/>
-          ${selectAllState === "checked" ? `<text x="${checkboxColumnWidth / 2}" y="${(headerHeight + checkboxSize) / 2 - 3}" text-anchor="middle" fill="var(--vscode-checkbox-foreground)" font-size="11" font-weight="bold">✓</text>` : ""}
-          ${selectAllState === "indeterminate" ? `<rect x="${(checkboxColumnWidth - 8) / 2}" y="${(headerHeight - 2) / 2}" width="8" height="2" fill="var(--vscode-checkbox-foreground)"/>` : ""}
-        </svg>
-      </div>
-      <div class="gantt-left-header" id="ganttLeftHeader">
-        <!-- Expand/Collapse buttons moved to overflow menu -->
-      </div>
-      <div class="gantt-resize-handle-header"></div>
-      <div class="gantt-timeline-header" id="ganttTimelineHeader">
-        <svg width="${timelineWidth}" height="${headerHeight}">
-          ${dateMarkers.header}
-        </svg>
-      </div>
-    </div>
-    <div class="gantt-body-wrapper" id="ganttBodyWrapper">
-      <div class="gantt-body-scroll" id="ganttBodyScroll" data-render-key="${this._renderKey}">
-        <div class="gantt-checkboxes" id="ganttCheckboxes">
-          <svg width="${checkboxColumnWidth}" height="${bodyHeight}" data-render-key="${this._renderKey}">
-            ${checkboxZebraStripes}
-            ${checkboxes}
+    <!-- Single scroll container for lag-free header/body sync -->
+    <div class="gantt-scroll" id="ganttScroll" data-render-key="${this._renderKey}">
+      <!-- Header row - sticky at top -->
+      <div class="gantt-header-row">
+        <div class="gantt-sticky-left gantt-corner">
+          <div class="gantt-checkbox-header">
+            <svg width="${checkboxColumnWidth}" height="${headerHeight}" class="select-all-checkbox" role="checkbox" aria-checked="${selectAllState === "checked"}" aria-label="Select/deselect all projects" tabindex="0">
+              <rect x="${(checkboxColumnWidth - checkboxSize) / 2}" y="${(headerHeight - checkboxSize) / 2}" width="${checkboxSize}" height="${checkboxSize}"
+                    fill="${selectAllState === "checked" ? "var(--vscode-checkbox-background)" : "transparent"}"
+                    stroke="var(--vscode-checkbox-border)" stroke-width="1" rx="2"/>
+              ${selectAllState === "checked" ? `<text x="${checkboxColumnWidth / 2}" y="${(headerHeight + checkboxSize) / 2 - 3}" text-anchor="middle" fill="var(--vscode-checkbox-foreground)" font-size="11" font-weight="bold">✓</text>` : ""}
+              ${selectAllState === "indeterminate" ? `<rect x="${(checkboxColumnWidth - 8) / 2}" y="${(headerHeight - 2) / 2}" width="8" height="2" fill="var(--vscode-checkbox-foreground)"/>` : ""}
+            </svg>
+          </div>
+          <div class="gantt-left-header" id="ganttLeftHeader"></div>
+          <div class="gantt-resize-handle-header"></div>
+        </div>
+        <div class="gantt-timeline-header" id="ganttTimelineHeader">
+          <svg width="${timelineWidth}" height="${headerHeight}">
+            ${dateMarkers.header}
           </svg>
         </div>
-        <div class="gantt-labels" id="ganttLabels">
-          <svg width="${labelWidth * 2}" height="${bodyHeight}" data-render-key="${this._renderKey}">
-            ${zebraStripes}
-            ${labels}
-          </svg>
+      </div>
+      <!-- Body -->
+      <div class="gantt-body">
+        <div class="gantt-sticky-left">
+          <div class="gantt-checkboxes" id="ganttCheckboxes">
+            <svg width="${checkboxColumnWidth}" height="${bodyHeight}" data-render-key="${this._renderKey}">
+              ${checkboxZebraStripes}
+              ${checkboxes}
+            </svg>
+          </div>
+          <div class="gantt-labels" id="ganttLabels">
+            <svg width="${labelWidth * 2}" height="${bodyHeight}" data-render-key="${this._renderKey}">
+              ${zebraStripes}
+              ${labels}
+            </svg>
+          </div>
+          <div class="gantt-resize-handle" id="resizeHandle"></div>
         </div>
-        <div class="gantt-resize-handle" id="resizeHandle"></div>
         <div class="gantt-timeline" id="ganttTimeline">
-        <svg width="${timelineWidth + 50}" height="${bodyHeight}" data-render-key="${this._renderKey}">
-          <defs>
-            <pattern id="past-stripes" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
-              <line x1="0" y1="0" x2="0" y2="6" stroke="var(--vscode-charts-red)" stroke-width="2" stroke-opacity="0.4"/>
-            </pattern>
-            <filter id="barShadow" x="-10%" y="-10%" width="120%" height="120%">
-              <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.3"/>
-            </filter>
-          </defs>
-          ${zebraStripes}
-          ${dateMarkers.body}
-          <!-- Arrows below bars so link-handles remain clickable -->
-          <g class="dependency-layer${this._showDependencies ? "" : " hidden"}">${dependencyArrows}</g>
-          ${bars}
-        </svg>
+          <svg width="${timelineWidth + 50}" height="${bodyHeight}" data-render-key="${this._renderKey}">
+            <defs>
+              <pattern id="past-stripes" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+                <line x1="0" y1="0" x2="0" y2="6" stroke="var(--vscode-charts-red)" stroke-width="2" stroke-opacity="0.4"/>
+              </pattern>
+              <filter id="barShadow" x="-10%" y="-10%" width="120%" height="120%">
+                <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+              </filter>
+            </defs>
+            ${zebraStripes}
+            ${dateMarkers.body}
+            <g class="dependency-layer${this._showDependencies ? "" : " hidden"}">${dependencyArrows}</g>
+            ${bars}
+          </svg>
         </div>
-      </div>
-      <div class="gantt-hscroll" id="ganttHScroll">
-        <div class="gantt-hscroll-content" id="ganttHScrollContent"></div>
       </div>
     </div>
   </div>
@@ -3017,22 +2999,14 @@ ${style.tip}
     }
 
     // Get DOM elements
+    const ganttScroll = document.getElementById('ganttScroll');
     const ganttLeftHeader = document.getElementById('ganttLeftHeader');
-    const bodyScroll = document.getElementById('ganttBodyScroll');
     const labelsColumn = document.getElementById('ganttLabels');
     const timelineColumn = document.getElementById('ganttTimeline');
-    const timelineHeader = document.getElementById('ganttTimelineHeader');
-    const hScroll = document.getElementById('ganttHScroll');
-    const hScrollContent = document.getElementById('ganttHScrollContent');
     const undoBtn = document.getElementById('undoBtn');
     const redoBtn = document.getElementById('redoBtn');
     const minimapSvg = document.getElementById('minimapSvg');
     const minimapViewport = document.getElementById('minimapViewport');
-
-    // Set hScroll content width via JS (CSP compliance - no inline styles)
-    if (hScrollContent) {
-      hScrollContent.style.width = (timelineWidth + 50) + 'px';
-    }
 
     // Minimap setup
     const minimapBarsData = ${minimapBarsJson};
@@ -3058,13 +3032,13 @@ ${style.tip}
     }
 
     // Update minimap viewport on scroll
-    // Use timelineWidth (content width) not scrollWidth (includes padding)
+    // Use ganttScroll for single-container scroll
     function updateMinimapViewport() {
-      if (!timelineColumn || !minimapViewport) return;
-      const contentWidth = timelineWidth; // Bars span from 0 to timelineWidth
-      const scrollableRange = Math.max(1, contentWidth - timelineColumn.clientWidth);
-      const scrollRatio = Math.min(1, timelineColumn.scrollLeft / scrollableRange);
-      const viewportRatio = Math.min(1, timelineColumn.clientWidth / contentWidth);
+      if (!ganttScroll || !minimapViewport) return;
+      const contentWidth = timelineWidth;
+      const scrollableRange = Math.max(1, ganttScroll.scrollWidth - ganttScroll.clientWidth);
+      const scrollRatio = Math.min(1, ganttScroll.scrollLeft / scrollableRange);
+      const viewportRatio = Math.min(1, ganttScroll.clientWidth / ganttScroll.scrollWidth);
       const viewportWidth = Math.max(2, viewportRatio * 100);
       const viewportX = scrollRatio * (100 - viewportWidth);
       minimapViewport.setAttribute('x', viewportX.toString());
@@ -3076,7 +3050,7 @@ ${style.tip}
     let minimapDragOffset = 0; // Offset within viewport where drag started
 
     function scrollFromMinimap(e, useOffset = false) {
-      if (!timelineColumn || !minimapSvg || !minimapViewport) return;
+      if (!ganttScroll || !minimapSvg || !minimapViewport) return;
       const rect = minimapSvg.getBoundingClientRect();
       const viewportWidth = parseFloat(minimapViewport.getAttribute('width') || '0');
       const viewportWidthPx = (viewportWidth / 100) * rect.width;
@@ -3090,10 +3064,10 @@ ${style.tip}
         targetX -= viewportWidthPx / 2;
       }
 
-      // Use timelineWidth for content-based scroll calculation
+      // Use ganttScroll for single-container scroll
       const clickRatio = Math.max(0, Math.min(1, targetX / (rect.width - viewportWidthPx)));
-      const scrollableRange = Math.max(0, timelineWidth - timelineColumn.clientWidth);
-      timelineColumn.scrollLeft = clickRatio * scrollableRange;
+      const scrollableRange = Math.max(0, ganttScroll.scrollWidth - ganttScroll.clientWidth);
+      ganttScroll.scrollLeft = clickRatio * scrollableRange;
     }
 
     if (minimapSvg && minimapViewport) {
@@ -3139,18 +3113,18 @@ ${style.tip}
 
     // Convert scroll position to center date (milliseconds)
     function getCenterDateMs() {
-      if (!timelineColumn) return null;
-      const centerX = timelineColumn.scrollLeft + timelineColumn.clientWidth / 2;
+      if (!ganttScroll) return null;
+      const centerX = ganttScroll.scrollLeft + ganttScroll.clientWidth / 2;
       const ratio = centerX / timelineWidth;
       return minDateMs + ratio * (maxDateMs - minDateMs);
     }
 
     // Scroll to center a specific date
     function scrollToCenterDate(dateMs) {
-      if (!timelineColumn) return;
+      if (!ganttScroll) return;
       const ratio = (dateMs - minDateMs) / (maxDateMs - minDateMs);
       const centerX = ratio * timelineWidth;
-      timelineColumn.scrollLeft = Math.max(0, centerX - timelineColumn.clientWidth / 2);
+      ganttScroll.scrollLeft = Math.max(0, centerX - ganttScroll.clientWidth / 2);
     }
 
     function saveState() {
@@ -3161,7 +3135,7 @@ ${style.tip}
         redoStack,
         labelWidth: labelsColumn?.offsetWidth || ${labelWidth},
         scrollLeft: null, // Deprecated: use centerDateMs instead
-        scrollTop: bodyScroll?.scrollTop ?? null,
+        scrollTop: ganttScroll?.scrollTop ?? null,
         centerDateMs: getCenterDateMs()
       });
     }
@@ -3181,40 +3155,10 @@ ${style.tip}
       labelsColumn.style.width = previousState.labelWidth + 'px';
     }
 
-    // Scrolling: bodyScroll handles vertical, hScroll handles horizontal
+    // Single scroll container - no sync needed, just update minimap and save state
     let deferredScrollUpdate = null;
-    // Get the SVG inside header for transform-based sync (GPU-accelerated, no lag)
-    const headerSvg = timelineHeader?.querySelector('svg');
-    function syncHeaderToTimeline() {
-      if (headerSvg && timelineColumn) {
-        // Use transform for lag-free sync (GPU-accelerated)
-        headerSvg.style.transform = 'translateX(' + (-timelineColumn.scrollLeft) + 'px)';
-      }
-    }
-    if (bodyScroll && timelineColumn && timelineHeader && hScroll) {
-      // Horizontal scroll from hScroll → sync to timeline and header
-      hScroll.addEventListener('scroll', () => {
-        timelineColumn.scrollLeft = hScroll.scrollLeft;
-        syncHeaderToTimeline();
-        // Defer non-critical updates
-        cancelAnimationFrame(deferredScrollUpdate);
-        deferredScrollUpdate = requestAnimationFrame(() => {
-          updateMinimapViewport();
-          saveState();
-        });
-      }, { passive: true });
-      // Horizontal scroll from timeline (e.g. via keyboard, wheel) → sync to hScroll, header, minimap
-      timelineColumn.addEventListener('scroll', () => {
-        hScroll.scrollLeft = timelineColumn.scrollLeft;
-        syncHeaderToTimeline();
-        cancelAnimationFrame(deferredScrollUpdate);
-        deferredScrollUpdate = requestAnimationFrame(() => {
-          updateMinimapViewport();
-          saveState();
-        });
-      }, { passive: true });
-      // Vertical scroll: just update minimap and save state
-      bodyScroll.addEventListener('scroll', () => {
+    if (ganttScroll) {
+      ganttScroll.addEventListener('scroll', () => {
         cancelAnimationFrame(deferredScrollUpdate);
         deferredScrollUpdate = requestAnimationFrame(() => {
           updateMinimapViewport();
@@ -4365,12 +4309,11 @@ ${style.tip}
 
         // Handle linking drag
         if (linkingState && tempArrow) {
-          // Use container rect + scroll to get SVG coordinates
-          const rect = timelineColumn.getBoundingClientRect();
-          const scrollLeft = timelineColumn.scrollLeft;
-          const scrollTop = timelineColumn.scrollTop;
-          const endX = evt.clientX - rect.left + scrollLeft;
-          const endY = evt.clientY - rect.top + scrollTop;
+          // Use SVG rect directly - getBoundingClientRect accounts for scroll
+          const svg = document.querySelector('#ganttTimeline svg');
+          const rect = svg.getBoundingClientRect();
+          const endX = evt.clientX - rect.left;
+          const endY = evt.clientY - rect.top;
 
           // Draw dashed line from start to cursor
           const path = \`M \${linkingState.startX} \${linkingState.startY} L \${endX} \${endY}\`;
@@ -4603,9 +4546,9 @@ ${style.tip}
     // Scroll to today marker (centered)
     const todayX = ${Math.round(todayX)};
     function scrollToToday() {
-      if (timelineColumn && todayX > 0) {
-        const containerWidth = timelineColumn.clientWidth;
-        timelineColumn.scrollLeft = Math.max(0, todayX - containerWidth / 2);
+      if (ganttScroll && todayX > 0) {
+        const containerWidth = ganttScroll.clientWidth;
+        ganttScroll.scrollLeft = Math.max(0, todayX - containerWidth / 2);
       }
     }
 
@@ -4619,11 +4562,11 @@ ${style.tip}
         label.classList.add('highlighted');
         setTimeout(() => label.classList.remove('highlighted'), 1500);
       }
-      if (bar && timelineColumn) {
+      if (bar && ganttScroll) {
         const barRect = bar.getBoundingClientRect();
-        const timelineRect = timelineColumn.getBoundingClientRect();
-        const scrollLeft = timelineColumn.scrollLeft + barRect.left - timelineRect.left - 100;
-        timelineColumn.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' });
+        const scrollRect = ganttScroll.getBoundingClientRect();
+        const scrollLeft = ganttScroll.scrollLeft + barRect.left - scrollRect.left - 100;
+        ganttScroll.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' });
         bar.classList.add('highlighted');
         setTimeout(() => bar.classList.remove('highlighted'), 1500);
       }
@@ -4632,30 +4575,27 @@ ${style.tip}
     // Restore scroll position or scroll to today on initial load
     // Defer to next frame to avoid blocking initial paint and batch layout reads
     requestAnimationFrame(() => {
-      if (savedCenterDateMs !== null && timelineColumn) {
+      if (savedCenterDateMs !== null && ganttScroll) {
         // Date-based restore: works correctly when date range changes
         // Clamp to current date range if saved date is outside
         const clampedDateMs = Math.max(minDateMs, Math.min(maxDateMs, savedCenterDateMs));
         // Always scroll to clamped date (nearest edge if out of range)
         scrollToCenterDate(clampedDateMs);
-        if (hScroll) hScroll.scrollLeft = timelineColumn.scrollLeft;
-        if (savedScrollTop !== null && bodyScroll) {
-          bodyScroll.scrollTop = savedScrollTop;
+        if (savedScrollTop !== null) {
+          ganttScroll.scrollTop = savedScrollTop;
         }
         savedCenterDateMs = null;
         savedScrollTop = null;
-      } else if (savedScrollLeft !== null && timelineColumn) {
+      } else if (savedScrollLeft !== null && ganttScroll) {
         // Legacy pixel position (deprecated, kept for backward compat)
-        timelineColumn.scrollLeft = savedScrollLeft;
-        if (hScroll) hScroll.scrollLeft = savedScrollLeft;
-        if (savedScrollTop !== null && bodyScroll) {
-          bodyScroll.scrollTop = savedScrollTop;
+        ganttScroll.scrollLeft = savedScrollLeft;
+        if (savedScrollTop !== null) {
+          ganttScroll.scrollTop = savedScrollTop;
         }
         savedScrollLeft = null;
         savedScrollTop = null;
       } else {
         scrollToToday();
-        if (hScroll) hScroll.scrollLeft = timelineColumn?.scrollLeft ?? 0;
       }
       // Initialize minimap viewport (batched with scroll restoration)
       updateMinimapViewport();
