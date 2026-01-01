@@ -115,6 +115,35 @@ describe("buildDependencyGraph", () => {
     expect(graph.get(1)!.downstream.size).toBe(0);
     expect(graph.get(1)!.upstream.size).toBe(0);
   });
+
+  it("ignores relations where issue_id != current issue (prevents self-blocking)", () => {
+    // Redmine returns relations from both perspectives
+    // When fetching issue 1 blocked by 2, we get:
+    //   {issue_id: 1, issue_to_id: 2, relation_type: "blocked"} - owned by 1
+    //   {issue_id: 2, issue_to_id: 1, relation_type: "blocks"} - owned by 2
+    // Without the fix, the second relation would create self-reference (1→1)
+    const issues = [
+      createMockIssue({
+        id: 1,
+        relations: [
+          // Correct: issue 1 blocked by issue 2 (issue_id = 1)
+          { id: 100, issue_id: 1, issue_to_id: 2, relation_type: "blocked" },
+          // Inverse: same relation from 2's perspective (should be ignored)
+          { id: 100, issue_id: 2, issue_to_id: 1, relation_type: "blocks" },
+        ],
+      }),
+      createMockIssue({ id: 2 }),
+    ];
+    const graph = buildDependencyGraph(issues);
+
+    // Issue 1 should NOT be in its own downstream (no self-blocking)
+    expect(graph.get(1)!.downstream.has(1)).toBe(false);
+    expect(graph.get(1)!.upstream.has(1)).toBe(false);
+
+    // Correct dependency: 2 blocks 1
+    expect(graph.get(2)!.downstream.has(1)).toBe(true);
+    expect(graph.get(1)!.upstream.has(2)).toBe(true);
+  });
 });
 
 describe("countDownstream", () => {

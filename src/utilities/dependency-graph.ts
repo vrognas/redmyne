@@ -38,29 +38,38 @@ export function buildDependencyGraph(issues: Issue[]): DependencyGraph {
   }
 
   // Process relations
+  // Redmine API returns relations from BOTH perspectives - need to handle correctly
   for (const issue of issues) {
     if (!issue.relations) continue;
 
     for (const rel of issue.relations) {
-      const sourceId = issue.id;
-      const targetId = rel.issue_to_id;
+      // rel.issue_id is the "owner" of the relation, rel.issue_to_id is the target
+      // relation_type describes: issue_id <relation_type> issue_to_id
+      // e.g., "blocks" means issue_id blocks issue_to_id
+
+      // Only process relations where current issue is the owner (issue_id)
+      // This ensures each relation is processed exactly once
+      if (rel.issue_id !== issue.id) continue;
+
+      const fromId = rel.issue_id;
+      const toId = rel.issue_to_id;
 
       // Skip self-references (malformed data)
-      if (targetId === sourceId) continue;
+      if (toId === fromId) continue;
 
       // Ensure target node exists (may be external)
-      if (!graph.has(targetId)) {
-        graph.set(targetId, { upstream: new Set(), downstream: new Set() });
+      if (!graph.has(toId)) {
+        graph.set(toId, { upstream: new Set(), downstream: new Set() });
       }
 
       if (BLOCKING_RELATIONS.has(rel.relation_type)) {
-        // source blocks target → target is downstream of source
-        graph.get(sourceId)!.downstream.add(targetId);
-        graph.get(targetId)!.upstream.add(sourceId);
+        // fromId blocks toId → toId is downstream of fromId
+        graph.get(fromId)!.downstream.add(toId);
+        graph.get(toId)!.upstream.add(fromId);
       } else if (BLOCKED_RELATIONS.has(rel.relation_type)) {
-        // source is blocked by target → source is downstream of target
-        graph.get(targetId)!.downstream.add(sourceId);
-        graph.get(sourceId)!.upstream.add(targetId);
+        // fromId is blocked by toId → fromId is downstream of toId
+        graph.get(toId)!.downstream.add(fromId);
+        graph.get(fromId)!.upstream.add(toId);
       }
       // Ignore non-dependency relations (relates, duplicates, etc.)
     }
