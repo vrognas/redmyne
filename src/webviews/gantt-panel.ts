@@ -2964,18 +2964,17 @@ ${style.tip}
       opacity: 0.4;
     }
     .minimap-viewport {
-      fill: var(--vscode-minimap-selectionHighlight, var(--vscode-editor-foreground));
-      fill-opacity: 0.15;
-      stroke: var(--vscode-minimapSlider-background, var(--vscode-scrollbarSlider-background));
-      stroke-width: 1;
+      fill: var(--vscode-minimapSlider-background, rgba(100, 100, 100, 0.2));
+      stroke: none;
       cursor: grab;
+      transition: fill 0.1s;
     }
     .minimap-viewport:hover {
-      fill-opacity: 0.2;
+      fill: var(--vscode-minimapSlider-hoverBackground, rgba(100, 100, 100, 0.35));
     }
     .minimap-viewport:active {
       cursor: grabbing;
-      fill-opacity: 0.25;
+      fill: var(--vscode-minimapSlider-activeBackground, rgba(100, 100, 100, 0.5));
     }
     .minimap-today {
       stroke: var(--vscode-charts-red);
