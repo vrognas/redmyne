@@ -2968,8 +2968,14 @@ ${style.tip}
     .arrow-selection-mode .issue-bar { opacity: 0.3; }
     .arrow-selection-mode .issue-bar.arrow-connected { opacity: 1; }
     .arrow-selection-mode .issue-bar.arrow-connected .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
+    .arrow-selection-mode .issue-label,
+    .arrow-selection-mode .project-label { opacity: 0.15; }
+    .arrow-selection-mode .issue-label.arrow-connected,
+    .arrow-selection-mode .project-label.arrow-connected { opacity: 1; }
     .arrow-selection-mode .dependency-arrow { opacity: 0.2; }
     .arrow-selection-mode .dependency-arrow.selected { opacity: 1; }
+    .arrow-selection-mode .dependency-arrow.selected .arrow-line { stroke-width: 3; filter: brightness(1.3) drop-shadow(0 0 4px currentColor); }
+    .arrow-selection-mode .dependency-arrow.selected .arrow-head { filter: brightness(1.3) drop-shadow(0 0 4px currentColor); }
     /* Hover highlighting - fade labels only for dependency arrow hovers */
     .hover-focus.dependency-hover .issue-label,
     .hover-focus.dependency-hover .project-label { opacity: 0.15; transition: opacity 0.15s ease-out; }
@@ -4298,11 +4304,13 @@ ${style.tip}
         arrow.classList.add('selected');
         document.body.classList.add('arrow-selection-mode');
 
-        // Highlight connected bars
+        // Highlight connected bars and labels
         const fromId = arrow.dataset.from;
         const toId = arrow.dataset.to;
         document.querySelectorAll(\`.issue-bar[data-issue-id="\${fromId}"], .issue-bar[data-issue-id="\${toId}"]\`)
           .forEach(bar => bar.classList.add('arrow-connected'));
+        document.querySelectorAll(\`.issue-label[data-issue-id="\${fromId}"], .issue-label[data-issue-id="\${toId}"]\`)
+          .forEach(label => label.classList.add('arrow-connected'));
 
         announce(\`Selected relation from #\${fromId} to #\${toId}\`);
       });
