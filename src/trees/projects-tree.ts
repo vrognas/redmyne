@@ -152,6 +152,9 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
       vscode.TreeItemCollapsibleState.Collapsed
     );
 
+    // Set id for tree item persistence across refreshes
+    treeItem.id = `project-${project.id}`;
+
     // Check if has issues directly or in subprojects
     const hasAnyIssues = totalIssuesWithSubprojects > 0;
     const subprojectIssues = totalIssuesWithSubprojects - assignedIssues.length;

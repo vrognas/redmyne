@@ -626,9 +626,10 @@ export function activate(context: vscode.ExtensionContext): void {
   // addTimeEntryForDate moved to time-entry-commands.ts
   registerCommand("quickCreateIssue", async (props, ...args) => {
     // Extract project ID from tree node if invoked from context menu
+    // ProjectNode has project.id, not direct id
     let projectId: number | undefined;
-    if (args[0] && typeof args[0] === "object" && "id" in args[0]) {
-      projectId = (args[0] as { id: number }).id;
+    if (args[0] && typeof args[0] === "object" && "project" in args[0]) {
+      projectId = (args[0] as { project: { id: number } }).project.id;
     } else if (typeof args[0] === "number") {
       projectId = args[0];
     }
@@ -668,9 +669,10 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   registerCommand("quickCreateVersion", async (props, ...args) => {
     // Extract project ID from tree node if invoked from context menu
+    // ProjectNode has project.id, not direct id
     let projectId: number | undefined;
-    if (args[0] && typeof args[0] === "object" && "id" in args[0]) {
-      projectId = (args[0] as { id: number }).id;
+    if (args[0] && typeof args[0] === "object" && "project" in args[0]) {
+      projectId = (args[0] as { project: { id: number } }).project.id;
     } else if (typeof args[0] === "number") {
       projectId = args[0];
     }

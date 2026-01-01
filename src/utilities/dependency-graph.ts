@@ -45,6 +45,9 @@ export function buildDependencyGraph(issues: Issue[]): DependencyGraph {
       const sourceId = issue.id;
       const targetId = rel.issue_to_id;
 
+      // Skip self-references (malformed data)
+      if (targetId === sourceId) continue;
+
       // Ensure target node exists (may be external)
       if (!graph.has(targetId)) {
         graph.set(targetId, { upstream: new Set(), downstream: new Set() });
