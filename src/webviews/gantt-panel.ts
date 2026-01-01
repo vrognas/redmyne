@@ -442,6 +442,7 @@ export class GanttPanel {
   private _renderKey = 0; // Incremented on each render to force SVG re-creation
   private _isRefreshing = false; // Show loading overlay during data refresh
   private _currentFilter: IssueFilter = { ...DEFAULT_ISSUE_FILTER };
+  private _healthFilter: "all" | "healthy" | "warning" | "critical" = "all";
   private _filterChangeCallback?: (filter: IssueFilter) => void;
   private _viewMode: GanttViewMode = "projects";
   private _showCapacityRibbon = true; // Capacity ribbon visible by default in My Work
@@ -1135,6 +1136,7 @@ export class GanttPanel {
     visible?: boolean; // For setAllProjectsVisibility
     isExpanded?: boolean; // For collapseStateSync
     filter?: { assignee?: string; status?: string }; // For setFilter
+    health?: string; // For setHealthFilter
     sortBy?: "id" | "assignee" | "start" | "due"; // For setSort
     sortOrder?: "asc" | "desc"; // For setSort
   }): void {
@@ -1414,6 +1416,12 @@ export class GanttPanel {
           if (this._filterChangeCallback) {
             this._filterChangeCallback(newFilter);
           }
+        }
+        break;
+      case "setHealthFilter":
+        if (message.health) {
+          this._healthFilter = message.health as "all" | "healthy" | "warning" | "critical";
+          this._updateContent();
         }
         break;
       case "setSort":
@@ -1833,7 +1841,22 @@ export class GanttPanel {
     const rows = allRows;
 
     // Filter visible rows ONCE upfront (avoid multiple .filter() calls)
-    const visibleRows = rows.filter(r => r.isVisible);
+    // Also apply health filter if set (issues only - projects/time-groups always pass)
+    const healthFilter = this._healthFilter;
+    const visibleRows = rows.filter(r => {
+      if (!r.isVisible) return false;
+      if (healthFilter === "all") return true;
+      // Non-issue rows (projects, time-groups) pass through
+      if (r.type !== "issue" || !r.issue) return true;
+      // Map filter values to FlexibilityScore status values
+      const status = r.issue.status;
+      switch (healthFilter) {
+        case "critical": return status === "overbooked";
+        case "warning": return status === "at-risk";
+        case "healthy": return status === "on-track" || status === "completed";
+        default: return true;
+      }
+    });
     const visibleRowCount = visibleRows.length;
     const contentHeight = visibleRowCount * (barHeight + barGap);
 
@@ -2394,8 +2417,14 @@ export class GanttPanel {
                   : downCount >= 3 ? "var(--vscode-charts-orange)"
                   : "var(--vscode-descriptionForeground)")
                 : "";
+              // Blocker badge: "⛔1" for blocked issues (clickable)
+              const blockerCount = issue.blockedBy.length;
+              const showBlocker = blockerCount > 0 && !issue.isClosed;
+              const blockerBadgeW = showBlocker ? 26 : 0;
+              const blockerLabel = showBlocker ? `⛔${blockerCount}` : "";
+              const firstBlockerId = showBlocker ? issue.blockedBy[0].id : null;
               const assigneeW = issue.assignee ? 90 : 0;
-              const totalLabelW = badgeW + flexBadgeW + impactBadgeW + assigneeW + 24;
+              const totalLabelW = badgeW + flexBadgeW + impactBadgeW + blockerBadgeW + assigneeW + 24;
               const onLeft = endX + totalLabelW > timelineWidth;
               const labelX = onLeft ? startX - 8 : endX + 16;
 
@@ -2421,9 +2450,14 @@ export class GanttPanel {
               const lastBadgeW = showFlex ? flexBadgeW : badgeW;
               const impactBadgeX = onLeft ? lastBadgeX - lastBadgeW - 4 : lastBadgeX + lastBadgeW + 4;
               const impactBadgeCenterX = onLeft ? impactBadgeX - impactBadgeW / 2 : impactBadgeX + impactBadgeW / 2;
-              // Assignee position: after impact badge (or last shown badge)
-              const finalBadgeX = showImpact ? impactBadgeX : lastBadgeX;
-              const finalBadgeW = showImpact ? impactBadgeW : lastBadgeW;
+              // Blocker badge position: after impact badge (or last shown badge)
+              const impactFinalX = showImpact ? impactBadgeX : lastBadgeX;
+              const impactFinalW = showImpact ? impactBadgeW : lastBadgeW;
+              const blockerBadgeX = onLeft ? impactFinalX - impactFinalW - 4 : impactFinalX + impactFinalW + 4;
+              const blockerBadgeCenterX = onLeft ? blockerBadgeX - blockerBadgeW / 2 : blockerBadgeX + blockerBadgeW / 2;
+              // Assignee position: after blocker badge (or last shown badge)
+              const finalBadgeX = showBlocker ? blockerBadgeX : impactFinalX;
+              const finalBadgeW = showBlocker ? blockerBadgeW : impactFinalW;
               const assigneeX = onLeft ? finalBadgeX - finalBadgeW - 6 : finalBadgeX + finalBadgeW + 6;
               return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
                 <rect class="status-badge-bg" x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" rx="2"
@@ -2436,6 +2470,12 @@ export class GanttPanel {
                       text-anchor="middle" fill="${flexColor}" font-size="10" font-weight="500">${flexLabel}</text>` : ""}
                 ${showImpact ? `<text class="impact-badge" x="${impactBadgeCenterX}" y="${barHeight / 2 + 4}"
                       text-anchor="middle" fill="${impactColor}" font-size="10" font-weight="500">${impactLabel}</text>` : ""}
+                ${showBlocker ? `<g class="blocker-badge" data-blocker-id="${firstBlockerId}" style="cursor: pointer;">
+                  <rect x="${onLeft ? blockerBadgeX - blockerBadgeW : blockerBadgeX}" y="${barHeight / 2 - 8}" width="${blockerBadgeW}" height="16" rx="2"
+                        fill="var(--vscode-charts-red)" opacity="0.15"/>
+                  <text x="${blockerBadgeCenterX}" y="${barHeight / 2 + 4}"
+                        text-anchor="middle" fill="var(--vscode-charts-red)" font-size="10" font-weight="500">${blockerLabel}</text>
+                </g>` : ""}
                 ${issue.assignee ? `<text class="bar-assignee" x="${assigneeX}" y="${barHeight / 2 + 4}"
                       text-anchor="${onLeft ? "end" : "start"}" fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(issue.assignee.length > 12 ? issue.assignee.substring(0, 11) + "…" : issue.assignee)}</text>` : ""}
               </g>`;
@@ -3544,6 +3584,18 @@ ${style.tip}
       pointer-events: none;
       font-family: var(--vscode-font-family);
     }
+    /* Focus mode: highlight dependency chain */
+    .focus-mode .issue-bar { opacity: 0.25; }
+    .focus-mode .issue-label { opacity: 0.25; }
+    .focus-mode .dependency-arrow { opacity: 0.15; }
+    .focus-mode .issue-bar.focus-highlighted { opacity: 1; }
+    .focus-mode .issue-label.focus-highlighted { opacity: 1; }
+    .focus-mode .dependency-arrow.focus-highlighted { opacity: 1; stroke-width: 2.5; }
+    .focus-mode .issue-bar.focus-highlighted .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
+    /* Blocker badge styling */
+    .blocker-badge { pointer-events: all; }
+    .blocker-badge:hover rect { opacity: 0.35 !important; }
+    .blocker-badge:hover text { filter: brightness(1.3); }
   </style>
 </head>
 <body>
@@ -3581,6 +3633,12 @@ ${style.tip}
             <option value="open"${this._currentFilter.status === "open" ? " selected" : ""}>Open</option>
             <option value="closed"${this._currentFilter.status === "closed" ? " selected" : ""}>Closed</option>
             <option value="any"${this._currentFilter.status === "any" ? " selected" : ""}>Any</option>
+          </select>
+          <select id="filterHealth" title="Filter by health">
+            <option value="all"${this._healthFilter === "all" ? " selected" : ""}>All</option>
+            <option value="critical"${this._healthFilter === "critical" ? " selected" : ""}>Critical</option>
+            <option value="warning"${this._healthFilter === "warning" ? " selected" : ""}>Warning</option>
+            <option value="healthy"${this._healthFilter === "healthy" ? " selected" : ""}>Healthy</option>
           </select>
         </div>
         <div class="filter-toggle" role="group" aria-label="Sort order">
@@ -4122,6 +4180,9 @@ ${style.tip}
       const value = e.target.value;
       vscode.postMessage({ command: 'setFilter', filter: { status: value } });
     });
+    document.getElementById('filterHealth').addEventListener('change', (e) => {
+      vscode.postMessage({ command: 'setHealthFilter', health: e.target.value });
+    });
 
     // Sort dropdown handlers
     document.getElementById('sortBy').addEventListener('change', (e) => {
@@ -4271,6 +4332,77 @@ ${style.tip}
     }
 
     criticalPathBtn.addEventListener('click', toggleCriticalPath);
+
+    // Focus mode: click on issue to highlight its dependency chain
+    let focusedIssueId = null;
+
+    function getAllConnected(issueId, graph, reverseGraph) {
+      const connected = new Set([issueId]);
+      const queue = [issueId];
+      // Traverse downstream (issues blocked by this one)
+      while (queue.length > 0) {
+        const current = queue.shift();
+        const downstream = graph.get(current) || [];
+        for (const dep of downstream) {
+          if (!connected.has(dep)) {
+            connected.add(dep);
+            queue.push(dep);
+          }
+        }
+      }
+      // Traverse upstream (issues that block this one)
+      const upQueue = [issueId];
+      while (upQueue.length > 0) {
+        const current = upQueue.shift();
+        const upstream = reverseGraph.get(current) || [];
+        for (const dep of upstream) {
+          if (!connected.has(dep)) {
+            connected.add(dep);
+            upQueue.push(dep);
+          }
+        }
+      }
+      return connected;
+    }
+
+    function focusOnDependencyChain(issueId) {
+      // Clear previous focus
+      clearFocus();
+      if (!issueId) return;
+
+      focusedIssueId = issueId;
+      const { graph, reverseGraph } = buildBlockingGraph();
+      const connected = getAllConnected(issueId, graph, reverseGraph);
+
+      // Add focus mode class to container
+      ganttContainer.classList.add('focus-mode');
+
+      // Highlight connected issues
+      document.querySelectorAll('.issue-bar').forEach(bar => {
+        if (connected.has(bar.dataset.issueId)) {
+          bar.classList.add('focus-highlighted');
+        }
+      });
+      document.querySelectorAll('.issue-label').forEach(label => {
+        if (connected.has(label.dataset.issueId)) {
+          label.classList.add('focus-highlighted');
+        }
+      });
+      // Highlight arrows between connected issues
+      document.querySelectorAll('.dependency-arrow').forEach(arrow => {
+        if (connected.has(arrow.dataset.from) && connected.has(arrow.dataset.to)) {
+          arrow.classList.add('focus-highlighted');
+        }
+      });
+
+      announce(\`Focus: \${connected.size} issue\${connected.size !== 1 ? 's' : ''} in dependency chain\`);
+    }
+
+    function clearFocus() {
+      focusedIssueId = null;
+      ganttContainer.classList.remove('focus-mode');
+      document.querySelectorAll('.focus-highlighted').forEach(el => el.classList.remove('focus-highlighted'));
+    }
 
     // Multi-select state
     const selectedIssues = new Set();
@@ -4934,6 +5066,7 @@ ${style.tip}
     }
 
     // Handle click on bar - scroll to issue start date and highlight
+    // Double-click enters focus mode (highlights dependency chain)
     document.querySelectorAll('.issue-bar').forEach(bar => {
       bar.addEventListener('click', (e) => {
         // Ignore if clicking on drag handles, link handle, or bar-outline (for move drag)
@@ -4946,7 +5079,28 @@ ${style.tip}
           return;
         }
         if (dragState || linkingState) return;
+        // Clear focus mode on single click
+        if (focusedIssueId) {
+          clearFocus();
+        }
         scrollToAndHighlight(bar.dataset.issueId);
+      });
+      bar.addEventListener('dblclick', (e) => {
+        if (dragState || linkingState) return;
+        e.preventDefault();
+        focusOnDependencyChain(bar.dataset.issueId);
+      });
+    });
+
+    // Blocker badge click - navigate to first blocker
+    document.querySelectorAll('.blocker-badge').forEach(badge => {
+      badge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const blockerId = badge.dataset.blockerId;
+        if (blockerId) {
+          scrollToAndHighlight(blockerId);
+          announce(\`Navigated to blocker #\${blockerId}\`);
+        }
       });
     });
 
@@ -5036,11 +5190,16 @@ ${style.tip}
       });
     });
 
-    // Escape to cancel linking mode and close pickers
+    // Escape to cancel linking mode, close pickers, and clear focus
     addDocListener('keydown', (e) => {
       if (e.key === 'Escape') {
         if (linkingState) {
           cancelLinking();
+        }
+        // Clear focus mode
+        if (focusedIssueId) {
+          clearFocus();
+          announce('Focus cleared');
         }
         // Close any open picker
         document.querySelector('.relation-picker')?.remove();
