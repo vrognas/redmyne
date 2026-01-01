@@ -10,6 +10,7 @@ import { showStatusBarMessage } from "../utilities/status-bar";
 import { errorToString } from "../utilities/error-feedback";
 import { buildProjectHierarchy, buildMyWorkHierarchy, flattenHierarchyAll, FlatNodeWithVisibility, HierarchyNode } from "../utilities/hierarchy-builder";
 import { ProjectHealth } from "../utilities/project-health";
+import { DependencyGraph, buildDependencyGraph, countDownstream, getBlockers } from "../utilities/dependency-graph";
 import { calculateDailyCapacity } from "../utilities/capacity-calculator";
 import { collapseState } from "../utilities/collapse-state";
 import { debounce, DebouncedFunction } from "../utilities/debounce";
@@ -59,6 +60,10 @@ interface GanttIssue {
   assignee: string | null;
   /** True for external dependencies (blockers not assigned to me) */
   isExternal?: boolean;
+  /** Count of issues that depend on this (transitively) */
+  downstreamCount: number;
+  /** Open issues blocking this one */
+  blockedBy: Array<{ id: number; subject: string; assignee: string | null }>;
 }
 
 interface GanttRow {
@@ -97,11 +102,29 @@ interface GanttRow {
 /**
  * Convert Issue to GanttIssue for SVG rendering
  */
-function toGanttIssue(issue: Issue, flexibilityCache: Map<number, FlexibilityScore | null>, closedStatusIds: Set<number>, isExternal = false): GanttIssue {
+function toGanttIssue(
+  issue: Issue,
+  flexibilityCache: Map<number, FlexibilityScore | null>,
+  closedStatusIds: Set<number>,
+  depGraph: DependencyGraph | null,
+  issueMap: Map<number, Issue> | null,
+  isExternal = false
+): GanttIssue {
   // Check if closed via status ID, or fallback to status name containing "closed"
   const isClosedById = closedStatusIds.has(issue.status?.id ?? 0);
   const isClosedByName = issue.status?.name?.toLowerCase().includes("closed") ?? false;
   const flexibility = flexibilityCache.get(issue.id);
+
+  // Calculate downstream impact and blockers if graph available
+  const downstreamCount = depGraph ? countDownstream(issue.id, depGraph) : 0;
+  const blockers = depGraph && issueMap
+    ? getBlockers(issue.id, depGraph, issueMap).map(b => ({
+        id: b.id,
+        subject: b.subject,
+        assignee: b.assignee,
+      }))
+    : [];
+
   return {
     id: issue.id,
     subject: issue.subject,
@@ -131,13 +154,21 @@ function toGanttIssue(issue: Issue, flexibilityCache: Map<number, FlexibilitySco
       })),
     assignee: issue.assigned_to?.name ?? null,
     isExternal,
+    downstreamCount,
+    blockedBy: blockers,
   };
 }
 
 /**
  * Convert FlatNodeWithVisibility to GanttRow for SVG rendering
  */
-function nodeToGanttRow(node: FlatNodeWithVisibility, flexibilityCache: Map<number, FlexibilityScore | null>, closedStatusIds: Set<number>): GanttRow {
+function nodeToGanttRow(
+  node: FlatNodeWithVisibility,
+  flexibilityCache: Map<number, FlexibilityScore | null>,
+  closedStatusIds: Set<number>,
+  depGraph: DependencyGraph | null,
+  issueMap: Map<number, Issue> | null
+): GanttRow {
   if (node.type === "project") {
     return {
       type: "project",
@@ -178,7 +209,7 @@ function nodeToGanttRow(node: FlatNodeWithVisibility, flexibilityCache: Map<numb
     id: node.id,
     label: node.label,
     depth: node.depth,
-    issue: toGanttIssue(issue, flexibilityCache, closedStatusIds, node.isExternal),
+    issue: toGanttIssue(issue, flexibilityCache, closedStatusIds, depGraph, issueMap, node.isExternal),
     isParent: node.children.length > 0,
     collapseKey: node.collapseKey,
     parentKey: node.parentKey,
@@ -1625,7 +1656,10 @@ export class GanttPanel {
     }
     // Get ALL nodes with visibility flags for client-side collapse management
     const flatNodes = flattenHierarchyAll(this._cachedHierarchy, collapseState.getExpandedKeys());
-    const allRows = flatNodes.map((node) => nodeToGanttRow(node, this._flexibilityCache, this._closedStatusIds));
+    // Build dependency graph for downstream impact calculation
+    const depGraph = buildDependencyGraph(sortedIssues);
+    const issueMap = new Map(sortedIssues.map(i => [i.id, i]));
+    const allRows = flatNodes.map((node) => nodeToGanttRow(node, this._flexibilityCache, this._closedStatusIds, depGraph, issueMap));
 
     // Extract project IDs that have rows (only these should affect date range)
     const projectIdsWithRows = new Set<number>();
@@ -2075,6 +2109,22 @@ export class GanttPanel {
           : flexSlack > 0 ? `Flexibility: +${flexSlack}d buffer`
           : flexSlack === 0 ? `Flexibility: ⚠ Critical path (no buffer)`
           : `Flexibility: ⚠ ${flexSlack}d behind`;
+        // Impact info
+        const impactText = issue.downstreamCount > 0
+          ? `Impact: ${issue.downstreamCount} task${issue.downstreamCount > 1 ? "s" : ""} depend on this`
+          : null;
+        // Blocker info
+        const blockerLines: string[] = [];
+        if (issue.blockedBy.length > 0) {
+          blockerLines.push(`⛔ BLOCKED BY:`);
+          for (const b of issue.blockedBy.slice(0, 3)) {
+            const assigneeText = b.assignee ? ` (${b.assignee})` : "";
+            blockerLines.push(`  • #${b.id} ${b.subject.length > 25 ? b.subject.substring(0, 24) + "…" : b.subject}${assigneeText}`);
+          }
+          if (issue.blockedBy.length > 3) {
+            blockerLines.push(`  ... and ${issue.blockedBy.length - 3} more`);
+          }
+        }
         const barTooltipLines = [
           issue.isExternal ? "⚡ EXTERNAL DEPENDENCY" : null,
           statusDesc,
@@ -2086,6 +2136,8 @@ export class GanttPanel {
           `Progress: ${doneRatio}%${isFallbackProgress ? ` (showing ${visualDoneRatio}% from time)` : ""}`,
           `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
           flexText,
+          impactText,
+          ...blockerLines,
         ];
 
         // Check for contributions
@@ -2285,8 +2337,18 @@ export class GanttPanel {
                   : flexSlack > 0 ? "var(--vscode-charts-yellow)"
                   : "var(--vscode-charts-red)")
                 : "";
+              // Impact badge: "⬇3" for downstream count (only show if >0)
+              const downCount = issue.downstreamCount;
+              const showImpact = downCount > 0 && !issue.isClosed;
+              const impactBadgeW = showImpact ? 24 : 0;
+              const impactLabel = showImpact ? `⬇${downCount}` : "";
+              const impactColor = showImpact
+                ? (downCount >= 6 ? "var(--vscode-charts-red)"
+                  : downCount >= 3 ? "var(--vscode-charts-orange)"
+                  : "var(--vscode-descriptionForeground)")
+                : "";
               const assigneeW = issue.assignee ? 90 : 0;
-              const totalLabelW = badgeW + flexBadgeW + assigneeW + 24;
+              const totalLabelW = badgeW + flexBadgeW + impactBadgeW + assigneeW + 24;
               const onLeft = endX + totalLabelW > timelineWidth;
               const labelX = onLeft ? startX - 8 : endX + 16;
 
@@ -2307,10 +2369,15 @@ export class GanttPanel {
               // Flex badge position: after progress badge
               const flexBadgeX = onLeft ? labelX - badgeW - 4 : labelX + badgeW + 4;
               const flexBadgeCenterX = onLeft ? flexBadgeX - flexBadgeW / 2 : flexBadgeX + flexBadgeW / 2;
-              // Assignee position: after flex badge (or after progress if no flex)
-              const assigneeX = onLeft
-                ? (showFlex ? flexBadgeX - flexBadgeW - 6 : labelX - badgeW - 6)
-                : (showFlex ? flexBadgeX + flexBadgeW + 6 : labelX + badgeW + 6);
+              // Impact badge position: after flex badge
+              const lastBadgeX = showFlex ? flexBadgeX : labelX;
+              const lastBadgeW = showFlex ? flexBadgeW : badgeW;
+              const impactBadgeX = onLeft ? lastBadgeX - lastBadgeW - 4 : lastBadgeX + lastBadgeW + 4;
+              const impactBadgeCenterX = onLeft ? impactBadgeX - impactBadgeW / 2 : impactBadgeX + impactBadgeW / 2;
+              // Assignee position: after impact badge (or last shown badge)
+              const finalBadgeX = showImpact ? impactBadgeX : lastBadgeX;
+              const finalBadgeW = showImpact ? impactBadgeW : lastBadgeW;
+              const assigneeX = onLeft ? finalBadgeX - finalBadgeW - 6 : finalBadgeX + finalBadgeW + 6;
               return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
                 <rect class="status-badge-bg" x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" rx="2"
                       fill="var(--vscode-badge-background)" opacity="0.9"/>
@@ -2320,6 +2387,8 @@ export class GanttPanel {
                       fill="${flexColor}" opacity="0.15"/>
                 <text class="flex-badge" x="${flexBadgeCenterX}" y="${barHeight / 2 + 4}"
                       text-anchor="middle" fill="${flexColor}" font-size="10" font-weight="500">${flexLabel}</text>` : ""}
+                ${showImpact ? `<text class="impact-badge" x="${impactBadgeCenterX}" y="${barHeight / 2 + 4}"
+                      text-anchor="middle" fill="${impactColor}" font-size="10" font-weight="500">${impactLabel}</text>` : ""}
                 ${issue.assignee ? `<text class="bar-assignee" x="${assigneeX}" y="${barHeight / 2 + 4}"
                       text-anchor="${onLeft ? "end" : "start"}" fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(issue.assignee.length > 12 ? issue.assignee.substring(0, 11) + "…" : issue.assignee)}</text>` : ""}
               </g>`;
