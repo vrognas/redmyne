@@ -2366,6 +2366,35 @@ ${style.tip}
       return `<rect x="${dayX}" y="0" width="${dayWidth}" height="${ribbonHeight}" fill="${fillColor}" opacity="${opacity}"><title>${escapeHtml(tooltip)}</title></rect>`;
     }).join("");
 
+    // Week boundaries for capacity ribbon (show Monday markers)
+    const capacityWeekMarkers: string[] = [];
+    if (this._viewMode === "mywork") {
+      const current = new Date(minDate);
+      while (current <= maxDate) {
+        if (current.getDay() === 1) { // Monday
+          const weekX = ((current.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
+          capacityWeekMarkers.push(`<line x1="${weekX}" y1="0" x2="${weekX}" y2="${ribbonHeight}" class="capacity-week-marker"/>`);
+        }
+        current.setDate(current.getDate() + 1);
+      }
+    }
+
+    // Today marker for capacity ribbon
+    const capacityTodayX = ((today.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
+    const capacityTodayMarker = this._viewMode === "mywork" && capacityTodayX >= 0 && capacityTodayX <= timelineWidth
+      ? `<line x1="${capacityTodayX}" y1="0" x2="${capacityTodayX}" y2="${ribbonHeight}" class="capacity-today-marker"/>`
+      : "";
+
+    // Calculate period summary (total load / total capacity for visible range)
+    const periodSummary = capacityData.reduce((acc, day) => {
+      acc.totalLoad += day.loadHours;
+      acc.totalCapacity += day.capacityHours;
+      return acc;
+    }, { totalLoad: 0, totalCapacity: 0 });
+    const capacitySummaryText = capacityData.length > 0
+      ? `${Math.round(periodSummary.totalLoad)}h / ${Math.round(periodSummary.totalCapacity)}h`
+      : "Capacity";
+
     // Date markers split into fixed header and scrollable body
     const dateMarkers = this._generateDateMarkers(
       minDate,
@@ -3309,13 +3338,15 @@ ${style.tip}
       <!-- Capacity ribbon (My Work mode only) -->
       <div class="capacity-ribbon-row capacity-ribbon${this._viewMode !== "mywork" || !this._showCapacityRibbon ? " hidden" : ""}">
         <div class="gantt-sticky-left gantt-corner">
-          <div class="capacity-ribbon-label" style="width: ${checkboxColumnWidth + labelWidth * 2}px; height: ${ribbonHeight}px;">
-            Capacity
+          <div class="capacity-ribbon-label" style="width: ${checkboxColumnWidth + labelWidth * 2}px; height: ${ribbonHeight}px;" title="Total workload for visible date range">
+            ${capacitySummaryText}
           </div>
         </div>
         <div class="capacity-ribbon-timeline">
           <svg width="${timelineWidth}" height="${ribbonHeight}">
             ${capacityRibbonBars}
+            ${capacityWeekMarkers.join("")}
+            ${capacityTodayMarker}
           </svg>
         </div>
       </div>
