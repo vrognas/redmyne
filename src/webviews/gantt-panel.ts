@@ -9,6 +9,7 @@ import { adHocTracker } from "../utilities/adhoc-tracker";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { errorToString } from "../utilities/error-feedback";
 import { buildProjectHierarchy, buildMyWorkHierarchy, flattenHierarchyAll, FlatNodeWithVisibility, HierarchyNode } from "../utilities/hierarchy-builder";
+import { ProjectHealth } from "../utilities/project-health";
 import { calculateDailyCapacity } from "../utilities/capacity-calculator";
 import { collapseState } from "../utilities/collapse-state";
 import { debounce, DebouncedFunction } from "../utilities/debounce";
@@ -86,6 +87,8 @@ interface GanttRow {
   icon?: string;
   /** Child count for group headers */
   childCount?: number;
+  /** Project health metrics (for project rows) */
+  health?: ProjectHealth;
 }
 
 
@@ -143,6 +146,7 @@ function nodeToGanttRow(node: FlatNodeWithVisibility, flexibilityCache: Map<numb
       childDateRanges: node.childDateRanges,
       isVisible: node.isVisible,
       isExpanded: node.isExpanded,
+      health: node.health,
     };
   }
 
@@ -1608,9 +1612,12 @@ export class GanttPanel {
     // Build hierarchical rows FIRST - needed to know which projects have rows
     // Cache hierarchy to avoid rebuilding on collapse/expand
     if (!this._cachedHierarchy) {
+      // Extract blocked issue IDs from relations (for health calculation)
+      const blockedIds = this.extractBlockedIds(sortedIssues);
+
       this._cachedHierarchy = this._viewMode === "mywork"
         ? buildMyWorkHierarchy(sortedIssues, this._flexibilityCache, this._dependencyIssues)
-        : buildProjectHierarchy(sortedIssues, this._flexibilityCache, this._projects, true); // preserveOrder=true for user sort
+        : buildProjectHierarchy(sortedIssues, this._flexibilityCache, this._projects, true, blockedIds);
     }
     // Get ALL nodes with visibility flags for client-side collapse management
     const flatNodes = flattenHierarchyAll(this._cachedHierarchy, collapseState.getExpandedKeys());
@@ -1811,13 +1818,48 @@ export class GanttPanel {
         const textOffset = row.hasChildren ? chevronWidth : 0;
 
         if (row.type === "project") {
-          // Project header row (checkbox is in separate column)
+          // Project header row with health indicators
+          const health = row.health;
+          const healthDot = health ? this.getHealthDot(health.status) : "";
+          const labelX = 5 + indent + textOffset;
+
+          // Build counts string: "12 open · 2 blocked · 1 overdue"
+          let countsStr = "";
+          if (health && health.counts.total > 0) {
+            const parts: string[] = [`${health.counts.open} open`];
+            if (health.counts.blocked > 0) parts.push(`${health.counts.blocked} blocked`);
+            if (health.counts.overdue > 0) parts.push(`${health.counts.overdue} overdue`);
+            countsStr = parts.join(" · ");
+          }
+
+          // Progress bar (thin inline)
+          const progressBarWidth = 40;
+          const progressBarHeight = 4;
+          const progressBarX = labelX + escapeHtml(row.label).length * 7 + 24; // After label + health dot
+          const progressBarY = barHeight / 2 - progressBarHeight / 2;
+          const progressFillWidth = health ? (health.progress / 100) * progressBarWidth : 0;
+          const progressBar = health && health.counts.total > 0 ? `
+            <rect x="${progressBarX}" y="${progressBarY}" width="${progressBarWidth}" height="${progressBarHeight}" rx="2" fill="var(--vscode-progressBar-background)" opacity="0.3"/>
+            <rect x="${progressBarX}" y="${progressBarY}" width="${progressFillWidth}" height="${progressBarHeight}" rx="2" fill="var(--vscode-progressBar-foreground)"/>
+            <text x="${progressBarX + progressBarWidth + 4}" y="${barHeight / 2 + 4}" fill="var(--vscode-descriptionForeground)" font-size="10">${health.progress}%</text>
+          ` : "";
+
+          // Counts text position (after progress bar)
+          const countsX = progressBarX + progressBarWidth + 30;
+          const countsText = countsStr ? `<text x="${countsX}" y="${barHeight / 2 + 4}" fill="var(--vscode-descriptionForeground)" font-size="10">${countsStr}</text>` : "";
+
+          // Tooltip with detailed breakdown
+          const tooltip = health ? this.formatHealthTooltip(row.label, health) : row.label;
+
           return `
             <g class="project-label gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
               ${chevron}
-              <text x="${5 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12" font-weight="bold">
-                ${escapeHtml(row.label)}
+              <text x="${labelX}" y="${barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12" font-weight="bold">
+                ${healthDot}${escapeHtml(row.label)}
               </text>
+              ${progressBar}
+              ${countsText}
+              <title>${escapeHtml(tooltip)}</title>
             </g>
           `;
         }
@@ -5830,6 +5872,73 @@ ${style.tip}
       header: headerContent.join(""),
       body: heatmapGroup + weekendGroup + bodyGridLines.join("") + bodyMarkers.join(""),
     };
+  }
+
+  /**
+   * Get health status dot/emoji for display
+   */
+  private getHealthDot(status: "green" | "yellow" | "red" | "grey"): string {
+    switch (status) {
+      case "green": return "🟢 ";
+      case "yellow": return "🟡 ";
+      case "red": return "🔴 ";
+      case "grey": return "⚪ ";
+    }
+  }
+
+  /**
+   * Format health data as tooltip text
+   */
+  private formatHealthTooltip(projectName: string, health: ProjectHealth): string {
+    const lines: string[] = [projectName];
+    lines.push(`Progress: ${health.progress}%`);
+    lines.push("");
+    lines.push(`Issues: ${health.counts.closed} closed, ${health.counts.open} open`);
+    if (health.counts.inProgress > 0) {
+      lines.push(`  In Progress: ${health.counts.inProgress}`);
+    }
+    if (health.counts.blocked > 0 || health.counts.overdue > 0 || health.counts.atRisk > 0) {
+      lines.push("");
+      lines.push("Attention:");
+      if (health.counts.overdue > 0) lines.push(`  🔴 ${health.counts.overdue} overdue`);
+      if (health.counts.blocked > 0) lines.push(`  ⚠ ${health.counts.blocked} blocked`);
+      if (health.counts.atRisk > 0) lines.push(`  ⏰ ${health.counts.atRisk} at risk`);
+    }
+    if (health.hours.estimated > 0) {
+      lines.push("");
+      lines.push(`Hours: ${health.hours.spent}h spent / ${health.hours.estimated}h estimated`);
+    }
+    return lines.join("\n");
+  }
+
+  /**
+   * Extract IDs of issues that are blocked by unresolved dependencies
+   * An issue is blocked if it has a "blocked" or "follows" relation
+   * where the blocking issue is not yet closed
+   */
+  private extractBlockedIds(issues: Issue[]): Set<number> {
+    const blockedIds = new Set<number>();
+    const closedIds = new Set(
+      issues.filter((i) => i.closed_on !== null).map((i) => i.id)
+    );
+
+    for (const issue of issues) {
+      if (issue.closed_on !== null) continue; // Closed issues aren't blocked
+
+      for (const rel of issue.relations ?? []) {
+        // "blocked" means this issue is blocked by issue_to_id
+        // "follows" means this issue must wait for issue_to_id
+        if (rel.relation_type === "blocked" || rel.relation_type === "follows") {
+          // Only blocked if the blocker is not closed
+          if (!closedIds.has(rel.issue_to_id)) {
+            blockedIds.add(issue.id);
+            break; // One blocker is enough
+          }
+        }
+      }
+    }
+
+    return blockedIds;
   }
 }
 

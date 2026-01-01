@@ -5,6 +5,7 @@ import { sortIssuesByRisk } from "./issue-sorting";
 import { groupBy } from "./collection-utils";
 import { formatLocalDate } from "./date-utils";
 import { endOfISOWeek } from "date-fns";
+import { calculateProjectHealth, ProjectHealth } from "./project-health";
 
 /**
  * Generic node in the hierarchy tree
@@ -36,6 +37,8 @@ export interface HierarchyNode {
   timeGroup?: "overdue" | "this-week" | "later" | "no-date";
   /** Icon/emoji for time group headers */
   icon?: string;
+  /** Project health metrics (for project nodes) */
+  health?: ProjectHealth;
 }
 
 export interface HierarchyOptions {
@@ -71,12 +74,14 @@ export async function buildHierarchy(
  * Uses project hierarchy (parent/child) and shows all projects with issues
  * Projects sorted alphabetically, issues sorted by risk (unless preserveOrder is true)
  * @param preserveOrder If true, preserve incoming issue order within each group (for user sort)
+ * @param blockedIds Set of issue IDs that are blocked (for health calculation)
  */
 export function buildProjectHierarchy(
   issues: Issue[],
   flexibilityCache: Map<number, FlexibilityScore | null>,
   projects: RedmineProject[] = [],
-  preserveOrder = false
+  preserveOrder = false,
+  blockedIds: Set<number> = new Set()
 ): HierarchyNode[] {
   // Group issues by project
   const issuesByProject = new Map<number, Issue[]>();
@@ -120,6 +125,18 @@ export function buildProjectHierarchy(
     return ranges;
   };
 
+  // Collect all issues from node and descendants (for health calculation)
+  const collectAllIssues = (node: HierarchyNode): Issue[] => {
+    const result: Issue[] = [];
+    if (node.issue) {
+      result.push(node.issue);
+    }
+    for (const child of node.children) {
+      result.push(...collectAllIssues(child));
+    }
+    return result;
+  };
+
   // Build project node recursively
   const buildProjectNode = (
     project: RedmineProject,
@@ -158,6 +175,10 @@ export function buildProjectHierarchy(
 
     // Collect child date ranges for aggregate bar rendering
     node.childDateRanges = collectChildDateRanges(node);
+
+    // Calculate project health from all descendant issues
+    const allIssues = collectAllIssues(node);
+    node.health = calculateProjectHealth(allIssues, blockedIds);
 
     return node;
   };
@@ -201,6 +222,10 @@ export function buildProjectHierarchy(
 
     // Collect child date ranges for aggregate bar rendering
     node.childDateRanges = collectChildDateRanges(node);
+
+    // Calculate project health
+    const allIssues = collectAllIssues(node);
+    node.health = calculateProjectHealth(allIssues, blockedIds);
 
     return node;
   });
