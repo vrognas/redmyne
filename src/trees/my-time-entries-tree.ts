@@ -355,6 +355,9 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     // Get today's date for capping week range
     const today = formatLocalDate(new Date());
 
+    // Get current year for comparison
+    const currentYear = new Date().getFullYear();
+
     // Create week subgroup nodes
     return sortedKeys.map((key) => {
       const { weekNum, year, entries: weekEntries } = byWeek.get(key)!;
@@ -373,10 +376,14 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       );
 
       const nodeId = `week-${year}-${weekNum}`;
+      // Show year suffix for cross-year weeks (Week 1 or 52/53 that span year boundaries)
+      const weekSpansYears = weekRange.start.slice(0, 4) !== weekRange.end.slice(0, 4);
+      const yearSuffix = weekSpansYears || year !== currentYear ? ` '${year % 100}` : "";
       return {
         id: nodeId,
-        label: `Week ${weekNum}`,
+        label: `Week ${weekNum}${yearSuffix}`,
         description: formatHoursWithComparison(total, available),
+        tooltip: `${weekRange.start} to ${cappedEnd}`,
         collapsibleState: this.getCollapsibleState(nodeId, true),
         type: "week-subgroup" as const,
         _cachedEntries: weekEntries,
