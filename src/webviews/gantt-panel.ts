@@ -449,6 +449,8 @@ export class GanttPanel {
   // Sort settings
   private _sortBy: "id" | "assignee" | "start" | "due" = "due";
   private _sortOrder: "asc" | "desc" = "asc";
+  // Keyboard navigation state
+  private _selectedCollapseKey: string | null = null;
   // Ad-hoc budget contribution tracking
   private _contributionData?: ContributionData;
   private _contributionSources?: Map<number, { fromIssueId: number; hours: number }[]>;
@@ -1423,6 +1425,10 @@ export class GanttPanel {
           this._healthFilter = message.health as "all" | "healthy" | "warning" | "critical";
           this._updateContent();
         }
+        break;
+      case "setSelectedKey":
+        // Preserve keyboard selection across re-renders
+        this._selectedCollapseKey = message.collapseKey ?? null;
         break;
       case "setSort":
         if (message.sortBy) {
@@ -5331,13 +5337,26 @@ ${style.tip}
     // Labels click and keyboard navigation
     const allLabels = Array.from(document.querySelectorAll('.project-label, .issue-label, .time-group-label'));
     let activeLabel = null;
+    const savedSelectedKey = ${JSON.stringify(this._selectedCollapseKey)};
 
-    function setActiveLabel(label) {
+    function setActiveLabel(label, skipNotify = false) {
       if (activeLabel) activeLabel.classList.remove('active');
       activeLabel = label;
       if (label) {
         label.classList.add('active');
         label.focus();
+        // Persist selection to extension for re-render preservation
+        if (!skipNotify) {
+          vscode.postMessage({ command: 'setSelectedKey', collapseKey: label.dataset.collapseKey });
+        }
+      }
+    }
+
+    // Restore selection from previous render
+    if (savedSelectedKey) {
+      const savedLabel = allLabels.find(el => el.dataset.collapseKey === savedSelectedKey);
+      if (savedLabel) {
+        setActiveLabel(savedLabel, true);
       }
     }
 
