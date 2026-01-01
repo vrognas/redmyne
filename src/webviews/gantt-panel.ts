@@ -463,6 +463,8 @@ export class GanttPanel {
   // Sort settings
   private _sortBy: "id" | "assignee" | "start" | "due" = "due";
   private _sortOrder: "asc" | "desc" = "asc";
+  // Current user for special highlighting
+  private _currentUserName: string | null = null;
   // Keyboard navigation state
   private _selectedCollapseKey: string | null = null;
   // Ad-hoc budget contribution tracking
@@ -921,6 +923,18 @@ export class GanttPanel {
         );
       } catch {
         // Ignore errors, just won't show closed status
+      }
+    }
+
+    // Fetch current user for special highlighting (if not already cached)
+    if (!this._currentUserName && this._server) {
+      try {
+        const user = await this._server.getCurrentUser();
+        if (user) {
+          this._currentUserName = `${user.firstname} ${user.lastname}`;
+        }
+      } catch {
+        // Ignore errors
       }
     }
 
@@ -2534,7 +2548,7 @@ export class GanttPanel {
                         fill="var(--vscode-charts-green)" opacity="0.2"/>
                   <text class="status-badge" x="${checkX}" y="${barHeight / 2 + 4}"
                         text-anchor="middle" fill="var(--vscode-charts-green)" font-size="12" font-weight="bold">✓</text>
-                  ${issue.assignee ? `<text class="bar-assignee" x="${assigneeX}" y="${barHeight / 2 + 4}"
+                  ${issue.assignee ? `<text class="bar-assignee${issue.assignee === this._currentUserName ? " current-user" : ""}" x="${assigneeX}" y="${barHeight / 2 + 4}"
                         text-anchor="${onLeft ? "end" : "start"}" fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(issue.assignee.length > 12 ? issue.assignee.substring(0, 11) + "…" : issue.assignee)}</text>` : ""}
                 </g>`;
               }
@@ -2573,6 +2587,8 @@ export class GanttPanel {
                   <title>${flexTooltip}</title>
                 </g>` : ""}
                 ${showBlocks ? `<g class="blocks-badge-group" style="cursor: help;">
+                  <rect class="blocks-badge-bg" x="${onLeft ? impactBadgeX - impactBadgeW : impactBadgeX}" y="${barHeight / 2 - 8}" width="${impactBadgeW}" height="16" rx="2"
+                        fill="${impactColor}" opacity="0.15"/>
                   <text class="blocks-badge" x="${impactBadgeCenterX}" y="${barHeight / 2 + 4}"
                         text-anchor="middle" fill="${impactColor}" font-size="10" font-weight="500">${impactLabel}</text>
                   <title>${blocksTooltip}</title>
@@ -2584,7 +2600,7 @@ export class GanttPanel {
                         text-anchor="middle" fill="var(--vscode-charts-red)" font-size="10" font-weight="500">${blockerLabel}</text>
                   <title>${blockerTooltip}</title>
                 </g>` : ""}
-                ${issue.assignee ? `<text class="bar-assignee" x="${assigneeX}" y="${barHeight / 2 + 4}"
+                ${issue.assignee ? `<text class="bar-assignee${issue.assignee === this._currentUserName ? " current-user" : ""}" x="${assigneeX}" y="${barHeight / 2 + 4}"
                       text-anchor="${onLeft ? "end" : "start"}" fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(issue.assignee.length > 12 ? issue.assignee.substring(0, 11) + "…" : issue.assignee)}</text>` : ""}
               </g>`;
             })()}
@@ -3268,6 +3284,7 @@ ${style.tip}
     }
     .gantt-sticky-left {
       display: flex;
+      flex-shrink: 0;
       position: sticky;
       left: 0;
       z-index: 5;
@@ -3391,6 +3408,7 @@ ${style.tip}
     .status-badge-bg { pointer-events: none; }
     .status-badge { pointer-events: none; font-weight: 500; }
     .bar-assignee { pointer-events: none; opacity: 0.85; }
+    .bar-assignee.current-user { fill: var(--vscode-charts-blue) !important; font-weight: 600; opacity: 1; }
     .issue-bar .drag-handle:hover { fill: var(--vscode-focusBorder); opacity: 0.5; }
     .issue-bar:hover .drag-handle { fill: var(--vscode-list-hoverBackground); opacity: 0.3; }
     .issue-bar:hover .link-handle-visual { opacity: 0.7; }
@@ -4932,23 +4950,28 @@ ${style.tip}
         announce(\`Selected relation from #\${fromId} to #\${toId}\`);
       });
 
-      // Click elsewhere to deselect arrow
+      // Helper to clear all arrow selections (single or multi-select)
+      function clearArrowSelection() {
+        document.querySelectorAll('.dependency-arrow.selected').forEach(a => a.classList.remove('selected'));
+        document.body.classList.remove('arrow-selection-mode');
+        document.querySelectorAll('.arrow-connected').forEach(el => el.classList.remove('arrow-connected'));
+        selectedArrow = null;
+      }
+
+      // Click elsewhere to deselect arrows
       document.addEventListener('click', (e) => {
-        if (selectedArrow && !e.target.closest('.dependency-arrow')) {
-          selectedArrow.classList.remove('selected');
-          document.body.classList.remove('arrow-selection-mode');
-          document.querySelectorAll('.arrow-connected').forEach(el => el.classList.remove('arrow-connected'));
-          selectedArrow = null;
+        // Check if we have any selected arrows (single or multi-select)
+        const hasSelection = selectedArrow || document.querySelector('.dependency-arrow.selected');
+        if (hasSelection && !e.target.closest('.dependency-arrow') && !e.target.closest('.blocks-badge-group') && !e.target.closest('.blocker-badge')) {
+          clearArrowSelection();
         }
       });
 
-      // Escape to deselect arrow
+      // Escape to deselect arrows
       document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && selectedArrow) {
-          selectedArrow.classList.remove('selected');
-          document.body.classList.remove('arrow-selection-mode');
-          document.querySelectorAll('.arrow-connected').forEach(el => el.classList.remove('arrow-connected'));
-          selectedArrow = null;
+        const hasSelection = selectedArrow || document.querySelector('.dependency-arrow.selected');
+        if (e.key === 'Escape' && hasSelection) {
+          clearArrowSelection();
         }
       });
     }
@@ -5260,14 +5283,58 @@ ${style.tip}
       });
     });
 
-    // Blocker badge click - navigate to first blocker
+    // Helper to highlight multiple arrows and their connected issues
+    function highlightArrows(arrows, issueId) {
+      // Clear any previous arrow selection
+      document.querySelectorAll('.dependency-arrow.selected').forEach(a => a.classList.remove('selected'));
+      document.querySelectorAll('.arrow-connected').forEach(el => el.classList.remove('arrow-connected'));
+
+      if (arrows.length === 0) return;
+
+      // Add selection mode and select all matching arrows
+      document.body.classList.add('arrow-selection-mode');
+      const connectedIds = new Set();
+      arrows.forEach(arrow => {
+        arrow.classList.add('selected');
+        connectedIds.add(arrow.dataset.from);
+        connectedIds.add(arrow.dataset.to);
+      });
+
+      // Highlight connected bars and labels
+      connectedIds.forEach(id => {
+        document.querySelectorAll(\`.issue-bar[data-issue-id="\${id}"], .issue-label[data-issue-id="\${id}"]\`)
+          .forEach(el => el.classList.add('arrow-connected'));
+      });
+
+      announce(\`Highlighted \${arrows.length} dependency arrow(s) for #\${issueId}\`);
+    }
+
+    // Blocks badge click - highlight arrows FROM this issue (issues it blocks)
+    document.querySelectorAll('.blocks-badge-group').forEach(badge => {
+      badge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const issueBar = badge.closest('.issue-bar');
+        if (!issueBar) return;
+        const issueId = issueBar.dataset.issueId;
+        const arrows = Array.from(document.querySelectorAll(\`.dependency-arrow[data-from="\${issueId}"]\`));
+        highlightArrows(arrows, issueId);
+      });
+    });
+
+    // Blocker badge click - highlight arrows TO this issue and navigate to first blocker
     document.querySelectorAll('.blocker-badge').forEach(badge => {
       badge.addEventListener('click', (e) => {
         e.stopPropagation();
+        const issueBar = badge.closest('.issue-bar');
+        if (!issueBar) return;
+        const issueId = issueBar.dataset.issueId;
+        const arrows = Array.from(document.querySelectorAll(\`.dependency-arrow[data-to="\${issueId}"]\`));
+        highlightArrows(arrows, issueId);
+
+        // Also navigate to first blocker if available
         const blockerId = badge.dataset.blockerId;
         if (blockerId) {
           scrollToAndHighlight(blockerId);
-          announce(\`Navigated to blocker #\${blockerId}\`);
         }
       });
     });
