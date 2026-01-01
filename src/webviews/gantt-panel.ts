@@ -2362,9 +2362,14 @@ ${style.tip}
           ? "var(--vscode-charts-yellow)"
           : "var(--vscode-charts-red)";
       const opacity = Math.min(0.8, 0.3 + (day.percentage / 200)); // Scale opacity with load
-      const tooltip = `${day.date}: ${day.loadHours}h / ${day.capacityHours}h (${day.percentage}%)`;
-      return `<rect x="${dayX}" y="0" width="${dayWidth}" height="${ribbonHeight}" fill="${fillColor}" opacity="${opacity}"><title>${escapeHtml(tooltip)}</title></rect>`;
+      const tooltip = `${day.date}: ${day.loadHours}h / ${day.capacityHours}h (${day.percentage}%)\nClick to scroll to this date`;
+      return `<rect class="capacity-day-bar" x="${dayX}" y="0" width="${dayWidth}" height="${ribbonHeight}" fill="${fillColor}" opacity="${opacity}" data-date="${day.date}" data-date-ms="${dayDate.getTime()}"><title>${escapeHtml(tooltip)}</title></rect>`;
     }).join("");
+
+    // Count overloaded days for warning badge
+    const overloadedDays = capacityData.filter(d => d.status === "overloaded");
+    const overloadCount = overloadedDays.length;
+    const firstOverloadDateMs = overloadedDays.length > 0 ? new Date(overloadedDays[0].date).getTime() : 0;
 
     // Week boundaries for capacity ribbon (show Monday markers)
     const capacityWeekMarkers: string[] = [];
@@ -2695,6 +2700,34 @@ ${style.tip}
       stroke-width: 1;
       opacity: 0.5;
     }
+    .capacity-day-bar {
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .capacity-day-bar:hover {
+      opacity: 1 !important;
+      stroke: var(--vscode-focusBorder);
+      stroke-width: 1;
+    }
+    .overload-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 16px;
+      height: 16px;
+      padding: 0 4px;
+      margin-left: 4px;
+      font-size: 10px;
+      font-weight: bold;
+      border-radius: 8px;
+      background: var(--vscode-charts-red);
+      color: var(--vscode-editor-background);
+      cursor: pointer;
+    }
+    .overload-badge:hover {
+      background: var(--vscode-errorForeground);
+    }
+    .overload-badge.hidden { display: none; }
     /* Overflow menu */
     .overflow-menu-container {
       position: relative;
@@ -3235,7 +3268,7 @@ ${style.tip}
         <button id="capacityBtn" class="icon-btn${this._showCapacityRibbon && this._viewMode === "mywork" ? " active" : ""}${this._viewMode !== "mywork" ? " disabled" : ""}" title="Toggle capacity ribbon (Y)" aria-pressed="${this._showCapacityRibbon}" ${this._viewMode !== "mywork" ? "disabled" : ""}>
           <svg viewBox="0 0 16 16"><path d="M2 4h12v1H2V4zm0 3h8v1H2V7zm0 3h12v1H2v-1zm0 3h6v1H2v-1z"/></svg>
           Capacity
-        </button>
+        </button><span id="overloadBadge" class="overload-badge${overloadCount === 0 || this._viewMode !== "mywork" || !this._showCapacityRibbon ? " hidden" : ""}" data-first-overload-ms="${firstOverloadDateMs}" title="${overloadCount} day${overloadCount !== 1 ? "s" : ""} overloaded - click to jump">${overloadCount}</span>
         <button id="depsBtn" class="icon-btn${this._showDependencies ? " active" : ""}" title="Toggle dependency arrows (D)" aria-pressed="${this._showDependencies}">
           <svg viewBox="0 0 16 16"><path d="M5 3.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm-6.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM10 8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM5.354 4.354l1.5 1.5-.708.707-1.5-1.5.708-.707zm4.792 5.292l1.5 1.5-.707.708-1.5-1.5.707-.708z"/></svg>
           Relations
@@ -3768,6 +3801,28 @@ ${style.tip}
     document.getElementById('capacityBtn')?.addEventListener('click', () => {
       saveState();
       vscode.postMessage({ command: 'toggleCapacityRibbon' });
+    });
+
+    // Overload badge click - jump to first overloaded day
+    document.getElementById('overloadBadge')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const badge = e.currentTarget;
+      const firstOverloadMs = parseInt(badge.dataset.firstOverloadMs || '0', 10);
+      if (firstOverloadMs > 0) {
+        scrollToCenterDate(firstOverloadMs);
+        saveState();
+      }
+    });
+
+    // Capacity ribbon click - scroll to clicked date
+    document.querySelectorAll('.capacity-day-bar').forEach(bar => {
+      bar.addEventListener('click', (e) => {
+        const dateMs = parseInt(e.currentTarget.dataset.dateMs || '0', 10);
+        if (dateMs > 0) {
+          scrollToCenterDate(dateMs);
+          saveState();
+        }
+      });
     });
 
     // Dependencies toggle handler
