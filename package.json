@@ -928,6 +928,11 @@
           "group": "navigation@2"
         },
         {
+          "command": "redmine.quickCreateIssue",
+          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^project/",
+          "group": "redmine@1"
+        },
+        {
           "command": "redmine.setDoneRatio",
           "when": "view == 'redmine-explorer-projects' && viewItem =~ /^issue/",
           "group": "redmine@2"

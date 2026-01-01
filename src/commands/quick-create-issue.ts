@@ -25,9 +25,12 @@ const validateDate = (v: string): string | null => {
 
 /**
  * Quick create issue wizard with back navigation
+ * @param props Action properties with server
+ * @param preselectedProjectId Optional project ID to skip project selection step
  */
 export async function quickCreateIssue(
-  props: ActionProperties
+  props: ActionProperties,
+  preselectedProjectId?: number
 ): Promise<CreatedIssue | undefined> {
   try {
     // Parallel fetch metadata
@@ -50,6 +53,15 @@ export async function quickCreateIssue(
 
     const state: WizardState = {};
     let step = 1;
+
+    // Pre-fill project if provided
+    if (preselectedProjectId) {
+      const project = projects.find(p => p.id === preselectedProjectId);
+      if (project) {
+        state.project = { label: project.name, id: project.id };
+        step = 2; // Skip project selection
+      }
+    }
 
     while (step <= 7) {
       const showBack = step > 1;

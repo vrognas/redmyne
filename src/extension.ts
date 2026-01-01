@@ -623,8 +623,15 @@ export function activate(context: vscode.ExtensionContext): void {
   registerCommand("newIssue", newIssue);
   registerCommand("quickLogTime", (props) => quickLogTime(props, context));
   // addTimeEntryForDate moved to time-entry-commands.ts
-  registerCommand("quickCreateIssue", async (props) => {
-    const created = await quickCreateIssue(props);
+  registerCommand("quickCreateIssue", async (props, ...args) => {
+    // Extract project ID from tree node if invoked from context menu
+    let projectId: number | undefined;
+    if (args[0] && typeof args[0] === "object" && "id" in args[0]) {
+      projectId = (args[0] as { id: number }).id;
+    } else if (typeof args[0] === "number") {
+      projectId = args[0];
+    }
+    const created = await quickCreateIssue(props, projectId);
     if (created) {
       // Refresh issues to show newly created issue
       projectsTree.clearProjects();
