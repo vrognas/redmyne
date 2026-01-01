@@ -3,12 +3,14 @@ import { RedmineProject } from "../redmine/redmine-project";
 import { FlexibilityScore } from "./flexibility-calculator";
 import { sortIssuesByRisk } from "./issue-sorting";
 import { groupBy } from "./collection-utils";
+import { formatLocalDate } from "./date-utils";
+import { endOfISOWeek } from "date-fns";
 
 /**
  * Generic node in the hierarchy tree
  */
 export interface HierarchyNode {
-  type: "project" | "issue" | "container";
+  type: "project" | "issue" | "container" | "time-group";
   id: number;
   label: string;
   depth: number;
@@ -30,6 +32,10 @@ export interface HierarchyNode {
   projectName?: string;
   /** True for external dependencies (blockers not assigned to me) */
   isExternal?: boolean;
+  /** Time group category for My Work view */
+  timeGroup?: "overdue" | "this-week" | "later" | "no-date";
+  /** Icon/emoji for time group headers */
+  icon?: string;
 }
 
 export interface HierarchyOptions {
@@ -423,10 +429,40 @@ function sortNodesByRisk(
 }
 
 /**
- * Build flat hierarchy for "My Work" view
- * No project grouping, no parent/child nesting
- * Sorted by start_date ascending (issues without dates at end)
- * Each node includes projectName for display
+ * Time group definition for My Work view
+ */
+interface TimeGroupDef {
+  key: "overdue" | "this-week" | "later" | "no-date";
+  label: string;
+  icon: string;
+}
+
+const TIME_GROUPS: TimeGroupDef[] = [
+  { key: "overdue", label: "Overdue", icon: "🔴" },
+  { key: "this-week", label: "Due This Week", icon: "🟡" },
+  { key: "later", label: "Due Later", icon: "🟢" },
+  { key: "no-date", label: "No Due Date", icon: "📋" },
+];
+
+/**
+ * Classify issue into time group based on due_date
+ */
+function classifyIssueTimeGroup(
+  issue: Issue,
+  today: string,
+  weekEnd: string
+): TimeGroupDef["key"] {
+  const dueDate = issue.due_date;
+  if (!dueDate) return "no-date";
+  if (dueDate < today) return "overdue";
+  if (dueDate <= weekEnd) return "this-week";
+  return "later";
+}
+
+/**
+ * Build hierarchy for "My Work" view with time-based grouping
+ * Groups: Overdue → Due This Week → Due Later → No Due Date
+ * Within each group: sorted by due_date ascending, external deps last
  */
 export function buildMyWorkHierarchy(
   issues: Issue[],
@@ -440,36 +476,94 @@ export function buildMyWorkHierarchy(
   // Track which are external
   const externalIds = new Set(externalIssues.map((i) => i.id));
 
-  // Sort by start_date: issues with dates first (ascending), then without dates
-  // External issues go after my issues at same date
-  const sorted = [...allIssues].sort((a, b) => {
-    const aDate = a.start_date;
-    const bDate = b.start_date;
-    const aExternal = externalIds.has(a.id);
-    const bExternal = externalIds.has(b.id);
+  // Calculate date boundaries
+  const today = formatLocalDate(new Date());
+  const weekEnd = formatLocalDate(endOfISOWeek(new Date()));
 
-    // External issues go after my issues
-    if (aExternal !== bExternal) return aExternal ? 1 : -1;
+  // Group issues by time category
+  const grouped = new Map<TimeGroupDef["key"], Issue[]>();
+  for (const group of TIME_GROUPS) {
+    grouped.set(group.key, []);
+  }
 
-    if (!aDate && !bDate) return 0;
-    if (!aDate) return 1; // a goes to end
-    if (!bDate) return -1; // b goes to end
-    return aDate.localeCompare(bDate);
-  });
+  for (const issue of allIssues) {
+    const groupKey = classifyIssueTimeGroup(issue, today, weekEnd);
+    grouped.get(groupKey)!.push(issue);
+  }
 
-  // Convert to flat nodes
-  return sorted.map((issue): HierarchyNode => ({
-    type: "issue",
-    id: issue.id,
-    label: issue.subject,
-    depth: 0,
-    issue,
-    children: [],
-    collapseKey: `issue-${issue.id}`,
-    parentKey: null,
-    projectName: issue.project?.name ?? "Unknown",
-    isExternal: externalIds.has(issue.id),
-  }));
+  // Sort issues within each group: by due_date, external last
+  const sortGroupIssues = (groupIssues: Issue[]): Issue[] => {
+    return [...groupIssues].sort((a, b) => {
+      const aExternal = externalIds.has(a.id);
+      const bExternal = externalIds.has(b.id);
+
+      // External issues go after my issues
+      if (aExternal !== bExternal) return aExternal ? 1 : -1;
+
+      // Sort by due_date (nulls last within group)
+      const aDate = a.due_date ?? "9999-12-31";
+      const bDate = b.due_date ?? "9999-12-31";
+      return aDate.localeCompare(bDate);
+    });
+  };
+
+  // Build hierarchy: time groups as parents, issues as children
+  const result: HierarchyNode[] = [];
+
+  for (const groupDef of TIME_GROUPS) {
+    const groupIssues = grouped.get(groupDef.key)!;
+    if (groupIssues.length === 0) continue; // Skip empty groups
+
+    const sortedIssues = sortGroupIssues(groupIssues);
+    const groupKey = `time-group-${groupDef.key}`;
+
+    // Create child nodes
+    const children: HierarchyNode[] = sortedIssues.map((issue): HierarchyNode => ({
+      type: "issue",
+      id: issue.id,
+      label: issue.subject,
+      depth: 1,
+      issue,
+      children: [],
+      collapseKey: `issue-${issue.id}`,
+      parentKey: groupKey,
+      projectName: issue.project?.name ?? "Unknown",
+      isExternal: externalIds.has(issue.id),
+    }));
+
+    // Collect child date ranges for aggregate bar
+    const childDateRanges = sortedIssues
+      .filter((i) => i.start_date || i.due_date)
+      .map((i) => ({
+        startDate: i.start_date ?? null,
+        dueDate: i.due_date ?? null,
+        issueId: i.id,
+      }));
+
+    // Calculate aggregated hours
+    const aggregatedHours = {
+      spent: sortedIssues.reduce((s, i) => s + (i.spent_hours ?? 0), 0),
+      estimated: sortedIssues.reduce((s, i) => s + (i.estimated_hours ?? 0), 0),
+    };
+
+    // Create group node
+    result.push({
+      type: "time-group",
+      id: TIME_GROUPS.indexOf(groupDef), // Use index as pseudo-ID
+      label: groupDef.label,
+      depth: 0,
+      children,
+      collapseKey: groupKey,
+      parentKey: null,
+      timeGroup: groupDef.key,
+      icon: groupDef.icon,
+      childCount: children.length,
+      childDateRanges,
+      aggregatedHours,
+    });
+  }
+
+  return result;
 }
 
 /**

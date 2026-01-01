@@ -59,7 +59,7 @@ interface GanttIssue {
 }
 
 interface GanttRow {
-  type: "project" | "issue";
+  type: "project" | "issue" | "time-group";
   id: number;
   label: string;
   depth: number;
@@ -80,6 +80,12 @@ interface GanttRow {
   isExpanded: boolean;
   /** Project name for My Work view (shown as badge) */
   projectName?: string;
+  /** Time group category for My Work view */
+  timeGroup?: "overdue" | "this-week" | "later" | "no-date";
+  /** Icon for time-group headers */
+  icon?: string;
+  /** Child count for group headers */
+  childCount?: number;
 }
 
 
@@ -137,6 +143,24 @@ function nodeToGanttRow(node: FlatNodeWithVisibility, flexibilityCache: Map<numb
       childDateRanges: node.childDateRanges,
       isVisible: node.isVisible,
       isExpanded: node.isExpanded,
+    };
+  }
+
+  if (node.type === "time-group") {
+    return {
+      type: "time-group",
+      id: node.id,
+      label: node.label,
+      depth: node.depth,
+      collapseKey: node.collapseKey,
+      parentKey: node.parentKey,
+      hasChildren: node.children.length > 0,
+      childDateRanges: node.childDateRanges,
+      isVisible: node.isVisible,
+      isExpanded: node.isExpanded,
+      timeGroup: node.timeGroup,
+      icon: node.icon,
+      childCount: node.childCount,
     };
   }
 
@@ -1798,6 +1822,20 @@ export class GanttPanel {
           `;
         }
 
+        if (row.type === "time-group") {
+          // Time group header row (Overdue, Due This Week, etc.)
+          const timeGroupClass = `time-group-${row.timeGroup}`;
+          const countBadge = row.childCount ? ` (${row.childCount})` : "";
+          return `
+            <g class="time-group-label gantt-row ${timeGroupClass}" data-collapse-key="${row.collapseKey}" data-time-group="${row.timeGroup}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Toggle ${escapeHtml(row.label)}">
+              ${chevron}
+              <text x="${5 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12" font-weight="bold">
+                ${row.icon || ""} ${escapeHtml(row.label)}${countBadge}
+              </text>
+            </g>
+          `;
+        }
+
         // Issue row
         const issue = row.issue!;
         const escapedSubject = escapeHtml(issue.subject);
@@ -1894,6 +1932,40 @@ export class GanttPanel {
             .join("");
 
           return `<g class="aggregate-bars gantt-row${hiddenClass}" data-project-id="${row.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" transform="translate(0, ${y})">${aggregateBars}</g>`;
+        }
+
+        // Time group headers: render aggregate bars for child issues
+        if (row.type === "time-group") {
+          if (!row.childDateRanges || row.childDateRanges.length === 0) {
+            return "";
+          }
+
+          // Render aggregate bars for each child issue date range
+          const timeGroupColor = row.timeGroup === "overdue" ? "var(--vscode-charts-red)"
+            : row.timeGroup === "this-week" ? "var(--vscode-charts-yellow)"
+            : row.timeGroup === "later" ? "var(--vscode-charts-green)"
+            : "var(--vscode-descriptionForeground)";
+
+          const aggregateBars = row.childDateRanges
+            .filter(range => range.startDate || range.dueDate)
+            .map(range => {
+              const startDate = range.startDate ?? range.dueDate!;
+              const dueDate = range.dueDate ?? range.startDate!;
+              const start = new Date(startDate);
+              const end = new Date(dueDate);
+              const endPlusOne = new Date(end);
+              endPlusOne.setUTCDate(endPlusOne.getUTCDate() + 1);
+
+              const startX = ((start.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
+              const endX = ((endPlusOne.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
+              const width = Math.max(4, endX - startX);
+
+              return `<rect class="aggregate-bar" x="${startX}" y="4" width="${width}" height="${barHeight - 8}"
+                            fill="${timeGroupColor}" opacity="0.4" rx="2" ry="2"/>`;
+            })
+            .join("");
+
+          return `<g class="aggregate-bars time-group-bars gantt-row" data-collapse-key="${row.collapseKey}" data-time-group="${row.timeGroup}" transform="translate(0, ${y})">${aggregateBars}</g>`;
         }
 
         const issue = row.issue!;
@@ -2969,18 +3041,22 @@ ${style.tip}
     .arrow-selection-mode .issue-bar.arrow-connected { opacity: 1; }
     .arrow-selection-mode .issue-bar.arrow-connected .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
     .arrow-selection-mode .issue-label,
-    .arrow-selection-mode .project-label { opacity: 0.15; }
+    .arrow-selection-mode .project-label,
+    .arrow-selection-mode .time-group-label { opacity: 0.15; }
     .arrow-selection-mode .issue-label.arrow-connected,
-    .arrow-selection-mode .project-label.arrow-connected { opacity: 1; }
+    .arrow-selection-mode .project-label.arrow-connected,
+    .arrow-selection-mode .time-group-label.arrow-connected { opacity: 1; }
     .arrow-selection-mode .dependency-arrow { opacity: 0.2; }
     .arrow-selection-mode .dependency-arrow.selected { opacity: 1; }
     .arrow-selection-mode .dependency-arrow.selected .arrow-line { stroke-width: 3; filter: brightness(1.3) drop-shadow(0 0 4px currentColor); }
     .arrow-selection-mode .dependency-arrow.selected .arrow-head { filter: brightness(1.3) drop-shadow(0 0 4px currentColor); }
     /* Hover highlighting - fade labels only for dependency arrow hovers */
     .hover-focus.dependency-hover .issue-label,
-    .hover-focus.dependency-hover .project-label { opacity: 0.15; transition: opacity 0.15s ease-out; }
+    .hover-focus.dependency-hover .project-label,
+    .hover-focus.dependency-hover .time-group-label { opacity: 0.15; transition: opacity 0.15s ease-out; }
     .hover-focus.dependency-hover .issue-label.hover-highlighted,
-    .hover-focus.dependency-hover .project-label.hover-highlighted { opacity: 1 !important; }
+    .hover-focus.dependency-hover .project-label.hover-highlighted,
+    .hover-focus.dependency-hover .time-group-label.hover-highlighted { opacity: 1 !important; }
     /* Highlight hovered bar */
     .hover-focus .issue-bar.hover-highlighted .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
     /* Dependency hover - glow on hovered arrow */
@@ -2998,13 +3074,13 @@ ${style.tip}
     button:focus { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
     .issue-bar:focus { outline: none; } /* Use stroke instead of outline for SVG */
     .issue-bar:focus .bar-outline, .issue-bar:focus-within .bar-outline, .issue-bar.focused .bar-outline { stroke-width: 3; stroke: var(--vscode-focusBorder); }
-    .issue-label:focus, .project-label:focus {
+    .issue-label:focus, .project-label:focus, .time-group-label:focus {
       outline: 2px solid var(--vscode-focusBorder);
       outline-offset: 1px;
       background: var(--vscode-list-activeSelectionBackground);
       border-radius: 4px;
     }
-    .issue-label.active, .project-label.active {
+    .issue-label.active, .project-label.active, .time-group-label.active {
       background: var(--vscode-list-inactiveSelectionBackground);
       border-radius: 4px;
     }
@@ -4783,7 +4859,7 @@ ${style.tip}
     }
 
     // Labels click and keyboard navigation
-    const allLabels = Array.from(document.querySelectorAll('.project-label, .issue-label'));
+    const allLabels = Array.from(document.querySelectorAll('.project-label, .issue-label, .time-group-label'));
     let activeLabel = null;
 
     function setActiveLabel(label) {
