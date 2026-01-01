@@ -7,6 +7,7 @@
 
 import { Issue } from "../redmine/models/issue";
 import { WeeklySchedule, countWorkingDays } from "./flexibility-calculator";
+import { parseLocalDate } from "./date-utils";
 
 export type CapacityStatus = "available" | "busy" | "overloaded";
 
@@ -35,8 +36,8 @@ function getIssueHoursPerDay(issue: Issue, schedule: WeeklySchedule): number {
     return 0;
   }
 
-  const startDate = new Date(issue.start_date);
-  const dueDate = new Date(issue.due_date);
+  const startDate = parseLocalDate(issue.start_date);
+  const dueDate = parseLocalDate(issue.due_date);
   const workingDays = countWorkingDays(startDate, dueDate, schedule);
 
   if (workingDays <= 0) return 0;

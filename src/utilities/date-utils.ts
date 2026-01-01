@@ -5,6 +5,28 @@
 import { getISOWeek, getISOWeekYear, startOfISOWeek, endOfISOWeek } from "date-fns";
 
 /**
+ * Parse YYYY-MM-DD string as local date (not UTC).
+ * JavaScript's Date constructor parses "YYYY-MM-DD" as UTC midnight,
+ * which can cause off-by-one errors in negative offset timezones.
+ * This function ensures the date is interpreted as local midnight.
+ */
+export function parseLocalDate(dateStr: string): Date {
+  // Add noon time to avoid DST edge cases, then set to midnight
+  const date = new Date(dateStr + "T12:00:00");
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+/**
+ * Get today's date at local midnight
+ */
+export function getLocalToday(): Date {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
+}
+
+/**
  * Format date as YYYY-MM-DD in local timezone (avoids UTC conversion issues)
  */
 export function formatLocalDate(date: Date): string {

@@ -7,6 +7,7 @@
  */
 
 import * as vscode from "vscode";
+import { parseLocalDate, getLocalToday } from "./date-utils";
 
 export type WeeklySchedule = {
   Mon: number;
@@ -68,10 +69,9 @@ export function calculateFlexibility(
     return null;
   }
 
-  const startDate = new Date(issue.start_date);
-  const dueDate = new Date(issue.due_date);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const startDate = parseLocalDate(issue.start_date);
+  const dueDate = parseLocalDate(issue.due_date);
+  const today = getLocalToday();
 
   // Use effective spent hours if provided (for ad-hoc contributions)
   const spentHours = effectiveSpentHours ?? issue.spent_hours ?? 0;

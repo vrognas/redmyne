@@ -14,6 +14,7 @@ import {
   countWorkingDays,
   countAvailableHours,
 } from "./flexibility-calculator";
+import { parseLocalDate } from "./date-utils";
 
 export interface WorkloadSummary {
   /** Total estimated hours across all issues */
@@ -68,14 +69,14 @@ export function calculateWorkload(
   // Optimization: pre-sort by raw due_date (cheap), then only compute daysLeft for top candidates
   const withDueDates = issues
     .filter((i) => i.due_date && i.done_ratio !== 100)
-    .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())
+    .sort((a, b) => parseLocalDate(a.due_date!).getTime() - parseLocalDate(b.due_date!).getTime())
     .slice(0, 6); // Take top 6 candidates (due date order approximates urgency)
 
   const topUrgent = withDueDates
     .map((i) => ({
       id: i.id,
       subject: i.subject,
-      daysLeft: countWorkingDays(today, new Date(i.due_date!), schedule),
+      daysLeft: countWorkingDays(today, parseLocalDate(i.due_date!), schedule),
       hoursLeft: Math.max((i.estimated_hours ?? 0) - (i.spent_hours ?? 0), 0),
     }))
     .sort((a, b) => a.daysLeft - b.daysLeft)

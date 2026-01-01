@@ -16,6 +16,7 @@ import { calculateDailyCapacity } from "../utilities/capacity-calculator";
 import { collapseState } from "../utilities/collapse-state";
 import { debounce, DebouncedFunction } from "../utilities/debounce";
 import { IssueFilter, DEFAULT_ISSUE_FILTER, GanttViewMode } from "../redmine/models/common";
+import { parseLocalDate } from "../utilities/date-utils";
 
 const COLLAPSE_DEBOUNCE_MS = 50;
 
@@ -305,8 +306,8 @@ function calculateDailyIntensity(
     return result;
   }
 
-  const start = new Date(issue.start_date);
-  const end = new Date(issue.due_date);
+  const start = parseLocalDate(issue.start_date);
+  const end = parseLocalDate(issue.due_date);
   const estimatedHours = issue.estimated_hours ?? 0;
 
   // Calculate total available hours in range
@@ -369,8 +370,8 @@ function calculateAggregateWorkload(
       continue;
     }
 
-    const start = new Date(issue.start_date);
-    const end = new Date(issue.due_date);
+    const start = parseLocalDate(issue.start_date);
+    const end = parseLocalDate(issue.due_date);
     const estimatedHours = issue.estimated_hours;
 
     // Calculate total available hours in the issue's range
@@ -1778,7 +1779,7 @@ export class GanttPanel {
     // Focus on active work: exclude completed issues with past dates
     const activeIssues = visibleIssues.filter((i) =>
       i.done_ratio !== 100 ||
-      (i.due_date && new Date(i.due_date) >= today)
+      (i.due_date && parseLocalDate(i.due_date) >= today)
     );
 
     // Use active issues for range, fall back to all visible if none active
@@ -2533,11 +2534,11 @@ export class GanttPanel {
       if (row.type === "issue" && row.issue) {
         const issue = row.issue;
         const start = issue.start_date
-          ? new Date(issue.start_date)
-          : new Date(issue.due_date!);
+          ? parseLocalDate(issue.start_date)
+          : parseLocalDate(issue.due_date!);
         const end = issue.due_date
-          ? new Date(issue.due_date)
-          : new Date(issue.start_date!);
+          ? parseLocalDate(issue.due_date)
+          : parseLocalDate(issue.start_date!);
         // Add 1 day to end to match bar width calculation
         const endPlusOne = new Date(end);
         endPlusOne.setUTCDate(endPlusOne.getUTCDate() + 1);
@@ -2673,7 +2674,7 @@ ${style.tip}
     const milestoneMarkers = this._versions
       .filter(v => v.due_date)
       .map(version => {
-        const versionDate = new Date(version.due_date!);
+        const versionDate = parseLocalDate(version.due_date!);
         if (versionDate < minDate || versionDate > maxDate) return "";
 
         const x = ((versionDate.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
