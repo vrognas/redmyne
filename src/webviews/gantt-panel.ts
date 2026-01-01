@@ -11,7 +11,7 @@ import { showStatusBarMessage } from "../utilities/status-bar";
 import { errorToString } from "../utilities/error-feedback";
 import { buildProjectHierarchy, buildMyWorkHierarchy, flattenHierarchyAll, FlatNodeWithVisibility, HierarchyNode } from "../utilities/hierarchy-builder";
 import { ProjectHealth } from "../utilities/project-health";
-import { DependencyGraph, buildDependencyGraph, countDownstream, getBlockers } from "../utilities/dependency-graph";
+import { DependencyGraph, buildDependencyGraph, countDownstream, getDownstream, getBlockers } from "../utilities/dependency-graph";
 import { calculateDailyCapacity } from "../utilities/capacity-calculator";
 import { collapseState } from "../utilities/collapse-state";
 import { debounce, DebouncedFunction } from "../utilities/debounce";
@@ -63,6 +63,8 @@ interface GanttIssue {
   isExternal?: boolean;
   /** Count of issues that depend on this (transitively) */
   downstreamCount: number;
+  /** Open issues blocked by this one (direct) */
+  blocks: Array<{ id: number; subject: string; assignee: string | null }>;
   /** Open issues blocking this one */
   blockedBy: Array<{ id: number; subject: string; assignee: string | null }>;
   /** True if this issue is tagged as an ad-hoc budget pool */
@@ -120,6 +122,13 @@ function toGanttIssue(
 
   // Calculate downstream impact and blockers if graph available
   const downstreamCount = depGraph ? countDownstream(issue.id, depGraph) : 0;
+  const blockedIssues = depGraph && issueMap
+    ? getDownstream(issue.id, depGraph, issueMap).map(b => ({
+        id: b.id,
+        subject: b.subject,
+        assignee: b.assignee,
+      }))
+    : [];
   const blockers = depGraph && issueMap
     ? getBlockers(issue.id, depGraph, issueMap).map(b => ({
         id: b.id,
@@ -162,6 +171,7 @@ function toGanttIssue(
     assignee: issue.assigned_to?.name ?? null,
     isExternal,
     downstreamCount,
+    blocks: blockedIssues,
     blockedBy: blockers,
     isAdHoc: adHocTracker.isAdHoc(issue.id),
   };
@@ -2201,10 +2211,18 @@ export class GanttPanel {
           : flexSlack > 0 ? `Flexibility: +${flexSlack}d buffer`
           : flexSlack === 0 ? `Flexibility: ⚠ Critical path (no buffer)`
           : `Flexibility: ⚠ ${flexSlack}d behind`;
-        // Impact info
-        const impactText = issue.downstreamCount > 0
-          ? `Impact: ${issue.downstreamCount} task${issue.downstreamCount > 1 ? "s" : ""} depend on this`
-          : null;
+        // Blocks info (issues waiting on this one)
+        const blocksLines: string[] = [];
+        if (issue.blocks.length > 0) {
+          blocksLines.push(`🚧 BLOCKS ${issue.blocks.length} TASK${issue.blocks.length > 1 ? "S" : ""}:`);
+          for (const b of issue.blocks.slice(0, 3)) {
+            const assigneeText = b.assignee ? ` (${b.assignee})` : "";
+            blocksLines.push(`  → #${b.id} ${b.subject.length > 25 ? b.subject.substring(0, 24) + "…" : b.subject}${assigneeText}`);
+          }
+          if (issue.blocks.length > 3) {
+            blocksLines.push(`  ... and ${issue.blocks.length - 3} more`);
+          }
+        }
         // Blocker info
         const blockerLines: string[] = [];
         if (issue.blockedBy.length > 0) {
@@ -2229,7 +2247,7 @@ export class GanttPanel {
           `Progress: ${doneRatio}%${isFallbackProgress ? ` (showing ${visualDoneRatio}% from time)` : ""}`,
           `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
           flexText,
-          impactText,
+          ...blocksLines,
           ...blockerLines,
         ];
 
@@ -2430,14 +2448,14 @@ export class GanttPanel {
                   : flexSlack > 0 ? "var(--vscode-charts-yellow)"
                   : "var(--vscode-charts-red)")
                 : "";
-              // Impact badge: "⬇3" for downstream count (only show if >0)
-              const downCount = issue.downstreamCount;
-              const showImpact = downCount > 0 && !issue.isClosed;
-              const impactBadgeW = showImpact ? 24 : 0;
-              const impactLabel = showImpact ? `⬇${downCount}` : "";
-              const impactColor = showImpact
-                ? (downCount >= 6 ? "var(--vscode-charts-red)"
-                  : downCount >= 3 ? "var(--vscode-charts-orange)"
+              // Blocks badge: "🚧3" for tasks blocked by this (only show if >0)
+              const blocksCount = issue.blocks.length;
+              const showBlocks = blocksCount > 0 && !issue.isClosed;
+              const impactBadgeW = showBlocks ? 26 : 0;
+              const impactLabel = showBlocks ? `🚧${blocksCount}` : "";
+              const impactColor = showBlocks
+                ? (blocksCount >= 5 ? "var(--vscode-charts-red)"
+                  : blocksCount >= 2 ? "var(--vscode-charts-orange)"
                   : "var(--vscode-descriptionForeground)")
                 : "";
               // Blocker badge: "⛔1" for blocked issues (clickable)
@@ -2474,8 +2492,8 @@ export class GanttPanel {
               const impactBadgeX = onLeft ? lastBadgeX - lastBadgeW - 4 : lastBadgeX + lastBadgeW + 4;
               const impactBadgeCenterX = onLeft ? impactBadgeX - impactBadgeW / 2 : impactBadgeX + impactBadgeW / 2;
               // Blocker badge position: after impact badge (or last shown badge)
-              const impactFinalX = showImpact ? impactBadgeX : lastBadgeX;
-              const impactFinalW = showImpact ? impactBadgeW : lastBadgeW;
+              const impactFinalX = showBlocks ? impactBadgeX : lastBadgeX;
+              const impactFinalW = showBlocks ? impactBadgeW : lastBadgeW;
               const blockerBadgeX = onLeft ? impactFinalX - impactFinalW - 4 : impactFinalX + impactFinalW + 4;
               const blockerBadgeCenterX = onLeft ? blockerBadgeX - blockerBadgeW / 2 : blockerBadgeX + blockerBadgeW / 2;
               // Assignee position: after blocker badge (or last shown badge)
@@ -2491,7 +2509,7 @@ export class GanttPanel {
                       fill="${flexColor}" opacity="0.15"/>
                 <text class="flex-badge" x="${flexBadgeCenterX}" y="${barHeight / 2 + 4}"
                       text-anchor="middle" fill="${flexColor}" font-size="10" font-weight="500">${flexLabel}</text>` : ""}
-                ${showImpact ? `<text class="impact-badge" x="${impactBadgeCenterX}" y="${barHeight / 2 + 4}"
+                ${showBlocks ? `<text class="blocks-badge" x="${impactBadgeCenterX}" y="${barHeight / 2 + 4}"
                       text-anchor="middle" fill="${impactColor}" font-size="10" font-weight="500">${impactLabel}</text>` : ""}
                 ${showBlocker ? `<g class="blocker-badge" data-blocker-id="${firstBlockerId}" style="cursor: pointer;">
                   <rect x="${onLeft ? blockerBadgeX - blockerBadgeW : blockerBadgeX}" y="${barHeight / 2 - 8}" width="${blockerBadgeW}" height="16" rx="2"
@@ -3805,11 +3823,11 @@ ${style.tip}
       <span class="relation-legend-item"><span class="relation-legend-line rel-line-duplicates"></span>duplicates</span>
       <span class="relation-legend-item"><span class="relation-legend-line rel-line-copied"></span>copied</span>
     </div>
-    <div id="healthLegend" class="health-legend" title="Bar badges: flexibility, impact, blockers">
-      <span class="health-legend-item" style="color:var(--vscode-charts-green)">+Nd flex</span>
-      <span class="health-legend-item" style="color:var(--vscode-charts-red)">-Nd behind</span>
-      <span class="health-legend-item">⬇N impact</span>
-      <span class="health-legend-item" style="color:var(--vscode-charts-red)">⛔N blocked</span>
+    <div id="healthLegend" class="health-legend" title="Bar badges explained">
+      <span class="health-legend-item" style="color:var(--vscode-charts-green)">+Nd slack</span>
+      <span class="health-legend-item" style="color:var(--vscode-charts-red)">-Nd late</span>
+      <span class="health-legend-item">🚧N blocks</span>
+      <span class="health-legend-item" style="color:var(--vscode-charts-red)">⛔N blocked by</span>
       <span class="health-legend-item" style="color:var(--vscode-charts-purple)">◆ milestone</span>
     </div>
   </div>

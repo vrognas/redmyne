@@ -96,6 +96,37 @@ export function countDownstream(issueId: number, graph: DependencyGraph): number
 }
 
 /**
+ * Get downstream issues blocked by this one (direct only, open only)
+ */
+export function getDownstream(
+  issueId: number,
+  graph: DependencyGraph,
+  issueMap: Map<number, Issue>
+): BlockerInfo[] {
+  const node = graph.get(issueId);
+  if (!node) return [];
+
+  const downstream: BlockerInfo[] = [];
+
+  for (const blockedId of node.downstream) {
+    const blocked = issueMap.get(blockedId);
+    if (!blocked) continue;
+
+    // Skip closed issues
+    if (blocked.closed_on !== null) continue;
+
+    downstream.push({
+      id: blocked.id,
+      subject: blocked.subject,
+      assignee: blocked.assigned_to?.name ?? null,
+      status: blocked.status?.name ?? "Unknown",
+    });
+  }
+
+  return downstream;
+}
+
+/**
  * Get blocker details for an issue (direct upstream, open only)
  */
 export function getBlockers(
