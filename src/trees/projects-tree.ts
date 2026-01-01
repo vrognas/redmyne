@@ -12,6 +12,7 @@ import {
   getWeeklySchedule,
 } from "../utilities/flexibility-calculator";
 import { groupBy } from "../utilities/collection-utils";
+import { extractSchedulingDependencyIds } from "../utilities/dependency-extractor";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
 import {
   LoadingPlaceholder,
@@ -67,6 +68,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   private isLoadingProjects = false;
   private loadingIssuesForProject = new Set<number>();
   private assignedIssues: Issue[] = [];
+  private dependencyIssues: Issue[] = []; // External scheduling dependencies
   private issueFilter: IssueFilter = { ...DEFAULT_ISSUE_FILTER };
   private issueSort: SortConfig<IssueSortField> | null = null; // null = use risk sorting
   private issuesByProject = new Map<number, Issue[]>();
@@ -257,6 +259,14 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
         this.projects = projects;
         this.assignedIssues = issuesResult.issues;
 
+        // Fetch external scheduling dependencies (blockers not assigned to me)
+        const depIds = extractSchedulingDependencyIds(this.assignedIssues);
+        if (depIds.size > 0) {
+          this.dependencyIssues = await this.server.getIssuesByIds([...depIds]);
+        } else {
+          this.dependencyIssues = [];
+        }
+
         // Calculate flexibility for assigned issues
         buildFlexibilityCache(this.assignedIssues, this.flexibilityCache, getWeeklySchedule());
 
@@ -363,6 +373,13 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   }
 
   /**
+   * Get external scheduling dependencies (blockers assigned to others)
+   */
+  getDependencyIssues(): Issue[] {
+    return this.dependencyIssues;
+  }
+
+  /**
    * Get cached projects for external use (Gantt)
    */
   getProjects(): RedmineProject[] {
@@ -395,6 +412,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
     this.projects = null;
     this.projectNodes = [];
     this.assignedIssues = [];
+    this.dependencyIssues = [];
     this.issuesByProject.clear();
     this.issuesByParent.clear();
     this.flexibilityCache.clear();

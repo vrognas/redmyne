@@ -355,6 +355,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerGanttCommands(context, {
     getServer: () => projectsTree.server,
     fetchIssuesIfNeeded: () => projectsTree.fetchIssuesIfNeeded(),
+    getDependencyIssues: () => projectsTree.getDependencyIssues(),
     getFlexibilityCache: () => projectsTree.getFlexibilityCache(),
     getProjects: () => projectsTree.getProjects(),
     clearProjects: () => projectsTree.clearProjects(),

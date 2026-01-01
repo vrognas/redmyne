@@ -28,6 +28,8 @@ export interface HierarchyNode {
   childDateRanges?: Array<{ startDate: string | null; dueDate: string | null; issueId: number }>;
   /** Project name for My Work view (flat list) */
   projectName?: string;
+  /** True for external dependencies (blockers not assigned to me) */
+  isExternal?: boolean;
 }
 
 export interface HierarchyOptions {
@@ -428,14 +430,27 @@ function sortNodesByRisk(
  */
 export function buildMyWorkHierarchy(
   issues: Issue[],
-  _flexibilityCache: Map<number, FlexibilityScore | null>
+  _flexibilityCache: Map<number, FlexibilityScore | null>,
+  externalIssues: Issue[] = []
 ): HierarchyNode[] {
-  if (issues.length === 0) return [];
+  // Combine my issues and external dependencies
+  const allIssues = [...issues, ...externalIssues];
+  if (allIssues.length === 0) return [];
+
+  // Track which are external
+  const externalIds = new Set(externalIssues.map((i) => i.id));
 
   // Sort by start_date: issues with dates first (ascending), then without dates
-  const sorted = [...issues].sort((a, b) => {
+  // External issues go after my issues at same date
+  const sorted = [...allIssues].sort((a, b) => {
     const aDate = a.start_date;
     const bDate = b.start_date;
+    const aExternal = externalIds.has(a.id);
+    const bExternal = externalIds.has(b.id);
+
+    // External issues go after my issues
+    if (aExternal !== bExternal) return aExternal ? 1 : -1;
+
     if (!aDate && !bDate) return 0;
     if (!aDate) return 1; // a goes to end
     if (!bDate) return -1; // b goes to end
@@ -453,6 +468,7 @@ export function buildMyWorkHierarchy(
     collapseKey: `issue-${issue.id}`,
     parentKey: null,
     projectName: issue.project?.name ?? "Unknown",
+    isExternal: externalIds.has(issue.id),
   }));
 }
 

@@ -875,18 +875,23 @@ export class RedmineServer {
   }
 
   /**
-   * Batch fetch issues by IDs (for parent containers)
+   * Batch fetch issues by IDs (for parent containers and dependencies)
    * @param ids Array of issue IDs to fetch
+   * @param skipClosed Skip closed issues (default: true for dependencies)
    */
-  async getIssuesByIds(ids: number[]): Promise<Issue[]> {
+  async getIssuesByIds(ids: number[], skipClosed = true): Promise<Issue[]> {
     if (ids.length === 0) return [];
 
-    // Redmine supports comma-separated IDs filter
-    const response = await this.doRequest<{
-      issues: Issue[];
-    }>(`/issues.json?issue_id=${ids.join(",")}&status_id=*`, "GET");
+    const params = new URLSearchParams();
+    params.set("issue_id", ids.join(","));
+    params.set("include", "relations");
+    params.set("status_id", skipClosed ? "open" : "*");
 
-    return response?.issues || [];
+    const issues = await this.paginate<Issue>(
+      `/issues.json?${params.toString()}`,
+      "issues"
+    );
+    return issues;
   }
 
   /**

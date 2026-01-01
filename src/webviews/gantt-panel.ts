@@ -54,6 +54,8 @@ interface GanttIssue {
   done_ratio: number;
   relations: GanttRelation[];
   assignee: string | null;
+  /** True for external dependencies (blockers not assigned to me) */
+  isExternal?: boolean;
 }
 
 interface GanttRow {
@@ -84,7 +86,7 @@ interface GanttRow {
 /**
  * Convert Issue to GanttIssue for SVG rendering
  */
-function toGanttIssue(issue: Issue, flexibilityCache: Map<number, FlexibilityScore | null>, closedStatusIds: Set<number>): GanttIssue {
+function toGanttIssue(issue: Issue, flexibilityCache: Map<number, FlexibilityScore | null>, closedStatusIds: Set<number>, isExternal = false): GanttIssue {
   // Check if closed via status ID, or fallback to status name containing "closed"
   const isClosedById = closedStatusIds.has(issue.status?.id ?? 0);
   const isClosedByName = issue.status?.name?.toLowerCase().includes("closed") ?? false;
@@ -115,6 +117,7 @@ function toGanttIssue(issue: Issue, flexibilityCache: Map<number, FlexibilitySco
         type: r.relation_type as RelationType,
       })),
     assignee: issue.assigned_to?.name ?? null,
+    isExternal,
   };
 }
 
@@ -143,7 +146,7 @@ function nodeToGanttRow(node: FlatNodeWithVisibility, flexibilityCache: Map<numb
     id: node.id,
     label: node.label,
     depth: node.depth,
-    issue: toGanttIssue(issue, flexibilityCache, closedStatusIds),
+    issue: toGanttIssue(issue, flexibilityCache, closedStatusIds, node.isExternal),
     isParent: node.children.length > 0,
     collapseKey: node.collapseKey,
     parentKey: node.parentKey,
@@ -350,6 +353,7 @@ export class GanttPanel {
   private readonly _panel: vscode.WebviewPanel;
   private _disposables: vscode.Disposable[] = [];
   private _issues: Issue[] = [];
+  private _dependencyIssues: Issue[] = []; // External scheduling dependencies
   private _issueById: Map<number, Issue> = new Map(); // O(1) lookup cache
   private _projects: RedmineProject[] = [];
   private _flexibilityCache: Map<number, FlexibilityScore | null> = new Map();
@@ -373,7 +377,7 @@ export class GanttPanel {
   private _viewMode: GanttViewMode = "projects";
   private _showCapacityRibbon = true; // Capacity ribbon visible by default in My Work
   // Sort settings
-  private _sortBy: "id" | "assignee" | "start" | "due" = "id";
+  private _sortBy: "id" | "assignee" | "start" | "due" = "due";
   private _sortOrder: "asc" | "desc" = "asc";
   // Ad-hoc budget contribution tracking
   private _contributionData?: ContributionData;
@@ -798,7 +802,8 @@ export class GanttPanel {
     flexibilityCache: Map<number, FlexibilityScore | null>,
     projects: RedmineProject[],
     schedule?: WeeklySchedule,
-    filter?: IssueFilter
+    filter?: IssueFilter,
+    dependencyIssues?: Issue[]
   ): Promise<void> {
     // Update schedule if provided
     if (schedule) {
@@ -811,8 +816,10 @@ export class GanttPanel {
 
     // Store issues with dates, projects, and flexibilityCache for shared sorting
     this._issues = issues.filter((i) => i.start_date || i.due_date);
-    // Build O(1) lookup map
-    this._issueById = new Map(this._issues.map(i => [i.id, i]));
+    this._dependencyIssues = (dependencyIssues ?? []).filter((i) => i.start_date || i.due_date);
+    // Build O(1) lookup map (includes dependencies for arrow rendering)
+    const allIssues = [...this._issues, ...this._dependencyIssues];
+    this._issueById = new Map(allIssues.map(i => [i.id, i]));
     this._projects = projects;
     this._flexibilityCache = flexibilityCache;
 
@@ -1578,7 +1585,7 @@ export class GanttPanel {
     // Cache hierarchy to avoid rebuilding on collapse/expand
     if (!this._cachedHierarchy) {
       this._cachedHierarchy = this._viewMode === "mywork"
-        ? buildMyWorkHierarchy(sortedIssues, this._flexibilityCache)
+        ? buildMyWorkHierarchy(sortedIssues, this._flexibilityCache, this._dependencyIssues)
         : buildProjectHierarchy(sortedIssues, this._flexibilityCache, this._projects, true); // preserveOrder=true for user sort
     }
     // Get ALL nodes with visibility flags for client-side collapse management
@@ -1832,16 +1839,19 @@ export class GanttPanel {
 
         const tooltip = tooltipLines.join("\n");
 
-        // In My Work view, show project badge
+        // In My Work view, show project badge and external indicator
         const projectBadge = this._viewMode === "mywork" && row.projectName
           ? `<tspan fill="var(--vscode-descriptionForeground)" font-size="10">[${escapeHtml(row.projectName)}]</tspan> `
+          : "";
+        const externalBadge = issue.isExternal
+          ? `<tspan fill="var(--vscode-charts-yellow)" font-size="10">(dep)</tspan> `
           : "";
 
         return `
           <g class="issue-label gantt-row cursor-pointer" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Open issue #${issue.id}">
             ${chevron}
-            <text x="${5 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12">
-              ${projectBadge}#${issue.id} ${escapedSubject}
+            <text x="${5 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="${issue.isExternal ? "var(--vscode-descriptionForeground)" : "var(--vscode-foreground)"}" font-size="12">
+              ${externalBadge}${projectBadge}#${issue.id} ${escapedSubject}
             </text>
             <title>${tooltip}</title>
           </g>
@@ -1943,9 +1953,11 @@ export class GanttPanel {
 
         // Build tooltip with contribution info
         const barTooltipLines = [
+          issue.isExternal ? "⚡ EXTERNAL DEPENDENCY" : null,
           statusDesc,
           `#${issue.id} ${escapedSubject}`,
           `Project: ${escapedProject}`,
+          issue.isExternal ? `Assigned to: ${issue.assignee ?? "Unassigned"}` : null,
           `Start: ${formatDateWithWeekday(issue.start_date)}`,
           `Due: ${hasOnlyStart ? "(no due date)" : formatDateWithWeekday(issue.due_date)}`,
           `Progress: ${doneRatio}%${isFallbackProgress ? ` (showing ${visualDoneRatio}% from time)` : ""}`,
@@ -2093,7 +2105,7 @@ export class GanttPanel {
         }
 
         return `
-          <g class="issue-bar gantt-row${hiddenClass}${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}" data-issue-id="${issue.id}"
+          <g class="issue-bar gantt-row${hiddenClass}${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}" data-issue-id="${issue.id}"
              data-project-id="${issue.projectId}"
              data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
              data-start-date="${issue.start_date || ""}"
@@ -2908,6 +2920,12 @@ ${style.tip}
     .issue-bar.bar-open-ended .bar-main { mask-image: linear-gradient(90deg, black 80%, transparent 100%); -webkit-mask-image: linear-gradient(90deg, black 80%, transparent 100%); }
     .issue-bar.bar-overdue .bar-outline { stroke: var(--vscode-charts-red) !important; stroke-width: 2; filter: drop-shadow(0 0 4px var(--vscode-charts-red)); }
     .issue-bar.bar-overdue:hover .bar-outline { stroke-width: 3; filter: drop-shadow(0 0 6px var(--vscode-charts-red)); }
+    /* External dependency bars (dimmed, dashed, no drag handles) */
+    .issue-bar.bar-external { opacity: 0.5; pointer-events: none; }
+    .issue-bar.bar-external .bar-outline { stroke-dasharray: 4, 2; stroke: var(--vscode-descriptionForeground); }
+    .issue-bar.bar-external .bar-main { opacity: 0.4; }
+    .issue-bar.bar-external .drag-handle,
+    .issue-bar.bar-external .link-handle { display: none; }
     /* Hidden project bars (toggled via checkbox) */
     .bar-hidden { display: none; }
     .critical-path-mode .issue-bar { opacity: 0.3; }
