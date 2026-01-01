@@ -11,6 +11,7 @@ import { TimeEntryActivity } from "./models/common";
 import { Project } from "./models/project";
 import { TimeEntry } from "./models/time-entry";
 import { Issue } from "./models/issue";
+import { Version } from "./models/version";
 import { IssueStatus as RedmineIssueStatus } from "./models/common";
 import { Membership as RedmineMembership } from "./models/membership";
 
@@ -396,6 +397,40 @@ export class RedmineServer {
     return {
       time_entry_activities: response?.time_entry_activities || [],
     };
+  }
+
+  /**
+   * Get versions (milestones) for a project
+   * Includes shared versions from parent/related projects
+   */
+  async getProjectVersions(projectId: number | string): Promise<Version[]> {
+    const response = await this.doRequest<{ versions: Version[] }>(
+      `/projects/${projectId}/versions.json`,
+      "GET"
+    );
+    return response?.versions || [];
+  }
+
+  /**
+   * Get versions for multiple projects (batched)
+   */
+  async getVersionsForProjects(projectIds: (number | string)[]): Promise<Map<number | string, Version[]>> {
+    const result = new Map<number | string, Version[]>();
+    // Fetch in parallel with concurrency limit
+    const batchSize = 5;
+    for (let i = 0; i < projectIds.length; i += batchSize) {
+      const batch = projectIds.slice(i, i + batchSize);
+      const promises = batch.map(async (id) => {
+        try {
+          const versions = await this.getProjectVersions(id);
+          result.set(id, versions);
+        } catch {
+          result.set(id, []);
+        }
+      });
+      await Promise.all(promises);
+    }
+    return result;
   }
 
   /**

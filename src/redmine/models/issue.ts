@@ -1,4 +1,5 @@
 import { NamedEntity } from "./common";
+import { VersionRef } from "./version";
 
 /**
  * Single field change in a journal entry
@@ -90,4 +91,6 @@ export interface Issue {
   relations?: IssueRelation[];
   /** Journal entries (from include=journals) - updates/comments history */
   journals?: Journal[];
+  /** Target version/milestone for this issue */
+  fixed_version?: VersionRef;
 }

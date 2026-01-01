@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as crypto from "crypto";
 import { Issue, IssueRelation } from "../redmine/models/issue";
+import { Version } from "../redmine/models/version";
 import { RedmineServer } from "../redmine/redmine-server";
 import { RedmineProject } from "../redmine/redmine-project";
 import { FlexibilityScore, WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE, calculateFlexibility, ContributionData } from "../utilities/flexibility-calculator";
@@ -423,6 +424,7 @@ export class GanttPanel {
   private _dependencyIssues: Issue[] = []; // External scheduling dependencies
   private _issueById: Map<number, Issue> = new Map(); // O(1) lookup cache
   private _projects: RedmineProject[] = [];
+  private _versions: Version[] = []; // Milestones across all projects
   private _flexibilityCache: Map<number, FlexibilityScore | null> = new Map();
   private _server: RedmineServer | undefined;
   private _zoomLevel: ZoomLevel = "month";
@@ -909,6 +911,9 @@ export class GanttPanel {
 
     // Load contributions if any ad-hoc issues exist
     this._loadContributions();
+
+    // Load versions (milestones) for all projects
+    this._loadVersions();
   }
 
   /**
@@ -993,6 +998,44 @@ export class GanttPanel {
       this._updateContent();
     } catch {
       // Silently fail - contributions are optional enhancement
+    }
+  }
+
+  /**
+   * Load versions (milestones) for all displayed projects.
+   * Fetches in parallel and stores for rendering as milestone markers.
+   */
+  private async _loadVersions(): Promise<void> {
+    if (!this._server || this._projects.length === 0) return;
+
+    try {
+      // Get unique project IDs
+      const projectIds = this._projects.map(p => p.id);
+
+      // Fetch versions for all projects
+      const versionMap = await this._server.getVersionsForProjects(projectIds);
+
+      // Flatten and deduplicate by ID (shared versions may appear multiple times)
+      const seen = new Set<number>();
+      const allVersions: Version[] = [];
+      for (const versions of versionMap.values()) {
+        for (const v of versions) {
+          if (!seen.has(v.id) && v.due_date && v.status !== "closed") {
+            seen.add(v.id);
+            allVersions.push(v);
+          }
+        }
+      }
+
+      // Sort by due date
+      allVersions.sort((a, b) => (a.due_date ?? "").localeCompare(b.due_date ?? ""));
+
+      this._versions = allVersions;
+
+      // Re-render with milestones
+      this._updateContent();
+    } catch {
+      // Silently fail - versions are optional
     }
   }
 
@@ -2545,6 +2588,37 @@ ${style.tip}
       .filter(Boolean)
       .join("");
 
+    // Generate milestone markers (diamond shapes with vertical dashed lines)
+    const milestoneMarkers = this._versions
+      .filter(v => v.due_date)
+      .map(version => {
+        const versionDate = new Date(version.due_date!);
+        if (versionDate < minDate || versionDate > maxDate) return "";
+
+        const x = ((versionDate.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
+        const diamondSize = 6;
+        const truncatedName = version.name.length > 15 ? version.name.substring(0, 14) + "…" : version.name;
+        const tooltip = `${version.name}\nDue: ${version.due_date}\n${version.description || ""}`.trim();
+
+        return `
+          <g class="milestone-marker" data-version-id="${version.id}">
+            <!-- Vertical dashed line spanning the entire height -->
+            <line class="milestone-line" x1="${x}" y1="0" x2="${x}" y2="${contentHeight}"
+                  stroke="var(--vscode-charts-purple)" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.6"/>
+            <!-- Diamond marker at top of body -->
+            <polygon class="milestone-diamond" points="${x},${diamondSize} ${x + diamondSize},${diamondSize * 2} ${x},${diamondSize * 3} ${x - diamondSize},${diamondSize * 2}"
+                     fill="var(--vscode-charts-purple)" stroke="var(--vscode-editorWidget-background)" stroke-width="1"/>
+            <!-- Rotated label along the line -->
+            <text class="milestone-label" x="${x + 4}" y="30" text-anchor="start"
+                  fill="var(--vscode-charts-purple)" font-size="10" font-weight="500"
+                  transform="rotate(90, ${x + 4}, 30)">${escapeHtml(truncatedName)}</text>
+            <title>${escapeHtml(tooltip)}</title>
+          </g>
+        `;
+      })
+      .filter(Boolean)
+      .join("");
+
     // Generate minimap bars (simplified representation) - only for visible projects
     const minimapBarHeight = 4;
     const minimapHeight = 44;
@@ -3453,6 +3527,23 @@ ${style.tip}
       stroke: var(--vscode-charts-red);
       stroke-width: 1.5;
     }
+    /* Milestone markers */
+    .milestone-marker {
+      pointer-events: all;
+      cursor: pointer;
+    }
+    .milestone-marker:hover .milestone-line {
+      opacity: 1;
+      stroke-width: 2;
+    }
+    .milestone-marker:hover .milestone-diamond {
+      transform-origin: center;
+      filter: brightness(1.2);
+    }
+    .milestone-label {
+      pointer-events: none;
+      font-family: var(--vscode-font-family);
+    }
   </style>
 </head>
 <body>
@@ -3663,6 +3754,7 @@ ${style.tip}
             ${dateMarkers.body}
             <g class="dependency-layer${this._showDependencies ? "" : " hidden"}">${dependencyArrows}</g>
             ${bars}
+            <g class="milestone-layer">${milestoneMarkers}</g>
           </svg>
         </div>
       </div>
