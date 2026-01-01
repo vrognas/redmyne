@@ -2708,7 +2708,8 @@ ${style.tip}
     .relation-picker button:hover, .relation-picker button:focus { background: var(--vscode-menu-selectionBackground); color: var(--vscode-menu-selectionForeground); }
     /* Focus indicators for accessibility */
     button:focus { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
-    .issue-bar:focus-within .bar-outline, .issue-bar.focused .bar-outline { stroke-width: 3; stroke: var(--vscode-focusBorder); }
+    .issue-bar:focus { outline: none; } /* Use stroke instead of outline for SVG */
+    .issue-bar:focus .bar-outline, .issue-bar:focus-within .bar-outline, .issue-bar.focused .bar-outline { stroke-width: 3; stroke: var(--vscode-focusBorder); }
     .issue-label:focus, .project-label:focus {
       outline: 2px solid var(--vscode-focusBorder);
       outline-offset: 1px;
@@ -2729,6 +2730,91 @@ ${style.tip}
     .project-checkbox.inherited-hidden rect { stroke-dasharray: 3, 2; }
     /* Screen reader only class */
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+    /* Quick search overlay */
+    .quick-search {
+      position: fixed;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+    }
+    .quick-search input {
+      width: 300px;
+      padding: 8px 12px;
+      font-size: 14px;
+      background: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+      border-radius: 4px;
+      outline: none;
+      box-shadow: 0 4px 12px var(--vscode-widget-shadow);
+    }
+    .quick-search input:focus {
+      border-color: var(--vscode-focusBorder);
+    }
+    .issue-label.search-match {
+      background: var(--vscode-editor-findMatchHighlightBackground);
+      border-radius: 2px;
+    }
+    /* Keyboard help overlay */
+    .keyboard-help {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .keyboard-help-content {
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 8px;
+      padding: 20px 24px;
+      max-width: 600px;
+      box-shadow: 0 8px 32px var(--vscode-widget-shadow);
+    }
+    .keyboard-help h3 {
+      margin: 0 0 16px;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--vscode-foreground);
+    }
+    .shortcut-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+    .shortcut-section h4 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--vscode-descriptionForeground);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .shortcut-section > div {
+      font-size: 12px;
+      color: var(--vscode-foreground);
+      margin-bottom: 4px;
+    }
+    .keyboard-help kbd {
+      display: inline-block;
+      padding: 2px 6px;
+      font-size: 11px;
+      font-family: var(--vscode-editor-font-family, monospace);
+      background: var(--vscode-keybindingLabel-background);
+      color: var(--vscode-keybindingLabel-foreground);
+      border: 1px solid var(--vscode-keybindingLabel-border, var(--vscode-panel-border));
+      border-radius: 3px;
+      margin-right: 2px;
+    }
+    .keyboard-help-close {
+      margin: 16px 0 0;
+      font-size: 11px;
+      color: var(--vscode-descriptionForeground);
+      text-align: center;
+    }
     .weekend-bg { fill: var(--vscode-editor-inactiveSelectionBackground); opacity: 0.3; }
     .zebra-stripe { fill: var(--vscode-list-hoverBackground); opacity: 0.15; pointer-events: none; }
     .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 1; opacity: 0.25; }
@@ -4102,6 +4188,7 @@ ${style.tip}
 
     // Keyboard navigation for issue bars
     const issueBars = Array.from(document.querySelectorAll('.issue-bar'));
+    const PAGE_JUMP = 10;
     issueBars.forEach((bar, index) => {
       bar.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -4115,6 +4202,33 @@ ${style.tip}
           e.preventDefault();
           issueBars[index - 1].focus();
           announce(\`Issue \${issueBars[index - 1].getAttribute('aria-label')}\`);
+        } else if (e.key === 'Home') {
+          e.preventDefault();
+          issueBars[0].focus();
+          announce(\`First issue: \${issueBars[0].getAttribute('aria-label')}\`);
+        } else if (e.key === 'End') {
+          e.preventDefault();
+          issueBars[issueBars.length - 1].focus();
+          announce(\`Last issue: \${issueBars[issueBars.length - 1].getAttribute('aria-label')}\`);
+        } else if (e.key === 'PageDown') {
+          e.preventDefault();
+          const nextIdx = Math.min(index + PAGE_JUMP, issueBars.length - 1);
+          issueBars[nextIdx].focus();
+          announce(\`Issue \${issueBars[nextIdx].getAttribute('aria-label')}\`);
+        } else if (e.key === 'PageUp') {
+          e.preventDefault();
+          const prevIdx = Math.max(index - PAGE_JUMP, 0);
+          issueBars[prevIdx].focus();
+          announce(\`Issue \${issueBars[prevIdx].getAttribute('aria-label')}\`);
+        } else if (e.key === 'Tab' && e.shiftKey) {
+          // Jump back to corresponding label
+          const issueId = bar.dataset.issueId;
+          const label = document.querySelector(\`.issue-label[data-issue-id="\${issueId}"]\`);
+          if (label) {
+            e.preventDefault();
+            label.focus();
+            announce(\`Label for issue #\${issueId}\`);
+          }
         }
       });
     });
@@ -4295,6 +4409,25 @@ ${style.tip}
           case 'End':
             e.preventDefault();
             setActiveLabel(allLabels[allLabels.length - 1]);
+            break;
+          case 'PageDown':
+            e.preventDefault();
+            setActiveLabel(allLabels[Math.min(index + 10, allLabels.length - 1)]);
+            break;
+          case 'PageUp':
+            e.preventDefault();
+            setActiveLabel(allLabels[Math.max(index - 10, 0)]);
+            break;
+          case 'Tab':
+            // Jump to corresponding bar in timeline
+            if (!e.shiftKey && !isNaN(issueId)) {
+              const bar = document.querySelector(\`.issue-bar[data-issue-id="\${issueId}"]\`);
+              if (bar) {
+                e.preventDefault();
+                bar.focus();
+                announce(\`Timeline bar for issue #\${issueId}\`);
+              }
+            }
             break;
         }
       });
@@ -4666,6 +4799,126 @@ ${style.tip}
           updateUndoRedoButtons();
           vscode.postMessage({ command: 'updateDates', issueId, startDate: newStart, dueDate: newDue });
         }
+      }
+      // Quick search (/)
+      else if (e.key === '/' && !modKey) {
+        e.preventDefault();
+        showQuickSearch();
+      }
+      // Keyboard shortcuts help (?)
+      else if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        e.preventDefault();
+        toggleKeyboardHelp();
+      }
+    });
+
+    // Quick search overlay
+    let quickSearchEl = null;
+    function showQuickSearch() {
+      if (quickSearchEl) { quickSearchEl.remove(); }
+      quickSearchEl = document.createElement('div');
+      quickSearchEl.className = 'quick-search';
+      quickSearchEl.innerHTML = \`
+        <input type="text" placeholder="Search issues..." autofocus />
+      \`;
+      document.body.appendChild(quickSearchEl);
+      const input = quickSearchEl.querySelector('input');
+      input.focus();
+
+      const labels = Array.from(document.querySelectorAll('.issue-label'));
+      input.addEventListener('input', () => {
+        const query = input.value.toLowerCase();
+        labels.forEach(label => {
+          const text = label.getAttribute('aria-label')?.toLowerCase() || '';
+          const match = query && text.includes(query);
+          label.classList.toggle('search-match', match);
+        });
+      });
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeQuickSearch();
+        } else if (e.key === 'Enter') {
+          const match = document.querySelector('.issue-label.search-match');
+          if (match) {
+            closeQuickSearch();
+            match.focus();
+            scrollToAndHighlight(match.dataset.issueId);
+          }
+        }
+      });
+
+      input.addEventListener('blur', () => setTimeout(closeQuickSearch, 150));
+    }
+
+    function closeQuickSearch() {
+      if (quickSearchEl) {
+        quickSearchEl.remove();
+        quickSearchEl = null;
+        document.querySelectorAll('.search-match').forEach(el => el.classList.remove('search-match'));
+      }
+    }
+
+    // Keyboard help overlay
+    let keyboardHelpEl = null;
+    function toggleKeyboardHelp() {
+      if (keyboardHelpEl) {
+        keyboardHelpEl.remove();
+        keyboardHelpEl = null;
+        return;
+      }
+      keyboardHelpEl = document.createElement('div');
+      keyboardHelpEl.className = 'keyboard-help';
+      keyboardHelpEl.innerHTML = \`
+        <div class="keyboard-help-content">
+          <h3>Keyboard Shortcuts</h3>
+          <div class="shortcut-grid">
+            <div class="shortcut-section">
+              <h4>Navigation</h4>
+              <div><kbd>↑</kbd><kbd>↓</kbd> Move between issues</div>
+              <div><kbd>Home</kbd><kbd>End</kbd> First/last issue</div>
+              <div><kbd>PgUp</kbd><kbd>PgDn</kbd> Jump 10 rows</div>
+              <div><kbd>Tab</kbd> Label → Bar</div>
+              <div><kbd>Shift+Tab</kbd> Bar → Label</div>
+            </div>
+            <div class="shortcut-section">
+              <h4>Date Editing</h4>
+              <div><kbd>←</kbd><kbd>→</kbd> Move bar ±1 day</div>
+              <div><kbd>Shift+←/→</kbd> Resize end</div>
+              <div><kbd>Alt+←/→</kbd> Resize start</div>
+              <div><kbd>Ctrl+Z</kbd> Undo</div>
+              <div><kbd>Ctrl+Y</kbd> Redo</div>
+            </div>
+            <div class="shortcut-section">
+              <h4>View</h4>
+              <div><kbd>1-5</kbd> Zoom levels</div>
+              <div><kbd>H</kbd> Heatmap</div>
+              <div><kbd>D</kbd> Dependencies</div>
+              <div><kbd>C</kbd> Critical path</div>
+              <div><kbd>T</kbd> Today</div>
+            </div>
+            <div class="shortcut-section">
+              <h4>Other</h4>
+              <div><kbd>/</kbd> Quick search</div>
+              <div><kbd>?</kbd> This help</div>
+              <div><kbd>R</kbd> Refresh</div>
+              <div><kbd>Ctrl+A</kbd> Select all</div>
+              <div><kbd>Esc</kbd> Clear/cancel</div>
+            </div>
+          </div>
+          <p class="keyboard-help-close">Press <kbd>?</kbd> or <kbd>Esc</kbd> to close</p>
+        </div>
+      \`;
+      document.body.appendChild(keyboardHelpEl);
+      keyboardHelpEl.addEventListener('click', (e) => {
+        if (e.target === keyboardHelpEl) toggleKeyboardHelp();
+      });
+    }
+
+    // Close help on Escape
+    addDocListener('keydown', (e) => {
+      if (e.key === 'Escape' && keyboardHelpEl) {
+        toggleKeyboardHelp();
       }
     });
 
