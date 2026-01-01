@@ -2213,7 +2213,7 @@ export class GanttPanel {
             <rect class="drag-handle drag-right cursor-ew-resize" x="${startX + width - handleWidth}" y="0" width="${handleWidth}" height="${barHeight}"
                   fill="transparent"/>
             <!-- Link handle for creating relations (larger hit area for Fitts's Law) -->
-            <g class="link-handle cursor-crosshair" data-cx="${endX + 8}" data-cy="${barHeight / 2}">
+            <g class="link-handle cursor-crosshair" data-cx="${endX + 8}" data-cy="${y + barHeight / 2}">
               <circle cx="${endX + 8}" cy="${barHeight / 2}" r="14" fill="transparent" pointer-events="all"/>
               <circle class="link-handle-visual" cx="${endX + 8}" cy="${barHeight / 2}" r="5"
                       fill="var(--vscode-button-background)" stroke="var(--vscode-button-foreground)"
