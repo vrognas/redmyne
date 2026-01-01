@@ -1579,7 +1579,7 @@ export class GanttPanel {
     if (!this._cachedHierarchy) {
       this._cachedHierarchy = this._viewMode === "mywork"
         ? buildMyWorkHierarchy(sortedIssues, this._flexibilityCache)
-        : buildProjectHierarchy(sortedIssues, this._flexibilityCache, this._projects);
+        : buildProjectHierarchy(sortedIssues, this._flexibilityCache, this._projects, true); // preserveOrder=true for user sort
     }
     // Get ALL nodes with visibility flags for client-side collapse management
     const flatNodes = flattenHierarchyAll(this._cachedHierarchy, collapseState.getExpandedKeys());
@@ -2634,6 +2634,7 @@ ${style.tip}
     .capacity-busy { background: var(--vscode-charts-yellow); opacity: 0.7; }
     .capacity-overloaded { background: var(--vscode-charts-red); opacity: 0.7; }
     .capacity-ribbon-row {
+      display: flex;
       position: sticky;
       top: 40px;
       z-index: 5;
@@ -2649,6 +2650,21 @@ ${style.tip}
       font-size: 10px;
       color: var(--vscode-descriptionForeground);
       background: var(--vscode-editor-background);
+      white-space: nowrap;
+    }
+    .capacity-ribbon-timeline {
+      flex: 1;
+      overflow: hidden;
+    }
+    .capacity-today-marker {
+      stroke: var(--vscode-charts-red);
+      stroke-width: 2;
+      stroke-dasharray: 4 2;
+    }
+    .capacity-week-marker {
+      stroke: var(--vscode-panel-border);
+      stroke-width: 1;
+      opacity: 0.5;
     }
     /* Overflow menu */
     .overflow-menu-container {

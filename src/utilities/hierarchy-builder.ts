@@ -61,12 +61,14 @@ export async function buildHierarchy(
 /**
  * Build hierarchy grouped by project (for Gantt) - synchronous
  * Uses project hierarchy (parent/child) and shows all projects with issues
- * Projects sorted alphabetically, issues sorted by risk
+ * Projects sorted alphabetically, issues sorted by risk (unless preserveOrder is true)
+ * @param preserveOrder If true, preserve incoming issue order within each group (for user sort)
  */
 export function buildProjectHierarchy(
   issues: Issue[],
   flexibilityCache: Map<number, FlexibilityScore | null>,
-  projects: RedmineProject[] = []
+  projects: RedmineProject[] = [],
+  preserveOrder = false
 ): HierarchyNode[] {
   // Group issues by project
   const issuesByProject = new Map<number, Issue[]>();
@@ -130,7 +132,7 @@ export function buildProjectHierarchy(
       .map((sub) => buildProjectNode(sub, projectKey, depth + 1));
 
     // Build issue tree for this project
-    const issueNodes = buildIssueTree(projectIssues, flexibilityCache, projectKey, depth + 1);
+    const issueNodes = buildIssueTree(projectIssues, flexibilityCache, projectKey, depth + 1, preserveOrder);
 
     // Combine: subprojects first, then issues
     const children = [...subprojectNodes, ...issueNodes];
@@ -177,7 +179,7 @@ export function buildProjectHierarchy(
   return sortedProjects.map(([projectId, name]) => {
     const projectKey = `project-${projectId}`;
     const projectIssues = issuesByProject.get(projectId) ?? [];
-    const issueNodes = buildIssueTree(projectIssues, flexibilityCache, projectKey, 1);
+    const issueNodes = buildIssueTree(projectIssues, flexibilityCache, projectKey, 1, preserveOrder);
 
     const node: HierarchyNode = {
       type: "project" as const,
@@ -312,17 +314,19 @@ async function buildFlatHierarchy(
 
 /**
  * Build issue tree within a project/container
+ * @param preserveOrder If true, preserve incoming issue order (for user sort)
  */
 function buildIssueTree(
   projectIssues: Issue[],
   flexibilityCache: Map<number, FlexibilityScore | null>,
   parentKey: string,
-  depth: number
+  depth: number,
+  preserveOrder = false
 ): HierarchyNode[] {
   const issueMap = new Map(projectIssues.map((i) => [i.id, i]));
   const childrenByParent = new Map<number | null, Issue[]>();
 
-  // Group by parent
+  // Group by parent (preserving input order)
   for (const issue of projectIssues) {
     const parentId = issue.parent?.id ?? null;
     // Only use parentId if parent is in this project's issues
@@ -335,7 +339,9 @@ function buildIssueTree(
 
   // Recursively build tree
   function buildChildren(parentId: number | null, pKey: string, d: number): HierarchyNode[] {
-    const childIssues = sortIssuesByRisk(childrenByParent.get(parentId) || [], flexibilityCache);
+    const rawChildren = childrenByParent.get(parentId) || [];
+    // Only sort by risk if not preserving order
+    const childIssues = preserveOrder ? rawChildren : sortIssuesByRisk(rawChildren, flexibilityCache);
     return childIssues.map((issue) => {
       const issueKey = `issue-${issue.id}`;
       const hasChildren = childrenByParent.has(issue.id) && childrenByParent.get(issue.id)!.length > 0;
