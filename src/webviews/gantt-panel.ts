@@ -65,6 +65,8 @@ interface GanttIssue {
   downstreamCount: number;
   /** Open issues blocking this one */
   blockedBy: Array<{ id: number; subject: string; assignee: string | null }>;
+  /** True if this issue is tagged as an ad-hoc budget pool */
+  isAdHoc?: boolean;
 }
 
 interface GanttRow {
@@ -161,6 +163,7 @@ function toGanttIssue(
     isExternal,
     downstreamCount,
     blockedBy: blockers,
+    isAdHoc: adHocTracker.isAdHoc(issue.id),
   };
 }
 
@@ -2011,6 +2014,7 @@ export class GanttPanel {
 
         // Build tooltip with contribution info if available
         const tooltipLines = [
+          issue.isAdHoc ? "🎲 AD-HOC BUDGET POOL" : null,
           `#${issue.id} ${escapedSubject}`,
           `Project: ${escapedProject}`,
           `Start: ${formatDateWithWeekday(issue.start_date)}`,
@@ -2043,7 +2047,7 @@ export class GanttPanel {
           tooltipLines.push(`Spent: ${formatHoursAsTime(issue.spent_hours)}`);
         }
 
-        const tooltip = tooltipLines.join("\n");
+        const tooltip = tooltipLines.filter(Boolean).join("\n");
 
         // In My Work view, show project badge and external indicator
         const projectBadge = this._viewMode === "mywork" && row.projectName
@@ -2214,6 +2218,7 @@ export class GanttPanel {
           }
         }
         const barTooltipLines = [
+          issue.isAdHoc ? "🎲 AD-HOC BUDGET POOL" : null,
           issue.isExternal ? "⚡ EXTERNAL DEPENDENCY" : null,
           statusDesc,
           `#${issue.id} ${escapedSubject}`,
@@ -2371,7 +2376,7 @@ export class GanttPanel {
         // Critical path: zero or negative flexibility
         const isCritical = flexSlack !== null && flexSlack <= 0 && !issue.isClosed;
         return `
-          <g class="issue-bar gantt-row${hiddenClass}${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${isCritical ? " bar-critical" : ""}" data-issue-id="${issue.id}"
+          <g class="issue-bar gantt-row${hiddenClass}${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${issue.isAdHoc ? " bar-adhoc" : ""}${isCritical ? " bar-critical" : ""}" data-issue-id="${issue.id}"
              data-project-id="${issue.projectId}"
              data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
              data-start-date="${issue.start_date || ""}"
@@ -3279,6 +3284,9 @@ ${style.tip}
     .issue-bar.bar-external .bar-main { opacity: 0.4; }
     .issue-bar.bar-external .drag-handle,
     .issue-bar.bar-external .link-handle { display: none; }
+    /* Ad-hoc budget pool bars (purple dotted outline) */
+    .issue-bar.bar-adhoc .bar-outline { stroke: var(--vscode-charts-purple) !important; stroke-width: 2; stroke-dasharray: 3, 2; }
+    .issue-bar.bar-adhoc .bar-main { opacity: 0.6; }
     /* Hidden project bars (toggled via checkbox) */
     .bar-hidden { display: none; }
     .critical-path-mode .issue-bar { opacity: 0.3; }
