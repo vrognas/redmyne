@@ -46,6 +46,8 @@ interface GanttIssue {
   start_date: string | null;
   due_date: string | null;
   status: FlexibilityScore["status"] | null;
+  /** Flexibility slack in days (positive = buffer, 0/negative = critical) */
+  flexibilitySlack: number | null;
   isClosed: boolean;
   project: string;
   projectId: number;
@@ -99,12 +101,14 @@ function toGanttIssue(issue: Issue, flexibilityCache: Map<number, FlexibilitySco
   // Check if closed via status ID, or fallback to status name containing "closed"
   const isClosedById = closedStatusIds.has(issue.status?.id ?? 0);
   const isClosedByName = issue.status?.name?.toLowerCase().includes("closed") ?? false;
+  const flexibility = flexibilityCache.get(issue.id);
   return {
     id: issue.id,
     subject: issue.subject,
     start_date: issue.start_date || null,
     due_date: issue.due_date || null,
-    status: flexibilityCache.get(issue.id)?.status ?? null,
+    status: flexibility?.status ?? null,
+    flexibilitySlack: flexibility?.remaining ?? null,
     isClosed: isClosedById || isClosedByName,
     project: issue.project?.name ?? "Unknown",
     projectId: issue.project?.id ?? 0,
@@ -2066,6 +2070,11 @@ export class GanttPanel {
         const statusDesc = this._getStatusDescription(issue.status);
 
         // Build tooltip with contribution info
+        const flexSlack = issue.flexibilitySlack;
+        const flexText = flexSlack === null ? null
+          : flexSlack > 0 ? `Flexibility: +${flexSlack}d buffer`
+          : flexSlack === 0 ? `Flexibility: ⚠ Critical path (no buffer)`
+          : `Flexibility: ⚠ ${flexSlack}d behind`;
         const barTooltipLines = [
           issue.isExternal ? "⚡ EXTERNAL DEPENDENCY" : null,
           statusDesc,
@@ -2076,6 +2085,7 @@ export class GanttPanel {
           `Due: ${hasOnlyStart ? "(no due date)" : formatDateWithWeekday(issue.due_date)}`,
           `Progress: ${doneRatio}%${isFallbackProgress ? ` (showing ${visualDoneRatio}% from time)` : ""}`,
           `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
+          flexText,
         ];
 
         // Check for contributions
@@ -2218,8 +2228,10 @@ export class GanttPanel {
           `;
         }
 
+        // Critical path: zero or negative flexibility
+        const isCritical = flexSlack !== null && flexSlack <= 0 && !issue.isClosed;
         return `
-          <g class="issue-bar gantt-row${hiddenClass}${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}" data-issue-id="${issue.id}"
+          <g class="issue-bar gantt-row${hiddenClass}${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${isCritical ? " bar-critical" : ""}" data-issue-id="${issue.id}"
              data-project-id="${issue.projectId}"
              data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
              data-start-date="${issue.start_date || ""}"
@@ -2264,8 +2276,17 @@ export class GanttPanel {
             <!-- Labels outside bar: adaptive positioning (left if near edge, else right) -->
             ${(() => {
               const badgeW = issue.isClosed ? 18 : (visualDoneRatio === 100 ? 32 : visualDoneRatio >= 10 ? 28 : 22);
+              // Flexibility badge: "+5d", "0d", "-3d" (width ~24-30)
+              const showFlex = flexSlack !== null && !issue.isClosed;
+              const flexBadgeW = showFlex ? 28 : 0;
+              const flexLabel = showFlex ? (flexSlack > 0 ? `+${flexSlack}d` : `${flexSlack}d`) : "";
+              const flexColor = showFlex
+                ? (flexSlack > 2 ? "var(--vscode-charts-green)"
+                  : flexSlack > 0 ? "var(--vscode-charts-yellow)"
+                  : "var(--vscode-charts-red)")
+                : "";
               const assigneeW = issue.assignee ? 90 : 0;
-              const totalLabelW = badgeW + assigneeW + 24;
+              const totalLabelW = badgeW + flexBadgeW + assigneeW + 24;
               const onLeft = endX + totalLabelW > timelineWidth;
               const labelX = onLeft ? startX - 8 : endX + 16;
 
@@ -2283,12 +2304,22 @@ export class GanttPanel {
               }
 
               const badgeCenterX = onLeft ? labelX - badgeW / 2 : labelX + badgeW / 2;
-              const assigneeX = onLeft ? labelX - badgeW - 6 : labelX + badgeW + 6;
+              // Flex badge position: after progress badge
+              const flexBadgeX = onLeft ? labelX - badgeW - 4 : labelX + badgeW + 4;
+              const flexBadgeCenterX = onLeft ? flexBadgeX - flexBadgeW / 2 : flexBadgeX + flexBadgeW / 2;
+              // Assignee position: after flex badge (or after progress if no flex)
+              const assigneeX = onLeft
+                ? (showFlex ? flexBadgeX - flexBadgeW - 6 : labelX - badgeW - 6)
+                : (showFlex ? flexBadgeX + flexBadgeW + 6 : labelX + badgeW + 6);
               return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
                 <rect class="status-badge-bg" x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" rx="2"
                       fill="var(--vscode-badge-background)" opacity="0.9"/>
                 <text class="status-badge" x="${badgeCenterX}" y="${barHeight / 2 + 4}"
                       text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${isFallbackProgress ? "~" : ""}${visualDoneRatio}%</text>
+                ${showFlex ? `<rect class="flex-badge-bg" x="${onLeft ? flexBadgeX - flexBadgeW : flexBadgeX}" y="${barHeight / 2 - 8}" width="${flexBadgeW}" height="16" rx="2"
+                      fill="${flexColor}" opacity="0.15"/>
+                <text class="flex-badge" x="${flexBadgeCenterX}" y="${barHeight / 2 + 4}"
+                      text-anchor="middle" fill="${flexColor}" font-size="10" font-weight="500">${flexLabel}</text>` : ""}
                 ${issue.assignee ? `<text class="bar-assignee" x="${assigneeX}" y="${barHeight / 2 + 4}"
                       text-anchor="${onLeft ? "end" : "start"}" fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(issue.assignee.length > 12 ? issue.assignee.substring(0, 11) + "…" : issue.assignee)}</text>` : ""}
               </g>`;
@@ -3034,6 +3065,9 @@ ${style.tip}
     .issue-bar.bar-open-ended .bar-main { mask-image: linear-gradient(90deg, black 80%, transparent 100%); -webkit-mask-image: linear-gradient(90deg, black 80%, transparent 100%); }
     .issue-bar.bar-overdue .bar-outline { stroke: var(--vscode-charts-red) !important; stroke-width: 2; filter: drop-shadow(0 0 4px var(--vscode-charts-red)); }
     .issue-bar.bar-overdue:hover .bar-outline { stroke-width: 3; filter: drop-shadow(0 0 6px var(--vscode-charts-red)); }
+    /* Critical path bars (zero/negative flexibility - subtle pulsing glow) */
+    .issue-bar.bar-critical:not(.bar-overdue) .bar-outline { stroke: var(--vscode-charts-orange) !important; stroke-width: 2; filter: drop-shadow(0 0 3px var(--vscode-charts-orange)); animation: critical-pulse 2s ease-in-out infinite; }
+    @keyframes critical-pulse { 0%, 100% { filter: drop-shadow(0 0 3px var(--vscode-charts-orange)); } 50% { filter: drop-shadow(0 0 6px var(--vscode-charts-orange)); } }
     /* External dependency bars (dimmed, dashed, no drag handles) */
     .issue-bar.bar-external { opacity: 0.5; pointer-events: none; }
     .issue-bar.bar-external .bar-outline { stroke-dasharray: 4, 2; stroke: var(--vscode-descriptionForeground); }
