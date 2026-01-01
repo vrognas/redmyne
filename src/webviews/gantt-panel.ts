@@ -2023,13 +2023,25 @@ export class GanttPanel {
         const escapedSubject = escapeHtml(issue.subject);
         const escapedProject = escapeHtml(issue.project);
 
-        // Build tooltip with contribution info if available
+        // Get status description and flexibility for consolidated tooltip
+        const leftStatusDesc = this._getStatusDescription(issue.status);
+        const leftFlexSlack = issue.flexibilitySlack;
+        const leftFlexText = leftFlexSlack === null ? null
+          : leftFlexSlack > 0 ? `Flexibility: +${leftFlexSlack}d buffer`
+          : leftFlexSlack === 0 ? `Flexibility: ⚠ Critical path (no buffer)`
+          : `Flexibility: ⚠ ${leftFlexSlack}d behind`;
+
+        // Build consolidated tooltip with all info
         const tooltipLines = [
           issue.isAdHoc ? "🎲 AD-HOC BUDGET POOL" : null,
+          issue.isExternal ? "⚡ EXTERNAL DEPENDENCY" : null,
+          leftStatusDesc,
           `#${issue.id} ${escapedSubject}`,
           `Project: ${escapedProject}`,
+          issue.isExternal ? `Assigned to: ${issue.assignee ?? "Unassigned"}` : null,
           `Start: ${formatDateWithWeekday(issue.start_date)}`,
           `Due: ${formatDateWithWeekday(issue.due_date)}`,
+          `Progress: ${issue.done_ratio ?? 0}%`,
           `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
         ];
 
@@ -2056,6 +2068,35 @@ export class GanttPanel {
           tooltipLines.push(`Total: ${formatHoursAsTime(directSpent + totalReceived)}`);
         } else {
           tooltipLines.push(`Spent: ${formatHoursAsTime(issue.spent_hours)}`);
+        }
+
+        // Add flexibility
+        if (leftFlexText) {
+          tooltipLines.push(leftFlexText);
+        }
+
+        // Add blocks info
+        if (issue.blocks.length > 0) {
+          tooltipLines.push(`🚧 BLOCKS ${issue.blocks.length} TASK${issue.blocks.length > 1 ? "S" : ""}:`);
+          for (const b of issue.blocks.slice(0, 3)) {
+            const assigneeText = b.assignee ? ` (${b.assignee})` : "";
+            tooltipLines.push(`  → #${b.id} ${b.subject.length > 25 ? b.subject.substring(0, 24) + "…" : b.subject}${assigneeText}`);
+          }
+          if (issue.blocks.length > 3) {
+            tooltipLines.push(`  ... and ${issue.blocks.length - 3} more`);
+          }
+        }
+
+        // Add blocked-by info
+        if (issue.blockedBy.length > 0) {
+          tooltipLines.push(`⛔ BLOCKED BY:`);
+          for (const b of issue.blockedBy.slice(0, 3)) {
+            const assigneeText = b.assignee ? ` (${b.assignee})` : "";
+            tooltipLines.push(`  • #${b.id} ${b.subject.length > 25 ? b.subject.substring(0, 24) + "…" : b.subject}${assigneeText}`);
+          }
+          if (issue.blockedBy.length > 3) {
+            tooltipLines.push(`  ... and ${issue.blockedBy.length - 3} more`);
+          }
         }
 
         const tooltip = tooltipLines.filter(Boolean).join("\n");
@@ -2236,7 +2277,9 @@ export class GanttPanel {
             blockerLines.push(`  ... and ${issue.blockedBy.length - 3} more`);
           }
         }
-        const barTooltipLines = [
+        // === Context-sensitive tooltips ===
+        // Bar tooltip: basic info only
+        const barTooltip = [
           issue.isAdHoc ? "🎲 AD-HOC BUDGET POOL" : null,
           issue.isExternal ? "⚡ EXTERNAL DEPENDENCY" : null,
           statusDesc,
@@ -2245,40 +2288,51 @@ export class GanttPanel {
           issue.isExternal ? `Assigned to: ${issue.assignee ?? "Unassigned"}` : null,
           `Start: ${formatDateWithWeekday(issue.start_date)}`,
           `Due: ${hasOnlyStart ? "(no due date)" : formatDateWithWeekday(issue.due_date)}`,
-          `Progress: ${doneRatio}%${isFallbackProgress ? ` (showing ${visualDoneRatio}% from time)` : ""}`,
-          `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
-          flexText,
-          ...blocksLines,
-          ...blockerLines,
-        ];
+          !isParent ? `───\n←/→: Move  Shift+←/→: Resize  Alt+←/→: Start` : null,
+        ].filter(Boolean).join("\n");
 
-        // Check for contributions
+        // Progress tooltip: time tracking info
         const barIsAdHoc = this._contributionData?.adHocIssues.has(issue.id);
         const barDonated = this._donationTargets?.get(issue.id);
         const barReceived = this._contributionSources?.get(issue.id);
 
+        const progressLines = [
+          `Progress: ${doneRatio}%${isFallbackProgress ? ` (~${visualDoneRatio}% from time)` : ""}`,
+          `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
+        ];
         if (barIsAdHoc && barDonated && barDonated.length > 0) {
-          // Ad-hoc issue: show donations
           const totalDonated = barDonated.reduce((sum, d) => sum + d.hours, 0);
-          barTooltipLines.push(`Spent: ${formatHoursAsTime(issue.spent_hours)}`);
-          barTooltipLines.push(`Donated: ${formatHoursAsTime(totalDonated)} to ${barDonated.length} issue(s)`);
+          progressLines.push(`Spent: ${formatHoursAsTime(issue.spent_hours)}`);
+          progressLines.push(`Donated: ${formatHoursAsTime(totalDonated)} to ${barDonated.length} issue(s)`);
         } else if (barReceived && barReceived.length > 0) {
-          // Normal issue receiving contributions
           const totalReceived = barReceived.reduce((sum, r) => sum + r.hours, 0);
           const directSpent = issue.spent_hours ?? 0;
-          barTooltipLines.push(`Direct: ${formatHoursAsTime(directSpent)}`);
-          barTooltipLines.push(`+ ${formatHoursAsTime(totalReceived)} from ad-hoc`);
-          barTooltipLines.push(`Total: ${formatHoursAsTime(directSpent + totalReceived)}`);
+          progressLines.push(`Direct: ${formatHoursAsTime(directSpent)}`);
+          progressLines.push(`+ ${formatHoursAsTime(totalReceived)} from ad-hoc`);
+          progressLines.push(`Total: ${formatHoursAsTime(directSpent + totalReceived)}`);
         } else {
-          barTooltipLines.push(`Spent: ${formatHoursAsTime(issue.spent_hours)}`);
+          progressLines.push(`Spent: ${formatHoursAsTime(issue.spent_hours)}`);
         }
-        // Keyboard hints for date editing (only for non-parent issues)
-        if (!isParent) {
-          barTooltipLines.push(`───`);
-          barTooltipLines.push(`←/→: Move  Shift+←/→: Resize end  Alt+←/→: Resize start`);
-        }
+        const progressTooltip = progressLines.join("\n");
 
-        const tooltip = barTooltipLines.filter(Boolean).join("\n");
+        // Flexibility tooltip
+        const flexTooltip = flexText || "";
+
+        // Blocks tooltip: issues this one blocks
+        const blocksTooltip = issue.blocks.length > 0
+          ? `🚧 Blocks ${issue.blocks.length} issue(s):\n` + issue.blocks.slice(0, 5).map(b => {
+              const assigneeText = b.assignee ? ` (${b.assignee})` : "";
+              return `#${b.id} ${b.subject.length > 30 ? b.subject.substring(0, 29) + "…" : b.subject}${assigneeText}`;
+            }).join("\n") + (issue.blocks.length > 5 ? `\n... and ${issue.blocks.length - 5} more` : "")
+          : "";
+
+        // Blockers tooltip: issues blocking this one
+        const blockerTooltip = issue.blockedBy.length > 0
+          ? `⛔ Blocked by ${issue.blockedBy.length} issue(s):\n` + issue.blockedBy.slice(0, 5).map(b => {
+              const assigneeText = b.assignee ? ` (${b.assignee})` : "";
+              return `#${b.id} ${b.subject.length > 30 ? b.subject.substring(0, 29) + "…" : b.subject}${assigneeText}`;
+            }).join("\n") + (issue.blockedBy.length > 5 ? `\n... and ${issue.blockedBy.length - 5} more` : "")
+          : "";
 
         // Calculate done portion width for progress visualization
         const doneWidth = (visualDoneRatio / 100) * width;
@@ -2387,7 +2441,7 @@ export class GanttPanel {
                         text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${doneRatio}%</text>
                 </g>`;
               })()}
-              <title>${tooltip} (parent - ${doneRatio}% done)</title>
+              <title>${barTooltip}\n\n(Parent issue - ${doneRatio}% aggregated progress)</title>
             </g>
           `;
         }
@@ -2425,7 +2479,9 @@ export class GanttPanel {
             ` : ""}
             <!-- Border/outline - pointer-events:all so clicks work even with fill:none -->
             <rect class="bar-outline cursor-move" x="${startX}" y="0" width="${width}" height="${barHeight}"
-                  fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1" rx="8" ry="8" pointer-events="all"/>
+                  fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1" rx="8" ry="8" pointer-events="all">
+              <title>${barTooltip}</title>
+            </rect>
             <rect class="drag-handle drag-left cursor-ew-resize" x="${startX}" y="0" width="${handleWidth}" height="${barHeight}"
                   fill="transparent"/>
             <rect class="drag-handle drag-right cursor-ew-resize" x="${startX + width - handleWidth}" y="0" width="${handleWidth}" height="${barHeight}"
@@ -2502,27 +2558,36 @@ export class GanttPanel {
               const finalBadgeW = showBlocker ? blockerBadgeW : impactFinalW;
               const assigneeX = onLeft ? finalBadgeX - finalBadgeW - 6 : finalBadgeX + finalBadgeW + 6;
               return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
-                <rect class="status-badge-bg" x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" rx="2"
-                      fill="var(--vscode-badge-background)" opacity="0.9"/>
-                <text class="status-badge" x="${badgeCenterX}" y="${barHeight / 2 + 4}"
-                      text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${isFallbackProgress ? "~" : ""}${visualDoneRatio}%</text>
-                ${showFlex ? `<rect class="flex-badge-bg" x="${onLeft ? flexBadgeX - flexBadgeW : flexBadgeX}" y="${barHeight / 2 - 8}" width="${flexBadgeW}" height="16" rx="2"
-                      fill="${flexColor}" opacity="0.15"/>
-                <text class="flex-badge" x="${flexBadgeCenterX}" y="${barHeight / 2 + 4}"
-                      text-anchor="middle" fill="${flexColor}" font-size="10" font-weight="500">${flexLabel}</text>` : ""}
-                ${showBlocks ? `<text class="blocks-badge" x="${impactBadgeCenterX}" y="${barHeight / 2 + 4}"
-                      text-anchor="middle" fill="${impactColor}" font-size="10" font-weight="500">${impactLabel}</text>` : ""}
+                <g class="progress-badge-group" style="cursor: help;">
+                  <rect class="status-badge-bg" x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" rx="2"
+                        fill="var(--vscode-badge-background)" opacity="0.9"/>
+                  <text class="status-badge" x="${badgeCenterX}" y="${barHeight / 2 + 4}"
+                        text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${isFallbackProgress ? "~" : ""}${visualDoneRatio}%</text>
+                  <title>${progressTooltip}</title>
+                </g>
+                ${showFlex ? `<g class="flex-badge-group" style="cursor: help;">
+                  <rect class="flex-badge-bg" x="${onLeft ? flexBadgeX - flexBadgeW : flexBadgeX}" y="${barHeight / 2 - 8}" width="${flexBadgeW}" height="16" rx="2"
+                        fill="${flexColor}" opacity="0.15"/>
+                  <text class="flex-badge" x="${flexBadgeCenterX}" y="${barHeight / 2 + 4}"
+                        text-anchor="middle" fill="${flexColor}" font-size="10" font-weight="500">${flexLabel}</text>
+                  <title>${flexTooltip}</title>
+                </g>` : ""}
+                ${showBlocks ? `<g class="blocks-badge-group" style="cursor: help;">
+                  <text class="blocks-badge" x="${impactBadgeCenterX}" y="${barHeight / 2 + 4}"
+                        text-anchor="middle" fill="${impactColor}" font-size="10" font-weight="500">${impactLabel}</text>
+                  <title>${blocksTooltip}</title>
+                </g>` : ""}
                 ${showBlocker ? `<g class="blocker-badge" data-blocker-id="${firstBlockerId}" style="cursor: pointer;">
                   <rect x="${onLeft ? blockerBadgeX - blockerBadgeW : blockerBadgeX}" y="${barHeight / 2 - 8}" width="${blockerBadgeW}" height="16" rx="2"
                         fill="var(--vscode-charts-red)" opacity="0.15"/>
                   <text x="${blockerBadgeCenterX}" y="${barHeight / 2 + 4}"
                         text-anchor="middle" fill="var(--vscode-charts-red)" font-size="10" font-weight="500">${blockerLabel}</text>
+                  <title>${blockerTooltip}</title>
                 </g>` : ""}
                 ${issue.assignee ? `<text class="bar-assignee" x="${assigneeX}" y="${barHeight / 2 + 4}"
                       text-anchor="${onLeft ? "end" : "start"}" fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(issue.assignee.length > 12 ? issue.assignee.substring(0, 11) + "…" : issue.assignee)}</text>` : ""}
               </g>`;
             })()}
-            <title>${tooltip}</title>
           </g>
         `;
       })
