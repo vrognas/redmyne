@@ -2351,7 +2351,7 @@ export class GanttPanel {
         // Calculate done portion width for progress visualization
         const doneWidth = (visualDoneRatio / 100) * width;
 
-        const handleWidth = 16;
+        const handleWidth = 8;
 
         // Calculate daily intensity for this issue (skip for parent issues - work is in subtasks)
         // Only compute if intensity display is enabled globally
@@ -3289,6 +3289,7 @@ ${style.tip}
       left: 0;
       z-index: 5;
       background: var(--vscode-editor-background);
+      min-width: ${checkboxColumnWidth + labelWidth * 2 + 10}px;
     }
     .gantt-corner {
       z-index: 15; /* Above both sticky header and sticky left */
