@@ -107,6 +107,9 @@ export class TimerController {
    * Units already have their secondsLeft and unitPhase from persistence
    */
   restoreState(state: TimerState): void {
+    // Stop any existing interval before restoring state
+    this.stopInterval();
+
     // Deep clone all units to avoid reference leaks
     this.state = {
       ...state,

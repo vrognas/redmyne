@@ -432,7 +432,7 @@ export function activate(context: vscode.ExtensionContext): void {
         projectsTree.refresh();
         myTimeEntriesTree.refresh();
 
-        // Fetch FTE from user's custom fields
+        // Fetch FTE from user's custom fields (non-critical, silent fail)
         server.getCurrentUser().then((user) => {
           const fteField = user?.custom_fields?.find(
             (f) => f.name.toLowerCase().includes("fte")
@@ -445,6 +445,8 @@ export function activate(context: vscode.ExtensionContext): void {
               cleanupResources.workloadStatusBar?.update();
             }
           }
+        }).catch(() => {
+          // FTE fetch is non-critical - continue without it
         });
         // Status bar updates via projectsTree event listener
       } catch (error) {
