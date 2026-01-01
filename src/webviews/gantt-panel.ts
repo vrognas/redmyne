@@ -131,7 +131,11 @@ function toGanttIssue(
     start_date: issue.start_date || null,
     due_date: issue.due_date || null,
     status: flexibility?.status ?? null,
-    flexibilitySlack: flexibility?.remaining ?? null,
+    // Calculate days of slack: daysRemaining - (hoursRemaining / 8)
+    // This gives actual buffer in working days, not percentage
+    flexibilitySlack: flexibility
+      ? Math.round(flexibility.daysRemaining - flexibility.hoursRemaining / 8)
+      : null,
     isClosed: isClosedById || isClosedByName,
     project: issue.project?.name ?? "Unknown",
     projectId: issue.project?.id ?? 0,
