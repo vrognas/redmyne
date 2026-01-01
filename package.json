@@ -211,6 +211,11 @@
         "icon": "$(add)"
       },
       {
+        "command": "redmine.quickCreateVersion",
+        "title": "Create Version/Milestone",
+        "icon": "$(milestone)"
+      },
+      {
         "command": "redmine.addIssueToKanban",
         "title": "Add to Kanban",
         "icon": "$(checklist)"
@@ -931,6 +936,11 @@
           "command": "redmine.quickCreateIssue",
           "when": "view == 'redmine-explorer-projects' && viewItem =~ /^project/",
           "group": "redmine@1"
+        },
+        {
+          "command": "redmine.quickCreateVersion",
+          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^project/",
+          "group": "redmine@2"
         },
         {
           "command": "redmine.setDoneRatio",

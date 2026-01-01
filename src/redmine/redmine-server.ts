@@ -434,6 +434,55 @@ export class RedmineServer {
   }
 
   /**
+   * Create a new version (milestone) for a project
+   */
+  async createVersion(
+    projectId: number | string,
+    version: {
+      name: string;
+      description?: string;
+      status?: "open" | "locked" | "closed";
+      sharing?: "none" | "descendants" | "hierarchy" | "tree" | "system";
+      due_date?: string;
+      wiki_page_title?: string;
+    }
+  ): Promise<Version> {
+    const response = await this.doRequest<{ version: Version }>(
+      `/projects/${projectId}/versions.json`,
+      "POST",
+      this.encodeJson({ version })
+    );
+    if (!response?.version) {
+      throw new Error("Failed to create version");
+    }
+    return response.version;
+  }
+
+  /**
+   * Update an existing version
+   */
+  async updateVersion(
+    versionId: number,
+    version: {
+      name?: string;
+      description?: string;
+      status?: "open" | "locked" | "closed";
+      sharing?: "none" | "descendants" | "hierarchy" | "tree" | "system";
+      due_date?: string | null;
+      wiki_page_title?: string;
+    }
+  ): Promise<void> {
+    await this.doRequest(`/versions/${versionId}.json`, "PUT", this.encodeJson({ version }));
+  }
+
+  /**
+   * Delete a version
+   */
+  async deleteVersion(versionId: number): Promise<void> {
+    await this.doRequest(`/versions/${versionId}.json`, "DELETE");
+  }
+
+  /**
    * Check if a project has time_tracking module enabled
    */
   async isTimeTrackingEnabled(projectId: number | string): Promise<boolean> {

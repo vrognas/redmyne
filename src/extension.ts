@@ -12,6 +12,7 @@ import listOpenIssuesAssignedToMe from "./commands/list-open-issues-assigned-to-
 import newIssue from "./commands/new-issue";
 import { quickLogTime } from "./commands/quick-log-time";
 import { quickCreateIssue, quickCreateSubIssue } from "./commands/quick-create-issue";
+import { quickCreateVersion } from "./commands/quick-create-version";
 import { ActionProperties } from "./commands/action-properties";
 import { ProjectsTree, ProjectsViewStyle } from "./trees/projects-tree";
 import { collapseState } from "./utilities/collapse-state";
@@ -663,6 +664,20 @@ export function activate(context: vscode.ExtensionContext): void {
     if (created) {
       projectsTree.clearProjects();
       projectsTree.refresh();
+    }
+  });
+  registerCommand("quickCreateVersion", async (props, ...args) => {
+    // Extract project ID from tree node if invoked from context menu
+    let projectId: number | undefined;
+    if (args[0] && typeof args[0] === "object" && "id" in args[0]) {
+      projectId = (args[0] as { id: number }).id;
+    } else if (typeof args[0] === "number") {
+      projectId = args[0];
+    }
+    const created = await quickCreateVersion(props, projectId);
+    if (created) {
+      // Refresh Gantt if open to show new milestone
+      vscode.commands.executeCommand("redmine.refreshGantt");
     }
   });
   registerCommand("changeDefaultServer", (conf) => {
