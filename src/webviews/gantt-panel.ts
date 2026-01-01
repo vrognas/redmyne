@@ -2721,6 +2721,13 @@ ${style.tip}
     .dependency-arrow .arrow-head { transition: filter 0.15s; }
     .dependency-arrow:hover .arrow-line { stroke-width: 3 !important; filter: brightness(1.2); }
     .dependency-arrow:hover .arrow-head { filter: brightness(1.2); }
+    .dependency-arrow.selected .arrow-line { stroke-width: 4 !important; filter: brightness(1.3) drop-shadow(0 0 6px currentColor); }
+    .dependency-arrow.selected .arrow-head { filter: brightness(1.3) drop-shadow(0 0 6px currentColor); }
+    .arrow-selection-mode .issue-bar { opacity: 0.3; }
+    .arrow-selection-mode .issue-bar.arrow-connected { opacity: 1; }
+    .arrow-selection-mode .issue-bar.arrow-connected .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
+    .arrow-selection-mode .dependency-arrow { opacity: 0.2; }
+    .arrow-selection-mode .dependency-arrow.selected { opacity: 1; }
     /* Hover highlighting - fade labels only for dependency arrow hovers */
     .hover-focus.dependency-hover .issue-label,
     .hover-focus.dependency-hover .project-label { opacity: 0.15; transition: opacity 0.15s ease-out; }
@@ -3942,6 +3949,56 @@ ${style.tip}
         const fromId = arrow.dataset.from;
         const toId = arrow.dataset.to;
         showDeletePicker(e.clientX, e.clientY, relationId, fromId, toId);
+      });
+
+      // Dependency arrow click to select/highlight
+      let selectedArrow = null;
+      timelineSvg.addEventListener('click', (e) => {
+        const arrow = e.target.closest('.dependency-arrow');
+
+        // Clear previous selection
+        if (selectedArrow) {
+          selectedArrow.classList.remove('selected');
+          document.body.classList.remove('arrow-selection-mode');
+          document.querySelectorAll('.arrow-connected').forEach(el => el.classList.remove('arrow-connected'));
+          selectedArrow = null;
+        }
+
+        if (!arrow) return;
+
+        // Select clicked arrow
+        e.stopPropagation();
+        selectedArrow = arrow;
+        arrow.classList.add('selected');
+        document.body.classList.add('arrow-selection-mode');
+
+        // Highlight connected bars
+        const fromId = arrow.dataset.from;
+        const toId = arrow.dataset.to;
+        document.querySelectorAll(\`.issue-bar[data-issue-id="\${fromId}"], .issue-bar[data-issue-id="\${toId}"]\`)
+          .forEach(bar => bar.classList.add('arrow-connected'));
+
+        announce(\`Selected relation from #\${fromId} to #\${toId}\`);
+      });
+
+      // Click elsewhere to deselect arrow
+      document.addEventListener('click', (e) => {
+        if (selectedArrow && !e.target.closest('.dependency-arrow')) {
+          selectedArrow.classList.remove('selected');
+          document.body.classList.remove('arrow-selection-mode');
+          document.querySelectorAll('.arrow-connected').forEach(el => el.classList.remove('arrow-connected'));
+          selectedArrow = null;
+        }
+      });
+
+      // Escape to deselect arrow
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && selectedArrow) {
+          selectedArrow.classList.remove('selected');
+          document.body.classList.remove('arrow-selection-mode');
+          document.querySelectorAll('.arrow-connected').forEach(el => el.classList.remove('arrow-connected'));
+          selectedArrow = null;
+        }
       });
     }
 
