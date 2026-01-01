@@ -1840,6 +1840,18 @@ export class GanttPanel {
     // Visibility is handled via CSS classes for client-side toggling
     const rows = allRows;
 
+    // Calculate health stats for summary (before filtering)
+    let criticalCount = 0, warningCount = 0, healthyCount = 0, blockedCount = 0;
+    for (const r of rows) {
+      if (r.type === "issue" && r.issue && r.isVisible && !r.issue.isClosed) {
+        const s = r.issue.status;
+        if (s === "overbooked") criticalCount++;
+        else if (s === "at-risk") warningCount++;
+        else if (s === "on-track" || s === "completed") healthyCount++;
+        if (r.issue.blockedBy.length > 0) blockedCount++;
+      }
+    }
+
     // Filter visible rows ONCE upfront (avoid multiple .filter() calls)
     // Also apply health filter if set (issues only - projects/time-groups always pass)
     const healthFilter = this._healthFilter;
@@ -3596,6 +3608,28 @@ ${style.tip}
     .blocker-badge { pointer-events: all; }
     .blocker-badge:hover rect { opacity: 0.35 !important; }
     .blocker-badge:hover text { filter: brightness(1.3); }
+    /* Health summary stats */
+    .health-summary { display: flex; gap: 8px; align-items: center; }
+    .health-stat {
+      display: flex; align-items: center; gap: 2px;
+      padding: 2px 6px; border-radius: 4px;
+      font-size: 11px; font-weight: 500;
+      cursor: pointer; transition: background 0.15s;
+      background: var(--vscode-badge-background);
+    }
+    .health-stat:hover { background: var(--vscode-list-hoverBackground); }
+    .health-stat.empty { opacity: 0.4; cursor: default; }
+    .health-stat.empty:hover { background: var(--vscode-badge-background); }
+    .health-stat .stat-icon { font-size: 10px; }
+    .health-stat .stat-count { color: var(--vscode-badge-foreground); min-width: 12px; text-align: center; }
+    .health-stat.critical .stat-count { color: var(--vscode-charts-red); }
+    .health-stat.warning .stat-count { color: var(--vscode-charts-yellow); }
+    .health-stat.healthy .stat-count { color: var(--vscode-charts-green); }
+    .health-stat.blocked .stat-count { color: var(--vscode-charts-red); }
+    /* Health legend */
+    .health-legend { display: flex; gap: 12px; font-size: 11px; margin-left: 12px; align-items: center; }
+    .health-legend-item { opacity: 0.8; white-space: nowrap; }
+    .health-legend-item:hover { opacity: 1; }
   </style>
 </head>
 <body>
@@ -3655,6 +3689,22 @@ ${style.tip}
             }</svg>
           </button>
         </div>
+      </div>
+      <div class="toolbar-separator"></div>
+      <!-- Health summary stats -->
+      <div class="toolbar-group health-summary" role="group" aria-label="Health summary">
+        <span class="health-stat critical${criticalCount === 0 ? " empty" : ""}" data-filter="critical" title="Critical issues - click to filter">
+          <span class="stat-icon">🔴</span><span class="stat-count">${criticalCount}</span>
+        </span>
+        <span class="health-stat warning${warningCount === 0 ? " empty" : ""}" data-filter="warning" title="Warning issues - click to filter">
+          <span class="stat-icon">🟡</span><span class="stat-count">${warningCount}</span>
+        </span>
+        <span class="health-stat healthy${healthyCount === 0 ? " empty" : ""}" data-filter="healthy" title="Healthy issues - click to filter">
+          <span class="stat-icon">🟢</span><span class="stat-count">${healthyCount}</span>
+        </span>
+        <span class="health-stat blocked${blockedCount === 0 ? " empty" : ""}" title="Blocked issues">
+          <span class="stat-icon">⛔</span><span class="stat-count">${blockedCount}</span>
+        </span>
       </div>
       <div class="toolbar-separator"></div>
       <!-- View toggles group -->
@@ -3740,6 +3790,13 @@ ${style.tip}
       <span class="relation-legend-item"><span class="relation-legend-line rel-line-relates"></span>relates</span>
       <span class="relation-legend-item"><span class="relation-legend-line rel-line-duplicates"></span>duplicates</span>
       <span class="relation-legend-item"><span class="relation-legend-line rel-line-copied"></span>copied</span>
+    </div>
+    <div id="healthLegend" class="health-legend" title="Bar badges: flexibility, impact, blockers">
+      <span class="health-legend-item" style="color:var(--vscode-charts-green)">+Nd flex</span>
+      <span class="health-legend-item" style="color:var(--vscode-charts-red)">-Nd behind</span>
+      <span class="health-legend-item">⬇N impact</span>
+      <span class="health-legend-item" style="color:var(--vscode-charts-red)">⛔N blocked</span>
+      <span class="health-legend-item" style="color:var(--vscode-charts-purple)">◆ milestone</span>
     </div>
   </div>
   <div class="gantt-container">
@@ -4182,6 +4239,19 @@ ${style.tip}
     });
     document.getElementById('filterHealth').addEventListener('change', (e) => {
       vscode.postMessage({ command: 'setHealthFilter', health: e.target.value });
+    });
+
+    // Health stat click handlers - filter by clicking on stats
+    document.querySelectorAll('.health-stat[data-filter]').forEach(stat => {
+      stat.addEventListener('click', () => {
+        if (stat.classList.contains('empty')) return;
+        const filter = stat.dataset.filter;
+        const healthSelect = document.getElementById('filterHealth');
+        // Toggle: if already filtered to this, go back to 'all'
+        const newFilter = healthSelect.value === filter ? 'all' : filter;
+        healthSelect.value = newFilter;
+        vscode.postMessage({ command: 'setHealthFilter', health: newFilter });
+      });
     });
 
     // Sort dropdown handlers
@@ -5695,6 +5765,34 @@ ${style.tip}
         sortSelect.value = options[nextIdx];
         sortSelect.dispatchEvent(new Event('change'));
       }
+      // Health filter shortcut (F cycles through health filters)
+      else if (e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        const healthSelect = document.getElementById('filterHealth');
+        const options = ['all', 'critical', 'warning', 'healthy'];
+        const currentIdx = options.indexOf(healthSelect.value);
+        const nextIdx = (currentIdx + 1) % options.length;
+        healthSelect.value = options[nextIdx];
+        vscode.postMessage({ command: 'setHealthFilter', health: options[nextIdx] });
+        announce('Health filter: ' + (options[nextIdx] === 'all' ? 'All' : options[nextIdx]));
+      }
+      // Jump to next blocked issue (B)
+      else if (e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        const blockedBars = Array.from(document.querySelectorAll('.issue-bar[data-issue-id]'))
+          .filter(bar => bar.querySelector('.blocker-badge'));
+        if (blockedBars.length === 0) {
+          announce('No blocked issues');
+          return;
+        }
+        const focusedBar = document.activeElement?.closest('.issue-bar');
+        const currentIdx = focusedBar ? blockedBars.indexOf(focusedBar) : -1;
+        const nextIdx = (currentIdx + 1) % blockedBars.length;
+        const nextBar = blockedBars[nextIdx];
+        scrollToAndHighlight(nextBar.dataset.issueId);
+        nextBar.focus();
+        announce('Blocked issue ' + (nextIdx + 1) + ' of ' + blockedBars.length);
+      }
       // Arrow key date nudging for focused issue bars
       else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         const focusedBar = document.activeElement?.closest('.issue-bar:not(.parent-bar)');
@@ -5837,9 +5935,10 @@ ${style.tip}
               <div><kbd>T</kbd> Today</div>
             </div>
             <div class="shortcut-section">
-              <h4>Other</h4>
+              <h4>Health & Other</h4>
+              <div><kbd>F</kbd> Cycle health filter</div>
+              <div><kbd>B</kbd> Next blocked issue</div>
               <div><kbd>/</kbd> Quick search</div>
-              <div><kbd>?</kbd> This help</div>
               <div><kbd>S</kbd> Cycle sort</div>
               <div><kbd>R</kbd> Refresh</div>
               <div><kbd>Esc</kbd> Clear/cancel</div>
