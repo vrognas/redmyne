@@ -365,6 +365,9 @@ export class GanttPanel {
   private _isRefreshing = false; // Show loading overlay during data refresh
   private _currentFilter: IssueFilter = { ...DEFAULT_ISSUE_FILTER };
   private _filterChangeCallback?: (filter: IssueFilter) => void;
+  // Sort settings
+  private _sortBy: "id" | "assignee" | "start" | "due" = "id";
+  private _sortOrder: "asc" | "desc" = "asc";
   // Ad-hoc budget contribution tracking
   private _contributionData?: ContributionData;
   private _contributionSources?: Map<number, { fromIssueId: number; hours: number }[]>;
@@ -1245,6 +1248,16 @@ export class GanttPanel {
           }
         }
         break;
+      case "setSort":
+        if (message.sortBy) {
+          this._sortBy = message.sortBy;
+        }
+        if (message.sortOrder) {
+          this._sortOrder = message.sortOrder;
+        }
+        this._cachedHierarchy = undefined; // Clear cache to rebuild with new sort
+        this._updateContent();
+        break;
     }
   }
 
@@ -1490,10 +1503,30 @@ export class GanttPanel {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
 
+    // Sort issues before building hierarchy
+    const sortedIssues = [...this._issues].sort((a, b) => {
+      let cmp = 0;
+      switch (this._sortBy) {
+        case "id":
+          cmp = a.id - b.id;
+          break;
+        case "assignee":
+          cmp = (a.assignee ?? "").localeCompare(b.assignee ?? "");
+          break;
+        case "start":
+          cmp = (a.start_date ?? "9999").localeCompare(b.start_date ?? "9999");
+          break;
+        case "due":
+          cmp = (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999");
+          break;
+      }
+      return this._sortOrder === "desc" ? -cmp : cmp;
+    });
+
     // Build hierarchical rows FIRST - needed to know which projects have rows
     // Cache hierarchy to avoid rebuilding on collapse/expand
     if (!this._cachedHierarchy) {
-      this._cachedHierarchy = buildProjectHierarchy(this._issues, this._flexibilityCache, this._projects);
+      this._cachedHierarchy = buildProjectHierarchy(sortedIssues, this._flexibilityCache, this._projects);
     }
     // Get ALL nodes with visibility flags for client-side collapse management
     const flatNodes = flattenHierarchyAll(this._cachedHierarchy, collapseState.getExpandedKeys());
@@ -2972,6 +3005,20 @@ ${style.tip}
             <option value="any"${this._currentFilter.status === "any" ? " selected" : ""}>Any</option>
           </select>
         </div>
+        <div class="filter-toggle" role="group" aria-label="Sort order">
+          <select id="sortBy" title="Sort by (S)">
+            <option value="id"${this._sortBy === "id" ? " selected" : ""}>#ID</option>
+            <option value="assignee"${this._sortBy === "assignee" ? " selected" : ""}>Assignee</option>
+            <option value="start"${this._sortBy === "start" ? " selected" : ""}>Start</option>
+            <option value="due"${this._sortBy === "due" ? " selected" : ""}>Due</option>
+          </select>
+          <button id="sortOrderBtn" class="icon-btn" title="Toggle sort order" aria-label="${this._sortOrder === "asc" ? "Ascending" : "Descending"}">
+            <svg viewBox="0 0 16 16">${this._sortOrder === "asc"
+              ? '<path d="M3 2v10l-2-2-.7.7L3.5 14l3.2-3.3-.7-.7-2 2V2H3zm5 0v1h7V2H8zm0 4v1h5V6H8zm0 4v1h3v-1H8z"/>'
+              : '<path d="M3 14V4l-2 2-.7-.7L3.5 2l3.2 3.3-.7.7-2-2v10H3zm5 0v-1h3v1H8zm0-4v-1h5v1H8zm0-4V5h7v1H8z"/>'
+            }</svg>
+          </button>
+        </div>
       </div>
       <div class="toolbar-separator"></div>
       <!-- View toggles group -->
@@ -3446,6 +3493,15 @@ ${style.tip}
     document.getElementById('filterStatus').addEventListener('change', (e) => {
       const value = e.target.value;
       vscode.postMessage({ command: 'setFilter', filter: { status: value } });
+    });
+
+    // Sort dropdown handlers
+    document.getElementById('sortBy').addEventListener('change', (e) => {
+      vscode.postMessage({ command: 'setSort', sortBy: e.target.value });
+    });
+    document.getElementById('sortOrderBtn').addEventListener('click', () => {
+      const currentOrder = '${this._sortOrder}';
+      vscode.postMessage({ command: 'setSort', sortOrder: currentOrder === 'asc' ? 'desc' : 'asc' });
     });
 
     // Heatmap toggle handler
@@ -4756,6 +4812,16 @@ ${style.tip}
       // Action shortcuts
       else if (e.key.toLowerCase() === 'r') { document.getElementById('refreshBtn')?.click(); }
       else if (e.key.toLowerCase() === 't') { document.getElementById('todayBtn')?.click(); }
+      // Sort shortcut (S cycles through sort options)
+      else if (e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        const sortSelect = document.getElementById('sortBy');
+        const options = ['id', 'assignee', 'start', 'due'];
+        const currentIdx = options.indexOf(sortSelect.value);
+        const nextIdx = (currentIdx + 1) % options.length;
+        sortSelect.value = options[nextIdx];
+        sortSelect.dispatchEvent(new Event('change'));
+      }
       // Arrow key date nudging for focused issue bars
       else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         const focusedBar = document.activeElement?.closest('.issue-bar:not(.parent-bar)');
@@ -4901,8 +4967,8 @@ ${style.tip}
               <h4>Other</h4>
               <div><kbd>/</kbd> Quick search</div>
               <div><kbd>?</kbd> This help</div>
+              <div><kbd>S</kbd> Cycle sort</div>
               <div><kbd>R</kbd> Refresh</div>
-              <div><kbd>Ctrl+A</kbd> Select all</div>
               <div><kbd>Esc</kbd> Clear/cancel</div>
             </div>
           </div>
