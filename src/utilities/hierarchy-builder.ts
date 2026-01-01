@@ -26,6 +26,8 @@ export interface HierarchyNode {
   childCount?: number;
   /** Individual date ranges from all child issues (for non-continuous aggregate bars) */
   childDateRanges?: Array<{ startDate: string | null; dueDate: string | null; issueId: number }>;
+  /** Project name for My Work view (flat list) */
+  projectName?: string;
 }
 
 export interface HierarchyOptions {
@@ -410,6 +412,42 @@ function sortNodesByRisk(
     }
   }
   return result;
+}
+
+/**
+ * Build flat hierarchy for "My Work" view
+ * No project grouping, no parent/child nesting
+ * Sorted by start_date ascending (issues without dates at end)
+ * Each node includes projectName for display
+ */
+export function buildMyWorkHierarchy(
+  issues: Issue[],
+  _flexibilityCache: Map<number, FlexibilityScore | null>
+): HierarchyNode[] {
+  if (issues.length === 0) return [];
+
+  // Sort by start_date: issues with dates first (ascending), then without dates
+  const sorted = [...issues].sort((a, b) => {
+    const aDate = a.start_date;
+    const bDate = b.start_date;
+    if (!aDate && !bDate) return 0;
+    if (!aDate) return 1; // a goes to end
+    if (!bDate) return -1; // b goes to end
+    return aDate.localeCompare(bDate);
+  });
+
+  // Convert to flat nodes
+  return sorted.map((issue): HierarchyNode => ({
+    type: "issue",
+    id: issue.id,
+    label: issue.subject,
+    depth: 0,
+    issue,
+    children: [],
+    collapseKey: `issue-${issue.id}`,
+    parentKey: null,
+    projectName: issue.project?.name ?? "Unknown",
+  }));
 }
 
 /**

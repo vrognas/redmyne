@@ -8,10 +8,10 @@ import { calculateContributions } from "../utilities/contribution-calculator";
 import { adHocTracker } from "../utilities/adhoc-tracker";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { errorToString } from "../utilities/error-feedback";
-import { buildProjectHierarchy, flattenHierarchyAll, FlatNodeWithVisibility, HierarchyNode } from "../utilities/hierarchy-builder";
+import { buildProjectHierarchy, buildMyWorkHierarchy, flattenHierarchyAll, FlatNodeWithVisibility, HierarchyNode } from "../utilities/hierarchy-builder";
 import { collapseState } from "../utilities/collapse-state";
 import { debounce, DebouncedFunction } from "../utilities/debounce";
-import { IssueFilter, DEFAULT_ISSUE_FILTER } from "../redmine/models/common";
+import { IssueFilter, DEFAULT_ISSUE_FILTER, GanttViewMode } from "../redmine/models/common";
 
 const COLLAPSE_DEBOUNCE_MS = 50;
 
@@ -75,6 +75,8 @@ interface GanttRow {
   isVisible: boolean;
   /** Whether this row is expanded (if it has children) - for client-side collapse */
   isExpanded: boolean;
+  /** Project name for My Work view (shown as badge) */
+  projectName?: string;
 }
 
 
@@ -147,6 +149,7 @@ function nodeToGanttRow(node: FlatNodeWithVisibility, flexibilityCache: Map<numb
     hasChildren: node.children.length > 0,
     isVisible: node.isVisible,
     isExpanded: node.isExpanded,
+    projectName: node.projectName,
   };
 }
 
@@ -332,6 +335,7 @@ function getHeatmapColor(utilization: number): string {
  * Shows issues as horizontal bars on a timeline
  */
 const HIDDEN_PROJECTS_KEY = "redmine.gantt.hiddenProjects";
+const VIEW_MODE_KEY = "redmine.gantt.viewMode";
 
 export class GanttPanel {
   public static currentPanel: GanttPanel | undefined;
@@ -365,6 +369,7 @@ export class GanttPanel {
   private _isRefreshing = false; // Show loading overlay during data refresh
   private _currentFilter: IssueFilter = { ...DEFAULT_ISSUE_FILTER };
   private _filterChangeCallback?: (filter: IssueFilter) => void;
+  private _viewMode: GanttViewMode = "projects";
   // Sort settings
   private _sortBy: "id" | "assignee" | "start" | "due" = "id";
   private _sortOrder: "asc" | "desc" = "asc";
@@ -383,10 +388,11 @@ export class GanttPanel {
       this._disposables
     );
 
-    // Restore hidden projects from globalState
+    // Restore hidden projects and view mode from globalState
     if (GanttPanel._globalState) {
       const saved = GanttPanel._globalState.get<number[]>(HIDDEN_PROJECTS_KEY, []);
       this._hiddenProjects = new Set(saved);
+      this._viewMode = GanttPanel._globalState.get<GanttViewMode>(VIEW_MODE_KEY, "projects");
     }
 
     // Create debounced collapse update to prevent rapid re-renders
@@ -550,6 +556,31 @@ export class GanttPanel {
       background: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
       opacity: 1;
+    }
+    .view-mode-toggle {
+      display: flex;
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .view-mode-toggle button {
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: none;
+      border-right: 1px solid var(--vscode-panel-border);
+      padding: 4px 8px;
+      font-size: 11px;
+      opacity: 0.5;
+      cursor: pointer;
+    }
+    .view-mode-toggle button:last-child { border-right: none; }
+    .view-mode-toggle button.active {
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      opacity: 1;
+    }
+    .view-mode-toggle button:hover:not(.active) {
+      opacity: 0.75;
     }
     .filter-toggle {
       display: flex;
@@ -970,6 +1001,7 @@ export class GanttPanel {
     startDate?: string | null;
     dueDate?: string | null;
     zoomLevel?: ZoomLevel;
+    viewMode?: GanttViewMode; // For setViewMode
     relationId?: number;
     targetIssueId?: number;
     relationType?: CreatableRelationType;
@@ -984,6 +1016,8 @@ export class GanttPanel {
     visible?: boolean; // For setAllProjectsVisibility
     isExpanded?: boolean; // For collapseStateSync
     filter?: { assignee?: string; status?: string }; // For setFilter
+    sortBy?: "id" | "assignee" | "start" | "due"; // For setSort
+    sortOrder?: "asc" | "desc"; // For setSort
   }): void {
     switch (message.command) {
       case "openIssue":
@@ -1012,6 +1046,14 @@ export class GanttPanel {
       case "setZoom":
         if (message.zoomLevel) {
           this._zoomLevel = message.zoomLevel;
+          this._updateContent();
+        }
+        break;
+      case "setViewMode":
+        if (message.viewMode && (message.viewMode === "projects" || message.viewMode === "mywork")) {
+          this._viewMode = message.viewMode;
+          this._cachedHierarchy = undefined; // Rebuild hierarchy with new mode
+          GanttPanel._globalState?.update(VIEW_MODE_KEY, this._viewMode);
           this._updateContent();
         }
         break;
@@ -1511,7 +1553,7 @@ export class GanttPanel {
           cmp = a.id - b.id;
           break;
         case "assignee":
-          cmp = (a.assignee ?? "").localeCompare(b.assignee ?? "");
+          cmp = (a.assigned_to?.name ?? "").localeCompare(b.assigned_to?.name ?? "");
           break;
         case "start":
           cmp = (a.start_date ?? "9999").localeCompare(b.start_date ?? "9999");
@@ -1526,7 +1568,9 @@ export class GanttPanel {
     // Build hierarchical rows FIRST - needed to know which projects have rows
     // Cache hierarchy to avoid rebuilding on collapse/expand
     if (!this._cachedHierarchy) {
-      this._cachedHierarchy = buildProjectHierarchy(sortedIssues, this._flexibilityCache, this._projects);
+      this._cachedHierarchy = this._viewMode === "mywork"
+        ? buildMyWorkHierarchy(sortedIssues, this._flexibilityCache)
+        : buildProjectHierarchy(sortedIssues, this._flexibilityCache, this._projects);
     }
     // Get ALL nodes with visibility flags for client-side collapse management
     const flatNodes = flattenHierarchyAll(this._cachedHierarchy, collapseState.getExpandedKeys());
@@ -1779,11 +1823,16 @@ export class GanttPanel {
 
         const tooltip = tooltipLines.join("\n");
 
+        // In My Work view, show project badge
+        const projectBadge = this._viewMode === "mywork" && row.projectName
+          ? `<tspan fill="var(--vscode-descriptionForeground)" font-size="10">[${escapeHtml(row.projectName)}]</tspan> `
+          : "";
+
         return `
           <g class="issue-label gantt-row cursor-pointer" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Open issue #${issue.id}">
             ${chevron}
             <text x="${5 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12">
-              #${issue.id} ${escapedSubject}
+              ${projectBadge}#${issue.id} ${escapedSubject}
             </text>
             <title>${tooltip}</title>
           </g>
@@ -2421,6 +2470,36 @@ ${style.tip}
       background: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
     }
+    .view-mode-toggle {
+      display: flex;
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .view-mode-toggle button {
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: none;
+      border-right: 1px solid var(--vscode-panel-border);
+      padding: 4px 8px;
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .view-mode-toggle button:last-child {
+      border-right: none;
+    }
+    .view-mode-toggle button:hover:not(.active) {
+      background: var(--vscode-button-secondaryHoverBackground);
+    }
+    .view-mode-toggle button:focus-visible {
+      outline: 2px solid var(--vscode-focusBorder);
+      outline-offset: -1px;
+      z-index: 1;
+    }
+    .view-mode-toggle button.active {
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+    }
     .filter-toggle {
       display: flex;
       border: 1px solid var(--vscode-panel-border);
@@ -2998,6 +3077,14 @@ ${style.tip}
         </div>
       </div>
       <div class="toolbar-separator"></div>
+      <!-- View mode group -->
+      <div class="toolbar-group">
+        <div class="view-mode-toggle" role="group" aria-label="View mode">
+          <button id="viewProjects" class="${this._viewMode === "projects" ? "active" : ""}" title="Group by project (V)">Projects</button>
+          <button id="viewMyWork" class="${this._viewMode === "mywork" ? "active" : ""}" title="My Work timeline (V)">My Work</button>
+        </div>
+      </div>
+      <div class="toolbar-separator"></div>
       <!-- Filter group -->
       <div class="toolbar-group">
         <div class="filter-toggle" role="group" aria-label="Issue filter">
@@ -3489,6 +3576,14 @@ ${style.tip}
     document.getElementById('zoomYear').addEventListener('click', () => {
       saveStateForZoom();
       vscode.postMessage({ command: 'setZoom', zoomLevel: 'year' });
+    });
+
+    // View mode toggle handlers
+    document.getElementById('viewProjects').addEventListener('click', () => {
+      vscode.postMessage({ command: 'setViewMode', viewMode: 'projects' });
+    });
+    document.getElementById('viewMyWork').addEventListener('click', () => {
+      vscode.postMessage({ command: 'setViewMode', viewMode: 'mywork' });
     });
 
     // Filter dropdown handlers
@@ -4865,6 +4960,11 @@ ${style.tip}
       else if (e.key.toLowerCase() === 'd') { document.getElementById('depsBtn')?.click(); }
       else if (e.key.toLowerCase() === 'c') { document.getElementById('criticalPathBtn')?.click(); }
       else if (e.key.toLowerCase() === 'i') { document.getElementById('intensityBtn')?.click(); }
+      else if (e.key.toLowerCase() === 'v') {
+        // Toggle view mode between Projects and My Work
+        const isProjects = document.getElementById('viewProjects')?.classList.contains('active');
+        document.getElementById(isProjects ? 'viewMyWork' : 'viewProjects')?.click();
+      }
       // Action shortcuts
       else if (e.key.toLowerCase() === 'r') { document.getElementById('refreshBtn')?.click(); }
       else if (e.key.toLowerCase() === 't') { document.getElementById('todayBtn')?.click(); }

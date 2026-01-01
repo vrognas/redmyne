@@ -49,3 +49,10 @@ export type IssueSortField = "id" | "subject" | "assignee";
  * Sort fields for Time Entries view
  */
 export type TimeEntrySortField = "id" | "subject" | "comment" | "user";
+
+/**
+ * Gantt view mode
+ * - projects: Group by project hierarchy (default)
+ * - mywork: Flat list sorted by date (personal capacity view)
+ */
+export type GanttViewMode = "projects" | "mywork";
