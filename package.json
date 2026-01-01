@@ -1134,9 +1134,23 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+            "enum": [
+              "Mon",
+              "Tue",
+              "Wed",
+              "Thu",
+              "Fri",
+              "Sat",
+              "Sun"
+            ]
           },
-          "default": ["Mon", "Tue", "Wed", "Thu", "Fri"],
+          "default": [
+            "Mon",
+            "Tue",
+            "Wed",
+            "Thu",
+            "Fri"
+          ],
           "minItems": 1,
           "maxItems": 7,
           "uniqueItems": true,
@@ -1156,13 +1170,41 @@
             "Sun": 0
           },
           "properties": {
-            "Mon": { "type": "number", "minimum": 0, "maximum": 24 },
-            "Tue": { "type": "number", "minimum": 0, "maximum": 24 },
-            "Wed": { "type": "number", "minimum": 0, "maximum": 24 },
-            "Thu": { "type": "number", "minimum": 0, "maximum": 24 },
-            "Fri": { "type": "number", "minimum": 0, "maximum": 24 },
-            "Sat": { "type": "number", "minimum": 0, "maximum": 24 },
-            "Sun": { "type": "number", "minimum": 0, "maximum": 24 }
+            "Mon": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 24
+            },
+            "Tue": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 24
+            },
+            "Wed": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 24
+            },
+            "Thu": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 24
+            },
+            "Fri": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 24
+            },
+            "Sat": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 24
+            },
+            "Sun": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 24
+            }
           },
           "additionalProperties": false,
           "scope": "application",
@@ -1201,7 +1243,9 @@
             "media": {
               "markdown": "media/walkthrough/configure.md"
             },
-            "completionEvents": ["onSettingChanged:redmine.url"]
+            "completionEvents": [
+              "onSettingChanged:redmine.url"
+            ]
           },
           {
             "id": "redmine.logTime",
@@ -1210,7 +1254,9 @@
             "media": {
               "markdown": "media/walkthrough/log-time.md"
             },
-            "completionEvents": ["onCommand:redmine.quickLogTime"]
+            "completionEvents": [
+              "onCommand:redmine.quickLogTime"
+            ]
           },
           {
             "id": "redmine.viewIssues",
@@ -1219,7 +1265,9 @@
             "media": {
               "markdown": "media/walkthrough/view-issues.md"
             },
-            "completionEvents": ["onView:redmine-explorer-projects"]
+            "completionEvents": [
+              "onView:redmine-explorer-projects"
+            ]
           },
           {
             "id": "redmine.goDeeper",
@@ -1228,7 +1276,9 @@
             "media": {
               "markdown": "media/walkthrough/timeline.md"
             },
-            "completionEvents": ["onCommand:redmine.showGantt"]
+            "completionEvents": [
+              "onCommand:redmine.showGantt"
+            ]
           }
         ]
       }
@@ -1264,5 +1314,8 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.48.0",
     "vitest": "^4.0.13"
+  },
+  "dependencies": {
+    "date-fns": "^4.1.0"
   }
 }

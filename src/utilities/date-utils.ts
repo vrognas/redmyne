@@ -2,22 +2,31 @@
  * Shared date utilities
  */
 
+import { getISOWeek, getISOWeekYear, startOfISOWeek, endOfISOWeek } from "date-fns";
+
 /**
- * Format date as ISO string (YYYY-MM-DD)
+ * Format date as YYYY-MM-DD in local timezone (avoids UTC conversion issues)
  */
-export function formatDateISO(date: Date): string {
-  return date.toISOString().split("T")[0];
+export function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 /**
- * Get Monday of current week as YYYY-MM-DD
+ * Format date as ISO string (YYYY-MM-DD) - uses local timezone
+ */
+export function formatDateISO(date: Date): string {
+  return formatLocalDate(date);
+}
+
+/**
+ * Get Monday of current week as YYYY-MM-DD (uses date-fns for reliability)
  */
 export function getWeekStart(): string {
   const now = new Date();
-  const dayOfWeek = now.getDay();
-  const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Monday
-  const weekStart = new Date(now.setDate(diff));
-  return weekStart.toISOString().split("T")[0];
+  return formatLocalDate(startOfISOWeek(now));
 }
 
 /**
@@ -25,9 +34,7 @@ export function getWeekStart(): string {
  */
 export function getMonthStart(): string {
   const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1)
-    .toISOString()
-    .split("T")[0];
+  return formatLocalDate(new Date(now.getFullYear(), now.getMonth(), 1));
 }
 
 /**
@@ -38,8 +45,8 @@ export function getLastMonthRange(): { start: string; end: string; name: string 
   const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0); // Day 0 = last day of prev month
   return {
-    start: lastMonthStart.toISOString().split("T")[0],
-    end: lastMonthEnd.toISOString().split("T")[0],
+    start: formatLocalDate(lastMonthStart),
+    end: formatLocalDate(lastMonthEnd),
     name: lastMonthStart.toLocaleDateString("en-US", { month: "short" }),
   };
 }
@@ -53,7 +60,7 @@ export function getDateRange(start: string, end: string): string[] {
   const endDate = new Date(end + "T12:00:00");
 
   while (current <= endDate) {
-    dates.push(current.toISOString().split("T")[0]);
+    dates.push(formatLocalDate(current));
     current.setDate(current.getDate() + 1);
   }
 
@@ -61,54 +68,40 @@ export function getDateRange(start: string, end: string): string[] {
 }
 
 /**
- * Get ISO week number for a date
+ * Get ISO week number for a date (uses date-fns for reliability)
  */
 export function getISOWeekNumber(date: Date): number {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  // Set to nearest Thursday (current date + 4 - current day number, making Sunday = 7)
-  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-  // Get first day of year
-  const yearStart = new Date(d.getFullYear(), 0, 1);
-  // Calculate full weeks to nearest Thursday
-  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return getISOWeek(date);
 }
 
 /**
  * Get ISO week year for a date (may differ from calendar year at year boundaries)
+ * Uses date-fns for reliable calculations
  */
-export function getISOWeekYear(date: Date): number {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  // Set to nearest Thursday
-  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-  return d.getFullYear();
-}
+export { getISOWeekYear };
 
 /**
  * Get date range (Mon-Sun) for a given ISO week number and year
+ * Uses date-fns for reliable week boundary calculations
  */
 export function getWeekDateRange(
   weekNum: number,
   year: number
 ): { start: string; end: string } {
-  // January 4th is always in week 1
-  const jan4 = new Date(year, 0, 4);
-  // Find the Monday of week 1
-  const dayOfWeek = jan4.getDay() || 7; // Sunday = 7
-  const week1Monday = new Date(jan4);
-  week1Monday.setDate(jan4.getDate() - dayOfWeek + 1);
+  // Create a date in the target week (using Jan 4 as reference since it's always in week 1)
+  const jan4 = new Date(year, 0, 4, 12, 0, 0);
+  const week1Start = startOfISOWeek(jan4);
 
-  // Calculate target week's Monday
-  const targetMonday = new Date(week1Monday);
-  targetMonday.setDate(week1Monday.getDate() + (weekNum - 1) * 7);
+  // Calculate target week's Monday by adding (weekNum - 1) weeks
+  const targetMonday = new Date(week1Start);
+  targetMonday.setDate(week1Start.getDate() + (weekNum - 1) * 7);
 
-  // Calculate Sunday
-  const targetSunday = new Date(targetMonday);
-  targetSunday.setDate(targetMonday.getDate() + 6);
+  // Get start and end of that week using date-fns
+  const start = startOfISOWeek(targetMonday);
+  const end = endOfISOWeek(targetMonday);
 
   return {
-    start: targetMonday.toISOString().split("T")[0],
-    end: targetSunday.toISOString().split("T")[0],
+    start: formatLocalDate(start),
+    end: formatLocalDate(end),
   };
 }

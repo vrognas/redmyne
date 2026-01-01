@@ -19,6 +19,7 @@ import {
   getISOWeekNumber,
   getISOWeekYear,
   getWeekDateRange,
+  formatLocalDate,
 } from "../utilities/date-utils";
 import { SortConfig, TimeEntrySortField } from "../redmine/models/common";
 
@@ -116,7 +117,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     }
 
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const today = formatLocalDate(new Date());
       const weekStart = getWeekStart();
       const monthStart = getMonthStart();
       const lastMonth = getLastMonthRange();
@@ -352,7 +353,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     const defaultSchedule = getWeeklySchedule();
 
     // Get today's date for capping week range
-    const today = new Date().toISOString().split("T")[0];
+    const today = formatLocalDate(new Date());
 
     // Create week subgroup nodes
     return sortedKeys.map((key) => {
