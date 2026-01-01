@@ -9,6 +9,7 @@ import { adHocTracker } from "../utilities/adhoc-tracker";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { errorToString } from "../utilities/error-feedback";
 import { buildProjectHierarchy, buildMyWorkHierarchy, flattenHierarchyAll, FlatNodeWithVisibility, HierarchyNode } from "../utilities/hierarchy-builder";
+import { calculateDailyCapacity } from "../utilities/capacity-calculator";
 import { collapseState } from "../utilities/collapse-state";
 import { debounce, DebouncedFunction } from "../utilities/debounce";
 import { IssueFilter, DEFAULT_ISSUE_FILTER, GanttViewMode } from "../redmine/models/common";
@@ -370,6 +371,7 @@ export class GanttPanel {
   private _currentFilter: IssueFilter = { ...DEFAULT_ISSUE_FILTER };
   private _filterChangeCallback?: (filter: IssueFilter) => void;
   private _viewMode: GanttViewMode = "projects";
+  private _showCapacityRibbon = true; // Capacity ribbon visible by default in My Work
   // Sort settings
   private _sortBy: "id" | "assignee" | "start" | "due" = "id";
   private _sortOrder: "asc" | "desc" = "asc";
@@ -1080,6 +1082,13 @@ export class GanttPanel {
         this._panel.webview.postMessage({
           command: "setDependenciesState",
           enabled: this._showDependencies,
+        });
+        break;
+      case "toggleCapacityRibbon":
+        this._showCapacityRibbon = !this._showCapacityRibbon;
+        this._panel.webview.postMessage({
+          command: "setCapacityRibbonState",
+          enabled: this._showCapacityRibbon,
         });
         break;
       case "toggleIntensity":
@@ -2335,6 +2344,28 @@ ${style.tip}
     // Always calculate aggregate workload (needed for heatmap toggle without re-render)
     const workloadMap = calculateAggregateWorkload(this._issues, this._schedule, minDate, maxDate);
 
+    // Calculate capacity ribbon data (My Work mode only)
+    const minDateStr = minDate.toISOString().slice(0, 10);
+    const capacityData = this._viewMode === "mywork"
+      ? calculateDailyCapacity(this._issues, this._schedule, minDateStr, maxDateStr)
+      : [];
+
+    // Build capacity ribbon bars (one rect per day showing load status)
+    const ribbonHeight = 20;
+    const capacityRibbonBars = capacityData.map((day) => {
+      const dayDate = new Date(day.date);
+      const dayX = ((dayDate.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
+      const dayWidth = pixelsPerDay;
+      const fillColor = day.status === "available"
+        ? "var(--vscode-charts-green)"
+        : day.status === "busy"
+          ? "var(--vscode-charts-yellow)"
+          : "var(--vscode-charts-red)";
+      const opacity = Math.min(0.8, 0.3 + (day.percentage / 200)); // Scale opacity with load
+      const tooltip = `${day.date}: ${day.loadHours}h / ${day.capacityHours}h (${day.percentage}%)`;
+      return `<rect x="${dayX}" y="0" width="${dayWidth}" height="${ribbonHeight}" fill="${fillColor}" opacity="${opacity}"><title>${escapeHtml(tooltip)}</title></rect>`;
+    }).join("");
+
     // Date markers split into fixed header and scrollable body
     const dateMarkers = this._generateDateMarkers(
       minDate,
@@ -2582,6 +2613,42 @@ ${style.tip}
     .relation-legend-line {
       width: 20px;
       height: 2px;
+    }
+    /* Capacity legend and ribbon */
+    .capacity-legend {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .capacity-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .capacity-legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+    }
+    .capacity-available { background: var(--vscode-charts-green); opacity: 0.7; }
+    .capacity-busy { background: var(--vscode-charts-yellow); opacity: 0.7; }
+    .capacity-overloaded { background: var(--vscode-charts-red); opacity: 0.7; }
+    .capacity-ribbon-row {
+      position: sticky;
+      top: 40px;
+      z-index: 5;
+      background: var(--vscode-editor-background);
+      border-bottom: 1px solid var(--vscode-panel-border);
+    }
+    .capacity-ribbon-row.hidden { display: none; }
+    .capacity-ribbon-label {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 8px;
+      font-size: 10px;
+      color: var(--vscode-descriptionForeground);
+      background: var(--vscode-editor-background);
     }
     /* Overflow menu */
     .overflow-menu-container {
@@ -3120,6 +3187,10 @@ ${style.tip}
           <svg viewBox="0 0 16 16"><path d="M8 1a3 3 0 0 0-3 3v2.5a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zm4 5.5a4 4 0 1 1-8 0V4a4 4 0 1 1 8 0v2.5zM8 11a5 5 0 0 1-5-5H2a6 6 0 0 0 5 5.91V14H5v1h6v-1H9v-2.09A6 6 0 0 0 14 6h-1a5 5 0 0 1-5 5z"/></svg>
           Heatmap
         </button>
+        <button id="capacityBtn" class="icon-btn${this._showCapacityRibbon && this._viewMode === "mywork" ? " active" : ""}${this._viewMode !== "mywork" ? " disabled" : ""}" title="Toggle capacity ribbon (Y)" aria-pressed="${this._showCapacityRibbon}" ${this._viewMode !== "mywork" ? "disabled" : ""}>
+          <svg viewBox="0 0 16 16"><path d="M2 4h12v1H2V4zm0 3h8v1H2V7zm0 3h12v1H2v-1zm0 3h6v1H2v-1z"/></svg>
+          Capacity
+        </button>
         <button id="depsBtn" class="icon-btn${this._showDependencies ? " active" : ""}" title="Toggle dependency arrows (D)" aria-pressed="${this._showDependencies}">
           <svg viewBox="0 0 16 16"><path d="M5 3.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm-6.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM10 8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM5.354 4.354l1.5 1.5-.708.707-1.5-1.5.708-.707zm4.792 5.292l1.5 1.5-.707.708-1.5-1.5.707-.708z"/></svg>
           Relations
@@ -3174,13 +3245,18 @@ ${style.tip}
       <span id="selectionCount" class="selection-count hidden"></span>
     </div>
   </div>
-  <!-- Legend row (shown when heatmap or deps enabled) -->
-  <div id="legendRow" class="legend-row${this._showWorkloadHeatmap || this._showDependencies ? "" : " hidden"}">
+  <!-- Legend row (shown when heatmap or deps or capacity enabled) -->
+  <div id="legendRow" class="legend-row${this._showWorkloadHeatmap || this._showDependencies || (this._viewMode === "mywork" && this._showCapacityRibbon) ? "" : " hidden"}">
     <div id="heatmapLegend" class="heatmap-legend${this._showWorkloadHeatmap ? "" : " hidden"}">
       <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-green"></span>&lt;80%</span>
       <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-yellow"></span>80-100%</span>
       <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-orange"></span>100-120%</span>
       <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-red"></span>&gt;120%</span>
+    </div>
+    <div id="capacityLegend" class="capacity-legend${this._viewMode === "mywork" && this._showCapacityRibbon ? "" : " hidden"}" title="Daily workload capacity">
+      <span class="capacity-legend-item"><span class="capacity-legend-color capacity-available"></span>&lt;80% available</span>
+      <span class="capacity-legend-item"><span class="capacity-legend-color capacity-busy"></span>80-100% busy</span>
+      <span class="capacity-legend-item"><span class="capacity-legend-color capacity-overloaded"></span>&gt;100% overloaded</span>
     </div>
     <div id="relationLegend" class="relation-legend${this._showDependencies ? "" : " hidden"}" title="Relation types (drag from link handle to create)">
       <span class="relation-legend-item"><span class="relation-legend-line rel-line-blocks"></span>blocks</span>
@@ -3211,6 +3287,19 @@ ${style.tip}
         <div class="gantt-timeline-header" id="ganttTimelineHeader">
           <svg width="${timelineWidth}" height="${headerHeight}">
             ${dateMarkers.header}
+          </svg>
+        </div>
+      </div>
+      <!-- Capacity ribbon (My Work mode only) -->
+      <div class="capacity-ribbon-row capacity-ribbon${this._viewMode !== "mywork" || !this._showCapacityRibbon ? " hidden" : ""}">
+        <div class="gantt-sticky-left gantt-corner">
+          <div class="capacity-ribbon-label" style="width: ${checkboxColumnWidth + labelWidth * 2}px; height: ${ribbonHeight}px;">
+            Capacity
+          </div>
+        </div>
+        <div class="capacity-ribbon-timeline">
+          <svg width="${timelineWidth}" height="${ribbonHeight}">
+            ${capacityRibbonBars}
           </svg>
         </div>
       </div>
@@ -3470,10 +3559,12 @@ ${style.tip}
         const legendRow = document.getElementById('legendRow');
         const heatmapLegend = document.getElementById('heatmapLegend');
         const relationLegend = document.getElementById('relationLegend');
+        const capacityLegend = document.getElementById('capacityLegend');
         const heatmapVisible = heatmapLegend && !heatmapLegend.classList.contains('hidden');
         const depsVisible = relationLegend && !relationLegend.classList.contains('hidden');
+        const capacityVisible = capacityLegend && !capacityLegend.classList.contains('hidden');
         if (legendRow) {
-          if (heatmapVisible || depsVisible) {
+          if (heatmapVisible || depsVisible || capacityVisible) {
             legendRow.classList.remove('hidden');
           } else {
             legendRow.classList.add('hidden');
@@ -3512,6 +3603,21 @@ ${style.tip}
           if (dependencyLayer) dependencyLayer.classList.add('hidden');
           if (depsBtn) depsBtn.classList.remove('active');
           if (relationLegend) relationLegend.classList.add('hidden');
+        }
+        updateLegendRow();
+      } else if (message.command === 'setCapacityRibbonState') {
+        const capacityRibbon = document.querySelector('.capacity-ribbon');
+        const capacityBtn = document.getElementById('capacityBtn');
+        const capacityLegend = document.getElementById('capacityLegend');
+
+        if (message.enabled) {
+          if (capacityRibbon) capacityRibbon.classList.remove('hidden');
+          if (capacityBtn) capacityBtn.classList.add('active');
+          if (capacityLegend) capacityLegend.classList.remove('hidden');
+        } else {
+          if (capacityRibbon) capacityRibbon.classList.add('hidden');
+          if (capacityBtn) capacityBtn.classList.remove('active');
+          if (capacityLegend) capacityLegend.classList.add('hidden');
         }
         updateLegendRow();
       } else if (message.command === 'pushUndoAction') {
@@ -3609,6 +3715,12 @@ ${style.tip}
     document.getElementById('heatmapBtn').addEventListener('click', () => {
       saveState();
       vscode.postMessage({ command: 'toggleWorkloadHeatmap' });
+    });
+
+    // Capacity ribbon toggle handler
+    document.getElementById('capacityBtn')?.addEventListener('click', () => {
+      saveState();
+      vscode.postMessage({ command: 'toggleCapacityRibbon' });
     });
 
     // Dependencies toggle handler
@@ -4957,6 +5069,7 @@ ${style.tip}
       else if (e.key === '5') { document.getElementById('zoomYear')?.click(); }
       // Toggle shortcuts
       else if (e.key.toLowerCase() === 'h') { document.getElementById('heatmapBtn')?.click(); }
+      else if (e.key.toLowerCase() === 'y') { document.getElementById('capacityBtn')?.click(); }
       else if (e.key.toLowerCase() === 'd') { document.getElementById('depsBtn')?.click(); }
       else if (e.key.toLowerCase() === 'c') { document.getElementById('criticalPathBtn')?.click(); }
       else if (e.key.toLowerCase() === 'i') { document.getElementById('intensityBtn')?.click(); }
