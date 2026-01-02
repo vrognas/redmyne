@@ -3030,7 +3030,7 @@ ${style.tip}
 
     // Generate minimap bars (simplified representation) - only for visible projects
     const minimapBarHeight = 4;
-    const minimapHeight = 28;
+    const minimapHeight = 20;
     const minimapBars = rows
       .filter(r => r.type === "issue" && r.issue && (r.issue.start_date || r.issue.due_date) && !isInHiddenTreeCached(r))
       .map((row) => {
@@ -3515,9 +3515,10 @@ ${style.tip}
       overflow: auto;
       min-height: 0;
     }
-    .gantt-scroll::-webkit-scrollbar { width: 8px; height: 0; }
+    .gantt-scroll::-webkit-scrollbar { width: 8px; }
+    .gantt-scroll::-webkit-scrollbar:horizontal { display: none; }
     .gantt-scroll::-webkit-scrollbar-thumb { background: var(--vscode-scrollbarSlider-background); border-radius: 4px; }
-    .gantt-scroll::-webkit-scrollbar-corner { background: var(--vscode-editor-background); }
+    .gantt-scroll::-webkit-scrollbar-corner { background: transparent; }
     .gantt-header-row {
       display: flex;
       position: sticky;
@@ -3958,55 +3959,35 @@ ${style.tip}
     .rel-start_to_finish .arrow-head { fill: var(--vscode-charts-purple); }
     .color-swatch { display: inline-block; width: 12px; height: 3px; margin-right: 8px; vertical-align: middle; }
 
-    /* Minimap - positioned at bottom of timeline area */
-    .minimap-row {
-      display: flex;
-      height: 24px;
-      flex-shrink: 0;
-      border-top: 1px solid var(--vscode-panel-border);
-      background: var(--vscode-editor-background);
-      width: max-content;
-      min-width: 100%;
-    }
-    .minimap-row .gantt-sticky-left {
-      display: flex;
-      flex-shrink: 0;
-      background: var(--vscode-editor-background);
-    }
+    /* Minimap - fixed at bottom of timeline, acts as horizontal scrollbar */
     .minimap-container {
-      flex-grow: 1;
-      position: relative;
-      overflow: hidden;
-      background: var(--vscode-minimap-background, rgba(0,0,0,0.05));
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 20px;
+      background: var(--vscode-editor-background);
+      border-top: 1px solid var(--vscode-panel-border);
+      z-index: 5;
     }
     .minimap-container svg {
       display: block;
       width: 100%;
       height: 100%;
     }
-    .minimap-bar {
-      opacity: 0.85;
+    .gantt-timeline {
+      position: relative;
+      padding-bottom: 20px; /* Space for minimap */
     }
-    .minimap-bar.bar-past {
-      opacity: 0.4;
-    }
+    .minimap-bar { opacity: 0.85; }
+    .minimap-bar.bar-past { opacity: 0.4; }
     .minimap-viewport {
-      fill: var(--vscode-minimapSlider-background, rgba(100, 100, 100, 0.25));
-      stroke: none;
+      fill: var(--vscode-scrollbarSlider-background, rgba(100, 100, 100, 0.4));
       cursor: grab;
-      transition: fill 0.1s;
     }
-    .minimap-viewport:hover {
-      fill: var(--vscode-minimapSlider-hoverBackground, rgba(100, 100, 100, 0.4));
-    }
-    .minimap-viewport:active {
-      cursor: grabbing;
-      fill: var(--vscode-minimapSlider-activeBackground, rgba(100, 100, 100, 0.55));
-    }
-    .minimap-today {
-      stroke: var(--vscode-charts-red);
-      stroke-width: 1.5;
-    }
+    .minimap-viewport:hover { fill: var(--vscode-scrollbarSlider-hoverBackground, rgba(100, 100, 100, 0.5)); }
+    .minimap-viewport:active { cursor: grabbing; fill: var(--vscode-scrollbarSlider-activeBackground, rgba(100, 100, 100, 0.6)); }
+    .minimap-today { stroke: var(--vscode-charts-red); stroke-width: 1; }
     /* Milestone markers */
     .milestone-marker {
       pointer-events: all;
@@ -4324,16 +4305,12 @@ ${style.tip}
             ${bars}
             <g class="milestone-layer">${milestoneMarkers}</g>
           </svg>
+          <div class="minimap-container" id="minimapContainer">
+            <svg id="minimapSvg" viewBox="0 0 ${timelineWidth} ${minimapHeight}" preserveAspectRatio="none">
+              <rect class="minimap-viewport" id="minimapViewport" x="0" y="0" width="100" height="${minimapHeight}"/>
+            </svg>
+          </div>
         </div>
-      </div>
-    </div>
-    <div class="minimap-row">
-      <div class="gantt-sticky-left" style="width: ${checkboxColumnWidth + labelWidth + extraColumnsWidth}px;"></div>
-      <div class="minimap-container" id="minimapContainer">
-        <svg id="minimapSvg" viewBox="0 0 ${timelineWidth} ${minimapHeight}" preserveAspectRatio="none">
-          <line class="minimap-today" x1="${todayX}" y1="0" x2="${todayX}" y2="${minimapHeight}"/>
-          <rect class="minimap-viewport" id="minimapViewport" x="0" y="0" width="100" height="${minimapHeight}" rx="2"/>
-        </svg>
       </div>
     </div>
   </div>
