@@ -2712,6 +2712,20 @@ export class GanttPanel {
                   fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1" rx="8" ry="8" pointer-events="all">
               <title>${barTooltip}</title>
             </rect>
+            ${(() => {
+              // Show subject text on bar if it fits (min 40px width, ~6px per char)
+              const padding = 12;
+              const availableWidth = width - padding * 2;
+              if (availableWidth < 30) return "";
+              const maxChars = Math.floor(availableWidth / 6);
+              if (maxChars < 3) return "";
+              const displaySubject = issue.subject.length > maxChars
+                ? issue.subject.substring(0, maxChars - 1) + "…"
+                : issue.subject;
+              return `<text class="bar-subject" x="${startX + padding}" y="${barHeight / 2 + 4}"
+                    fill="var(--vscode-editor-foreground)" font-size="10" opacity="0.9"
+                    pointer-events="none">${escapeHtml(displaySubject)}</text>`;
+            })()}
             <rect class="drag-handle drag-left cursor-ew-resize" x="${startX}" y="0" width="${handleWidth}" height="${barHeight}"
                   fill="transparent"/>
             <rect class="drag-handle drag-right cursor-ew-resize" x="${startX + width - handleWidth}" y="0" width="${handleWidth}" height="${barHeight}"
