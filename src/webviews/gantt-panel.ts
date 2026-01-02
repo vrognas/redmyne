@@ -3515,7 +3515,7 @@ ${style.tip}
       overflow: auto;
       min-height: 0;
     }
-    .gantt-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+    .gantt-scroll::-webkit-scrollbar { width: 8px; height: 0; }
     .gantt-scroll::-webkit-scrollbar-thumb { background: var(--vscode-scrollbarSlider-background); border-radius: 4px; }
     .gantt-scroll::-webkit-scrollbar-corner { background: var(--vscode-editor-background); }
     .gantt-header-row {
@@ -4004,8 +4004,6 @@ ${style.tip}
       stroke: var(--vscode-charts-red);
       stroke-width: 1.5;
     }
-    /* Hide horizontal scrollbar - minimap replaces it */
-    .gantt-scroll::-webkit-scrollbar:horizontal { height: 0; }
     /* Milestone markers */
     .milestone-marker {
       pointer-events: all;
@@ -4326,14 +4324,14 @@ ${style.tip}
         </div>
       </div>
     </div>
-  </div>
-  <div class="minimap-row">
+    <div class="minimap-row">
     <div class="minimap-spacer" style="width: ${checkboxColumnWidth + labelWidth + extraColumnsWidth + 4}px;"></div>
     <div class="minimap-container" id="minimapContainer">
       <svg id="minimapSvg" viewBox="0 0 100 ${minimapHeight}" preserveAspectRatio="none">
         <line class="minimap-today" x1="${(todayX / timelineWidth) * 100}" y1="0" x2="${(todayX / timelineWidth) * 100}" y2="${minimapHeight}"/>
         <rect class="minimap-viewport" id="minimapViewport" x="0" y="0" width="20" height="${minimapHeight}" rx="2"/>
       </svg>
+    </div>
     </div>
   </div>
   <script nonce="${nonce}">
