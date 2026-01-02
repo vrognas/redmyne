@@ -5439,7 +5439,7 @@ ${style.tip}
       label.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         const projectId = label.dataset.projectId;
-        const projectName = label.querySelector('text')?.textContent?.trim() || 'Project';
+        const projectName = label.querySelector('text:not(.collapse-toggle)')?.textContent?.trim() || 'Project';
         if (projectId) showProjectContextMenu(e.clientX, e.clientY, projectId, projectName);
       });
     });
