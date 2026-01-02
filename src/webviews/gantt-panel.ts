@@ -3508,6 +3508,7 @@ ${style.tip}
       border-radius: 2px;
       flex-grow: 1;
       min-height: 0;
+      position: relative;
     }
     /* Single scroll container - no JS sync needed */
     .gantt-scroll {
@@ -3959,15 +3960,15 @@ ${style.tip}
     .rel-start_to_finish .arrow-head { fill: var(--vscode-charts-purple); }
     .color-swatch { display: inline-block; width: 12px; height: 3px; margin-right: 8px; vertical-align: middle; }
 
-    /* Minimap - sticky at bottom of timeline viewport */
+    /* Minimap - fixed at bottom of gantt-container, aligned with timeline */
     .minimap-container {
-      position: sticky;
+      position: absolute;
       bottom: 0;
+      right: 0;
       height: 20px;
       background: var(--vscode-editor-background);
       border-top: 1px solid var(--vscode-panel-border);
       z-index: 6;
-      margin-top: -20px;
     }
     .minimap-container svg {
       display: block;
@@ -4300,13 +4301,14 @@ ${style.tip}
             ${bars}
             <g class="milestone-layer">${milestoneMarkers}</g>
           </svg>
-          <div class="minimap-container" id="minimapContainer">
-            <svg id="minimapSvg" viewBox="0 0 ${timelineWidth} ${minimapHeight}" preserveAspectRatio="none">
-              <rect class="minimap-viewport" id="minimapViewport" x="0" y="0" width="100" height="${minimapHeight}"/>
-            </svg>
-          </div>
         </div>
       </div>
+    </div>
+    <!-- Minimap outside scroll container, positioned absolutely -->
+    <div class="minimap-container" id="minimapContainer">
+      <svg id="minimapSvg" viewBox="0 0 ${timelineWidth} ${minimapHeight}" preserveAspectRatio="none">
+        <rect class="minimap-viewport" id="minimapViewport" x="0" y="0" width="100" height="${minimapHeight}"/>
+      </svg>
     </div>
   </div>
   <script nonce="${nonce}">
@@ -4351,6 +4353,16 @@ ${style.tip}
     const redoBtn = document.getElementById('redoBtn');
     const minimapSvg = document.getElementById('minimapSvg');
     const minimapViewport = document.getElementById('minimapViewport');
+    const minimapContainer = document.getElementById('minimapContainer');
+
+    // Position minimap to align with timeline (skip sticky-left columns)
+    function updateMinimapPosition() {
+      const stickyLeft = document.querySelector('.gantt-body .gantt-sticky-left');
+      if (stickyLeft && minimapContainer) {
+        minimapContainer.style.left = stickyLeft.offsetWidth + 'px';
+      }
+    }
+    updateMinimapPosition();
 
     // Minimap setup
     const minimapBarsData = ${minimapBarsJson};
@@ -6589,6 +6601,7 @@ ${style.tip}
           const labelsSvg = labelsColumn.querySelector('svg');
           if (labelsSvg) labelsSvg.setAttribute('width', String(newWidth));
         }
+        updateMinimapPosition();
       });
     });
 
