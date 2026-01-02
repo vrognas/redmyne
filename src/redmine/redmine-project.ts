@@ -38,6 +38,10 @@ export class RedmineProject {
     return this.options.identifier;
   }
 
+  get description() {
+    return this.options.description || "";
+  }
+
   toQuickPickItem(): ProjectQuickPickItem {
     return {
       label: this.options.name,

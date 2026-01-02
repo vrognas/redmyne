@@ -104,6 +104,8 @@ interface GanttRow {
   childCount?: number;
   /** Project health metrics (for project rows) */
   health?: ProjectHealth;
+  /** Project description (for project rows) */
+  description?: string;
 }
 
 
@@ -204,6 +206,7 @@ function nodeToGanttRow(
       isVisible: node.isVisible,
       isExpanded: node.isExpanded,
       health: node.health,
+      description: node.description,
     };
   }
 
@@ -2130,8 +2133,12 @@ export class GanttPanel {
           const countsX = progressBarX + progressBarWidth + 30;
           const countsText = countsStr ? `<text x="${countsX}" y="${barHeight / 2 + 4}" fill="var(--vscode-descriptionForeground)" font-size="10">${countsStr}</text>` : "";
 
-          // Tooltip with detailed breakdown
-          const tooltip = health ? this.formatHealthTooltip(row.label, health) : row.label;
+          // Tooltip with detailed breakdown (include description if available)
+          const tooltip = health
+            ? this.formatHealthTooltip(row.label, health, row.description)
+            : row.description
+              ? `${row.label}\n\n${row.description}`
+              : row.label;
 
           return `
             <g class="project-label gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
@@ -6901,10 +6908,17 @@ ${style.tip}
   /**
    * Format health data as tooltip text
    */
-  private formatHealthTooltip(projectName: string, health: ProjectHealth): string {
+  private formatHealthTooltip(projectName: string, health: ProjectHealth, description?: string): string {
     const lines: string[] = [projectName];
-    lines.push(`Progress: ${health.progress}%`);
+
+    // Add project description if available
+    if (description && description.trim()) {
+      lines.push("");
+      lines.push(description.trim());
+    }
+
     lines.push("");
+    lines.push(`Progress: ${health.progress}%`);
     lines.push(`Issues: ${health.counts.closed} closed, ${health.counts.open} open`);
     if (health.counts.inProgress > 0) {
       lines.push(`  In Progress: ${health.counts.inProgress}`);
