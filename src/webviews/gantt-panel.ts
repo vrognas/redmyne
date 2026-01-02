@@ -3535,7 +3535,9 @@ ${style.tip}
     .progress-fill { pointer-events: none; }
     .bar-labels { pointer-events: none; }
     .bar-labels .blocks-badge-group,
-    .bar-labels .blocker-badge { pointer-events: all; }
+    .bar-labels .blocker-badge,
+    .bar-labels .flex-badge-group,
+    .bar-labels .progress-badge-group { pointer-events: all; }
     .status-badge-bg { pointer-events: none; }
     .status-badge { pointer-events: none; font-weight: 500; }
     .bar-assignee { pointer-events: none; opacity: 0.85; }
