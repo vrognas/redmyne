@@ -4093,10 +4093,10 @@ ${style.tip}
             </svg>
           </div>
           <div class="gantt-left-header" id="ganttLeftHeader"></div>
+          <div class="gantt-resize-handle-header"></div>
           <div class="gantt-col-status"><div class="gantt-col-header">Status</div></div>
           <div class="gantt-col-due"><div class="gantt-col-header">Due</div></div>
           <div class="gantt-col-assignee"><div class="gantt-col-header">Assignee</div></div>
-          <div class="gantt-resize-handle-header"></div>
         </div>
         <div class="gantt-timeline-header" id="ganttTimelineHeader">
           <svg width="${timelineWidth}" height="${headerHeight}">
@@ -4134,6 +4134,7 @@ ${style.tip}
               ${labels}
             </svg>
           </div>
+          <div class="gantt-resize-handle" id="resizeHandle"></div>
           <div class="gantt-col-status">
             <svg width="${statusColumnWidth}" height="${bodyHeight}">
               ${zebraStripes}
@@ -4152,7 +4153,6 @@ ${style.tip}
               ${assigneeCells}
             </svg>
           </div>
-          <div class="gantt-resize-handle" id="resizeHandle"></div>
         </div>
         <div class="gantt-timeline" id="ganttTimeline">
           <svg width="${timelineWidth + 50}" height="${bodyHeight}" data-render-key="${this._renderKey}">
