@@ -4751,45 +4751,45 @@ ${style.tip}
     });
 
     // Zoom toggle handlers - use saveStateForZoom to preserve center date
-    document.getElementById('zoomDay').addEventListener('click', () => {
+    document.getElementById('zoomDay')?.addEventListener('click', () => {
       saveStateForZoom();
       vscode.postMessage({ command: 'setZoom', zoomLevel: 'day' });
     });
-    document.getElementById('zoomWeek').addEventListener('click', () => {
+    document.getElementById('zoomWeek')?.addEventListener('click', () => {
       saveStateForZoom();
       vscode.postMessage({ command: 'setZoom', zoomLevel: 'week' });
     });
-    document.getElementById('zoomMonth').addEventListener('click', () => {
+    document.getElementById('zoomMonth')?.addEventListener('click', () => {
       saveStateForZoom();
       vscode.postMessage({ command: 'setZoom', zoomLevel: 'month' });
     });
-    document.getElementById('zoomQuarter').addEventListener('click', () => {
+    document.getElementById('zoomQuarter')?.addEventListener('click', () => {
       saveStateForZoom();
       vscode.postMessage({ command: 'setZoom', zoomLevel: 'quarter' });
     });
-    document.getElementById('zoomYear').addEventListener('click', () => {
+    document.getElementById('zoomYear')?.addEventListener('click', () => {
       saveStateForZoom();
       vscode.postMessage({ command: 'setZoom', zoomLevel: 'year' });
     });
 
     // View mode toggle handlers
-    document.getElementById('viewProjects').addEventListener('click', () => {
+    document.getElementById('viewProjects')?.addEventListener('click', () => {
       vscode.postMessage({ command: 'setViewMode', viewMode: 'projects' });
     });
-    document.getElementById('viewMyWork').addEventListener('click', () => {
+    document.getElementById('viewMyWork')?.addEventListener('click', () => {
       vscode.postMessage({ command: 'setViewMode', viewMode: 'mywork' });
     });
 
     // Filter dropdown handlers
-    document.getElementById('filterAssignee').addEventListener('change', (e) => {
+    document.getElementById('filterAssignee')?.addEventListener('change', (e) => {
       const value = e.target.value;
       vscode.postMessage({ command: 'setFilter', filter: { assignee: value } });
     });
-    document.getElementById('filterStatus').addEventListener('change', (e) => {
+    document.getElementById('filterStatus')?.addEventListener('change', (e) => {
       const value = e.target.value;
       vscode.postMessage({ command: 'setFilter', filter: { status: value } });
     });
-    document.getElementById('filterHealth').addEventListener('change', (e) => {
+    document.getElementById('filterHealth')?.addEventListener('change', (e) => {
       vscode.postMessage({ command: 'setHealthFilter', health: e.target.value });
     });
 
@@ -4828,7 +4828,7 @@ ${style.tip}
     });
 
     // Heatmap toggle handler
-    document.getElementById('heatmapBtn').addEventListener('click', () => {
+    document.getElementById('heatmapBtn')?.addEventListener('click', () => {
       saveState();
       vscode.postMessage({ command: 'toggleWorkloadHeatmap' });
     });
@@ -4862,13 +4862,13 @@ ${style.tip}
     });
 
     // Dependencies toggle handler
-    document.getElementById('depsBtn').addEventListener('click', () => {
+    document.getElementById('depsBtn')?.addEventListener('click', () => {
       saveState();
       vscode.postMessage({ command: 'toggleDependencies' });
     });
 
     // Intensity toggle handler
-    document.getElementById('intensityBtn').addEventListener('click', () => {
+    document.getElementById('intensityBtn')?.addEventListener('click', () => {
       saveState();
       vscode.postMessage({ command: 'toggleIntensity' });
     });
@@ -5131,7 +5131,7 @@ ${style.tip}
     });
 
     // Refresh button handler
-    document.getElementById('refreshBtn').addEventListener('click', () => {
+    document.getElementById('refreshBtn')?.addEventListener('click', () => {
       document.getElementById('loadingOverlay').classList.add('visible');
       vscode.postMessage({ command: 'refresh' });
     });
@@ -6679,7 +6679,7 @@ ${style.tip}
     });
 
     // Today button handler
-    document.getElementById('todayBtn').addEventListener('click', scrollToToday);
+    document.getElementById('todayBtn')?.addEventListener('click', scrollToToday);
 
     // Column resize handling
     const resizeHandle = document.getElementById('resizeHandle');
