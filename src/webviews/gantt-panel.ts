@@ -471,6 +471,7 @@ export class GanttPanel {
   private _showIntensity: boolean = false;
   private _scrollPosition: { left: number; top: number } = { left: 0, top: 0 };
   private _extendedRelationTypes: boolean = false;
+  private _visibleRelationTypes: Set<string> = new Set(["blocks", "precedes"]);
   private _closedStatusIds: Set<number> = new Set();
   private _hiddenProjects: Set<number> = new Set(); // Projects hidden from view (persisted)
   private _debouncedCollapseUpdate: DebouncedFunction<() => void>;
@@ -1838,6 +1839,12 @@ export class GanttPanel {
   private _getHtmlContent(): string {
     const nonce = getNonce();
 
+    // Read gantt config settings
+    const ganttConfig = vscode.workspace.getConfiguration("redmine.gantt");
+    this._extendedRelationTypes = ganttConfig.get<boolean>("extendedRelationTypes", false);
+    const visibleTypes = ganttConfig.get<string[]>("visibleRelationTypes", ["blocks", "precedes"]);
+    this._visibleRelationTypes = new Set(visibleTypes);
+
     // Today for calculations (start of today UTC)
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
@@ -2920,10 +2927,13 @@ export class GanttPanel {
     };
 
     // Use rows (which have GanttIssue) for dependency arrows - only for visible projects
+    const visibleRelTypes = this._visibleRelationTypes;
     const dependencyArrows = rows
       .filter((row): row is GanttRow & { issue: GanttIssue } => row.type === "issue" && !!row.issue && !isInHiddenTreeCached(row))
       .flatMap((row) =>
-        row.issue.relations.map((rel) => {
+        row.issue.relations
+          .filter((rel) => visibleRelTypes.has(rel.type))
+          .map((rel) => {
           const issue = row.issue;
           const source = issuePositions.get(issue.id);
           const target = issuePositions.get(rel.targetId);
@@ -4266,11 +4276,11 @@ ${style.tip}
       <span class="capacity-legend-item"><span class="capacity-legend-color capacity-overloaded"></span>&gt;100% overloaded</span>
     </div>
     <div id="relationLegend" class="relation-legend${this._showDependencies ? "" : " hidden"}" title="Relation types (drag from link handle to create)">
-      <span class="relation-legend-item"><span class="relation-legend-line rel-line-blocks"></span>blocks</span>
-      <span class="relation-legend-item"><span class="relation-legend-line rel-line-precedes"></span>precedes</span>
-      <span class="relation-legend-item"><span class="relation-legend-line rel-line-relates"></span>relates</span>
-      <span class="relation-legend-item"><span class="relation-legend-line rel-line-duplicates"></span>duplicates</span>
-      <span class="relation-legend-item"><span class="relation-legend-line rel-line-copied"></span>copied</span>
+      ${this._visibleRelationTypes.has("blocks") ? '<span class="relation-legend-item"><span class="relation-legend-line rel-line-blocks"></span>blocks</span>' : ""}
+      ${this._visibleRelationTypes.has("precedes") ? '<span class="relation-legend-item"><span class="relation-legend-line rel-line-precedes"></span>precedes</span>' : ""}
+      ${this._visibleRelationTypes.has("relates") ? '<span class="relation-legend-item"><span class="relation-legend-line rel-line-relates"></span>relates</span>' : ""}
+      ${this._visibleRelationTypes.has("duplicates") ? '<span class="relation-legend-item"><span class="relation-legend-line rel-line-duplicates"></span>duplicates</span>' : ""}
+      ${this._visibleRelationTypes.has("copied_to") ? '<span class="relation-legend-item"><span class="relation-legend-line rel-line-copied"></span>copied</span>' : ""}
     </div>
     <!-- Help: Progressive Disclosure via help icon -->
     <div class="health-help">

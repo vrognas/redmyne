@@ -1242,6 +1242,26 @@
           "default": false,
           "scope": "application",
           "markdownDescription": "**Enable extended scheduling relation types**\n\nAdds support for Gantt plugin dependency types:\n- Finish-to-Start (FS)\n- Start-to-Start (SS)\n- Finish-to-Finish (FF)\n- Start-to-Finish (SF)\n\nDisable if your server doesn't have a Gantt plugin."
+        },
+        "redmine.gantt.visibleRelationTypes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "blocks",
+              "precedes",
+              "relates",
+              "duplicates",
+              "copied_to"
+            ]
+          },
+          "default": [
+            "blocks",
+            "precedes"
+          ],
+          "uniqueItems": true,
+          "scope": "application",
+          "markdownDescription": "**Relation types to show as dependency arrows**\n\n- `blocks` / `precedes` — Scheduling relations (default)\n- `relates` — General association\n- `duplicates` — Duplicate tracking\n- `copied_to` — Copy history\n\nOnly scheduling types affect project planning."
         }
       }
     },
