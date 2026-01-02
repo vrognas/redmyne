@@ -2133,12 +2133,10 @@ export class GanttPanel {
           const countsX = progressBarX + progressBarWidth + 30;
           const countsText = countsStr ? `<text x="${countsX}" y="${barHeight / 2 + 4}" fill="var(--vscode-descriptionForeground)" font-size="10">${countsStr}</text>` : "";
 
-          // Tooltip with detailed breakdown (include description if available)
+          // Tooltip: description + health stats (name already visible in row)
           const tooltip = health
-            ? this.formatHealthTooltip(row.label, health, row.description)
-            : row.description
-              ? `${row.label}\n\n${row.description}`
-              : row.label;
+            ? this.formatHealthTooltip(health, row.description)
+            : row.description || "";
 
           return `
             <g class="project-label gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
@@ -6908,32 +6906,32 @@ ${style.tip}
   /**
    * Format health data as tooltip text
    */
-  private formatHealthTooltip(projectName: string, health: ProjectHealth, description?: string): string {
-    const lines: string[] = [projectName];
+  private formatHealthTooltip(health: ProjectHealth, description?: string): string {
+    const lines: string[] = [];
 
-    // Add project description if available
+    // Description first - this is the primary value
     if (description && description.trim()) {
-      lines.push("");
       lines.push(description.trim());
+      lines.push("");
     }
 
-    lines.push("");
-    lines.push(`Progress: ${health.progress}%`);
-    lines.push(`Issues: ${health.counts.closed} closed, ${health.counts.open} open`);
-    if (health.counts.inProgress > 0) {
-      lines.push(`  In Progress: ${health.counts.inProgress}`);
+    // Health summary
+    lines.push(`${health.progress}% · ${health.counts.closed}/${health.counts.closed + health.counts.open} done`);
+
+    // Attention items (compact)
+    const alerts: string[] = [];
+    if (health.counts.overdue > 0) alerts.push(`🔴 ${health.counts.overdue} overdue`);
+    if (health.counts.blocked > 0) alerts.push(`⚠ ${health.counts.blocked} blocked`);
+    if (health.counts.atRisk > 0) alerts.push(`⏰ ${health.counts.atRisk} at risk`);
+    if (alerts.length > 0) {
+      lines.push(alerts.join(" · "));
     }
-    if (health.counts.blocked > 0 || health.counts.overdue > 0 || health.counts.atRisk > 0) {
-      lines.push("");
-      lines.push("Attention:");
-      if (health.counts.overdue > 0) lines.push(`  🔴 ${health.counts.overdue} overdue`);
-      if (health.counts.blocked > 0) lines.push(`  ⚠ ${health.counts.blocked} blocked`);
-      if (health.counts.atRisk > 0) lines.push(`  ⏰ ${health.counts.atRisk} at risk`);
-    }
+
+    // Hours (if tracked)
     if (health.hours.estimated > 0) {
-      lines.push("");
-      lines.push(`Hours: ${health.hours.spent}h spent / ${health.hours.estimated}h estimated`);
+      lines.push(`${health.hours.spent}h / ${health.hours.estimated}h`);
     }
+
     return lines.join("\n");
   }
 
