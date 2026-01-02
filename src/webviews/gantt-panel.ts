@@ -3545,6 +3545,7 @@ ${style.tip}
       display: flex;
       width: max-content;
       min-width: 100%;
+      min-height: calc(100vh - 200px); /* Fill available space when collapsed */
     }
     .gantt-sticky-left {
       display: flex;
@@ -3601,6 +3602,7 @@ ${style.tip}
       flex-shrink: 0;
       width: ${checkboxColumnWidth}px;
       border-right: 1px solid var(--vscode-panel-border);
+      box-sizing: border-box;
     }
     .gantt-checkboxes svg { display: block; }
     .project-checkbox:hover rect { stroke: var(--vscode-focusBorder); }
@@ -3611,6 +3613,7 @@ ${style.tip}
       max-width: 600px;
       overflow-x: auto;
       overflow-y: hidden;
+      box-sizing: border-box;
     }
     .gantt-labels svg { min-width: 100%; }
     .gantt-col-id, .gantt-col-start, .gantt-col-status, .gantt-col-due, .gantt-col-assignee {
