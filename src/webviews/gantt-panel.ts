@@ -3516,6 +3516,7 @@ ${style.tip}
       overflow: auto;
       min-height: 0;
       scrollbar-width: thin; /* Firefox */
+      padding-bottom: 30px; /* Space for minimap overlay */
     }
     .gantt-scroll::-webkit-scrollbar { width: 8px; height: 0; }
     .gantt-scroll::-webkit-scrollbar-thumb { background: var(--vscode-scrollbarSlider-background); border-radius: 4px; }
@@ -3960,15 +3961,15 @@ ${style.tip}
     .rel-start_to_finish .arrow-head { fill: var(--vscode-charts-purple); }
     .color-swatch { display: inline-block; width: 12px; height: 3px; margin-right: 8px; vertical-align: middle; }
 
-    /* Minimap - sticky at bottom of scroll viewport */
+    /* Minimap - fixed at bottom of gantt-container, aligned with timeline */
     .minimap-container {
-      position: sticky;
+      position: absolute;
       bottom: 0;
+      right: 0;
       height: 30px;
       background: var(--vscode-editor-background);
       border-top: 1px solid var(--vscode-panel-border);
       z-index: 6;
-      margin-left: var(--sticky-left-width, 0);
     }
     .minimap-container svg {
       display: block;
@@ -4303,12 +4304,12 @@ ${style.tip}
           </svg>
         </div>
       </div>
-      <!-- Minimap sticky at bottom of scroll viewport -->
-      <div class="minimap-container" id="minimapContainer">
-        <svg id="minimapSvg" viewBox="0 0 ${timelineWidth} ${minimapHeight}" preserveAspectRatio="none">
-          <rect class="minimap-viewport" id="minimapViewport" x="0" y="0" width="100" height="${minimapHeight}"/>
-        </svg>
-      </div>
+    </div>
+    <!-- Minimap outside scroll, positioned absolutely at bottom of gantt-container -->
+    <div class="minimap-container" id="minimapContainer">
+      <svg id="minimapSvg" viewBox="0 0 ${timelineWidth} ${minimapHeight}" preserveAspectRatio="none">
+        <rect class="minimap-viewport" id="minimapViewport" x="0" y="0" width="100" height="${minimapHeight}"/>
+      </svg>
     </div>
   </div>
   <script nonce="${nonce}">
@@ -4359,7 +4360,7 @@ ${style.tip}
     function updateMinimapPosition() {
       const stickyLeft = document.querySelector('.gantt-body .gantt-sticky-left');
       if (stickyLeft && minimapContainer) {
-        minimapContainer.style.setProperty('--sticky-left-width', stickyLeft.offsetWidth + 'px');
+        minimapContainer.style.left = stickyLeft.offsetWidth + 'px';
       }
     }
     updateMinimapPosition();
