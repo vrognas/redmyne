@@ -3406,8 +3406,8 @@ ${style.tip}
     .gantt-left-header {
       flex-shrink: 0;
       width: ${labelWidth}px;
-      min-width: 150px;
-      max-width: 500px;
+      min-width: 120px;
+      max-width: 600px;
       display: flex;
       gap: 4px;
       padding: 4px 8px;
@@ -3442,8 +3442,8 @@ ${style.tip}
     .gantt-labels {
       flex-shrink: 0;
       width: ${labelWidth}px;
-      min-width: 150px;
-      max-width: 500px;
+      min-width: 120px;
+      max-width: 600px;
       overflow-x: auto;
       overflow-y: hidden;
     }
@@ -6376,10 +6376,14 @@ ${style.tip}
         resizeRafPending = false;
         if (!lastResizeEvent) return;
         const delta = lastResizeEvent.clientX - resizeStartX;
-        const newWidth = Math.min(500, Math.max(150, resizeStartWidth + delta));
-        // Resize both header and body labels columns
+        const newWidth = Math.min(600, Math.max(120, resizeStartWidth + delta));
+        // Resize both header and body labels columns + inner SVG
         if (ganttLeftHeader) ganttLeftHeader.style.width = newWidth + 'px';
-        if (labelsColumn) labelsColumn.style.width = newWidth + 'px';
+        if (labelsColumn) {
+          labelsColumn.style.width = newWidth + 'px';
+          const labelsSvg = labelsColumn.querySelector('svg');
+          if (labelsSvg) labelsSvg.setAttribute('width', String(newWidth));
+        }
       });
     });
 
