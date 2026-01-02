@@ -3465,7 +3465,6 @@ ${style.tip}
       left: 0;
       z-index: 5;
       background: var(--vscode-editor-background);
-      min-width: ${checkboxColumnWidth + labelWidth * 2 + extraColumnsWidth + 10}px;
     }
     .gantt-corner {
       z-index: 15; /* Above both sticky header and sticky left */
