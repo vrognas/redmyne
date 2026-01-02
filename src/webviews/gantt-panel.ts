@@ -3958,15 +3958,18 @@ ${style.tip}
     .rel-start_to_finish .arrow-head { fill: var(--vscode-charts-purple); }
     .color-swatch { display: inline-block; width: 12px; height: 3px; margin-right: 8px; vertical-align: middle; }
 
-    /* Minimap - aligned with timeline, acts as horizontal scrollbar */
+    /* Minimap - positioned at bottom of timeline area */
     .minimap-row {
       display: flex;
-      height: 28px;
+      height: 24px;
       flex-shrink: 0;
       border-top: 1px solid var(--vscode-panel-border);
       background: var(--vscode-editor-background);
+      width: max-content;
+      min-width: 100%;
     }
-    .minimap-spacer {
+    .minimap-row .gantt-sticky-left {
+      display: flex;
       flex-shrink: 0;
       background: var(--vscode-editor-background);
     }
@@ -3974,7 +3977,7 @@ ${style.tip}
       flex-grow: 1;
       position: relative;
       overflow: hidden;
-      background: var(--vscode-minimap-background, var(--vscode-editor-background));
+      background: var(--vscode-minimap-background, rgba(0,0,0,0.05));
     }
     .minimap-container svg {
       display: block;
@@ -4325,13 +4328,13 @@ ${style.tip}
       </div>
     </div>
     <div class="minimap-row">
-    <div class="minimap-spacer" style="width: ${checkboxColumnWidth + labelWidth + extraColumnsWidth + 4}px;"></div>
-    <div class="minimap-container" id="minimapContainer">
-      <svg id="minimapSvg" viewBox="0 0 100 ${minimapHeight}" preserveAspectRatio="none">
-        <line class="minimap-today" x1="${(todayX / timelineWidth) * 100}" y1="0" x2="${(todayX / timelineWidth) * 100}" y2="${minimapHeight}"/>
-        <rect class="minimap-viewport" id="minimapViewport" x="0" y="0" width="20" height="${minimapHeight}" rx="2"/>
-      </svg>
-    </div>
+      <div class="gantt-sticky-left" style="width: ${checkboxColumnWidth + labelWidth + extraColumnsWidth}px;"></div>
+      <div class="minimap-container" id="minimapContainer">
+        <svg id="minimapSvg" viewBox="0 0 ${timelineWidth} ${minimapHeight}" preserveAspectRatio="none">
+          <line class="minimap-today" x1="${todayX}" y1="0" x2="${todayX}" y2="${minimapHeight}"/>
+          <rect class="minimap-viewport" id="minimapViewport" x="0" y="0" width="100" height="${minimapHeight}" rx="2"/>
+        </svg>
+      </div>
     </div>
   </div>
   <script nonce="${nonce}">
@@ -4389,12 +4392,12 @@ ${style.tip}
         minimapBarsData.forEach((bar, i) => {
           const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
           rect.setAttribute('class', bar.classes);
-          rect.setAttribute('x', (bar.startPct * 100).toString());
+          rect.setAttribute('x', (bar.startPct * timelineWidth).toString());
           rect.setAttribute('y', (barSpacing * (i + 0.5)).toString());
-          rect.setAttribute('width', Math.max(0.5, (bar.endPct - bar.startPct) * 100).toString());
+          rect.setAttribute('width', Math.max(2, (bar.endPct - bar.startPct) * timelineWidth).toString());
           rect.setAttribute('height', minimapBarHeight.toString());
           rect.setAttribute('rx', '1');
-          rect.setAttribute('fill', bar.color); // Use status color from main view
+          rect.setAttribute('fill', bar.color);
           minimapSvg.insertBefore(rect, minimapViewport);
         });
       });
@@ -4404,12 +4407,11 @@ ${style.tip}
     // Use ganttScroll for single-container scroll
     function updateMinimapViewport() {
       if (!ganttScroll || !minimapViewport) return;
-      const contentWidth = timelineWidth;
       const scrollableRange = Math.max(1, ganttScroll.scrollWidth - ganttScroll.clientWidth);
       const scrollRatio = Math.min(1, ganttScroll.scrollLeft / scrollableRange);
       const viewportRatio = Math.min(1, ganttScroll.clientWidth / ganttScroll.scrollWidth);
-      const viewportWidth = Math.max(2, viewportRatio * 100);
-      const viewportX = scrollRatio * (100 - viewportWidth);
+      const viewportWidth = Math.max(20, viewportRatio * timelineWidth);
+      const viewportX = scrollRatio * (timelineWidth - viewportWidth);
       minimapViewport.setAttribute('x', viewportX.toString());
       minimapViewport.setAttribute('width', viewportWidth.toString());
     }
@@ -4422,7 +4424,7 @@ ${style.tip}
       if (!ganttScroll || !minimapSvg || !minimapViewport) return;
       const rect = minimapSvg.getBoundingClientRect();
       const viewportWidth = parseFloat(minimapViewport.getAttribute('width') || '0');
-      const viewportWidthPx = (viewportWidth / 100) * rect.width;
+      const viewportWidthPx = (viewportWidth / timelineWidth) * rect.width;
 
       // Calculate target position, accounting for drag offset if dragging viewport
       let targetX = e.clientX - rect.left;
@@ -4446,7 +4448,7 @@ ${style.tip}
         minimapDragging = true;
         const rect = minimapSvg.getBoundingClientRect();
         const viewportX = parseFloat(minimapViewport.getAttribute('x') || '0');
-        const viewportXPx = (viewportX / 100) * rect.width;
+        const viewportXPx = (viewportX / timelineWidth) * rect.width;
         minimapDragOffset = e.clientX - rect.left - viewportXPx;
       });
 
