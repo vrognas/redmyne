@@ -3604,7 +3604,8 @@ ${style.tip}
       border-right: 1px solid var(--vscode-panel-border);
       box-sizing: border-box;
     }
-    .gantt-checkboxes svg { display: block; }
+    .gantt-checkboxes svg { display: block; width: 100%; }
+    .gantt-labels svg { display: block; min-width: 100%; }
     .project-checkbox:hover rect { stroke: var(--vscode-focusBorder); }
     .gantt-labels {
       flex-shrink: 0;
@@ -3615,11 +3616,15 @@ ${style.tip}
       overflow-y: hidden;
       box-sizing: border-box;
     }
-    .gantt-labels svg { min-width: 100%; }
     .gantt-col-id, .gantt-col-start, .gantt-col-status, .gantt-col-due, .gantt-col-assignee {
       flex-shrink: 0;
       overflow: hidden;
       border-right: 1px solid var(--vscode-panel-border);
+      box-sizing: border-box;
+    }
+    .gantt-col-id svg, .gantt-col-start svg, .gantt-col-status svg, .gantt-col-due svg, .gantt-col-assignee svg {
+      display: block;
+      width: 100%;
     }
     .gantt-col-id { width: ${idColumnWidth}px; }
     .gantt-col-start { width: ${startDateColumnWidth}px; }
@@ -4255,7 +4260,7 @@ ${style.tip}
       <div class="gantt-body">
         <div class="gantt-sticky-left">
           <div class="gantt-checkboxes" id="ganttCheckboxes">
-            <svg width="${checkboxColumnWidth}" height="${bodyHeight}" data-render-key="${this._renderKey}">
+            <svg viewBox="0 0 ${checkboxColumnWidth} ${bodyHeight}" preserveAspectRatio="none" height="${bodyHeight}" data-render-key="${this._renderKey}">
               ${checkboxZebraStripes}
               ${checkboxes}
             </svg>
@@ -4268,31 +4273,31 @@ ${style.tip}
           </div>
           <div class="gantt-resize-handle" id="resizeHandle"></div>
           <div class="gantt-col-id">
-            <svg width="${idColumnWidth}" height="${bodyHeight}">
+            <svg viewBox="0 0 ${idColumnWidth} ${bodyHeight}" preserveAspectRatio="none" height="${bodyHeight}">
               ${zebraStripes}
               ${idCells}
             </svg>
           </div>
           <div class="gantt-col-start">
-            <svg width="${startDateColumnWidth}" height="${bodyHeight}">
+            <svg viewBox="0 0 ${startDateColumnWidth} ${bodyHeight}" preserveAspectRatio="none" height="${bodyHeight}">
               ${zebraStripes}
               ${startDateCells}
             </svg>
           </div>
           <div class="gantt-col-status">
-            <svg width="${statusColumnWidth}" height="${bodyHeight}">
+            <svg viewBox="0 0 ${statusColumnWidth} ${bodyHeight}" preserveAspectRatio="none" height="${bodyHeight}">
               ${zebraStripes}
               ${statusCells}
             </svg>
           </div>
           <div class="gantt-col-due">
-            <svg width="${dueDateColumnWidth}" height="${bodyHeight}">
+            <svg viewBox="0 0 ${dueDateColumnWidth} ${bodyHeight}" preserveAspectRatio="none" height="${bodyHeight}">
               ${zebraStripes}
               ${dueCells}
             </svg>
           </div>
           <div class="gantt-col-assignee">
-            <svg width="${assigneeColumnWidth}" height="${bodyHeight}">
+            <svg viewBox="0 0 ${assigneeColumnWidth} ${bodyHeight}" preserveAspectRatio="none" height="${bodyHeight}">
               ${zebraStripes}
               ${assigneeCells}
             </svg>
