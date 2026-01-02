@@ -573,7 +573,7 @@ export class GanttPanel {
     const barHeight = 30;
     const barGap = 10;
     const rowCount = 10;
-    const checkboxColumnWidth = 28;
+    const checkboxColumnWidth = 32;
     const idColumnWidth = 55;
     const startDateColumnWidth = 85;
     const statusColumnWidth = 90;
@@ -792,6 +792,7 @@ export class GanttPanel {
       flex-shrink: 0;
       width: ${checkboxColumnWidth}px;
       border-right: 1px solid var(--vscode-panel-border);
+      box-sizing: border-box;
     }
     .gantt-left-header {
       flex-shrink: 0;
@@ -800,6 +801,7 @@ export class GanttPanel {
       align-items: center;
       padding: 4px 8px;
       gap: 4px;
+      box-sizing: border-box;
     }
     .gantt-resize-handle-header {
       width: 10px;
@@ -846,11 +848,13 @@ export class GanttPanel {
       width: ${checkboxColumnWidth}px;
       background: var(--vscode-editor-background);
       border-right: 1px solid var(--vscode-panel-border);
+      box-sizing: border-box;
     }
     .gantt-labels {
       flex-shrink: 0;
       width: ${labelWidth}px;
       background: var(--vscode-editor-background);
+      box-sizing: border-box;
     }
     .gantt-resize-handle {
       width: 10px;
