@@ -3518,8 +3518,10 @@ ${style.tip}
       scrollbar-width: thin; /* Firefox */
       padding-bottom: 30px; /* Space for minimap overlay */
     }
-    .gantt-scroll::-webkit-scrollbar { width: 8px; height: 0; }
+    .gantt-scroll::-webkit-scrollbar { width: 8px; }
+    .gantt-scroll::-webkit-scrollbar:horizontal { height: 0; display: none; }
     .gantt-scroll::-webkit-scrollbar-thumb { background: var(--vscode-scrollbarSlider-background); border-radius: 4px; }
+    .gantt-scroll::-webkit-scrollbar-thumb:horizontal { display: none; }
     .gantt-scroll::-webkit-scrollbar-corner { background: transparent; }
     .gantt-header-row {
       display: flex;
