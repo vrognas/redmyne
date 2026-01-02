@@ -571,6 +571,9 @@ export class GanttPanel {
     const barGap = 10;
     const rowCount = 10;
     const checkboxColumnWidth = 28;
+    const statusColumnWidth = 90;
+    const dueDateColumnWidth = 85;
+    const assigneeColumnWidth = 40;
 
     // Generate skeleton rows
     const skeletonRows = Array.from({ length: rowCount }, (_, i) => {
@@ -597,6 +600,27 @@ export class GanttPanel {
       <g class="skeleton-bar-group delay-${Math.min(i, 7)}">
         <rect x="${r.barStart}" y="${r.y + 4}" width="${r.barWidth}" height="${barHeight - 8}" rx="8"
               fill="var(--vscode-panel-border)" class="skeleton-timeline-bar"/>
+      </g>
+    `).join("");
+
+    // Status column skeleton (short text placeholders)
+    const statusSvg = skeletonRows.map((r, i) => r.isProject ? "" : `
+      <g class="skeleton-label delay-${Math.min(i, 7)}">
+        <rect x="${(statusColumnWidth - 50) / 2}" y="${r.y + 10}" width="50" height="10" rx="2" fill="var(--vscode-panel-border)"/>
+      </g>
+    `).join("");
+
+    // Due date column skeleton
+    const dueSvg = skeletonRows.map((r, i) => r.isProject ? "" : `
+      <g class="skeleton-label delay-${Math.min(i, 7)}">
+        <rect x="${(dueDateColumnWidth - 60) / 2}" y="${r.y + 10}" width="60" height="10" rx="2" fill="var(--vscode-panel-border)"/>
+      </g>
+    `).join("");
+
+    // Assignee column skeleton (circle avatars)
+    const assigneeSvg = skeletonRows.map((r, i) => r.isProject ? "" : `
+      <g class="skeleton-label delay-${Math.min(i, 7)}">
+        <circle cx="${assigneeColumnWidth / 2}" cy="${r.y + barHeight / 2}" r="12" fill="var(--vscode-panel-border)"/>
       </g>
     `).join("");
 
@@ -763,6 +787,22 @@ export class GanttPanel {
       background: var(--vscode-panel-border);
       flex-shrink: 0;
     }
+    .gantt-col-status, .gantt-col-due, .gantt-col-assignee {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-right: 1px solid var(--vscode-panel-border);
+    }
+    .gantt-col-status { width: ${statusColumnWidth}px; }
+    .gantt-col-due { width: ${dueDateColumnWidth}px; }
+    .gantt-col-assignee { width: ${assigneeColumnWidth}px; }
+    .gantt-col-header {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: var(--vscode-descriptionForeground);
+      letter-spacing: 0.5px;
+    }
     .gantt-timeline-header {
       flex-grow: 1;
       display: flex;
@@ -875,6 +915,9 @@ export class GanttPanel {
       <div class="gantt-checkbox-header"></div>
       <div class="gantt-left-header"></div>
       <div class="gantt-resize-handle-header"></div>
+      <div class="gantt-col-status"><div class="gantt-col-header">Status</div></div>
+      <div class="gantt-col-due"><div class="gantt-col-header">Due</div></div>
+      <div class="gantt-col-assignee"><div class="gantt-col-header">Assignee</div></div>
       <div class="gantt-timeline-header">
         <span class="loading-text">Loading issues...</span>
       </div>
@@ -892,6 +935,24 @@ export class GanttPanel {
         </svg>
       </div>
       <div class="gantt-resize-handle"></div>
+      <div class="gantt-col-status">
+        <svg width="${statusColumnWidth}" height="${bodyHeight}">
+          ${zebraStripes}
+          ${statusSvg}
+        </svg>
+      </div>
+      <div class="gantt-col-due">
+        <svg width="${dueDateColumnWidth}" height="${bodyHeight}">
+          ${zebraStripes}
+          ${dueSvg}
+        </svg>
+      </div>
+      <div class="gantt-col-assignee">
+        <svg width="${assigneeColumnWidth}" height="${bodyHeight}">
+          ${zebraStripes}
+          ${assigneeSvg}
+        </svg>
+      </div>
       <div class="gantt-timeline">
         <svg width="100%" height="${bodyHeight}">
           ${zebraStripes}
