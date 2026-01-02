@@ -49,6 +49,8 @@ interface GanttIssue {
   start_date: string | null;
   due_date: string | null;
   status: FlexibilityScore["status"] | null;
+  /** Redmine status name (e.g., "New", "In Progress", "Closed") */
+  statusName: string;
   /** Flexibility slack in days (positive = buffer, 0/negative = critical) */
   flexibilitySlack: number | null;
   isClosed: boolean;
@@ -144,6 +146,7 @@ function toGanttIssue(
     start_date: issue.start_date || null,
     due_date: issue.due_date || null,
     status: flexibility?.status ?? null,
+    statusName: issue.status?.name ?? "Unknown",
     // Calculate days of slack: daysRemaining - (hoursRemaining / 8)
     // This gives actual buffer in working days, not percentage
     flexibilitySlack: flexibility
@@ -1841,6 +1844,10 @@ export class GanttPanel {
     const pixelsPerDay = ZOOM_PIXELS_PER_DAY[this._zoomLevel];
     const timelineWidth = Math.max(600, totalDays * pixelsPerDay);
     const labelWidth = 250;
+    const statusColumnWidth = 90;
+    const dueDateColumnWidth = 85;
+    const assigneeColumnWidth = 100;
+    const extraColumnsWidth = statusColumnWidth + dueDateColumnWidth + assigneeColumnWidth;
     const barHeight = 30;
     const barGap = 10;
     const headerHeight = 40;
@@ -2132,6 +2139,77 @@ export class GanttPanel {
             <title>${tooltip}</title>
           </g>
         `;
+      })
+      .join("");
+
+    // Status column cells
+    const statusCells = visibleRows
+      .map((row, idx) => {
+        const y = idx * (barHeight + barGap);
+        if (row.type === "project") return `<g transform="translate(0, ${y})"><rect class="zebra-stripe" x="0" y="0" width="100%" height="${barHeight + barGap}"/></g>`;
+        const issue = row.issue!;
+        const statusName = issue.statusName ?? "Unknown";
+        // Determine status class based on done_ratio and status name
+        let statusClass = "status-new";
+        const lowerStatus = statusName.toLowerCase();
+        if (issue.done_ratio === 100 || lowerStatus.includes("closed") || lowerStatus.includes("done") || lowerStatus.includes("resolved")) {
+          statusClass = "status-closed";
+        } else if (issue.done_ratio > 0 || lowerStatus.includes("progress") || lowerStatus.includes("in ")) {
+          statusClass = "status-inprogress";
+        }
+        // Truncate status name to fit
+        const displayStatus = statusName.length > 12 ? statusName.substring(0, 11) + "…" : statusName;
+        return `<g transform="translate(0, ${y})">
+          <text class="gantt-col-cell ${statusClass}" x="${statusColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">
+            ${escapeHtml(displayStatus)}
+          </text>
+          <title>${escapeHtml(statusName)}</title>
+        </g>`;
+      })
+      .join("");
+
+    // Due date column cells
+    const dueCells = visibleRows
+      .map((row, idx) => {
+        const y = idx * (barHeight + barGap);
+        if (row.type === "project") return `<g transform="translate(0, ${y})"></g>`;
+        const issue = row.issue!;
+        if (!issue.due_date) return `<g transform="translate(0, ${y})"><text class="gantt-col-cell" x="${dueDateColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">—</text></g>`;
+        // Format date as MMM DD (e.g., "Jan 15")
+        const dueDate = parseLocalDate(issue.due_date);
+        const today = getLocalToday();
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const displayDate = `${monthNames[dueDate.getMonth()]} ${dueDate.getDate()}`;
+        // Determine if overdue or due soon
+        const daysUntilDue = Math.floor((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        let dueClass = "";
+        if (issue.done_ratio < 100 && daysUntilDue < 0) dueClass = "due-overdue";
+        else if (issue.done_ratio < 100 && daysUntilDue <= 3) dueClass = "due-soon";
+        return `<g transform="translate(0, ${y})">
+          <text class="gantt-col-cell ${dueClass}" x="${dueDateColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">${displayDate}</text>
+          <title>${issue.due_date}</title>
+        </g>`;
+      })
+      .join("");
+
+    // Assignee column cells
+    const assigneeCells = visibleRows
+      .map((row, idx) => {
+        const y = idx * (barHeight + barGap);
+        if (row.type === "project") return `<g transform="translate(0, ${y})"></g>`;
+        const issue = row.issue!;
+        if (!issue.assignee) return `<g transform="translate(0, ${y})"><text class="gantt-col-cell" x="4" y="${barHeight / 2 + 4}">—</text></g>`;
+        // Format as "F. Lastname" (first initial + last name)
+        const nameParts = issue.assignee.split(" ");
+        const firstInitial = nameParts[0]?.charAt(0) ?? "";
+        const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : nameParts[0];
+        const formattedName = nameParts.length > 1 ? `${firstInitial}. ${lastName}` : lastName;
+        const isCurrentUser = issue.assignee === this._currentUserName;
+        const displayName = formattedName.length > 12 ? formattedName.substring(0, 11) + "…" : formattedName;
+        return `<g transform="translate(0, ${y})">
+          <text class="gantt-col-cell${isCurrentUser ? " current-user" : ""}" x="4" y="${barHeight / 2 + 4}">${escapeHtml(displayName)}</text>
+          <title>${escapeHtml(issue.assignee)}</title>
+        </g>`;
       })
       .join("");
 
@@ -2496,6 +2574,20 @@ export class GanttPanel {
                   fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1" rx="8" ry="8" pointer-events="all">
               <title>${barTooltip}</title>
             </rect>
+            ${(() => {
+              // Show subject text on bar if it fits (min 40px width, ~6px per char)
+              const padding = 12; // Left/right padding inside bar
+              const availableWidth = width - padding * 2;
+              if (availableWidth < 30) return "";
+              const maxChars = Math.floor(availableWidth / 6);
+              if (maxChars < 3) return "";
+              const displaySubject = issue.subject.length > maxChars
+                ? issue.subject.substring(0, maxChars - 1) + "…"
+                : issue.subject;
+              return `<text class="bar-subject" x="${startX + padding}" y="${barHeight / 2 + 4}"
+                    fill="var(--vscode-editor-foreground)" font-size="10" opacity="0.9"
+                    pointer-events="none">${escapeHtml(displaySubject)}</text>`;
+            })()}
             <rect class="drag-handle drag-left cursor-ew-resize" x="${startX}" y="0" width="${handleWidth}" height="${barHeight}"
                   fill="transparent"/>
             <rect class="drag-handle drag-right cursor-ew-resize" x="${startX + width - handleWidth}" y="0" width="${handleWidth}" height="${barHeight}"
@@ -3295,7 +3387,7 @@ ${style.tip}
       left: 0;
       z-index: 5;
       background: var(--vscode-editor-background);
-      min-width: ${checkboxColumnWidth + labelWidth * 2 + 10}px;
+      min-width: ${checkboxColumnWidth + labelWidth * 2 + extraColumnsWidth + 10}px;
     }
     .gantt-corner {
       z-index: 15; /* Above both sticky header and sticky left */
@@ -3356,6 +3448,36 @@ ${style.tip}
       overflow-y: hidden;
     }
     .gantt-labels svg { min-width: 100%; }
+    .gantt-col-status, .gantt-col-due, .gantt-col-assignee {
+      flex-shrink: 0;
+      border-right: 1px solid var(--vscode-panel-border);
+      overflow: hidden;
+    }
+    .gantt-col-status { width: ${statusColumnWidth}px; }
+    .gantt-col-due { width: ${dueDateColumnWidth}px; }
+    .gantt-col-assignee { width: ${assigneeColumnWidth}px; }
+    .gantt-col-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--vscode-descriptionForeground);
+      padding: 0 4px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .gantt-col-cell {
+      font-size: 11px;
+      fill: var(--vscode-descriptionForeground);
+    }
+    .gantt-col-cell.current-user { fill: var(--vscode-charts-blue); font-weight: 600; }
+    .gantt-col-cell.status-closed { fill: var(--vscode-charts-green); }
+    .gantt-col-cell.status-inprogress { fill: var(--vscode-charts-blue); }
+    .gantt-col-cell.status-new { fill: var(--vscode-descriptionForeground); }
+    .gantt-col-cell.due-overdue { fill: var(--vscode-charts-red); font-weight: 600; }
+    .gantt-col-cell.due-soon { fill: var(--vscode-charts-orange); }
     .gantt-resize-handle {
       width: 10px;
       background: var(--vscode-panel-border);
@@ -3938,6 +4060,9 @@ ${style.tip}
             </svg>
           </div>
           <div class="gantt-left-header" id="ganttLeftHeader"></div>
+          <div class="gantt-col-status"><div class="gantt-col-header">Status</div></div>
+          <div class="gantt-col-due"><div class="gantt-col-header">Due</div></div>
+          <div class="gantt-col-assignee"><div class="gantt-col-header">Assignee</div></div>
           <div class="gantt-resize-handle-header"></div>
         </div>
         <div class="gantt-timeline-header" id="ganttTimelineHeader">
@@ -3949,7 +4074,7 @@ ${style.tip}
       <!-- Capacity ribbon (My Work mode only) -->
       <div class="capacity-ribbon-row capacity-ribbon${this._viewMode !== "mywork" || !this._showCapacityRibbon ? " hidden" : ""}">
         <div class="gantt-sticky-left gantt-corner">
-          <div class="capacity-ribbon-label" style="width: ${checkboxColumnWidth + labelWidth * 2}px; height: ${ribbonHeight}px;" title="Total workload for visible date range">
+          <div class="capacity-ribbon-label" style="width: ${checkboxColumnWidth + labelWidth * 2 + extraColumnsWidth}px; height: ${ribbonHeight}px;" title="Total workload for visible date range">
             ${capacitySummaryText}
           </div>
         </div>
@@ -3974,6 +4099,24 @@ ${style.tip}
             <svg width="${labelWidth * 2}" height="${bodyHeight}" data-render-key="${this._renderKey}">
               ${zebraStripes}
               ${labels}
+            </svg>
+          </div>
+          <div class="gantt-col-status">
+            <svg width="${statusColumnWidth}" height="${bodyHeight}">
+              ${zebraStripes}
+              ${statusCells}
+            </svg>
+          </div>
+          <div class="gantt-col-due">
+            <svg width="${dueDateColumnWidth}" height="${bodyHeight}">
+              ${zebraStripes}
+              ${dueCells}
+            </svg>
+          </div>
+          <div class="gantt-col-assignee">
+            <svg width="${assigneeColumnWidth}" height="${bodyHeight}">
+              ${zebraStripes}
+              ${assigneeCells}
             </svg>
           </div>
           <div class="gantt-resize-handle" id="resizeHandle"></div>
