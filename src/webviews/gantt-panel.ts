@@ -3030,7 +3030,7 @@ ${style.tip}
 
     // Generate minimap bars (simplified representation) - only for visible projects
     const minimapBarHeight = 4;
-    const minimapHeight = 44;
+    const minimapHeight = 28;
     const minimapBars = rows
       .filter(r => r.type === "issue" && r.issue && (r.issue.start_date || r.issue.due_date) && !isInHiddenTreeCached(r))
       .map((row) => {
@@ -3958,14 +3958,23 @@ ${style.tip}
     .rel-start_to_finish .arrow-head { fill: var(--vscode-charts-purple); }
     .color-swatch { display: inline-block; width: 12px; height: 3px; margin-right: 8px; vertical-align: middle; }
 
-    /* Minimap */
-    .minimap-container {
-      position: relative;
-      height: 44px;
+    /* Minimap - aligned with timeline, acts as horizontal scrollbar */
+    .minimap-row {
+      display: flex;
+      height: 28px;
       flex-shrink: 0;
-      background: var(--vscode-minimap-background, var(--vscode-editor-background));
       border-top: 1px solid var(--vscode-panel-border);
+      background: var(--vscode-editor-background);
+    }
+    .minimap-spacer {
+      flex-shrink: 0;
+      background: var(--vscode-editor-background);
+    }
+    .minimap-container {
+      flex-grow: 1;
+      position: relative;
       overflow: hidden;
+      background: var(--vscode-minimap-background, var(--vscode-editor-background));
     }
     .minimap-container svg {
       display: block;
@@ -3979,22 +3988,24 @@ ${style.tip}
       opacity: 0.4;
     }
     .minimap-viewport {
-      fill: var(--vscode-minimapSlider-background, rgba(100, 100, 100, 0.2));
+      fill: var(--vscode-minimapSlider-background, rgba(100, 100, 100, 0.25));
       stroke: none;
       cursor: grab;
       transition: fill 0.1s;
     }
     .minimap-viewport:hover {
-      fill: var(--vscode-minimapSlider-hoverBackground, rgba(100, 100, 100, 0.35));
+      fill: var(--vscode-minimapSlider-hoverBackground, rgba(100, 100, 100, 0.4));
     }
     .minimap-viewport:active {
       cursor: grabbing;
-      fill: var(--vscode-minimapSlider-activeBackground, rgba(100, 100, 100, 0.5));
+      fill: var(--vscode-minimapSlider-activeBackground, rgba(100, 100, 100, 0.55));
     }
     .minimap-today {
       stroke: var(--vscode-charts-red);
       stroke-width: 1.5;
     }
+    /* Hide horizontal scrollbar - minimap replaces it */
+    .gantt-scroll::-webkit-scrollbar:horizontal { height: 0; }
     /* Milestone markers */
     .milestone-marker {
       pointer-events: all;
@@ -4316,12 +4327,14 @@ ${style.tip}
       </div>
     </div>
   </div>
-  <div class="minimap-container" id="minimapContainer">
-    <svg id="minimapSvg" viewBox="0 0 100 ${minimapHeight}" preserveAspectRatio="none">
-      <!-- Bars will be rendered by JS -->
-      <line class="minimap-today" x1="${(todayX / timelineWidth) * 100}" y1="0" x2="${(todayX / timelineWidth) * 100}" y2="${minimapHeight}"/>
-      <rect class="minimap-viewport" id="minimapViewport" x="0" y="0" width="20" height="${minimapHeight}" rx="2"/>
-    </svg>
+  <div class="minimap-row">
+    <div class="minimap-spacer" style="width: ${checkboxColumnWidth + labelWidth + extraColumnsWidth + 4}px;"></div>
+    <div class="minimap-container" id="minimapContainer">
+      <svg id="minimapSvg" viewBox="0 0 100 ${minimapHeight}" preserveAspectRatio="none">
+        <line class="minimap-today" x1="${(todayX / timelineWidth) * 100}" y1="0" x2="${(todayX / timelineWidth) * 100}" y2="${minimapHeight}"/>
+        <rect class="minimap-viewport" id="minimapViewport" x="0" y="0" width="20" height="${minimapHeight}" rx="2"/>
+      </svg>
+    </div>
   </div>
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
