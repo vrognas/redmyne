@@ -3618,9 +3618,8 @@ ${style.tip}
     .gantt-labels svg { min-width: 100%; }
     .gantt-col-id, .gantt-col-start, .gantt-col-status, .gantt-col-due, .gantt-col-assignee {
       flex-shrink: 0;
-      border-right: 1px solid var(--vscode-panel-border);
       overflow: hidden;
-      box-sizing: border-box;
+      border-right: 1px solid var(--vscode-panel-border);
     }
     .gantt-col-id { width: ${idColumnWidth}px; }
     .gantt-col-start { width: ${startDateColumnWidth}px; }
