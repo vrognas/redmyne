@@ -3510,19 +3510,20 @@ ${style.tip}
       min-height: 0;
       position: relative;
     }
-    /* Single scroll container - no JS sync needed */
-    .gantt-scroll {
+    /* Single scroll container - clip horizontal scrollbar */
+    .gantt-scroll-wrapper {
       flex-grow: 1;
-      overflow: auto;
+      overflow: hidden;
       min-height: 0;
-      scrollbar-width: thin; /* Firefox */
-      padding-bottom: 30px; /* Space for minimap overlay */
+      position: relative;
+    }
+    .gantt-scroll {
+      height: calc(100% + 20px); /* Push scrollbar outside wrapper */
+      overflow: scroll;
+      padding-bottom: 50px; /* Space for minimap + clipped scrollbar */
     }
     .gantt-scroll::-webkit-scrollbar { width: 8px; }
-    .gantt-scroll::-webkit-scrollbar:horizontal { height: 1px; background: transparent; }
     .gantt-scroll::-webkit-scrollbar-thumb { background: var(--vscode-scrollbarSlider-background); border-radius: 4px; }
-    .gantt-scroll::-webkit-scrollbar-thumb:horizontal { background: transparent; }
-    .gantt-scroll::-webkit-scrollbar-track:horizontal { background: transparent; }
     .gantt-scroll::-webkit-scrollbar-corner { background: transparent; }
     .gantt-header-row {
       display: flex;
@@ -4199,8 +4200,9 @@ ${style.tip}
     </div>
   </div>
   <div class="gantt-container">
-    <!-- Single scroll container for lag-free header/body sync -->
-    <div class="gantt-scroll" id="ganttScroll" data-render-key="${this._renderKey}">
+    <!-- Wrapper clips horizontal scrollbar -->
+    <div class="gantt-scroll-wrapper">
+      <div class="gantt-scroll" id="ganttScroll" data-render-key="${this._renderKey}">
       <!-- Header row - sticky at top -->
       <div class="gantt-header-row">
         <div class="gantt-sticky-left gantt-corner">
@@ -4307,6 +4309,7 @@ ${style.tip}
           </svg>
         </div>
       </div>
+    </div>
     </div>
     <!-- Minimap outside scroll, positioned absolutely at bottom of gantt-container -->
     <div class="minimap-container" id="minimapContainer">
