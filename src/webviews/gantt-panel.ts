@@ -2327,11 +2327,11 @@ export class GanttPanel {
         const today = getLocalToday();
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         const displayDate = `${monthNames[dueDate.getMonth()]} ${dueDate.getDate()}`;
-        // Determine if overdue or due soon
+        // Determine if overdue or due soon (closed issues are never overdue)
         const daysUntilDue = Math.floor((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
         let dueClass = "";
-        if (issue.done_ratio < 100 && daysUntilDue < 0) dueClass = "due-overdue";
-        else if (issue.done_ratio < 100 && daysUntilDue <= 3) dueClass = "due-soon";
+        if (!issue.isClosed && issue.done_ratio < 100 && daysUntilDue < 0) dueClass = "due-overdue";
+        else if (!issue.isClosed && issue.done_ratio < 100 && daysUntilDue <= 3) dueClass = "due-soon";
         return `<g transform="translate(0, ${y})">
           <text class="gantt-col-cell ${dueClass}" x="${dueDateColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">${displayDate}</text>
           <title>${issue.due_date}</title>
