@@ -3566,7 +3566,9 @@ ${style.tip}
       display: flex;
       align-items: center;
       justify-content: center;
+      overflow: hidden;
     }
+    .gantt-checkbox-header svg { display: block; max-width: 100%; }
     .select-all-checkbox { cursor: pointer; }
     .select-all-checkbox:hover rect { stroke: var(--vscode-focusBorder); }
     .gantt-left-header {
@@ -3635,11 +3637,13 @@ ${style.tip}
       display: flex;
       align-items: center;
       justify-content: center;
+      width: 100%;
       height: 100%;
       font-size: 11px;
       font-weight: 500;
       color: var(--vscode-descriptionForeground);
       padding: 0 4px;
+      box-sizing: border-box;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
