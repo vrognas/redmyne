@@ -3959,25 +3959,20 @@ ${style.tip}
     .rel-start_to_finish .arrow-head { fill: var(--vscode-charts-purple); }
     .color-swatch { display: inline-block; width: 12px; height: 3px; margin-right: 8px; vertical-align: middle; }
 
-    /* Minimap - fixed at bottom of timeline, acts as horizontal scrollbar */
+    /* Minimap - sticky at bottom of timeline viewport */
     .minimap-container {
-      position: absolute;
+      position: sticky;
       bottom: 0;
-      left: 0;
-      right: 0;
       height: 20px;
       background: var(--vscode-editor-background);
       border-top: 1px solid var(--vscode-panel-border);
-      z-index: 5;
+      z-index: 6;
+      margin-top: -20px;
     }
     .minimap-container svg {
       display: block;
       width: 100%;
       height: 100%;
-    }
-    .gantt-timeline {
-      position: relative;
-      padding-bottom: 20px; /* Space for minimap */
     }
     .minimap-bar { opacity: 0.85; }
     .minimap-bar.bar-past { opacity: 0.4; }
