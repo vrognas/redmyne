@@ -1504,6 +1504,14 @@ export class GanttPanel {
           vscode.commands.executeCommand("redmine.openIssueInBrowser", { id: message.issueId });
         }
         break;
+      case "openProjectInBrowser":
+        if (message.projectId) {
+          const project = this._projects.find(p => p.id === message.projectId);
+          if (project) {
+            vscode.commands.executeCommand("redmine.openProjectInBrowser", { project: { identifier: project.identifier } });
+          }
+        }
+        break;
       case "showInIssues":
         if (message.issueId) {
           vscode.commands.executeCommand("redmine.revealIssueInTree", message.issueId);
@@ -5378,6 +5386,57 @@ ${style.tip}
         e.preventDefault();
         const issueId = label.dataset.issueId;
         if (issueId) showIssueContextMenu(e.clientX, e.clientY, issueId);
+      });
+    });
+
+    // Show context menu for project
+    function showProjectContextMenu(x, y, projectId, projectName) {
+      document.querySelector('.relation-picker')?.remove();
+
+      const picker = document.createElement('div');
+      picker.className = 'relation-picker';
+
+      const pickerWidth = 140;
+      const pickerHeight = 60;
+      const clampedX = Math.min(x, window.innerWidth - pickerWidth - 10);
+      const clampedY = Math.min(y, window.innerHeight - pickerHeight - 10);
+      picker.style.left = Math.max(10, clampedX) + 'px';
+      picker.style.top = Math.max(10, clampedY) + 'px';
+
+      const label = document.createElement('div');
+      label.style.padding = '6px 12px';
+      label.style.fontSize = '11px';
+      label.style.opacity = '0.7';
+      label.textContent = projectName;
+      picker.appendChild(label);
+
+      const btn = document.createElement('button');
+      btn.textContent = 'Open in Browser';
+      btn.addEventListener('click', () => {
+        vscode.postMessage({ command: 'openProjectInBrowser', projectId: parseInt(projectId) });
+        picker.remove();
+      });
+      picker.appendChild(btn);
+
+      document.body.appendChild(picker);
+
+      setTimeout(() => {
+        document.addEventListener('click', function closeHandler(e) {
+          if (!picker.contains(e.target)) {
+            picker.remove();
+            document.removeEventListener('click', closeHandler);
+          }
+        });
+      }, 0);
+    }
+
+    // Project label right-click context menu
+    document.querySelectorAll('.project-label').forEach(label => {
+      label.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const projectId = label.dataset.projectId;
+        const projectName = label.querySelector('text')?.textContent?.trim() || 'Project';
+        if (projectId) showProjectContextMenu(e.clientX, e.clientY, projectId, projectName);
       });
     });
 
