@@ -480,8 +480,8 @@ export class GanttPanel {
   private _filterChangeCallback?: (filter: IssueFilter) => void;
   private _viewMode: GanttViewMode = "projects";
   private _showCapacityRibbon = true; // Capacity ribbon visible by default in My Work
-  // Sort settings
-  private _sortBy: "id" | "assignee" | "start" | "due" = "due";
+  // Sort settings (null = no sorting, use natural/hierarchy order)
+  private _sortBy: "id" | "assignee" | "start" | "due" | null = null;
   private _sortOrder: "asc" | "desc" = "asc";
   // Current user for special highlighting
   private _currentUserName: string | null = null;
@@ -1278,7 +1278,7 @@ export class GanttPanel {
     isExpanded?: boolean; // For collapseStateSync
     filter?: { assignee?: string; status?: string }; // For setFilter
     health?: string; // For setHealthFilter
-    sortBy?: "id" | "assignee" | "start" | "due"; // For setSort
+    sortBy?: "id" | "assignee" | "start" | "due" | null; // For setSort (null = no sort)
     sortOrder?: "asc" | "desc"; // For setSort
   }): void {
     switch (message.command) {
@@ -1570,7 +1570,7 @@ export class GanttPanel {
         this._selectedCollapseKey = message.collapseKey ?? null;
         break;
       case "setSort":
-        if (message.sortBy) {
+        if (message.sortBy !== undefined) {
           this._sortBy = message.sortBy;
         }
         if (message.sortOrder) {
@@ -1824,8 +1824,8 @@ export class GanttPanel {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
 
-    // Sort issues before building hierarchy
-    const sortedIssues = [...this._issues].sort((a, b) => {
+    // Sort issues before building hierarchy (null = no sorting, keep natural order)
+    const sortedIssues = this._sortBy === null ? [...this._issues] : [...this._issues].sort((a, b) => {
       let cmp = 0;
       switch (this._sortBy) {
         case "id":
@@ -4678,17 +4678,22 @@ ${style.tip}
       });
     });
 
-    // Sortable column header handlers
+    // Sortable column header handlers (cycle: asc → desc → none)
     document.querySelectorAll('.gantt-col-header.sortable').forEach(header => {
       header.addEventListener('click', () => {
         const sortField = header.dataset.sort;
         const currentSort = '${this._sortBy}';
         const currentOrder = '${this._sortOrder}';
         if (sortField === currentSort) {
-          // Toggle order if same field
-          vscode.postMessage({ command: 'setSort', sortOrder: currentOrder === 'asc' ? 'desc' : 'asc' });
+          // Same field: asc → desc → none
+          if (currentOrder === 'asc') {
+            vscode.postMessage({ command: 'setSort', sortOrder: 'desc' });
+          } else {
+            // desc → none (clear sort)
+            vscode.postMessage({ command: 'setSort', sortBy: null });
+          }
         } else {
-          // Switch to new field, default ascending
+          // Different field: start with ascending
           vscode.postMessage({ command: 'setSort', sortBy: sortField, sortOrder: 'asc' });
         }
       });
