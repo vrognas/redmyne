@@ -5399,25 +5399,18 @@ ${style.tip}
     });
 
     // Show context menu for project
-    function showProjectContextMenu(x, y, projectId, projectName) {
+    function showProjectContextMenu(x, y, projectId) {
       document.querySelector('.relation-picker')?.remove();
 
       const picker = document.createElement('div');
       picker.className = 'relation-picker';
 
       const pickerWidth = 140;
-      const pickerHeight = 60;
+      const pickerHeight = 36;
       const clampedX = Math.min(x, window.innerWidth - pickerWidth - 10);
       const clampedY = Math.min(y, window.innerHeight - pickerHeight - 10);
       picker.style.left = Math.max(10, clampedX) + 'px';
       picker.style.top = Math.max(10, clampedY) + 'px';
-
-      const label = document.createElement('div');
-      label.style.padding = '6px 12px';
-      label.style.fontSize = '11px';
-      label.style.opacity = '0.7';
-      label.textContent = projectName;
-      picker.appendChild(label);
 
       const btn = document.createElement('button');
       btn.textContent = 'Open in Browser';
@@ -5444,8 +5437,7 @@ ${style.tip}
       label.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         const projectId = label.dataset.projectId;
-        const projectName = label.querySelector('text:not(.collapse-toggle)')?.textContent?.trim() || 'Project';
-        if (projectId) showProjectContextMenu(e.clientX, e.clientY, projectId, projectName);
+        if (projectId) showProjectContextMenu(e.clientX, e.clientY, projectId);
       });
     });
 
