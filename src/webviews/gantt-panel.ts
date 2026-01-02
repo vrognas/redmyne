@@ -603,6 +603,20 @@ export class GanttPanel {
       </g>
     `).join("");
 
+    // ID column skeleton
+    const idSvg = skeletonRows.map((r, i) => r.isProject ? "" : `
+      <g class="skeleton-label delay-${Math.min(i, 7)}">
+        <rect x="${(idColumnWidth - 35) / 2}" y="${r.y + 10}" width="35" height="10" rx="2" fill="var(--vscode-panel-border)"/>
+      </g>
+    `).join("");
+
+    // Start date column skeleton
+    const startSvg = skeletonRows.map((r, i) => r.isProject ? "" : `
+      <g class="skeleton-label delay-${Math.min(i, 7)}">
+        <rect x="${(startDateColumnWidth - 50) / 2}" y="${r.y + 10}" width="50" height="10" rx="2" fill="var(--vscode-panel-border)"/>
+      </g>
+    `).join("");
+
     // Status column skeleton (short text placeholders)
     const statusSvg = skeletonRows.map((r, i) => r.isProject ? "" : `
       <g class="skeleton-label delay-${Math.min(i, 7)}">
@@ -613,7 +627,7 @@ export class GanttPanel {
     // Due date column skeleton
     const dueSvg = skeletonRows.map((r, i) => r.isProject ? "" : `
       <g class="skeleton-label delay-${Math.min(i, 7)}">
-        <rect x="${(dueDateColumnWidth - 60) / 2}" y="${r.y + 10}" width="60" height="10" rx="2" fill="var(--vscode-panel-border)"/>
+        <rect x="${(dueDateColumnWidth - 50) / 2}" y="${r.y + 10}" width="50" height="10" rx="2" fill="var(--vscode-panel-border)"/>
       </g>
     `).join("");
 
@@ -787,13 +801,15 @@ export class GanttPanel {
       background: var(--vscode-panel-border);
       flex-shrink: 0;
     }
-    .gantt-col-status, .gantt-col-due, .gantt-col-assignee {
+    .gantt-col-id, .gantt-col-start, .gantt-col-status, .gantt-col-due, .gantt-col-assignee {
       flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
       border-right: 1px solid var(--vscode-panel-border);
     }
+    .gantt-col-id { width: ${idColumnWidth}px; }
+    .gantt-col-start { width: ${startDateColumnWidth}px; }
     .gantt-col-status { width: ${statusColumnWidth}px; }
     .gantt-col-due { width: ${dueDateColumnWidth}px; }
     .gantt-col-assignee { width: ${assigneeColumnWidth}px; }
@@ -915,9 +931,11 @@ export class GanttPanel {
       <div class="gantt-checkbox-header"></div>
       <div class="gantt-left-header"></div>
       <div class="gantt-resize-handle-header"></div>
+      <div class="gantt-col-id"><div class="gantt-col-header">#ID</div></div>
+      <div class="gantt-col-start"><div class="gantt-col-header">Start</div></div>
       <div class="gantt-col-status"><div class="gantt-col-header">Status</div></div>
       <div class="gantt-col-due"><div class="gantt-col-header">Due</div></div>
-      <div class="gantt-col-assignee"><div class="gantt-col-header">Assignee</div></div>
+      <div class="gantt-col-assignee"><div class="gantt-col-header">Asn</div></div>
       <div class="gantt-timeline-header">
         <span class="loading-text">Loading issues...</span>
       </div>
@@ -935,6 +953,18 @@ export class GanttPanel {
         </svg>
       </div>
       <div class="gantt-resize-handle"></div>
+      <div class="gantt-col-id">
+        <svg width="${idColumnWidth}" height="${bodyHeight}">
+          ${zebraStripes}
+          ${idSvg}
+        </svg>
+      </div>
+      <div class="gantt-col-start">
+        <svg width="${startDateColumnWidth}" height="${bodyHeight}">
+          ${zebraStripes}
+          ${startSvg}
+        </svg>
+      </div>
       <div class="gantt-col-status">
         <svg width="${statusColumnWidth}" height="${bodyHeight}">
           ${zebraStripes}
@@ -1922,10 +1952,12 @@ export class GanttPanel {
     const pixelsPerDay = ZOOM_PIXELS_PER_DAY[this._zoomLevel];
     const timelineWidth = Math.max(600, totalDays * pixelsPerDay);
     const labelWidth = 250;
+    const idColumnWidth = 55;
+    const startDateColumnWidth = 85;
     const statusColumnWidth = 90;
     const dueDateColumnWidth = 85;
     const assigneeColumnWidth = 40;
-    const extraColumnsWidth = statusColumnWidth + dueDateColumnWidth + assigneeColumnWidth;
+    const extraColumnsWidth = idColumnWidth + startDateColumnWidth + statusColumnWidth + dueDateColumnWidth + assigneeColumnWidth;
     const barHeight = 30;
     const barGap = 10;
     const headerHeight = 40;
@@ -2212,11 +2244,39 @@ export class GanttPanel {
           <g class="issue-label gantt-row cursor-pointer" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Open issue #${issue.id}">
             ${chevron}
             <text x="${5 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="${issue.isExternal ? "var(--vscode-descriptionForeground)" : "var(--vscode-foreground)"}" font-size="12">
-              ${externalBadge}${projectBadge}#${issue.id} ${escapedSubject}
+              ${externalBadge}${projectBadge}${escapedSubject}
             </text>
             <title>${tooltip}</title>
           </g>
         `;
+      })
+      .join("");
+
+    // ID column cells
+    const idCells = visibleRows
+      .map((row, idx) => {
+        const y = idx * (barHeight + barGap);
+        if (row.type === "project") return `<g transform="translate(0, ${y})"></g>`;
+        const issue = row.issue!;
+        return `<g transform="translate(0, ${y})">
+          <text class="gantt-col-cell" x="${idColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">#${issue.id}</text>
+        </g>`;
+      })
+      .join("");
+
+    // Start date column cells
+    const startDateCells = visibleRows
+      .map((row, idx) => {
+        const y = idx * (barHeight + barGap);
+        if (row.type === "project") return `<g transform="translate(0, ${y})"></g>`;
+        const issue = row.issue!;
+        if (!issue.start_date) return `<g transform="translate(0, ${y})"><text class="gantt-col-cell" x="${startDateColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">—</text></g>`;
+        const startDate = parseLocalDate(issue.start_date);
+        const displayDate = startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        return `<g transform="translate(0, ${y})">
+          <text class="gantt-col-cell" x="${startDateColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">${displayDate}</text>
+          <title>${issue.start_date}</title>
+        </g>`;
       })
       .join("");
 
@@ -3525,11 +3585,13 @@ ${style.tip}
       overflow-y: hidden;
     }
     .gantt-labels svg { min-width: 100%; }
-    .gantt-col-status, .gantt-col-due, .gantt-col-assignee {
+    .gantt-col-id, .gantt-col-start, .gantt-col-status, .gantt-col-due, .gantt-col-assignee {
       flex-shrink: 0;
       border-right: 1px solid var(--vscode-panel-border);
       overflow: hidden;
     }
+    .gantt-col-id { width: ${idColumnWidth}px; }
+    .gantt-col-start { width: ${startDateColumnWidth}px; }
     .gantt-col-status { width: ${statusColumnWidth}px; }
     .gantt-col-due { width: ${dueDateColumnWidth}px; }
     .gantt-col-assignee { width: ${assigneeColumnWidth}px; }
@@ -3545,6 +3607,9 @@ ${style.tip}
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    .gantt-col-header.sortable { cursor: pointer; }
+    .gantt-col-header.sortable:hover { color: var(--vscode-foreground); background: var(--vscode-list-hoverBackground); }
+    .gantt-col-header.sorted { color: var(--vscode-foreground); font-weight: 600; }
     .gantt-col-cell {
       font-size: 11px;
       fill: var(--vscode-descriptionForeground);
@@ -4013,20 +4078,6 @@ ${style.tip}
             <option value="healthy"${this._healthFilter === "healthy" ? " selected" : ""}>Healthy</option>
           </select>
         </div>
-        <div class="filter-toggle" role="group" aria-label="Sort order">
-          <select id="sortBy" title="Sort by (S)">
-            <option value="id"${this._sortBy === "id" ? " selected" : ""}>#ID</option>
-            <option value="assignee"${this._sortBy === "assignee" ? " selected" : ""}>Assignee</option>
-            <option value="start"${this._sortBy === "start" ? " selected" : ""}>Start</option>
-            <option value="due"${this._sortBy === "due" ? " selected" : ""}>Due</option>
-          </select>
-          <button id="sortOrderBtn" class="icon-btn" title="Toggle sort order" aria-label="${this._sortOrder === "asc" ? "Ascending" : "Descending"}">
-            <svg viewBox="0 0 16 16">${this._sortOrder === "asc"
-              ? '<path d="M3 2v10l-2-2-.7.7L3.5 14l3.2-3.3-.7-.7-2 2V2H3zm5 0v1h7V2H8zm0 4v1h5V6H8zm0 4v1h3v-1H8z"/>'
-              : '<path d="M3 14V4l-2 2-.7-.7L3.5 2l3.2 3.3-.7.7-2-2v10H3zm5 0v-1h3v1H8zm0-4v-1h5v1H8zm0-4V5h7v1H8z"/>'
-            }</svg>
-          </button>
-        </div>
       </div>
       <div class="toolbar-separator"></div>
       <!-- Health summary stats -->
@@ -4154,9 +4205,11 @@ ${style.tip}
           </div>
           <div class="gantt-left-header" id="ganttLeftHeader"></div>
           <div class="gantt-resize-handle-header"></div>
+          <div class="gantt-col-id"><div class="gantt-col-header sortable${this._sortBy === "id" ? " sorted" : ""}" data-sort="id">#ID${this._sortBy === "id" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
+          <div class="gantt-col-start"><div class="gantt-col-header sortable${this._sortBy === "start" ? " sorted" : ""}" data-sort="start">Start${this._sortBy === "start" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
           <div class="gantt-col-status"><div class="gantt-col-header">Status</div></div>
-          <div class="gantt-col-due"><div class="gantt-col-header">Due</div></div>
-          <div class="gantt-col-assignee"><div class="gantt-col-header">Assignee</div></div>
+          <div class="gantt-col-due"><div class="gantt-col-header sortable${this._sortBy === "due" ? " sorted" : ""}" data-sort="due">Due${this._sortBy === "due" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
+          <div class="gantt-col-assignee"><div class="gantt-col-header sortable${this._sortBy === "assignee" ? " sorted" : ""}" data-sort="assignee">Asn${this._sortBy === "assignee" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
         </div>
         <div class="gantt-timeline-header" id="ganttTimelineHeader">
           <svg width="${timelineWidth}" height="${headerHeight}">
@@ -4195,6 +4248,18 @@ ${style.tip}
             </svg>
           </div>
           <div class="gantt-resize-handle" id="resizeHandle"></div>
+          <div class="gantt-col-id">
+            <svg width="${idColumnWidth}" height="${bodyHeight}">
+              ${zebraStripes}
+              ${idCells}
+            </svg>
+          </div>
+          <div class="gantt-col-start">
+            <svg width="${startDateColumnWidth}" height="${bodyHeight}">
+              ${zebraStripes}
+              ${startDateCells}
+            </svg>
+          </div>
           <div class="gantt-col-status">
             <svg width="${statusColumnWidth}" height="${bodyHeight}">
               ${zebraStripes}
@@ -4613,13 +4678,20 @@ ${style.tip}
       });
     });
 
-    // Sort dropdown handlers
-    document.getElementById('sortBy').addEventListener('change', (e) => {
-      vscode.postMessage({ command: 'setSort', sortBy: e.target.value });
-    });
-    document.getElementById('sortOrderBtn').addEventListener('click', () => {
-      const currentOrder = '${this._sortOrder}';
-      vscode.postMessage({ command: 'setSort', sortOrder: currentOrder === 'asc' ? 'desc' : 'asc' });
+    // Sortable column header handlers
+    document.querySelectorAll('.gantt-col-header.sortable').forEach(header => {
+      header.addEventListener('click', () => {
+        const sortField = header.dataset.sort;
+        const currentSort = '${this._sortBy}';
+        const currentOrder = '${this._sortOrder}';
+        if (sortField === currentSort) {
+          // Toggle order if same field
+          vscode.postMessage({ command: 'setSort', sortOrder: currentOrder === 'asc' ? 'desc' : 'asc' });
+        } else {
+          // Switch to new field, default ascending
+          vscode.postMessage({ command: 'setSort', sortBy: sortField, sortOrder: 'asc' });
+        }
+      });
     });
 
     // Heatmap toggle handler
@@ -6176,16 +6248,6 @@ ${style.tip}
       // Action shortcuts
       else if (e.key.toLowerCase() === 'r') { document.getElementById('refreshBtn')?.click(); }
       else if (e.key.toLowerCase() === 't') { document.getElementById('todayBtn')?.click(); }
-      // Sort shortcut (S cycles through sort options)
-      else if (e.key.toLowerCase() === 's') {
-        e.preventDefault();
-        const sortSelect = document.getElementById('sortBy');
-        const options = ['id', 'assignee', 'start', 'due'];
-        const currentIdx = options.indexOf(sortSelect.value);
-        const nextIdx = (currentIdx + 1) % options.length;
-        sortSelect.value = options[nextIdx];
-        sortSelect.dispatchEvent(new Event('change'));
-      }
       // Health filter shortcut (F cycles through health filters)
       else if (e.key.toLowerCase() === 'f') {
         e.preventDefault();
