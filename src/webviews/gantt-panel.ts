@@ -3141,6 +3141,8 @@ ${style.tip}
       z-index: 5;
       background: var(--vscode-editor-background);
       border-bottom: 1px solid var(--vscode-panel-border);
+      width: max-content;
+      min-width: 100%;
     }
     .capacity-ribbon-row.hidden { display: none; }
     .capacity-ribbon-label {
@@ -3278,9 +3280,13 @@ ${style.tip}
       height: ${headerHeight}px;
       border-bottom: 1px solid var(--vscode-panel-border);
       background: var(--vscode-editor-background);
+      width: max-content;
+      min-width: 100%;
     }
     .gantt-body {
       display: flex;
+      width: max-content;
+      min-width: 100%;
     }
     .gantt-sticky-left {
       display: flex;
