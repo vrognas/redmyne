@@ -2009,6 +2009,9 @@ export class GanttPanel {
     // Visibility is handled via CSS classes for client-side toggling
     const rows = allRows;
 
+    // Collect all expandable keys (rows with children) for "Expand All" functionality
+    const allExpandableKeys = rows.filter(r => r.hasChildren).map(r => r.collapseKey);
+
     // Calculate health stats for summary (before filtering)
     let criticalCount = 0, warningCount = 0, healthyCount = 0, blockedCount = 0;
     for (const r of rows) {
@@ -3538,13 +3541,14 @@ ${style.tip}
       display: flex;
       position: sticky;
       top: 0;
-      z-index: 10;
+      z-index: 20;
       height: ${headerHeight}px;
       border-bottom: 1px solid var(--vscode-panel-border);
       background: var(--vscode-editor-background);
       width: max-content;
       min-width: 100%;
     }
+    .gantt-header-row > * { background: var(--vscode-editor-background); }
     .gantt-body {
       display: flex;
       width: max-content;
@@ -3560,7 +3564,7 @@ ${style.tip}
       background: var(--vscode-editor-background);
     }
     .gantt-corner {
-      z-index: 15; /* Above both sticky header and sticky left */
+      z-index: 25; /* Above both sticky header and sticky left */
     }
     .gantt-checkbox-header {
       flex-shrink: 0;
@@ -3603,7 +3607,7 @@ ${style.tip}
       top: 0;
       bottom: 0;
     }
-    .gantt-timeline-header { flex-shrink: 0; }
+    .gantt-timeline-header { flex-shrink: 0; background: var(--vscode-editor-background); }
     .gantt-checkboxes {
       flex-shrink: 0;
       width: ${checkboxColumnWidth}px;
@@ -4222,7 +4226,7 @@ ${style.tip}
   <div class="gantt-container">
     <!-- Wrapper clips horizontal scrollbar -->
     <div class="gantt-scroll-wrapper">
-      <div class="gantt-scroll" id="ganttScroll" data-render-key="${this._renderKey}">
+      <div class="gantt-scroll" id="ganttScroll" data-render-key="${this._renderKey}" data-all-expandable-keys='${JSON.stringify(allExpandableKeys)}'>
       <!-- Header row - sticky at top -->
       <div class="gantt-header-row">
         <div class="gantt-sticky-left gantt-corner">
@@ -5860,9 +5864,10 @@ ${style.tip}
 
     // Expand/collapse all buttons
     document.getElementById('expandAllBtn')?.addEventListener('click', () => {
-      const keys = [...document.querySelectorAll('[data-collapse-key]')]
-        .map(el => el.dataset.collapseKey)
-        .filter((k, i, arr) => k && arr.indexOf(k) === i);
+      // Use pre-computed list of ALL expandable keys (not just visible DOM elements)
+      const ganttScroll = document.getElementById('ganttScroll');
+      const allKeys = ganttScroll?.dataset.allExpandableKeys;
+      const keys = allKeys ? JSON.parse(allKeys) : [];
       vscode.postMessage({ command: 'expandAll', keys });
     });
     document.getElementById('collapseAllBtn')?.addEventListener('click', () => {
