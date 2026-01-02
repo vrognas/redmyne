@@ -3340,7 +3340,7 @@ ${style.tip}
       height: 14px;
       fill: currentColor;
     }
-    /* Legend row (below toolbar) */
+    /* Legend row (below toolbar) - Aesthetic-Usability: smooth transitions */
     .legend-row {
       display: flex;
       align-items: center;
@@ -3350,6 +3350,9 @@ ${style.tip}
       border-bottom: 1px solid var(--vscode-panel-border);
       font-size: 11px;
       color: var(--vscode-descriptionForeground);
+      transition: opacity 0.15s ease-out, max-height 0.2s ease-out;
+      max-height: 40px;
+      overflow: hidden;
       flex-shrink: 0;
     }
     .legend-row.hidden { display: none; }
@@ -4064,10 +4067,53 @@ ${style.tip}
     .health-stat.warning .stat-count { color: var(--vscode-charts-yellow); }
     .health-stat.healthy .stat-count { color: var(--vscode-charts-green); }
     .health-stat.blocked .stat-count { color: var(--vscode-charts-red); }
-    /* Health legend */
-    .health-legend { display: flex; gap: 12px; font-size: 11px; margin-left: 12px; align-items: center; }
-    .health-legend-item { opacity: 0.8; white-space: nowrap; }
-    .health-legend-item:hover { opacity: 1; }
+    /* Health legend - Progressive Disclosure via help icon */
+    .health-help {
+      position: relative;
+      display: flex;
+      align-items: center;
+      margin-left: auto;
+      padding-left: 12px;
+    }
+    .health-help-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--vscode-badge-background);
+      color: var(--vscode-badge-foreground);
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: help;
+      opacity: 0.7;
+      transition: opacity 0.15s;
+    }
+    .health-help-icon:hover { opacity: 1; }
+    .health-help-tooltip {
+      position: absolute;
+      right: 0;
+      top: 100%;
+      margin-top: 8px;
+      background: var(--vscode-editorWidget-background);
+      border: 1px solid var(--vscode-editorWidget-border);
+      border-radius: 4px;
+      padding: 8px 12px;
+      box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.15s, visibility 0.15s;
+      white-space: nowrap;
+    }
+    .health-help:hover .health-help-tooltip {
+      opacity: 1;
+      visibility: visible;
+    }
+    .health-legend { display: flex; flex-direction: column; gap: 4px; font-size: 11px; }
+    .health-legend-item { opacity: 0.9; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+    .health-legend-title { font-weight: 600; margin-bottom: 4px; color: var(--vscode-foreground); }
   </style>
 </head>
 <body>
@@ -4215,12 +4261,19 @@ ${style.tip}
       <span class="relation-legend-item"><span class="relation-legend-line rel-line-duplicates"></span>duplicates</span>
       <span class="relation-legend-item"><span class="relation-legend-line rel-line-copied"></span>copied</span>
     </div>
-    <div id="healthLegend" class="health-legend" title="Bar badges explained">
-      <span class="health-legend-item" style="color:var(--vscode-charts-green)">+Nd slack</span>
-      <span class="health-legend-item" style="color:var(--vscode-charts-red)">-Nd late</span>
-      <span class="health-legend-item">🚧N blocks</span>
-      <span class="health-legend-item" style="color:var(--vscode-charts-red)">⛔N blocked by</span>
-      <span class="health-legend-item" style="color:var(--vscode-charts-purple)">◆ milestone</span>
+    <!-- Health legend: Progressive Disclosure via help icon -->
+    <div class="health-help">
+      <div class="health-help-icon" aria-label="Badge legend">?</div>
+      <div class="health-help-tooltip">
+        <div class="health-legend">
+          <div class="health-legend-title">Bar Badges</div>
+          <span class="health-legend-item"><span style="color:var(--vscode-charts-green)">+Nd</span> days of slack</span>
+          <span class="health-legend-item"><span style="color:var(--vscode-charts-red)">-Nd</span> days late</span>
+          <span class="health-legend-item">🚧N issues blocked by this</span>
+          <span class="health-legend-item"><span style="color:var(--vscode-charts-red)">⛔N</span> blocking this issue</span>
+          <span class="health-legend-item"><span style="color:var(--vscode-charts-purple)">◆</span> milestone marker</span>
+        </div>
+      </div>
     </div>
   </div>
   <div class="gantt-container">
