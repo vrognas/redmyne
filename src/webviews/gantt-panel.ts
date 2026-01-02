@@ -16,7 +16,7 @@ import { calculateDailyCapacity } from "../utilities/capacity-calculator";
 import { collapseState } from "../utilities/collapse-state";
 import { debounce, DebouncedFunction } from "../utilities/debounce";
 import { IssueFilter, DEFAULT_ISSUE_FILTER, GanttViewMode } from "../redmine/models/common";
-import { parseLocalDate } from "../utilities/date-utils";
+import { parseLocalDate, getLocalToday } from "../utilities/date-utils";
 
 const COLLAPSE_DEBOUNCE_MS = 50;
 
