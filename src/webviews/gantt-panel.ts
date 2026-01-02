@@ -571,6 +571,8 @@ export class GanttPanel {
     const barGap = 10;
     const rowCount = 10;
     const checkboxColumnWidth = 28;
+    const idColumnWidth = 55;
+    const startDateColumnWidth = 85;
     const statusColumnWidth = 90;
     const dueDateColumnWidth = 85;
     const assigneeColumnWidth = 40;
