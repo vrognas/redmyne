@@ -3029,8 +3029,8 @@ ${style.tip}
       .join("");
 
     // Generate minimap bars (simplified representation) - only for visible projects
-    const minimapBarHeight = 4;
-    const minimapHeight = 20;
+    const minimapBarHeight = 5;
+    const minimapHeight = 30;
     const minimapBars = rows
       .filter(r => r.type === "issue" && r.issue && (r.issue.start_date || r.issue.due_date) && !isInHiddenTreeCached(r))
       .map((row) => {
@@ -3515,9 +3515,10 @@ ${style.tip}
       flex-grow: 1;
       overflow: auto;
       min-height: 0;
+      scrollbar-width: thin; /* Firefox */
+      padding-bottom: 30px; /* Space for minimap */
     }
-    .gantt-scroll::-webkit-scrollbar { width: 8px; }
-    .gantt-scroll::-webkit-scrollbar:horizontal { display: none; }
+    .gantt-scroll::-webkit-scrollbar { width: 8px; height: 0; }
     .gantt-scroll::-webkit-scrollbar-thumb { background: var(--vscode-scrollbarSlider-background); border-radius: 4px; }
     .gantt-scroll::-webkit-scrollbar-corner { background: transparent; }
     .gantt-header-row {
@@ -3965,7 +3966,7 @@ ${style.tip}
       position: absolute;
       bottom: 0;
       right: 0;
-      height: 20px;
+      height: 30px;
       background: var(--vscode-editor-background);
       border-top: 1px solid var(--vscode-panel-border);
       z-index: 6;
