@@ -4114,6 +4114,17 @@ ${style.tip}
     .health-legend { display: flex; flex-direction: column; gap: 4px; font-size: 11px; }
     .health-legend-item { opacity: 0.9; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
     .health-legend-title { font-weight: 600; margin-bottom: 4px; color: var(--vscode-foreground); }
+    .health-legend kbd {
+      background: var(--vscode-keybindingLabel-background);
+      color: var(--vscode-keybindingLabel-foreground);
+      border: 1px solid var(--vscode-keybindingLabel-border);
+      border-radius: 3px;
+      padding: 1px 4px;
+      font-family: var(--vscode-editor-font-family);
+      font-size: 10px;
+      min-width: 18px;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -4261,9 +4272,9 @@ ${style.tip}
       <span class="relation-legend-item"><span class="relation-legend-line rel-line-duplicates"></span>duplicates</span>
       <span class="relation-legend-item"><span class="relation-legend-line rel-line-copied"></span>copied</span>
     </div>
-    <!-- Health legend: Progressive Disclosure via help icon -->
+    <!-- Help: Progressive Disclosure via help icon -->
     <div class="health-help">
-      <div class="health-help-icon" aria-label="Badge legend">?</div>
+      <div class="health-help-icon" aria-label="Help">?</div>
       <div class="health-help-tooltip">
         <div class="health-legend">
           <div class="health-legend-title">Bar Badges</div>
@@ -4272,6 +4283,15 @@ ${style.tip}
           <span class="health-legend-item">🚧N issues blocked by this</span>
           <span class="health-legend-item"><span style="color:var(--vscode-charts-red)">⛔N</span> blocking this issue</span>
           <span class="health-legend-item"><span style="color:var(--vscode-charts-purple)">◆</span> milestone marker</span>
+        </div>
+        <div class="health-legend" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--vscode-panel-border);">
+          <div class="health-legend-title">Keyboard Shortcuts</div>
+          <span class="health-legend-item"><kbd>1-5</kbd> Zoom levels</span>
+          <span class="health-legend-item"><kbd>D</kbd> Toggle relations</span>
+          <span class="health-legend-item"><kbd>H</kbd> Toggle heatmap</span>
+          <span class="health-legend-item"><kbd>T</kbd> Jump to today</span>
+          <span class="health-legend-item"><kbd>R</kbd> Refresh</span>
+          <span class="health-legend-item"><kbd>/</kbd> Quick search</span>
         </div>
       </div>
     </div>
