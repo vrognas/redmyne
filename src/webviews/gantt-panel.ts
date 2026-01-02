@@ -258,6 +258,23 @@ function escapeHtml(str: string): string {
     .replace(/'/g, "&#39;");
 }
 
+/** Extract initials from full name (e.g., "Viktor Rognås" → "VR") */
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
+
+/** Generate consistent HSL color from string (for avatar badges) */
+function getAvatarColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 65%, 45%)`;
+}
+
 function formatDateWithWeekday(dateStr: string | null): string {
   if (!dateStr) return "—";
   const d = new Date(dateStr);
@@ -1846,7 +1863,7 @@ export class GanttPanel {
     const labelWidth = 250;
     const statusColumnWidth = 90;
     const dueDateColumnWidth = 85;
-    const assigneeColumnWidth = 100;
+    const assigneeColumnWidth = 40;
     const extraColumnsWidth = statusColumnWidth + dueDateColumnWidth + assigneeColumnWidth;
     const barHeight = 30;
     const barGap = 10;
@@ -2192,22 +2209,22 @@ export class GanttPanel {
       })
       .join("");
 
-    // Assignee column cells
+    // Assignee column cells - circular avatar badges with initials
     const assigneeCells = visibleRows
       .map((row, idx) => {
         const y = idx * (barHeight + barGap);
         if (row.type === "project") return `<g transform="translate(0, ${y})"></g>`;
         const issue = row.issue!;
-        if (!issue.assignee) return `<g transform="translate(0, ${y})"><text class="gantt-col-cell" x="4" y="${barHeight / 2 + 4}">—</text></g>`;
-        // Format as "F. Lastname" (first initial + last name)
-        const nameParts = issue.assignee.split(" ");
-        const firstInitial = nameParts[0]?.charAt(0) ?? "";
-        const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : nameParts[0];
-        const formattedName = nameParts.length > 1 ? `${firstInitial}. ${lastName}` : lastName;
+        if (!issue.assignee) return `<g transform="translate(0, ${y})"><text class="gantt-col-cell" x="${assigneeColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">—</text></g>`;
+        const initials = getInitials(issue.assignee);
+        const bgColor = getAvatarColor(issue.assignee);
         const isCurrentUser = issue.assignee === this._currentUserName;
-        const displayName = formattedName.length > 12 ? formattedName.substring(0, 11) + "…" : formattedName;
-        return `<g transform="translate(0, ${y})">
-          <text class="gantt-col-cell${isCurrentUser ? " current-user" : ""}" x="4" y="${barHeight / 2 + 4}">${escapeHtml(displayName)}</text>
+        const radius = 12;
+        const cx = assigneeColumnWidth / 2;
+        const cy = barHeight / 2;
+        return `<g transform="translate(0, ${y})" class="assignee-badge${isCurrentUser ? " current-user" : ""}">
+          <circle cx="${cx}" cy="${cy}" r="${radius}" fill="${bgColor}"/>
+          <text x="${cx}" y="${cy + 4}" text-anchor="middle" fill="white" font-size="10" font-weight="600">${escapeHtml(initials)}</text>
           <title>${escapeHtml(issue.assignee)}</title>
         </g>`;
       })
@@ -3472,7 +3489,8 @@ ${style.tip}
       font-size: 11px;
       fill: var(--vscode-descriptionForeground);
     }
-    .gantt-col-cell.current-user { fill: var(--vscode-charts-blue); font-weight: 600; }
+    .assignee-badge circle { cursor: default; }
+    .assignee-badge.current-user circle { stroke: var(--vscode-focusBorder); stroke-width: 2; }
     .gantt-col-cell.status-closed { fill: var(--vscode-charts-green); }
     .gantt-col-cell.status-inprogress { fill: var(--vscode-charts-blue); }
     .gantt-col-cell.status-new { fill: var(--vscode-descriptionForeground); }
