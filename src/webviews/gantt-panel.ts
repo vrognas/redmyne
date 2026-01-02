@@ -2171,7 +2171,9 @@ export class GanttPanel {
         const escapedProject = escapeHtml(issue.project);
 
         // Get status description and flexibility for consolidated tooltip
-        const leftStatusDesc = this._getStatusDescription(issue.status);
+        // Closed issues always show as "completed" regardless of calculated flexibility
+        const leftEffectiveStatus = issue.isClosed ? "completed" : issue.status;
+        const leftStatusDesc = this._getStatusDescription(leftEffectiveStatus);
         const leftFlexSlack = issue.flexibilitySlack;
         const leftFlexText = leftFlexSlack === null ? null
           : leftFlexSlack > 0 ? `Flexibility: +${leftFlexSlack}d buffer`
@@ -2467,7 +2469,9 @@ export class GanttPanel {
 
         const width = Math.max(10, endX - startX);
         // Note: y is now used for transform, internal positions are 0-based
-        const color = isParent ? "var(--vscode-descriptionForeground)" : this._getStatusColor(issue.status);
+        // Closed issues always show as "completed" regardless of calculated flexibility
+        const effectiveStatus = issue.isClosed ? "completed" : issue.status;
+        const color = isParent ? "var(--vscode-descriptionForeground)" : this._getStatusColor(effectiveStatus);
         const isPast = end < today;
         const isOverdue = !isParent && !issue.isClosed && issue.done_ratio < 100 && end < today;
 
@@ -2491,7 +2495,7 @@ export class GanttPanel {
           visualDoneRatio = Math.min(100, Math.round((issue.spent_hours / issue.estimated_hours) * 100));
           isFallbackProgress = true;
         }
-        const statusDesc = this._getStatusDescription(issue.status);
+        const statusDesc = this._getStatusDescription(effectiveStatus);
 
         // Build tooltip with contribution info
         const flexSlack = issue.flexibilitySlack;
@@ -3048,8 +3052,9 @@ ${style.tip}
         const isPast = !hasOnlyStart && end < today;
         const isOverdue = !hasOnlyStart && !issue.isClosed && issue.done_ratio < 100 && end < today;
         const classes = ["minimap-bar", isPast ? "bar-past" : "", isOverdue ? "bar-overdue" : ""].filter(Boolean).join(" ");
-        // Use same status color as main view
-        const color = this._getStatusColor(issue.status);
+        // Use same status color as main view (closed issues show as completed)
+        const minimapEffectiveStatus = issue.isClosed ? "completed" : issue.status;
+        const color = this._getStatusColor(minimapEffectiveStatus);
         return { startPct, endPct, classes, color };
       });
     const minimapBarsJson = JSON.stringify(minimapBars);
