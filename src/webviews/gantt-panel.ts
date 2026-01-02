@@ -3499,6 +3499,13 @@ ${style.tip}
     svg { display: block; }
     .issue-bar:hover .bar-main, .issue-bar:hover .bar-outline, .issue-label:hover { opacity: 1; }
     .issue-bar:hover .bar-intensity rect { filter: brightness(1.1); }
+    /* Suppress bar hover when hovering badges */
+    .issue-bar:has(.blocks-badge-group:hover) .bar-main,
+    .issue-bar:has(.blocks-badge-group:hover) .bar-outline,
+    .issue-bar:has(.blocker-badge:hover) .bar-main,
+    .issue-bar:has(.blocker-badge:hover) .bar-outline { opacity: inherit; }
+    .issue-bar:has(.blocks-badge-group:hover) .bar-intensity rect,
+    .issue-bar:has(.blocker-badge:hover) .bar-intensity rect { filter: none; }
     .issue-bar.bar-past { filter: saturate(0.4) opacity(0.7); }
     .issue-bar.bar-past:hover { filter: saturate(0.6) opacity(0.85); }
     .issue-bar.bar-open-ended .bar-outline { stroke-dasharray: 6, 3; stroke-dashoffset: -6; }
@@ -3857,6 +3864,10 @@ ${style.tip}
     .blocker-badge { pointer-events: all; }
     .blocker-badge:hover rect { opacity: 0.35 !important; }
     .blocker-badge:hover text { filter: brightness(1.3); }
+    /* Blocks badge styling */
+    .blocks-badge-group { cursor: help; }
+    .blocks-badge-group:hover .blocks-badge-bg { opacity: 0.35 !important; }
+    .blocks-badge-group:hover .blocks-badge { filter: brightness(1.3); }
     /* Health summary stats */
     .health-summary { display: flex; gap: 8px; align-items: center; }
     .health-stat {
