@@ -807,6 +807,7 @@ export class GanttPanel {
       align-items: center;
       justify-content: center;
       border-right: 1px solid var(--vscode-panel-border);
+      box-sizing: border-box;
     }
     .gantt-col-id { width: ${idColumnWidth}px; }
     .gantt-col-start { width: ${startDateColumnWidth}px; }
@@ -3597,6 +3598,7 @@ ${style.tip}
       flex-shrink: 0;
       border-right: 1px solid var(--vscode-panel-border);
       overflow: hidden;
+      box-sizing: border-box;
     }
     .gantt-col-id { width: ${idColumnWidth}px; }
     .gantt-col-start { width: ${startDateColumnWidth}px; }
