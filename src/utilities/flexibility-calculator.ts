@@ -49,6 +49,7 @@ export interface FlexibilityIssue {
   estimated_hours: number | null;
   spent_hours?: number;
   done_ratio?: number;
+  closed_on?: string | null;
 }
 
 // Memoization cache for working days calculation
@@ -294,6 +295,12 @@ export function buildFlexibilityCache(
   for (const issue of issues) {
     const issueWithId = issue as FlexibilityIssue & { id: number };
     const issueId = issueWithId.id;
+
+    // Skip closed issues - no flexibility calculation needed
+    if (issue.closed_on !== null && issue.closed_on !== undefined) {
+      cache.set(issueId, null);
+      continue;
+    }
 
     // Calculate effective spent hours if contributions provided
     let effectiveSpent: number | undefined;
