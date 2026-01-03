@@ -4323,7 +4323,7 @@ ${style.tip}
         ${this._viewFocus === "project" ? `
         <select id="projectSelector" class="toolbar-select" title="Select project">
           ${(() => {
-            // Build project hierarchy for optgroups
+            // Build project hierarchy for indented flat list
             const childrenMap = new Map<number, typeof this._projects>();
             for (const p of this._projects) {
               if (p.parent?.id) {
@@ -4333,21 +4333,13 @@ ${style.tip}
             }
             const rootProjects = this._projects.filter(p => !p.parent).sort((a, b) => a.name.localeCompare(b.name));
 
-            // Render project with children as optgroup, leaf projects as options
-            const renderProject = (p: typeof this._projects[0], indent = ""): string => {
+            // Render project tree as flat options with indentation
+            const renderProject = (p: typeof this._projects[0], depth = 0): string => {
               const children = (childrenMap.get(p.id) ?? []).sort((a, b) => a.name.localeCompare(b.name));
               const isSelected = p.id === this._selectedProjectId;
-              if (children.length > 0) {
-                // Parent with children: use optgroup + option for parent itself
-                return `
-                  <optgroup label="${escapeHtml(indent + p.name)}">
-                    <option value="${p.id}"${isSelected ? " selected" : ""}>${escapeHtml(p.name)} (select this)</option>
-                    ${children.map(c => renderProject(c, indent + "  ")).join("")}
-                  </optgroup>`;
-              } else {
-                // Leaf project: just an option
-                return `<option value="${p.id}"${isSelected ? " selected" : ""}>${escapeHtml(indent + p.name)}</option>`;
-              }
+              const indent = "\u00A0\u00A0".repeat(depth); // Non-breaking spaces for indent
+              const option = `<option value="${p.id}"${isSelected ? " selected" : ""}>${indent}${escapeHtml(p.name)}</option>`;
+              return option + children.map(c => renderProject(c, depth + 1)).join("");
             };
 
             return rootProjects.map(p => renderProject(p)).join("");
