@@ -3731,12 +3731,6 @@ ${style.tip}
     .issue-bar.bar-adhoc .bar-main { opacity: 0.6; }
     /* Hidden project bars (toggled via checkbox) */
     .bar-hidden { display: none; }
-    .critical-path-mode .issue-bar { opacity: 0.3; }
-    .critical-path-mode .issue-bar.critical-path { opacity: 1; }
-    .critical-path-mode .issue-bar.critical-path .bar-outline { stroke: var(--vscode-charts-orange) !important; stroke-width: 3; }
-    .critical-path-mode .dependency-arrow { opacity: 0.15; }
-    .critical-path-mode .dependency-arrow.critical-path { opacity: 1; }
-    .critical-path-mode .dependency-arrow.critical-path .arrow-line { stroke: var(--vscode-charts-orange) !important; stroke-width: 3; }
     .issue-bar.selected .bar-outline { stroke: var(--vscode-focusBorder) !important; stroke-width: 2; }
     .issue-bar.selected .bar-main { opacity: 1; }
     .multi-select-mode .issue-bar { cursor: pointer; }
@@ -4760,18 +4754,9 @@ ${style.tip}
       vscode.postMessage({ command: 'toggleDependencies' });
     });
 
-    // Intensity toggle handler
-    document.getElementById('intensityBtn')?.addEventListener('click', () => {
-      saveState();
-      vscode.postMessage({ command: 'toggleIntensity' });
-    });
-
-    // Critical path toggle
-    let criticalPathEnabled = false;
-    const criticalPathBtn = document.getElementById('criticalPathBtn');
     const ganttContainer = document.querySelector('.gantt-container');
 
-    // Build blocking graph from dependency arrows
+    // Build blocking graph from dependency arrows (used by focus mode)
     function buildBlockingGraph() {
       const graph = new Map(); // issueId -> [targetIds that this issue blocks/precedes]
       const reverseGraph = new Map(); // issueId -> [sourceIds that block/precede this issue]
@@ -4787,78 +4772,6 @@ ${style.tip}
       });
       return { graph, reverseGraph };
     }
-
-    // Find longest path using DFS with memoization
-    function findLongestPath(graph, reverseGraph) {
-      const allNodes = new Set([...graph.keys(), ...reverseGraph.keys()]);
-      const memo = new Map();
-
-      function dfs(node, visited) {
-        if (memo.has(node)) return memo.get(node);
-        if (visited.has(node)) return { length: 0, path: [] }; // cycle detection
-
-        visited.add(node);
-        const neighbors = graph.get(node) || [];
-        let longest = { length: 0, path: [] };
-
-        for (const neighbor of neighbors) {
-          const result = dfs(neighbor, new Set(visited));
-          if (result.length + 1 > longest.length) {
-            longest = { length: result.length + 1, path: [neighbor, ...result.path] };
-          }
-        }
-
-        memo.set(node, longest);
-        return longest;
-      }
-
-      // Find the longest path starting from any node
-      let criticalPath = [];
-      let maxLength = 0;
-      for (const node of allNodes) {
-        const result = dfs(node, new Set());
-        if (result.length > maxLength) {
-          maxLength = result.length;
-          criticalPath = [node, ...result.path];
-        }
-      }
-      return criticalPath;
-    }
-
-    function toggleCriticalPath() {
-      criticalPathEnabled = !criticalPathEnabled;
-      criticalPathBtn?.classList.toggle('active', criticalPathEnabled);
-      criticalPathBtn?.setAttribute('aria-pressed', String(criticalPathEnabled));
-
-      // Clear previous highlights
-      document.querySelectorAll('.critical-path').forEach(el => el.classList.remove('critical-path'));
-      ganttContainer.classList.toggle('critical-path-mode', criticalPathEnabled);
-
-      if (criticalPathEnabled) {
-        const { graph, reverseGraph } = buildBlockingGraph();
-        const criticalPath = findLongestPath(graph, reverseGraph);
-
-        // Highlight issues on critical path
-        const criticalSet = new Set(criticalPath);
-        document.querySelectorAll('.issue-bar').forEach(bar => {
-          if (criticalSet.has(bar.dataset.issueId)) {
-            bar.classList.add('critical-path');
-          }
-        });
-
-        // Highlight arrows on critical path
-        for (let i = 0; i < criticalPath.length - 1; i++) {
-          const from = criticalPath[i];
-          const to = criticalPath[i + 1];
-          const arrow = document.querySelector(\`.dependency-arrow[data-from="\${from}"][data-to="\${to}"]\`);
-          if (arrow) arrow.classList.add('critical-path');
-        }
-
-        announce(\`Critical path: \${criticalPath.length} issues in longest blocking chain\`);
-      }
-    }
-
-    criticalPathBtn?.addEventListener('click', toggleCriticalPath);
 
     // Focus mode: click on issue to highlight its dependency chain
     let focusedIssueId = null;
