@@ -4415,8 +4415,10 @@ ${style.tip}
                     ${hasChildren ? `<div class="project-submenu">${children.map(c => renderMenuItem(c)).join("")}</div>` : ""}
                   </div>`;
               };
-              return this._projects
-                .filter(p => !p.parent)
+              // Show root projects (no parent), or all if no roots exist
+              const rootProjects = this._projects.filter(p => !p.parent);
+              const projectsToShow = rootProjects.length > 0 ? rootProjects : this._projects;
+              return projectsToShow
                 .sort((a, b) => a.name.localeCompare(b.name))
                 .map(p => renderMenuItem(p))
                 .join("");
@@ -5073,7 +5075,9 @@ ${style.tip}
     if (window._ganttMenuCloseHandler) {
       document.removeEventListener('click', window._ganttMenuCloseHandler);
     }
-    window._ganttMenuCloseHandler = () => {
+    window._ganttMenuCloseHandler = (e) => {
+      // Don't close if click was inside the menu or on the trigger
+      if (projectMenu?.contains(e.target) || projectMenuTrigger?.contains(e.target)) return;
       projectMenu?.classList.add('hidden');
     };
     document.addEventListener('click', window._ganttMenuCloseHandler);
