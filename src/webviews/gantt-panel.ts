@@ -1958,8 +1958,10 @@ export class GanttPanel {
         // Person view: group by project, flat issues
         this._cachedHierarchy = buildResourceHierarchy(sortedIssues, this._flexibilityCache, this._selectedAssignee ?? "");
       } else {
-        // Project view: project tree with parent/child issues
-        this._cachedHierarchy = buildProjectHierarchy(sortedIssues, this._flexibilityCache, this._projects, true, blockedIds);
+        // Project view: single project tree with parent/child issues
+        const selectedProject = this._projects.find(p => p.id === this._selectedProjectId);
+        const projectsForHierarchy = selectedProject ? [selectedProject] : [];
+        this._cachedHierarchy = buildProjectHierarchy(sortedIssues, this._flexibilityCache, projectsForHierarchy, true, blockedIds);
       }
     }
     // Get ALL nodes with visibility flags for client-side collapse management
