@@ -228,6 +228,22 @@ function nodeToGanttRow(
     };
   }
 
+  // Container nodes (orphan issue placeholders) render like projects
+  if (node.type === "container") {
+    return {
+      type: "project",
+      id: node.id,
+      label: node.label,
+      depth: node.depth,
+      collapseKey: node.collapseKey,
+      parentKey: node.parentKey,
+      hasChildren: node.children.length > 0,
+      childDateRanges: node.childDateRanges,
+      isVisible: node.isVisible,
+      isExpanded: node.isExpanded,
+    };
+  }
+
   const issue = node.issue!;
   return {
     type: "issue",
