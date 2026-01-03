@@ -3495,6 +3495,7 @@ ${style.tip}
       overflow: hidden;
       min-height: 0;
       position: relative;
+      margin-bottom: 30px; /* Reserve space for minimap */
     }
     .gantt-scroll {
       height: calc(100% + 20px); /* Push scrollbar outside wrapper */
