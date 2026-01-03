@@ -3239,7 +3239,7 @@ ${style.tip}
       margin-bottom: 8px;
       flex-shrink: 0;
       overflow-x: auto;
-      overflow-y: hidden;
+      overflow-y: visible;
       scrollbar-width: thin;
     }
     .gantt-header::-webkit-scrollbar {
