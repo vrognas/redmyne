@@ -3599,6 +3599,35 @@ ${style.tip}
       background: var(--vscode-panel-border);
       margin: 4px 0;
     }
+    .overflow-menu-section {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: var(--vscode-descriptionForeground);
+      padding: 4px 8px 2px;
+      letter-spacing: 0.5px;
+    }
+    .overflow-menu-row {
+      display: flex;
+      gap: 4px;
+      padding: 4px 8px;
+    }
+    .overflow-menu-row select {
+      flex: 1;
+      min-width: 0;
+    }
+    .overflow-menu button.active {
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+    }
+    .menu-badge {
+      background: var(--vscode-badge-background);
+      color: var(--vscode-badge-foreground);
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 8px;
+      margin-left: 4px;
+    }
     .gantt-container {
       display: flex;
       flex-direction: column;
@@ -4216,7 +4245,7 @@ ${style.tip}
   <div id="liveRegion" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
   <div class="gantt-header">
     <div class="gantt-actions" role="toolbar" aria-label="Gantt chart controls">
-      <!-- Zoom group -->
+      <!-- 1. Zoom group -->
       <div class="toolbar-group">
         <div class="zoom-toggle" role="group" aria-label="Zoom level">
           <button id="zoomDay" class="${this._zoomLevel === "day" ? "active" : ""}" title="Day view (1)">Day</button>
@@ -4227,15 +4256,7 @@ ${style.tip}
         </div>
       </div>
       <div class="toolbar-separator"></div>
-      <!-- View mode group -->
-      <div class="toolbar-group">
-        <div class="view-mode-toggle" role="group" aria-label="View mode">
-          <button id="viewProjects" class="${this._viewMode === "projects" ? "active" : ""}" title="Group by project (V)">Projects</button>
-          <button id="viewMyWork" class="${this._viewMode === "mywork" ? "active" : ""}" title="My Work timeline (V)">My Work</button>
-        </div>
-      </div>
-      <div class="toolbar-separator"></div>
-      <!-- Project selector -->
+      <!-- 2. Selectors group -->
       <div class="toolbar-group">
         <select id="projectSelector" class="toolbar-select" title="Focus on project">
           <option value=""${this._selectedProjectId === null ? " selected" : ""}>All Projects</option>
@@ -4251,28 +4272,7 @@ ${style.tip}
         </select>
       </div>
       <div class="toolbar-separator"></div>
-      <!-- Filter group -->
-      <div class="toolbar-group">
-        <div class="filter-toggle" role="group" aria-label="Issue filter">
-          <select id="filterAssignee" title="Filter by assignee">
-            <option value="me"${this._currentFilter.assignee === "me" ? " selected" : ""}>Me</option>
-            <option value="any"${this._currentFilter.assignee === "any" ? " selected" : ""}>Anyone</option>
-          </select>
-          <select id="filterStatus" title="Filter by status">
-            <option value="open"${this._currentFilter.status === "open" ? " selected" : ""}>Open</option>
-            <option value="closed"${this._currentFilter.status === "closed" ? " selected" : ""}>Closed</option>
-            <option value="any"${this._currentFilter.status === "any" ? " selected" : ""}>Any</option>
-          </select>
-          <select id="filterHealth" title="Filter by health">
-            <option value="all"${this._healthFilter === "all" ? " selected" : ""}>All</option>
-            <option value="critical"${this._healthFilter === "critical" ? " selected" : ""}>Critical</option>
-            <option value="warning"${this._healthFilter === "warning" ? " selected" : ""}>Warning</option>
-            <option value="healthy"${this._healthFilter === "healthy" ? " selected" : ""}>Healthy</option>
-          </select>
-        </div>
-      </div>
-      <div class="toolbar-separator"></div>
-      <!-- Health summary stats -->
+      <!-- 3. Health summary (compact) -->
       <div class="toolbar-group health-summary" role="group" aria-label="Health summary">
         <span class="health-stat critical${criticalCount === 0 ? " empty" : ""}" data-filter="critical" title="Critical issues - click to filter">
           <span class="stat-icon">🔴</span><span class="stat-count">${criticalCount}</span>
@@ -4283,24 +4283,9 @@ ${style.tip}
         <span class="health-stat healthy${healthyCount === 0 ? " empty" : ""}" data-filter="healthy" title="Healthy issues - click to filter">
           <span class="stat-icon">🟢</span><span class="stat-count">${healthyCount}</span>
         </span>
-        <span class="health-stat blocked${blockedCount === 0 ? " empty" : ""}" title="Blocked issues">
-          <span class="stat-icon">⛔</span><span class="stat-count">${blockedCount}</span>
-        </span>
       </div>
       <div class="toolbar-separator"></div>
-      <!-- View toggles group (Miller's Law: reduced to essential toggles) -->
-      <div class="toolbar-group">
-        <button id="depsBtn" class="icon-btn${this._showDependencies ? " active" : ""}" title="Toggle dependency arrows (D)" aria-pressed="${this._showDependencies}">
-          <svg viewBox="0 0 16 16"><path d="M5 3.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm-6.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zM10 8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM5.354 4.354l1.5 1.5-.708.707-1.5-1.5.708-.707zm4.792 5.292l1.5 1.5-.707.708-1.5-1.5.707-.708z"/></svg>
-          Relations
-        </button>
-        <button id="capacityBtn" class="icon-btn${this._showCapacityRibbon && this._viewMode === "mywork" ? " active" : ""}${this._viewMode !== "mywork" ? " disabled" : ""}" title="Toggle capacity ribbon (Y)" aria-pressed="${this._showCapacityRibbon}" ${this._viewMode !== "mywork" ? "disabled" : ""}>
-          <svg viewBox="0 0 16 16"><path d="M2 4h12v1H2V4zm0 3h8v1H2V7zm0 3h12v1H2v-1zm0 3h6v1H2v-1z"/></svg>
-          Capacity
-        </button><span id="overloadBadge" class="overload-badge${overloadCount === 0 || this._viewMode !== "mywork" || !this._showCapacityRibbon ? " hidden" : ""}" data-first-overload-ms="${firstOverloadDateMs}" title="${overloadCount} day${overloadCount !== 1 ? "s" : ""} overloaded - click to jump">${overloadCount}</span>
-      </div>
-      <div class="toolbar-separator"></div>
-      <!-- Actions group -->
+      <!-- 4. Actions group -->
       <div class="toolbar-group">
         <button id="refreshBtn" class="icon-btn" title="Refresh issues (R)">
           <svg viewBox="0 0 16 16"><path d="M13.451 5.609l-.579-.939-1.068.812-.076.094c-.335.415-.927 1.341-1.124 2.876l-.021.165-.033.167a4.5 4.5 0 1 1-4.05-5.258l.066-.004.073.004-1.024 1.024 1.414 1.414 3.536-3.536L7.029.893 5.615 2.307l.982.982a5.5 5.5 0 1 0 5.537 6.124c.196-1.627.857-2.64 1.317-3.243V5.609z"/></svg>
@@ -4320,25 +4305,63 @@ ${style.tip}
         </button>
       </div>
       <div class="toolbar-separator"></div>
-      <!-- Overflow menu -->
+      <!-- 5. Overflow menu -->
       <div class="toolbar-group overflow-menu-container">
         <button id="overflowBtn" class="icon-btn" title="More options" aria-haspopup="true" aria-expanded="false">
           <svg viewBox="0 0 16 16"><circle cx="8" cy="3" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="8" cy="13" r="1.5"/></svg>
         </button>
         <div id="overflowMenu" class="overflow-menu hidden">
-          <button id="heatmapBtn" title="Toggle workload heatmap (H)" aria-pressed="${this._showWorkloadHeatmap}">
-            <svg viewBox="0 0 16 16"><path d="M8 1a3 3 0 0 0-3 3v2.5a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zm4 5.5a4 4 0 1 1-8 0V4a4 4 0 1 1 8 0v2.5zM8 11a5 5 0 0 1-5-5H2a6 6 0 0 0 5 5.91V14H5v1h6v-1H9v-2.09A6 6 0 0 0 14 6h-1a5 5 0 0 1-5 5z"/></svg>
+          <!-- View mode -->
+          <div class="overflow-menu-section">View Mode</div>
+          <button id="viewProjects" class="${this._viewMode === "projects" ? "active" : ""}" title="Group by project (V)">
+            <svg viewBox="0 0 16 16"><path d="M1.5 1h13l.5.5v13l-.5.5h-13l-.5-.5v-13l.5-.5zM2 14h12V2H2v12z"/><path d="M3 3h4v4H3V3zm0 6h4v4H3V9zm6-6h4v4H9V3zm0 6h4v4H9V9z"/></svg>
+            Projects
+          </button>
+          <button id="viewMyWork" class="${this._viewMode === "mywork" ? "active" : ""}" title="My Work timeline (V)">
+            <svg viewBox="0 0 16 16"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 13A6 6 0 1 1 8 2a6 6 0 0 1 0 12z"/><path d="M8 4v4.5l3 1.5-.5 1L7 9V4h1z"/></svg>
+            My Work
+          </button>
+          <div class="overflow-menu-divider"></div>
+          <!-- Filters -->
+          <div class="overflow-menu-section">Filters</div>
+          <div class="overflow-menu-row">
+            <select id="filterAssignee" title="Filter by assignee">
+              <option value="me"${this._currentFilter.assignee === "me" ? " selected" : ""}>Me</option>
+              <option value="any"${this._currentFilter.assignee === "any" ? " selected" : ""}>Anyone</option>
+            </select>
+            <select id="filterStatus" title="Filter by status">
+              <option value="open"${this._currentFilter.status === "open" ? " selected" : ""}>Open</option>
+              <option value="closed"${this._currentFilter.status === "closed" ? " selected" : ""}>Closed</option>
+              <option value="any"${this._currentFilter.status === "any" ? " selected" : ""}>Any</option>
+            </select>
+            <select id="filterHealth" title="Filter by health">
+              <option value="all"${this._healthFilter === "all" ? " selected" : ""}>All</option>
+              <option value="critical"${this._healthFilter === "critical" ? " selected" : ""}>Critical</option>
+              <option value="warning"${this._healthFilter === "warning" ? " selected" : ""}>Warning</option>
+              <option value="healthy"${this._healthFilter === "healthy" ? " selected" : ""}>Healthy</option>
+            </select>
+          </div>
+          <div class="overflow-menu-divider"></div>
+          <!-- Toggles -->
+          <div class="overflow-menu-section">Display</div>
+          <button id="depsBtn" title="Toggle dependency arrows (D)" aria-pressed="${this._showDependencies}" class="${this._showDependencies ? "active" : ""}">
+            <svg viewBox="0 0 16 16"><path d="M5 3.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm-6.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/></svg>
+            Relations
+          </button>
+          <button id="capacityBtn" title="Toggle capacity ribbon (Y)" aria-pressed="${this._showCapacityRibbon}" class="${this._showCapacityRibbon && this._viewMode === "mywork" ? "active" : ""}${this._viewMode !== "mywork" ? " disabled" : ""}" ${this._viewMode !== "mywork" ? "disabled" : ""}>
+            <svg viewBox="0 0 16 16"><path d="M2 4h12v1H2V4zm0 3h8v1H2V7zm0 3h12v1H2v-1zm0 3h6v1H2v-1z"/></svg>
+            Capacity${overloadCount > 0 && this._viewMode === "mywork" ? ` <span class="menu-badge">${overloadCount}</span>` : ""}
+          </button>
+          <button id="heatmapBtn" title="Toggle workload heatmap (H)" aria-pressed="${this._showWorkloadHeatmap}" class="${this._showWorkloadHeatmap ? "active" : ""}">
+            <svg viewBox="0 0 16 16"><path d="M8 1a3 3 0 0 0-3 3v2.5a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zm4 5.5a4 4 0 1 1-8 0V4a4 4 0 1 1 8 0v2.5z"/></svg>
             Heatmap
           </button>
-          <button id="criticalPathBtn" title="Toggle critical path (C)" aria-pressed="false">
-            <svg viewBox="0 0 16 16"><path d="M7.56 1.44l.94 2.81 2.97.01-2.4 1.74.91 2.81-2.42-1.74L5.14 8.8l.92-2.8-2.4-1.75h2.97l.93-2.81zm.44 3.56L7.65 6.1l1.07.78-.4-1.27.41-1.27-1.07.78L6.6 4.04l1.32.01.08.95z" fill-rule="evenodd"/></svg>
-            Critical Path
-          </button>
-          <button id="intensityBtn" title="Toggle daily intensity (I)" aria-pressed="${this._showIntensity}">
-            <svg viewBox="0 0 16 16"><path d="M11.5 11.5L13 10l-3-3 3-3-1.5-1.5L8 6l1.5 1.5L6 11l5.5.5zM2 14v-3h1v2h2v1H2zm12-12v3h-1V3h-2V2h3z"/></svg>
+          <button id="intensityBtn" title="Toggle daily intensity (I)" aria-pressed="${this._showIntensity}" class="${this._showIntensity ? "active" : ""}">
+            <svg viewBox="0 0 16 16"><path d="M11.5 11.5L13 10l-3-3 3-3-1.5-1.5L8 6l1.5 1.5L6 11l5.5.5z"/></svg>
             Intensity
           </button>
           <div class="overflow-menu-divider"></div>
+          <!-- Actions -->
           <button id="expandAllBtn" title="Expand all">
             <svg viewBox="0 0 16 16"><path d="M11 10H5.344L8 12.656 10.656 10H11zm-6 1h6v1H5v-1zM8 3L5.344 6H10.656L8 3zm0 1.344L9.313 6H6.688L8 4.344z" fill-rule="evenodd"/></svg>
             Expand All
