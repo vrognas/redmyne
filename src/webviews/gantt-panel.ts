@@ -724,81 +724,6 @@ export class GanttPanel {
       margin: 0 8px;
       flex-shrink: 0;
     }
-    .zoom-toggle {
-      display: flex;
-      border: 1px solid var(--vscode-panel-border);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .zoom-toggle button {
-      background: var(--vscode-button-secondaryBackground);
-      color: var(--vscode-button-secondaryForeground);
-      border: none;
-      border-right: 1px solid var(--vscode-panel-border);
-      padding: 4px 8px;
-      font-size: 11px;
-      cursor: pointer;
-    }
-    .zoom-toggle button:last-child { border-right: none; }
-    .zoom-toggle button:hover { background: var(--vscode-button-secondaryHoverBackground); }
-    .zoom-toggle button.active {
-      background: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
-    }
-    .view-mode-toggle {
-      display: flex;
-      border: 1px solid var(--vscode-panel-border);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .view-mode-toggle button {
-      background: var(--vscode-button-secondaryBackground);
-      color: var(--vscode-button-secondaryForeground);
-      border: none;
-      border-right: 1px solid var(--vscode-panel-border);
-      padding: 4px 8px;
-      font-size: 11px;
-      cursor: pointer;
-    }
-    .view-mode-toggle button:last-child { border-right: none; }
-    .view-mode-toggle button:hover { background: var(--vscode-button-secondaryHoverBackground); }
-    .view-mode-toggle button.active {
-      background: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
-    }
-    .filter-toggle {
-      display: flex;
-      border: 1px solid var(--vscode-panel-border);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .filter-toggle select {
-      background: var(--vscode-dropdown-background);
-      color: var(--vscode-dropdown-foreground);
-      border: none;
-      border-right: 1px solid var(--vscode-panel-border);
-      padding: 4px 8px;
-      font-size: 11px;
-    }
-    .filter-toggle select:last-child { border-right: none; }
-    .icon-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      background: var(--vscode-button-secondaryBackground);
-      color: var(--vscode-button-secondaryForeground);
-      border: none;
-      padding: 4px 8px;
-      border-radius: 2px;
-      font-size: 13px;
-      cursor: pointer;
-    }
-    .icon-btn:hover { background: var(--vscode-button-secondaryHoverBackground); }
-    .icon-btn svg {
-      width: 14px;
-      height: 14px;
-      fill: currentColor;
-    }
     .gantt-container {
       display: flex;
       flex-direction: column;
@@ -3370,63 +3295,6 @@ ${style.tip}
       color: var(--vscode-button-foreground);
       border-color: var(--vscode-button-background);
     }
-    .zoom-toggle {
-      display: flex;
-      border: 1px solid var(--vscode-panel-border);
-      border-radius: 2px;
-      overflow: hidden;
-      margin-right: 8px;
-    }
-    .zoom-toggle button {
-      background: var(--vscode-button-secondaryBackground);
-      color: var(--vscode-button-secondaryForeground);
-      border: none;
-      border-right: 1px solid var(--vscode-panel-border);
-      padding: 4px 8px;
-      cursor: pointer;
-      font-size: 11px;
-    }
-    .zoom-toggle button:last-child {
-      border-right: none;
-    }
-    .zoom-toggle button:hover {
-      background: var(--vscode-button-secondaryHoverBackground);
-    }
-    .zoom-toggle button:focus-visible {
-      outline: 2px solid var(--vscode-focusBorder);
-      outline-offset: -1px;
-      z-index: 1;
-    }
-    .zoom-toggle button.active {
-      background: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
-    }
-    .focus-toggle {
-      display: flex;
-      border: 1px solid var(--vscode-panel-border);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .focus-toggle button {
-      background: var(--vscode-button-secondaryBackground);
-      color: var(--vscode-button-secondaryForeground);
-      border: none;
-      border-right: 1px solid var(--vscode-panel-border);
-      padding: 4px 8px;
-      cursor: pointer;
-      font-size: 11px;
-    }
-    .focus-toggle button:last-child { border-right: none; }
-    .focus-toggle button:hover { background: var(--vscode-button-secondaryHoverBackground); }
-    .focus-toggle button:focus-visible {
-      outline: 2px solid var(--vscode-focusBorder);
-      outline-offset: -1px;
-      z-index: 1;
-    }
-    .focus-toggle button.active {
-      background: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
-    }
     .toolbar-select {
       background: var(--vscode-dropdown-background);
       color: var(--vscode-dropdown-foreground);
@@ -3513,17 +3381,6 @@ ${style.tip}
       background: var(--vscode-panel-border);
       margin: 0 8px;
       flex-shrink: 0;
-    }
-    /* Icon buttons */
-    .icon-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .icon-btn svg {
-      width: 14px;
-      height: 14px;
-      fill: currentColor;
     }
     /* Legend row (below toolbar) - Aesthetic-Usability: smooth transitions */
     .legend-row {
@@ -4164,25 +4021,6 @@ ${style.tip}
     /* Blocks badge styling */
     .blocks-badge-group { cursor: help; }
     .blocks-badge-group:hover .blocks-badge-bg { opacity: 0.35 !important; }
-    /* Health summary stats */
-    .health-summary { display: flex; gap: 8px; align-items: center; }
-    .health-stat {
-      display: flex; align-items: center; gap: 4px;
-      padding: 2px 6px;
-      font-size: 11px; font-weight: 500;
-      cursor: pointer;
-    }
-    .health-stat:hover { background: var(--vscode-list-hoverBackground); border-radius: 2px; }
-    .health-stat.empty { opacity: 0.4; cursor: default; }
-    .health-stat.empty:hover { background: transparent; }
-    .health-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .health-dot.critical { background: var(--vscode-charts-red, #f14c4c); }
-    .health-dot.warning { background: var(--vscode-charts-yellow, #cca700); }
-    .health-dot.healthy { background: var(--vscode-charts-green, #89d185); }
-    .health-stat .stat-count { color: var(--vscode-foreground); min-width: 12px; text-align: center; }
     /* Health legend - Progressive Disclosure via help icon */
     .health-help {
       position: relative;
