@@ -4412,7 +4412,10 @@ ${style.tip}
       if (!ganttScroll) return;
       const ratio = (dateMs - minDateMs) / (maxDateMs - minDateMs);
       const centerX = ratio * timelineWidth;
-      ganttScroll.scrollLeft = Math.max(0, centerX - ganttScroll.clientWidth / 2);
+      const stickyLeft = document.querySelector('.gantt-body .gantt-sticky-left');
+      const stickyWidth = stickyLeft?.offsetWidth ?? 0;
+      const visibleTimelineWidth = ganttScroll.clientWidth - stickyWidth;
+      ganttScroll.scrollLeft = Math.max(0, centerX - visibleTimelineWidth / 2);
     }
 
     function saveState() {
@@ -6274,12 +6277,14 @@ ${style.tip}
       }
     });
 
-    // Scroll to today marker (centered)
+    // Scroll to today marker (centered in visible timeline area)
     const todayX = ${Math.round(todayX)};
     function scrollToToday() {
       if (ganttScroll && todayX > 0) {
-        const containerWidth = ganttScroll.clientWidth;
-        ganttScroll.scrollLeft = Math.max(0, todayX - containerWidth / 2);
+        const stickyLeft = document.querySelector('.gantt-body .gantt-sticky-left');
+        const stickyWidth = stickyLeft?.offsetWidth ?? 0;
+        const visibleTimelineWidth = ganttScroll.clientWidth - stickyWidth;
+        ganttScroll.scrollLeft = Math.max(0, todayX - visibleTimelineWidth / 2);
       }
     }
 
