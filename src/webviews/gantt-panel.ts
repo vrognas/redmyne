@@ -3410,6 +3410,66 @@ ${style.tip}
       background: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
     }
+    /* Cascading project menu */
+    .project-menu-container { position: relative; }
+    .project-menu-trigger {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+    }
+    .dropdown-chevron { font-size: 10px; opacity: 0.7; }
+    .project-menu {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      min-width: 180px;
+      max-height: 400px;
+      overflow-y: auto;
+      background: var(--vscode-menu-background, var(--vscode-dropdown-background));
+      border: 1px solid var(--vscode-menu-border, var(--vscode-dropdown-border));
+      border-radius: 4px;
+      box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+      z-index: 1000;
+      padding: 4px 0;
+    }
+    .project-menu.hidden { display: none; }
+    .project-menu-item {
+      position: relative;
+      display: flex;
+      align-items: center;
+      padding: 4px 8px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--vscode-menu-foreground, var(--vscode-dropdown-foreground));
+      white-space: nowrap;
+    }
+    .project-menu-item:hover {
+      background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
+      color: var(--vscode-menu-selectionForeground, var(--vscode-list-hoverForeground));
+    }
+    .project-menu-item.selected {
+      background: var(--vscode-menu-selectionBackground, var(--vscode-list-activeSelectionBackground));
+      color: var(--vscode-menu-selectionForeground, var(--vscode-list-activeSelectionForeground));
+    }
+    .menu-item-label { flex: 1; }
+    .menu-item-count { opacity: 0.6; font-size: 11px; margin-left: 8px; }
+    .submenu-arrow { margin-left: 8px; font-size: 10px; opacity: 0.7; }
+    .project-submenu {
+      display: none;
+      position: absolute;
+      left: 100%;
+      top: -4px;
+      min-width: 180px;
+      max-height: 400px;
+      overflow-y: auto;
+      background: var(--vscode-menu-background, var(--vscode-dropdown-background));
+      border: 1px solid var(--vscode-menu-border, var(--vscode-dropdown-border));
+      border-radius: 4px;
+      box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+      padding: 4px 0;
+    }
+    .project-menu-item.has-children:hover > .project-submenu { display: block; }
     .toolbar-select {
       background: var(--vscode-dropdown-background);
       color: var(--vscode-dropdown-foreground);
@@ -4317,36 +4377,48 @@ ${style.tip}
           <button id="focusPerson" class="${this._viewFocus === "person" ? "active" : ""}" title="View by person">Person</button>
         </div>
         ${this._viewFocus === "project" ? `
-        <select id="focusSelector" class="toolbar-select" title="Select project">
-          ${(() => {
-            // Build hierarchical project options with indentation
-            const issueCountByProject = new Map<number, number>();
-            for (const issue of this._issues) {
-              if (issue.project?.id) {
-                issueCountByProject.set(issue.project.id, (issueCountByProject.get(issue.project.id) ?? 0) + 1);
+        <div class="project-menu-container">
+          <button id="projectMenuTrigger" class="toolbar-select project-menu-trigger" title="Select project">
+            ${escapeHtml(this._projects.find(p => p.id === this._selectedProjectId)?.name ?? "Select...")}
+            <span class="dropdown-chevron">▾</span>
+          </button>
+          <div id="projectMenu" class="project-menu hidden">
+            ${(() => {
+              // Build cascading menu structure
+              const issueCountByProject = new Map<number, number>();
+              for (const issue of this._issues) {
+                if (issue.project?.id) {
+                  issueCountByProject.set(issue.project.id, (issueCountByProject.get(issue.project.id) ?? 0) + 1);
+                }
               }
-            }
-            const childrenMap = new Map<number, typeof this._projects>();
-            for (const p of this._projects) {
-              if (p.parent?.id) {
-                if (!childrenMap.has(p.parent.id)) childrenMap.set(p.parent.id, []);
-                childrenMap.get(p.parent.id)!.push(p);
+              const childrenMap = new Map<number, typeof this._projects>();
+              for (const p of this._projects) {
+                if (p.parent?.id) {
+                  if (!childrenMap.has(p.parent.id)) childrenMap.set(p.parent.id, []);
+                  childrenMap.get(p.parent.id)!.push(p);
+                }
               }
-            }
-            const renderProject = (p: typeof this._projects[0], depth: number): string => {
-              const indent = "\u00A0\u00A0".repeat(depth) + (depth > 0 ? "└ " : "");
-              const count = issueCountByProject.get(p.id) ?? 0;
-              const children = (childrenMap.get(p.id) ?? []).sort((a, b) => a.name.localeCompare(b.name));
-              const childrenHtml = children.map(c => renderProject(c, depth + 1)).join("");
-              return `<option value="${p.id}"${this._selectedProjectId === p.id ? " selected" : ""}>${indent}${escapeHtml(p.name)} (${count})</option>${childrenHtml}`;
-            };
-            return this._projects
-              .filter(p => !p.parent)
-              .sort((a, b) => a.name.localeCompare(b.name))
-              .map(p => renderProject(p, 0))
-              .join("");
-          })()}
-        </select>` : `
+              const renderMenuItem = (p: typeof this._projects[0]): string => {
+                const count = issueCountByProject.get(p.id) ?? 0;
+                const children = (childrenMap.get(p.id) ?? []).sort((a, b) => a.name.localeCompare(b.name));
+                const hasChildren = children.length > 0;
+                const isSelected = p.id === this._selectedProjectId;
+                return `
+                  <div class="project-menu-item${isSelected ? " selected" : ""}${hasChildren ? " has-children" : ""}" data-project-id="${p.id}">
+                    <span class="menu-item-label">${escapeHtml(p.name)}</span>
+                    <span class="menu-item-count">(${count})</span>
+                    ${hasChildren ? '<span class="submenu-arrow">▸</span>' : ""}
+                    ${hasChildren ? `<div class="project-submenu">${children.map(c => renderMenuItem(c)).join("")}</div>` : ""}
+                  </div>`;
+              };
+              return this._projects
+                .filter(p => !p.parent)
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(p => renderMenuItem(p))
+                .join("");
+            })()}
+          </div>
+        </div>` : `
         <select id="focusSelector" class="toolbar-select" title="Select person">
           ${this._uniqueAssignees.map(name => {
             const isMe = name === this._currentUserName;
@@ -4969,22 +5041,39 @@ ${style.tip}
       vscode.postMessage({ command: 'setViewFocus', focus: 'person' });
     });
 
-    // Focus selector handler (contextual - shows projects or people based on focus mode)
+    // Project cascading menu handlers
+    const projectMenuTrigger = document.getElementById('projectMenuTrigger');
+    const projectMenu = document.getElementById('projectMenu');
+
+    // Toggle menu on trigger click
+    projectMenuTrigger?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      projectMenu?.classList.toggle('hidden');
+    });
+
+    // Select project on menu item click
+    document.querySelectorAll('.project-menu-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const projectId = parseInt(item.dataset.projectId, 10);
+        vscode.postMessage({ command: 'setSelectedProject', projectId });
+        projectMenu?.classList.add('hidden');
+      });
+    });
+
+    // Close menu on outside click
+    document.addEventListener('click', () => {
+      projectMenu?.classList.add('hidden');
+    });
+
+    // Person selector handler (focusSelector in person focus mode)
     const focusSelector = document.getElementById('focusSelector');
-    const currentFocus = '${this._viewFocus}';
     focusSelector?.addEventListener('change', (e) => {
       const value = e.target.value;
-      if (currentFocus === 'project') {
-        vscode.postMessage({
-          command: 'setSelectedProject',
-          projectId: value ? parseInt(value, 10) : null
-        });
-      } else {
-        vscode.postMessage({
-          command: 'setSelectedAssignee',
-          assignee: value || null
-        });
-      }
+      vscode.postMessage({
+        command: 'setSelectedAssignee',
+        assignee: value || null
+      });
     });
 
     // Filter dropdown handlers

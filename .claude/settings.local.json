@@ -24,7 +24,9 @@
       "Bash(wc:*)",
       "Bash(find:*)",
       "Bash(sort:*)",
-      "Bash(git mv:*)"
+      "Bash(git mv:*)",
+      "WebFetch(domain:microsoft.github.io)",
+      "WebFetch(domain:vscode-elements.github.io)"
     ],
     "deny": [],
     "ask": []
