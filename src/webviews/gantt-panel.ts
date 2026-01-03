@@ -4648,6 +4648,18 @@ ${style.tip}
       winListeners.forEach(l => window.removeEventListener(l.type, l.handler, l.options));
     };
 
+    // Helper: close element on outside click (used by pickers/menus)
+    function closeOnOutsideClick(element) {
+      setTimeout(() => {
+        document.addEventListener('click', function closeHandler(e) {
+          if (!element.contains(e.target)) {
+            element.remove();
+            document.removeEventListener('click', closeHandler);
+          }
+        });
+      }, 0);
+    }
+
     // Snap x position to nearest day boundary
     function snapToDay(x) {
       return Math.round(x / dayWidth) * dayWidth;
@@ -5411,15 +5423,7 @@ ${style.tip}
       picker.appendChild(cancelBtn);
 
       document.body.appendChild(picker);
-
-      setTimeout(() => {
-        document.addEventListener('click', function closeHandler(e) {
-          if (!picker.contains(e.target)) {
-            picker.remove();
-            document.removeEventListener('click', closeHandler);
-          }
-        });
-      }, 0);
+      closeOnOutsideClick(picker);
     }
 
     // Build lookup maps for O(1) hover highlight (instead of repeated querySelectorAll)
@@ -5706,15 +5710,7 @@ ${style.tip}
       });
 
       document.body.appendChild(picker);
-
-      setTimeout(() => {
-        document.addEventListener('click', function closeHandler(e) {
-          if (!picker.contains(e.target)) {
-            picker.remove();
-            document.removeEventListener('click', closeHandler);
-          }
-        });
-      }, 0);
+      closeOnOutsideClick(picker);
     }
 
     // Issue bar right-click context menu
@@ -5758,15 +5754,7 @@ ${style.tip}
       picker.appendChild(btn);
 
       document.body.appendChild(picker);
-
-      setTimeout(() => {
-        document.addEventListener('click', function closeHandler(e) {
-          if (!picker.contains(e.target)) {
-            picker.remove();
-            document.removeEventListener('click', closeHandler);
-          }
-        });
-      }, 0);
+      closeOnOutsideClick(picker);
     }
 
     // Project label right-click context menu
@@ -5953,16 +5941,7 @@ ${style.tip}
       });
 
       document.body.appendChild(picker);
-
-      // Close on outside click
-      setTimeout(() => {
-        document.addEventListener('click', function closeHandler(e) {
-          if (!picker.contains(e.target)) {
-            picker.remove();
-            document.removeEventListener('click', closeHandler);
-          }
-        });
-      }, 0);
+      closeOnOutsideClick(picker);
     }
 
     // Announce to screen readers
