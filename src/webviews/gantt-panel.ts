@@ -2342,7 +2342,7 @@ export class GanttPanel {
     const idCells = visibleRows
       .map((row, idx) => {
         const y = idx * (barHeight + barGap);
-        if (row.type === "project") return `<g transform="translate(0, ${y})"></g>`;
+        if (row.type !== "issue") return `<g transform="translate(0, ${y})"></g>`;
         const issue = row.issue!;
         return `<g transform="translate(0, ${y})">
           <text class="gantt-col-cell" x="${idColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">#${issue.id}</text>
@@ -2354,7 +2354,7 @@ export class GanttPanel {
     const startDateCells = visibleRows
       .map((row, idx) => {
         const y = idx * (barHeight + barGap);
-        if (row.type === "project") return `<g transform="translate(0, ${y})"></g>`;
+        if (row.type !== "issue") return `<g transform="translate(0, ${y})"></g>`;
         const issue = row.issue!;
         if (!issue.start_date) return `<g transform="translate(0, ${y})"><text class="gantt-col-cell" x="${startDateColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">—</text></g>`;
         const startDate = parseLocalDate(issue.start_date);
@@ -2370,7 +2370,7 @@ export class GanttPanel {
     const statusCells = visibleRows
       .map((row, idx) => {
         const y = idx * (barHeight + barGap);
-        if (row.type === "project") return `<g transform="translate(0, ${y})"><rect class="zebra-stripe" x="0" y="0" width="100%" height="${barHeight + barGap}"/></g>`;
+        if (row.type !== "issue") return `<g transform="translate(0, ${y})"><rect class="zebra-stripe" x="0" y="0" width="100%" height="${barHeight + barGap}"/></g>`;
         const issue = row.issue!;
         const statusName = issue.statusName ?? "Unknown";
         // Determine status class based on done_ratio and status name
@@ -2396,7 +2396,7 @@ export class GanttPanel {
     const dueCells = visibleRows
       .map((row, idx) => {
         const y = idx * (barHeight + barGap);
-        if (row.type === "project") return `<g transform="translate(0, ${y})"></g>`;
+        if (row.type !== "issue") return `<g transform="translate(0, ${y})"></g>`;
         const issue = row.issue!;
         if (!issue.due_date) return `<g transform="translate(0, ${y})"><text class="gantt-col-cell" x="${dueDateColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">—</text></g>`;
         // Format date as MMM DD (e.g., "Jan 15")
@@ -2420,7 +2420,7 @@ export class GanttPanel {
     const assigneeCells = visibleRows
       .map((row, idx) => {
         const y = idx * (barHeight + barGap);
-        if (row.type === "project") return `<g transform="translate(0, ${y})"></g>`;
+        if (row.type !== "issue") return `<g transform="translate(0, ${y})"></g>`;
         const issue = row.issue!;
         if (!issue.assignee) return `<g transform="translate(0, ${y})"><text class="gantt-col-cell" x="${assigneeColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">—</text></g>`;
         const initials = getInitials(issue.assignee);
@@ -2508,7 +2508,12 @@ export class GanttPanel {
           return `<g class="aggregate-bars time-group-bars gantt-row" data-collapse-key="${row.collapseKey}" data-time-group="${row.timeGroup}" transform="translate(0, ${y})">${aggregateBars}</g>`;
         }
 
-        const issue = row.issue!;
+        // Skip non-issue types (container nodes, etc.)
+        if (row.type !== "issue" || !row.issue) {
+          return "";
+        }
+
+        const issue = row.issue;
         // Guard: skip if neither date exists (shouldn't happen due to filter)
         if (!issue.start_date && !issue.due_date) {
           return "";
