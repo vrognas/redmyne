@@ -3208,10 +3208,6 @@ ${style.tip}
       return `<rect class="capacity-day-bar" x="${dayX}" y="0" width="${dayWidth}" height="${ribbonHeight}" fill="${fillColor}" opacity="${opacity}" data-date="${day.date}" data-date-ms="${dayDate.getTime()}"><title>${escapeHtml(tooltip)}</title></rect>`;
     }).join("");
 
-    // Count overloaded days for warning badge
-    const overloadedDays = capacityData.filter(d => d.status === "overloaded");
-    const overloadCount = overloadedDays.length;
-
     // Week boundaries for capacity ribbon (show Monday markers)
     const capacityWeekMarkers: string[] = [];
     if (this._viewFocus === "person") {
@@ -3627,90 +3623,23 @@ ${style.tip}
       background: var(--vscode-errorForeground);
     }
     .overload-badge.hidden { display: none; }
-    /* Overflow menu */
-    .overflow-menu-container {
-      position: relative;
-    }
-    .overflow-menu {
-      position: absolute;
-      top: 100%;
-      right: 0;
-      margin-top: 4px;
-      background: var(--vscode-menu-background);
-      border: 1px solid var(--vscode-menu-border);
-      border-radius: 2px;
-      padding: 4px 0;
-      z-index: 1000;
-      box-shadow: 0 2px 8px var(--vscode-widget-shadow);
-      min-width: 160px;
-    }
-    .overflow-menu.hidden { display: none; }
-    .overflow-menu button {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      width: 100%;
-      padding: 6px 12px;
-      border: none;
+    /* Toggle buttons */
+    .toggle-btn {
+      padding: 4px 6px;
+      border: 1px solid transparent;
       background: transparent;
-      color: var(--vscode-menu-foreground);
-      text-align: left;
+      color: var(--vscode-foreground);
+      border-radius: 3px;
       cursor: pointer;
-      font-size: 13px;
-      font-family: var(--vscode-font-family);
+      opacity: 0.7;
     }
-    .overflow-menu button svg {
-      width: 16px;
-      height: 16px;
-      fill: currentColor;
-      flex-shrink: 0;
-    }
-    .overflow-menu button:hover {
-      background: var(--vscode-menu-selectionBackground);
-      color: var(--vscode-menu-selectionForeground);
-    }
-    .overflow-menu button:focus-visible {
-      outline: 2px solid var(--vscode-focusBorder);
-      outline-offset: -2px;
-    }
-    .overflow-menu button[aria-pressed="true"] {
+    .toggle-btn:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground); }
+    .toggle-btn.active {
+      opacity: 1;
       color: var(--vscode-textLink-foreground);
+      background: var(--vscode-toolbar-activeBackground);
     }
-    .overflow-menu button[aria-pressed="true"] svg {
-      fill: var(--vscode-textLink-foreground);
-    }
-    .overflow-menu-divider {
-      height: 1px;
-      background: var(--vscode-panel-border);
-      margin: 4px 0;
-    }
-    .overflow-menu-section {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--vscode-descriptionForeground);
-      padding: 4px 8px 2px;
-    }
-    .overflow-menu-row {
-      display: flex;
-      gap: 4px;
-      padding: 4px 8px;
-    }
-    .overflow-menu-row select {
-      flex: 1;
-      min-width: 0;
-    }
-    .overflow-menu button.active {
-      background: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
-    }
-    .menu-badge {
-      background: var(--vscode-badge-background);
-      color: var(--vscode-badge-foreground);
-      font-size: 10px;
-      padding: 1px 5px;
-      border-radius: 4px;
-      margin-left: 4px;
-    }
+    .toggle-btn svg { width: 14px; height: 14px; fill: currentColor; }
     .gantt-container {
       display: flex;
       flex-direction: column;
@@ -4302,149 +4231,95 @@ ${style.tip}
   <div id="liveRegion" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
   <div class="gantt-header">
     <div class="gantt-actions" role="toolbar" aria-label="Gantt chart controls">
-      <!-- 1. Zoom group -->
-      <div class="toolbar-group">
-        <div class="zoom-toggle" role="group" aria-label="Zoom level">
-          <button id="zoomDay" class="${this._zoomLevel === "day" ? "active" : ""}" title="Day view (1)">Day</button>
-          <button id="zoomWeek" class="${this._zoomLevel === "week" ? "active" : ""}" title="Week view (2)">Week</button>
-          <button id="zoomMonth" class="${this._zoomLevel === "month" ? "active" : ""}" title="Month view (3)">Month</button>
-          <button id="zoomQuarter" class="${this._zoomLevel === "quarter" ? "active" : ""}" title="Quarter view (4)">Qtr</button>
-          <button id="zoomYear" class="${this._zoomLevel === "year" ? "active" : ""}" title="Year view (5)">Year</button>
-        </div>
-      </div>
-      <div class="toolbar-separator"></div>
-      <!-- 2. View focus: toggle + contextual dropdown -->
-      <div class="toolbar-group">
-        <div class="focus-toggle" role="group" aria-label="View focus">
-          <button id="focusProject" class="${this._viewFocus === "project" ? "active" : ""}" title="View by project">Project</button>
-          <button id="focusPerson" class="${this._viewFocus === "person" ? "active" : ""}" title="View by person">Person</button>
-        </div>
-        ${this._viewFocus === "project" ? `
-        <select id="projectSelector" class="toolbar-select" title="Select project">
-          ${(() => {
-            // Build project hierarchy for indented flat list
-            const childrenMap = new Map<number, typeof this._projects>();
-            for (const p of this._projects) {
-              if (p.parent?.id) {
-                if (!childrenMap.has(p.parent.id)) childrenMap.set(p.parent.id, []);
-                childrenMap.get(p.parent.id)!.push(p);
-              }
+      <!-- Zoom -->
+      <select id="zoomSelect" class="toolbar-select" title="Zoom level (1-5)">
+        <option value="day"${this._zoomLevel === "day" ? " selected" : ""}>Day</option>
+        <option value="week"${this._zoomLevel === "week" ? " selected" : ""}>Week</option>
+        <option value="month"${this._zoomLevel === "month" ? " selected" : ""}>Month</option>
+        <option value="quarter"${this._zoomLevel === "quarter" ? " selected" : ""}>Quarter</option>
+        <option value="year"${this._zoomLevel === "year" ? " selected" : ""}>Year</option>
+      </select>
+      <!-- View -->
+      <select id="viewFocusSelect" class="toolbar-select" title="View by (V)">
+        <option value="project"${this._viewFocus === "project" ? " selected" : ""}>By Project</option>
+        <option value="person"${this._viewFocus === "person" ? " selected" : ""}>By Person</option>
+      </select>
+      <!-- Context selector -->
+      ${this._viewFocus === "project" ? `
+      <select id="projectSelector" class="toolbar-select" title="Select project">
+        ${(() => {
+          const childrenMap = new Map<number, typeof this._projects>();
+          for (const p of this._projects) {
+            if (p.parent?.id) {
+              if (!childrenMap.has(p.parent.id)) childrenMap.set(p.parent.id, []);
+              childrenMap.get(p.parent.id)!.push(p);
             }
-            const rootProjects = this._projects.filter(p => !p.parent).sort((a, b) => a.name.localeCompare(b.name));
-
-            // Render project tree as flat options with indentation
-            const renderProject = (p: typeof this._projects[0], depth = 0): string => {
-              const children = (childrenMap.get(p.id) ?? []).sort((a, b) => a.name.localeCompare(b.name));
-              const isSelected = p.id === this._selectedProjectId;
-              const indent = "\u00A0\u00A0".repeat(depth); // Non-breaking spaces for indent
-              const option = `<option value="${p.id}"${isSelected ? " selected" : ""}>${indent}${escapeHtml(p.name)}</option>`;
-              return option + children.map(c => renderProject(c, depth + 1)).join("");
-            };
-
-            return rootProjects.map(p => renderProject(p)).join("");
-          })()}
-        </select>` : `
-        <select id="focusSelector" class="toolbar-select" title="Select person">
-          ${this._uniqueAssignees.map(name => {
-            const isMe = name === this._currentUserName;
-            return `<option value="${escapeHtml(name)}"${this._selectedAssignee === name ? " selected" : ""}>${escapeHtml(name)}${isMe ? " (me)" : ""}</option>`;
-          }).join("")}
-        </select>`}
-      </div>
+          }
+          const rootProjects = this._projects.filter(p => !p.parent).sort((a, b) => a.name.localeCompare(b.name));
+          const renderProject = (p: typeof this._projects[0], depth = 0): string => {
+            const children = (childrenMap.get(p.id) ?? []).sort((a, b) => a.name.localeCompare(b.name));
+            const isSelected = p.id === this._selectedProjectId;
+            const indent = "\u00A0\u00A0".repeat(depth);
+            const option = `<option value="${p.id}"${isSelected ? " selected" : ""}>${indent}${escapeHtml(p.name)}</option>`;
+            return option + children.map(c => renderProject(c, depth + 1)).join("");
+          };
+          return rootProjects.map(p => renderProject(p)).join("");
+        })()}
+      </select>` : `
+      <select id="focusSelector" class="toolbar-select" title="Select person">
+        ${this._uniqueAssignees.map(name => {
+          const isMe = name === this._currentUserName;
+          return `<option value="${escapeHtml(name)}"${this._selectedAssignee === name ? " selected" : ""}>${escapeHtml(name)}${isMe ? " (me)" : ""}</option>`;
+        }).join("")}
+      </select>`}
       <div class="toolbar-separator"></div>
-      <!-- 3. Health summary (compact) -->
-      <div class="toolbar-group health-summary" role="group" aria-label="Health summary">
-        <span class="health-stat critical${criticalCount === 0 ? " empty" : ""}" data-filter="critical" title="Critical issues - click to filter">
-          <span class="health-dot critical"></span><span class="stat-count">${criticalCount}</span>
-        </span>
-        <span class="health-stat warning${warningCount === 0 ? " empty" : ""}" data-filter="warning" title="Warning issues - click to filter">
-          <span class="health-dot warning"></span><span class="stat-count">${warningCount}</span>
-        </span>
-        <span class="health-stat healthy${healthyCount === 0 ? " empty" : ""}" data-filter="healthy" title="Healthy issues - click to filter">
-          <span class="health-dot healthy"></span><span class="stat-count">${healthyCount}</span>
-        </span>
-      </div>
+      <!-- Filters -->
+      <select id="filterAssignee" class="toolbar-select" title="Filter by assignee">
+        <option value="me"${this._currentFilter.assignee === "me" ? " selected" : ""}>My issues</option>
+        <option value="any"${this._currentFilter.assignee === "any" ? " selected" : ""}>All assignees</option>
+      </select>
+      <select id="filterStatus" class="toolbar-select" title="Filter by status">
+        <option value="open"${this._currentFilter.status === "open" ? " selected" : ""}>Open</option>
+        <option value="closed"${this._currentFilter.status === "closed" ? " selected" : ""}>Closed</option>
+        <option value="any"${this._currentFilter.status === "any" ? " selected" : ""}>Any status</option>
+      </select>
+      <select id="filterHealth" class="toolbar-select" title="Filter by health (F)">
+        <option value="all"${this._healthFilter === "all" ? " selected" : ""}>All health</option>
+        <option value="critical"${this._healthFilter === "critical" ? " selected" : ""}>Critical (${criticalCount})</option>
+        <option value="warning"${this._healthFilter === "warning" ? " selected" : ""}>Warning (${warningCount})</option>
+        <option value="healthy"${this._healthFilter === "healthy" ? " selected" : ""}>Healthy (${healthyCount})</option>
+      </select>
       <div class="toolbar-separator"></div>
-      <!-- 4. Actions group -->
-      <div class="toolbar-group">
-        <button id="refreshBtn" class="icon-btn" title="Refresh issues (R)">
-          <svg viewBox="0 0 16 16"><path d="M13.451 5.609l-.579-.939-1.068.812-.076.094c-.335.415-.927 1.341-1.124 2.876l-.021.165-.033.167a4.5 4.5 0 1 1-4.05-5.258l.066-.004.073.004-1.024 1.024 1.414 1.414 3.536-3.536L7.029.893 5.615 2.307l.982.982a5.5 5.5 0 1 0 5.537 6.124c.196-1.627.857-2.64 1.317-3.243V5.609z"/></svg>
-          Refresh
-        </button>
-        <button id="todayBtn" class="icon-btn" title="Jump to today (T)">
-          <svg viewBox="0 0 16 16"><path d="M14 2H2v12h12V2zm-1 11H3V5h10v8zM4 1h1v1H4V1zm7 0h1v1h-1V1zM4 8h2v2H4V8z"/></svg>
-          Today
-        </button>
-        <button id="undoBtn" class="icon-btn" disabled title="Undo (Ctrl+Z)">
-          <svg viewBox="0 0 16 16"><path d="M3 8.5l4-4v3h5a3 3 0 0 1 0 6H8v-1h4a2 2 0 0 0 0-4H7v3l-4-4z"/></svg>
-          Undo
-        </button>
-        <button id="redoBtn" class="icon-btn" disabled title="Redo (Ctrl+Shift+Z)">
-          <svg viewBox="0 0 16 16"><path d="M13 8.5l-4-4v3H4a3 3 0 0 0 0 6h4v-1H4a2 2 0 0 1 0-4h5v3l4-4z"/></svg>
-          Redo
-        </button>
-      </div>
+      <!-- Toggle buttons -->
+      <button id="depsBtn" class="toggle-btn${this._showDependencies ? " active" : ""}" title="Relations (D)">
+        <svg viewBox="0 0 16 16"><path d="M5 3.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm-6.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/></svg>
+      </button>
+      <button id="heatmapBtn" class="toggle-btn${this._showWorkloadHeatmap ? " active" : ""}" title="Heatmap (H)">
+        <svg viewBox="0 0 16 16"><path d="M8 1a3 3 0 0 0-3 3v2.5a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zm4 5.5a4 4 0 1 1-8 0V4a4 4 0 1 1 8 0v2.5z"/></svg>
+      </button>
+      <button id="capacityBtn" class="toggle-btn${this._showCapacityRibbon && this._viewFocus === "person" ? " active" : ""}" title="Capacity (Y)"${this._viewFocus !== "person" ? " disabled" : ""}>
+        <svg viewBox="0 0 16 16"><path d="M2 4h12v1H2V4zm0 3h8v1H2V7zm0 3h12v1H2v-1zm0 3h6v1H2v-1z"/></svg>
+      </button>
       <div class="toolbar-separator"></div>
-      <!-- 5. Overflow menu -->
-      <div class="toolbar-group overflow-menu-container">
-        <button id="overflowBtn" class="icon-btn" title="More options" aria-haspopup="true" aria-expanded="false">
-          <svg viewBox="0 0 16 16"><circle cx="8" cy="3" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="8" cy="13" r="1.5"/></svg>
-        </button>
-        <div id="overflowMenu" class="overflow-menu hidden">
-          <!-- Filters -->
-          <div class="overflow-menu-section">Filters</div>
-          <div class="overflow-menu-row">
-            <select id="filterAssignee" title="Filter by assignee">
-              <option value="me"${this._currentFilter.assignee === "me" ? " selected" : ""}>Me</option>
-              <option value="any"${this._currentFilter.assignee === "any" ? " selected" : ""}>Anyone</option>
-            </select>
-            <select id="filterStatus" title="Filter by status">
-              <option value="open"${this._currentFilter.status === "open" ? " selected" : ""}>Open</option>
-              <option value="closed"${this._currentFilter.status === "closed" ? " selected" : ""}>Closed</option>
-              <option value="any"${this._currentFilter.status === "any" ? " selected" : ""}>Any</option>
-            </select>
-            <select id="filterHealth" title="Filter by health">
-              <option value="all"${this._healthFilter === "all" ? " selected" : ""}>All</option>
-              <option value="critical"${this._healthFilter === "critical" ? " selected" : ""}>Critical</option>
-              <option value="warning"${this._healthFilter === "warning" ? " selected" : ""}>Warning</option>
-              <option value="healthy"${this._healthFilter === "healthy" ? " selected" : ""}>Healthy</option>
-            </select>
-          </div>
-          <div class="overflow-menu-divider"></div>
-          <!-- Toggles -->
-          <div class="overflow-menu-section">Display</div>
-          <button id="depsBtn" title="Toggle dependency arrows (D)" aria-pressed="${this._showDependencies}" class="${this._showDependencies ? "active" : ""}">
-            <svg viewBox="0 0 16 16"><path d="M5 3.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm-6.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/></svg>
-            Relations
-          </button>
-          <button id="capacityBtn" title="Toggle capacity ribbon (Y)" aria-pressed="${this._showCapacityRibbon}" class="${this._showCapacityRibbon && this._viewFocus === "person" ? "active" : ""}${this._viewFocus !== "person" ? " disabled" : ""}" ${this._viewFocus !== "person" ? "disabled" : ""}>
-            <svg viewBox="0 0 16 16"><path d="M2 4h12v1H2V4zm0 3h8v1H2V7zm0 3h12v1H2v-1zm0 3h6v1H2v-1z"/></svg>
-            Capacity${overloadCount > 0 && this._viewFocus === "person" ? ` <span class="menu-badge">${overloadCount}</span>` : ""}
-          </button>
-          <button id="heatmapBtn" title="Toggle workload heatmap (H)" aria-pressed="${this._showWorkloadHeatmap}" class="${this._showWorkloadHeatmap ? "active" : ""}">
-            <svg viewBox="0 0 16 16"><path d="M8 1a3 3 0 0 0-3 3v2.5a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zm4 5.5a4 4 0 1 1-8 0V4a4 4 0 1 1 8 0v2.5z"/></svg>
-            Heatmap
-          </button>
-          <button id="intensityBtn" title="Toggle daily intensity (I)" aria-pressed="${this._showIntensity}" class="${this._showIntensity ? "active" : ""}">
-            <svg viewBox="0 0 16 16"><path d="M11.5 11.5L13 10l-3-3 3-3-1.5-1.5L8 6l1.5 1.5L6 11l5.5.5z"/></svg>
-            Intensity
-          </button>
-          <button id="criticalPathBtn" title="Toggle critical path (C)" aria-pressed="false">
-            <svg viewBox="0 0 16 16"><path d="M7.56 1.44l.94 2.81 2.97.01-2.4 1.74.91 2.81-2.42-1.74L5.14 8.8l.92-2.8-2.4-1.75h2.97l.93-2.81z"/></svg>
-            Critical Path
-          </button>
-          <div class="overflow-menu-divider"></div>
-          <!-- Actions -->
-          <button id="expandAllBtn" title="Expand all">
-            <svg viewBox="0 0 16 16"><path d="M11 10H5.344L8 12.656 10.656 10H11zm-6 1h6v1H5v-1zM8 3L5.344 6H10.656L8 3zm0 1.344L9.313 6H6.688L8 4.344z" fill-rule="evenodd"/></svg>
-            Expand All
-          </button>
-          <button id="collapseAllBtn" title="Collapse all">
-            <svg viewBox="0 0 16 16"><path d="M11 6H5.344L8 3.344 10.656 6H11zm-6-1h6V4H5v1zm3 7l2.656-3H5.344L8 12zm0-1.344L6.688 9h2.625L8 10.656z" fill-rule="evenodd"/></svg>
-            Collapse All
-          </button>
-        </div>
-      </div>
+      <!-- Actions -->
+      <button id="refreshBtn" class="toggle-btn" title="Refresh (R)">
+        <svg viewBox="0 0 16 16"><path d="M13.451 5.609l-.579-.939-1.068.812-.076.094c-.335.415-.927 1.341-1.124 2.876l-.021.165-.033.167a4.5 4.5 0 1 1-4.05-5.258l.066-.004.073.004-1.024 1.024 1.414 1.414 3.536-3.536L7.029.893 5.615 2.307l.982.982a5.5 5.5 0 1 0 5.537 6.124c.196-1.627.857-2.64 1.317-3.243V5.609z"/></svg>
+      </button>
+      <button id="todayBtn" class="toggle-btn" title="Today (T)">
+        <svg viewBox="0 0 16 16"><path d="M14 2H2v12h12V2zm-1 11H3V5h10v8zM4 1h1v1H4V1zm7 0h1v1h-1V1zM4 8h2v2H4V8z"/></svg>
+      </button>
+      <button id="undoBtn" class="toggle-btn" disabled title="Undo (Ctrl+Z)">
+        <svg viewBox="0 0 16 16"><path d="M3 8.5l4-4v3h5a3 3 0 0 1 0 6H8v-1h4a2 2 0 0 0 0-4H7v3l-4-4z"/></svg>
+      </button>
+      <button id="redoBtn" class="toggle-btn" disabled title="Redo (Ctrl+Y)">
+        <svg viewBox="0 0 16 16"><path d="M13 8.5l-4-4v3H4a3 3 0 0 0 0 6h4v-1H4a2 2 0 0 1 0-4h5v3l4-4z"/></svg>
+      </button>
+      <button id="expandAllBtn" class="toggle-btn" title="Expand all">
+        <svg viewBox="0 0 16 16"><path d="M11 10H5.344L8 12.656 10.656 10H11zm-6 1h6v1H5v-1zM8 3L5.344 6H10.656L8 3zm0 1.344L9.313 6H6.688L8 4.344z"/></svg>
+      </button>
+      <button id="collapseAllBtn" class="toggle-btn" title="Collapse all">
+        <svg viewBox="0 0 16 16"><path d="M11 6H5.344L8 3.344 10.656 6H11zm-6-1h6V4H5v1zm3 7l2.656-3H5.344L8 12zm0-1.344L6.688 9h2.625L8 10.656z"/></svg>
+      </button>
       <span id="selectionCount" class="selection-count hidden"></span>
     </div>
   </div>
@@ -4948,34 +4823,15 @@ ${style.tip}
       }
     });
 
-    // Zoom toggle handlers - use saveStateForZoom to preserve center date
-    document.getElementById('zoomDay')?.addEventListener('click', () => {
+    // Zoom select handler
+    document.getElementById('zoomSelect')?.addEventListener('change', (e) => {
       saveStateForZoom();
-      vscode.postMessage({ command: 'setZoom', zoomLevel: 'day' });
-    });
-    document.getElementById('zoomWeek')?.addEventListener('click', () => {
-      saveStateForZoom();
-      vscode.postMessage({ command: 'setZoom', zoomLevel: 'week' });
-    });
-    document.getElementById('zoomMonth')?.addEventListener('click', () => {
-      saveStateForZoom();
-      vscode.postMessage({ command: 'setZoom', zoomLevel: 'month' });
-    });
-    document.getElementById('zoomQuarter')?.addEventListener('click', () => {
-      saveStateForZoom();
-      vscode.postMessage({ command: 'setZoom', zoomLevel: 'quarter' });
-    });
-    document.getElementById('zoomYear')?.addEventListener('click', () => {
-      saveStateForZoom();
-      vscode.postMessage({ command: 'setZoom', zoomLevel: 'year' });
+      vscode.postMessage({ command: 'setZoom', zoomLevel: e.target.value });
     });
 
-    // Focus toggle handlers (Project vs Person view)
-    document.getElementById('focusProject')?.addEventListener('click', () => {
-      vscode.postMessage({ command: 'setViewFocus', focus: 'project' });
-    });
-    document.getElementById('focusPerson')?.addEventListener('click', () => {
-      vscode.postMessage({ command: 'setViewFocus', focus: 'person' });
+    // View focus select handler
+    document.getElementById('viewFocusSelect')?.addEventListener('change', (e) => {
+      vscode.postMessage({ command: 'setViewFocus', focus: e.target.value });
     });
 
     // Project selector handler (native select)
@@ -5009,19 +4865,6 @@ ${style.tip}
     });
     document.getElementById('filterHealth')?.addEventListener('change', (e) => {
       vscode.postMessage({ command: 'setHealthFilter', health: e.target.value });
-    });
-
-    // Health stat click handlers - filter by clicking on stats
-    document.querySelectorAll('.health-stat[data-filter]').forEach(stat => {
-      stat.addEventListener('click', () => {
-        if (stat.classList.contains('empty')) return;
-        const filter = stat.dataset.filter;
-        const healthSelect = document.getElementById('filterHealth');
-        // Toggle: if already filtered to this, go back to 'all'
-        const newFilter = healthSelect.value === filter ? 'all' : filter;
-        healthSelect.value = newFilter;
-        vscode.postMessage({ command: 'setHealthFilter', health: newFilter });
-      });
     });
 
     // Sortable column header handlers (cycle: asc → desc → none)
@@ -5353,29 +5196,6 @@ ${style.tip}
       document.getElementById('loadingOverlay').classList.add('visible');
       vscode.postMessage({ command: 'refresh' });
     });
-
-    // Overflow menu handlers
-    const overflowBtn = document.getElementById('overflowBtn');
-    const overflowMenu = document.getElementById('overflowMenu');
-    if (overflowBtn && overflowMenu) {
-      overflowBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isOpen = !overflowMenu.classList.contains('hidden');
-        overflowMenu.classList.toggle('hidden');
-        overflowBtn.setAttribute('aria-expanded', String(!isOpen));
-      });
-      // Close on click outside (cleanup previous handler)
-      if (window._ganttOverflowCloseHandler) {
-        document.removeEventListener('click', window._ganttOverflowCloseHandler);
-      }
-      window._ganttOverflowCloseHandler = (e) => {
-        if (!overflowMenu.contains(e.target) && e.target !== overflowBtn) {
-          overflowMenu.classList.add('hidden');
-          overflowBtn.setAttribute('aria-expanded', 'false');
-        }
-      };
-      document.addEventListener('click', window._ganttOverflowCloseHandler);
-    }
 
     // Show delete confirmation picker
     function showDeletePicker(x, y, relationId, fromId, toId) {
@@ -6602,21 +6422,21 @@ ${style.tip}
         redoBtn.click();
       }
       // Zoom shortcuts (1-5)
-      else if (e.key === '1') { document.getElementById('zoomDay')?.click(); }
-      else if (e.key === '2') { document.getElementById('zoomWeek')?.click(); }
-      else if (e.key === '3') { document.getElementById('zoomMonth')?.click(); }
-      else if (e.key === '4') { document.getElementById('zoomQuarter')?.click(); }
-      else if (e.key === '5') { document.getElementById('zoomYear')?.click(); }
+      else if (e.key >= '1' && e.key <= '5') {
+        const zoomSelect = document.getElementById('zoomSelect');
+        const levels = ['day', 'week', 'month', 'quarter', 'year'];
+        zoomSelect.value = levels[parseInt(e.key) - 1];
+        zoomSelect.dispatchEvent(new Event('change'));
+      }
       // Toggle shortcuts
       else if (e.key.toLowerCase() === 'h') { document.getElementById('heatmapBtn')?.click(); }
       else if (e.key.toLowerCase() === 'y') { document.getElementById('capacityBtn')?.click(); }
       else if (e.key.toLowerCase() === 'd') { document.getElementById('depsBtn')?.click(); }
-      else if (e.key.toLowerCase() === 'c') { document.getElementById('criticalPathBtn')?.click(); }
-      else if (e.key.toLowerCase() === 'i') { document.getElementById('intensityBtn')?.click(); }
       else if (e.key.toLowerCase() === 'v') {
         // Toggle view focus between Project and Person
-        const isProject = document.getElementById('focusProject')?.classList.contains('active');
-        document.getElementById(isProject ? 'focusPerson' : 'focusProject')?.click();
+        const viewSelect = document.getElementById('viewFocusSelect');
+        viewSelect.value = viewSelect.value === 'project' ? 'person' : 'project';
+        viewSelect.dispatchEvent(new Event('change'));
       }
       // Action shortcuts
       else if (e.key.toLowerCase() === 'r') { document.getElementById('refreshBtn')?.click(); }
