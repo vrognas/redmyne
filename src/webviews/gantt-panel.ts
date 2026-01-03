@@ -4020,7 +4020,7 @@ ${style.tip}
       </select>
       <!-- Primary actions -->
       <button id="refreshBtn" class="toggle-btn text-btn" title="Refresh (R)">↻</button>
-      <button id="todayBtn" class="toggle-btn text-btn" title="Today (T)">◉</button>
+      <button id="todayBtn" class="toggle-btn text-btn" title="Today (T)">T</button>
       <!-- Overflow menu -->
       <div class="toolbar-dropdown">
         <button class="toggle-btn text-btn" title="More options">⋮</button>
