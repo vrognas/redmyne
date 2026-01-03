@@ -1306,6 +1306,8 @@ export class GanttPanel {
     health?: string; // For setHealthFilter
     sortBy?: "id" | "assignee" | "start" | "due" | null; // For setSort (null = no sort)
     sortOrder?: "asc" | "desc"; // For setSort
+    focus?: "project" | "person"; // For setViewFocus
+    assignee?: string | null; // For setSelectedAssignee
   }): void {
     switch (message.command) {
       case "openIssue":
@@ -1965,6 +1967,7 @@ export class GanttPanel {
         this._cachedHierarchy = buildResourceHierarchy(sortedIssues, this._flexibilityCache, this._selectedAssignee ?? "");
       } else {
         // Project view: selected project and all subprojects
+        // _selectedProjectId was already updated to effective value in filtering logic above
         const projectsForHierarchy = this._projects.filter(p => {
           // Include selected project and all its descendants
           let current: typeof p | undefined = p;
