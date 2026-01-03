@@ -514,6 +514,8 @@ export class GanttPanel {
   private _currentUserName: string | null = null;
   // Keyboard navigation state
   private _selectedCollapseKey: string | null = null;
+  // Expand all nodes on next render (when switching project/person)
+  private _expandAllOnNextRender = false;
   // Ad-hoc budget contribution tracking
   private _contributionData?: ContributionData;
   private _contributionSources?: Map<number, { fromIssueId: number; hours: number }[]>;
@@ -1356,12 +1358,14 @@ export class GanttPanel {
       case "setSelectedProject":
         this._selectedProjectId = message.projectId ?? null;
         this._cachedHierarchy = undefined;
+        this._expandAllOnNextRender = true;
         GanttPanel._globalState?.update(SELECTED_PROJECT_KEY, this._selectedProjectId);
         this._updateContent();
         break;
       case "setSelectedAssignee":
         this._selectedAssignee = message.assignee ?? null;
         this._cachedHierarchy = undefined;
+        this._expandAllOnNextRender = true;
         GanttPanel._globalState?.update(SELECTED_ASSIGNEE_KEY, this._selectedAssignee);
         this._updateContent();
         break;
@@ -1980,6 +1984,20 @@ export class GanttPanel {
         });
         this._cachedHierarchy = buildProjectHierarchy(sortedIssues, this._flexibilityCache, projectsForHierarchy, true, blockedIds);
       }
+    }
+    // Auto-expand all when switching project/person (before flattening)
+    if (this._expandAllOnNextRender) {
+      this._expandAllOnNextRender = false;
+      const collectKeys = (nodes: HierarchyNode[]): string[] => {
+        const keys: string[] = [];
+        for (const n of nodes) {
+          if (n.children.length > 0) keys.push(n.collapseKey);
+          keys.push(...collectKeys(n.children));
+        }
+        return keys;
+      };
+      const allKeys = collectKeys(this._cachedHierarchy);
+      if (allKeys.length > 0) collapseState.expandAll(allKeys);
     }
     // Get ALL nodes with visibility flags for client-side collapse management
     const flatNodes = flattenHierarchyAll(this._cachedHierarchy, collapseState.getExpandedKeys());
@@ -3517,8 +3535,6 @@ ${style.tip}
       border-bottom: 1px solid var(--vscode-panel-border);
       font-size: 11px;
       color: var(--vscode-descriptionForeground);
-      max-height: 40px;
-      overflow: hidden;
       flex-shrink: 0;
     }
     .legend-row.hidden { display: none; }
