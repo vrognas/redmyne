@@ -3238,16 +3238,6 @@ ${style.tip}
       align-items: center;
       margin-bottom: 8px;
       flex-shrink: 0;
-      overflow-x: auto;
-      overflow-y: visible;
-      scrollbar-width: thin;
-    }
-    .gantt-header::-webkit-scrollbar {
-      height: 4px;
-    }
-    .gantt-header::-webkit-scrollbar-thumb {
-      background: var(--vscode-scrollbarSlider-background);
-      border-radius: 2px;
     }
     .gantt-actions {
       display: flex;
@@ -4086,7 +4076,7 @@ ${style.tip}
       </div>
       <div class="toolbar-separator"></div>
       <div class="help-dropdown">
-        <button class="toggle-btn text-btn" title="Help">?</button>
+        <button class="toggle-btn text-btn">?</button>
         <div class="help-tooltip">
           <div class="help-section">
             <div class="help-title">Bar Badges</div>
