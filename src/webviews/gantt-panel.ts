@@ -3436,15 +3436,13 @@ ${style.tip}
       position: absolute;
       right: 0;
       top: 100%;
-      padding-top: 4px;
-      z-index: 1000;
-    }
-    .help-tooltip-inner {
+      margin-top: 4px;
       background: var(--vscode-editorWidget-background);
       border: 1px solid var(--vscode-editorWidget-border);
       border-radius: 4px;
       padding: 8px 12px;
       box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+      z-index: 1000;
       white-space: nowrap;
     }
     .help-dropdown:hover .help-tooltip { display: block; }
@@ -4084,7 +4082,6 @@ ${style.tip}
       <div class="help-dropdown">
         <button class="toggle-btn text-btn">?</button>
         <div class="help-tooltip">
-          <div class="help-tooltip-inner">
             <div class="help-section">
               <div class="help-title">Bar Badges</div>
               <span class="help-item"><span style="color:var(--vscode-charts-green)">+Nd</span> days of slack</span>
@@ -4115,7 +4112,6 @@ ${style.tip}
               <span class="help-item"><kbd>C</kbd> Collapse</span>
               <span class="help-item"><kbd>B</kbd> Blocked</span>
             </div>
-          </div>
         </div>
       </div>
       <span id="selectionCount" class="selection-count hidden"></span>
