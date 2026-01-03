@@ -4360,6 +4360,10 @@ ${style.tip}
             <svg viewBox="0 0 16 16"><path d="M11.5 11.5L13 10l-3-3 3-3-1.5-1.5L8 6l1.5 1.5L6 11l5.5.5z"/></svg>
             Intensity
           </button>
+          <button id="criticalPathBtn" title="Toggle critical path (C)" aria-pressed="false">
+            <svg viewBox="0 0 16 16"><path d="M7.56 1.44l.94 2.81 2.97.01-2.4 1.74.91 2.81-2.42-1.74L5.14 8.8l.92-2.8-2.4-1.75h2.97l.93-2.81z"/></svg>
+            Critical Path
+          </button>
           <div class="overflow-menu-divider"></div>
           <!-- Actions -->
           <button id="expandAllBtn" title="Expand all">
@@ -5065,8 +5069,8 @@ ${style.tip}
 
     function toggleCriticalPath() {
       criticalPathEnabled = !criticalPathEnabled;
-      criticalPathBtn.classList.toggle('active', criticalPathEnabled);
-      criticalPathBtn.setAttribute('aria-pressed', criticalPathEnabled);
+      criticalPathBtn?.classList.toggle('active', criticalPathEnabled);
+      criticalPathBtn?.setAttribute('aria-pressed', String(criticalPathEnabled));
 
       // Clear previous highlights
       document.querySelectorAll('.critical-path').forEach(el => el.classList.remove('critical-path'));
@@ -5096,7 +5100,7 @@ ${style.tip}
       }
     }
 
-    criticalPathBtn.addEventListener('click', toggleCriticalPath);
+    criticalPathBtn?.addEventListener('click', toggleCriticalPath);
 
     // Focus mode: click on issue to highlight its dependency chain
     let focusedIssueId = null;
