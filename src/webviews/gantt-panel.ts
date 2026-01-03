@@ -464,6 +464,9 @@ const VIEW_MODE_KEY = "redmine.gantt.viewMode";
 const VIEW_FOCUS_KEY = "redmine.gantt.viewFocus";
 const SELECTED_PROJECT_KEY = "redmine.gantt.selectedProject";
 const SELECTED_ASSIGNEE_KEY = "redmine.gantt.selectedAssignee";
+const FILTER_ASSIGNEE_KEY = "redmine.gantt.filterAssignee";
+const FILTER_STATUS_KEY = "redmine.gantt.filterStatus";
+const FILTER_HEALTH_KEY = "redmine.gantt.filterHealth";
 
 export class GanttPanel {
   public static currentPanel: GanttPanel | undefined;
@@ -539,6 +542,12 @@ export class GanttPanel {
       this._viewFocus = GanttPanel._globalState.get<"project" | "person">(VIEW_FOCUS_KEY, "project");
       this._selectedProjectId = GanttPanel._globalState.get<number | null>(SELECTED_PROJECT_KEY, null);
       this._selectedAssignee = GanttPanel._globalState.get<string | null>(SELECTED_ASSIGNEE_KEY, null);
+      // Restore filter state
+      const savedAssignee = GanttPanel._globalState.get<"me" | "any">(FILTER_ASSIGNEE_KEY);
+      const savedStatus = GanttPanel._globalState.get<"open" | "closed" | "any">(FILTER_STATUS_KEY);
+      if (savedAssignee) this._currentFilter.assignee = savedAssignee;
+      if (savedStatus) this._currentFilter.status = savedStatus;
+      this._healthFilter = GanttPanel._globalState.get<"all" | "healthy" | "warning" | "critical">(FILTER_HEALTH_KEY, "all");
     }
 
     // Create debounced collapse update to prevent rapid re-renders
@@ -1508,6 +1517,9 @@ export class GanttPanel {
             status: (message.filter.status as "open" | "closed" | "any") ?? this._currentFilter.status,
           };
           this._currentFilter = newFilter;
+          // Persist filter state
+          GanttPanel._globalState?.update(FILTER_ASSIGNEE_KEY, newFilter.assignee);
+          GanttPanel._globalState?.update(FILTER_STATUS_KEY, newFilter.status);
           // Notify callback to sync with ProjectsTree (triggers data refresh)
           if (this._filterChangeCallback) {
             this._filterChangeCallback(newFilter);
@@ -1517,6 +1529,7 @@ export class GanttPanel {
       case "setHealthFilter":
         if (message.health) {
           this._healthFilter = message.health as "all" | "healthy" | "warning" | "critical";
+          GanttPanel._globalState?.update(FILTER_HEALTH_KEY, this._healthFilter);
           this._updateContent();
         }
         break;
