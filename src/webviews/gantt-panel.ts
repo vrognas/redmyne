@@ -461,6 +461,7 @@ function getHeatmapColor(utilization: number): string {
  */
 const HIDDEN_PROJECTS_KEY = "redmine.gantt.hiddenProjects";
 const VIEW_MODE_KEY = "redmine.gantt.viewMode";
+const SELECTED_PROJECT_KEY = "redmine.gantt.selectedProject";
 
 export class GanttPanel {
   public static currentPanel: GanttPanel | undefined;
@@ -499,6 +500,7 @@ export class GanttPanel {
   private _healthFilter: "all" | "healthy" | "warning" | "critical" = "all";
   private _filterChangeCallback?: (filter: IssueFilter) => void;
   private _viewMode: GanttViewMode = "projects";
+  private _selectedProjectId: number | null = null; // null = all projects
   private _showCapacityRibbon = true; // Capacity ribbon visible by default in My Work
   // Sort settings (null = no sorting, use natural/hierarchy order)
   private _sortBy: "id" | "assignee" | "start" | "due" | null = null;
@@ -527,6 +529,7 @@ export class GanttPanel {
       const saved = GanttPanel._globalState.get<number[]>(HIDDEN_PROJECTS_KEY, []);
       this._hiddenProjects = new Set(saved);
       this._viewMode = GanttPanel._globalState.get<GanttViewMode>(VIEW_MODE_KEY, "projects");
+      this._selectedProjectId = GanttPanel._globalState.get<number | null>(SELECTED_PROJECT_KEY, null);
     }
 
     // Create debounced collapse update to prevent rapid re-renders
@@ -1346,6 +1349,12 @@ export class GanttPanel {
           this._updateContent();
         }
         break;
+      case "setSelectedProject":
+        this._selectedProjectId = message.projectId ?? null;
+        this._cachedHierarchy = undefined; // Rebuild with filtered issues
+        GanttPanel._globalState?.update(SELECTED_PROJECT_KEY, this._selectedProjectId);
+        this._updateContent();
+        break;
       case "deleteRelation":
         if (message.relationId && this._server) {
           this._deleteRelation(message.relationId);
@@ -1865,8 +1874,13 @@ export class GanttPanel {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
 
+    // Filter by selected project (null = all projects)
+    const projectFilteredIssues = this._selectedProjectId !== null
+      ? this._issues.filter(i => i.project?.id === this._selectedProjectId)
+      : this._issues;
+
     // Sort issues before building hierarchy (null = no sorting, keep natural order)
-    const sortedIssues = this._sortBy === null ? [...this._issues] : [...this._issues].sort((a, b) => {
+    const sortedIssues = this._sortBy === null ? [...projectFilteredIssues] : [...projectFilteredIssues].sort((a, b) => {
       let cmp = 0;
       switch (this._sortBy) {
         case "id":
@@ -4177,6 +4191,16 @@ ${style.tip}
         </div>
       </div>
       <div class="toolbar-separator"></div>
+      <!-- Project selector -->
+      <div class="toolbar-group">
+        <select id="projectSelector" class="toolbar-select" title="Focus on project">
+          <option value=""${this._selectedProjectId === null ? " selected" : ""}>All Projects</option>
+          ${this._projects.map(p =>
+            `<option value="${p.id}"${this._selectedProjectId === p.id ? " selected" : ""}>${escapeHtml(p.name)}</option>`
+          ).join("")}
+        </select>
+      </div>
+      <div class="toolbar-separator"></div>
       <!-- Filter group -->
       <div class="toolbar-group">
         <div class="filter-toggle" role="group" aria-label="Issue filter">
@@ -4794,6 +4818,15 @@ ${style.tip}
     });
     document.getElementById('viewMyWork')?.addEventListener('click', () => {
       vscode.postMessage({ command: 'setViewMode', viewMode: 'mywork' });
+    });
+
+    // Project selector handler
+    document.getElementById('projectSelector')?.addEventListener('change', (e) => {
+      const value = e.target.value;
+      vscode.postMessage({
+        command: 'setSelectedProject',
+        projectId: value === '' ? null : parseInt(value, 10)
+      });
     });
 
     // Filter dropdown handlers
