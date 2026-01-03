@@ -997,13 +997,12 @@ export class GanttPanel {
       }
     }
 
-    // Fetch current user for special highlighting (if not already cached)
-    if (!this._currentUserId && this._server) {
+    // Fetch current user ID for highlighting (name captured from issues later)
+    if (this._currentUserId === null && this._server) {
       try {
         const user = await this._server.getCurrentUser();
         if (user) {
           this._currentUserId = user.id;
-          this._currentUserName = `${user.firstname} ${user.lastname}`;
         }
       } catch {
         // Ignore errors
