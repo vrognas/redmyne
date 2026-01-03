@@ -188,9 +188,12 @@ export function buildProjectHierarchy(
 
   // If we have project hierarchy, use it
   if (projects.length > 0) {
-    // Get root projects (no parent)
+    // Build set of project IDs in the filtered set
+    const projectIdSet = new Set(projects.map(p => p.id));
+    // Root projects are those whose parent is NOT in the filtered set
+    // (either no parent, or parent is outside the selection)
     const rootProjects = projects
-      .filter((p) => !p.parent)
+      .filter((p) => !p.parent || !projectIdSet.has(p.parent.id))
       .sort((a, b) => a.name.localeCompare(b.name));
 
     return rootProjects.map((p) => buildProjectNode(p, null, 0));
