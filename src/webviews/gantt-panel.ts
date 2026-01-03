@@ -1898,7 +1898,12 @@ export class GanttPanel {
         assigneeSet.add(issue.assigned_to.name);
       }
     }
-    this._uniqueAssignees = [...assigneeSet].sort((a, b) => a.localeCompare(b));
+    // Sort assignees: current user first, then alphabetical
+    this._uniqueAssignees = [...assigneeSet].sort((a, b) => {
+      if (a === this._currentUserName) return -1;
+      if (b === this._currentUserName) return 1;
+      return a.localeCompare(b);
+    });
 
     // Apply view focus filtering: either by project OR by person
     let filteredIssues: typeof this._issues;
@@ -4333,9 +4338,10 @@ ${style.tip}
           ).join("")}
         </select>` : `
         <select id="focusSelector" class="toolbar-select" title="Select person">
-          ${this._uniqueAssignees.map(name =>
-            `<option value="${escapeHtml(name)}"${this._selectedAssignee === name ? " selected" : ""}>${escapeHtml(name)}</option>`
-          ).join("")}
+          ${this._uniqueAssignees.map(name => {
+            const isMe = name === this._currentUserName;
+            return `<option value="${escapeHtml(name)}"${this._selectedAssignee === name ? " selected" : ""}>${escapeHtml(name)}${isMe ? " (me)" : ""}</option>`;
+          }).join("")}
         </select>`}
       </div>
       <div class="toolbar-separator"></div>
