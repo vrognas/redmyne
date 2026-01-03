@@ -609,7 +609,7 @@ export function buildMyWorkHierarchy(
  */
 export function buildResourceHierarchy(
   issues: Issue[],
-  flexibilityCache: Map<number, FlexibilityScore | null>,
+  _flexibilityCache: Map<number, FlexibilityScore | null>,
   assigneeName: string
 ): HierarchyNode[] {
   // Filter by assignee

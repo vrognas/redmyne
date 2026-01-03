@@ -3211,7 +3211,6 @@ ${style.tip}
     // Count overloaded days for warning badge
     const overloadedDays = capacityData.filter(d => d.status === "overloaded");
     const overloadCount = overloadedDays.length;
-    const firstOverloadDateMs = overloadedDays.length > 0 ? new Date(overloadedDays[0].date).getTime() : 0;
 
     // Week boundaries for capacity ribbon (show Monday markers)
     const capacityWeekMarkers: string[] = [];
