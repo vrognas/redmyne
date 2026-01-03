@@ -1828,15 +1828,24 @@ export class GanttPanel {
     today.setUTCHours(0, 0, 0, 0);
 
     // Extract unique assignees from ALL issues (sorted alphabetically)
-    // Also capture current user's display name from issues (matches Redmine format)
+    // Also capture current user's ID and name from issues if not yet set
     const assigneeSet = new Set<string>();
     for (const issue of this._issues) {
       if (issue.assigned_to?.name) {
         assigneeSet.add(issue.assigned_to.name);
-        // Capture current user's name as displayed in Redmine
+        // Capture current user's ID and name from issues
         if (issue.assigned_to.id === this._currentUserId && !this._currentUserName) {
           this._currentUserName = issue.assigned_to.name;
         }
+      }
+    }
+    // Fallback: if we still don't have current user ID but have issues loaded with "me" filter,
+    // all issues should belong to current user - infer ID from first assigned issue
+    if (this._currentUserId === null && this._currentFilter.assignee === "me") {
+      const firstAssigned = this._issues.find(i => i.assigned_to?.id);
+      if (firstAssigned?.assigned_to) {
+        this._currentUserId = firstAssigned.assigned_to.id;
+        this._currentUserName = firstAssigned.assigned_to.name;
       }
     }
     // Sort assignees: current user first, then alphabetical
