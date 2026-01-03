@@ -847,10 +847,8 @@ export class GanttPanel {
     .gantt-col-due { width: ${dueDateColumnWidth}px; }
     .gantt-col-assignee { width: ${assigneeColumnWidth}px; }
     .gantt-col-header {
-      font-size: 10px;
-      text-transform: uppercase;
+      font-size: 11px;
       color: var(--vscode-descriptionForeground);
-      letter-spacing: 0.5px;
     }
     .gantt-timeline-header {
       flex-grow: 1;
@@ -3603,7 +3601,7 @@ ${style.tip}
       margin-left: 4px;
       font-size: 10px;
       font-weight: bold;
-      border-radius: 8px;
+      border-radius: 4px;
       background: var(--vscode-charts-red);
       color: var(--vscode-editor-background);
       cursor: pointer;
@@ -3670,12 +3668,10 @@ ${style.tip}
       margin: 4px 0;
     }
     .overflow-menu-section {
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 600;
-      text-transform: uppercase;
       color: var(--vscode-descriptionForeground);
       padding: 4px 8px 2px;
-      letter-spacing: 0.5px;
     }
     .overflow-menu-row {
       display: flex;
@@ -3695,7 +3691,7 @@ ${style.tip}
       color: var(--vscode-badge-foreground);
       font-size: 10px;
       padding: 1px 5px;
-      border-radius: 8px;
+      border-radius: 4px;
       margin-left: 4px;
     }
     .gantt-container {
@@ -3874,7 +3870,7 @@ ${style.tip}
     .gantt-timeline { flex-shrink: 0; }
     svg { display: block; }
     .issue-bar:hover .bar-main, .issue-bar:hover .bar-outline, .issue-label:hover { opacity: 1; }
-    .issue-bar:hover .bar-intensity rect { filter: brightness(1.1); }
+    .issue-bar:hover .bar-intensity rect { opacity: 1; }
     /* Suppress bar hover when hovering badges */
     .issue-bar:has(.blocks-badge-group:hover) .bar-main,
     .issue-bar:has(.blocks-badge-group:hover) .bar-outline,
@@ -3909,7 +3905,7 @@ ${style.tip}
     .critical-path-mode .dependency-arrow.critical-path { opacity: 1; }
     .critical-path-mode .dependency-arrow.critical-path .arrow-line { stroke: var(--vscode-charts-orange) !important; stroke-width: 3; }
     .issue-bar.selected .bar-outline { stroke: var(--vscode-focusBorder) !important; stroke-width: 2; }
-    .issue-bar.selected .bar-main { filter: brightness(1.1); }
+    .issue-bar.selected .bar-main { opacity: 1; }
     .multi-select-mode .issue-bar { cursor: pointer; }
     .selection-count { margin-left: 8px; font-size: 11px; color: var(--vscode-descriptionForeground); }
     .issue-bar.parent-bar { opacity: 0.7; }
@@ -3940,8 +3936,7 @@ ${style.tip}
     .temp-link-arrow { pointer-events: none; }
     .dependency-arrow .arrow-line { transition: stroke-width 0.15s, filter 0.15s; }
     .dependency-arrow .arrow-head { transition: filter 0.15s; }
-    .dependency-arrow:hover .arrow-line { stroke-width: 3 !important; filter: brightness(1.2); }
-    .dependency-arrow:hover .arrow-head { filter: brightness(1.2); }
+    .dependency-arrow:hover .arrow-line { stroke-width: 3 !important; }
     .dependency-arrow.selected .arrow-line { stroke-width: 4 !important; }
     .arrow-selection-mode .issue-bar { opacity: 0.3; }
     .arrow-selection-mode .issue-bar.arrow-connected { opacity: 1; }
@@ -4038,7 +4033,7 @@ ${style.tip}
     .keyboard-help-content {
       background: var(--vscode-editor-background);
       border: 1px solid var(--vscode-panel-border);
-      border-radius: 8px;
+      border-radius: 4px;
       padding: 20px 24px;
       max-width: 600px;
       box-shadow: 0 8px 32px var(--vscode-widget-shadow);
@@ -4059,8 +4054,6 @@ ${style.tip}
       font-size: 12px;
       font-weight: 600;
       color: var(--vscode-descriptionForeground);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
     }
     .shortcut-section > div {
       font-size: 12px;
@@ -4206,8 +4199,7 @@ ${style.tip}
       stroke-width: 2;
     }
     .milestone-marker:hover .milestone-diamond {
-      transform-origin: center;
-      filter: brightness(1.2);
+      stroke-width: 3;
     }
     .milestone-label {
       pointer-events: none;
@@ -4224,11 +4216,9 @@ ${style.tip}
     /* Blocker badge styling */
     .blocker-badge { pointer-events: all; }
     .blocker-badge:hover rect { opacity: 0.35 !important; }
-    .blocker-badge:hover text { filter: brightness(1.3); }
     /* Blocks badge styling */
     .blocks-badge-group { cursor: help; }
     .blocks-badge-group:hover .blocks-badge-bg { opacity: 0.35 !important; }
-    .blocks-badge-group:hover .blocks-badge { filter: brightness(1.3); }
     /* Health summary stats */
     .health-summary { display: flex; gap: 8px; align-items: center; }
     .health-stat {
