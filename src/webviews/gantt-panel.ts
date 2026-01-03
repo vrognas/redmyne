@@ -461,6 +461,7 @@ function getHeatmapColor(utilization: number): string {
  */
 const HIDDEN_PROJECTS_KEY = "redmine.gantt.hiddenProjects";
 const VIEW_MODE_KEY = "redmine.gantt.viewMode";
+const VIEW_FOCUS_KEY = "redmine.gantt.viewFocus";
 const SELECTED_PROJECT_KEY = "redmine.gantt.selectedProject";
 const SELECTED_ASSIGNEE_KEY = "redmine.gantt.selectedAssignee";
 
@@ -501,8 +502,9 @@ export class GanttPanel {
   private _healthFilter: "all" | "healthy" | "warning" | "critical" = "all";
   private _filterChangeCallback?: (filter: IssueFilter) => void;
   private _viewMode: GanttViewMode = "projects";
-  private _selectedProjectId: number | null = null; // null = all projects
-  private _selectedAssignee: string | null = null; // null = all assignees
+  private _viewFocus: "project" | "person" = "project"; // Toggle: view by project or person
+  private _selectedProjectId: number | null = null; // Selected project (null = first available)
+  private _selectedAssignee: string | null = null; // Selected person (null = first available)
   private _uniqueAssignees: string[] = []; // Extracted from issues
   private _showCapacityRibbon = true; // Capacity ribbon visible by default in My Work
   // Sort settings (null = no sorting, use natural/hierarchy order)
@@ -532,6 +534,7 @@ export class GanttPanel {
       const saved = GanttPanel._globalState.get<number[]>(HIDDEN_PROJECTS_KEY, []);
       this._hiddenProjects = new Set(saved);
       this._viewMode = GanttPanel._globalState.get<GanttViewMode>(VIEW_MODE_KEY, "projects");
+      this._viewFocus = GanttPanel._globalState.get<"project" | "person">(VIEW_FOCUS_KEY, "project");
       this._selectedProjectId = GanttPanel._globalState.get<number | null>(SELECTED_PROJECT_KEY, null);
       this._selectedAssignee = GanttPanel._globalState.get<string | null>(SELECTED_ASSIGNEE_KEY, null);
     }
@@ -732,13 +735,13 @@ export class GanttPanel {
       border-right: 1px solid var(--vscode-panel-border);
       padding: 4px 8px;
       font-size: 11px;
-      opacity: 0.5;
+      cursor: pointer;
     }
     .zoom-toggle button:last-child { border-right: none; }
+    .zoom-toggle button:hover { background: var(--vscode-button-secondaryHoverBackground); }
     .zoom-toggle button.active {
       background: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
-      opacity: 1;
     }
     .view-mode-toggle {
       display: flex;
@@ -753,17 +756,13 @@ export class GanttPanel {
       border-right: 1px solid var(--vscode-panel-border);
       padding: 4px 8px;
       font-size: 11px;
-      opacity: 0.5;
       cursor: pointer;
     }
     .view-mode-toggle button:last-child { border-right: none; }
+    .view-mode-toggle button:hover { background: var(--vscode-button-secondaryHoverBackground); }
     .view-mode-toggle button.active {
       background: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
-      opacity: 1;
-    }
-    .view-mode-toggle button:hover:not(.active) {
-      opacity: 0.75;
     }
     .filter-toggle {
       display: flex;
@@ -778,7 +777,6 @@ export class GanttPanel {
       border-right: 1px solid var(--vscode-panel-border);
       padding: 4px 8px;
       font-size: 11px;
-      opacity: 0.5;
     }
     .filter-toggle select:last-child { border-right: none; }
     .icon-btn {
@@ -791,8 +789,9 @@ export class GanttPanel {
       padding: 4px 8px;
       border-radius: 2px;
       font-size: 13px;
-      opacity: 0.5;
+      cursor: pointer;
     }
+    .icon-btn:hover { background: var(--vscode-button-secondaryHoverBackground); }
     .icon-btn svg {
       width: 14px;
       height: 14px;
@@ -1355,9 +1354,15 @@ export class GanttPanel {
           this._updateContent();
         }
         break;
+      case "setViewFocus":
+        this._viewFocus = message.focus === "person" ? "person" : "project";
+        this._cachedHierarchy = undefined;
+        GanttPanel._globalState?.update(VIEW_FOCUS_KEY, this._viewFocus);
+        this._updateContent();
+        break;
       case "setSelectedProject":
         this._selectedProjectId = message.projectId ?? null;
-        this._cachedHierarchy = undefined; // Rebuild with filtered issues
+        this._cachedHierarchy = undefined;
         GanttPanel._globalState?.update(SELECTED_PROJECT_KEY, this._selectedProjectId);
         this._updateContent();
         break;
@@ -1886,22 +1891,42 @@ export class GanttPanel {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
 
-    // Filter by selected project (null = all projects)
-    const projectFilteredIssues = this._selectedProjectId !== null
-      ? this._issues.filter(i => i.project?.id === this._selectedProjectId)
-      : this._issues;
-
-    // Extract unique assignees (sorted alphabetically)
+    // Extract unique assignees from ALL issues (sorted alphabetically)
     const assigneeSet = new Set<string>();
-    for (const issue of projectFilteredIssues) {
+    for (const issue of this._issues) {
       if (issue.assigned_to?.name) {
         assigneeSet.add(issue.assigned_to.name);
       }
     }
     this._uniqueAssignees = [...assigneeSet].sort((a, b) => a.localeCompare(b));
 
+    // Apply view focus filtering: either by project OR by person
+    let filteredIssues: typeof this._issues;
+    if (this._viewFocus === "person") {
+      // Person view: filter by assignee (default to current user or first available)
+      const effectiveAssignee = this._selectedAssignee
+        ?? this._currentUserName
+        ?? this._uniqueAssignees[0]
+        ?? null;
+      if (effectiveAssignee && effectiveAssignee !== this._selectedAssignee) {
+        this._selectedAssignee = effectiveAssignee;
+      }
+      filteredIssues = effectiveAssignee
+        ? this._issues.filter(i => i.assigned_to?.name === effectiveAssignee)
+        : this._issues;
+    } else {
+      // Project view: filter by project (default to first available)
+      const effectiveProjectId = this._selectedProjectId ?? this._projects[0]?.id ?? null;
+      if (effectiveProjectId && effectiveProjectId !== this._selectedProjectId) {
+        this._selectedProjectId = effectiveProjectId;
+      }
+      filteredIssues = effectiveProjectId !== null
+        ? this._issues.filter(i => i.project?.id === effectiveProjectId)
+        : this._issues;
+    }
+
     // Sort issues before building hierarchy (null = no sorting, keep natural order)
-    const sortedIssues = this._sortBy === null ? [...projectFilteredIssues] : [...projectFilteredIssues].sort((a, b) => {
+    const sortedIssues = this._sortBy === null ? [...filteredIssues] : [...filteredIssues].sort((a, b) => {
       let cmp = 0;
       switch (this._sortBy) {
         case "id":
@@ -1926,9 +1951,9 @@ export class GanttPanel {
       // Extract blocked issue IDs from relations (for health calculation)
       const blockedIds = this.extractBlockedIds(sortedIssues);
 
-      if (this._selectedAssignee) {
-        // Resource view: single assignee grouped by project
-        this._cachedHierarchy = buildResourceHierarchy(sortedIssues, this._flexibilityCache, this._selectedAssignee);
+      if (this._viewFocus === "person") {
+        // Person view: group by project
+        this._cachedHierarchy = buildResourceHierarchy(sortedIssues, this._flexibilityCache, this._selectedAssignee ?? "");
       } else if (this._viewMode === "mywork") {
         this._cachedHierarchy = buildMyWorkHierarchy(sortedIssues, this._flexibilityCache, this._dependencyIssues);
       } else {
@@ -3342,6 +3367,48 @@ ${style.tip}
       background: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
     }
+    .focus-toggle {
+      display: flex;
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .focus-toggle button {
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: none;
+      border-right: 1px solid var(--vscode-panel-border);
+      padding: 4px 8px;
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .focus-toggle button:last-child { border-right: none; }
+    .focus-toggle button:hover { background: var(--vscode-button-secondaryHoverBackground); }
+    .focus-toggle button:focus-visible {
+      outline: 2px solid var(--vscode-focusBorder);
+      outline-offset: -1px;
+      z-index: 1;
+    }
+    .focus-toggle button.active {
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+    }
+    .toolbar-select {
+      background: var(--vscode-dropdown-background);
+      color: var(--vscode-dropdown-foreground);
+      border: 1px solid var(--vscode-dropdown-border);
+      padding: 3px 6px;
+      font-size: 12px;
+      font-family: var(--vscode-font-family);
+      border-radius: 2px;
+      cursor: pointer;
+      max-width: 180px;
+    }
+    .toolbar-select:hover { border-color: var(--vscode-focusBorder); }
+    .toolbar-select:focus {
+      outline: 1px solid var(--vscode-focusBorder);
+      outline-offset: -1px;
+    }
     .view-mode-toggle {
       display: flex;
       border: 1px solid var(--vscode-panel-border);
@@ -3434,7 +3501,6 @@ ${style.tip}
       border-bottom: 1px solid var(--vscode-panel-border);
       font-size: 11px;
       color: var(--vscode-descriptionForeground);
-      transition: opacity 0.15s ease-out, max-height 0.2s ease-out;
       max-height: 40px;
       overflow: hidden;
       flex-shrink: 0;
@@ -3516,7 +3582,6 @@ ${style.tip}
     }
     .capacity-day-bar {
       cursor: pointer;
-      transition: opacity 0.15s;
     }
     .capacity-day-bar:hover {
       opacity: 1 !important;
@@ -3790,7 +3855,6 @@ ${style.tip}
       background: var(--vscode-panel-border);
       cursor: col-resize;
       flex-shrink: 0;
-      transition: background 0.15s;
       position: relative;
     }
     .gantt-resize-handle::before {
@@ -4165,21 +4229,22 @@ ${style.tip}
     /* Health summary stats */
     .health-summary { display: flex; gap: 8px; align-items: center; }
     .health-stat {
-      display: flex; align-items: center; gap: 2px;
-      padding: 2px 6px; border-radius: 4px;
+      display: flex; align-items: center; gap: 4px;
+      padding: 2px 6px;
       font-size: 11px; font-weight: 500;
-      cursor: pointer; transition: background 0.15s;
-      background: var(--vscode-badge-background);
+      cursor: pointer;
     }
-    .health-stat:hover { background: var(--vscode-list-hoverBackground); }
+    .health-stat:hover { background: var(--vscode-list-hoverBackground); border-radius: 2px; }
     .health-stat.empty { opacity: 0.4; cursor: default; }
-    .health-stat.empty:hover { background: var(--vscode-badge-background); }
-    .health-stat .stat-icon { font-size: 10px; }
-    .health-stat .stat-count { color: var(--vscode-badge-foreground); min-width: 12px; text-align: center; }
-    .health-stat.critical .stat-count { color: var(--vscode-charts-red); }
-    .health-stat.warning .stat-count { color: var(--vscode-charts-yellow); }
-    .health-stat.healthy .stat-count { color: var(--vscode-charts-green); }
-    .health-stat.blocked .stat-count { color: var(--vscode-charts-red); }
+    .health-stat.empty:hover { background: transparent; }
+    .health-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .health-dot.critical { background: var(--vscode-charts-red, #f14c4c); }
+    .health-dot.warning { background: var(--vscode-charts-yellow, #cca700); }
+    .health-dot.healthy { background: var(--vscode-charts-green, #89d185); }
+    .health-stat .stat-count { color: var(--vscode-foreground); min-width: 12px; text-align: center; }
     /* Health legend - Progressive Disclosure via help icon */
     .health-help {
       position: relative;
@@ -4217,7 +4282,6 @@ ${style.tip}
       z-index: 1000;
       opacity: 0;
       visibility: hidden;
-      transition: opacity 0.15s, visibility 0.15s;
       white-space: nowrap;
     }
     .health-help:hover .health-help-tooltip {
@@ -4256,32 +4320,35 @@ ${style.tip}
         </div>
       </div>
       <div class="toolbar-separator"></div>
-      <!-- 2. Selectors group -->
+      <!-- 2. View focus: toggle + contextual dropdown -->
       <div class="toolbar-group">
-        <select id="projectSelector" class="toolbar-select" title="Focus on project">
-          <option value=""${this._selectedProjectId === null ? " selected" : ""}>All Projects</option>
+        <div class="focus-toggle" role="group" aria-label="View focus">
+          <button id="focusProject" class="${this._viewFocus === "project" ? "active" : ""}" title="View by project">Project</button>
+          <button id="focusPerson" class="${this._viewFocus === "person" ? "active" : ""}" title="View by person">Person</button>
+        </div>
+        ${this._viewFocus === "project" ? `
+        <select id="focusSelector" class="toolbar-select" title="Select project">
           ${this._projects.map(p =>
             `<option value="${p.id}"${this._selectedProjectId === p.id ? " selected" : ""}>${escapeHtml(p.name)}</option>`
           ).join("")}
-        </select>
-        <select id="assigneeSelector" class="toolbar-select" title="View by team member">
-          <option value=""${this._selectedAssignee === null ? " selected" : ""}>All Assignees</option>
+        </select>` : `
+        <select id="focusSelector" class="toolbar-select" title="Select person">
           ${this._uniqueAssignees.map(name =>
             `<option value="${escapeHtml(name)}"${this._selectedAssignee === name ? " selected" : ""}>${escapeHtml(name)}</option>`
           ).join("")}
-        </select>
+        </select>`}
       </div>
       <div class="toolbar-separator"></div>
       <!-- 3. Health summary (compact) -->
       <div class="toolbar-group health-summary" role="group" aria-label="Health summary">
         <span class="health-stat critical${criticalCount === 0 ? " empty" : ""}" data-filter="critical" title="Critical issues - click to filter">
-          <span class="stat-icon">🔴</span><span class="stat-count">${criticalCount}</span>
+          <span class="health-dot critical"></span><span class="stat-count">${criticalCount}</span>
         </span>
         <span class="health-stat warning${warningCount === 0 ? " empty" : ""}" data-filter="warning" title="Warning issues - click to filter">
-          <span class="stat-icon">🟡</span><span class="stat-count">${warningCount}</span>
+          <span class="health-dot warning"></span><span class="stat-count">${warningCount}</span>
         </span>
         <span class="health-stat healthy${healthyCount === 0 ? " empty" : ""}" data-filter="healthy" title="Healthy issues - click to filter">
-          <span class="stat-icon">🟢</span><span class="stat-count">${healthyCount}</span>
+          <span class="health-dot healthy"></span><span class="stat-count">${healthyCount}</span>
         </span>
       </div>
       <div class="toolbar-separator"></div>
@@ -4889,7 +4956,7 @@ ${style.tip}
       vscode.postMessage({ command: 'setZoom', zoomLevel: 'year' });
     });
 
-    // View mode toggle handlers
+    // View mode toggle handlers (in overflow menu)
     document.getElementById('viewProjects')?.addEventListener('click', () => {
       vscode.postMessage({ command: 'setViewMode', viewMode: 'projects' });
     });
@@ -4897,22 +4964,30 @@ ${style.tip}
       vscode.postMessage({ command: 'setViewMode', viewMode: 'mywork' });
     });
 
-    // Project selector handler
-    document.getElementById('projectSelector')?.addEventListener('change', (e) => {
-      const value = e.target.value;
-      vscode.postMessage({
-        command: 'setSelectedProject',
-        projectId: value === '' ? null : parseInt(value, 10)
-      });
+    // Focus toggle handlers (Project vs Person view)
+    document.getElementById('focusProject')?.addEventListener('click', () => {
+      vscode.postMessage({ command: 'setViewFocus', focus: 'project' });
+    });
+    document.getElementById('focusPerson')?.addEventListener('click', () => {
+      vscode.postMessage({ command: 'setViewFocus', focus: 'person' });
     });
 
-    // Assignee selector handler
-    document.getElementById('assigneeSelector')?.addEventListener('change', (e) => {
+    // Focus selector handler (contextual - shows projects or people based on focus mode)
+    const focusSelector = document.getElementById('focusSelector');
+    const currentFocus = '${this._viewFocus}';
+    focusSelector?.addEventListener('change', (e) => {
       const value = e.target.value;
-      vscode.postMessage({
-        command: 'setSelectedAssignee',
-        assignee: value === '' ? null : value
-      });
+      if (currentFocus === 'project') {
+        vscode.postMessage({
+          command: 'setSelectedProject',
+          projectId: value ? parseInt(value, 10) : null
+        });
+      } else {
+        vscode.postMessage({
+          command: 'setSelectedAssignee',
+          assignee: value || null
+        });
+      }
     });
 
     // Filter dropdown handlers
