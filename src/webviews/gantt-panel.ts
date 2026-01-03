@@ -1546,6 +1546,9 @@ export class GanttPanel {
           // Persist filter state
           GanttPanel._globalState?.update(FILTER_ASSIGNEE_KEY, newFilter.assignee);
           GanttPanel._globalState?.update(FILTER_STATUS_KEY, newFilter.status);
+          // Apply filter locally and re-render
+          this._cachedHierarchy = undefined;
+          this._updateContent();
           // Notify callback to sync with ProjectsTree (triggers data refresh)
           if (this._filterChangeCallback) {
             this._filterChangeCallback(newFilter);
@@ -1880,6 +1883,10 @@ export class GanttPanel {
       filteredIssues = projectIdsToInclude.size > 0
         ? this._issues.filter(i => i.project?.id !== undefined && projectIdsToInclude.has(i.project.id))
         : this._issues;
+      // Apply "My issues" filter locally (filter by current user ID)
+      if (this._currentFilter.assignee === "me" && this._currentUserId !== null) {
+        filteredIssues = filteredIssues.filter(i => i.assigned_to?.id === this._currentUserId);
+      }
     }
 
     // Sort issues before building hierarchy (null = no sorting, keep natural order)
