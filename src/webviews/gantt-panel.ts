@@ -813,6 +813,13 @@ export class GanttPanel {
       flex-grow: 1;
       overflow: hidden;
     }
+    .gantt-body-scroll .gantt-col-id,
+    .gantt-body-scroll .gantt-col-start,
+    .gantt-body-scroll .gantt-col-status,
+    .gantt-body-scroll .gantt-col-due,
+    .gantt-body-scroll .gantt-col-assignee {
+      align-items: flex-start;
+    }
     .gantt-checkboxes {
       display: none; /* Removed: now viewing one project/person at a time */
     }
