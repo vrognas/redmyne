@@ -711,12 +711,6 @@ export class GanttPanel {
       gap: 4px;
       align-items: center;
     }
-    .toolbar-group {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      flex-shrink: 0;
-    }
     .toolbar-separator {
       width: 1px;
       height: 20px;
@@ -835,48 +829,26 @@ export class GanttPanel {
 <body>
   <div class="gantt-header">
     <div class="gantt-actions" role="toolbar" aria-label="Gantt chart controls">
-      <div class="toolbar-group">
-        <div class="zoom-toggle" role="group" aria-label="Zoom level">
-          <button>Day</button>
-          <button>Week</button>
-          <button class="active">Month</button>
-          <button>Qtr</button>
-          <button>Year</button>
-        </div>
-      </div>
+      <select class="toolbar-select" disabled><option>Month</option></select>
+      <select class="toolbar-select" disabled><option>By Project</option></select>
+      <select class="toolbar-select" disabled><option>All Projects</option></select>
       <div class="toolbar-separator"></div>
-      <div class="toolbar-group">
-        <div class="filter-toggle">
-          <select disabled><option>Me</option></select>
-          <select disabled><option>Open</option></select>
-        </div>
-      </div>
+      <select class="toolbar-select" disabled><option>My issues</option></select>
+      <select class="toolbar-select" disabled><option>Open</option></select>
+      <select class="toolbar-select" disabled><option>All health</option></select>
       <div class="toolbar-separator"></div>
-      <div class="toolbar-group">
-        <button class="icon-btn">
-          <svg viewBox="0 0 16 16"><path d="M8 1a3 3 0 0 0-3 3v2.5a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/></svg>
-          Heatmap
-        </button>
-        <button class="icon-btn">
-          <svg viewBox="0 0 16 16"><circle cx="3.5" cy="3.5" r="1.5"/><circle cx="10" cy="3.5" r="1.5"/></svg>
-          Relations
-        </button>
-        <button class="icon-btn">
-          <svg viewBox="0 0 16 16"><path d="M2 14v-3h1v2h2v1H2z"/></svg>
-          Intensity
-        </button>
-      </div>
+      <button class="toggle-btn text-btn" disabled>⤤</button>
+      <button class="toggle-btn text-btn" disabled>▦</button>
+      <button class="toggle-btn text-btn" disabled>▤</button>
       <div class="toolbar-separator"></div>
-      <div class="toolbar-group">
-        <button class="icon-btn">
-          <svg viewBox="0 0 16 16"><path d="M13.451 5.609l-.579-.939-1.068.812-.076.094z"/></svg>
-          Refresh
-        </button>
-        <button class="icon-btn">
-          <svg viewBox="0 0 16 16"><path d="M14 2H2v12h12V2z"/></svg>
-          Today
-        </button>
-      </div>
+      <button class="toggle-btn text-btn" disabled>↻</button>
+      <button class="toggle-btn text-btn" disabled>◉</button>
+      <button class="toggle-btn text-btn" disabled>↶</button>
+      <button class="toggle-btn text-btn" disabled>↷</button>
+      <button class="toggle-btn text-btn" disabled>⊞</button>
+      <button class="toggle-btn text-btn" disabled>⊟</button>
+      <div class="toolbar-separator"></div>
+      <button class="toggle-btn text-btn" disabled>?</button>
     </div>
   </div>
   <div class="gantt-container">
@@ -3310,77 +3282,6 @@ ${style.tip}
     .toolbar-select:focus {
       outline: 1px solid var(--vscode-focusBorder);
       outline-offset: -1px;
-    }
-    .view-mode-toggle {
-      display: flex;
-      border: 1px solid var(--vscode-panel-border);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .view-mode-toggle button {
-      background: var(--vscode-button-secondaryBackground);
-      color: var(--vscode-button-secondaryForeground);
-      border: none;
-      border-right: 1px solid var(--vscode-panel-border);
-      padding: 4px 8px;
-      cursor: pointer;
-      font-size: 11px;
-    }
-    .view-mode-toggle button:last-child {
-      border-right: none;
-    }
-    .view-mode-toggle button:hover:not(.active) {
-      background: var(--vscode-button-secondaryHoverBackground);
-    }
-    .view-mode-toggle button:focus-visible {
-      outline: 2px solid var(--vscode-focusBorder);
-      outline-offset: -1px;
-      z-index: 1;
-    }
-    .view-mode-toggle button.active {
-      background: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
-    }
-    .filter-toggle {
-      display: flex;
-      border: 1px solid var(--vscode-panel-border);
-      border-radius: 2px;
-      overflow: hidden;
-      margin-left: 4px;
-    }
-    .filter-toggle select {
-      background: var(--vscode-dropdown-background);
-      color: var(--vscode-dropdown-foreground);
-      border: none;
-      border-right: 1px solid var(--vscode-panel-border);
-      padding: 4px 8px;
-      cursor: pointer;
-      font-size: 11px;
-      outline: none;
-    }
-    .filter-toggle select:last-child {
-      border-right: none;
-    }
-    .filter-toggle select:hover {
-      background: var(--vscode-dropdown-listBackground);
-    }
-    .filter-toggle select:focus {
-      outline: 1px solid var(--vscode-focusBorder);
-      outline-offset: -1px;
-    }
-    /* Toolbar groups with separators */
-    .toolbar-group {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      flex-shrink: 0;
-    }
-    .toolbar-separator {
-      width: 1px;
-      height: 20px;
-      background: var(--vscode-panel-border);
-      margin: 0 8px;
-      flex-shrink: 0;
     }
     /* Legend row (below toolbar) - Aesthetic-Usability: smooth transitions */
     .legend-row {
