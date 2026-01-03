@@ -3376,7 +3376,54 @@ ${style.tip}
     }
     .toggle-btn svg { width: 14px; height: 14px; fill: currentColor; }
     .toggle-btn.text-btn { font-weight: 600; font-size: 13px; min-width: 20px; }
-    /* Help dropdown (hover) */
+    /* Dropdown menus (help, overflow) */
+    .toolbar-dropdown { position: relative; }
+    .toolbar-dropdown-menu {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 100%;
+      margin-top: 4px;
+      background: var(--vscode-editorWidget-background);
+      border: 1px solid var(--vscode-editorWidget-border);
+      border-radius: 4px;
+      padding: 4px 0;
+      box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+      z-index: 1000;
+      min-width: 140px;
+    }
+    .toolbar-dropdown:hover .toolbar-dropdown-menu { display: block; }
+    .toolbar-dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--vscode-foreground);
+      white-space: nowrap;
+    }
+    .toolbar-dropdown-item:hover { background: var(--vscode-list-hoverBackground); }
+    .toolbar-dropdown-item.active { background: var(--vscode-list-activeSelectionBackground); }
+    .toolbar-dropdown-item:disabled, .toolbar-dropdown-item[disabled] {
+      opacity: 0.5;
+      cursor: default;
+    }
+    .toolbar-dropdown-item:disabled:hover, .toolbar-dropdown-item[disabled]:hover {
+      background: transparent;
+    }
+    .toolbar-dropdown-divider {
+      height: 1px;
+      background: var(--vscode-panel-border);
+      margin: 4px 0;
+    }
+    .toolbar-dropdown-item .icon { width: 16px; text-align: center; }
+    .toolbar-dropdown-item .shortcut {
+      margin-left: auto;
+      opacity: 0.6;
+      font-size: 11px;
+    }
+    /* Help tooltip (special styling) */
     .help-dropdown { position: relative; }
     .help-tooltip {
       display: none;
@@ -3971,25 +4018,58 @@ ${style.tip}
         <option value="closed"${this._currentFilter.status === "closed" ? " selected" : ""}>Closed</option>
         <option value="any"${this._currentFilter.status === "any" ? " selected" : ""}>Any status</option>
       </select>
-      <select id="filterHealth" class="toolbar-select" title="Filter by health (F)">
-        <option value="all"${this._healthFilter === "all" ? " selected" : ""}>All health</option>
-        <option value="critical"${this._healthFilter === "critical" ? " selected" : ""}>Critical (${criticalCount})</option>
-        <option value="warning"${this._healthFilter === "warning" ? " selected" : ""}>Warning (${warningCount})</option>
-        <option value="healthy"${this._healthFilter === "healthy" ? " selected" : ""}>Healthy (${healthyCount})</option>
-      </select>
-      <div class="toolbar-separator"></div>
-      <!-- Toggle buttons -->
-      <button id="depsBtn" class="toggle-btn text-btn${this._showDependencies ? " active" : ""}" title="Relations (D)">⤤</button>
-      <button id="heatmapBtn" class="toggle-btn text-btn${this._showWorkloadHeatmap && this._viewFocus === "person" ? " active" : ""}" title="Heatmap (H)"${this._viewFocus !== "person" ? " disabled" : ""}>▦</button>
-      <button id="capacityBtn" class="toggle-btn text-btn${this._showCapacityRibbon && this._viewFocus === "person" ? " active" : ""}" title="Capacity (Y)"${this._viewFocus !== "person" ? " disabled" : ""}>▤</button>
-      <div class="toolbar-separator"></div>
-      <!-- Actions -->
+      <!-- Primary actions -->
       <button id="refreshBtn" class="toggle-btn text-btn" title="Refresh (R)">↻</button>
       <button id="todayBtn" class="toggle-btn text-btn" title="Today (T)">◉</button>
-      <button id="undoBtn" class="toggle-btn text-btn" disabled title="Undo (Ctrl+Z)">↩</button>
-      <button id="redoBtn" class="toggle-btn text-btn" disabled title="Redo (Ctrl+Y)">↪</button>
-      <button id="expandAllBtn" class="toggle-btn text-btn" title="Expand all (E)">+</button>
-      <button id="collapseAllBtn" class="toggle-btn text-btn" title="Collapse all (C)">−</button>
+      <!-- Overflow menu -->
+      <div class="toolbar-dropdown">
+        <button class="toggle-btn text-btn" title="More options">⋮</button>
+        <div class="toolbar-dropdown-menu">
+          <div class="toolbar-dropdown-item" id="menuFilterHealth">
+            <span class="icon">🏥</span>
+            <span>Health: ${this._healthFilter === "all" ? "All" : this._healthFilter}</span>
+            <span class="shortcut">F</span>
+          </div>
+          <div class="toolbar-dropdown-divider"></div>
+          <div class="toolbar-dropdown-item${this._showDependencies ? " active" : ""}" id="menuDeps">
+            <span class="icon">⤤</span>
+            <span>Relations</span>
+            <span class="shortcut">D</span>
+          </div>
+          <div class="toolbar-dropdown-item${this._showWorkloadHeatmap && this._viewFocus === "person" ? " active" : ""}" id="menuHeatmap"${this._viewFocus !== "person" ? " disabled" : ""}>
+            <span class="icon">▦</span>
+            <span>Heatmap</span>
+            <span class="shortcut">H</span>
+          </div>
+          <div class="toolbar-dropdown-item${this._showCapacityRibbon && this._viewFocus === "person" ? " active" : ""}" id="menuCapacity"${this._viewFocus !== "person" ? " disabled" : ""}>
+            <span class="icon">▤</span>
+            <span>Capacity</span>
+            <span class="shortcut">Y</span>
+          </div>
+          <div class="toolbar-dropdown-divider"></div>
+          <div class="toolbar-dropdown-item" id="menuUndo" disabled>
+            <span class="icon">↩</span>
+            <span>Undo</span>
+            <span class="shortcut">⌘Z</span>
+          </div>
+          <div class="toolbar-dropdown-item" id="menuRedo" disabled>
+            <span class="icon">↪</span>
+            <span>Redo</span>
+            <span class="shortcut">⌘Y</span>
+          </div>
+          <div class="toolbar-dropdown-divider"></div>
+          <div class="toolbar-dropdown-item" id="menuExpand">
+            <span class="icon">+</span>
+            <span>Expand all</span>
+            <span class="shortcut">E</span>
+          </div>
+          <div class="toolbar-dropdown-item" id="menuCollapse">
+            <span class="icon">−</span>
+            <span>Collapse all</span>
+            <span class="shortcut">C</span>
+          </div>
+        </div>
+      </div>
       <div class="toolbar-separator"></div>
       <div class="help-dropdown">
         <button class="toggle-btn text-btn" title="Help">?</button>
@@ -4198,8 +4278,8 @@ ${style.tip}
     const ganttLeftHeader = document.getElementById('ganttLeftHeader');
     const labelsColumn = document.getElementById('ganttLabels');
     const timelineColumn = document.getElementById('ganttTimeline');
-    const undoBtn = document.getElementById('undoBtn');
-    const redoBtn = document.getElementById('redoBtn');
+    const menuUndo = document.getElementById('menuUndo');
+    const menuRedo = document.getElementById('menuRedo');
     const minimapSvg = document.getElementById('minimapSvg');
     const minimapViewport = document.getElementById('minimapViewport');
     const minimapContainer = document.getElementById('minimapContainer');
@@ -4348,8 +4428,8 @@ ${style.tip}
     const saveStateForZoom = saveState;
 
     function updateUndoRedoButtons() {
-      undoBtn.disabled = undoStack.length === 0;
-      redoBtn.disabled = redoStack.length === 0;
+      if (menuUndo) menuUndo.toggleAttribute('disabled', undoStack.length === 0);
+      if (menuRedo) menuRedo.toggleAttribute('disabled', redoStack.length === 0);
       saveState();
     }
 
@@ -4380,38 +4460,38 @@ ${style.tip}
       if (message.command === 'setHeatmapState') {
         const heatmapLayer = document.querySelector('.heatmap-layer');
         const weekendLayer = document.querySelector('.weekend-layer');
-        const heatmapBtn = document.getElementById('heatmapBtn');
+        const menuHeatmap = document.getElementById('menuHeatmap');
 
         if (message.enabled) {
           if (heatmapLayer) heatmapLayer.classList.remove('hidden');
           if (weekendLayer) weekendLayer.classList.add('hidden');
-          if (heatmapBtn) heatmapBtn.classList.add('active');
+          if (menuHeatmap) menuHeatmap.classList.add('active');
         } else {
           if (heatmapLayer) heatmapLayer.classList.add('hidden');
           if (weekendLayer) weekendLayer.classList.remove('hidden');
-          if (heatmapBtn) heatmapBtn.classList.remove('active');
+          if (menuHeatmap) menuHeatmap.classList.remove('active');
         }
       } else if (message.command === 'setDependenciesState') {
         const dependencyLayer = document.querySelector('.dependency-layer');
-        const depsBtn = document.getElementById('depsBtn');
+        const menuDeps = document.getElementById('menuDeps');
 
         if (message.enabled) {
           if (dependencyLayer) dependencyLayer.classList.remove('hidden');
-          if (depsBtn) depsBtn.classList.add('active');
+          if (menuDeps) menuDeps.classList.add('active');
         } else {
           if (dependencyLayer) dependencyLayer.classList.add('hidden');
-          if (depsBtn) depsBtn.classList.remove('active');
+          if (menuDeps) menuDeps.classList.remove('active');
         }
       } else if (message.command === 'setCapacityRibbonState') {
         const capacityRibbon = document.querySelector('.capacity-ribbon');
-        const capacityBtn = document.getElementById('capacityBtn');
+        const menuCapacity = document.getElementById('menuCapacity');
 
         if (message.enabled) {
           if (capacityRibbon) capacityRibbon.classList.remove('hidden');
-          if (capacityBtn) capacityBtn.classList.add('active');
+          if (menuCapacity) menuCapacity.classList.add('active');
         } else {
           if (capacityRibbon) capacityRibbon.classList.add('hidden');
-          if (capacityBtn) capacityBtn.classList.remove('active');
+          if (menuCapacity) menuCapacity.classList.remove('active');
         }
       } else if (message.command === 'pushUndoAction') {
         // Push relation action to undo stack
@@ -4493,8 +4573,13 @@ ${style.tip}
       const value = e.target.value;
       vscode.postMessage({ command: 'setFilter', filter: { status: value } });
     });
-    document.getElementById('filterHealth')?.addEventListener('change', (e) => {
-      vscode.postMessage({ command: 'setHealthFilter', health: e.target.value });
+    // Health filter menu item (cycles through options)
+    document.getElementById('menuFilterHealth')?.addEventListener('click', () => {
+      const options = ['all', 'critical', 'warning', 'healthy'];
+      const currentHealth = '${this._healthFilter}';
+      const currentIdx = options.indexOf(currentHealth);
+      const nextIdx = (currentIdx + 1) % options.length;
+      vscode.postMessage({ command: 'setHealthFilter', health: options[nextIdx] });
     });
 
     // Sortable column header handlers (cycle: asc → desc → none)
@@ -4518,14 +4603,16 @@ ${style.tip}
       });
     });
 
-    // Heatmap toggle handler
-    document.getElementById('heatmapBtn')?.addEventListener('click', () => {
+    // Heatmap toggle handler (menu item)
+    document.getElementById('menuHeatmap')?.addEventListener('click', () => {
+      if (document.getElementById('menuHeatmap')?.hasAttribute('disabled')) return;
       saveState();
       vscode.postMessage({ command: 'toggleWorkloadHeatmap' });
     });
 
-    // Capacity ribbon toggle handler
-    document.getElementById('capacityBtn')?.addEventListener('click', () => {
+    // Capacity ribbon toggle handler (menu item)
+    document.getElementById('menuCapacity')?.addEventListener('click', () => {
+      if (document.getElementById('menuCapacity')?.hasAttribute('disabled')) return;
       saveState();
       vscode.postMessage({ command: 'toggleCapacityRibbon' });
     });
@@ -4552,8 +4639,8 @@ ${style.tip}
       });
     });
 
-    // Dependencies toggle handler
-    document.getElementById('depsBtn')?.addEventListener('click', () => {
+    // Dependencies toggle handler (menu item)
+    document.getElementById('menuDeps')?.addEventListener('click', () => {
       saveState();
       vscode.postMessage({ command: 'toggleDependencies' });
     });
@@ -5510,15 +5597,15 @@ ${style.tip}
       });
     });
 
-    // Expand/collapse all buttons
-    document.getElementById('expandAllBtn')?.addEventListener('click', () => {
+    // Expand/collapse all menu items
+    document.getElementById('menuExpand')?.addEventListener('click', () => {
       // Use pre-computed list of ALL expandable keys (not just visible DOM elements)
       const ganttScroll = document.getElementById('ganttScroll');
       const allKeys = ganttScroll?.dataset.allExpandableKeys;
       const keys = allKeys ? JSON.parse(allKeys) : [];
       vscode.postMessage({ command: 'expandAll', keys });
     });
-    document.getElementById('collapseAllBtn')?.addEventListener('click', () => {
+    document.getElementById('menuCollapse')?.addEventListener('click', () => {
       vscode.postMessage({ command: 'collapseAll' });
     });
 
@@ -5856,8 +5943,9 @@ ${style.tip}
       }
     });
 
-    // Undo button
-    undoBtn.addEventListener('click', () => {
+    // Undo menu item
+    menuUndo?.addEventListener('click', () => {
+      if (menuUndo.hasAttribute('disabled')) return;
       if (undoStack.length === 0) return;
       const action = undoStack.pop();
       redoStack.push(action);
@@ -5905,8 +5993,9 @@ ${style.tip}
       }
     });
 
-    // Redo button
-    redoBtn.addEventListener('click', () => {
+    // Redo menu item
+    menuRedo?.addEventListener('click', () => {
+      if (menuRedo.hasAttribute('disabled')) return;
       if (redoStack.length === 0) return;
       const action = redoStack.pop();
       undoStack.push(action);
@@ -5977,10 +6066,10 @@ ${style.tip}
         zoomSelect.value = levels[parseInt(e.key) - 1];
         zoomSelect.dispatchEvent(new Event('change'));
       }
-      // Toggle shortcuts
-      else if (e.key.toLowerCase() === 'h') { document.getElementById('heatmapBtn')?.click(); }
-      else if (e.key.toLowerCase() === 'y') { document.getElementById('capacityBtn')?.click(); }
-      else if (e.key.toLowerCase() === 'd') { document.getElementById('depsBtn')?.click(); }
+      // Toggle shortcuts (trigger menu items)
+      else if (e.key.toLowerCase() === 'h') { document.getElementById('menuHeatmap')?.click(); }
+      else if (e.key.toLowerCase() === 'y') { document.getElementById('menuCapacity')?.click(); }
+      else if (e.key.toLowerCase() === 'd') { document.getElementById('menuDeps')?.click(); }
       else if (e.key.toLowerCase() === 'v') {
         // Toggle view focus between Project and Person
         const viewSelect = document.getElementById('viewFocusSelect');
@@ -5990,18 +6079,12 @@ ${style.tip}
       // Action shortcuts
       else if (e.key.toLowerCase() === 'r') { document.getElementById('refreshBtn')?.click(); }
       else if (e.key.toLowerCase() === 't') { document.getElementById('todayBtn')?.click(); }
-      else if (e.key.toLowerCase() === 'e') { document.getElementById('expandAllBtn')?.click(); }
-      else if (e.key.toLowerCase() === 'c' && !modKey) { document.getElementById('collapseAllBtn')?.click(); }
+      else if (e.key.toLowerCase() === 'e') { document.getElementById('menuExpand')?.click(); }
+      else if (e.key.toLowerCase() === 'c' && !modKey) { document.getElementById('menuCollapse')?.click(); }
       // Health filter shortcut (F cycles through health filters, skip if Ctrl/Cmd held)
       else if (e.key.toLowerCase() === 'f' && !modKey) {
         e.preventDefault();
-        const healthSelect = document.getElementById('filterHealth');
-        const options = ['all', 'critical', 'warning', 'healthy'];
-        const currentIdx = options.indexOf(healthSelect.value);
-        const nextIdx = (currentIdx + 1) % options.length;
-        healthSelect.value = options[nextIdx];
-        vscode.postMessage({ command: 'setHealthFilter', health: options[nextIdx] });
-        announce('Health filter: ' + (options[nextIdx] === 'all' ? 'All' : options[nextIdx]));
+        document.getElementById('menuFilterHealth')?.click();
       }
       // Jump to next blocked issue (B)
       else if (e.key.toLowerCase() === 'b') {
