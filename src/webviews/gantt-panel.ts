@@ -4069,6 +4069,7 @@ ${style.tip}
       <!-- Context selector -->
       ${this._viewFocus === "project" ? `
       <select id="projectSelector" class="toolbar-select" title="Select project">
+        <option value=""${this._selectedProjectId === null ? " selected" : ""}>All Projects</option>
         ${(() => {
           const childrenMap = new Map<number, typeof this._projects>();
           for (const p of this._projects) {
@@ -4137,10 +4138,10 @@ ${style.tip}
       <button id="redoBtn" class="toggle-btn" disabled title="Redo (Ctrl+Y)">
         <svg viewBox="0 0 16 16"><path d="M13 8.5l-4-4v3H4a3 3 0 0 0 0 6h4v-1H4a2 2 0 0 1 0-4h5v3l4-4z"/></svg>
       </button>
-      <button id="expandAllBtn" class="toggle-btn" title="Expand all">
+      <button id="expandAllBtn" class="toggle-btn" title="Expand all (E)">
         <svg viewBox="0 0 16 16"><path d="M11 10H5.344L8 12.656 10.656 10H11zm-6 1h6v1H5v-1zM8 3L5.344 6H10.656L8 3zm0 1.344L9.313 6H6.688L8 4.344z"/></svg>
       </button>
-      <button id="collapseAllBtn" class="toggle-btn" title="Collapse all">
+      <button id="collapseAllBtn" class="toggle-btn" title="Collapse all (C)">
         <svg viewBox="0 0 16 16"><path d="M11 6H5.344L8 3.344 10.656 6H11zm-6-1h6V4H5v1zm3 7l2.656-3H5.344L8 12zm0-1.344L6.688 9h2.625L8 10.656z"/></svg>
       </button>
       <div class="toolbar-separator"></div>
@@ -4164,8 +4165,11 @@ ${style.tip}
             <span class="help-item"><kbd>F</kbd> Filter</span>
             <span class="help-item"><kbd>D</kbd> Relations</span>
             <span class="help-item"><kbd>H</kbd> Heatmap</span>
+            <span class="help-item"><kbd>Y</kbd> Capacity</span>
             <span class="help-item"><kbd>R</kbd> Refresh</span>
             <span class="help-item"><kbd>T</kbd> Today</span>
+            <span class="help-item"><kbd>E</kbd> Expand</span>
+            <span class="help-item"><kbd>C</kbd> Collapse</span>
             <span class="help-item"><kbd>B</kbd> Blocked</span>
           </div>
         </div>
@@ -4182,9 +4186,9 @@ ${style.tip}
       <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-red"></span>&gt;120%</span>
     </div>
     <div id="capacityLegend" class="capacity-legend${this._viewFocus === "person" && this._showCapacityRibbon ? "" : " hidden"}" title="Daily workload capacity">
-      <span class="capacity-legend-item"><span class="capacity-legend-color capacity-available"></span>&lt;80% available</span>
-      <span class="capacity-legend-item"><span class="capacity-legend-color capacity-busy"></span>80-100% busy</span>
-      <span class="capacity-legend-item"><span class="capacity-legend-color capacity-overloaded"></span>&gt;100% overloaded</span>
+      <span class="capacity-legend-item"><span class="capacity-legend-color capacity-available"></span>&lt;80%</span>
+      <span class="capacity-legend-item"><span class="capacity-legend-color capacity-busy"></span>80-100%</span>
+      <span class="capacity-legend-item"><span class="capacity-legend-color capacity-overloaded"></span>&gt;100%</span>
     </div>
     <div id="relationLegend" class="relation-legend${this._showDependencies ? "" : " hidden"}" title="Relation types (drag from link handle to create)">
       ${this._visibleRelationTypes.has("blocks") ? '<span class="relation-legend-item"><span class="relation-legend-line rel-line-blocks"></span>blocks</span>' : ""}
@@ -4665,10 +4669,8 @@ ${style.tip}
     const projectSelector = document.getElementById('projectSelector');
     projectSelector?.addEventListener('change', (e) => {
       const value = e.target.value;
-      const projectId = parseInt(value, 10);
-      if (!isNaN(projectId)) {
-        vscode.postMessage({ command: 'setSelectedProject', projectId });
-      }
+      const projectId = value ? parseInt(value, 10) : null;
+      vscode.postMessage({ command: 'setSelectedProject', projectId });
     });
 
     // Person selector handler (focusSelector in person focus mode)
@@ -6201,6 +6203,8 @@ ${style.tip}
       // Action shortcuts
       else if (e.key.toLowerCase() === 'r') { document.getElementById('refreshBtn')?.click(); }
       else if (e.key.toLowerCase() === 't') { document.getElementById('todayBtn')?.click(); }
+      else if (e.key.toLowerCase() === 'e') { document.getElementById('expandAllBtn')?.click(); }
+      else if (e.key.toLowerCase() === 'c' && !modKey) { document.getElementById('collapseAllBtn')?.click(); }
       // Health filter shortcut (F cycles through health filters, skip if Ctrl/Cmd held)
       else if (e.key.toLowerCase() === 'f' && !modKey) {
         e.preventDefault();
