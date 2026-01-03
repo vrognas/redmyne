@@ -1911,13 +1911,26 @@ export class GanttPanel {
         ? this._issues.filter(i => i.assigned_to?.name === effectiveAssignee)
         : this._issues;
     } else {
-      // Project view: filter by project (default to first available)
+      // Project view: filter by project and all subprojects
       const effectiveProjectId = this._selectedProjectId ?? this._projects[0]?.id ?? null;
       if (effectiveProjectId && effectiveProjectId !== this._selectedProjectId) {
         this._selectedProjectId = effectiveProjectId;
       }
-      filteredIssues = effectiveProjectId !== null
-        ? this._issues.filter(i => i.project?.id === effectiveProjectId)
+      // Build set of project IDs including all descendants
+      const projectIdsToInclude = new Set<number>();
+      if (effectiveProjectId !== null) {
+        const addDescendants = (pid: number) => {
+          projectIdsToInclude.add(pid);
+          for (const p of this._projects) {
+            if (p.parent?.id === pid) {
+              addDescendants(p.id);
+            }
+          }
+        };
+        addDescendants(effectiveProjectId);
+      }
+      filteredIssues = projectIdsToInclude.size > 0
+        ? this._issues.filter(i => i.project?.id !== undefined && projectIdsToInclude.has(i.project.id))
         : this._issues;
     }
 
@@ -1951,9 +1964,16 @@ export class GanttPanel {
         // Person view: group by project, flat issues
         this._cachedHierarchy = buildResourceHierarchy(sortedIssues, this._flexibilityCache, this._selectedAssignee ?? "");
       } else {
-        // Project view: single project tree with parent/child issues
-        const selectedProject = this._projects.find(p => p.id === this._selectedProjectId);
-        const projectsForHierarchy = selectedProject ? [selectedProject] : [];
+        // Project view: selected project and all subprojects
+        const projectsForHierarchy = this._projects.filter(p => {
+          // Include selected project and all its descendants
+          let current: typeof p | undefined = p;
+          while (current) {
+            if (current.id === this._selectedProjectId) return true;
+            current = this._projects.find(pp => pp.id === current?.parent?.id);
+          }
+          return false;
+        });
         this._cachedHierarchy = buildProjectHierarchy(sortedIssues, this._flexibilityCache, projectsForHierarchy, true, blockedIds);
       }
     }
@@ -4298,9 +4318,34 @@ ${style.tip}
         </div>
         ${this._viewFocus === "project" ? `
         <select id="focusSelector" class="toolbar-select" title="Select project">
-          ${this._projects.map(p =>
-            `<option value="${p.id}"${this._selectedProjectId === p.id ? " selected" : ""}>${escapeHtml(p.name)}</option>`
-          ).join("")}
+          ${(() => {
+            // Build hierarchical project options with indentation
+            const issueCountByProject = new Map<number, number>();
+            for (const issue of this._issues) {
+              if (issue.project?.id) {
+                issueCountByProject.set(issue.project.id, (issueCountByProject.get(issue.project.id) ?? 0) + 1);
+              }
+            }
+            const childrenMap = new Map<number, typeof this._projects>();
+            for (const p of this._projects) {
+              if (p.parent?.id) {
+                if (!childrenMap.has(p.parent.id)) childrenMap.set(p.parent.id, []);
+                childrenMap.get(p.parent.id)!.push(p);
+              }
+            }
+            const renderProject = (p: typeof this._projects[0], depth: number): string => {
+              const indent = "\u00A0\u00A0".repeat(depth) + (depth > 0 ? "└ " : "");
+              const count = issueCountByProject.get(p.id) ?? 0;
+              const children = (childrenMap.get(p.id) ?? []).sort((a, b) => a.name.localeCompare(b.name));
+              const childrenHtml = children.map(c => renderProject(c, depth + 1)).join("");
+              return `<option value="${p.id}"${this._selectedProjectId === p.id ? " selected" : ""}>${indent}${escapeHtml(p.name)} (${count})</option>${childrenHtml}`;
+            };
+            return this._projects
+              .filter(p => !p.parent)
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map(p => renderProject(p, 0))
+              .join("");
+          })()}
         </select>` : `
         <select id="focusSelector" class="toolbar-select" title="Select person">
           ${this._uniqueAssignees.map(name => {
