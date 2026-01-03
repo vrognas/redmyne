@@ -600,7 +600,7 @@ export class GanttPanel {
     const barHeight = 30;
     const barGap = 10;
     const rowCount = 10;
-    const checkboxColumnWidth = 32;
+    const checkboxColumnWidth = 0; // Removed: now viewing one project/person at a time
     const idColumnWidth = 55;
     const startDateColumnWidth = 85;
     const statusColumnWidth = 90;
@@ -814,10 +814,7 @@ export class GanttPanel {
       background: var(--vscode-editor-background);
     }
     .gantt-checkbox-header {
-      flex-shrink: 0;
-      width: ${checkboxColumnWidth}px;
-      border-right: 1px solid var(--vscode-panel-border);
-      box-sizing: border-box;
+      display: none; /* Removed: now viewing one project/person at a time */
     }
     .gantt-left-header {
       flex-shrink: 0;
@@ -867,11 +864,7 @@ export class GanttPanel {
       overflow: hidden;
     }
     .gantt-checkboxes {
-      flex-shrink: 0;
-      width: ${checkboxColumnWidth}px;
-      background: var(--vscode-editor-background);
-      border-right: 1px solid var(--vscode-panel-border);
-      box-sizing: border-box;
+      display: none; /* Removed: now viewing one project/person at a time */
     }
     .gantt-labels {
       flex-shrink: 0;
@@ -2153,7 +2146,7 @@ export class GanttPanel {
     // Checkbox column - shows checkboxes for ALL visible projects
     // Checked = bars visible, Unchecked = project moved to bottom, bars hidden
     // Checkboxes align 1:1 with project rows in the labels column
-    const checkboxColumnWidth = 32;
+    const checkboxColumnWidth = 0; // Removed: now viewing one project/person at a time
     const checkboxSize = 14;
 
     // Only visible projects get checkboxes (aligned with their label row)
@@ -3749,19 +3742,9 @@ ${style.tip}
     .gantt-corner {
       z-index: 25; /* Above both sticky header and sticky left */
     }
-    .gantt-checkbox-header {
-      flex-shrink: 0;
-      width: ${checkboxColumnWidth}px;
-      border-right: 1px solid var(--vscode-panel-border);
-      box-sizing: border-box;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
+    .gantt-checkbox-header, .select-all-checkbox {
+      display: none; /* Removed: now viewing one project/person at a time */
     }
-    .gantt-checkbox-header svg { display: block; max-width: 100%; }
-    .select-all-checkbox { cursor: pointer; }
-    .select-all-checkbox:hover rect { stroke: var(--vscode-focusBorder); }
     .gantt-left-header {
       flex-shrink: 0;
       width: ${labelWidth}px;
@@ -3791,15 +3774,8 @@ ${style.tip}
       bottom: 0;
     }
     .gantt-timeline-header { flex-shrink: 0; background: var(--vscode-editor-background); }
-    .gantt-checkboxes {
-      flex-shrink: 0;
-      width: ${checkboxColumnWidth}px;
-      border-right: 1px solid var(--vscode-panel-border);
-      box-sizing: border-box;
-    }
-    .gantt-checkboxes svg { display: block; width: 100%; }
+    .gantt-checkboxes, .project-checkbox { display: none; /* Removed */ }
     .gantt-labels svg { display: block; min-width: 100%; }
-    .project-checkbox:hover rect { stroke: var(--vscode-focusBorder); }
     .gantt-labels {
       flex-shrink: 0;
       width: ${labelWidth}px;
