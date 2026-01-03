@@ -3387,14 +3387,16 @@ ${style.tip}
       position: absolute;
       right: 0;
       top: 100%;
-      margin-top: 4px;
+      z-index: 1000;
+      min-width: 140px;
+      padding-top: 4px;
+    }
+    .toolbar-dropdown-menu-inner {
       background: var(--vscode-editorWidget-background);
       border: 1px solid var(--vscode-editorWidget-border);
       border-radius: 4px;
       padding: 4px 0;
       box-shadow: 0 2px 8px var(--vscode-widget-shadow);
-      z-index: 1000;
-      min-width: 140px;
     }
     .toolbar-dropdown:hover .toolbar-dropdown-menu { display: block; }
     .toolbar-dropdown-item {
@@ -3434,13 +3436,15 @@ ${style.tip}
       position: absolute;
       right: 0;
       top: 100%;
-      margin-top: 4px;
+      padding-top: 4px;
+      z-index: 1000;
+    }
+    .help-tooltip-inner {
       background: var(--vscode-editorWidget-background);
       border: 1px solid var(--vscode-editorWidget-border);
       border-radius: 4px;
       padding: 8px 12px;
       box-shadow: 0 2px 8px var(--vscode-widget-shadow);
-      z-index: 1000;
       white-space: nowrap;
     }
     .help-dropdown:hover .help-tooltip { display: block; }
@@ -4029,48 +4033,50 @@ ${style.tip}
       <div class="toolbar-dropdown">
         <button class="toggle-btn text-btn" title="More options">⋮</button>
         <div class="toolbar-dropdown-menu">
-          <div class="toolbar-dropdown-item" id="menuFilterHealth">
-            <span class="icon">🏥</span>
-            <span>Health: ${this._healthFilter === "all" ? "All" : this._healthFilter}</span>
-            <span class="shortcut">F</span>
-          </div>
-          <div class="toolbar-dropdown-divider"></div>
-          <div class="toolbar-dropdown-item${this._showDependencies ? " active" : ""}" id="menuDeps">
-            <span class="icon">⤤</span>
-            <span>Relations</span>
-            <span class="shortcut">D</span>
-          </div>
-          <div class="toolbar-dropdown-item${this._showWorkloadHeatmap && this._viewFocus === "person" ? " active" : ""}" id="menuHeatmap"${this._viewFocus !== "person" ? " disabled" : ""}>
-            <span class="icon">▦</span>
-            <span>Heatmap</span>
-            <span class="shortcut">H</span>
-          </div>
-          <div class="toolbar-dropdown-item${this._showCapacityRibbon && this._viewFocus === "person" ? " active" : ""}" id="menuCapacity"${this._viewFocus !== "person" ? " disabled" : ""}>
-            <span class="icon">▤</span>
-            <span>Capacity</span>
-            <span class="shortcut">Y</span>
-          </div>
-          <div class="toolbar-dropdown-divider"></div>
-          <div class="toolbar-dropdown-item" id="menuUndo" disabled>
-            <span class="icon">↩</span>
-            <span>Undo</span>
-            <span class="shortcut">⌘Z</span>
-          </div>
-          <div class="toolbar-dropdown-item" id="menuRedo" disabled>
-            <span class="icon">↪</span>
-            <span>Redo</span>
-            <span class="shortcut">⌘Y</span>
-          </div>
-          <div class="toolbar-dropdown-divider"></div>
-          <div class="toolbar-dropdown-item" id="menuExpand">
-            <span class="icon">+</span>
-            <span>Expand all</span>
-            <span class="shortcut">E</span>
-          </div>
-          <div class="toolbar-dropdown-item" id="menuCollapse">
-            <span class="icon">−</span>
-            <span>Collapse all</span>
-            <span class="shortcut">C</span>
+          <div class="toolbar-dropdown-menu-inner">
+            <div class="toolbar-dropdown-item" id="menuFilterHealth">
+              <span class="icon">🏥</span>
+              <span>Health: ${this._healthFilter === "all" ? "All" : this._healthFilter}</span>
+              <span class="shortcut">F</span>
+            </div>
+            <div class="toolbar-dropdown-divider"></div>
+            <div class="toolbar-dropdown-item${this._showDependencies ? " active" : ""}" id="menuDeps">
+              <span class="icon">⤤</span>
+              <span>Relations</span>
+              <span class="shortcut">D</span>
+            </div>
+            <div class="toolbar-dropdown-item${this._showWorkloadHeatmap && this._viewFocus === "person" ? " active" : ""}" id="menuHeatmap"${this._viewFocus !== "person" ? " disabled" : ""}>
+              <span class="icon">▦</span>
+              <span>Heatmap</span>
+              <span class="shortcut">H</span>
+            </div>
+            <div class="toolbar-dropdown-item${this._showCapacityRibbon && this._viewFocus === "person" ? " active" : ""}" id="menuCapacity"${this._viewFocus !== "person" ? " disabled" : ""}>
+              <span class="icon">▤</span>
+              <span>Capacity</span>
+              <span class="shortcut">Y</span>
+            </div>
+            <div class="toolbar-dropdown-divider"></div>
+            <div class="toolbar-dropdown-item" id="menuUndo" disabled>
+              <span class="icon">↩</span>
+              <span>Undo</span>
+              <span class="shortcut">⌘Z</span>
+            </div>
+            <div class="toolbar-dropdown-item" id="menuRedo" disabled>
+              <span class="icon">↪</span>
+              <span>Redo</span>
+              <span class="shortcut">⌘Y</span>
+            </div>
+            <div class="toolbar-dropdown-divider"></div>
+            <div class="toolbar-dropdown-item" id="menuExpand">
+              <span class="icon">+</span>
+              <span>Expand all</span>
+              <span class="shortcut">E</span>
+            </div>
+            <div class="toolbar-dropdown-item" id="menuCollapse">
+              <span class="icon">−</span>
+              <span>Collapse all</span>
+              <span class="shortcut">C</span>
+            </div>
           </div>
         </div>
       </div>
@@ -4078,35 +4084,37 @@ ${style.tip}
       <div class="help-dropdown">
         <button class="toggle-btn text-btn">?</button>
         <div class="help-tooltip">
-          <div class="help-section">
-            <div class="help-title">Bar Badges</div>
-            <span class="help-item"><span style="color:var(--vscode-charts-green)">+Nd</span> days of slack</span>
-            <span class="help-item"><span style="color:var(--vscode-charts-red)">-Nd</span> days late</span>
-            <span class="help-item">🚧N blocked by this</span>
-            <span class="help-item"><span style="color:var(--vscode-charts-red)">⛔N</span> blockers</span>
-            <span class="help-item"><span style="color:var(--vscode-charts-purple)">◆</span> milestone</span>
-          </div>
-          <div class="help-section">
-            <div class="help-title">Relations</div>
-            <span class="help-item"><span class="relation-legend-line rel-line-blocks"></span>blocks</span>
-            <span class="help-item"><span class="relation-legend-line rel-line-precedes"></span>precedes</span>
-            <span class="help-item"><span class="relation-legend-line rel-line-relates"></span>relates</span>
-            <span class="help-item"><span class="relation-legend-line rel-line-duplicates"></span>duplicates</span>
-            <span class="help-item"><span class="relation-legend-line rel-line-copied"></span>copied</span>
-          </div>
-          <div class="help-section">
-            <div class="help-title">Shortcuts</div>
-            <span class="help-item"><kbd>1-5</kbd> Zoom</span>
-            <span class="help-item"><kbd>V</kbd> View</span>
-            <span class="help-item"><kbd>F</kbd> Filter</span>
-            <span class="help-item"><kbd>D</kbd> Relations</span>
-            <span class="help-item"><kbd>H</kbd> Heatmap</span>
-            <span class="help-item"><kbd>Y</kbd> Capacity</span>
-            <span class="help-item"><kbd>R</kbd> Refresh</span>
-            <span class="help-item"><kbd>T</kbd> Today</span>
-            <span class="help-item"><kbd>E</kbd> Expand</span>
-            <span class="help-item"><kbd>C</kbd> Collapse</span>
-            <span class="help-item"><kbd>B</kbd> Blocked</span>
+          <div class="help-tooltip-inner">
+            <div class="help-section">
+              <div class="help-title">Bar Badges</div>
+              <span class="help-item"><span style="color:var(--vscode-charts-green)">+Nd</span> days of slack</span>
+              <span class="help-item"><span style="color:var(--vscode-charts-red)">-Nd</span> days late</span>
+              <span class="help-item">🚧N blocked by this</span>
+              <span class="help-item"><span style="color:var(--vscode-charts-red)">⛔N</span> blockers</span>
+              <span class="help-item"><span style="color:var(--vscode-charts-purple)">◆</span> milestone</span>
+            </div>
+            <div class="help-section">
+              <div class="help-title">Relations</div>
+              <span class="help-item"><span class="relation-legend-line rel-line-blocks"></span>blocks</span>
+              <span class="help-item"><span class="relation-legend-line rel-line-precedes"></span>precedes</span>
+              <span class="help-item"><span class="relation-legend-line rel-line-relates"></span>relates</span>
+              <span class="help-item"><span class="relation-legend-line rel-line-duplicates"></span>duplicates</span>
+              <span class="help-item"><span class="relation-legend-line rel-line-copied"></span>copied</span>
+            </div>
+            <div class="help-section">
+              <div class="help-title">Shortcuts</div>
+              <span class="help-item"><kbd>1-5</kbd> Zoom</span>
+              <span class="help-item"><kbd>V</kbd> View</span>
+              <span class="help-item"><kbd>F</kbd> Filter</span>
+              <span class="help-item"><kbd>D</kbd> Relations</span>
+              <span class="help-item"><kbd>H</kbd> Heatmap</span>
+              <span class="help-item"><kbd>Y</kbd> Capacity</span>
+              <span class="help-item"><kbd>R</kbd> Refresh</span>
+              <span class="help-item"><kbd>T</kbd> Today</span>
+              <span class="help-item"><kbd>E</kbd> Expand</span>
+              <span class="help-item"><kbd>C</kbd> Collapse</span>
+              <span class="help-item"><kbd>B</kbd> Blocked</span>
+            </div>
           </div>
         </div>
       </div>
