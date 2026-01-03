@@ -3414,66 +3414,6 @@ ${style.tip}
       background: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
     }
-    /* Cascading project menu */
-    .project-menu-container { position: relative; }
-    .project-menu-trigger {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      cursor: pointer;
-    }
-    .dropdown-chevron { font-size: 10px; opacity: 0.7; }
-    .project-menu {
-      position: absolute;
-      top: 100%;
-      left: 0;
-      min-width: 180px;
-      max-height: 400px;
-      overflow-y: auto;
-      background: var(--vscode-menu-background, var(--vscode-dropdown-background));
-      border: 1px solid var(--vscode-menu-border, var(--vscode-dropdown-border));
-      border-radius: 4px;
-      box-shadow: 0 2px 8px var(--vscode-widget-shadow);
-      z-index: 1000;
-      padding: 4px 0;
-    }
-    .project-menu.hidden { display: none; }
-    .project-menu-item {
-      position: relative;
-      display: flex;
-      align-items: center;
-      padding: 4px 8px;
-      cursor: pointer;
-      font-size: 12px;
-      color: var(--vscode-menu-foreground, var(--vscode-dropdown-foreground));
-      white-space: nowrap;
-    }
-    .project-menu-item:hover {
-      background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
-      color: var(--vscode-menu-selectionForeground, var(--vscode-list-hoverForeground));
-    }
-    .project-menu-item.selected {
-      background: var(--vscode-menu-selectionBackground, var(--vscode-list-activeSelectionBackground));
-      color: var(--vscode-menu-selectionForeground, var(--vscode-list-activeSelectionForeground));
-    }
-    .menu-item-label { flex: 1; }
-    .menu-item-count { opacity: 0.6; font-size: 11px; margin-left: 8px; }
-    .submenu-arrow { margin-left: 8px; font-size: 10px; opacity: 0.7; }
-    .project-submenu {
-      display: none;
-      position: absolute;
-      left: 100%;
-      top: -4px;
-      min-width: 180px;
-      max-height: 400px;
-      overflow-y: auto;
-      background: var(--vscode-menu-background, var(--vscode-dropdown-background));
-      border: 1px solid var(--vscode-menu-border, var(--vscode-dropdown-border));
-      border-radius: 4px;
-      box-shadow: 0 2px 8px var(--vscode-widget-shadow);
-      padding: 4px 0;
-    }
-    .project-menu-item.has-children:hover > .project-submenu { display: block; }
     .toolbar-select {
       background: var(--vscode-dropdown-background);
       color: var(--vscode-dropdown-foreground);
@@ -4381,50 +4321,38 @@ ${style.tip}
           <button id="focusPerson" class="${this._viewFocus === "person" ? "active" : ""}" title="View by person">Person</button>
         </div>
         ${this._viewFocus === "project" ? `
-        <div class="project-menu-container">
-          <button id="projectMenuTrigger" class="toolbar-select project-menu-trigger" title="Select project">
-            ${escapeHtml(this._projects.find(p => p.id === this._selectedProjectId)?.name ?? "Select...")}
-            <span class="dropdown-chevron">▾</span>
-          </button>
-          <div id="projectMenu" class="project-menu hidden">
-            ${(() => {
-              // Build cascading menu structure
-              const issueCountByProject = new Map<number, number>();
-              for (const issue of this._issues) {
-                if (issue.project?.id) {
-                  issueCountByProject.set(issue.project.id, (issueCountByProject.get(issue.project.id) ?? 0) + 1);
-                }
+        <select id="projectSelector" class="toolbar-select" title="Select project">
+          ${(() => {
+            // Build project hierarchy for optgroups
+            const childrenMap = new Map<number, typeof this._projects>();
+            for (const p of this._projects) {
+              if (p.parent?.id) {
+                if (!childrenMap.has(p.parent.id)) childrenMap.set(p.parent.id, []);
+                childrenMap.get(p.parent.id)!.push(p);
               }
-              const childrenMap = new Map<number, typeof this._projects>();
-              for (const p of this._projects) {
-                if (p.parent?.id) {
-                  if (!childrenMap.has(p.parent.id)) childrenMap.set(p.parent.id, []);
-                  childrenMap.get(p.parent.id)!.push(p);
-                }
-              }
-              const renderMenuItem = (p: typeof this._projects[0]): string => {
-                const count = issueCountByProject.get(p.id) ?? 0;
-                const children = (childrenMap.get(p.id) ?? []).sort((a, b) => a.name.localeCompare(b.name));
-                const hasChildren = children.length > 0;
-                const isSelected = p.id === this._selectedProjectId;
+            }
+            const rootProjects = this._projects.filter(p => !p.parent).sort((a, b) => a.name.localeCompare(b.name));
+
+            // Render project with children as optgroup, leaf projects as options
+            const renderProject = (p: typeof this._projects[0], indent = ""): string => {
+              const children = (childrenMap.get(p.id) ?? []).sort((a, b) => a.name.localeCompare(b.name));
+              const isSelected = p.id === this._selectedProjectId;
+              if (children.length > 0) {
+                // Parent with children: use optgroup + option for parent itself
                 return `
-                  <div class="project-menu-item${isSelected ? " selected" : ""}${hasChildren ? " has-children" : ""}" data-project-id="${p.id}">
-                    <span class="menu-item-label">${escapeHtml(p.name)}</span>
-                    <span class="menu-item-count">(${count})</span>
-                    ${hasChildren ? '<span class="submenu-arrow">▸</span>' : ""}
-                    ${hasChildren ? `<div class="project-submenu">${children.map(c => renderMenuItem(c)).join("")}</div>` : ""}
-                  </div>`;
-              };
-              // Show root projects (no parent), or all if no roots exist
-              const rootProjects = this._projects.filter(p => !p.parent);
-              const projectsToShow = rootProjects.length > 0 ? rootProjects : this._projects;
-              return projectsToShow
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map(p => renderMenuItem(p))
-                .join("");
-            })()}
-          </div>
-        </div>` : `
+                  <optgroup label="${escapeHtml(indent + p.name)}">
+                    <option value="${p.id}"${isSelected ? " selected" : ""}>${escapeHtml(p.name)} (select this)</option>
+                    ${children.map(c => renderProject(c, indent + "  ")).join("")}
+                  </optgroup>`;
+              } else {
+                // Leaf project: just an option
+                return `<option value="${p.id}"${isSelected ? " selected" : ""}>${escapeHtml(indent + p.name)}</option>`;
+              }
+            };
+
+            return rootProjects.map(p => renderProject(p)).join("");
+          })()}
+        </select>` : `
         <select id="focusSelector" class="toolbar-select" title="Select person">
           ${this._uniqueAssignees.map(name => {
             const isMe = name === this._currentUserName;
@@ -5047,40 +4975,15 @@ ${style.tip}
       vscode.postMessage({ command: 'setViewFocus', focus: 'person' });
     });
 
-    // Project cascading menu handlers
-    const projectMenuTrigger = document.getElementById('projectMenuTrigger');
-    const projectMenu = document.getElementById('projectMenu');
-
-    // Toggle menu on trigger click
-    projectMenuTrigger?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      projectMenu?.classList.toggle('hidden');
-    });
-
-    // Select project on menu item click (ignore clicks bubbling from child submenus)
-    document.querySelectorAll('.project-menu-item').forEach(item => {
-      item.addEventListener('click', (e) => {
-        e.stopPropagation();
-        // Only process if this is the closest menu-item to the click target
-        const closestItem = e.target.closest('.project-menu-item');
-        if (closestItem !== item) return; // Click was on a nested submenu item
-        const projectId = parseInt(item.dataset.projectId, 10);
-        if (isNaN(projectId)) return; // Invalid projectId protection
+    // Project selector handler (native select)
+    const projectSelector = document.getElementById('projectSelector');
+    projectSelector?.addEventListener('change', (e) => {
+      const value = e.target.value;
+      const projectId = parseInt(value, 10);
+      if (!isNaN(projectId)) {
         vscode.postMessage({ command: 'setSelectedProject', projectId });
-        projectMenu?.classList.add('hidden');
-      });
+      }
     });
-
-    // Close menu on outside click (cleanup previous handler to prevent memory leak)
-    if (window._ganttMenuCloseHandler) {
-      document.removeEventListener('click', window._ganttMenuCloseHandler);
-    }
-    window._ganttMenuCloseHandler = (e) => {
-      // Don't close if click was inside the menu or on the trigger
-      if (projectMenu?.contains(e.target) || projectMenuTrigger?.contains(e.target)) return;
-      projectMenu?.classList.add('hidden');
-    };
-    document.addEventListener('click', window._ganttMenuCloseHandler);
 
     // Person selector handler (focusSelector in person focus mode)
     const focusSelector = document.getElementById('focusSelector');
