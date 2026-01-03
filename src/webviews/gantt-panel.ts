@@ -728,14 +728,13 @@ export class GanttPanel {
       flex-shrink: 0;
     }
     .toggle-btn {
-      padding: 3px 6px;
-      border: 1px solid var(--vscode-dropdown-border);
-      background: var(--vscode-dropdown-background);
-      color: var(--vscode-dropdown-foreground);
-      border-radius: 2px;
+      padding: 4px;
+      border: none;
+      background: transparent;
+      color: var(--vscode-foreground);
+      border-radius: 4px;
       cursor: pointer;
-      font-size: 12px;
-      font-family: var(--vscode-font-family);
+      font-size: 13px;
     }
     .toggle-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .toolbar-select {
@@ -3362,23 +3361,21 @@ ${style.tip}
       background: var(--vscode-errorForeground);
     }
     .overload-badge.hidden { display: none; }
-    /* Toggle buttons - match dropdown styling */
+    /* Toggle buttons - native toolbar style */
     .toggle-btn {
-      padding: 3px 6px;
-      border: 1px solid var(--vscode-dropdown-border);
-      background: var(--vscode-dropdown-background);
-      color: var(--vscode-dropdown-foreground);
-      border-radius: 2px;
+      padding: 4px;
+      border: none;
+      background: transparent;
+      color: var(--vscode-foreground);
+      border-radius: 4px;
       cursor: pointer;
-      font-size: 12px;
-      font-family: var(--vscode-font-family);
+      font-size: 13px;
     }
-    .toggle-btn:hover { border-color: var(--vscode-focusBorder); }
+    .toggle-btn:hover { background: var(--vscode-toolbar-hoverBackground); }
     .toggle-btn:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
     .toggle-btn.active {
-      background: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
-      border-color: var(--vscode-button-background);
+      background: var(--vscode-toolbar-activeBackground);
+      color: var(--vscode-textLink-foreground);
     }
     .toggle-btn svg { width: 14px; height: 14px; fill: currentColor; }
     /* Dropdown menus (help, overflow) */
