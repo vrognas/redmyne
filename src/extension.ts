@@ -35,6 +35,7 @@ import { registerTimeEntryCommands } from "./commands/time-entry-commands";
 import { registerMonthlyScheduleCommands } from "./commands/monthly-schedule-commands";
 import { registerGanttCommands } from "./commands/gantt-commands";
 import { GanttPanel } from "./webviews/gantt-panel";
+import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "./utilities/flexibility-calculator";
 import { registerConfigureCommand } from "./commands/configure-command";
 import { registerViewCommands } from "./commands/view-commands";
 import { registerCreateTestIssuesCommand } from "./commands/create-test-issues";
@@ -372,11 +373,18 @@ export function activate(context: vscode.ExtensionContext): void {
       // Fetch and populate data
       const issues = await projectsTree.fetchIssuesIfNeeded();
       if (issues.length > 0) {
+        const scheduleConfig = vscode.workspace.getConfiguration("redmine.workingHours");
+        const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
         await ganttPanel.updateIssues(
           issues,
           projectsTree.getFlexibilityCache(),
-          projectsTree.getProjects()
+          projectsTree.getProjects(),
+          schedule,
+          projectsTree.getFilter(),
+          projectsTree.getDependencyIssues(),
+          projectsTree.server
         );
+        ganttPanel.setFilterChangeCallback((filter) => projectsTree.setFilter(filter));
       }
     },
   });

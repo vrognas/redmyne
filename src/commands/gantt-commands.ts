@@ -44,7 +44,7 @@ export function registerGanttCommands(
       const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
 
       const panel = GanttPanel.createOrShow(deps.getServer());
-      panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule, deps.getFilter(), deps.getDependencyIssues());
+      panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule, deps.getFilter(), deps.getDependencyIssues(), deps.getServer());
       panel.setFilterChangeCallback((filter) => deps.setFilter(filter));
     }),
 
@@ -61,7 +61,7 @@ export function registerGanttCommands(
       const scheduleConfig = vscode.workspace.getConfiguration("redmine.workingHours");
       const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
 
-      panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule, deps.getFilter(), deps.getDependencyIssues());
+      panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule, deps.getFilter(), deps.getDependencyIssues(), deps.getServer());
     }),
 
     // Open specific issue in Gantt (context menu)
@@ -84,7 +84,7 @@ export function registerGanttCommands(
       const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
 
       const panel = GanttPanel.createOrShow(deps.getServer());
-      panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule, deps.getFilter(), deps.getDependencyIssues());
+      panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule, deps.getFilter(), deps.getDependencyIssues(), deps.getServer());
       panel.setFilterChangeCallback((filter) => deps.setFilter(filter));
 
       // Wait for webview to render, then scroll to issue

@@ -962,8 +962,13 @@ export class GanttPanel {
     projects: RedmineProject[],
     schedule?: WeeklySchedule,
     filter?: IssueFilter,
-    dependencyIssues?: Issue[]
+    dependencyIssues?: Issue[],
+    server?: RedmineServer
   ): Promise<void> {
+    // Update server if provided (for restored panels)
+    if (server) {
+      this._server = server;
+    }
     // Update schedule if provided
     if (schedule) {
       this._schedule = schedule;
@@ -1837,15 +1842,6 @@ export class GanttPanel {
         if (issue.assigned_to.id === this._currentUserId && !this._currentUserName) {
           this._currentUserName = issue.assigned_to.name;
         }
-      }
-    }
-    // Fallback: if we still don't have current user ID but have issues loaded with "me" filter,
-    // all issues should belong to current user - infer ID from first assigned issue
-    if (this._currentUserId === null && this._currentFilter.assignee === "me") {
-      const firstAssigned = this._issues.find(i => i.assigned_to?.id);
-      if (firstAssigned?.assigned_to) {
-        this._currentUserId = firstAssigned.assigned_to.id;
-        this._currentUserName = firstAssigned.assigned_to.name;
       }
     }
     // Sort assignees: current user first, then alphabetical
