@@ -5069,10 +5069,14 @@ ${style.tip}
       });
     });
 
-    // Close menu on outside click
-    document.addEventListener('click', () => {
+    // Close menu on outside click (cleanup previous handler to prevent memory leak)
+    if (window._ganttMenuCloseHandler) {
+      document.removeEventListener('click', window._ganttMenuCloseHandler);
+    }
+    window._ganttMenuCloseHandler = () => {
       projectMenu?.classList.add('hidden');
-    });
+    };
+    document.addEventListener('click', window._ganttMenuCloseHandler);
 
     // Person selector handler (focusSelector in person focus mode)
     const focusSelector = document.getElementById('focusSelector');
@@ -5450,13 +5454,17 @@ ${style.tip}
         overflowMenu.classList.toggle('hidden');
         overflowBtn.setAttribute('aria-expanded', String(!isOpen));
       });
-      // Close on click outside
-      document.addEventListener('click', (e) => {
+      // Close on click outside (cleanup previous handler)
+      if (window._ganttOverflowCloseHandler) {
+        document.removeEventListener('click', window._ganttOverflowCloseHandler);
+      }
+      window._ganttOverflowCloseHandler = (e) => {
         if (!overflowMenu.contains(e.target) && e.target !== overflowBtn) {
           overflowMenu.classList.add('hidden');
           overflowBtn.setAttribute('aria-expanded', 'false');
         }
-      });
+      };
+      document.addEventListener('click', window._ganttOverflowCloseHandler);
     }
 
     // Show delete confirmation picker
@@ -5710,22 +5718,29 @@ ${style.tip}
         selectedArrow = null;
       }
 
-      // Click elsewhere to deselect arrows
-      document.addEventListener('click', (e) => {
-        // Check if we have any selected arrows (single or multi-select)
+      // Click elsewhere to deselect arrows (cleanup previous handlers)
+      if (window._ganttArrowClickHandler) {
+        document.removeEventListener('click', window._ganttArrowClickHandler);
+      }
+      window._ganttArrowClickHandler = (e) => {
         const hasSelection = selectedArrow || document.querySelector('.dependency-arrow.selected');
         if (hasSelection && !e.target.closest('.dependency-arrow') && !e.target.closest('.blocks-badge-group') && !e.target.closest('.blocker-badge')) {
           clearArrowSelection();
         }
-      });
+      };
+      document.addEventListener('click', window._ganttArrowClickHandler);
 
-      // Escape to deselect arrows
-      document.addEventListener('keydown', (e) => {
+      // Escape to deselect arrows (cleanup previous handler)
+      if (window._ganttArrowKeyHandler) {
+        document.removeEventListener('keydown', window._ganttArrowKeyHandler);
+      }
+      window._ganttArrowKeyHandler = (e) => {
         const hasSelection = selectedArrow || document.querySelector('.dependency-arrow.selected');
         if (e.key === 'Escape' && hasSelection) {
           clearArrowSelection();
         }
-      });
+      };
+      document.addEventListener('keydown', window._ganttArrowKeyHandler);
     }
 
     // Show context menu for issue (similar to Issues pane context menu)
