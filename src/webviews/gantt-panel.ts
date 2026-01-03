@@ -3513,6 +3513,37 @@ ${style.tip}
       background: var(--vscode-toolbar-activeBackground);
     }
     .toggle-btn svg { width: 14px; height: 14px; fill: currentColor; }
+    /* Help dropdown */
+    .help-dropdown { position: relative; }
+    .help-tooltip {
+      position: absolute;
+      right: 0;
+      top: 100%;
+      margin-top: 4px;
+      background: var(--vscode-editorWidget-background);
+      border: 1px solid var(--vscode-editorWidget-border);
+      border-radius: 4px;
+      padding: 8px 12px;
+      box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+      z-index: 1000;
+      white-space: nowrap;
+    }
+    .help-tooltip.hidden { display: none; }
+    .help-section { display: flex; flex-direction: column; gap: 3px; font-size: 11px; }
+    .help-section + .help-section { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--vscode-panel-border); }
+    .help-title { font-weight: 600; margin-bottom: 2px; color: var(--vscode-foreground); }
+    .help-item { opacity: 0.9; display: flex; align-items: center; gap: 6px; }
+    .help-item kbd {
+      background: var(--vscode-keybindingLabel-background);
+      color: var(--vscode-keybindingLabel-foreground);
+      border: 1px solid var(--vscode-keybindingLabel-border);
+      border-radius: 3px;
+      padding: 1px 4px;
+      font-family: var(--vscode-editor-font-family);
+      font-size: 10px;
+      min-width: 18px;
+      text-align: center;
+    }
     .gantt-container {
       display: flex;
       flex-direction: column;
@@ -4021,63 +4052,6 @@ ${style.tip}
     /* Blocks badge styling */
     .blocks-badge-group { cursor: help; }
     .blocks-badge-group:hover .blocks-badge-bg { opacity: 0.35 !important; }
-    /* Health legend - Progressive Disclosure via help icon */
-    .health-help {
-      position: relative;
-      display: flex;
-      align-items: center;
-      margin-left: auto;
-      padding-left: 12px;
-    }
-    .health-help-icon {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: var(--vscode-badge-background);
-      color: var(--vscode-badge-foreground);
-      font-size: 12px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: help;
-      opacity: 0.7;
-      transition: opacity 0.15s;
-    }
-    .health-help-icon:hover { opacity: 1; }
-    .health-help-tooltip {
-      position: absolute;
-      right: 0;
-      top: 100%;
-      margin-top: 8px;
-      background: var(--vscode-editorWidget-background);
-      border: 1px solid var(--vscode-editorWidget-border);
-      border-radius: 4px;
-      padding: 8px 12px;
-      box-shadow: 0 2px 8px var(--vscode-widget-shadow);
-      z-index: 1000;
-      opacity: 0;
-      visibility: hidden;
-      white-space: nowrap;
-    }
-    .health-help:hover .health-help-tooltip {
-      opacity: 1;
-      visibility: visible;
-    }
-    .health-legend { display: flex; flex-direction: column; gap: 4px; font-size: 11px; }
-    .health-legend-item { opacity: 0.9; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
-    .health-legend-title { font-weight: 600; margin-bottom: 4px; color: var(--vscode-foreground); }
-    .health-legend kbd {
-      background: var(--vscode-keybindingLabel-background);
-      color: var(--vscode-keybindingLabel-foreground);
-      border: 1px solid var(--vscode-keybindingLabel-border);
-      border-radius: 3px;
-      padding: 1px 4px;
-      font-family: var(--vscode-editor-font-family);
-      font-size: 10px;
-      min-width: 18px;
-      text-align: center;
-    }
   </style>
 </head>
 <body>
@@ -4174,6 +4148,33 @@ ${style.tip}
       <button id="collapseAllBtn" class="toggle-btn" title="Collapse all">
         <svg viewBox="0 0 16 16"><path d="M11 6H5.344L8 3.344 10.656 6H11zm-6-1h6V4H5v1zm3 7l2.656-3H5.344L8 12zm0-1.344L6.688 9h2.625L8 10.656z"/></svg>
       </button>
+      <div class="toolbar-separator"></div>
+      <div class="help-dropdown">
+        <button id="helpBtn" class="toggle-btn" title="Help">
+          <svg viewBox="0 0 16 16"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 12.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5zM9.5 8.5c-.5.5-.5.5-.5 1v.5H7v-.5c0-1 .5-1.5 1-2l.5-.5c.28-.28.5-.6.5-1 0-.83-.67-1.5-1.5-1.5S6 4.67 6 5.5H4.5C4.5 3.57 6.07 2 8 2s3.5 1.57 3.5 3.5c0 1-.5 1.5-1.5 2.5l-.5.5z"/></svg>
+        </button>
+        <div id="helpTooltip" class="help-tooltip hidden">
+          <div class="help-section">
+            <div class="help-title">Bar Badges</div>
+            <span class="help-item"><span style="color:var(--vscode-charts-green)">+Nd</span> days of slack</span>
+            <span class="help-item"><span style="color:var(--vscode-charts-red)">-Nd</span> days late</span>
+            <span class="help-item">🚧N blocked by this</span>
+            <span class="help-item"><span style="color:var(--vscode-charts-red)">⛔N</span> blockers</span>
+            <span class="help-item"><span style="color:var(--vscode-charts-purple)">◆</span> milestone</span>
+          </div>
+          <div class="help-section">
+            <div class="help-title">Shortcuts</div>
+            <span class="help-item"><kbd>1-5</kbd> Zoom</span>
+            <span class="help-item"><kbd>V</kbd> View</span>
+            <span class="help-item"><kbd>F</kbd> Filter</span>
+            <span class="help-item"><kbd>D</kbd> Relations</span>
+            <span class="help-item"><kbd>H</kbd> Heatmap</span>
+            <span class="help-item"><kbd>R</kbd> Refresh</span>
+            <span class="help-item"><kbd>T</kbd> Today</span>
+            <span class="help-item"><kbd>B</kbd> Blocked</span>
+          </div>
+        </div>
+      </div>
       <span id="selectionCount" class="selection-count hidden"></span>
     </div>
   </div>
@@ -4196,29 +4197,6 @@ ${style.tip}
       ${this._visibleRelationTypes.has("relates") ? '<span class="relation-legend-item"><span class="relation-legend-line rel-line-relates"></span>relates</span>' : ""}
       ${this._visibleRelationTypes.has("duplicates") ? '<span class="relation-legend-item"><span class="relation-legend-line rel-line-duplicates"></span>duplicates</span>' : ""}
       ${this._visibleRelationTypes.has("copied_to") ? '<span class="relation-legend-item"><span class="relation-legend-line rel-line-copied"></span>copied</span>' : ""}
-    </div>
-    <!-- Help: Progressive Disclosure via help icon -->
-    <div class="health-help">
-      <div class="health-help-icon" aria-label="Help">?</div>
-      <div class="health-help-tooltip">
-        <div class="health-legend">
-          <div class="health-legend-title">Bar Badges</div>
-          <span class="health-legend-item"><span style="color:var(--vscode-charts-green)">+Nd</span> days of slack</span>
-          <span class="health-legend-item"><span style="color:var(--vscode-charts-red)">-Nd</span> days late</span>
-          <span class="health-legend-item">🚧N issues blocked by this</span>
-          <span class="health-legend-item"><span style="color:var(--vscode-charts-red)">⛔N</span> blocking this issue</span>
-          <span class="health-legend-item"><span style="color:var(--vscode-charts-purple)">◆</span> milestone marker</span>
-        </div>
-        <div class="health-legend" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--vscode-panel-border);">
-          <div class="health-legend-title">Keyboard Shortcuts</div>
-          <span class="health-legend-item"><kbd>1-5</kbd> Zoom levels</span>
-          <span class="health-legend-item"><kbd>D</kbd> Toggle relations</span>
-          <span class="health-legend-item"><kbd>H</kbd> Toggle heatmap</span>
-          <span class="health-legend-item"><kbd>T</kbd> Jump to today</span>
-          <span class="health-legend-item"><kbd>R</kbd> Refresh</span>
-          <span class="health-legend-item"><kbd>/</kbd> Quick search</span>
-        </div>
-      </div>
     </div>
   </div>
   <div class="gantt-container">
@@ -5049,6 +5027,20 @@ ${style.tip}
     document.getElementById('refreshBtn')?.addEventListener('click', () => {
       document.getElementById('loadingOverlay').classList.add('visible');
       vscode.postMessage({ command: 'refresh' });
+    });
+
+    // Help button toggle
+    document.getElementById('helpBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const tooltip = document.getElementById('helpTooltip');
+      tooltip?.classList.toggle('hidden');
+    });
+    // Close help tooltip on outside click
+    document.addEventListener('click', (e) => {
+      const helpDropdown = document.querySelector('.help-dropdown');
+      if (helpDropdown && !helpDropdown.contains(e.target)) {
+        document.getElementById('helpTooltip')?.classList.add('hidden');
+      }
     });
 
     // Show delete confirmation picker
