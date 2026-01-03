@@ -3428,9 +3428,10 @@ ${style.tip}
     }
     .toggle-btn svg { width: 14px; height: 14px; fill: currentColor; }
     .toggle-btn.text-btn { font-weight: 600; font-size: 13px; min-width: 20px; }
-    /* Help dropdown */
+    /* Help dropdown (hover) */
     .help-dropdown { position: relative; }
     .help-tooltip {
+      display: none;
       position: absolute;
       right: 0;
       top: 100%;
@@ -3443,7 +3444,7 @@ ${style.tip}
       z-index: 1000;
       white-space: nowrap;
     }
-    .help-tooltip.hidden { display: none; }
+    .help-dropdown:hover .help-tooltip { display: block; }
     .help-section { display: flex; flex-direction: column; gap: 3px; font-size: 11px; }
     .help-section + .help-section { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--vscode-panel-border); }
     .help-title { font-weight: 600; margin-bottom: 2px; color: var(--vscode-foreground); }
@@ -4043,8 +4044,8 @@ ${style.tip}
       <button id="collapseAllBtn" class="toggle-btn text-btn" title="Collapse all (C)">⊟</button>
       <div class="toolbar-separator"></div>
       <div class="help-dropdown">
-        <button id="helpBtn" class="toggle-btn text-btn" title="Help">?</button>
-        <div id="helpTooltip" class="help-tooltip hidden">
+        <button class="toggle-btn text-btn" title="Help">?</button>
+        <div class="help-tooltip">
           <div class="help-section">
             <div class="help-title">Bar Badges</div>
             <span class="help-item"><span style="color:var(--vscode-charts-green)">+Nd</span> days of slack</span>
@@ -4838,20 +4839,6 @@ ${style.tip}
     document.getElementById('refreshBtn')?.addEventListener('click', () => {
       document.getElementById('loadingOverlay')?.classList.add('visible');
       vscode.postMessage({ command: 'refresh' });
-    });
-
-    // Help button toggle
-    document.getElementById('helpBtn')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const tooltip = document.getElementById('helpTooltip');
-      tooltip?.classList.toggle('hidden');
-    });
-    // Close help tooltip on outside click
-    document.addEventListener('click', (e) => {
-      const helpDropdown = document.querySelector('.help-dropdown');
-      if (helpDropdown && !helpDropdown.contains(e.target)) {
-        document.getElementById('helpTooltip')?.classList.add('hidden');
-      }
     });
 
     // Show delete confirmation picker
