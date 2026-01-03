@@ -1053,7 +1053,7 @@ export class GanttPanel {
     // Build O(1) lookup map (includes dependencies for arrow rendering)
     const allIssues = [...this._issues, ...this._dependencyIssues];
     this._issueById = new Map(allIssues.map(i => [i.id, i]));
-    this._projects = projects;
+    this._projects = projects.filter(p => p != null);
     this._flexibilityCache = flexibilityCache;
 
     // Invalidate hierarchy cache when data changes
