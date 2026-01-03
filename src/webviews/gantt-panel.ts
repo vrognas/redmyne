@@ -4095,11 +4095,12 @@ ${style.tip}
         }).join("")}
       </select>`}
       <div class="toolbar-separator"></div>
-      <!-- Filters -->
+      <!-- Filters (assignee filter only in project view) -->
+      ${this._viewFocus === "project" ? `
       <select id="filterAssignee" class="toolbar-select" title="Filter by assignee">
         <option value="me"${this._currentFilter.assignee === "me" ? " selected" : ""}>My issues</option>
         <option value="any"${this._currentFilter.assignee === "any" ? " selected" : ""}>All assignees</option>
-      </select>
+      </select>` : ""}
       <select id="filterStatus" class="toolbar-select" title="Filter by status">
         <option value="open"${this._currentFilter.status === "open" ? " selected" : ""}>Open</option>
         <option value="closed"${this._currentFilter.status === "closed" ? " selected" : ""}>Closed</option>
