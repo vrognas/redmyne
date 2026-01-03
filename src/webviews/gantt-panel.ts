@@ -4038,10 +4038,10 @@ ${style.tip}
       <!-- Actions -->
       <button id="refreshBtn" class="toggle-btn text-btn" title="Refresh (R)">↻</button>
       <button id="todayBtn" class="toggle-btn text-btn" title="Today (T)">◉</button>
-      <button id="undoBtn" class="toggle-btn text-btn" disabled title="Undo (Ctrl+Z)">↶</button>
-      <button id="redoBtn" class="toggle-btn text-btn" disabled title="Redo (Ctrl+Y)">↷</button>
-      <button id="expandAllBtn" class="toggle-btn text-btn" title="Expand all (E)">⊞</button>
-      <button id="collapseAllBtn" class="toggle-btn text-btn" title="Collapse all (C)">⊟</button>
+      <button id="undoBtn" class="toggle-btn text-btn" disabled title="Undo (Ctrl+Z)">↩</button>
+      <button id="redoBtn" class="toggle-btn text-btn" disabled title="Redo (Ctrl+Y)">↪</button>
+      <button id="expandAllBtn" class="toggle-btn text-btn" title="Expand all (E)">+</button>
+      <button id="collapseAllBtn" class="toggle-btn text-btn" title="Collapse all (C)">−</button>
       <div class="toolbar-separator"></div>
       <div class="help-dropdown">
         <button class="toggle-btn text-btn" title="Help">?</button>
@@ -4053,6 +4053,14 @@ ${style.tip}
             <span class="help-item">🚧N blocked by this</span>
             <span class="help-item"><span style="color:var(--vscode-charts-red)">⛔N</span> blockers</span>
             <span class="help-item"><span style="color:var(--vscode-charts-purple)">◆</span> milestone</span>
+          </div>
+          <div class="help-section">
+            <div class="help-title">Relations</div>
+            <span class="help-item"><span class="relation-legend-line rel-line-blocks"></span>blocks</span>
+            <span class="help-item"><span class="relation-legend-line rel-line-precedes"></span>precedes</span>
+            <span class="help-item"><span class="relation-legend-line rel-line-relates"></span>relates</span>
+            <span class="help-item"><span class="relation-legend-line rel-line-duplicates"></span>duplicates</span>
+            <span class="help-item"><span class="relation-legend-line rel-line-copied"></span>copied</span>
           </div>
           <div class="help-section">
             <div class="help-title">Shortcuts</div>
@@ -4073,8 +4081,8 @@ ${style.tip}
       <span id="selectionCount" class="selection-count hidden"></span>
     </div>
   </div>
-  <!-- Legend row (shown when heatmap or deps or capacity enabled) -->
-  <div id="legendRow" class="legend-row${this._showWorkloadHeatmap || this._showDependencies || (this._viewFocus === "person" && this._showCapacityRibbon) ? "" : " hidden"}">
+  <!-- Legend row (shown when heatmap or capacity enabled) -->
+  <div id="legendRow" class="legend-row${this._showWorkloadHeatmap || (this._viewFocus === "person" && this._showCapacityRibbon) ? "" : " hidden"}">
     <div id="heatmapLegend" class="heatmap-legend${this._showWorkloadHeatmap ? "" : " hidden"}">
       <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-green"></span>&lt;80%</span>
       <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-yellow"></span>80-100%</span>
@@ -4085,13 +4093,6 @@ ${style.tip}
       <span class="capacity-legend-item"><span class="capacity-legend-color capacity-available"></span>&lt;80%</span>
       <span class="capacity-legend-item"><span class="capacity-legend-color capacity-busy"></span>80-100%</span>
       <span class="capacity-legend-item"><span class="capacity-legend-color capacity-overloaded"></span>&gt;100%</span>
-    </div>
-    <div id="relationLegend" class="relation-legend${this._showDependencies ? "" : " hidden"}" title="Relation types (drag from link handle to create)">
-      ${this._visibleRelationTypes.has("blocks") ? '<span class="relation-legend-item"><span class="relation-legend-line rel-line-blocks"></span>blocks</span>' : ""}
-      ${this._visibleRelationTypes.has("precedes") ? '<span class="relation-legend-item"><span class="relation-legend-line rel-line-precedes"></span>precedes</span>' : ""}
-      ${this._visibleRelationTypes.has("relates") ? '<span class="relation-legend-item"><span class="relation-legend-line rel-line-relates"></span>relates</span>' : ""}
-      ${this._visibleRelationTypes.has("duplicates") ? '<span class="relation-legend-item"><span class="relation-legend-line rel-line-duplicates"></span>duplicates</span>' : ""}
-      ${this._visibleRelationTypes.has("copied_to") ? '<span class="relation-legend-item"><span class="relation-legend-line rel-line-copied"></span>copied</span>' : ""}
     </div>
   </div>
   <div class="gantt-container">
@@ -4446,13 +4447,11 @@ ${style.tip}
       function updateLegendRow() {
         const legendRow = document.getElementById('legendRow');
         const heatmapLegend = document.getElementById('heatmapLegend');
-        const relationLegend = document.getElementById('relationLegend');
         const capacityLegend = document.getElementById('capacityLegend');
         const heatmapVisible = heatmapLegend && !heatmapLegend.classList.contains('hidden');
-        const depsVisible = relationLegend && !relationLegend.classList.contains('hidden');
         const capacityVisible = capacityLegend && !capacityLegend.classList.contains('hidden');
         if (legendRow) {
-          if (heatmapVisible || depsVisible || capacityVisible) {
+          if (heatmapVisible || capacityVisible) {
             legendRow.classList.remove('hidden');
           } else {
             legendRow.classList.add('hidden');
@@ -4481,18 +4480,14 @@ ${style.tip}
       } else if (message.command === 'setDependenciesState') {
         const dependencyLayer = document.querySelector('.dependency-layer');
         const depsBtn = document.getElementById('depsBtn');
-        const relationLegend = document.getElementById('relationLegend');
 
         if (message.enabled) {
           if (dependencyLayer) dependencyLayer.classList.remove('hidden');
           if (depsBtn) depsBtn.classList.add('active');
-          if (relationLegend) relationLegend.classList.remove('hidden');
         } else {
           if (dependencyLayer) dependencyLayer.classList.add('hidden');
           if (depsBtn) depsBtn.classList.remove('active');
-          if (relationLegend) relationLegend.classList.add('hidden');
         }
-        updateLegendRow();
       } else if (message.command === 'setCapacityRibbonState') {
         const capacityRibbon = document.querySelector('.capacity-ribbon');
         const capacityBtn = document.getElementById('capacityBtn');
