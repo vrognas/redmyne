@@ -9,7 +9,7 @@ import { calculateContributions } from "../utilities/contribution-calculator";
 import { adHocTracker } from "../utilities/adhoc-tracker";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { errorToString } from "../utilities/error-feedback";
-import { buildProjectHierarchy, buildMyWorkHierarchy, flattenHierarchyAll, FlatNodeWithVisibility, HierarchyNode } from "../utilities/hierarchy-builder";
+import { buildProjectHierarchy, buildMyWorkHierarchy, buildResourceHierarchy, flattenHierarchyAll, FlatNodeWithVisibility, HierarchyNode } from "../utilities/hierarchy-builder";
 import { ProjectHealth } from "../utilities/project-health";
 import { DependencyGraph, buildDependencyGraph, countDownstream, getDownstream, getBlockers } from "../utilities/dependency-graph";
 import { calculateDailyCapacity } from "../utilities/capacity-calculator";
@@ -462,6 +462,7 @@ function getHeatmapColor(utilization: number): string {
 const HIDDEN_PROJECTS_KEY = "redmine.gantt.hiddenProjects";
 const VIEW_MODE_KEY = "redmine.gantt.viewMode";
 const SELECTED_PROJECT_KEY = "redmine.gantt.selectedProject";
+const SELECTED_ASSIGNEE_KEY = "redmine.gantt.selectedAssignee";
 
 export class GanttPanel {
   public static currentPanel: GanttPanel | undefined;
@@ -501,6 +502,8 @@ export class GanttPanel {
   private _filterChangeCallback?: (filter: IssueFilter) => void;
   private _viewMode: GanttViewMode = "projects";
   private _selectedProjectId: number | null = null; // null = all projects
+  private _selectedAssignee: string | null = null; // null = all assignees
+  private _uniqueAssignees: string[] = []; // Extracted from issues
   private _showCapacityRibbon = true; // Capacity ribbon visible by default in My Work
   // Sort settings (null = no sorting, use natural/hierarchy order)
   private _sortBy: "id" | "assignee" | "start" | "due" | null = null;
@@ -530,6 +533,7 @@ export class GanttPanel {
       this._hiddenProjects = new Set(saved);
       this._viewMode = GanttPanel._globalState.get<GanttViewMode>(VIEW_MODE_KEY, "projects");
       this._selectedProjectId = GanttPanel._globalState.get<number | null>(SELECTED_PROJECT_KEY, null);
+      this._selectedAssignee = GanttPanel._globalState.get<string | null>(SELECTED_ASSIGNEE_KEY, null);
     }
 
     // Create debounced collapse update to prevent rapid re-renders
@@ -1355,6 +1359,12 @@ export class GanttPanel {
         GanttPanel._globalState?.update(SELECTED_PROJECT_KEY, this._selectedProjectId);
         this._updateContent();
         break;
+      case "setSelectedAssignee":
+        this._selectedAssignee = message.assignee ?? null;
+        this._cachedHierarchy = undefined;
+        GanttPanel._globalState?.update(SELECTED_ASSIGNEE_KEY, this._selectedAssignee);
+        this._updateContent();
+        break;
       case "deleteRelation":
         if (message.relationId && this._server) {
           this._deleteRelation(message.relationId);
@@ -1879,6 +1889,15 @@ export class GanttPanel {
       ? this._issues.filter(i => i.project?.id === this._selectedProjectId)
       : this._issues;
 
+    // Extract unique assignees (sorted alphabetically)
+    const assigneeSet = new Set<string>();
+    for (const issue of projectFilteredIssues) {
+      if (issue.assigned_to?.name) {
+        assigneeSet.add(issue.assigned_to.name);
+      }
+    }
+    this._uniqueAssignees = [...assigneeSet].sort((a, b) => a.localeCompare(b));
+
     // Sort issues before building hierarchy (null = no sorting, keep natural order)
     const sortedIssues = this._sortBy === null ? [...projectFilteredIssues] : [...projectFilteredIssues].sort((a, b) => {
       let cmp = 0;
@@ -1905,9 +1924,14 @@ export class GanttPanel {
       // Extract blocked issue IDs from relations (for health calculation)
       const blockedIds = this.extractBlockedIds(sortedIssues);
 
-      this._cachedHierarchy = this._viewMode === "mywork"
-        ? buildMyWorkHierarchy(sortedIssues, this._flexibilityCache, this._dependencyIssues)
-        : buildProjectHierarchy(sortedIssues, this._flexibilityCache, this._projects, true, blockedIds);
+      if (this._selectedAssignee) {
+        // Resource view: single assignee grouped by project
+        this._cachedHierarchy = buildResourceHierarchy(sortedIssues, this._flexibilityCache, this._selectedAssignee);
+      } else if (this._viewMode === "mywork") {
+        this._cachedHierarchy = buildMyWorkHierarchy(sortedIssues, this._flexibilityCache, this._dependencyIssues);
+      } else {
+        this._cachedHierarchy = buildProjectHierarchy(sortedIssues, this._flexibilityCache, this._projects, true, blockedIds);
+      }
     }
     // Get ALL nodes with visibility flags for client-side collapse management
     const flatNodes = flattenHierarchyAll(this._cachedHierarchy, collapseState.getExpandedKeys());
@@ -4199,6 +4223,12 @@ ${style.tip}
             `<option value="${p.id}"${this._selectedProjectId === p.id ? " selected" : ""}>${escapeHtml(p.name)}</option>`
           ).join("")}
         </select>
+        <select id="assigneeSelector" class="toolbar-select" title="View by team member">
+          <option value=""${this._selectedAssignee === null ? " selected" : ""}>All Assignees</option>
+          ${this._uniqueAssignees.map(name =>
+            `<option value="${escapeHtml(name)}"${this._selectedAssignee === name ? " selected" : ""}>${escapeHtml(name)}</option>`
+          ).join("")}
+        </select>
       </div>
       <div class="toolbar-separator"></div>
       <!-- Filter group -->
@@ -4826,6 +4856,15 @@ ${style.tip}
       vscode.postMessage({
         command: 'setSelectedProject',
         projectId: value === '' ? null : parseInt(value, 10)
+      });
+    });
+
+    // Assignee selector handler
+    document.getElementById('assigneeSelector')?.addEventListener('change', (e) => {
+      const value = e.target.value;
+      vscode.postMessage({
+        command: 'setSelectedAssignee',
+        assignee: value === '' ? null : value
       });
     });
 
