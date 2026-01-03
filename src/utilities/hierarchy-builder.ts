@@ -139,13 +139,16 @@ export function buildProjectHierarchy(
     return result;
   };
 
-  // Build project node recursively
+  // Build project node recursively (with cycle protection)
+  const visitedProjects = new Set<number>();
   const buildProjectNode = (
     project: RedmineProject,
     parentKey: string | null,
     depth: number
-  ): HierarchyNode => {
+  ): HierarchyNode | null => {
     const projectId = project.id;
+    if (visitedProjects.has(projectId)) return null; // Cycle protection
+    visitedProjects.add(projectId);
     const projectKey = `project-${projectId}`;
     const projectIssues = issuesByProject.get(projectId) ?? [];
 
@@ -154,9 +157,10 @@ export function buildProjectHierarchy(
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    // Build subproject nodes
+    // Build subproject nodes (filter out cycles)
     const subprojectNodes = subprojects
-      .map((sub) => buildProjectNode(sub, projectKey, depth + 1));
+      .map((sub) => buildProjectNode(sub, projectKey, depth + 1))
+      .filter((n): n is HierarchyNode => n !== null);
 
     // Build issue tree for this project
     const issueNodes = buildIssueTree(projectIssues, flexibilityCache, projectKey, depth + 1, preserveOrder);
@@ -196,7 +200,9 @@ export function buildProjectHierarchy(
       .filter((p) => !p.parent || !projectIdSet.has(p.parent.id))
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    return rootProjects.map((p) => buildProjectNode(p, null, 0));
+    return rootProjects
+      .map((p) => buildProjectNode(p, null, 0))
+      .filter((n): n is HierarchyNode => n !== null);
   }
 
   // Fallback: no project hierarchy, group by issue.project (old behavior)

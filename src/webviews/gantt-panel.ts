@@ -1918,10 +1918,11 @@ export class GanttPanel {
       if (effectiveProjectId && effectiveProjectId !== this._selectedProjectId) {
         this._selectedProjectId = effectiveProjectId;
       }
-      // Build set of project IDs including all descendants
+      // Build set of project IDs including all descendants (with cycle protection)
       const projectIdsToInclude = new Set<number>();
       if (effectiveProjectId !== null) {
         const addDescendants = (pid: number) => {
+          if (projectIdsToInclude.has(pid)) return; // Cycle protection
           projectIdsToInclude.add(pid);
           for (const p of this._projects) {
             if (p.parent?.id === pid) {
@@ -5054,11 +5055,15 @@ ${style.tip}
       projectMenu?.classList.toggle('hidden');
     });
 
-    // Select project on menu item click
+    // Select project on menu item click (ignore clicks bubbling from child submenus)
     document.querySelectorAll('.project-menu-item').forEach(item => {
       item.addEventListener('click', (e) => {
         e.stopPropagation();
+        // Only process if this is the closest menu-item to the click target
+        const closestItem = e.target.closest('.project-menu-item');
+        if (closestItem !== item) return; // Click was on a nested submenu item
         const projectId = parseInt(item.dataset.projectId, 10);
+        if (isNaN(projectId)) return; // Invalid projectId protection
         vscode.postMessage({ command: 'setSelectedProject', projectId });
         projectMenu?.classList.add('hidden');
       });
