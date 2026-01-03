@@ -2834,7 +2834,7 @@ export class GanttPanel {
             ` : ""}
             <!-- Border/outline - pointer-events:all so clicks work even with fill:none -->
             <rect class="bar-outline cursor-move" x="${startX}" y="0" width="${width}" height="${barHeight}"
-                  fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1" rx="8" ry="8" pointer-events="all">
+                  fill="none" stroke="var(--vscode-panel-border)" stroke-width="1" rx="8" ry="8" pointer-events="all">
               <title>${barTooltip}</title>
             </rect>
             ${(() => {
@@ -3886,11 +3886,11 @@ ${style.tip}
     .issue-bar.bar-past:hover { filter: saturate(0.6) opacity(0.85); }
     .issue-bar.bar-open-ended .bar-outline { stroke-dasharray: 6, 3; stroke-dashoffset: -6; }
     .issue-bar.bar-open-ended .bar-main { mask-image: linear-gradient(90deg, black 80%, transparent 100%); -webkit-mask-image: linear-gradient(90deg, black 80%, transparent 100%); }
-    .issue-bar.bar-overdue .bar-outline { stroke: var(--vscode-charts-red) !important; stroke-width: 2; filter: drop-shadow(0 0 4px var(--vscode-charts-red)); }
-    .issue-bar.bar-overdue:hover .bar-outline { stroke-width: 3; filter: drop-shadow(0 0 6px var(--vscode-charts-red)); }
-    /* Critical path bars (zero/negative flexibility - subtle pulsing glow) */
-    .issue-bar.bar-critical:not(.bar-overdue) .bar-outline { stroke: var(--vscode-charts-orange) !important; stroke-width: 2; filter: drop-shadow(0 0 3px var(--vscode-charts-orange)); animation: critical-pulse 2s ease-in-out infinite; }
-    @keyframes critical-pulse { 0%, 100% { filter: drop-shadow(0 0 3px var(--vscode-charts-orange)); } 50% { filter: drop-shadow(0 0 6px var(--vscode-charts-orange)); } }
+    .issue-bar.bar-overdue .bar-outline { stroke: var(--vscode-charts-red) !important; stroke-width: 2; }
+    .issue-bar.bar-overdue:hover .bar-outline { stroke-width: 3; }
+    /* Critical path bars (zero/negative flexibility - pulsing border) */
+    .issue-bar.bar-critical:not(.bar-overdue) .bar-outline { stroke: var(--vscode-charts-orange) !important; stroke-width: 2; animation: critical-pulse 2s ease-in-out infinite; }
+    @keyframes critical-pulse { 0%, 100% { stroke-width: 2; } 50% { stroke-width: 3; } }
     /* External dependency bars (dimmed, dashed, no drag handles) */
     .issue-bar.bar-external { opacity: 0.5; pointer-events: none; }
     .issue-bar.bar-external .bar-outline { stroke-dasharray: 4, 2; stroke: var(--vscode-descriptionForeground); }
@@ -3904,7 +3904,7 @@ ${style.tip}
     .bar-hidden { display: none; }
     .critical-path-mode .issue-bar { opacity: 0.3; }
     .critical-path-mode .issue-bar.critical-path { opacity: 1; }
-    .critical-path-mode .issue-bar.critical-path .bar-outline { stroke: var(--vscode-charts-orange) !important; stroke-width: 3; filter: drop-shadow(0 0 6px var(--vscode-charts-orange)); }
+    .critical-path-mode .issue-bar.critical-path .bar-outline { stroke: var(--vscode-charts-orange) !important; stroke-width: 3; }
     .critical-path-mode .dependency-arrow { opacity: 0.15; }
     .critical-path-mode .dependency-arrow.critical-path { opacity: 1; }
     .critical-path-mode .dependency-arrow.critical-path .arrow-line { stroke: var(--vscode-charts-orange) !important; stroke-width: 3; }
@@ -3942,8 +3942,7 @@ ${style.tip}
     .dependency-arrow .arrow-head { transition: filter 0.15s; }
     .dependency-arrow:hover .arrow-line { stroke-width: 3 !important; filter: brightness(1.2); }
     .dependency-arrow:hover .arrow-head { filter: brightness(1.2); }
-    .dependency-arrow.selected .arrow-line { stroke-width: 4 !important; filter: brightness(1.3) drop-shadow(0 0 6px currentColor); }
-    .dependency-arrow.selected .arrow-head { filter: brightness(1.3) drop-shadow(0 0 6px currentColor); }
+    .dependency-arrow.selected .arrow-line { stroke-width: 4 !important; }
     .arrow-selection-mode .issue-bar { opacity: 0.3; }
     .arrow-selection-mode .issue-bar.arrow-connected { opacity: 1; }
     .arrow-selection-mode .issue-bar.arrow-connected .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
@@ -3955,8 +3954,7 @@ ${style.tip}
     .arrow-selection-mode .time-group-label.arrow-connected { opacity: 1; }
     .arrow-selection-mode .dependency-arrow { opacity: 0.2; }
     .arrow-selection-mode .dependency-arrow.selected { opacity: 1; }
-    .arrow-selection-mode .dependency-arrow.selected .arrow-line { stroke-width: 3; filter: brightness(1.3) drop-shadow(0 0 4px currentColor); }
-    .arrow-selection-mode .dependency-arrow.selected .arrow-head { filter: brightness(1.3) drop-shadow(0 0 4px currentColor); }
+    .arrow-selection-mode .dependency-arrow.selected .arrow-line { stroke-width: 3; }
     /* Hover highlighting - fade labels only for dependency arrow hovers */
     .hover-focus.dependency-hover .issue-label,
     .hover-focus.dependency-hover .project-label,
@@ -3967,8 +3965,7 @@ ${style.tip}
     /* Highlight hovered bar */
     .hover-focus .issue-bar.hover-highlighted .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
     /* Dependency hover - glow on hovered arrow */
-    .hover-focus.dependency-hover .dependency-arrow.hover-source .arrow-line { stroke-width: 3; filter: brightness(1.3) drop-shadow(0 0 4px currentColor); }
-    .hover-focus.dependency-hover .dependency-arrow.hover-source .arrow-head { filter: brightness(1.3) drop-shadow(0 0 4px currentColor); }
+    .hover-focus.dependency-hover .dependency-arrow.hover-source .arrow-line { stroke-width: 3; }
     /* Relation type colors in legend */
     .relation-legend { display: flex; gap: 12px; font-size: 11px; margin-left: 12px; align-items: center; }
     .relation-legend-item { display: flex; align-items: center; gap: 4px; opacity: 0.8; }
@@ -4031,7 +4028,8 @@ ${style.tip}
     .keyboard-help {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.5);
+      background: var(--vscode-editor-background);
+      opacity: 0.85;
       display: flex;
       align-items: center;
       justify-content: center;
