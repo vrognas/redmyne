@@ -3267,16 +3267,6 @@ ${style.tip}
       opacity: 0.4;
       cursor: not-allowed;
     }
-    /* Minimize disabled undo/redo (Hick's Law: reduce visual choices) */
-    #undoBtn:disabled, #redoBtn:disabled {
-      opacity: 0.25;
-      padding: 4px;
-      font-size: 0;
-      gap: 0;
-    }
-    #undoBtn:not(:disabled), #redoBtn:not(:disabled) {
-      transition: opacity 0.15s, padding 0.15s;
-    }
     .gantt-actions button.active {
       background: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
@@ -6068,13 +6058,13 @@ ${style.tip}
 
       if (modKey && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
-        undoBtn.click();
+        menuUndo?.click();
       } else if (modKey && e.key === 'z' && e.shiftKey) {
         e.preventDefault();
-        redoBtn.click();
+        menuRedo?.click();
       } else if (modKey && e.key === 'y') {
         e.preventDefault();
-        redoBtn.click();
+        menuRedo?.click();
       }
       // Zoom shortcuts (1-5)
       else if (e.key >= '1' && e.key <= '5') {
