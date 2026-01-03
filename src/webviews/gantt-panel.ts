@@ -514,8 +514,8 @@ export class GanttPanel {
   private _currentUserName: string | null = null;
   // Keyboard navigation state
   private _selectedCollapseKey: string | null = null;
-  // Expand all nodes on next render (when switching project/person)
-  private _expandAllOnNextRender = false;
+  // Expand all on first render and when switching project/person
+  private _expandAllOnNextRender = true;
   // Ad-hoc budget contribution tracking
   private _contributionData?: ContributionData;
   private _contributionSources?: Map<number, { fromIssueId: number; hours: number }[]>;
@@ -4823,7 +4823,7 @@ ${style.tip}
 
     // Refresh button handler
     document.getElementById('refreshBtn')?.addEventListener('click', () => {
-      document.getElementById('loadingOverlay').classList.add('visible');
+      document.getElementById('loadingOverlay')?.classList.add('visible');
       vscode.postMessage({ command: 'refresh' });
     });
 
@@ -6393,7 +6393,7 @@ ${style.tip}
 
     // Auto-hide loading overlay after content renders
     requestAnimationFrame(() => {
-      document.getElementById('loadingOverlay').classList.remove('visible');
+      document.getElementById('loadingOverlay')?.classList.remove('visible');
     });
   </script>
 </body>
