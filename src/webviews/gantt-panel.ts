@@ -6621,8 +6621,8 @@ ${style.tip}
       // Action shortcuts
       else if (e.key.toLowerCase() === 'r') { document.getElementById('refreshBtn')?.click(); }
       else if (e.key.toLowerCase() === 't') { document.getElementById('todayBtn')?.click(); }
-      // Health filter shortcut (F cycles through health filters)
-      else if (e.key.toLowerCase() === 'f') {
+      // Health filter shortcut (F cycles through health filters, skip if Ctrl/Cmd held)
+      else if (e.key.toLowerCase() === 'f' && !modKey) {
         e.preventDefault();
         const healthSelect = document.getElementById('filterHealth');
         const options = ['all', 'critical', 'warning', 'healthy'];
