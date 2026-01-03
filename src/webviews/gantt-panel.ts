@@ -62,6 +62,7 @@ interface GanttIssue {
   done_ratio: number;
   relations: GanttRelation[];
   assignee: string | null;
+  assigneeId: number | null;
   /** True for external dependencies (blockers not assigned to me) */
   isExternal?: boolean;
   /** Count of issues that depend on this (transitively) */
@@ -175,6 +176,7 @@ function toGanttIssue(
         type: r.relation_type as RelationType,
       })),
     assignee: issue.assigned_to?.name ?? null,
+    assigneeId: issue.assigned_to?.id ?? null,
     isExternal,
     downstreamCount,
     blocks: blockedIssues,
@@ -514,6 +516,7 @@ export class GanttPanel {
   private _sortBy: "id" | "assignee" | "start" | "due" | null = null;
   private _sortOrder: "asc" | "desc" = "asc";
   // Current user for special highlighting
+  private _currentUserId: number | null = null;
   private _currentUserName: string | null = null;
   // Keyboard navigation state
   private _selectedCollapseKey: string | null = null;
@@ -995,10 +998,11 @@ export class GanttPanel {
     }
 
     // Fetch current user for special highlighting (if not already cached)
-    if (!this._currentUserName && this._server) {
+    if (!this._currentUserId && this._server) {
       try {
         const user = await this._server.getCurrentUser();
         if (user) {
+          this._currentUserId = user.id;
           this._currentUserName = `${user.firstname} ${user.lastname}`;
         }
       } catch {
@@ -1822,10 +1826,15 @@ export class GanttPanel {
     today.setUTCHours(0, 0, 0, 0);
 
     // Extract unique assignees from ALL issues (sorted alphabetically)
+    // Also capture current user's display name from issues (matches Redmine format)
     const assigneeSet = new Set<string>();
     for (const issue of this._issues) {
       if (issue.assigned_to?.name) {
         assigneeSet.add(issue.assigned_to.name);
+        // Capture current user's name as displayed in Redmine
+        if (issue.assigned_to.id === this._currentUserId && !this._currentUserName) {
+          this._currentUserName = issue.assigned_to.name;
+        }
       }
     }
     // Sort assignees: current user first, then alphabetical
@@ -2424,7 +2433,7 @@ export class GanttPanel {
         if (!issue.assignee) return `<g transform="translate(0, ${y})"><text class="gantt-col-cell" x="${assigneeColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">—</text></g>`;
         const initials = getInitials(issue.assignee);
         const bgColor = getAvatarColor(issue.assignee);
-        const isCurrentUser = issue.assignee === this._currentUserName;
+        const isCurrentUser = issue.assigneeId === this._currentUserId;
         const radius = 12;
         const cx = assigneeColumnWidth / 2;
         const cy = barHeight / 2;
@@ -2870,7 +2879,7 @@ export class GanttPanel {
                         fill="var(--vscode-charts-green)" opacity="0.2"/>
                   <text class="status-badge" x="${checkX}" y="${barHeight / 2 + 4}"
                         text-anchor="middle" fill="var(--vscode-charts-green)" font-size="12" font-weight="bold">✓</text>
-                  ${issue.assignee ? `<text class="bar-assignee${issue.assignee === this._currentUserName ? " current-user" : ""}" x="${assigneeX}" y="${barHeight / 2 + 4}"
+                  ${issue.assignee ? `<text class="bar-assignee${issue.assigneeId === this._currentUserId ? " current-user" : ""}" x="${assigneeX}" y="${barHeight / 2 + 4}"
                         text-anchor="${onLeft ? "end" : "start"}" fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(issue.assignee.length > 12 ? issue.assignee.substring(0, 11) + "…" : issue.assignee)}</text>` : ""}
                 </g>`;
               }
@@ -2922,7 +2931,7 @@ export class GanttPanel {
                         text-anchor="middle" fill="var(--vscode-charts-red)" font-size="10" font-weight="500">${blockerLabel}</text>
                   <title>${blockerTooltip}</title>
                 </g>` : ""}
-                ${issue.assignee ? `<text class="bar-assignee${issue.assignee === this._currentUserName ? " current-user" : ""}" x="${assigneeX}" y="${barHeight / 2 + 4}"
+                ${issue.assignee ? `<text class="bar-assignee${issue.assigneeId === this._currentUserId ? " current-user" : ""}" x="${assigneeX}" y="${barHeight / 2 + 4}"
                       text-anchor="${onLeft ? "end" : "start"}" fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(issue.assignee.length > 12 ? issue.assignee.substring(0, 11) + "…" : issue.assignee)}</text>` : ""}
               </g>`;
             })()}
