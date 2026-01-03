@@ -3498,13 +3498,12 @@ ${style.tip}
       margin-bottom: 30px; /* Reserve space for minimap */
     }
     .gantt-scroll {
-      height: calc(100% + 20px); /* Push scrollbar outside wrapper */
-      overflow: scroll;
-      padding-bottom: 50px; /* Space for minimap + clipped scrollbar */
+      height: 100%;
+      overflow-x: hidden; /* Use minimap for horizontal nav */
+      overflow-y: scroll;
     }
     .gantt-scroll::-webkit-scrollbar { width: 8px; }
     .gantt-scroll::-webkit-scrollbar-thumb { background: var(--vscode-scrollbarSlider-background); border-radius: 4px; }
-    .gantt-scroll::-webkit-scrollbar-corner { background: transparent; }
     .gantt-header-row {
       display: flex;
       position: sticky;
@@ -3573,8 +3572,7 @@ ${style.tip}
       width: ${labelWidth}px;
       min-width: 120px;
       max-width: 600px;
-      overflow-x: auto;
-      overflow-y: hidden;
+      overflow: hidden;
       box-sizing: border-box;
     }
     .gantt-col-id, .gantt-col-start, .gantt-col-status, .gantt-col-due, .gantt-col-assignee {
@@ -3932,7 +3930,7 @@ ${style.tip}
     .minimap-container {
       position: absolute;
       bottom: 0;
-      right: 0;
+      right: 8px; /* Leave space for vertical scrollbar */
       height: 30px;
       background: var(--vscode-editor-background);
       border-top: 1px solid var(--vscode-panel-border);
