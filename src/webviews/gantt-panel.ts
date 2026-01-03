@@ -3296,58 +3296,6 @@ ${style.tip}
       outline: 1px solid var(--vscode-focusBorder);
       outline-offset: -1px;
     }
-    /* Legend row (below toolbar) - Aesthetic-Usability: smooth transitions */
-    .legend-row {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      padding: 4px 16px;
-      background: var(--vscode-editor-background);
-      border-bottom: 1px solid var(--vscode-panel-border);
-      font-size: 11px;
-      color: var(--vscode-descriptionForeground);
-      flex-shrink: 0;
-    }
-    .legend-row.hidden { display: none; }
-    .heatmap-legend, .relation-legend {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .heatmap-legend-item, .relation-legend-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .heatmap-legend-color {
-      width: 12px;
-      height: 12px;
-      border-radius: 2px;
-      opacity: 0.7;
-    }
-    .relation-legend-line {
-      width: 20px;
-      height: 2px;
-    }
-    /* Capacity legend and ribbon */
-    .capacity-legend {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .capacity-legend-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .capacity-legend-color {
-      width: 12px;
-      height: 12px;
-      border-radius: 2px;
-    }
-    .capacity-available { background: var(--vscode-charts-green); opacity: 0.7; }
-    .capacity-busy { background: var(--vscode-charts-yellow); opacity: 0.7; }
-    .capacity-overloaded { background: var(--vscode-charts-red); opacity: 0.7; }
     .capacity-ribbon-row {
       display: flex;
       position: sticky;
@@ -4032,7 +3980,7 @@ ${style.tip}
       <div class="toolbar-separator"></div>
       <!-- Toggle buttons -->
       <button id="depsBtn" class="toggle-btn text-btn${this._showDependencies ? " active" : ""}" title="Relations (D)">⤤</button>
-      <button id="heatmapBtn" class="toggle-btn text-btn${this._showWorkloadHeatmap ? " active" : ""}" title="Heatmap (H)">▦</button>
+      <button id="heatmapBtn" class="toggle-btn text-btn${this._showWorkloadHeatmap && this._viewFocus === "person" ? " active" : ""}" title="Heatmap (H)"${this._viewFocus !== "person" ? " disabled" : ""}>▦</button>
       <button id="capacityBtn" class="toggle-btn text-btn${this._showCapacityRibbon && this._viewFocus === "person" ? " active" : ""}" title="Capacity (Y)"${this._viewFocus !== "person" ? " disabled" : ""}>▤</button>
       <div class="toolbar-separator"></div>
       <!-- Actions -->
@@ -4081,21 +4029,7 @@ ${style.tip}
       <span id="selectionCount" class="selection-count hidden"></span>
     </div>
   </div>
-  <!-- Legend row (shown when heatmap or capacity enabled) -->
-  <div id="legendRow" class="legend-row${this._showWorkloadHeatmap || (this._viewFocus === "person" && this._showCapacityRibbon) ? "" : " hidden"}">
-    <div id="heatmapLegend" class="heatmap-legend${this._showWorkloadHeatmap ? "" : " hidden"}">
-      <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-green"></span>&lt;80%</span>
-      <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-yellow"></span>80-100%</span>
-      <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-orange"></span>100-120%</span>
-      <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-red"></span>&gt;120%</span>
-    </div>
-    <div id="capacityLegend" class="capacity-legend${this._viewFocus === "person" && this._showCapacityRibbon ? "" : " hidden"}" title="Daily workload capacity">
-      <span class="capacity-legend-item"><span class="capacity-legend-color capacity-available"></span>&lt;80%</span>
-      <span class="capacity-legend-item"><span class="capacity-legend-color capacity-busy"></span>80-100%</span>
-      <span class="capacity-legend-item"><span class="capacity-legend-color capacity-overloaded"></span>&gt;100%</span>
-    </div>
-  </div>
-  <div class="gantt-container">
+    <div class="gantt-container">
     <!-- Wrapper clips horizontal scrollbar -->
     <div class="gantt-scroll-wrapper">
       <div class="gantt-scroll" id="ganttScroll" data-render-key="${this._renderKey}" data-all-expandable-keys='${JSON.stringify(allExpandableKeys)}'>
@@ -4443,40 +4377,20 @@ ${style.tip}
     // Handle messages from extension (for state updates without full re-render)
     addWinListener('message', event => {
       const message = event.data;
-      // Helper to update legend row visibility
-      function updateLegendRow() {
-        const legendRow = document.getElementById('legendRow');
-        const heatmapLegend = document.getElementById('heatmapLegend');
-        const capacityLegend = document.getElementById('capacityLegend');
-        const heatmapVisible = heatmapLegend && !heatmapLegend.classList.contains('hidden');
-        const capacityVisible = capacityLegend && !capacityLegend.classList.contains('hidden');
-        if (legendRow) {
-          if (heatmapVisible || capacityVisible) {
-            legendRow.classList.remove('hidden');
-          } else {
-            legendRow.classList.add('hidden');
-          }
-        }
-      }
-
       if (message.command === 'setHeatmapState') {
         const heatmapLayer = document.querySelector('.heatmap-layer');
         const weekendLayer = document.querySelector('.weekend-layer');
         const heatmapBtn = document.getElementById('heatmapBtn');
-        const heatmapLegend = document.getElementById('heatmapLegend');
 
         if (message.enabled) {
           if (heatmapLayer) heatmapLayer.classList.remove('hidden');
           if (weekendLayer) weekendLayer.classList.add('hidden');
           if (heatmapBtn) heatmapBtn.classList.add('active');
-          if (heatmapLegend) heatmapLegend.classList.remove('hidden');
         } else {
           if (heatmapLayer) heatmapLayer.classList.add('hidden');
           if (weekendLayer) weekendLayer.classList.remove('hidden');
           if (heatmapBtn) heatmapBtn.classList.remove('active');
-          if (heatmapLegend) heatmapLegend.classList.add('hidden');
         }
-        updateLegendRow();
       } else if (message.command === 'setDependenciesState') {
         const dependencyLayer = document.querySelector('.dependency-layer');
         const depsBtn = document.getElementById('depsBtn');
@@ -4491,18 +4405,14 @@ ${style.tip}
       } else if (message.command === 'setCapacityRibbonState') {
         const capacityRibbon = document.querySelector('.capacity-ribbon');
         const capacityBtn = document.getElementById('capacityBtn');
-        const capacityLegend = document.getElementById('capacityLegend');
 
         if (message.enabled) {
           if (capacityRibbon) capacityRibbon.classList.remove('hidden');
           if (capacityBtn) capacityBtn.classList.add('active');
-          if (capacityLegend) capacityLegend.classList.remove('hidden');
         } else {
           if (capacityRibbon) capacityRibbon.classList.add('hidden');
           if (capacityBtn) capacityBtn.classList.remove('active');
-          if (capacityLegend) capacityLegend.classList.add('hidden');
         }
-        updateLegendRow();
       } else if (message.command === 'pushUndoAction') {
         // Push relation action to undo stack
         undoStack.push(message.action);
