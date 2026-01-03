@@ -727,6 +727,26 @@ export class GanttPanel {
       margin: 0 8px;
       flex-shrink: 0;
     }
+    .toggle-btn {
+      padding: 4px 8px;
+      border: 1px solid var(--vscode-button-border, transparent);
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border-radius: 2px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .toggle-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .toggle-btn.text-btn { font-weight: 600; font-size: 13px; min-width: 20px; }
+    .toolbar-select {
+      padding: 2px 6px;
+      border: 1px solid var(--vscode-dropdown-border);
+      background: var(--vscode-dropdown-background);
+      color: var(--vscode-dropdown-foreground);
+      border-radius: 2px;
+      font-size: 12px;
+    }
+    .toolbar-select:disabled { opacity: 0.5; }
     .gantt-container {
       display: flex;
       flex-direction: column;
@@ -838,26 +858,23 @@ export class GanttPanel {
 <body>
   <div class="gantt-header">
     <div class="gantt-actions" role="toolbar" aria-label="Gantt chart controls">
-      <select class="toolbar-select" disabled><option>Month</option></select>
-      <select class="toolbar-select" disabled><option>By Project</option></select>
-      <select class="toolbar-select" disabled><option>All Projects</option></select>
+      <!-- Zoom -->
+      <select class="toolbar-select" disabled title="Zoom level"><option>Month</option></select>
+      <!-- View -->
+      <select class="toolbar-select" disabled title="View by"><option>By Project</option></select>
+      <!-- Context selector -->
+      <select class="toolbar-select" disabled title="Select project"><option>Loading...</option></select>
       <div class="toolbar-separator"></div>
-      <select class="toolbar-select" disabled><option>My issues</option></select>
-      <select class="toolbar-select" disabled><option>Open</option></select>
-      <select class="toolbar-select" disabled><option>All health</option></select>
+      <!-- Filters -->
+      <select class="toolbar-select" disabled title="Filter by assignee"><option>My issues</option></select>
+      <select class="toolbar-select" disabled title="Filter by status"><option>Open</option></select>
+      <!-- Primary actions -->
+      <button class="toggle-btn text-btn" disabled title="Refresh">↻</button>
+      <button class="toggle-btn text-btn" disabled title="Today">T</button>
+      <!-- Overflow menu -->
+      <button class="toggle-btn text-btn" disabled title="More options">⋮</button>
       <div class="toolbar-separator"></div>
-      <button class="toggle-btn text-btn" disabled>⤤</button>
-      <button class="toggle-btn text-btn" disabled>▦</button>
-      <button class="toggle-btn text-btn" disabled>▤</button>
-      <div class="toolbar-separator"></div>
-      <button class="toggle-btn text-btn" disabled>↻</button>
-      <button class="toggle-btn text-btn" disabled>◉</button>
-      <button class="toggle-btn text-btn" disabled>↶</button>
-      <button class="toggle-btn text-btn" disabled>↷</button>
-      <button class="toggle-btn text-btn" disabled>⊞</button>
-      <button class="toggle-btn text-btn" disabled>⊟</button>
-      <div class="toolbar-separator"></div>
-      <button class="toggle-btn text-btn" disabled>?</button>
+      <button class="toggle-btn text-btn" disabled title="Help">?</button>
     </div>
   </div>
   <div class="gantt-container">
