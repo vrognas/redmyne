@@ -728,16 +728,16 @@ export class GanttPanel {
       flex-shrink: 0;
     }
     .toggle-btn {
-      padding: 4px 8px;
-      border: 1px solid var(--vscode-button-border, transparent);
-      background: var(--vscode-button-secondaryBackground);
-      color: var(--vscode-button-secondaryForeground);
+      padding: 3px 6px;
+      border: 1px solid var(--vscode-dropdown-border);
+      background: var(--vscode-dropdown-background);
+      color: var(--vscode-dropdown-foreground);
       border-radius: 2px;
       cursor: pointer;
       font-size: 12px;
+      font-family: var(--vscode-font-family);
     }
     .toggle-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .toggle-btn.text-btn { font-weight: 600; font-size: 13px; min-width: 20px; }
     .toolbar-select {
       padding: 2px 6px;
       border: 1px solid var(--vscode-dropdown-border);
@@ -3362,24 +3362,25 @@ ${style.tip}
       background: var(--vscode-errorForeground);
     }
     .overload-badge.hidden { display: none; }
-    /* Toggle buttons */
+    /* Toggle buttons - match dropdown styling */
     .toggle-btn {
-      padding: 4px 6px;
-      border: 1px solid transparent;
-      background: transparent;
-      color: var(--vscode-foreground);
-      border-radius: 3px;
+      padding: 3px 6px;
+      border: 1px solid var(--vscode-dropdown-border);
+      background: var(--vscode-dropdown-background);
+      color: var(--vscode-dropdown-foreground);
+      border-radius: 2px;
       cursor: pointer;
-      opacity: 0.7;
+      font-size: 12px;
+      font-family: var(--vscode-font-family);
     }
-    .toggle-btn:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground); }
+    .toggle-btn:hover { border-color: var(--vscode-focusBorder); }
+    .toggle-btn:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
     .toggle-btn.active {
-      opacity: 1;
-      color: var(--vscode-textLink-foreground);
-      background: var(--vscode-toolbar-activeBackground);
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border-color: var(--vscode-button-background);
     }
     .toggle-btn svg { width: 14px; height: 14px; fill: currentColor; }
-    .toggle-btn.text-btn { font-weight: 600; font-size: 13px; min-width: 20px; }
     /* Dropdown menus (help, overflow) */
     .toolbar-dropdown { position: relative; }
     .toolbar-dropdown-menu {
