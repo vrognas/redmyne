@@ -3513,6 +3513,7 @@ ${style.tip}
       background: var(--vscode-toolbar-activeBackground);
     }
     .toggle-btn svg { width: 14px; height: 14px; fill: currentColor; }
+    .toggle-btn.text-btn { font-weight: 600; font-size: 13px; min-width: 20px; }
     /* Help dropdown */
     .help-dropdown { position: relative; }
     .help-tooltip {
@@ -4115,40 +4116,20 @@ ${style.tip}
       </select>
       <div class="toolbar-separator"></div>
       <!-- Toggle buttons -->
-      <button id="depsBtn" class="toggle-btn${this._showDependencies ? " active" : ""}" title="Relations (D)">
-        <svg viewBox="0 0 16 16"><path d="M5 3.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm-6.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/></svg>
-      </button>
-      <button id="heatmapBtn" class="toggle-btn${this._showWorkloadHeatmap ? " active" : ""}" title="Heatmap (H)">
-        <svg viewBox="0 0 16 16"><path d="M8 1a3 3 0 0 0-3 3v2.5a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zm4 5.5a4 4 0 1 1-8 0V4a4 4 0 1 1 8 0v2.5z"/></svg>
-      </button>
-      <button id="capacityBtn" class="toggle-btn${this._showCapacityRibbon && this._viewFocus === "person" ? " active" : ""}" title="Capacity (Y)"${this._viewFocus !== "person" ? " disabled" : ""}>
-        <svg viewBox="0 0 16 16"><path d="M2 4h12v1H2V4zm0 3h8v1H2V7zm0 3h12v1H2v-1zm0 3h6v1H2v-1z"/></svg>
-      </button>
+      <button id="depsBtn" class="toggle-btn text-btn${this._showDependencies ? " active" : ""}" title="Relations (D)">⤤</button>
+      <button id="heatmapBtn" class="toggle-btn text-btn${this._showWorkloadHeatmap ? " active" : ""}" title="Heatmap (H)">▦</button>
+      <button id="capacityBtn" class="toggle-btn text-btn${this._showCapacityRibbon && this._viewFocus === "person" ? " active" : ""}" title="Capacity (Y)"${this._viewFocus !== "person" ? " disabled" : ""}>▤</button>
       <div class="toolbar-separator"></div>
       <!-- Actions -->
-      <button id="refreshBtn" class="toggle-btn" title="Refresh (R)">
-        <svg viewBox="0 0 16 16"><path d="M13.451 5.609l-.579-.939-1.068.812-.076.094c-.335.415-.927 1.341-1.124 2.876l-.021.165-.033.167a4.5 4.5 0 1 1-4.05-5.258l.066-.004.073.004-1.024 1.024 1.414 1.414 3.536-3.536L7.029.893 5.615 2.307l.982.982a5.5 5.5 0 1 0 5.537 6.124c.196-1.627.857-2.64 1.317-3.243V5.609z"/></svg>
-      </button>
-      <button id="todayBtn" class="toggle-btn" title="Today (T)">
-        <svg viewBox="0 0 16 16"><path d="M14 2H2v12h12V2zm-1 11H3V5h10v8zM4 1h1v1H4V1zm7 0h1v1h-1V1zM4 8h2v2H4V8z"/></svg>
-      </button>
-      <button id="undoBtn" class="toggle-btn" disabled title="Undo (Ctrl+Z)">
-        <svg viewBox="0 0 16 16"><path d="M3 8.5l4-4v3h5a3 3 0 0 1 0 6H8v-1h4a2 2 0 0 0 0-4H7v3l-4-4z"/></svg>
-      </button>
-      <button id="redoBtn" class="toggle-btn" disabled title="Redo (Ctrl+Y)">
-        <svg viewBox="0 0 16 16"><path d="M13 8.5l-4-4v3H4a3 3 0 0 0 0 6h4v-1H4a2 2 0 0 1 0-4h5v3l4-4z"/></svg>
-      </button>
-      <button id="expandAllBtn" class="toggle-btn" title="Expand all (E)">
-        <svg viewBox="0 0 16 16"><path d="M11 10H5.344L8 12.656 10.656 10H11zm-6 1h6v1H5v-1zM8 3L5.344 6H10.656L8 3zm0 1.344L9.313 6H6.688L8 4.344z"/></svg>
-      </button>
-      <button id="collapseAllBtn" class="toggle-btn" title="Collapse all (C)">
-        <svg viewBox="0 0 16 16"><path d="M11 6H5.344L8 3.344 10.656 6H11zm-6-1h6V4H5v1zm3 7l2.656-3H5.344L8 12zm0-1.344L6.688 9h2.625L8 10.656z"/></svg>
-      </button>
+      <button id="refreshBtn" class="toggle-btn text-btn" title="Refresh (R)">↻</button>
+      <button id="todayBtn" class="toggle-btn text-btn" title="Today (T)">◉</button>
+      <button id="undoBtn" class="toggle-btn text-btn" disabled title="Undo (Ctrl+Z)">↶</button>
+      <button id="redoBtn" class="toggle-btn text-btn" disabled title="Redo (Ctrl+Y)">↷</button>
+      <button id="expandAllBtn" class="toggle-btn text-btn" title="Expand all (E)">⊞</button>
+      <button id="collapseAllBtn" class="toggle-btn text-btn" title="Collapse all (C)">⊟</button>
       <div class="toolbar-separator"></div>
       <div class="help-dropdown">
-        <button id="helpBtn" class="toggle-btn" title="Help">
-          <svg viewBox="0 0 16 16"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 12.5a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5zM9.5 8.5c-.5.5-.5.5-.5 1v.5H7v-.5c0-1 .5-1.5 1-2l.5-.5c.28-.28.5-.6.5-1 0-.83-.67-1.5-1.5-1.5S6 4.67 6 5.5H4.5C4.5 3.57 6.07 2 8 2s3.5 1.57 3.5 3.5c0 1-.5 1.5-1.5 2.5l-.5.5z"/></svg>
-        </button>
+        <button id="helpBtn" class="toggle-btn text-btn" title="Help">?</button>
         <div id="helpTooltip" class="help-tooltip hidden">
           <div class="help-section">
             <div class="help-title">Bar Badges</div>
