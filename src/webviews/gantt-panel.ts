@@ -9,7 +9,7 @@ import { calculateContributions } from "../utilities/contribution-calculator";
 import { adHocTracker } from "../utilities/adhoc-tracker";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { errorToString } from "../utilities/error-feedback";
-import { buildProjectHierarchy, buildMyWorkHierarchy, buildResourceHierarchy, flattenHierarchyAll, FlatNodeWithVisibility, HierarchyNode } from "../utilities/hierarchy-builder";
+import { buildProjectHierarchy, buildResourceHierarchy, flattenHierarchyAll, FlatNodeWithVisibility, HierarchyNode } from "../utilities/hierarchy-builder";
 import { ProjectHealth } from "../utilities/project-health";
 import { DependencyGraph, buildDependencyGraph, countDownstream, getDownstream, getBlockers } from "../utilities/dependency-graph";
 import { calculateDailyCapacity } from "../utilities/capacity-calculator";
@@ -1955,11 +1955,10 @@ export class GanttPanel {
       const blockedIds = this.extractBlockedIds(sortedIssues);
 
       if (this._viewFocus === "person") {
-        // Person view: group by project
+        // Person view: group by project, flat issues
         this._cachedHierarchy = buildResourceHierarchy(sortedIssues, this._flexibilityCache, this._selectedAssignee ?? "");
-      } else if (this._viewMode === "mywork") {
-        this._cachedHierarchy = buildMyWorkHierarchy(sortedIssues, this._flexibilityCache, this._dependencyIssues);
       } else {
+        // Project view: project tree with parent/child issues
         this._cachedHierarchy = buildProjectHierarchy(sortedIssues, this._flexibilityCache, this._projects, true, blockedIds);
       }
     }
@@ -2349,7 +2348,7 @@ export class GanttPanel {
         const tooltip = tooltipLines.filter(Boolean).join("\n");
 
         // In My Work view, show project badge and external indicator
-        const projectBadge = this._viewMode === "mywork" && row.projectName
+        const projectBadge = this._viewFocus === "person" && row.projectName
           ? `<tspan fill="var(--vscode-descriptionForeground)" font-size="10">[${escapeHtml(row.projectName)}]</tspan> `
           : "";
         const externalBadge = issue.isExternal
@@ -3168,9 +3167,9 @@ ${style.tip}
     // Always calculate aggregate workload (needed for heatmap toggle without re-render)
     const workloadMap = calculateAggregateWorkload(this._issues, this._schedule, minDate, maxDate);
 
-    // Calculate capacity ribbon data (My Work mode only)
+    // Calculate capacity ribbon data (Person view only)
     const minDateStr = minDate.toISOString().slice(0, 10);
-    const capacityData = this._viewMode === "mywork"
+    const capacityData = this._viewFocus === "person"
       ? calculateDailyCapacity(this._issues, this._schedule, minDateStr, maxDateStr)
       : [];
 
@@ -3197,7 +3196,7 @@ ${style.tip}
 
     // Week boundaries for capacity ribbon (show Monday markers)
     const capacityWeekMarkers: string[] = [];
-    if (this._viewMode === "mywork") {
+    if (this._viewFocus === "person") {
       const current = new Date(minDate);
       while (current <= maxDate) {
         if (current.getDay() === 1) { // Monday
@@ -3210,7 +3209,7 @@ ${style.tip}
 
     // Today marker for capacity ribbon
     const capacityTodayX = ((today.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
-    const capacityTodayMarker = this._viewMode === "mywork" && capacityTodayX >= 0 && capacityTodayX <= timelineWidth
+    const capacityTodayMarker = this._viewFocus === "person" && capacityTodayX >= 0 && capacityTodayX <= timelineWidth
       ? `<line x1="${capacityTodayX}" y1="0" x2="${capacityTodayX}" y2="${ribbonHeight}" class="capacity-today-marker"/>`
       : "";
 
@@ -4372,17 +4371,6 @@ ${style.tip}
           <svg viewBox="0 0 16 16"><circle cx="8" cy="3" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="8" cy="13" r="1.5"/></svg>
         </button>
         <div id="overflowMenu" class="overflow-menu hidden">
-          <!-- View mode -->
-          <div class="overflow-menu-section">View Mode</div>
-          <button id="viewProjects" class="${this._viewMode === "projects" ? "active" : ""}" title="Group by project (V)">
-            <svg viewBox="0 0 16 16"><path d="M1.5 1h13l.5.5v13l-.5.5h-13l-.5-.5v-13l.5-.5zM2 14h12V2H2v12z"/><path d="M3 3h4v4H3V3zm0 6h4v4H3V9zm6-6h4v4H9V3zm0 6h4v4H9V9z"/></svg>
-            Projects
-          </button>
-          <button id="viewMyWork" class="${this._viewMode === "mywork" ? "active" : ""}" title="My Work timeline (V)">
-            <svg viewBox="0 0 16 16"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 13A6 6 0 1 1 8 2a6 6 0 0 1 0 12z"/><path d="M8 4v4.5l3 1.5-.5 1L7 9V4h1z"/></svg>
-            My Work
-          </button>
-          <div class="overflow-menu-divider"></div>
           <!-- Filters -->
           <div class="overflow-menu-section">Filters</div>
           <div class="overflow-menu-row">
@@ -4409,9 +4397,9 @@ ${style.tip}
             <svg viewBox="0 0 16 16"><path d="M5 3.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm-6.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm6.5 0a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/></svg>
             Relations
           </button>
-          <button id="capacityBtn" title="Toggle capacity ribbon (Y)" aria-pressed="${this._showCapacityRibbon}" class="${this._showCapacityRibbon && this._viewMode === "mywork" ? "active" : ""}${this._viewMode !== "mywork" ? " disabled" : ""}" ${this._viewMode !== "mywork" ? "disabled" : ""}>
+          <button id="capacityBtn" title="Toggle capacity ribbon (Y)" aria-pressed="${this._showCapacityRibbon}" class="${this._showCapacityRibbon && this._viewFocus === "person" ? "active" : ""}${this._viewFocus !== "person" ? " disabled" : ""}" ${this._viewFocus !== "person" ? "disabled" : ""}>
             <svg viewBox="0 0 16 16"><path d="M2 4h12v1H2V4zm0 3h8v1H2V7zm0 3h12v1H2v-1zm0 3h6v1H2v-1z"/></svg>
-            Capacity${overloadCount > 0 && this._viewMode === "mywork" ? ` <span class="menu-badge">${overloadCount}</span>` : ""}
+            Capacity${overloadCount > 0 && this._viewFocus === "person" ? ` <span class="menu-badge">${overloadCount}</span>` : ""}
           </button>
           <button id="heatmapBtn" title="Toggle workload heatmap (H)" aria-pressed="${this._showWorkloadHeatmap}" class="${this._showWorkloadHeatmap ? "active" : ""}">
             <svg viewBox="0 0 16 16"><path d="M8 1a3 3 0 0 0-3 3v2.5a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3zm4 5.5a4 4 0 1 1-8 0V4a4 4 0 1 1 8 0v2.5z"/></svg>
@@ -4441,14 +4429,14 @@ ${style.tip}
     </div>
   </div>
   <!-- Legend row (shown when heatmap or deps or capacity enabled) -->
-  <div id="legendRow" class="legend-row${this._showWorkloadHeatmap || this._showDependencies || (this._viewMode === "mywork" && this._showCapacityRibbon) ? "" : " hidden"}">
+  <div id="legendRow" class="legend-row${this._showWorkloadHeatmap || this._showDependencies || (this._viewFocus === "person" && this._showCapacityRibbon) ? "" : " hidden"}">
     <div id="heatmapLegend" class="heatmap-legend${this._showWorkloadHeatmap ? "" : " hidden"}">
       <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-green"></span>&lt;80%</span>
       <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-yellow"></span>80-100%</span>
       <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-orange"></span>100-120%</span>
       <span class="heatmap-legend-item"><span class="heatmap-legend-color heatmap-color-red"></span>&gt;120%</span>
     </div>
-    <div id="capacityLegend" class="capacity-legend${this._viewMode === "mywork" && this._showCapacityRibbon ? "" : " hidden"}" title="Daily workload capacity">
+    <div id="capacityLegend" class="capacity-legend${this._viewFocus === "person" && this._showCapacityRibbon ? "" : " hidden"}" title="Daily workload capacity">
       <span class="capacity-legend-item"><span class="capacity-legend-color capacity-available"></span>&lt;80% available</span>
       <span class="capacity-legend-item"><span class="capacity-legend-color capacity-busy"></span>80-100% busy</span>
       <span class="capacity-legend-item"><span class="capacity-legend-color capacity-overloaded"></span>&gt;100% overloaded</span>
@@ -4514,8 +4502,8 @@ ${style.tip}
           </svg>
         </div>
       </div>
-      <!-- Capacity ribbon (My Work mode only) -->
-      <div class="capacity-ribbon-row capacity-ribbon${this._viewMode !== "mywork" || !this._showCapacityRibbon ? " hidden" : ""}">
+      <!-- Capacity ribbon (Person view only) -->
+      <div class="capacity-ribbon-row capacity-ribbon${this._viewFocus !== "person" || !this._showCapacityRibbon ? " hidden" : ""}">
         <div class="gantt-sticky-left gantt-corner">
           <div class="capacity-ribbon-label" style="width: ${checkboxColumnWidth + labelWidth * 2 + extraColumnsWidth}px; height: ${ribbonHeight}px;" title="Total workload for visible date range">
             ${capacitySummaryText}
@@ -4948,14 +4936,6 @@ ${style.tip}
     document.getElementById('zoomYear')?.addEventListener('click', () => {
       saveStateForZoom();
       vscode.postMessage({ command: 'setZoom', zoomLevel: 'year' });
-    });
-
-    // View mode toggle handlers (in overflow menu)
-    document.getElementById('viewProjects')?.addEventListener('click', () => {
-      vscode.postMessage({ command: 'setViewMode', viewMode: 'projects' });
-    });
-    document.getElementById('viewMyWork')?.addEventListener('click', () => {
-      vscode.postMessage({ command: 'setViewMode', viewMode: 'mywork' });
     });
 
     // Focus toggle handlers (Project vs Person view)
@@ -6622,9 +6602,9 @@ ${style.tip}
       else if (e.key.toLowerCase() === 'c') { document.getElementById('criticalPathBtn')?.click(); }
       else if (e.key.toLowerCase() === 'i') { document.getElementById('intensityBtn')?.click(); }
       else if (e.key.toLowerCase() === 'v') {
-        // Toggle view mode between Projects and My Work
-        const isProjects = document.getElementById('viewProjects')?.classList.contains('active');
-        document.getElementById(isProjects ? 'viewMyWork' : 'viewProjects')?.click();
+        // Toggle view focus between Project and Person
+        const isProject = document.getElementById('focusProject')?.classList.contains('active');
+        document.getElementById(isProject ? 'focusPerson' : 'focusProject')?.click();
       }
       // Action shortcuts
       else if (e.key.toLowerCase() === 'r') { document.getElementById('refreshBtn')?.click(); }
