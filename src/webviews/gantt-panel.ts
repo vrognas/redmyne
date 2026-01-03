@@ -710,12 +710,14 @@ export class GanttPanel {
       display: flex;
       align-items: center;
       gap: 4px;
+      flex-shrink: 0;
     }
     .toolbar-separator {
       width: 1px;
       height: 20px;
       background: var(--vscode-panel-border);
       margin: 0 8px;
+      flex-shrink: 0;
     }
     .zoom-toggle {
       display: flex;
@@ -3243,10 +3245,21 @@ ${style.tip}
       align-items: center;
       margin-bottom: 8px;
       flex-shrink: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: thin;
+    }
+    .gantt-header::-webkit-scrollbar {
+      height: 4px;
+    }
+    .gantt-header::-webkit-scrollbar-thumb {
+      background: var(--vscode-scrollbarSlider-background);
+      border-radius: 2px;
     }
     .gantt-actions {
       display: flex;
       gap: 4px;
+      flex-shrink: 0;
     }
     .gantt-actions button {
       background: var(--vscode-button-secondaryBackground);
@@ -3391,12 +3404,14 @@ ${style.tip}
       display: flex;
       align-items: center;
       gap: 4px;
+      flex-shrink: 0;
     }
     .toolbar-separator {
       width: 1px;
       height: 20px;
       background: var(--vscode-panel-border);
       margin: 0 8px;
+      flex-shrink: 0;
     }
     /* Icon buttons */
     .icon-btn {
