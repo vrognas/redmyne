@@ -29,7 +29,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Current user caching** - `/users/current.json` cached for session duration
 - **Issue lookup caching** - `getIssueById` cached with 60s TTL, auto-invalidated on mutations
 - **Gantt single time entries fetch** - contributions now fetch all time entries in one request instead of per-project
-- **Gantt by-person optimizations** - skip versions fetch (not relevant), skip contributions if no ad-hoc issues displayed
+- **Gantt by-person optimizations** - skip versions fetch, skip contributions if no ad-hoc displayed, filter time entries by viewed user
 
 ### Fixed
 

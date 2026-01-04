@@ -1045,7 +1045,17 @@ export class GanttPanel {
       const displayedAdHocIds = this._issues
         .filter(i => adHocIssueIds.has(i.id))
         .map(i => i.id);
-      const allTimeEntries = await this._server.getTimeEntriesForIssues(displayedAdHocIds);
+
+      // In by-person mode, only fetch entries by the viewed user
+      let userId: number | undefined;
+      if (this._viewFocus === "person" && this._selectedAssignee) {
+        const assigneeIssue = this._issues.find(
+          i => i.assigned_to?.name === this._selectedAssignee
+        );
+        userId = assigneeIssue?.assigned_to?.id;
+      }
+
+      const allTimeEntries = await this._server.getTimeEntriesForIssues(displayedAdHocIds, userId);
 
       // Calculate contributions
       const contributions = calculateContributions(allTimeEntries);

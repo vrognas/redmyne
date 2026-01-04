@@ -756,18 +756,21 @@ export class RedmineServer {
   /**
    * Returns time entries for specific issues
    * Used for ad-hoc contribution calculation (only fetch ad-hoc issue entries)
+   * @param issueIds Issue IDs to fetch entries for
+   * @param userId Optional user ID to filter entries by (for by-person view)
    */
-  async getTimeEntriesForIssues(issueIds: number[]): Promise<TimeEntry[]> {
+  async getTimeEntriesForIssues(issueIds: number[], userId?: number): Promise<TimeEntry[]> {
     if (issueIds.length === 0) return [];
 
     // Fetch in batches to respect concurrency and avoid URL length limits
     const allEntries: TimeEntry[] = [];
+    const userFilter = userId ? `&user_id=${userId}` : "";
     for (let i = 0; i < issueIds.length; i += this.maxConcurrentRequests) {
       const batch = issueIds.slice(i, i + this.maxConcurrentRequests);
       const batchResults = await Promise.all(
         batch.map(id =>
           this.paginate<TimeEntry>(
-            `/time_entries.json?issue_id=${id}`,
+            `/time_entries.json?issue_id=${id}${userFilter}`,
             "time_entries"
           )
         )
