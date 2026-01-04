@@ -7,6 +7,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 ### Added
 
 - **Priority-based capacity scheduling** - capacity/intensity now uses frontloaded day-by-day simulation; prioritizes by due date urgency, external blocks (2x weight), and downstream count
+- **Gantt bar intensity visualization** - bars show scheduled work distribution (person view); intensity lines indicate when work is actually scheduled vs uniform spread
 - **Internal estimates** - right-click issue to set manual "hours remaining" when original estimate is outdated; takes highest priority in capacity calculation
 - **Ad-hoc budget transfers** - tag issues as ad-hoc budget pools; time entries on ad-hoc issues can contribute hours to other issues via `#<id>` in comments
 - **Gantt contribution display** - tooltip shows contributed hours breakdown (direct + from ad-hoc)

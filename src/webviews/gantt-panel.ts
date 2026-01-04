@@ -13,10 +13,12 @@ import { buildProjectHierarchy, buildResourceHierarchy, flattenHierarchyAll, Fla
 import { ProjectHealth } from "../utilities/project-health";
 import { DependencyGraph, buildDependencyGraph, countDownstream, getDownstream, getBlockers } from "../utilities/dependency-graph";
 import {
+  calculateScheduledCapacity,
   calculateScheduledCapacityByZoom,
   type CapacityZoomLevel,
   type PeriodCapacity,
   type InternalEstimates,
+  type ScheduledDailyCapacity,
 } from "../utilities/capacity-calculator";
 import { getInternalEstimates } from "../utilities/internal-estimates";
 import { collapseState } from "../utilities/collapse-state";
@@ -384,6 +386,41 @@ function calculateDailyIntensity(
     // Intensity = (allocated hours for this day) / (available hours for this day)
     // For uniform distribution: allocated = dayHours * (estimated / totalAvailable)
     const intensity = dayHours > 0 ? hoursPerAvailableHour : 0;
+    result.push({ dayOffset, intensity: Math.min(intensity, 1.5) }); // Cap at 1.5 for display
+    current.setUTCDate(current.getUTCDate() + 1);
+    dayOffset++;
+  }
+
+  return result;
+}
+
+/**
+ * Get scheduled intensity for an issue from pre-computed schedule map
+ * Uses priority-based scheduling data instead of uniform distribution
+ */
+function getScheduledIntensity(
+  issue: GanttIssue,
+  schedule: WeeklySchedule,
+  issueScheduleMap: Map<number, Map<string, number>>
+): { dayOffset: number; intensity: number }[] {
+  const result: { dayOffset: number; intensity: number }[] = [];
+
+  if (!issue.start_date || !issue.due_date) {
+    return result;
+  }
+
+  const issueHoursMap = issueScheduleMap.get(issue.id);
+  const start = parseLocalDate(issue.start_date);
+  const end = parseLocalDate(issue.due_date);
+
+  const current = new Date(start);
+  let dayOffset = 0;
+  while (current <= end) {
+    const dateStr = current.toISOString().slice(0, 10);
+    const dayCapacity = schedule[getDayKey(current)];
+    const scheduledHours = issueHoursMap?.get(dateStr) ?? 0;
+    // Intensity = scheduled hours / available hours for this day
+    const intensity = dayCapacity > 0 ? scheduledHours / dayCapacity : 0;
     result.push({ dayOffset, intensity: Math.min(intensity, 1.5) }); // Cap at 1.5 for display
     current.setUTCDate(current.getUTCDate() + 1);
     dayOffset++;
@@ -1962,6 +1999,35 @@ export class GanttPanel {
 
     // String format for open-ended bars (issues with start but no due date)
     const maxDateStr = maxDate.toISOString().slice(0, 10);
+    const minDateStr = minDate.toISOString().slice(0, 10);
+
+    // Build scheduled capacity map for intensity visualization (person view only)
+    // Maps issueId -> date -> scheduled hours for that day
+    const internalEstimates: InternalEstimates = GanttPanel._globalState
+      ? getInternalEstimates(GanttPanel._globalState)
+      : new Map();
+    const issueScheduleMap = new Map<number, Map<string, number>>();
+    if (this._viewFocus === "person" && this._showIntensity) {
+      const scheduledDays: ScheduledDailyCapacity[] = calculateScheduledCapacity(
+        filteredIssues,
+        this._schedule,
+        minDateStr,
+        maxDateStr,
+        depGraph,
+        internalEstimates,
+        this._currentUserId ?? undefined,
+        issueMap
+      );
+      // Build the map from breakdown
+      for (const day of scheduledDays) {
+        for (const entry of day.breakdown) {
+          if (!issueScheduleMap.has(entry.issueId)) {
+            issueScheduleMap.set(entry.issueId, new Map());
+          }
+          issueScheduleMap.get(entry.issueId)!.set(day.date, entry.hours);
+        }
+      }
+    }
 
     const totalDays = Math.max(1, Math.ceil(
       (maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)
@@ -2547,8 +2613,12 @@ export class GanttPanel {
         const handleWidth = 8;
 
         // Calculate daily intensity for this issue (skip for parent issues - work is in subtasks)
-        // Only compute if intensity display is enabled globally
-        const intensities = this._showIntensity && !isParent ? calculateDailyIntensity(issue, this._schedule) : [];
+        // Use scheduled intensity (priority-based) in person view, uniform distribution otherwise
+        const intensities = this._showIntensity && !isParent
+          ? (issueScheduleMap.size > 0
+              ? getScheduledIntensity(issue, this._schedule, issueScheduleMap)
+              : calculateDailyIntensity(issue, this._schedule))
+          : [];
         const hasIntensity = this._showIntensity && !isParent && intensities.length > 0 && issue.estimated_hours !== null;
 
         // Generate intensity segments and line chart
@@ -3022,11 +3092,7 @@ ${style.tip}
 
     // Calculate capacity ribbon data (Person view only), aggregated by zoom level
     // Use priority-based scheduling (frontloading) instead of uniform distribution
-    const minDateStr = minDate.toISOString().slice(0, 10);
     const capacityZoomLevel = this._zoomLevel as CapacityZoomLevel;
-    const internalEstimates: InternalEstimates = GanttPanel._globalState
-      ? getInternalEstimates(GanttPanel._globalState)
-      : new Map();
     const capacityData: PeriodCapacity[] = this._viewFocus === "person"
       ? calculateScheduledCapacityByZoom(
           filteredIssues,
