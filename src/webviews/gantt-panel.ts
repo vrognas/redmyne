@@ -2449,7 +2449,7 @@ export class GanttPanel {
           }
         }
         // === Context-sensitive tooltips ===
-        // Bar tooltip: basic info only
+        // Bar tooltip: basic info + progress
         const barTooltip = [
           issue.isAdHoc ? "🎲 AD-HOC BUDGET POOL" : null,
           issue.isExternal ? "⚡ EXTERNAL DEPENDENCY" : null,
@@ -2459,6 +2459,12 @@ export class GanttPanel {
           issue.isExternal ? `Assigned to: ${issue.assignee ?? "Unassigned"}` : null,
           `Start: ${formatDateWithWeekday(issue.start_date)}`,
           `Due: ${hasOnlyStart ? "(no due date)" : formatDateWithWeekday(issue.due_date)}`,
+          `───`,
+          `Progress: ${doneRatio}%${isFallbackProgress ? ` (~${visualDoneRatio}% from time)` : ""}`,
+          `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
+          contributedHours > 0
+            ? `Spent: ${formatHoursAsTime(issue.spent_hours)} + ${formatHoursAsTime(contributedHours)} contributed = ${formatHoursAsTime(effectiveSpentHours)}`
+            : `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
           !isParent ? `───\n←/→: Move  Shift+←/→: Resize  Alt+←/→: Start` : null,
         ].filter(Boolean).join("\n");
 
