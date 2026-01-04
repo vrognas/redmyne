@@ -1045,9 +1045,20 @@ export class GanttPanel {
       // This ensures contributions to displayed issues are calculated
       const allAdHocIds = Array.from(adHocIssueIds);
 
-      // Fetch ALL time entries on ad-hoc issues (no user filter)
-      // Contributions can come from any user's time entries
-      const allTimeEntries = await this._server.getTimeEntriesForIssues(allAdHocIds);
+      // Calculate date range: earliest issue start to today
+      // This limits fetches to relevant period instead of all history
+      const today = new Date().toISOString().slice(0, 10);
+      const startDates = this._issues
+        .map(i => i.start_date)
+        .filter((d): d is string => !!d)
+        .sort();
+      const fromDate = startDates[0] || today; // Earliest start date or today
+
+      // Fetch time entries with date range filter
+      const allTimeEntries = await this._server.getTimeEntriesForIssues(allAdHocIds, {
+        from: fromDate,
+        to: today,
+      });
 
       // Calculate contributions
       const contributions = calculateContributions(allTimeEntries);
