@@ -8,7 +8,7 @@
 
 import { Issue } from "../redmine/models/issue";
 import { WeeklySchedule, countWorkingDays } from "./flexibility-calculator";
-import { parseLocalDate, getISOWeekNumber, getISOWeekYear } from "./date-utils";
+import { parseLocalDate, getISOWeekNumber, getISOWeekYear, formatLocalDate } from "./date-utils";
 import { DependencyGraph, countDownstream } from "./dependency-graph";
 import type { InternalEstimates } from "./internal-estimates";
 
@@ -520,12 +520,13 @@ export function calculateScheduledCapacity(
   }
 
   const result: ScheduledDailyCapacity[] = [];
-  const current = new Date(startDate + "T00:00:00Z");
-  const end = new Date(endDate + "T00:00:00Z");
+  // Use parseLocalDate to avoid UTC/local timezone mismatch with getScheduledIntensity
+  const current = parseLocalDate(startDate);
+  const end = parseLocalDate(endDate);
 
   while (current <= end) {
-    const dateStr = current.toISOString().slice(0, 10);
-    const dayOfWeek = current.getUTCDay();
+    const dateStr = formatLocalDate(current);
+    const dayOfWeek = current.getDay();  // Local day
     const capacityHours = schedule[DAY_KEYS[dayOfWeek]];
 
     // Skip non-working days
@@ -621,7 +622,7 @@ export function calculateScheduledCapacity(
       }
     }
 
-    current.setUTCDate(current.getUTCDate() + 1);
+    current.setDate(current.getDate() + 1);  // Local increment
   }
 
   return result;
