@@ -396,6 +396,47 @@
         "icon": "$(package)"
       },
       {
+        "command": "redmine.togglePrecedence",
+        "title": "Toggle Precedence Priority",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "redmine.gantt.updateIssue",
+        "title": "Update Issue..."
+      },
+      {
+        "command": "redmine.gantt.openInBrowser",
+        "title": "Open in Browser"
+      },
+      {
+        "command": "redmine.gantt.showInIssues",
+        "title": "Show in Issues"
+      },
+      {
+        "command": "redmine.gantt.logTime",
+        "title": "Log Time"
+      },
+      {
+        "command": "redmine.gantt.setDoneRatio",
+        "title": "Set % Done"
+      },
+      {
+        "command": "redmine.gantt.toggleAutoUpdate",
+        "title": "Toggle Auto-update %"
+      },
+      {
+        "command": "redmine.gantt.toggleAdHoc",
+        "title": "Toggle Ad-hoc Budget"
+      },
+      {
+        "command": "redmine.gantt.togglePrecedence",
+        "title": "Toggle Precedence"
+      },
+      {
+        "command": "redmine.gantt.copyUrl",
+        "title": "Copy URL"
+      },
+      {
         "command": "redmine.contributeToIssue",
         "title": "Contribute to Issue...",
         "icon": "$(arrow-right)"
@@ -1129,6 +1170,53 @@
           "command": "redmine.kanban.openInBrowser",
           "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-/",
           "group": "navigation@1"
+        }
+      ],
+      "webview/context": [
+        {
+          "command": "redmine.gantt.updateIssue",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "group": "1_actions@1"
+        },
+        {
+          "command": "redmine.gantt.openInBrowser",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "group": "1_actions@2"
+        },
+        {
+          "command": "redmine.gantt.showInIssues",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "group": "1_actions@3"
+        },
+        {
+          "command": "redmine.gantt.logTime",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "group": "2_time@1"
+        },
+        {
+          "command": "redmine.gantt.setDoneRatio",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "group": "2_time@2"
+        },
+        {
+          "command": "redmine.gantt.toggleAutoUpdate",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "group": "3_toggles@1"
+        },
+        {
+          "command": "redmine.gantt.toggleAdHoc",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "group": "3_toggles@2"
+        },
+        {
+          "command": "redmine.gantt.togglePrecedence",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "group": "3_toggles@3"
+        },
+        {
+          "command": "redmine.gantt.copyUrl",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "group": "9_clipboard@1"
         }
       ]
     },

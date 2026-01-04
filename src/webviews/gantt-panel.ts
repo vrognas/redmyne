@@ -2309,7 +2309,7 @@ export class GanttPanel {
           : "";
 
         return `
-          <g class="issue-label gantt-row cursor-pointer" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Open issue #${issue.id}">
+          <g class="issue-label gantt-row cursor-pointer" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"preventDefaultContextMenuItems":true}' transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Open issue #${issue.id}">
             ${chevron}
             <text x="${5 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="${issue.isExternal ? "var(--vscode-descriptionForeground)" : "var(--vscode-foreground)"}" font-size="12">
               ${externalBadge}${projectBadge}${escapedSubject}
@@ -2743,6 +2743,7 @@ export class GanttPanel {
                data-start-date="${issue.start_date || ""}"
                data-due-date="${issue.due_date || ""}"
                data-start-x="${startX}" data-end-x="${endX}"
+               data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"preventDefaultContextMenuItems":true}'
                transform="translate(0, ${y})"
                tabindex="0" role="button" aria-label="#${issue.id} ${escapedSubject} (parent, ${doneRatio}% done)">
               <!-- Summary bar: bracket-style with downward arrows at ends (0-based Y) -->
@@ -2788,6 +2789,7 @@ export class GanttPanel {
              data-start-date="${issue.start_date || ""}"
              data-due-date="${issue.due_date || ""}"
              data-start-x="${startX}" data-end-x="${endX}"
+             data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"preventDefaultContextMenuItems":true}'
              transform="translate(0, ${y})"
              tabindex="0" role="button" aria-label="#${issue.id} ${escapedSubject}${isOverdue ? " (overdue)" : ""}">
             ${hasIntensity ? `
@@ -5218,23 +5220,8 @@ ${style.tip}
       closeOnOutsideClick(picker);
     }
 
-    // Issue bar right-click context menu
-    document.querySelectorAll('.issue-bar').forEach(bar => {
-      bar.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        const issueId = bar.dataset.issueId;
-        if (issueId) showIssueContextMenu(e.clientX, e.clientY, issueId);
-      });
-    });
-
-    // Issue label right-click context menu
-    document.querySelectorAll('.issue-label').forEach(label => {
-      label.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        const issueId = label.dataset.issueId;
-        if (issueId) showIssueContextMenu(e.clientX, e.clientY, issueId);
-      });
-    });
+    // Issue bar/label context menu is now handled by VS Code native webview context menu
+    // via data-vscode-context attribute on issue bars (see webview/context in package.json)
 
     // Show context menu for project
     function showProjectContextMenu(x, y, projectId) {
