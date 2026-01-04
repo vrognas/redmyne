@@ -1922,9 +1922,14 @@ export class GanttPanel {
     // Use active issues for range, fall back to all visible if none active
     const rangeIssues = activeIssues.length > 0 ? activeIssues : visibleIssues;
 
+    // Exclude ad-hoc issues from range calc (they may have very old dates)
+    const adHocIds = new Set(adHocTracker.getAll());
+    const nonAdHocRangeIssues = rangeIssues.filter((i) => !adHocIds.has(i.id));
+    const rangeBase = nonAdHocRangeIssues.length > 0 ? nonAdHocRangeIssues : rangeIssues;
+
     // Prioritize issues with BOTH dates for range calculation (avoid point-bar issues extending timeline)
-    const issuesWithBothDates = rangeIssues.filter((i) => i.start_date && i.due_date);
-    const rangeBasis = issuesWithBothDates.length > 0 ? issuesWithBothDates : rangeIssues;
+    const issuesWithBothDates = rangeBase.filter((i) => i.start_date && i.due_date);
+    const rangeBasis = issuesWithBothDates.length > 0 ? issuesWithBothDates : rangeBase;
     const dates = rangeBasis.flatMap((i) =>
       [i.start_date, i.due_date].filter(Boolean)
     ) as string[];
