@@ -706,6 +706,12 @@ export function activate(context: vscode.ExtensionContext): void {
     myTimeEntriesTree.refresh();
   });
 
+  // Refresh after issue update (status change, etc.) - updates workload and trees
+  registerCommand("refreshAfterIssueUpdate", () => {
+    projectsTree.refresh();
+    cleanupResources.workloadStatusBar?.update();
+  });
+
   // Open issue in browser (context menu - receives tree element directly)
   context.subscriptions.push(
     vscode.commands.registerCommand("redmine.openIssueInBrowser", async (issue: { id: number } | undefined) => {

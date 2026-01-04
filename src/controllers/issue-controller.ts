@@ -15,7 +15,8 @@ interface TimeEntryActivityItem extends vscode.QuickPickItem {
 export class IssueController {
   constructor(
     private issue: Issue,
-    private redmine: RedmineServer
+    private redmine: RedmineServer,
+    private onIssueUpdated?: () => void
   ) {}
 
   async chooseTimeEntryType(activities: TimeEntryActivity[]) {
@@ -237,6 +238,9 @@ export class IssueController {
           )}`
         );
       }
+      // Trigger refresh (even on partial success - issue was modified)
+      this.onIssueUpdated?.();
+      vscode.commands.executeCommand("redmine.refreshAfterIssueUpdate");
     } catch (error) {
       vscode.window.showErrorMessage(
         `Error while applying quick update: ${error}`
