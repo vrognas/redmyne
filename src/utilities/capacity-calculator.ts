@@ -458,9 +458,12 @@ export function calculateScheduledCapacity(
   myUserId?: number,
   allIssuesMap?: Map<number, Issue>
 ): ScheduledDailyCapacity[] {
-  // Filter to schedulable issues (has start_date and estimated_hours)
+  // Filter to schedulable issues (has start_date AND work to schedule)
+  // Work can come from estimated_hours OR internal estimate
   const schedulableIssues = issues.filter(
-    (i) => i.start_date && i.estimated_hours && i.estimated_hours > 0
+    (i) =>
+      i.start_date &&
+      ((i.estimated_hours && i.estimated_hours > 0) || internalEstimates.has(i.id))
   );
 
   // Build issue map for priority calculation (use provided or build from issues)
