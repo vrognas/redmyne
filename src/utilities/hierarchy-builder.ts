@@ -41,6 +41,8 @@ export interface HierarchyNode {
   health?: ProjectHealth;
   /** Project description (for project nodes) */
   description?: string;
+  /** Project identifier (for project nodes) */
+  identifier?: string;
 }
 
 export interface HierarchyOptions {
@@ -178,6 +180,7 @@ export function buildProjectHierarchy(
       collapseKey: projectKey,
       parentKey,
       description: project.description,
+      identifier: project.identifier,
     };
 
     // Collect child date ranges for aggregate bar rendering

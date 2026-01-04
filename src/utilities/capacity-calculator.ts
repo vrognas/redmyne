@@ -537,7 +537,8 @@ export function calculateScheduledCapacity(
       if (usePrediction) {
         // FUTURE: Priority-based scheduling prediction
         const todaysIssues = schedulableIssues.filter((issue) => {
-          if (issue.start_date! > dateStr) return false;
+          if (issue.start_date! > dateStr) return false;  // Not started yet
+          if (issue.due_date && issue.due_date < dateStr) return false;  // Past due date - no more capacity
           if ((remainingWork.get(issue.id) ?? 0) <= 0) return false;
           if (!allBlockersComplete(issue, completedIssues, graph)) return false;
           return true;
@@ -590,18 +591,20 @@ export function calculateScheduledCapacity(
           breakdown,
         });
       } else {
-        // PAST/TODAY: Use actual time entries (truth)
+        // PAST: Use actual time entries (truth)
+        // Iterate ALL time entries, not just filteredIssues - capacity reflects real work
         const breakdown: IssueScheduleEntry[] = [];
         let loadHours = 0;
 
         if (actualTimeEntries) {
-          for (const issue of issues) {
-            const issueEntries = actualTimeEntries.get(issue.id);
-            const hours = issueEntries?.get(dateStr) ?? 0;
+          for (const [issueId, dateMap] of actualTimeEntries) {
+            const hours = dateMap.get(dateStr) ?? 0;
             if (hours > 0) {
-              const isSlippage = issue.due_date ? dateStr > issue.due_date : false;
+              // Look up issue for slippage check (may not be in filtered list)
+              const issue = issueMap.get(issueId);
+              const isSlippage = issue?.due_date ? dateStr > issue.due_date : false;
               breakdown.push({
-                issueId: issue.id,
+                issueId,
                 hours: Math.round(hours * 100) / 100,
                 isSlippage,
               });

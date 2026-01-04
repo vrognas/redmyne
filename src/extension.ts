@@ -1029,7 +1029,27 @@ export function activate(context: vscode.ExtensionContext): void {
       if (ctx?.issueId) {
         vscode.commands.executeCommand("redmine.copyIssueUrl", { id: ctx.issueId });
       }
-    })
+    }),
+    vscode.commands.registerCommand(
+      "redmine.gantt.openProjectInBrowser",
+      (ctx: { projectId: number; projectIdentifier: string }) => {
+        if (ctx?.projectIdentifier) {
+          vscode.commands.executeCommand("redmine.openProjectInBrowser", {
+            project: { identifier: ctx.projectIdentifier },
+          });
+        }
+      }
+    ),
+    vscode.commands.registerCommand(
+      "redmine.gantt.showProjectInGantt",
+      (ctx: { projectId: number; projectIdentifier: string }) => {
+        if (ctx?.projectId) {
+          vscode.commands.executeCommand("redmine.showProjectInGantt", {
+            project: { id: ctx.projectId },
+          });
+        }
+      }
+    )
   );
 
   // Register view commands

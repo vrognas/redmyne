@@ -437,6 +437,14 @@
         "title": "Copy URL"
       },
       {
+        "command": "redmine.gantt.openProjectInBrowser",
+        "title": "Open Project in Browser"
+      },
+      {
+        "command": "redmine.gantt.showProjectInGantt",
+        "title": "Show Project in Gantt"
+      },
+      {
         "command": "redmine.contributeToIssue",
         "title": "Contribute to Issue...",
         "icon": "$(arrow-right)"
@@ -1217,6 +1225,16 @@
           "command": "redmine.gantt.copyUrl",
           "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
           "group": "9_clipboard@1"
+        },
+        {
+          "command": "redmine.gantt.openProjectInBrowser",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'projectLabel'",
+          "group": "1_actions@1"
+        },
+        {
+          "command": "redmine.gantt.showProjectInGantt",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'projectLabel'",
+          "group": "1_actions@2"
         }
       ]
     },

@@ -278,7 +278,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
           iconPath: new vscode.ThemeIcon("refresh"),
         }];
       }
-      const weekGroups = this.groupEntriesByWeek(element._cachedEntries);
+      const weekGroups = this.groupEntriesByWeek(element._cachedEntries, element.id || "month");
       if (weekGroups.length === 0) {
         return [{
           label: "No time entries",
@@ -364,7 +364,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     });
   }
 
-  private groupEntriesByWeek(entries: TimeEntry[]): TimeEntryNode[] {
+  private groupEntriesByWeek(entries: TimeEntry[], idPrefix = "week"): TimeEntryNode[] {
     // Group entries by ISO week number and year
     const byWeek = new Map<string, { weekNum: number; year: number; entries: TimeEntry[] }>();
     for (const entry of entries) {
@@ -406,7 +406,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         defaultSchedule
       );
 
-      const nodeId = `week-${year}-${weekNum}`;
+      const nodeId = `${idPrefix}-week-${year}-${weekNum}`;
       // Show year suffix for cross-year weeks (Week 1 or 52/53 that span year boundaries)
       const weekSpansYears = weekRange.start.slice(0, 4) !== weekRange.end.slice(0, 4);
       const yearSuffix = weekSpansYears || year !== currentYear ? ` '${year % 100}` : "";
