@@ -29,8 +29,10 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Current user caching** - `/users/current.json` cached for session duration
 - **Issue lookup caching** - `getIssueById` cached with 60s TTL, auto-invalidated on mutations
 - **Gantt single time entries fetch** - contributions now fetch all time entries in one request instead of per-project
-- **Gantt by-person optimizations** - skip versions fetch in person mode
+- **Gantt by-person optimizations** - skip versions fetch in person mode; user filter for contribution fetching
 - **Gantt bar tooltip enhanced** - now shows progress %, estimated, spent, and contributed hours
+- **Gantt contribution fetch date filter** - only fetches time entries within displayed issues' date range
+- **Gantt timeline excludes ad-hoc** - ad-hoc issues don't affect timeline range (prevents old budget issues from extending view)
 
 ### Fixed
 
@@ -40,6 +42,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Cross-user contributions** - contributions from other users' time entries now included in calculations
 - **Progress bar includes contributions** - visual progress now accounts for contributed hours from ad-hoc issues
 - **Issue picker duplicate results** - search results no longer duplicate issues already shown in assigned list
+- **Time entries empty month expansion** - "This Month" now shows fallback message when empty instead of failing to expand
 
 ## [3.19.0]
 
