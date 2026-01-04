@@ -4,6 +4,7 @@ export interface TimeEntry {
   id?: number; // Present in GET responses
   issue_id: number;
   issue?: { id: number; subject?: string }; // Present in GET responses (subject may be missing)
+  project?: NamedEntity; // Present in GET responses
   activity_id: TimeEntryActivity["id"];
   activity?: NamedEntity; // Present in GET responses
   hours: string;

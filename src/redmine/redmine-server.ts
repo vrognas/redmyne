@@ -729,6 +729,14 @@ export class RedmineServer {
   }
 
   /**
+   * Returns all time entries (all users, all projects)
+   * Single paginated fetch for Gantt contribution calculation
+   */
+  async getAllTimeEntries(): Promise<TimeEntry[]> {
+    return this.paginate<TimeEntry>(`/time_entries.json`, "time_entries");
+  }
+
+  /**
    * Update an existing time entry
    * @param id Time entry ID
    * @param updates Fields to update (hours, comments, activity_id, spent_on, issue_id)
