@@ -65,14 +65,13 @@ export class LoggingRedmineServer extends RedmineServer {
     this.pendingBySymbol.clear();
   }
 
-  override doRequest<T>(
+  protected override onRequestStart(
     path: string,
     method: HttpMethods,
-    data?: Buffer
-  ): Promise<T> {
-    if (!this.loggingConfig.enabled) {
-      return super.doRequest<T>(path, method, data);
-    }
+    data?: Buffer,
+    _requestId?: unknown
+  ): void {
+    if (!this.loggingConfig.enabled) return;
 
     const displayId = ++this.counter;
     const startTime = Date.now();
@@ -84,8 +83,6 @@ export class LoggingRedmineServer extends RedmineServer {
       this.pendingByPath.set(pathKey, []);
     }
     this.pendingByPath.get(pathKey)!.push({ startTime, displayId });
-
-    return super.doRequest<T>(path, method, data);
   }
 
   protected override onResponseSuccess(

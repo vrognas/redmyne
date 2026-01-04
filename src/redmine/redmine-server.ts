@@ -165,6 +165,19 @@ export class RedmineServer {
   }
 
   /**
+   * Hook called when request starts (after slot acquired).
+   * Override in subclasses to log request start.
+   */
+  protected onRequestStart(
+    _path: string,
+    _method: HttpMethods,
+    _requestBody?: Buffer,
+    _requestId?: unknown
+  ): void {
+    // No-op by default, child classes can override
+  }
+
+  /**
    * Hook called before successful response resolution.
    * Override in subclasses to capture response metadata for logging.
    */
@@ -214,6 +227,10 @@ export class RedmineServer {
   private executeRequest<T>(path: string, method: HttpMethods, data?: Buffer): Promise<T> {
     const { url, key, additionalHeaders } = this.options;
     const requestId = Symbol("request"); // Unique ID for hook correlation
+
+    // Call hook after slot acquired, before HTTP request
+    this.onRequestStart(path, method, data, requestId);
+
     const options: https.RequestOptions = {
       hostname: url.hostname,
       port: url.port ? parseInt(url.port, 10) : undefined,
