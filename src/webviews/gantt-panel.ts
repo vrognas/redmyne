@@ -464,7 +464,6 @@ function getHeatmapColor(utilization: number): string {
  * Gantt timeline webview panel
  * Shows issues as horizontal bars on a timeline
  */
-const HIDDEN_PROJECTS_KEY = "redmine.gantt.hiddenProjects";
 const VIEW_MODE_KEY = "redmine.gantt.viewMode";
 const VIEW_FOCUS_KEY = "redmine.gantt.viewFocus";
 const SELECTED_PROJECT_KEY = "redmine.gantt.selectedProject";
@@ -500,7 +499,6 @@ export class GanttPanel {
   private _extendedRelationTypes: boolean = false;
   private _visibleRelationTypes: Set<string> = new Set(["blocks", "precedes"]);
   private _closedStatusIds: Set<number> = new Set();
-  private _hiddenProjects: Set<number> = new Set(); // Projects hidden from view (persisted)
   private _debouncedCollapseUpdate: DebouncedFunction<() => void>;
   private _cachedHierarchy?: HierarchyNode[];
   private _skipCollapseRerender = false; // Skip re-render when collapse is from client-side
@@ -540,10 +538,8 @@ export class GanttPanel {
       this._disposables
     );
 
-    // Restore hidden projects and view mode from globalState
+    // Restore view mode from globalState
     if (GanttPanel._globalState) {
-      const saved = GanttPanel._globalState.get<number[]>(HIDDEN_PROJECTS_KEY, []);
-      this._hiddenProjects = new Set(saved);
       this._viewMode = GanttPanel._globalState.get<GanttViewMode>(VIEW_MODE_KEY, "projects");
       this._viewFocus = GanttPanel._globalState.get<"project" | "person">(VIEW_FOCUS_KEY, "project");
       this._selectedProjectId = GanttPanel._globalState.get<number | null>(SELECTED_PROJECT_KEY, null);
@@ -617,7 +613,6 @@ export class GanttPanel {
     const barHeight = 30;
     const barGap = 10;
     const rowCount = 10;
-    const checkboxColumnWidth = 0; // Removed: now viewing one project/person at a time
     const idColumnWidth = 55;
     const startDateColumnWidth = 85;
     const statusColumnWidth = 90;
@@ -634,10 +629,6 @@ export class GanttPanel {
       const barWidth = 80 + (i * 53) % 150;
       return { y, isProject, indent, barStart, barWidth };
     });
-
-    const checkboxesSvg = skeletonRows.map((r, i) => `
-      <rect class="skeleton-checkbox delay-${Math.min(i, 7)}" x="6" y="${r.y + 9}" width="12" height="12" rx="2" fill="var(--vscode-panel-border)"/>
-    `).join("");
 
     const labelsSvg = skeletonRows.map((r, i) => `
       <g class="skeleton-label delay-${Math.min(i, 7)}">
@@ -768,9 +759,6 @@ export class GanttPanel {
       border-bottom: 1px solid var(--vscode-panel-border);
       background: var(--vscode-editor-background);
     }
-    .gantt-checkbox-header {
-      display: none; /* Removed: now viewing one project/person at a time */
-    }
     .gantt-left-header {
       flex-shrink: 0;
       width: ${labelWidth}px;
@@ -847,7 +835,7 @@ export class GanttPanel {
       0%, 100% { opacity: 0.3; }
       50% { opacity: 0.7; }
     }
-    .skeleton-checkbox, .skeleton-label, .skeleton-bar-group {
+    .skeleton-label, .skeleton-bar-group {
       animation: pulse 1.5s ease-in-out infinite;
     }
     .delay-0 { animation-delay: 0s; }
@@ -890,7 +878,6 @@ export class GanttPanel {
   </div>
   <div class="gantt-container">
     <div class="gantt-header-row">
-      <div class="gantt-checkbox-header"></div>
       <div class="gantt-left-header"></div>
       <div class="gantt-resize-handle-header"></div>
       <div class="gantt-col-id"><div class="gantt-col-header">#ID</div></div>
@@ -903,11 +890,6 @@ export class GanttPanel {
       </div>
     </div>
     <div class="gantt-body-scroll">
-      <div class="gantt-checkboxes">
-        <svg width="${checkboxColumnWidth}" height="${bodyHeight}">
-          ${checkboxesSvg}
-        </svg>
-      </div>
       <div class="gantt-labels">
         <svg width="${labelWidth * 2}" height="${bodyHeight}">
           ${zebraStripes}
@@ -1389,87 +1371,6 @@ export class GanttPanel {
           } else {
             collapseState.collapse(message.collapseKey);
           }
-        }
-        break;
-      case "toggleProjectVisibility":
-        if (message.projectId !== undefined) {
-          const projectId = message.projectId as number;
-          const wasDirectlyHidden = this._hiddenProjects.has(projectId);
-
-          // Build project hierarchy helpers
-          const projectMap = new Map(this._projects.map(p => [p.id, p]));
-          const childrenMap = new Map<number, number[]>();
-          for (const p of this._projects) {
-            if (p.parent?.id) {
-              const siblings = childrenMap.get(p.parent.id) ?? [];
-              siblings.push(p.id);
-              childrenMap.set(p.parent.id, siblings);
-            }
-          }
-          const getAncestors = (id: number): number[] => {
-            const ancestors: number[] = [];
-            let current = projectMap.get(id);
-            while (current?.parent?.id) {
-              ancestors.push(current.parent.id);
-              current = projectMap.get(current.parent.id);
-            }
-            return ancestors;
-          };
-          const getDescendants = (id: number): number[] => {
-            const descendants: number[] = [];
-            const stack = childrenMap.get(id) ?? [];
-            while (stack.length > 0) {
-              const childId = stack.pop()!;
-              descendants.push(childId);
-              stack.push(...(childrenMap.get(childId) ?? []));
-            }
-            return descendants;
-          };
-
-          if (wasDirectlyHidden) {
-            // Show project + all descendants
-            this._hiddenProjects.delete(projectId);
-            for (const descendantId of getDescendants(projectId)) {
-              this._hiddenProjects.delete(descendantId);
-            }
-          } else {
-            // Check if inherited hidden (ancestor is hidden)
-            const ancestors = getAncestors(projectId);
-            const hiddenAncestor = ancestors.find(id => this._hiddenProjects.has(id));
-            if (hiddenAncestor !== undefined) {
-              // Inherited hidden - show by unhiding ancestors + this project's descendants
-              for (const ancestorId of ancestors) {
-                this._hiddenProjects.delete(ancestorId);
-              }
-              for (const descendantId of getDescendants(projectId)) {
-                this._hiddenProjects.delete(descendantId);
-              }
-            } else {
-              // Not hidden at all - hide it (children auto-hidden via effectiveHiddenProjects)
-              this._hiddenProjects.add(projectId);
-            }
-          }
-          // Persist hidden projects to globalState
-          GanttPanel._globalState?.update(HIDDEN_PROJECTS_KEY, [...this._hiddenProjects]);
-          // Full re-render to update date range and minimap
-          this._updateContent();
-        }
-        break;
-      case "setAllProjectsVisibility":
-        if (message.visible !== undefined && Array.isArray(message.projectIds)) {
-          if (message.visible) {
-            // Show all - remove from hidden set
-            for (const id of message.projectIds) {
-              this._hiddenProjects.delete(id);
-            }
-          } else {
-            // Hide all - add to hidden set
-            for (const id of message.projectIds) {
-              this._hiddenProjects.add(id);
-            }
-          }
-          GanttPanel._globalState?.update(HIDDEN_PROJECTS_KEY, [...this._hiddenProjects]);
-          this._updateContent();
         }
         break;
       case "scrollPosition":
@@ -1969,36 +1870,9 @@ export class GanttPanel {
       }
     }
 
-    // Build effective hidden projects set (includes children of hidden projects)
-    const effectiveHiddenProjects = new Set(this._hiddenProjects);
-    if (this._projects.length > 0) {
-      // Build parent→children map
-      const childrenMap = new Map<number, number[]>();
-      for (const p of this._projects) {
-        if (p.parent?.id) {
-          const siblings = childrenMap.get(p.parent.id) ?? [];
-          siblings.push(p.id);
-          childrenMap.set(p.parent.id, siblings);
-        }
-      }
-      // Recursively add children of hidden projects
-      const addChildren = (projectId: number) => {
-        for (const childId of childrenMap.get(projectId) ?? []) {
-          if (!effectiveHiddenProjects.has(childId)) {
-            effectiveHiddenProjects.add(childId);
-            addChildren(childId);
-          }
-        }
-      };
-      for (const hiddenId of this._hiddenProjects) {
-        addChildren(hiddenId);
-      }
-    }
-
-    // Filter issues: must have a row AND not be hidden
-    // This fixes the bug where issues from projects without rows affected date range
+    // Filter issues: must have a project with rows in the hierarchy
     const visibleIssues = this._issues.filter(
-      (i) => projectIdsWithRows.has(i.project.id) && !effectiveHiddenProjects.has(i.project.id)
+      (i) => projectIdsWithRows.has(i.project.id)
     );
 
     // Focus on active work: exclude completed issues with past dates
@@ -2017,13 +1891,12 @@ export class GanttPanel {
       [i.start_date, i.due_date].filter(Boolean)
     ) as string[];
 
-    // If no issues at all (not just hidden), show empty state
+    // If no issues at all, show empty state
     if (this._issues.length === 0) {
-      return this._getEmptyHtml(false);
+      return this._getEmptyHtml();
     }
 
-    // When no visible dates (all hidden), use today +/- 30 days as default range
-    // This keeps checkboxes visible so user can re-enable projects
+    // When no visible dates, use today +/- 30 days as default range
     let minDate: Date;
     let maxDate: Date;
 
@@ -2065,32 +1938,7 @@ export class GanttPanel {
     const headerHeight = 40;
     const indentSize = 16;
 
-    // Hidden projects: use effectiveHiddenProjects (consistent with date range calculation)
-    // Build lookup for faster ancestor checks
-    const rowByCollapseKey = new Map(allRows.map(r => [r.collapseKey, r]));
-    const hiddenTreeCache = new Map<string, boolean>();
-
-    const isInHiddenTreeCached = (row: GanttRow): boolean => {
-      const cached = hiddenTreeCache.get(row.collapseKey);
-      if (cached !== undefined) return cached;
-
-      let result = false;
-      if (row.type === "project" && effectiveHiddenProjects.has(row.id)) {
-        result = true;
-      } else if (row.issue?.projectId && effectiveHiddenProjects.has(row.issue.projectId)) {
-        result = true;
-      } else if (row.parentKey) {
-        const parentRow = rowByCollapseKey.get(row.parentKey);
-        if (parentRow) {
-          result = isInHiddenTreeCached(parentRow);
-        }
-      }
-      hiddenTreeCache.set(row.collapseKey, result);
-      return result;
-    };
-
-    // Keep original hierarchy order (no sorting for hidden projects)
-    // Visibility is handled via CSS classes for client-side toggling
+    // All projects are visible - no hidden project filtering
     const rows = allRows;
 
     // Collect all expandable keys (rows with children) for "Expand All" functionality
@@ -2139,46 +1987,6 @@ export class GanttPanel {
         if (idx % 2 === 0) return ""; // Only odd rows get background
         const y = idx * (barHeight + barGap);
         return `<rect class="zebra-stripe" data-stripe-for="${row.collapseKey}" x="0" y="${y}" width="100%" height="${barHeight + barGap}" />`;
-      })
-      .join("");
-
-    // Checkbox column - shows checkboxes for ALL visible projects
-    // Checked = bars visible, Unchecked = project moved to bottom, bars hidden
-    // Checkboxes align 1:1 with project rows in the labels column
-    const checkboxColumnWidth = 0; // Removed: now viewing one project/person at a time
-    const checkboxSize = 14;
-
-    // Only visible projects get checkboxes (aligned with their label row)
-    const projectRows = visibleRows.filter(r => r.type === "project");
-
-    // Calculate "select all" state: all checked, none checked, or indeterminate
-    const checkedCount = projectRows.filter(r => !effectiveHiddenProjects.has(r.id)).length;
-    const allChecked = projectRows.length > 0 && checkedCount === projectRows.length;
-    const noneChecked = checkedCount === 0;
-    const selectAllState = allChecked ? "checked" : noneChecked ? "unchecked" : "indeterminate";
-
-    // Zebra stripes for checkbox column - use same pattern as labels/timeline for alignment
-    const checkboxZebraStripes = zebraStripes;
-    const checkboxes = projectRows
-      .map((row) => {
-        // Get Y from visible row index - guaranteed to exist since we filtered visibleRows
-        const visibleIdx = rowVisibleIndices.get(row.collapseKey)!;
-        const y = visibleIdx * (barHeight + barGap);
-        const checkboxX = (checkboxColumnWidth - checkboxSize) / 2;
-        const checkboxY = y + (barHeight - checkboxSize) / 2;
-        // Use effective visibility (includes parent hidden state) for checkbox visual
-        const isEffectivelyVisible = !effectiveHiddenProjects.has(row.id);
-        // Check if hidden because parent is hidden (for dimmed styling)
-        const isInheritedHidden = !this._hiddenProjects.has(row.id) && effectiveHiddenProjects.has(row.id);
-        return `
-          <g class="project-checkbox cursor-pointer${isInheritedHidden ? " inherited-hidden" : ""}" data-project-id="${row.id}" role="checkbox" aria-checked="${isEffectivelyVisible}" aria-label="Show/hide ${escapeHtml(row.label)}">
-            <rect x="${checkboxX}" y="${checkboxY}" width="${checkboxSize}" height="${checkboxSize}"
-                  fill="${isEffectivelyVisible ? "var(--vscode-checkbox-background)" : "transparent"}"
-                  stroke="var(--vscode-checkbox-border)" stroke-width="1" rx="2"/>
-            ${isEffectivelyVisible ? `<text x="${checkboxX + checkboxSize / 2}" y="${checkboxY + checkboxSize - 3}" text-anchor="middle" fill="var(--vscode-checkbox-foreground)" font-size="11" font-weight="bold">✓</text>` : ""}
-            <title>${escapeHtml(row.label)}</title>
-          </g>
-        `;
       })
       .join("");
 
@@ -2461,12 +2269,10 @@ export class GanttPanel {
       .join("");
 
     // Right bars (scrollable timeline) - only visible rows for performance
-    // Hidden project bars get CSS class for client-side visibility toggling
+    // Generate bars for all visible rows
     const bars = visibleRows
       .map((row, idx) => {
         const y = idx * (barHeight + barGap);
-        const isHidden = isInHiddenTreeCached(row);
-        const hiddenClass = isHidden ? " bar-hidden" : "";
 
         // Project headers: always render aggregate bars (with visibility class)
         if (row.type === "project") {
@@ -2494,7 +2300,7 @@ export class GanttPanel {
             })
             .join("");
 
-          return `<g class="aggregate-bars gantt-row${hiddenClass}" data-project-id="${row.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" transform="translate(0, ${y})">${aggregateBars}</g>`;
+          return `<g class="aggregate-bars gantt-row" data-project-id="${row.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" transform="translate(0, ${y})">${aggregateBars}</g>`;
         }
 
         // Time group headers: render aggregate bars for child issues
@@ -2751,7 +2557,7 @@ export class GanttPanel {
           // Parent done_ratio is weighted average of subtasks
           const parentDoneWidth = (doneRatio / 100) * (endX - startX - 8);
           return `
-            <g class="issue-bar parent-bar gantt-row${hiddenClass}" data-issue-id="${issue.id}"
+            <g class="issue-bar parent-bar gantt-row" data-issue-id="${issue.id}"
                data-project-id="${issue.projectId}"
                data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
                data-start-date="${issue.start_date || ""}"
@@ -2796,7 +2602,7 @@ export class GanttPanel {
         // Critical path: zero or negative flexibility
         const isCritical = flexSlack !== null && flexSlack <= 0 && !issue.isClosed;
         return `
-          <g class="issue-bar gantt-row${hiddenClass}${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${issue.isAdHoc ? " bar-adhoc" : ""}${isCritical ? " bar-critical" : ""}" data-issue-id="${issue.id}"
+          <g class="issue-bar gantt-row${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${issue.isAdHoc ? " bar-adhoc" : ""}${isCritical ? " bar-critical" : ""}" data-issue-id="${issue.id}"
              data-project-id="${issue.projectId}"
              data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
              data-start-date="${issue.start_date || ""}"
@@ -3012,7 +2818,7 @@ export class GanttPanel {
     // Use rows (which have GanttIssue) for dependency arrows - only for visible projects
     const visibleRelTypes = this._visibleRelationTypes;
     const dependencyArrows = rows
-      .filter((row): row is GanttRow & { issue: GanttIssue } => row.type === "issue" && !!row.issue && !isInHiddenTreeCached(row))
+      .filter((row): row is GanttRow & { issue: GanttIssue } => row.type === "issue" && !!row.issue)
       .flatMap((row) =>
         row.issue.relations
           .filter((rel) => visibleRelTypes.has(rel.type))
@@ -3020,9 +2826,7 @@ export class GanttPanel {
           const issue = row.issue;
           const source = issuePositions.get(issue.id);
           const target = issuePositions.get(rel.targetId);
-          // Skip if source/target missing OR target is in hidden project
-          const targetRow = rowByCollapseKey.get(`issue-${rel.targetId}`);
-          if (!source || !target || (targetRow && isInHiddenTreeCached(targetRow))) return "";
+          if (!source || !target) return "";
 
           const style = relationStyles[rel.type] || relationStyles.relates;
           const arrowSize = 6;
@@ -3132,11 +2936,11 @@ ${style.tip}
       .filter(Boolean)
       .join("");
 
-    // Generate minimap bars (simplified representation) - only for visible projects
+    // Generate minimap bars (simplified representation)
     const minimapBarHeight = 5;
     const minimapHeight = 30;
     const minimapBars = rows
-      .filter(r => r.type === "issue" && r.issue && (r.issue.start_date || r.issue.due_date) && !isInHiddenTreeCached(r))
+      .filter(r => r.type === "issue" && r.issue && (r.issue.start_date || r.issue.due_date))
       .map((row) => {
         const issue = row.issue!;
         // Open-ended bars: start_date but no due_date stretches to window end
@@ -3545,9 +3349,6 @@ ${style.tip}
     .gantt-corner {
       z-index: 25; /* Above both sticky header and sticky left */
     }
-    .gantt-checkbox-header, .select-all-checkbox {
-      display: none; /* Removed: now viewing one project/person at a time */
-    }
     .gantt-left-header {
       flex-shrink: 0;
       width: ${labelWidth}px;
@@ -3577,7 +3378,6 @@ ${style.tip}
       bottom: 0;
     }
     .gantt-timeline-header { flex-shrink: 0; background: var(--vscode-editor-background); }
-    .gantt-checkboxes, .project-checkbox { display: none; /* Removed */ }
     .gantt-labels svg { display: block; min-width: 100%; }
     .gantt-labels {
       flex-shrink: 0;
@@ -3675,8 +3475,6 @@ ${style.tip}
     /* Ad-hoc budget pool bars (purple dotted outline) */
     .issue-bar.bar-adhoc .bar-outline { stroke: var(--vscode-charts-purple) !important; stroke-width: 2; stroke-dasharray: 3, 2; }
     .issue-bar.bar-adhoc .bar-main { opacity: 0.6; }
-    /* Hidden project bars (toggled via checkbox) */
-    .bar-hidden { display: none; }
     .issue-bar.selected .bar-outline { stroke: var(--vscode-focusBorder) !important; stroke-width: 2; }
     .issue-bar.selected .bar-main { opacity: 1; }
     .multi-select-mode .issue-bar { cursor: pointer; }
@@ -3759,11 +3557,6 @@ ${style.tip}
     /* Collapse toggle chevron */
     .collapse-toggle { cursor: pointer; opacity: 0.7; }
     .collapse-toggle:hover { opacity: 1; }
-    /* Project visibility checkbox */
-    .project-checkbox:hover rect { stroke: var(--vscode-focusBorder); }
-    .project-checkbox rect { transition: stroke 0.1s; }
-    .project-checkbox.inherited-hidden { opacity: 0.5; }
-    .project-checkbox.inherited-hidden rect { stroke-dasharray: 3, 2; }
     /* Screen reader only class */
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
     /* Quick search overlay */
@@ -4154,15 +3947,6 @@ ${style.tip}
       <!-- Header row - sticky at top -->
       <div class="gantt-header-row">
         <div class="gantt-sticky-left gantt-corner">
-          <div class="gantt-checkbox-header">
-            <svg width="${checkboxColumnWidth}" height="${headerHeight}" class="select-all-checkbox" role="checkbox" aria-checked="${selectAllState === "checked"}" aria-label="Select/deselect all projects" tabindex="0">
-              <rect x="${(checkboxColumnWidth - checkboxSize) / 2}" y="${(headerHeight - checkboxSize) / 2}" width="${checkboxSize}" height="${checkboxSize}"
-                    fill="${selectAllState === "checked" ? "var(--vscode-checkbox-background)" : "transparent"}"
-                    stroke="var(--vscode-checkbox-border)" stroke-width="1" rx="2"/>
-              ${selectAllState === "checked" ? `<text x="${checkboxColumnWidth / 2}" y="${(headerHeight + checkboxSize) / 2 - 3}" text-anchor="middle" fill="var(--vscode-checkbox-foreground)" font-size="11" font-weight="bold">✓</text>` : ""}
-              ${selectAllState === "indeterminate" ? `<rect x="${(checkboxColumnWidth - 8) / 2}" y="${(headerHeight - 2) / 2}" width="8" height="2" fill="var(--vscode-checkbox-foreground)"/>` : ""}
-            </svg>
-          </div>
           <div class="gantt-left-header" id="ganttLeftHeader"></div>
           <div class="gantt-resize-handle-header"></div>
           <div class="gantt-col-id"><div class="gantt-col-header sortable${this._sortBy === "id" ? " sorted" : ""}" data-sort="id">#ID${this._sortBy === "id" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
@@ -4195,12 +3979,6 @@ ${style.tip}
       <!-- Body -->
       <div class="gantt-body">
         <div class="gantt-sticky-left">
-          <div class="gantt-checkboxes" id="ganttCheckboxes">
-            <svg viewBox="0 0 ${checkboxColumnWidth} ${bodyHeight}" preserveAspectRatio="none" height="${bodyHeight}" data-render-key="${this._renderKey}">
-              ${checkboxZebraStripes}
-              ${checkboxes}
-            </svg>
-          </div>
           <div class="gantt-labels" id="ganttLabels">
             <svg width="${labelWidth * 2}" height="${bodyHeight}" data-render-key="${this._renderKey}">
               ${zebraStripes}
@@ -5657,34 +5435,6 @@ ${style.tip}
       vscode.postMessage({ command: 'collapseAll' });
     });
 
-    // Project visibility checkbox click
-    document.querySelectorAll('.project-checkbox').forEach(el => {
-      el.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const projectId = parseInt(el.dataset.projectId);
-        if (!isNaN(projectId)) {
-          vscode.postMessage({ command: 'toggleProjectVisibility', projectId });
-        }
-      });
-    });
-
-    // Select all checkbox click
-    const selectAllCheckbox = document.querySelector('.select-all-checkbox');
-    if (selectAllCheckbox) {
-      selectAllCheckbox.addEventListener('click', () => {
-        const allProjectIds = Array.from(document.querySelectorAll('.project-checkbox'))
-          .map(el => parseInt(el.dataset.projectId))
-          .filter(id => !isNaN(id));
-        const isCurrentlyAllChecked = selectAllCheckbox.getAttribute('aria-checked') === 'true';
-        // If all checked, uncheck all; otherwise check all
-        vscode.postMessage({
-          command: 'setAllProjectsVisibility',
-          projectIds: allProjectIds,
-          visible: !isCurrentlyAllChecked
-        });
-      });
-    }
-
     // Labels click and keyboard navigation
     const allLabels = Array.from(document.querySelectorAll('.project-label, .issue-label, .time-group-label'));
     let activeLabel = null;
@@ -6443,11 +6193,9 @@ ${style.tip}
 </html>`;
   }
 
-  private _getEmptyHtml(allProjectsHidden = false): string {
+  private _getEmptyHtml(): string {
     const nonce = getNonce();
-    const message = allProjectsHidden
-      ? "All projects are hidden. Use the checkboxes to show projects."
-      : "No issues with dates to display. Add start_date or due_date to your issues.";
+    const message = "No issues with dates to display. Add start_date or due_date to your issues.";
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
