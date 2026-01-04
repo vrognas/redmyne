@@ -4010,7 +4010,7 @@ ${style.tip}
               <span class="shortcut">Y</span>
             </div>
             <div class="toolbar-dropdown-item${this._showIntensity && this._viewFocus === "person" ? " active" : ""}" id="menuIntensity"${this._viewFocus !== "person" ? " disabled" : ""}>
-              <span class="icon">📈</span>
+              <span class="icon">▥</span>
               <span>Intensity</span>
               <span class="shortcut">I</span>
             </div>
