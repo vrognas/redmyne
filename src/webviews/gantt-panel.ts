@@ -1054,10 +1054,21 @@ export class GanttPanel {
         .sort();
       const fromDate = startDates[0] || today; // Earliest start date or today
 
-      // Fetch time entries with date range filter
+      // In by-person mode, filter by viewed user for efficiency
+      // (cross-user contributions won't show, but avoids fetching thousands of entries)
+      let userId: number | undefined;
+      if (this._viewFocus === "person" && this._selectedAssignee) {
+        const assigneeIssue = this._issues.find(
+          i => i.assigned_to?.name === this._selectedAssignee
+        );
+        userId = assigneeIssue?.assigned_to?.id;
+      }
+
+      // Fetch time entries with date range and optional user filter
       const allTimeEntries = await this._server.getTimeEntriesForIssues(allAdHocIds, {
         from: fromDate,
         to: today,
+        userId,
       });
 
       // Calculate contributions
