@@ -85,18 +85,24 @@ export async function contributeToIssue(
 
   const targetId = parseInt(targetIdStr, 10);
 
-  // Verify target issue exists and is in same project
+  // Verify target issue exists
+  let targetIssue;
   try {
-    const { issue: targetIssue } = await server.getIssueById(targetId);
-    if (targetIssue.project?.id !== projectId) {
-      vscode.window.showErrorMessage(
-        `Issue #${targetId} is not in the same project`
-      );
-      return;
-    }
+    const result = await server.getIssueById(targetId);
+    targetIssue = result.issue;
   } catch {
     vscode.window.showErrorMessage(`Issue #${targetId} not found`);
     return;
+  }
+
+  // Warn if cross-project contribution
+  if (targetIssue.project?.id !== projectId) {
+    const proceed = await vscode.window.showWarningMessage(
+      `Issue #${targetId} is in a different project (${targetIssue.project?.name ?? "unknown"}). Continue?`,
+      "Yes",
+      "Cancel"
+    );
+    if (proceed !== "Yes") return;
   }
 
   // Update comment to include target reference
