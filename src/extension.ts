@@ -884,14 +884,20 @@ export function activate(context: vscode.ExtensionContext): void {
   // Contribute time entry hours to another issue
   context.subscriptions.push(
     vscode.commands.registerCommand("redmine.contributeToIssue", (item) =>
-      contributeToIssue(item, myTimeEntriesTree.server, () => myTimeEntriesTree.refresh())
+      contributeToIssue(item, myTimeEntriesTree.server, () => {
+        myTimeEntriesTree.refresh();
+        vscode.commands.executeCommand("redmine.refreshGanttData");
+      })
     )
   );
 
   // Remove contribution from time entry
   context.subscriptions.push(
     vscode.commands.registerCommand("redmine.removeContribution", (item) =>
-      removeContribution(item, myTimeEntriesTree.server, () => myTimeEntriesTree.refresh())
+      removeContribution(item, myTimeEntriesTree.server, () => {
+        myTimeEntriesTree.refresh();
+        vscode.commands.executeCommand("redmine.refreshGanttData");
+      })
     )
   );
 
