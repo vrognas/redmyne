@@ -354,7 +354,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     // Label format: "#id comment", description: "HH:MM [activity] subject"
     expect(todayChildren[0].label).toBe("#123 Test comment");
     expect(todayChildren[0].description).toContain("Fetched Issue Subject");
-    expect(mockServer.getIssuesByIds).toHaveBeenCalledWith([123]);
+    expect(mockServer.getIssuesByIds).toHaveBeenCalledWith([123], false);
   });
 
   it("caches fetched issues to avoid redundant API calls", async () => {

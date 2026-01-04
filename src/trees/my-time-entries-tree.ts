@@ -421,7 +421,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     // Batch fetch missing issues in single API call
     if (missingIssueIds.length > 0 && this.server) {
       try {
-        const issues = await this.server.getIssuesByIds(missingIssueIds);
+        const issues = await this.server.getIssuesByIds(missingIssueIds, false);
         const foundIds = new Set<number>();
         for (const issue of issues) {
           foundIds.add(issue.id);
