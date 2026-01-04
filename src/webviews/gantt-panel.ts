@@ -4009,6 +4009,11 @@ ${style.tip}
               <span>Capacity</span>
               <span class="shortcut">Y</span>
             </div>
+            <div class="toolbar-dropdown-item${this._showIntensity && this._viewFocus === "person" ? " active" : ""}" id="menuIntensity"${this._viewFocus !== "person" ? " disabled" : ""}>
+              <span class="icon">📈</span>
+              <span>Intensity</span>
+              <span class="shortcut">I</span>
+            </div>
             <div class="toolbar-dropdown-divider"></div>
             <div class="toolbar-dropdown-item" id="menuUndo" disabled>
               <span class="icon">↩</span>
@@ -4574,6 +4579,13 @@ ${style.tip}
       if (document.getElementById('menuCapacity')?.hasAttribute('disabled')) return;
       saveState();
       vscode.postMessage({ command: 'toggleCapacityRibbon' });
+    });
+
+    // Intensity toggle handler (menu item)
+    document.getElementById('menuIntensity')?.addEventListener('click', () => {
+      if (document.getElementById('menuIntensity')?.hasAttribute('disabled')) return;
+      saveState();
+      vscode.postMessage({ command: 'toggleIntensity' });
     });
 
     // Overload badge click - jump to first overloaded day
@@ -6000,6 +6012,7 @@ ${style.tip}
       // Toggle shortcuts (trigger menu items)
       else if (e.key.toLowerCase() === 'h') { document.getElementById('menuHeatmap')?.click(); }
       else if (e.key.toLowerCase() === 'y') { document.getElementById('menuCapacity')?.click(); }
+      else if (e.key.toLowerCase() === 'i') { document.getElementById('menuIntensity')?.click(); }
       else if (e.key.toLowerCase() === 'd') { document.getElementById('menuDeps')?.click(); }
       else if (e.key.toLowerCase() === 'v') {
         // Toggle view focus between Project and Person
