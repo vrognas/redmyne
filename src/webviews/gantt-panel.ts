@@ -504,6 +504,7 @@ export class GanttPanel {
   private _skipCollapseRerender = false; // Skip re-render when collapse is from client-side
   private _renderKey = 0; // Incremented on each render to force SVG re-creation
   private _isRefreshing = false; // Show loading overlay during data refresh
+  private _contributionsLoading = false; // Prevent duplicate contribution fetches
   private _currentFilter: IssueFilter = { ...DEFAULT_ISSUE_FILTER };
   private _healthFilter: "all" | "healthy" | "warning" | "critical" = "all";
   private _filterChangeCallback?: (filter: IssueFilter) => void;
@@ -1013,6 +1014,8 @@ export class GanttPanel {
    */
   private async _loadContributions(): Promise<void> {
     if (!this._server || this._issues.length === 0) return;
+    if (this._contributionsLoading) return; // Prevent duplicate fetches
+    this._contributionsLoading = true;
 
     // Get unique project IDs from displayed issues
     const projectIds = new Set<number>();
@@ -1022,12 +1025,18 @@ export class GanttPanel {
       }
     }
 
-    if (projectIds.size === 0) return;
+    if (projectIds.size === 0) {
+      this._contributionsLoading = false;
+      return;
+    }
 
     // Check if any displayed issues are ad-hoc
     const adHocIssueIds = new Set(adHocTracker.getAll());
     const hasAdHocIssues = this._issues.some(i => adHocIssueIds.has(i.id));
-    if (!hasAdHocIssues && adHocIssueIds.size === 0) return;
+    if (!hasAdHocIssues && adHocIssueIds.size === 0) {
+      this._contributionsLoading = false;
+      return;
+    }
 
     try {
       // Single fetch all time entries, filter client-side by project
@@ -1088,6 +1097,8 @@ export class GanttPanel {
       this._updateContent();
     } catch {
       // Silently fail - contributions are optional enhancement
+    } finally {
+      this._contributionsLoading = false;
     }
   }
 
