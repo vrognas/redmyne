@@ -1900,17 +1900,18 @@ export class GanttPanel {
     const issueMap = new Map(sortedIssues.map(i => [i.id, i]));
     const allRows = flatNodes.map((node) => nodeToGanttRow(node, this._flexibilityCache, this._closedStatusIds, depGraph, issueMap));
 
-    // Extract project IDs that have rows (only these should affect date range)
-    const projectIdsWithRows = new Set<number>();
+    // Extract issue IDs that are actually displayed as rows
+    const issueIdsInRows = new Set<number>();
     for (const row of allRows) {
-      if (row.type === "project") {
-        projectIdsWithRows.add(row.id);
+      if (row.type === "issue") {
+        issueIdsInRows.add(row.id);
       }
     }
 
-    // Filter issues: must have a project with rows in the hierarchy
+    // Filter issues: must actually be displayed in the hierarchy
+    // (not just in same project - important for by-person mode)
     const visibleIssues = this._issues.filter(
-      (i) => projectIdsWithRows.has(i.project.id)
+      (i) => issueIdsInRows.has(i.id)
     );
 
     // Focus on active work: exclude completed issues with past dates
