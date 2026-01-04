@@ -6,6 +6,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 ### Added
 
+- **Actual time entry reconciliation** - past-day intensity now uses actual logged hours instead of predictions; today and future use priority-based scheduling
 - **Priority-based capacity scheduling** - capacity/intensity now uses frontloaded day-by-day simulation; prioritizes by due date urgency, external blocks (2x weight), and downstream count
 - **Gantt bar intensity visualization** - bars show scheduled work distribution (person view); intensity lines indicate when work is actually scheduled vs uniform spread
 - **Internal estimates** - right-click issue to set manual "hours remaining" when original estimate is outdated; takes highest priority in capacity calculation
@@ -40,6 +41,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Capacity tooltip shows project** - breakdown now shows project name instead of subject (issue ID already visible)
 - **Internal estimate prompt on %done** - setting manual %done now prompts for hours remaining
 - **Gantt native context menu** - issue bars now use VS Code native context menus instead of custom HTML
+- **Gantt project context menu** - project labels now have native VS Code context menu with "Open in Browser" and "Show in Gantt"
 
 ### Fixed
 
@@ -53,6 +55,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Gantt by-person timeline range** - timeline no longer extends to old issues assigned to others in same project
 - **Intensity off-by-1** - fixed timezone mismatch causing intensity bars to show on wrong day
 - **Internal estimates in scheduling** - issues with internal estimates but no Redmine estimate now included
+- **Week subgroup ID collision** - fixed duplicate week ID error when same week spans multiple month groups
 
 ## [3.19.0]
 

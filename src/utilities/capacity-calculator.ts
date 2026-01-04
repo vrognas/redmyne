@@ -432,9 +432,15 @@ function calculatePriorityScore(
   return score;
 }
 
+/** Map of issueId -> date (YYYY-MM-DD) -> hours logged */
+export type ActualTimeEntries = Map<number, Map<string, number>>;
+
 /**
  * Calculate daily capacity using priority-based frontloading.
  * Unlike uniform distribution, this schedules high-priority work ASAP.
+ *
+ * For past/today: uses actual time entries (truth)
+ * For future: uses priority-based prediction
  *
  * Priority order:
  * 1. Issues blocking external assignees (2x weight)
@@ -455,6 +461,8 @@ function calculatePriorityScore(
  * @param myUserId - Current user ID for external block detection
  * @param allIssuesMap - Optional map of all issues (for external block detection)
  * @param precedenceIssues - User-tagged issues that always get scheduled first
+ * @param actualTimeEntries - Actual logged hours per issue per day (for past days)
+ * @param today - Today's date (YYYY-MM-DD); dates <= today use actual entries
  */
 export function calculateScheduledCapacity(
   issues: Issue[],
@@ -465,7 +473,9 @@ export function calculateScheduledCapacity(
   internalEstimates: InternalEstimates,
   myUserId?: number,
   allIssuesMap?: Map<number, Issue>,
-  precedenceIssues?: Set<number>
+  precedenceIssues?: Set<number>,
+  actualTimeEntries?: ActualTimeEntries,
+  today?: string
 ): ScheduledDailyCapacity[] {
   // Filter to schedulable issues (has start_date AND work to schedule)
   // Work can come from estimated_hours OR internal estimate
@@ -494,14 +504,20 @@ export function calculateScheduledCapacity(
     }
   }
 
-  // Initialize remaining work per issue
+  // Initialize remaining work per issue (reflects current state including spent hours)
   const remainingWork = new Map<number, number>();
   for (const issue of schedulableIssues) {
     remainingWork.set(issue.id, calculateRemainingWork(issue, internalEstimates));
   }
 
-  // Track completed issues for blocker resolution
+  // Track completed issues for blocker resolution (start with fully done issues)
   const completedIssues = new Set<number>();
+  for (const issue of issues) {
+    // Treat 100% done issues as completed for blocking purposes
+    if (issue.done_ratio === 100) {
+      completedIssues.add(issue.id);
+    }
+  }
 
   const result: ScheduledDailyCapacity[] = [];
   const current = new Date(startDate + "T00:00:00Z");
@@ -514,77 +530,95 @@ export function calculateScheduledCapacity(
 
     // Skip non-working days
     if (capacityHours > 0) {
-      // Get issues that can be scheduled today
-      const todaysIssues = schedulableIssues.filter((issue) => {
-        // Must have started
-        if (issue.start_date! > dateStr) return false;
-        // Must have remaining work
-        if ((remainingWork.get(issue.id) ?? 0) <= 0) return false;
-        // All blockers must be complete
-        if (!allBlockersComplete(issue, completedIssues, graph)) return false;
-        return true;
-      });
+      // Check if this is past (use actual) or today/future (use prediction)
+      const usePrediction = !today || dateStr >= today;
 
-      // Sort by priority (highest first)
-      todaysIssues.sort((a, b) => {
-        const scoreA = calculatePriorityScore(a, graph, issueMap, maxDueDate, myUserId, precedenceIssues);
-        const scoreB = calculatePriorityScore(b, graph, issueMap, maxDueDate, myUserId, precedenceIssues);
-        if (scoreB !== scoreA) return scoreB - scoreA;
-        // Tiebreaker: earlier due date
-        if (a.due_date && b.due_date) {
-          if (a.due_date !== b.due_date) return a.due_date.localeCompare(b.due_date);
-        }
-        // Tiebreaker: earlier start date
-        if (a.start_date !== b.start_date) return a.start_date!.localeCompare(b.start_date!);
-        // Tiebreaker: lower ID
-        return a.id - b.id;
-      });
+      if (usePrediction) {
+        // FUTURE: Priority-based scheduling prediction
+        const todaysIssues = schedulableIssues.filter((issue) => {
+          if (issue.start_date! > dateStr) return false;
+          if ((remainingWork.get(issue.id) ?? 0) <= 0) return false;
+          if (!allBlockersComplete(issue, completedIssues, graph)) return false;
+          return true;
+        });
 
-      // Fill capacity from highest priority
-      const breakdown: IssueScheduleEntry[] = [];
-      let loadHours = 0;
-      let available = capacityHours;
+        todaysIssues.sort((a, b) => {
+          const scoreA = calculatePriorityScore(a, graph, issueMap, maxDueDate, myUserId, precedenceIssues);
+          const scoreB = calculatePriorityScore(b, graph, issueMap, maxDueDate, myUserId, precedenceIssues);
+          if (scoreB !== scoreA) return scoreB - scoreA;
+          if (a.due_date && b.due_date && a.due_date !== b.due_date) {
+            return a.due_date.localeCompare(b.due_date);
+          }
+          if (a.start_date !== b.start_date) return a.start_date!.localeCompare(b.start_date!);
+          return a.id - b.id;
+        });
 
-      for (const issue of todaysIssues) {
-        if (available <= 0) break;
+        const breakdown: IssueScheduleEntry[] = [];
+        let loadHours = 0;
+        let available = capacityHours;
 
-        const issueRemaining = remainingWork.get(issue.id) ?? 0;
-        const hours = Math.min(available, issueRemaining);
+        for (const issue of todaysIssues) {
+          if (available <= 0) break;
+          const issueRemaining = remainingWork.get(issue.id) ?? 0;
+          const hours = Math.min(available, issueRemaining);
 
-        if (hours > 0) {
-          // Check if past due date (slippage)
-          const isSlippage = issue.due_date ? dateStr > issue.due_date : false;
-
-          breakdown.push({
-            issueId: issue.id,
-            hours: Math.round(hours * 100) / 100,
-            isSlippage,
-          });
-
-          loadHours += hours;
-          available -= hours;
-
-          // Update remaining work
-          const newRemaining = issueRemaining - hours;
-          remainingWork.set(issue.id, newRemaining);
-
-          // Mark as completed if no remaining work
-          if (newRemaining <= 0) {
-            completedIssues.add(issue.id);
+          if (hours > 0) {
+            const isSlippage = issue.due_date ? dateStr > issue.due_date : false;
+            breakdown.push({
+              issueId: issue.id,
+              hours: Math.round(hours * 100) / 100,
+              isSlippage,
+            });
+            loadHours += hours;
+            available -= hours;
+            const newRemaining = issueRemaining - hours;
+            remainingWork.set(issue.id, newRemaining);
+            if (newRemaining <= 0) {
+              completedIssues.add(issue.id);
+            }
           }
         }
+
+        const percentage = capacityHours > 0 ? (loadHours / capacityHours) * 100 : 0;
+        result.push({
+          date: dateStr,
+          loadHours: Math.round(loadHours * 100) / 100,
+          capacityHours,
+          percentage: Math.round(percentage),
+          status: getCapacityStatus(percentage),
+          breakdown,
+        });
+      } else {
+        // PAST/TODAY: Use actual time entries (truth)
+        const breakdown: IssueScheduleEntry[] = [];
+        let loadHours = 0;
+
+        if (actualTimeEntries) {
+          for (const issue of issues) {
+            const issueEntries = actualTimeEntries.get(issue.id);
+            const hours = issueEntries?.get(dateStr) ?? 0;
+            if (hours > 0) {
+              const isSlippage = issue.due_date ? dateStr > issue.due_date : false;
+              breakdown.push({
+                issueId: issue.id,
+                hours: Math.round(hours * 100) / 100,
+                isSlippage,
+              });
+              loadHours += hours;
+            }
+          }
+        }
+
+        const percentage = capacityHours > 0 ? (loadHours / capacityHours) * 100 : 0;
+        result.push({
+          date: dateStr,
+          loadHours: Math.round(loadHours * 100) / 100,
+          capacityHours,
+          percentage: Math.round(percentage),
+          status: getCapacityStatus(percentage),
+          breakdown,
+        });
       }
-
-      const percentage = capacityHours > 0 ? (loadHours / capacityHours) * 100 : 0;
-
-      result.push({
-        date: dateStr,
-        loadHours: Math.round(loadHours * 100) / 100,
-        capacityHours,
-        percentage: Math.round(percentage),
-        status: getCapacityStatus(percentage),
-        breakdown,
-      });
     }
 
     current.setUTCDate(current.getUTCDate() + 1);
@@ -607,7 +641,9 @@ export function calculateScheduledCapacityByZoom(
   zoomLevel: CapacityZoomLevel,
   myUserId?: number,
   allIssuesMap?: Map<number, Issue>,
-  precedenceIssues?: Set<number>
+  precedenceIssues?: Set<number>,
+  actualTimeEntries?: ActualTimeEntries,
+  today?: string
 ): PeriodCapacity[] {
   // Get daily scheduled capacity first
   const dailyData = calculateScheduledCapacity(
@@ -619,7 +655,9 @@ export function calculateScheduledCapacityByZoom(
     internalEstimates,
     myUserId,
     allIssuesMap,
-    precedenceIssues
+    precedenceIssues,
+    actualTimeEntries,
+    today
   );
 
   if (dailyData.length === 0) {

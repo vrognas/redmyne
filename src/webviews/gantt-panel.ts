@@ -19,6 +19,7 @@ import {
   type PeriodCapacity,
   type InternalEstimates,
   type ScheduledDailyCapacity,
+  type ActualTimeEntries,
 } from "../utilities/capacity-calculator";
 import { getInternalEstimates, getInternalEstimate } from "../utilities/internal-estimates";
 import { getPrecedenceIssues, hasPrecedence, togglePrecedence } from "../utilities/precedence-tracker";
@@ -27,6 +28,9 @@ import { collapseState } from "../utilities/collapse-state";
 import { debounce, DebouncedFunction } from "../utilities/debounce";
 import { IssueFilter, DEFAULT_ISSUE_FILTER, GanttViewMode } from "../redmine/models/common";
 import { parseLocalDate, getLocalToday, formatLocalDate } from "../utilities/date-utils";
+
+/** Get today's date as YYYY-MM-DD string */
+const getTodayStr = (): string => formatLocalDate(getLocalToday());
 
 const COLLAPSE_DEBOUNCE_MS = 50;
 
@@ -117,6 +121,8 @@ interface GanttRow {
   health?: ProjectHealth;
   /** Project description (for project rows) */
   description?: string;
+  /** Project identifier (for project rows) */
+  identifier?: string;
 }
 
 
@@ -219,6 +225,7 @@ function nodeToGanttRow(
       isExpanded: node.isExpanded,
       health: node.health,
       description: node.description,
+      identifier: node.identifier,
     };
   }
 
@@ -564,6 +571,8 @@ export class GanttPanel {
   // Sort settings (null = no sorting, use natural/hierarchy order)
   private _sortBy: "id" | "assignee" | "start" | "due" | null = null;
   private _sortOrder: "asc" | "desc" = "asc";
+  // Actual time entries for past-day intensity (issueId -> date -> hours)
+  private _actualTimeEntries: ActualTimeEntries = new Map();
   // Current user for special highlighting
   private _currentUserId: number | null = null;
   private _currentUserName: string | null = null;
@@ -1043,6 +1052,38 @@ export class GanttPanel {
         }
       } catch {
         // Ignore errors
+      }
+    }
+
+    // Fetch time entries for intensity calculation (person view uses actual hours for past days)
+    if (this._viewFocus === "person" && this._server) {
+      try {
+        const today = getLocalToday();
+        // Fetch last 90 days of time entries for current user
+        const fromDate = new Date(today);
+        fromDate.setDate(fromDate.getDate() - 90);
+        const fromStr = formatLocalDate(fromDate);
+        const toStr = formatLocalDate(today);
+
+        const { time_entries } = await this._server.getTimeEntries({ from: fromStr, to: toStr });
+
+        // Build actualTimeEntries map: issueId -> date -> hours
+        this._actualTimeEntries = new Map();
+        for (const entry of time_entries) {
+          if (!entry.issue?.id || !entry.spent_on) continue;
+          const issueId = entry.issue.id;
+          const date = entry.spent_on;
+          const hours = parseFloat(entry.hours as unknown as string) || 0;
+
+          if (!this._actualTimeEntries.has(issueId)) {
+            this._actualTimeEntries.set(issueId, new Map());
+          }
+          const issueMap = this._actualTimeEntries.get(issueId)!;
+          issueMap.set(date, (issueMap.get(date) ?? 0) + hours);
+        }
+      } catch {
+        // Ignore errors, fall back to prediction-only
+        this._actualTimeEntries = new Map();
       }
     }
 
@@ -2032,6 +2073,8 @@ export class GanttPanel {
     const issueScheduleMap = new Map<number, Map<string, number>>();
     const dayScheduleMap = new Map<string, { issueId: number; hours: number; project: string }[]>();
     if (this._viewFocus === "person") {
+      // Get today's date for past/future split in capacity calculation
+      const todayStr = getTodayStr();
       const scheduledDays: ScheduledDailyCapacity[] = calculateScheduledCapacity(
         filteredIssues,
         this._schedule,
@@ -2041,7 +2084,9 @@ export class GanttPanel {
         internalEstimates,
         this._currentUserId ?? undefined,
         issueMap,
-        precedenceIssues
+        precedenceIssues,
+        this._actualTimeEntries,
+        todayStr
       );
       // Build both maps from breakdown
       for (const day of scheduledDays) {
@@ -2189,7 +2234,7 @@ export class GanttPanel {
             : row.description || "";
 
           return `
-            <g class="project-label gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
+            <g class="project-label gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-vscode-context='{"webviewSection":"projectLabel","projectId":${row.id},"projectIdentifier":"${row.identifier || ""}","preventDefaultContextMenuItems":true}' transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
               ${chevron}
               <text x="${labelX}" y="${barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12" font-weight="bold">
                 ${healthDot}${escapeHtml(row.label)}
@@ -3162,7 +3207,9 @@ ${style.tip}
           capacityZoomLevel,
           this._currentUserId ?? undefined,
           issueMap,
-          precedenceIssues
+          precedenceIssues,
+          this._actualTimeEntries,
+          getTodayStr()
         )
       : [];
 
