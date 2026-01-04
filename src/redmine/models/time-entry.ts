@@ -3,7 +3,7 @@ import { TimeEntryActivity, NamedEntity } from "./common";
 export interface TimeEntry {
   id?: number; // Present in GET responses
   issue_id: number;
-  issue?: { id: number; subject: string }; // Present in GET responses
+  issue?: { id: number; subject?: string }; // Present in GET responses (subject may be missing)
   activity_id: TimeEntryActivity["id"];
   activity?: NamedEntity; // Present in GET responses
   hours: string;

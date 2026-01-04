@@ -99,7 +99,7 @@ export function registerTimeEntryCommands(
 
       // Show what to edit
       const hoursDisplay = formatHoursAsHHMM(parseFloat(entry.hours));
-      const issueDisplay = entry.issue ? `#${entry.issue.id} ${entry.issue.subject}` : `#${entry.issue_id || "?"}`;
+      const issueDisplay = entry.issue ? `#${entry.issue.id} ${entry.issue.subject || ""}`.trim() : `#${entry.issue_id || "?"}`;
       const options = [
         { label: `Issue: ${issueDisplay}`, field: "issue" as const },
         { label: `Hours: ${hoursDisplay}`, field: "hours" as const },
@@ -197,7 +197,7 @@ export function registerTimeEntryCommands(
       }
 
       const hoursDisplay = formatHoursAsHHMM(parseFloat(entry.hours));
-      const issueInfo = entry.issue ? `#${entry.issue.id} ${entry.issue.subject}` : "Unknown issue";
+      const issueInfo = entry.issue ? `#${entry.issue.id} ${entry.issue.subject || ""}`.trim() : "Unknown issue";
       const activityInfo = entry.activity?.name ? `[${entry.activity.name}]` : "";
       const confirm = await vscode.window.showWarningMessage(
         "Delete time entry?",
