@@ -35,6 +35,8 @@ import { registerTimeEntryCommands } from "./commands/time-entry-commands";
 import { registerMonthlyScheduleCommands } from "./commands/monthly-schedule-commands";
 import { registerGanttCommands } from "./commands/gantt-commands";
 import { registerInternalEstimateCommands } from "./commands/internal-estimate-commands";
+import { setInternalEstimate } from "./utilities/internal-estimates";
+import { parseTimeInput } from "./utilities/time-input";
 import { GanttPanel } from "./webviews/gantt-panel";
 import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "./utilities/flexibility-calculator";
 import { registerConfigureCommand } from "./commands/configure-command";
@@ -779,9 +781,35 @@ export function activate(context: vscode.ExtensionContext): void {
         await server.updateDoneRatio(issue.id, selected.value);
         // Disable auto-update for this issue since user manually set %done
         autoUpdateTracker.disable(issue.id);
-        showStatusBarMessage(`$(check) #${issue.id} set to ${selected.value}%`, 2000);
+
+        // Prompt for internal estimate (time remaining until 100% done)
+        const hoursInput = await vscode.window.showInputBox({
+          title: `Internal Estimate: #${issue.id}`,
+          prompt: `Hours remaining until 100% done (e.g., 5, 2.5, 1:30, 2h 30min)`,
+          placeHolder: "Leave blank to skip",
+          validateInput: (value) => {
+            if (!value.trim()) return null; // Empty is OK (skip)
+            const parsed = parseTimeInput(value);
+            if (parsed === null) return "Invalid format. Use: 5, 2.5, 1:30, or 2h 30min";
+            if (parsed < 0) return "Hours cannot be negative";
+            return null;
+          },
+        });
+
+        if (hoursInput && hoursInput.trim()) {
+          const hours = parseTimeInput(hoursInput);
+          if (hours !== null) {
+            await setInternalEstimate(context.globalState, issue.id, hours);
+            showStatusBarMessage(`$(check) #${issue.id} set to ${selected.value}% with ${hours}h remaining`, 2000);
+          }
+        } else {
+          showStatusBarMessage(`$(check) #${issue.id} set to ${selected.value}%`, 2000);
+        }
+
         // Update only the Gantt panel if open, avoid full tree refresh
         GanttPanel.currentPanel?.updateIssueDoneRatio(issue.id, selected.value);
+        // Refresh Gantt data to recalculate capacity
+        vscode.commands.executeCommand("redmine.refreshGanttData");
       } catch (error) {
         vscode.window.showErrorMessage(`Failed to update: ${error}`);
       }
@@ -817,9 +845,35 @@ export function activate(context: vscode.ExtensionContext): void {
         await Promise.all(issueIds.map(id => server.updateDoneRatio(id, selected.value)));
         // Disable auto-update for all these issues
         issueIds.forEach(id => autoUpdateTracker.disable(id));
-        showStatusBarMessage(`$(check) ${issueIds.length} issues set to ${selected.value}%`, 2000);
+
+        // Prompt for internal estimate (applies same value to all selected issues)
+        const hoursInput = await vscode.window.showInputBox({
+          title: `Internal Estimate for ${issueIds.length} issues`,
+          prompt: `Hours remaining per issue until 100% done (e.g., 5, 2.5, 1:30)`,
+          placeHolder: "Leave blank to skip",
+          validateInput: (value) => {
+            if (!value.trim()) return null; // Empty is OK (skip)
+            const parsed = parseTimeInput(value);
+            if (parsed === null) return "Invalid format. Use: 5, 2.5, 1:30, or 2h 30min";
+            if (parsed < 0) return "Hours cannot be negative";
+            return null;
+          },
+        });
+
+        if (hoursInput && hoursInput.trim()) {
+          const hours = parseTimeInput(hoursInput);
+          if (hours !== null) {
+            await Promise.all(issueIds.map(id => setInternalEstimate(context.globalState, id, hours)));
+            showStatusBarMessage(`$(check) ${issueIds.length} issues set to ${selected.value}% with ${hours}h remaining each`, 2000);
+          }
+        } else {
+          showStatusBarMessage(`$(check) ${issueIds.length} issues set to ${selected.value}%`, 2000);
+        }
+
         // Update Gantt panel for each issue
         issueIds.forEach(id => GanttPanel.currentPanel?.updateIssueDoneRatio(id, selected.value));
+        // Refresh Gantt data to recalculate capacity
+        vscode.commands.executeCommand("redmine.refreshGanttData");
       } catch (error) {
         vscode.window.showErrorMessage(`Failed to update: ${error}`);
       }
