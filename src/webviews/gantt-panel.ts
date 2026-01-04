@@ -2407,10 +2407,13 @@ export class GanttPanel {
         const escapedProject = escapeHtml(issue.project);
         const doneRatio = issue.done_ratio;
         // Visual progress: fallback to spent/estimated when done_ratio is 0
+        // Include contributed hours from ad-hoc issues
+        const contributedHours = this._contributionSources?.get(issue.id)?.reduce((sum, c) => sum + c.hours, 0) ?? 0;
+        const effectiveSpentHours = (issue.spent_hours ?? 0) + contributedHours;
         let visualDoneRatio = doneRatio;
         let isFallbackProgress = false;
-        if (doneRatio === 0 && issue.spent_hours && issue.spent_hours > 0 && issue.estimated_hours && issue.estimated_hours > 0) {
-          visualDoneRatio = Math.min(100, Math.round((issue.spent_hours / issue.estimated_hours) * 100));
+        if (doneRatio === 0 && effectiveSpentHours > 0 && issue.estimated_hours && issue.estimated_hours > 0) {
+          visualDoneRatio = Math.min(100, Math.round((effectiveSpentHours / issue.estimated_hours) * 100));
           isFallbackProgress = true;
         }
         const statusDesc = this._getStatusDescription(effectiveStatus);
