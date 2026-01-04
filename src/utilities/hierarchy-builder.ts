@@ -605,11 +605,11 @@ export function buildMyWorkHierarchy(
 
 /**
  * Build hierarchy for "Resource" view - single assignee grouped by project
- * Filters issues by assignee, groups by project, sorts by due date
+ * Filters issues by assignee, groups by project, preserves parent/child hierarchy
  */
 export function buildResourceHierarchy(
   issues: Issue[],
-  _flexibilityCache: Map<number, FlexibilityScore | null>,
+  flexibilityCache: Map<number, FlexibilityScore | null>,
   assigneeName: string
 ): HierarchyNode[] {
   // Filter by assignee
@@ -634,37 +634,34 @@ export function buildResourceHierarchy(
     a[1].name.localeCompare(b[1].name)
   );
 
-  // Build project nodes
+  // Helper to collect child date ranges recursively
+  const collectChildDateRanges = (node: HierarchyNode): Array<{ startDate: string | null; dueDate: string | null; issueId: number }> => {
+    const ranges: Array<{ startDate: string | null; dueDate: string | null; issueId: number }> = [];
+    if (node.issue && (node.issue.start_date || node.issue.due_date)) {
+      ranges.push({
+        startDate: node.issue.start_date ?? null,
+        dueDate: node.issue.due_date ?? null,
+        issueId: node.issue.id,
+      });
+    }
+    for (const child of node.children) {
+      ranges.push(...collectChildDateRanges(child));
+    }
+    return ranges;
+  };
+
+  // Build project nodes with hierarchical issue tree
   return sortedProjects.map(([projectId, { name, issues: projectIssues }]) => {
     const projectKey = `project-${projectId}`;
 
-    // Sort issues by due date (null last)
-    const sortedIssues = [...projectIssues].sort((a, b) => {
-      const aDate = a.due_date ?? "9999-12-31";
-      const bDate = b.due_date ?? "9999-12-31";
-      return aDate.localeCompare(bDate);
-    });
-
-    // Build child nodes
-    const children: HierarchyNode[] = sortedIssues.map((issue) => ({
-      type: "issue" as const,
-      id: issue.id,
-      label: issue.subject,
-      depth: 1,
-      issue,
-      children: [],
-      collapseKey: `issue-${issue.id}`,
-      parentKey: projectKey,
-    }));
+    // Use buildIssueTree to preserve parent/child relationships
+    const children = buildIssueTree(projectIssues, flexibilityCache, projectKey, 1, false);
 
     // Collect date ranges for aggregate bar
-    const childDateRanges = sortedIssues
-      .filter((i) => i.start_date || i.due_date)
-      .map((i) => ({
-        startDate: i.start_date ?? null,
-        dueDate: i.due_date ?? null,
-        issueId: i.id,
-      }));
+    const childDateRanges: Array<{ startDate: string | null; dueDate: string | null; issueId: number }> = [];
+    for (const child of children) {
+      childDateRanges.push(...collectChildDateRanges(child));
+    }
 
     return {
       type: "project" as const,

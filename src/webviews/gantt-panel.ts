@@ -3163,10 +3163,11 @@ ${style.tip}
     const workloadMap = calculateAggregateWorkload(this._issues, this._schedule, minDate, maxDate);
 
     // Calculate capacity ribbon data (Person view only), aggregated by zoom level
+    // Use filteredIssues to only count the selected person's workload
     const minDateStr = minDate.toISOString().slice(0, 10);
     const capacityZoomLevel = this._zoomLevel as CapacityZoomLevel;
     const capacityData: PeriodCapacity[] = this._viewFocus === "person"
-      ? calculateCapacityByZoom(this._issues, this._schedule, minDateStr, maxDateStr, capacityZoomLevel)
+      ? calculateCapacityByZoom(filteredIssues, this._schedule, minDateStr, maxDateStr, capacityZoomLevel)
       : [];
 
     // Build capacity ribbon bars (one rect per period showing load status)
@@ -6584,8 +6585,8 @@ ${style.tip}
         `);
       }
 
-      // Year markers (for quarter/year zoom)
-      if ((zoomLevel === "quarter" || zoomLevel === "year") && month === 0 && dayOfMonth === 1 && lastYear !== year) {
+      // Year markers (for year zoom only - quarter zoom includes year in Q label)
+      if (zoomLevel === "year" && month === 0 && dayOfMonth === 1 && lastYear !== year) {
         lastYear = year;
         headerContent.push(`
           <line x1="${x}" y1="0" x2="${x}" y2="40" class="date-marker"/>
@@ -6599,15 +6600,14 @@ ${style.tip}
       // Quarter markers (for quarter zoom)
       if (zoomLevel === "quarter" && dayOfMonth === 1 && (month % 3 === 0) && lastQuarter !== quarter) {
         lastQuarter = quarter;
-        const quarterLabel = `Q${quarter}`;
+        const quarterLabel = `Q${quarter} ${year}`;
         headerContent.push(`
-          <text x="${x + 4}" y="30" fill="var(--vscode-descriptionForeground)" font-size="10">${quarterLabel}</text>
+          <line x1="${x}" y1="0" x2="${x}" y2="40" class="date-marker"/>
+          <text x="${x + 4}" y="14" fill="var(--vscode-foreground)" font-size="11" font-weight="bold">${quarterLabel}</text>
         `);
-        if (month !== 0) { // Don't double line on Jan 1
-          bodyGridLines.push(`
-            <line x1="${x}" y1="0" x2="${x}" y2="100%" class="day-grid opacity-02"/>
-          `);
-        }
+        bodyGridLines.push(`
+          <line x1="${x}" y1="0" x2="${x}" y2="100%" class="day-grid"/>
+        `);
       }
 
       // Month markers (for month/quarter/year zoom)
@@ -6621,6 +6621,7 @@ ${style.tip}
           `);
           // Month zoom: use week gridlines only for even spacing (skip month gridlines in body)
         } else if (zoomLevel === "quarter") {
+          // Show all month labels on second line (quarter label is on top line)
           headerContent.push(`
             <text x="${x + 2}" y="30" fill="var(--vscode-descriptionForeground)" font-size="9">${monthLabel}</text>
           `);
