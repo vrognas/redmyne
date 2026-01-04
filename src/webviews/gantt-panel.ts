@@ -2022,7 +2022,7 @@ export class GanttPanel {
 
     // Build scheduled capacity maps for intensity + capacity tooltip (person view only)
     // issueScheduleMap: issueId -> date -> hours (for bar intensity)
-    // dayScheduleMap: date -> [{issueId, hours, subject}] (for capacity tooltip)
+    // dayScheduleMap: date -> [{issueId, hours, project}] (for capacity tooltip)
     const internalEstimates: InternalEstimates = GanttPanel._globalState
       ? getInternalEstimates(GanttPanel._globalState)
       : new Map();
@@ -2030,7 +2030,7 @@ export class GanttPanel {
       ? getPrecedenceIssues(GanttPanel._globalState)
       : new Set();
     const issueScheduleMap = new Map<number, Map<string, number>>();
-    const dayScheduleMap = new Map<string, { issueId: number; hours: number; subject: string }[]>();
+    const dayScheduleMap = new Map<string, { issueId: number; hours: number; project: string }[]>();
     if (this._viewFocus === "person") {
       const scheduledDays: ScheduledDailyCapacity[] = calculateScheduledCapacity(
         filteredIssues,
@@ -2045,7 +2045,7 @@ export class GanttPanel {
       );
       // Build both maps from breakdown
       for (const day of scheduledDays) {
-        const dayEntries: { issueId: number; hours: number; subject: string }[] = [];
+        const dayEntries: { issueId: number; hours: number; project: string }[] = [];
         for (const entry of day.breakdown) {
           // issueScheduleMap for intensity bars
           if (!issueScheduleMap.has(entry.issueId)) {
@@ -2055,10 +2055,11 @@ export class GanttPanel {
           // dayScheduleMap for capacity tooltip
           const issue = issueMap.get(entry.issueId);
           if (issue && entry.hours > 0) {
+            const projectName = issue.project?.name ?? "Unknown";
             dayEntries.push({
               issueId: entry.issueId,
               hours: entry.hours,
-              subject: issue.subject.length > 25 ? issue.subject.substring(0, 24) + "…" : issue.subject
+              project: projectName.length > 20 ? projectName.substring(0, 19) + "…" : projectName
             });
           }
         }
@@ -3189,7 +3190,7 @@ ${style.tip}
         : `${period.startDate} to ${period.endDate}`;
 
       // Build breakdown for this period (aggregate across days in period)
-      const periodBreakdown = new Map<number, { hours: number; subject: string }>();
+      const periodBreakdown = new Map<number, { hours: number; project: string }>();
       const periodStart = new Date(period.startDate + "T00:00:00Z");
       const periodEnd = new Date(period.endDate + "T00:00:00Z");
       for (let d = new Date(periodStart); d <= periodEnd; d.setUTCDate(d.getUTCDate() + 1)) {
@@ -3201,7 +3202,7 @@ ${style.tip}
             if (existing) {
               existing.hours += entry.hours;
             } else {
-              periodBreakdown.set(entry.issueId, { hours: entry.hours, subject: entry.subject });
+              periodBreakdown.set(entry.issueId, { hours: entry.hours, project: entry.project });
             }
           }
         }
@@ -3211,7 +3212,7 @@ ${style.tip}
         .filter(([, v]) => v.hours > 0)
         .sort((a, b) => b[1].hours - a[1].hours)
         .slice(0, 8) // Limit to 8 issues
-        .map(([id, v]) => `  #${id}: ${v.hours.toFixed(1)}h - ${v.subject}`);
+        .map(([id, v]) => `  #${id}: ${v.hours.toFixed(1)}h - ${v.project}`);
       const breakdownText = breakdownLines.length > 0
         ? `\n${breakdownLines.join("\n")}${periodBreakdown.size > 8 ? `\n  ... and ${periodBreakdown.size - 8} more` : ""}`
         : "";
