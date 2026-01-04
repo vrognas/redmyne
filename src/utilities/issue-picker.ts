@@ -410,12 +410,39 @@ export async function pickIssue(
     return undefined;
   }
 
-  // Build base items from assigned issues
-  const baseItems: IssueQuickPickItem[] = issues.map((issue) => ({
-    label: `#${issue.id} ${issue.subject}`,
-    description: issue.project?.name,
-    issue,
-  }));
+  // Check time_tracking for all projects
+  const projectIds = [...new Set(issues.map(i => i.project?.id).filter(Boolean))] as number[];
+  const timeTrackingByProject = new Map<number, boolean>();
+
+  await Promise.all(
+    projectIds.map(async (projectId) => {
+      const enabled = await server.isTimeTrackingEnabled(projectId);
+      timeTrackingByProject.set(projectId, enabled);
+    })
+  );
+
+  // Build base items: trackable first, then non-trackable (disabled)
+  const trackableIssues = issues.filter(
+    (issue) => issue.project?.id && timeTrackingByProject.get(issue.project.id)
+  );
+  const nonTrackableIssues = issues.filter(
+    (issue) => !issue.project?.id || !timeTrackingByProject.get(issue.project.id)
+  );
+
+  const baseItems: IssueQuickPickItem[] = [
+    ...trackableIssues.map((issue) => ({
+      label: `#${issue.id} ${issue.subject}`,
+      description: issue.project?.name,
+      issue,
+      disabled: false,
+    })),
+    ...nonTrackableIssues.map((issue) => ({
+      label: `$(circle-slash) #${issue.id} ${issue.subject}`,
+      description: `${issue.project?.name ?? "Unknown"} (no time tracking)`,
+      issue,
+      disabled: true,
+    })),
+  ];
 
   // Use createQuickPick for inline search
   return new Promise<Issue | undefined>((resolve) => {
@@ -499,6 +526,21 @@ export async function pickIssue(
 
         if (thisSearchVersion !== searchVersion || resolved) return;
 
+        // Check time tracking for any new projects in search results
+        const newProjectIds = [...new Set(
+          allResults
+            .map(i => i.project?.id)
+            .filter((id): id is number => id !== undefined && !timeTrackingByProject.has(id))
+        )];
+        await Promise.all(
+          newProjectIds.map(async (projectId) => {
+            const enabled = await server.isTimeTrackingEnabled(projectId);
+            timeTrackingByProject.set(projectId, enabled);
+          })
+        );
+
+        if (thisSearchVersion !== searchVersion || resolved) return;
+
         // Build result items
         const assignedIds = new Set(issues.map(i => i.id));
         const limitedResults = allResults.slice(0, 15);
@@ -507,6 +549,17 @@ export async function pickIssue(
           ? [{ label: `$(info) No results for "${query}"`, disabled: true }]
           : limitedResults.map((issue) => {
               const isAssigned = assignedIds.has(issue.id);
+              const projectId = issue.project?.id;
+              const hasTimeTracking = projectId ? timeTrackingByProject.get(projectId) : false;
+              if (!hasTimeTracking) {
+                return {
+                  label: `$(circle-slash) #${issue.id} ${issue.subject}`,
+                  description: `${issue.project?.name ?? "Unknown"} (no time tracking)`,
+                  detail: issue.status?.name,
+                  issue,
+                  disabled: true,
+                };
+              }
               const icon = isAssigned ? "$(account)" : "$(search)";
               return {
                 label: `${icon} #${issue.id} ${issue.subject}`,
