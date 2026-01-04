@@ -19,6 +19,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Time entries single fetch** - reduced API calls from 4 to 1 by fetching all periods at once and filtering client-side
 - **Request queue with concurrency limit** - API requests now queued with max 2 concurrent to prevent server overload (503 errors)
 - **Batched pagination** - pagination requests now fetched in batches of 2 instead of all at once
+- **Gantt batched requests** - contribution/version fetches now batched to respect concurrency limit
 - **Gantt bar labels outside** - %done badge and assignee now appear after bar; adaptive positioning flips to left when near edge
 - **Gantt toolbar redesign** - grouped controls, SVG icons, collapsible legend row, overflow menu
 - **Gantt default zoom** - changed from Day to Month level

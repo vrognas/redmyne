@@ -1030,11 +1030,18 @@ export class GanttPanel {
     if (!hasAdHocIssues && adHocIssueIds.size === 0) return;
 
     try {
-      // Fetch time entries for all projects in parallel
-      const timeEntriesArrays = await Promise.all(
-        Array.from(projectIds).map(id => this._server!.getProjectTimeEntries(id))
-      );
-      const allTimeEntries = timeEntriesArrays.flat();
+      // Fetch time entries in batches to avoid overwhelming server
+      const projectIdArray = Array.from(projectIds);
+      const batchSize = 2;
+      const allTimeEntries: TimeEntry[] = [];
+
+      for (let i = 0; i < projectIdArray.length; i += batchSize) {
+        const batch = projectIdArray.slice(i, i + batchSize);
+        const batchResults = await Promise.all(
+          batch.map(id => this._server!.getProjectTimeEntries(id))
+        );
+        allTimeEntries.push(...batchResults.flat());
+      }
 
       // Calculate contributions
       const contributions = calculateContributions(allTimeEntries);

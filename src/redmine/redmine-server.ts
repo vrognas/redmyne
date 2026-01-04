@@ -477,8 +477,8 @@ export class RedmineServer {
    */
   async getVersionsForProjects(projectIds: (number | string)[]): Promise<Map<number | string, Version[]>> {
     const result = new Map<number | string, Version[]>();
-    // Fetch in parallel with concurrency limit
-    const batchSize = 5;
+    // Fetch in batches matching request queue concurrency
+    const batchSize = this.maxConcurrentRequests;
     for (let i = 0; i < projectIds.length; i += batchSize) {
       const batch = projectIds.slice(i, i + batchSize);
       const promises = batch.map(async (id) => {
