@@ -39,6 +39,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Gantt timeline range by displayed issues** - timeline range uses only actually displayed issues, not all issues in same projects
 - **Capacity tooltip shows project** - breakdown now shows project name instead of subject (issue ID already visible)
 - **Internal estimate prompt on %done** - setting manual %done now prompts for hours remaining
+- **Gantt native context menu** - issue bars now use VS Code native context menus instead of custom HTML
 
 ### Fixed
 
