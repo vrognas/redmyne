@@ -391,7 +391,7 @@ function calculateDailyIntensity(
  * Returns map of date string (YYYY-MM-DD) to total intensity (hours used / hours available)
  */
 function calculateAggregateWorkload(
-  issues: { start_date?: string | null; due_date?: string | null; estimated_hours?: number | null }[],
+  issues: { start_date?: string | null; due_date?: string | null; estimated_hours?: number | null; children?: unknown[] }[],
   schedule: WeeklySchedule,
   minDate: Date,
   maxDate: Date
@@ -405,8 +405,11 @@ function calculateAggregateWorkload(
     current.setUTCDate(current.getUTCDate() + 1);
   }
 
+  // Filter to leaf issues only (no children) to avoid double-counting
+  const leafIssues = issues.filter(i => !i.children || i.children.length === 0);
+
   // For each issue, distribute its estimated hours across its date range
-  for (const issue of issues) {
+  for (const issue of leafIssues) {
     if (!issue.start_date || !issue.due_date || !issue.estimated_hours) {
       continue;
     }
@@ -435,8 +438,8 @@ function calculateAggregateWorkload(
         // Allocated = estimatedHours * (dayHours / totalAvailable)
         const allocated = estimatedHours * (dayHours / totalAvailable);
         const intensity = allocated / dayHours;
-        const current = workloadMap.get(dateKey) ?? 0;
-        workloadMap.set(dateKey, current + intensity);
+        const curr = workloadMap.get(dateKey) ?? 0;
+        workloadMap.set(dateKey, curr + intensity);
       }
       temp.setUTCDate(temp.getUTCDate() + 1);
     }
@@ -803,7 +806,6 @@ export class GanttPanel {
       flex-grow: 1;
       display: flex;
       align-items: center;
-      padding: 0 16px;
     }
     .loading-text {
       font-size: 11px;
@@ -2036,8 +2038,8 @@ export class GanttPanel {
       maxDate = new Date(Math.max(...dates.map((d) => new Date(d).getTime())));
       // Add padding based on zoom level for breathing room
       const paddingDays = { day: 1, week: 7, month: 30, quarter: 90, year: 365 }[this._zoomLevel] || 7;
-      minDate.setDate(minDate.getDate() - paddingDays);
-      maxDate.setDate(maxDate.getDate() + paddingDays);
+      minDate.setUTCDate(minDate.getUTCDate() - paddingDays);
+      maxDate.setUTCDate(maxDate.getUTCDate() + paddingDays);
     }
 
     // String format for open-ended bars (issues with start but no due date)
@@ -2056,6 +2058,8 @@ export class GanttPanel {
     const dueDateColumnWidth = 85;
     const assigneeColumnWidth = 40;
     const extraColumnsWidth = idColumnWidth + startDateColumnWidth + statusColumnWidth + dueDateColumnWidth + assigneeColumnWidth;
+    const resizeHandleWidth = 10;
+    const stickyLeftWidth = labelWidth + resizeHandleWidth + extraColumnsWidth;
     const barHeight = 30;
     const barGap = 10;
     const headerHeight = 40;
@@ -2564,6 +2568,7 @@ export class GanttPanel {
         // Closed issues always show as "completed" regardless of calculated flexibility
         const effectiveStatus = issue.isClosed ? "completed" : issue.status;
         const color = isParent ? "var(--vscode-descriptionForeground)" : this._getStatusColor(effectiveStatus);
+        const textColor = isParent ? "var(--vscode-editor-foreground)" : this._getStatusTextColor(effectiveStatus);
         const isPast = end < today;
         const isOverdue = !isParent && !issue.isClosed && issue.done_ratio < 100 && end < today;
 
@@ -2665,7 +2670,7 @@ export class GanttPanel {
           ? `🚧 Blocks ${issue.blocks.length} issue(s):\n` + issue.blocks.slice(0, 5).map(b => {
               const assigneeText = b.assignee ? ` (${b.assignee})` : "";
               return `#${b.id} ${b.subject.length > 30 ? b.subject.substring(0, 29) + "…" : b.subject}${assigneeText}`;
-            }).join("\n") + (issue.blocks.length > 5 ? `\n... and ${issue.blocks.length - 5} more` : "")
+            }).join("\n") + (issue.blocks.length > 5 ? `\n... and ${issue.blocks.length - 5} more` : "") + "\n\nClick to highlight dependencies"
           : "";
 
         // Blockers tooltip: issues blocking this one
@@ -2673,7 +2678,7 @@ export class GanttPanel {
           ? `⛔ Blocked by ${issue.blockedBy.length} issue(s):\n` + issue.blockedBy.slice(0, 5).map(b => {
               const assigneeText = b.assignee ? ` (${b.assignee})` : "";
               return `#${b.id} ${b.subject.length > 30 ? b.subject.substring(0, 29) + "…" : b.subject}${assigneeText}`;
-            }).join("\n") + (issue.blockedBy.length > 5 ? `\n... and ${issue.blockedBy.length - 5} more` : "")
+            }).join("\n") + (issue.blockedBy.length > 5 ? `\n... and ${issue.blockedBy.length - 5} more` : "") + "\n\nClick to highlight and jump to blocker"
           : "";
 
         // Calculate done portion width for progress visualization
@@ -2835,7 +2840,7 @@ export class GanttPanel {
                 ? issue.subject.substring(0, maxChars - 1) + "…"
                 : issue.subject;
               return `<text class="bar-subject" x="${startX + padding}" y="${barHeight / 2 + 4}"
-                    fill="var(--vscode-editor-foreground)" font-size="10" opacity="0.9"
+                    fill="${textColor}" font-size="10"
                     pointer-events="none">${escapeHtml(displaySubject)}</text>`;
             })()}
             <rect class="drag-handle drag-left cursor-ew-resize" x="${startX}" y="0" width="${handleWidth}" height="${barHeight}"
@@ -2928,7 +2933,7 @@ export class GanttPanel {
                         text-anchor="middle" fill="${flexColor}" font-size="10" font-weight="500">${flexLabel}</text>
                   <title>${flexTooltip}</title>
                 </g>` : ""}
-                ${showBlocks ? `<g class="blocks-badge-group" style="cursor: help;">
+                ${showBlocks ? `<g class="blocks-badge-group" style="cursor: pointer;">
                   <rect class="blocks-badge-bg" x="${onLeft ? impactBadgeX - impactBadgeW : impactBadgeX}" y="${barHeight / 2 - 8}" width="${impactBadgeW}" height="16" rx="2"
                         fill="${impactColor}" opacity="0.15"/>
                   <text class="blocks-badge" x="${impactBadgeCenterX}" y="${barHeight / 2 + 4}"
@@ -3165,10 +3170,13 @@ ${style.tip}
 
     // Build capacity ribbon bars (one rect per day showing load status)
     const ribbonHeight = 20;
+    // Calculate actual day width (same formula as _generateDateMarkers) to handle min width and rounding
+    const actualDayWidth = timelineWidth / ((maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24));
     const capacityRibbonBars = capacityData.map((day) => {
-      const dayDate = new Date(day.date);
+      // Use UTC midnight to match minDate/maxDate (which are UTC-based)
+      const dayDate = new Date(day.date + "T00:00:00Z");
       const dayX = ((dayDate.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
-      const dayWidth = pixelsPerDay;
+      const dayWidth = actualDayWidth;
       const fillColor = day.status === "available"
         ? "var(--vscode-charts-green)"
         : day.status === "busy"
@@ -3197,16 +3205,6 @@ ${style.tip}
     const capacityTodayMarker = this._viewFocus === "person" && capacityTodayX >= 0 && capacityTodayX <= timelineWidth
       ? `<line x1="${capacityTodayX}" y1="0" x2="${capacityTodayX}" y2="${ribbonHeight}" class="capacity-today-marker"/>`
       : "";
-
-    // Calculate period summary (total load / total capacity for visible range)
-    const periodSummary = capacityData.reduce((acc, day) => {
-      acc.totalLoad += day.loadHours;
-      acc.totalCapacity += day.capacityHours;
-      return acc;
-    }, { totalLoad: 0, totalCapacity: 0 });
-    const capacitySummaryText = capacityData.length > 0
-      ? `${Math.round(periodSummary.totalLoad)}h / ${Math.round(periodSummary.totalCapacity)}h`
-      : "Capacity";
 
     // Date markers split into fixed header and scrollable body
     const dateMarkers = this._generateDateMarkers(
@@ -3339,6 +3337,7 @@ ${style.tip}
       color: var(--vscode-descriptionForeground);
       background: var(--vscode-editor-background);
       white-space: nowrap;
+      box-sizing: border-box;
     }
     .capacity-ribbon-timeline {
       flex: 1;
@@ -3488,22 +3487,23 @@ ${style.tip}
       flex-grow: 1;
       min-height: 0;
       position: relative;
+      --sticky-left-width: ${stickyLeftWidth}px;
     }
-    /* Single scroll container - clip horizontal scrollbar */
+    /* Single scroll container - push horizontal scrollbar outside visible area */
     .gantt-scroll-wrapper {
       flex-grow: 1;
-      overflow: hidden;
+      overflow: hidden; /* Clips the pushed-out horizontal scrollbar */
       min-height: 0;
       position: relative;
       margin-bottom: 30px; /* Reserve space for minimap */
     }
     .gantt-scroll {
-      height: 100%;
-      overflow-x: hidden; /* Use minimap for horizontal nav */
-      overflow-y: scroll;
+      height: calc(100% + 17px); /* Push horizontal scrollbar below wrapper (17px = typical scrollbar height) */
+      overflow: scroll;
     }
     .gantt-scroll::-webkit-scrollbar { width: 8px; }
     .gantt-scroll::-webkit-scrollbar-thumb { background: var(--vscode-scrollbarSlider-background); border-radius: 4px; }
+    .gantt-scroll::-webkit-scrollbar-corner { background: transparent; }
     .gantt-header-row {
       display: flex;
       position: sticky;
@@ -3930,6 +3930,7 @@ ${style.tip}
     .minimap-container {
       position: absolute;
       bottom: 0;
+      left: var(--sticky-left-width);
       right: 8px; /* Leave space for vertical scrollbar */
       height: 30px;
       background: var(--vscode-editor-background);
@@ -3978,7 +3979,7 @@ ${style.tip}
     .blocker-badge { pointer-events: all; }
     .blocker-badge:hover rect { opacity: 0.35 !important; }
     /* Blocks badge styling */
-    .blocks-badge-group { cursor: help; }
+    .blocks-badge-group { cursor: pointer; }
     .blocks-badge-group:hover .blocks-badge-bg { opacity: 0.35 !important; }
   </style>
 </head>
@@ -4167,8 +4168,8 @@ ${style.tip}
       <!-- Capacity ribbon (Person view only) -->
       <div class="capacity-ribbon-row capacity-ribbon${this._viewFocus !== "person" || !this._showCapacityRibbon ? " hidden" : ""}">
         <div class="gantt-sticky-left gantt-corner">
-          <div class="capacity-ribbon-label" style="width: ${checkboxColumnWidth + labelWidth * 2 + extraColumnsWidth}px; height: ${ribbonHeight}px;" title="Total workload for visible date range">
-            ${capacitySummaryText}
+          <div class="capacity-ribbon-label" style="width: ${stickyLeftWidth}px; height: ${ribbonHeight}px;">
+            Capacity
           </div>
         </div>
         <div class="capacity-ribbon-timeline">
@@ -4312,11 +4313,13 @@ ${style.tip}
     // Position minimap to align with timeline (skip sticky-left columns)
     function updateMinimapPosition() {
       const stickyLeft = document.querySelector('.gantt-body .gantt-sticky-left');
-      if (stickyLeft && minimapContainer) {
-        minimapContainer.style.left = stickyLeft.offsetWidth + 'px';
+      const ganttContainer = document.querySelector('.gantt-container');
+      if (stickyLeft && ganttContainer) {
+        ganttContainer.style.setProperty('--sticky-left-width', stickyLeft.offsetWidth + 'px');
       }
     }
-    updateMinimapPosition();
+    // Defer to next frame to ensure layout is complete (fixes minimap alignment on project switch)
+    requestAnimationFrame(updateMinimapPosition);
 
     // Minimap setup
     const minimapBarsData = ${minimapBarsJson};
@@ -4465,6 +4468,11 @@ ${style.tip}
     if (previousState.labelWidth && ganttLeftHeader && labelsColumn) {
       ganttLeftHeader.style.width = previousState.labelWidth + 'px';
       labelsColumn.style.width = previousState.labelWidth + 'px';
+      // Also update capacity ribbon label to stay aligned
+      const capacityLabel = document.querySelector('.capacity-ribbon-label');
+      if (capacityLabel) {
+        capacityLabel.style.width = (previousState.labelWidth + ${resizeHandleWidth + extraColumnsWidth}) + 'px';
+      }
     }
 
     // Single scroll container - no sync needed, just update minimap and save state
@@ -6396,6 +6404,11 @@ ${style.tip}
           const labelsSvg = labelsColumn.querySelector('svg');
           if (labelsSvg) labelsSvg.setAttribute('width', String(newWidth));
         }
+        // Update capacity ribbon label width (label + resize handle + extra columns)
+        const capacityLabel = document.querySelector('.capacity-ribbon-label');
+        if (capacityLabel) {
+          capacityLabel.style.width = (newWidth + ${resizeHandleWidth + extraColumnsWidth}) + 'px';
+        }
         updateMinimapPosition();
       });
     });
@@ -6458,6 +6471,24 @@ ${style.tip}
         return "var(--vscode-charts-blue)";
       default:
         return "var(--vscode-charts-foreground)";
+    }
+  }
+
+  /** Returns contrasting text color for bar labels based on status background */
+  private _getStatusTextColor(
+    status: FlexibilityScore["status"] | null
+  ): string {
+    switch (status) {
+      // Light backgrounds need dark text
+      case "on-track":
+      case "at-risk":
+        return "rgba(0,0,0,0.85)";
+      // Dark backgrounds need light text
+      case "overbooked":
+      case "completed":
+        return "rgba(255,255,255,0.9)";
+      default:
+        return "var(--vscode-editor-foreground)";
     }
   }
 

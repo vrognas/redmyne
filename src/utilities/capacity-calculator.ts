@@ -80,14 +80,17 @@ export function calculateDailyCapacity(
   startDate: string,
   endDate: string
 ): DailyCapacity[] {
-  if (issues.length === 0) {
+  // Filter to leaf issues only (no children) to avoid double-counting
+  const leafIssues = issues.filter(i => !i.children || i.children.length === 0);
+
+  if (leafIssues.length === 0) {
     // Still generate capacity entries for the range
     return generateEmptyCapacity(schedule, startDate, endDate);
   }
 
   // Pre-calculate hours/day for each issue
   const issueHoursPerDay = new Map<number, number>();
-  for (const issue of issues) {
+  for (const issue of leafIssues) {
     const hoursPerDay = getIssueHoursPerDay(issue, schedule);
     if (hoursPerDay > 0) {
       issueHoursPerDay.set(issue.id, hoursPerDay);
@@ -95,19 +98,19 @@ export function calculateDailyCapacity(
   }
 
   const result: DailyCapacity[] = [];
-  const current = new Date(startDate);
-  const end = new Date(endDate);
+  const current = new Date(startDate + "T00:00:00Z");  // Explicit UTC
+  const end = new Date(endDate + "T00:00:00Z");
 
   while (current <= end) {
     const dateStr = current.toISOString().slice(0, 10);
-    const dayOfWeek = current.getDay();
+    const dayOfWeek = current.getUTCDay();  // Use UTC day
     const capacityHours = schedule[DAY_KEYS[dayOfWeek]];
 
     // Skip non-working days
     if (capacityHours > 0) {
       // Sum hours from all issues that span this date
       let loadHours = 0;
-      for (const issue of issues) {
+      for (const issue of leafIssues) {
         if (isDateInIssueRange(dateStr, issue)) {
           loadHours += issueHoursPerDay.get(issue.id) ?? 0;
         }
@@ -124,7 +127,7 @@ export function calculateDailyCapacity(
       });
     }
 
-    current.setDate(current.getDate() + 1);
+    current.setUTCDate(current.getUTCDate() + 1);  // Use UTC increment
   }
 
   return result;
@@ -139,12 +142,12 @@ function generateEmptyCapacity(
   endDate: string
 ): DailyCapacity[] {
   const result: DailyCapacity[] = [];
-  const current = new Date(startDate);
-  const end = new Date(endDate);
+  const current = new Date(startDate + "T00:00:00Z");  // Explicit UTC
+  const end = new Date(endDate + "T00:00:00Z");
 
   while (current <= end) {
     const dateStr = current.toISOString().slice(0, 10);
-    const dayOfWeek = current.getDay();
+    const dayOfWeek = current.getUTCDay();  // Use UTC day
     const capacityHours = schedule[DAY_KEYS[dayOfWeek]];
 
     if (capacityHours > 0) {
@@ -157,7 +160,7 @@ function generateEmptyCapacity(
       });
     }
 
-    current.setDate(current.getDate() + 1);
+    current.setUTCDate(current.getUTCDate() + 1);  // Use UTC increment
   }
 
   return result;
