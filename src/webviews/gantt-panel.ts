@@ -1004,8 +1004,10 @@ export class GanttPanel {
     // Load contributions if any ad-hoc issues exist
     this._loadContributions();
 
-    // Load versions (milestones) for all projects
-    this._loadVersions();
+    // Load versions (milestones) - skip in person mode (not relevant)
+    if (this._viewFocus !== "person") {
+      this._loadVersions();
+    }
   }
 
   /**
@@ -1030,10 +1032,10 @@ export class GanttPanel {
       return;
     }
 
-    // Check if any displayed issues are ad-hoc
+    // Only fetch if displayed issues include ad-hoc issues
     const adHocIssueIds = new Set(adHocTracker.getAll());
     const hasAdHocIssues = this._issues.some(i => adHocIssueIds.has(i.id));
-    if (!hasAdHocIssues && adHocIssueIds.size === 0) {
+    if (!hasAdHocIssues) {
       this._contributionsLoading = false;
       return;
     }
