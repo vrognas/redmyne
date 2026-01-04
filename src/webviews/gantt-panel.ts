@@ -25,7 +25,7 @@ import { autoUpdateTracker } from "../utilities/auto-update-tracker";
 import { collapseState } from "../utilities/collapse-state";
 import { debounce, DebouncedFunction } from "../utilities/debounce";
 import { IssueFilter, DEFAULT_ISSUE_FILTER, GanttViewMode } from "../redmine/models/common";
-import { parseLocalDate, getLocalToday } from "../utilities/date-utils";
+import { parseLocalDate, getLocalToday, formatLocalDate } from "../utilities/date-utils";
 
 const COLLAPSE_DEBOUNCE_MS = 50;
 
@@ -417,13 +417,15 @@ function getScheduledIntensity(
   const current = new Date(start);
   let dayOffset = 0;
   while (current <= end) {
-    const dateStr = current.toISOString().slice(0, 10);
+    // Use formatLocalDate to get consistent YYYY-MM-DD in local timezone
+    // (matches the UTC dates used in calculateScheduledCapacity)
+    const dateStr = formatLocalDate(current);
     const dayCapacity = schedule[getDayKey(current)];
     const scheduledHours = issueHoursMap?.get(dateStr) ?? 0;
     // Intensity = scheduled hours / available hours for this day
     const intensity = dayCapacity > 0 ? scheduledHours / dayCapacity : 0;
     result.push({ dayOffset, intensity: Math.min(intensity, 1.5) }); // Cap at 1.5 for display
-    current.setUTCDate(current.getUTCDate() + 1);
+    current.setDate(current.getDate() + 1);
     dayOffset++;
   }
 
