@@ -9,6 +9,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Priority-based capacity scheduling** - capacity/intensity now uses frontloaded day-by-day simulation; prioritizes by due date urgency, external blocks (2x weight), and downstream count
 - **Gantt bar intensity visualization** - bars show scheduled work distribution (person view); intensity lines indicate when work is actually scheduled vs uniform spread
 - **Internal estimates** - right-click issue to set manual "hours remaining" when original estimate is outdated; takes highest priority in capacity calculation
+- **Precedence priority tag** - right-click issue to tag as precedence; tagged issues always scheduled first (+10000 priority bonus)
 - **Ad-hoc budget transfers** - tag issues as ad-hoc budget pools; time entries on ad-hoc issues can contribute hours to other issues via `#<id>` in comments
 - **Gantt contribution display** - tooltip shows contributed hours breakdown (direct + from ad-hoc)
 - **Time entry contribution commands** - right-click time entries on ad-hoc issues to set/remove contribution target
@@ -36,6 +37,8 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Gantt bar tooltip enhanced** - now shows progress %, estimated, spent, and contributed hours
 - **Gantt contribution fetch date filter** - only fetches time entries within displayed issues' date range
 - **Gantt timeline range by displayed issues** - timeline range uses only actually displayed issues, not all issues in same projects
+- **Capacity tooltip shows project** - breakdown now shows project name instead of subject (issue ID already visible)
+- **Internal estimate prompt on %done** - setting manual %done now prompts for hours remaining
 
 ### Fixed
 
@@ -47,6 +50,8 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Issue picker duplicate results** - search results no longer duplicate issues already shown in assigned list
 - **Time entries empty month expansion** - "This Month" now shows fallback message when empty instead of failing to expand
 - **Gantt by-person timeline range** - timeline no longer extends to old issues assigned to others in same project
+- **Intensity off-by-1** - fixed timezone mismatch causing intensity bars to show on wrong day
+- **Internal estimates in scheduling** - issues with internal estimates but no Redmine estimate now included
 
 ## [3.19.0]
 
