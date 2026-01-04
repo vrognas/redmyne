@@ -1041,10 +1041,11 @@ export class GanttPanel {
     }
 
     try {
-      // Single fetch all time entries, filter client-side by project
-      const allTimeEntries = (await this._server.getAllTimeEntries()).filter(
-        te => te.project?.id && projectIds.has(te.project.id)
-      );
+      // Only fetch time entries for ad-hoc issues (not all 80k+ entries!)
+      const displayedAdHocIds = this._issues
+        .filter(i => adHocIssueIds.has(i.id))
+        .map(i => i.id);
+      const allTimeEntries = await this._server.getTimeEntriesForIssues(displayedAdHocIds);
 
       // Calculate contributions
       const contributions = calculateContributions(allTimeEntries);
