@@ -1045,10 +1045,11 @@ export class GanttPanel {
       // This ensures contributions to displayed issues are calculated
       const allAdHocIds = Array.from(adHocIssueIds);
 
-      // Calculate date range: earliest issue start to today
-      // This limits fetches to relevant period instead of all history
+      // Calculate date range: earliest non-ad-hoc issue start to today
+      // Exclude ad-hoc issues from range calc (they may have very old dates)
       const today = new Date().toISOString().slice(0, 10);
       const startDates = this._issues
+        .filter(i => !adHocIssueIds.has(i.id)) // Exclude ad-hoc issues
         .map(i => i.start_date)
         .filter((d): d is string => !!d)
         .sort();
