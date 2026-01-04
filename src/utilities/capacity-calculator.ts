@@ -329,6 +329,7 @@ export function calculateCapacityByZoom(
 // ============================================================================
 
 /** Priority weights for scheduling */
+const PRECEDENCE_BONUS = 10000; // Massive bonus for user-tagged precedence issues
 const URGENCY_WEIGHT = 10; // Points per day earlier due date
 const EXTERNAL_BLOCK_BONUS = 100; // Bonus for blocking external assignee
 const DOWNSTREAM_WEIGHT = 5; // Points per downstream issue
@@ -390,9 +391,15 @@ function calculatePriorityScore(
   graph: DependencyGraph,
   issueMap: Map<number, Issue>,
   maxDueDate: Date,
-  myUserId?: number
+  myUserId?: number,
+  precedenceIssues?: Set<number>
 ): number {
   let score = 0;
+
+  // 0. Precedence tag: user-tagged issues always come first
+  if (precedenceIssues?.has(issue.id)) {
+    score += PRECEDENCE_BONUS;
+  }
 
   // 1. Due date urgency: earlier due = higher priority
   if (issue.due_date) {
@@ -447,6 +454,7 @@ function calculatePriorityScore(
  * @param internalEstimates - User-provided remaining hours overrides
  * @param myUserId - Current user ID for external block detection
  * @param allIssuesMap - Optional map of all issues (for external block detection)
+ * @param precedenceIssues - User-tagged issues that always get scheduled first
  */
 export function calculateScheduledCapacity(
   issues: Issue[],
@@ -456,7 +464,8 @@ export function calculateScheduledCapacity(
   graph: DependencyGraph,
   internalEstimates: InternalEstimates,
   myUserId?: number,
-  allIssuesMap?: Map<number, Issue>
+  allIssuesMap?: Map<number, Issue>,
+  precedenceIssues?: Set<number>
 ): ScheduledDailyCapacity[] {
   // Filter to schedulable issues (has start_date AND work to schedule)
   // Work can come from estimated_hours OR internal estimate
@@ -518,8 +527,8 @@ export function calculateScheduledCapacity(
 
       // Sort by priority (highest first)
       todaysIssues.sort((a, b) => {
-        const scoreA = calculatePriorityScore(a, graph, issueMap, maxDueDate, myUserId);
-        const scoreB = calculatePriorityScore(b, graph, issueMap, maxDueDate, myUserId);
+        const scoreA = calculatePriorityScore(a, graph, issueMap, maxDueDate, myUserId, precedenceIssues);
+        const scoreB = calculatePriorityScore(b, graph, issueMap, maxDueDate, myUserId, precedenceIssues);
         if (scoreB !== scoreA) return scoreB - scoreA;
         // Tiebreaker: earlier due date
         if (a.due_date && b.due_date) {
@@ -597,7 +606,8 @@ export function calculateScheduledCapacityByZoom(
   internalEstimates: InternalEstimates,
   zoomLevel: CapacityZoomLevel,
   myUserId?: number,
-  allIssuesMap?: Map<number, Issue>
+  allIssuesMap?: Map<number, Issue>,
+  precedenceIssues?: Set<number>
 ): PeriodCapacity[] {
   // Get daily scheduled capacity first
   const dailyData = calculateScheduledCapacity(
@@ -608,7 +618,8 @@ export function calculateScheduledCapacityByZoom(
     graph,
     internalEstimates,
     myUserId,
-    allIssuesMap
+    allIssuesMap,
+    precedenceIssues
   );
 
   if (dailyData.length === 0) {

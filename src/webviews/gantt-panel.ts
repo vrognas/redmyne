@@ -21,6 +21,7 @@ import {
   type ScheduledDailyCapacity,
 } from "../utilities/capacity-calculator";
 import { getInternalEstimates, getInternalEstimate } from "../utilities/internal-estimates";
+import { getPrecedenceIssues, hasPrecedence, togglePrecedence } from "../utilities/precedence-tracker";
 import { autoUpdateTracker } from "../utilities/auto-update-tracker";
 import { collapseState } from "../utilities/collapse-state";
 import { debounce, DebouncedFunction } from "../utilities/debounce";
@@ -1528,6 +1529,21 @@ export class GanttPanel {
           vscode.commands.executeCommand("redmine.refreshIssues");
         }
         break;
+      case "togglePrecedence":
+        if (message.issueId && GanttPanel._globalState) {
+          togglePrecedence(GanttPanel._globalState, message.issueId).then((isNowPrecedence) => {
+            showStatusBarMessage(
+              isNowPrecedence
+                ? `$(check) #${message.issueId} tagged with precedence priority`
+                : `$(check) #${message.issueId} precedence removed`,
+              2000
+            );
+            // Refresh to update intensity calculations
+            this._isRefreshing = true;
+            vscode.commands.executeCommand("redmine.refreshIssues");
+          });
+        }
+        break;
       case "setFilter":
         if (message.filter) {
           const newFilter: IssueFilter = {
@@ -2010,6 +2026,9 @@ export class GanttPanel {
     const internalEstimates: InternalEstimates = GanttPanel._globalState
       ? getInternalEstimates(GanttPanel._globalState)
       : new Map();
+    const precedenceIssues: Set<number> = GanttPanel._globalState
+      ? getPrecedenceIssues(GanttPanel._globalState)
+      : new Set();
     const issueScheduleMap = new Map<number, Map<string, number>>();
     const dayScheduleMap = new Map<string, { issueId: number; hours: number; subject: string }[]>();
     if (this._viewFocus === "person") {
@@ -2021,7 +2040,8 @@ export class GanttPanel {
         depGraph,
         internalEstimates,
         this._currentUserId ?? undefined,
-        issueMap
+        issueMap,
+        precedenceIssues
       );
       // Build both maps from breakdown
       for (const day of scheduledDays) {
@@ -2564,14 +2584,18 @@ export class GanttPanel {
           }
         }
         // === Context-sensitive tooltips ===
-        // Check for internal estimate and manual %done
+        // Check for internal estimate, manual %done, and precedence
         const issueInternalEstimate = GanttPanel._globalState
           ? getInternalEstimate(GanttPanel._globalState, issue.id)
           : null;
         const isManualDone = !autoUpdateTracker.isEnabled(issue.id);
+        const issuePrecedence = GanttPanel._globalState
+          ? hasPrecedence(GanttPanel._globalState, issue.id)
+          : false;
 
         // Bar tooltip: basic info + progress
         const barTooltip = [
+          issuePrecedence ? "⏫ PRECEDENCE PRIORITY" : null,
           issue.isAdHoc ? "🎲 AD-HOC BUDGET POOL" : null,
           issue.isExternal ? "⚡ EXTERNAL DEPENDENCY" : null,
           statusDesc,
@@ -3134,7 +3158,8 @@ ${style.tip}
           internalEstimates,
           capacityZoomLevel,
           this._currentUserId ?? undefined,
-          issueMap
+          issueMap,
+          precedenceIssues
         )
       : [];
 
@@ -5168,6 +5193,7 @@ ${style.tip}
         { label: 'Set % Done', command: 'setDoneRatio' },
         { label: 'Toggle Auto-update %', command: 'toggleAutoUpdate' },
         { label: 'Toggle Ad-hoc Budget', command: 'toggleAdHoc' },
+        { label: 'Toggle Precedence', command: 'togglePrecedence' },
         { label: 'Copy URL', command: 'copyUrl' },
       ];
 
