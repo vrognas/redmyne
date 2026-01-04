@@ -20,7 +20,8 @@ import {
   type InternalEstimates,
   type ScheduledDailyCapacity,
 } from "../utilities/capacity-calculator";
-import { getInternalEstimates } from "../utilities/internal-estimates";
+import { getInternalEstimates, getInternalEstimate } from "../utilities/internal-estimates";
+import { autoUpdateTracker } from "../utilities/auto-update-tracker";
 import { collapseState } from "../utilities/collapse-state";
 import { debounce, DebouncedFunction } from "../utilities/debounce";
 import { IssueFilter, DEFAULT_ISSUE_FILTER, GanttViewMode } from "../redmine/models/common";
@@ -2561,6 +2562,12 @@ export class GanttPanel {
           }
         }
         // === Context-sensitive tooltips ===
+        // Check for internal estimate and manual %done
+        const issueInternalEstimate = GanttPanel._globalState
+          ? getInternalEstimate(GanttPanel._globalState, issue.id)
+          : null;
+        const isManualDone = !autoUpdateTracker.isEnabled(issue.id);
+
         // Bar tooltip: basic info + progress
         const barTooltip = [
           issue.isAdHoc ? "🎲 AD-HOC BUDGET POOL" : null,
@@ -2572,8 +2579,11 @@ export class GanttPanel {
           `Start: ${formatDateWithWeekday(issue.start_date)}`,
           `Due: ${hasOnlyStart ? "(no due date)" : formatDateWithWeekday(issue.due_date)}`,
           `───`,
-          `Progress: ${doneRatio}%${isFallbackProgress ? ` (~${visualDoneRatio}% from time)` : ""}`,
+          `Progress: ${doneRatio}%${isFallbackProgress ? ` (~${visualDoneRatio}% from time)` : ""}${isManualDone && doneRatio > 0 ? " (manual)" : ""}`,
           `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
+          issueInternalEstimate
+            ? `Remaining: ${formatHoursAsTime(issueInternalEstimate.hoursRemaining)} (internal estimate)`
+            : null,
           contributedHours > 0
             ? `Spent: ${formatHoursAsTime(issue.spent_hours)} + ${formatHoursAsTime(contributedHours)} contributed = ${formatHoursAsTime(effectiveSpentHours)}`
             : `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
@@ -2586,9 +2596,12 @@ export class GanttPanel {
         const barReceived = this._contributionSources?.get(issue.id);
 
         const progressLines = [
-          `Progress: ${doneRatio}%${isFallbackProgress ? ` (~${visualDoneRatio}% from time)` : ""}`,
+          `Progress: ${doneRatio}%${isFallbackProgress ? ` (~${visualDoneRatio}% from time)` : ""}${isManualDone && doneRatio > 0 ? " (manual)" : ""}`,
           `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
         ];
+        if (issueInternalEstimate) {
+          progressLines.push(`Remaining: ${formatHoursAsTime(issueInternalEstimate.hoursRemaining)} (internal)`);
+        }
         if (barIsAdHoc && barDonated && barDonated.length > 0) {
           const totalDonated = barDonated.reduce((sum, d) => sum + d.hours, 0);
           progressLines.push(`Spent: ${formatHoursAsTime(issue.spent_hours)}`);
