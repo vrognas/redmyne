@@ -1032,30 +1032,22 @@ export class GanttPanel {
       return;
     }
 
-    // Only fetch if displayed issues include ad-hoc issues
+    // Get all ad-hoc issue IDs - we need to fetch time entries from ALL of them
+    // to calculate contributions TO displayed issues (even if ad-hoc source isn't displayed)
     const adHocIssueIds = new Set(adHocTracker.getAll());
-    const hasAdHocIssues = this._issues.some(i => adHocIssueIds.has(i.id));
-    if (!hasAdHocIssues) {
+    if (adHocIssueIds.size === 0) {
       this._contributionsLoading = false;
       return;
     }
 
     try {
-      // Only fetch time entries for ad-hoc issues (not all 80k+ entries!)
-      const displayedAdHocIds = this._issues
-        .filter(i => adHocIssueIds.has(i.id))
-        .map(i => i.id);
+      // Fetch time entries for ALL ad-hoc issues (not just displayed)
+      // This ensures contributions to displayed issues are calculated
+      const allAdHocIds = Array.from(adHocIssueIds);
 
-      // In by-person mode, only fetch entries by the viewed user
-      let userId: number | undefined;
-      if (this._viewFocus === "person" && this._selectedAssignee) {
-        const assigneeIssue = this._issues.find(
-          i => i.assigned_to?.name === this._selectedAssignee
-        );
-        userId = assigneeIssue?.assigned_to?.id;
-      }
-
-      const allTimeEntries = await this._server.getTimeEntriesForIssues(displayedAdHocIds, userId);
+      // Fetch ALL time entries on ad-hoc issues (no user filter)
+      // Contributions can come from any user's time entries
+      const allTimeEntries = await this._server.getTimeEntriesForIssues(allAdHocIds);
 
       // Calculate contributions
       const contributions = calculateContributions(allTimeEntries);
