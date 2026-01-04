@@ -26,6 +26,8 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Gantt collapse performance** - collapse/expand now client-side without HTML regeneration; debounced + cached hierarchy
 - **Debounce utility** - extracted shared `debounce()` function; refactored 5 manual debounce patterns
 - **Gantt gridlines visibility** - increased opacity for clearer day/week markers
+- **Current user caching** - `/users/current.json` cached for session duration
+- **Issue lookup caching** - `getIssueById` cached with 60s TTL, auto-invalidated on mutations
 
 ### Fixed
 

@@ -58,11 +58,31 @@ export class RedmineOptionsError extends Error {
 /** Default max concurrent API requests */
 const DEFAULT_MAX_CONCURRENT_REQUESTS = 2;
 
+/** Issue cache entry with timestamp for TTL */
+interface IssueCacheEntry {
+  issue: Issue;
+  timestamp: number;
+}
+
+/** Default issue cache TTL in milliseconds (60 seconds) */
+const ISSUE_CACHE_TTL = 60_000;
+
 export class RedmineServer {
   options: RedmineServerOptions = {} as RedmineServerOptions;
 
   private timeEntryActivities: TimeEntryActivity[] | null = null;
   private cachedProjects: RedmineProject[] | null = null;
+  private cachedCurrentUser: {
+    id: number;
+    login: string;
+    firstname: string;
+    lastname: string;
+    mail: string;
+    created_on: string;
+    last_login_on?: string;
+    custom_fields?: { id: number; name: string; value: string }[];
+  } | null = null;
+  private issueCache = new Map<number, IssueCacheEntry>();
 
   // Request queue to prevent server overload
   private activeRequests = 0;
@@ -613,6 +633,9 @@ export class RedmineServer {
       this.encodeJson({ time_entry: entry })
     );
 
+    // Invalidate issue cache (spent_hours changed)
+    this.invalidateIssueCache(issueId);
+
     // Auto-update %done based on spent/estimated hours
     await this.autoUpdateDoneRatio(issueId);
 
@@ -737,10 +760,27 @@ export class RedmineServer {
 
   /**
    * Returns promise, that resolves to an issue
+   * Cached with 60s TTL to avoid redundant fetches
    * @param issueId ID of issue
    */
-  getIssueById(issueId: number): Promise<{ issue: Issue }> {
-    return this.doRequest(`/issues/${issueId}.json`, "GET");
+  async getIssueById(issueId: number): Promise<{ issue: Issue }> {
+    // Check cache with TTL
+    const cached = this.issueCache.get(issueId);
+    if (cached && Date.now() - cached.timestamp < ISSUE_CACHE_TTL) {
+      return { issue: cached.issue };
+    }
+
+    const result = await this.doRequest<{ issue: Issue }>(`/issues/${issueId}.json`, "GET");
+
+    // Cache the result
+    if (result?.issue) {
+      this.issueCache.set(issueId, {
+        issue: result.issue,
+        timestamp: Date.now(),
+      });
+    }
+
+    return result;
   }
 
   /**
@@ -751,10 +791,17 @@ export class RedmineServer {
   }
 
   /**
+   * Invalidate cached issue (call after updates)
+   */
+  private invalidateIssueCache(issueId: number): void {
+    this.issueCache.delete(issueId);
+  }
+
+  /**
    * Returns promise, that resolves, when issue status is set
    */
-  setIssueStatus(issue: Issue, statusId: number): Promise<unknown> {
-    return this.doRequest<{ issue: Issue }>(
+  async setIssueStatus(issue: Issue, statusId: number): Promise<unknown> {
+    const result = await this.doRequest<{ issue: Issue }>(
       `/issues/${issue.id}.json`,
       "PUT",
       Buffer.from(
@@ -766,12 +813,14 @@ export class RedmineServer {
         "utf8"
       )
     );
+    this.invalidateIssueCache(issue.id);
+    return result;
   }
 
   /**
    * Update issue start_date and/or due_date
    */
-  updateIssueDates(
+  async updateIssueDates(
     issueId: number,
     startDate: string | null,
     dueDate: string | null
@@ -783,22 +832,26 @@ export class RedmineServer {
     if (dueDate !== null) {
       issueUpdate.due_date = dueDate;
     }
-    return this.doRequest(
+    const result = await this.doRequest(
       `/issues/${issueId}.json`,
       "PUT",
       this.encodeJson({ issue: issueUpdate })
     );
+    this.invalidateIssueCache(issueId);
+    return result;
   }
 
   /**
    * Update done_ratio (% Done) for an issue
    */
-  updateDoneRatio(issueId: number, doneRatio: number): Promise<unknown> {
-    return this.doRequest(
+  async updateDoneRatio(issueId: number, doneRatio: number): Promise<unknown> {
+    const result = await this.doRequest(
       `/issues/${issueId}.json`,
       "PUT",
       this.encodeJson({ issue: { done_ratio: doneRatio } })
     );
+    this.invalidateIssueCache(issueId);
+    return result;
   }
 
   /**
@@ -864,6 +917,7 @@ export class RedmineServer {
 
   /**
    * Get current user info including custom fields (e.g., FTE)
+   * Cached for session duration (user doesn't change)
    */
   async getCurrentUser(): Promise<{
     id: number;
@@ -875,6 +929,11 @@ export class RedmineServer {
     last_login_on?: string;
     custom_fields?: { id: number; name: string; value: string }[];
   } | undefined> {
+    // Return cached user if available
+    if (this.cachedCurrentUser) {
+      return this.cachedCurrentUser;
+    }
+
     try {
       const response = await this.doRequest<{
         user: {
@@ -888,6 +947,7 @@ export class RedmineServer {
           custom_fields?: { id: number; name: string; value: string }[];
         };
       }>("/users/current.json", "GET");
+      this.cachedCurrentUser = response?.user ?? null;
       return response?.user;
     } catch {
       return undefined;
