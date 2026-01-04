@@ -2001,13 +2001,15 @@ export class GanttPanel {
     const maxDateStr = maxDate.toISOString().slice(0, 10);
     const minDateStr = minDate.toISOString().slice(0, 10);
 
-    // Build scheduled capacity map for intensity visualization (person view only)
-    // Maps issueId -> date -> scheduled hours for that day
+    // Build scheduled capacity maps for intensity + capacity tooltip (person view only)
+    // issueScheduleMap: issueId -> date -> hours (for bar intensity)
+    // dayScheduleMap: date -> [{issueId, hours, subject}] (for capacity tooltip)
     const internalEstimates: InternalEstimates = GanttPanel._globalState
       ? getInternalEstimates(GanttPanel._globalState)
       : new Map();
     const issueScheduleMap = new Map<number, Map<string, number>>();
-    if (this._viewFocus === "person" && this._showIntensity) {
+    const dayScheduleMap = new Map<string, { issueId: number; hours: number; subject: string }[]>();
+    if (this._viewFocus === "person") {
       const scheduledDays: ScheduledDailyCapacity[] = calculateScheduledCapacity(
         filteredIssues,
         this._schedule,
@@ -2018,13 +2020,27 @@ export class GanttPanel {
         this._currentUserId ?? undefined,
         issueMap
       );
-      // Build the map from breakdown
+      // Build both maps from breakdown
       for (const day of scheduledDays) {
+        const dayEntries: { issueId: number; hours: number; subject: string }[] = [];
         for (const entry of day.breakdown) {
+          // issueScheduleMap for intensity bars
           if (!issueScheduleMap.has(entry.issueId)) {
             issueScheduleMap.set(entry.issueId, new Map());
           }
           issueScheduleMap.get(entry.issueId)!.set(day.date, entry.hours);
+          // dayScheduleMap for capacity tooltip
+          const issue = issueMap.get(entry.issueId);
+          if (issue && entry.hours > 0) {
+            dayEntries.push({
+              issueId: entry.issueId,
+              hours: entry.hours,
+              subject: issue.subject.length > 25 ? issue.subject.substring(0, 24) + "…" : issue.subject
+            });
+          }
+        }
+        if (dayEntries.length > 0) {
+          dayScheduleMap.set(day.date, dayEntries);
         }
       }
     }
@@ -3131,7 +3147,36 @@ ${style.tip}
       const dateLabel = period.startDate === period.endDate
         ? period.startDate
         : `${period.startDate} to ${period.endDate}`;
-      const tooltip = `${dateLabel}: ${period.loadHours}h / ${period.capacityHours}h (${period.percentage}%)\nClick to scroll to this date`;
+
+      // Build breakdown for this period (aggregate across days in period)
+      const periodBreakdown = new Map<number, { hours: number; subject: string }>();
+      const periodStart = new Date(period.startDate + "T00:00:00Z");
+      const periodEnd = new Date(period.endDate + "T00:00:00Z");
+      for (let d = new Date(periodStart); d <= periodEnd; d.setUTCDate(d.getUTCDate() + 1)) {
+        const dateStr = d.toISOString().slice(0, 10);
+        const dayEntries = dayScheduleMap.get(dateStr);
+        if (dayEntries) {
+          for (const entry of dayEntries) {
+            const existing = periodBreakdown.get(entry.issueId);
+            if (existing) {
+              existing.hours += entry.hours;
+            } else {
+              periodBreakdown.set(entry.issueId, { hours: entry.hours, subject: entry.subject });
+            }
+          }
+        }
+      }
+      // Format breakdown lines (sorted by hours desc, skip 0)
+      const breakdownLines = Array.from(periodBreakdown.entries())
+        .filter(([, v]) => v.hours > 0)
+        .sort((a, b) => b[1].hours - a[1].hours)
+        .slice(0, 8) // Limit to 8 issues
+        .map(([id, v]) => `  #${id}: ${v.hours.toFixed(1)}h - ${v.subject}`);
+      const breakdownText = breakdownLines.length > 0
+        ? `\n${breakdownLines.join("\n")}${periodBreakdown.size > 8 ? `\n  ... and ${periodBreakdown.size - 8} more` : ""}`
+        : "";
+
+      const tooltip = `${dateLabel}: ${period.loadHours.toFixed(1)}h / ${period.capacityHours}h (${period.percentage}%)${breakdownText}\n\nClick to scroll to this date`;
 
       return `<rect class="capacity-day-bar" x="${startX}" y="0" width="${barWidth}" height="${ribbonHeight}" fill="${fillColor}" opacity="${opacity}" data-date="${period.startDate}" data-date-ms="${startDateObj.getTime()}"><title>${escapeHtml(tooltip)}</title></rect>`;
     }).join("");
