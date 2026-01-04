@@ -122,19 +122,32 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const monthStart = getMonthStart();
       const lastMonth = getLastMonthRange();
 
-      // Fetch entries in parallel (4 requests) - filter by user based on showAllUsers
+      // Single fetch covering all periods (lastMonth.start to today)
+      // Then filter client-side - reduces 4 API requests to 1
       const allUsers = this.showAllUsers;
-      const [todayResult, weekResult, monthResult, lastMonthResult] = await Promise.all([
-        this.server.getTimeEntries({ from: today, to: today, allUsers }),
-        this.server.getTimeEntries({ from: weekStart, to: today, allUsers }),
-        this.server.getTimeEntries({ from: monthStart, to: today, allUsers }),
-        this.server.getTimeEntries({ from: lastMonth.start, to: lastMonth.end, allUsers }),
-      ]);
+      const result = await this.server.getTimeEntries({
+        from: lastMonth.start,
+        to: today,
+        allUsers,
+      });
 
-      const todayTotal = calculateTotal(todayResult.time_entries);
-      const weekTotal = calculateTotal(weekResult.time_entries);
-      const monthTotal = calculateTotal(monthResult.time_entries);
-      const lastMonthTotal = calculateTotal(lastMonthResult.time_entries);
+      // Filter entries client-side by date range (spent_on is YYYY-MM-DD string)
+      const allEntries = result.time_entries;
+      const todayEntries = allEntries.filter((e) => e.spent_on === today);
+      const weekEntries = allEntries.filter(
+        (e) => e.spent_on && e.spent_on >= weekStart && e.spent_on <= today
+      );
+      const monthEntries = allEntries.filter(
+        (e) => e.spent_on && e.spent_on >= monthStart && e.spent_on <= today
+      );
+      const lastMonthEntries = allEntries.filter(
+        (e) => e.spent_on && e.spent_on >= lastMonth.start && e.spent_on <= lastMonth.end
+      );
+
+      const todayTotal = calculateTotal(todayEntries);
+      const weekTotal = calculateTotal(weekEntries);
+      const monthTotal = calculateTotal(monthEntries);
+      const lastMonthTotal = calculateTotal(lastMonthEntries);
 
       const defaultSchedule = getWeeklySchedule();
 
@@ -178,7 +191,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
           collapsibleState: this.getCollapsibleState("group-today", true),
           type: "group",
           contextValue: "day-group",
-          _cachedEntries: todayResult.time_entries,
+          _cachedEntries: todayEntries,
           _date: today,
         },
         {
@@ -188,7 +201,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
           tooltip: "Shows working days from Monday up to today",
           collapsibleState: this.getCollapsibleState("group-week", true),
           type: "week-group",
-          _cachedEntries: weekResult.time_entries,
+          _cachedEntries: weekEntries,
           _dateRange: { start: weekStart, end: today },
         },
         {
@@ -198,7 +211,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
           tooltip: "Shows working days from 1st up to today",
           collapsibleState: this.getCollapsibleState("group-month", true),
           type: "month-group",
-          _cachedEntries: monthResult.time_entries,
+          _cachedEntries: monthEntries,
         },
         {
           id: "group-last-month",
@@ -207,7 +220,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
           tooltip: `${lastMonth.start} to ${lastMonth.end}`,
           collapsibleState: this.getCollapsibleState("group-last-month", true),
           type: "month-group",
-          _cachedEntries: lastMonthResult.time_entries,
+          _cachedEntries: lastMonthEntries,
         },
       ];
     } catch {

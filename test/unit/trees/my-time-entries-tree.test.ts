@@ -166,11 +166,8 @@ describe("MyTimeEntriesTreeDataProvider", () => {
 
     const monthEntries: TimeEntry[] = [...weekEntries];
 
-    mockServer.getTimeEntries
-      .mockResolvedValueOnce({ time_entries: todayEntries }) // today
-      .mockResolvedValueOnce({ time_entries: weekEntries }) // week
-      .mockResolvedValueOnce({ time_entries: monthEntries }) // month
-      .mockResolvedValueOnce({ time_entries: [] }); // last month
+    // Single API call returns all entries; client-side filters by date
+    mockServer.getTimeEntries.mockResolvedValueOnce({ time_entries: monthEntries });
 
     // First call returns loading state
     await provider.getChildren();
@@ -182,13 +179,13 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     const groups = await provider.getChildren();
 
     expect(groups).toHaveLength(4); // Today, This Week, This Month, Last Month
-    expect(mockServer.getTimeEntries).toHaveBeenCalledTimes(4);
+    expect(mockServer.getTimeEntries).toHaveBeenCalledTimes(1); // Single fetch
 
     // Get children for first group (Today)
     const todayChildren = await provider.getChildren(groups[0]);
 
     // Should NOT call API again (cached)
-    expect(mockServer.getTimeEntries).toHaveBeenCalledTimes(4);
+    expect(mockServer.getTimeEntries).toHaveBeenCalledTimes(1);
     expect(todayChildren).toHaveLength(1);
   });
 
@@ -618,18 +615,17 @@ describe("MyTimeEntriesTreeDataProvider", () => {
       },
     ];
 
-    mockServer.getTimeEntries
-      .mockResolvedValueOnce({ time_entries: [] }) // today
-      .mockResolvedValueOnce({ time_entries: [] }) // week
-      .mockResolvedValueOnce({ time_entries: monthEntries }) // month
-      .mockResolvedValueOnce({ time_entries: [] }); // last month
+    // Single API call returns all entries; client-side filters by date
+    // These entries are from Dec 2025, which falls in "Last Month" from Jan 2026 perspective
+    mockServer.getTimeEntries.mockResolvedValueOnce({ time_entries: monthEntries });
 
     const groups = await getLoadedGroups();
-    const thisMonth = groups[2];
-    expect(thisMonth.label).toContain("This Month");
+    // With Dec 2025 entries and Jan 2026 "today", these entries are in "Last Month"
+    const lastMonth = groups[3];
+    expect(lastMonth.label).toContain("Last Month");
 
     // Get week groups
-    const weekGroups = await provider.getChildren(thisMonth);
+    const weekGroups = await provider.getChildren(lastMonth);
 
     // Should have 2 week groups (weeks 50 and 51)
     expect(weekGroups.length).toBe(2);

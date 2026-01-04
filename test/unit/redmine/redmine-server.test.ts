@@ -368,4 +368,101 @@ describe("RedmineServer", () => {
       ).toThrow(RedmineOptionsError);
     });
   });
+
+  describe("Request Queue", () => {
+    it("should limit concurrent requests to maxConcurrentRequests", async () => {
+      const requestOrder: number[] = [];
+      const requestCompletions: Array<() => void> = [];
+
+      // Create mock that tracks request order and allows manual completion
+      const mockRequest = vi.fn(
+        (
+          _options: unknown,
+          callback: (response: NodeJS.EventEmitter & { statusCode: number; statusMessage: string; headers: Record<string, string> }) => void
+        ) => {
+          const requestNum = requestOrder.length + 1;
+          requestOrder.push(requestNum);
+
+          const request = new EventEmitter() as NodeJS.EventEmitter & { end: () => void };
+          request.end = () => {
+            // Store completion callback for manual triggering
+            requestCompletions.push(() => {
+              const response = new EventEmitter() as NodeJS.EventEmitter & { statusCode: number; statusMessage: string; headers: Record<string, string> };
+              response.statusCode = 200;
+              response.statusMessage = "OK";
+              response.headers = {};
+              callback(response);
+              queueMicrotask(() => {
+                response.emit("data", Buffer.from(JSON.stringify({ ok: true })));
+                response.emit("end");
+              });
+            });
+          };
+          return request;
+        }
+      );
+
+      const server = new RedmineServer({
+        address: "https://redmine.example.com",
+        key: "test-api-key",
+        requestFn: mockRequest as unknown as typeof http.request,
+        maxConcurrentRequests: 2,
+      });
+
+      // Start 4 requests simultaneously
+      const promises = [
+        server.doRequest("/test1.json", "GET"),
+        server.doRequest("/test2.json", "GET"),
+        server.doRequest("/test3.json", "GET"),
+        server.doRequest("/test4.json", "GET"),
+      ];
+
+      // Wait for requests to be initiated
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Only 2 requests should have started (due to maxConcurrentRequests=2)
+      expect(requestOrder).toEqual([1, 2]);
+      expect(requestCompletions).toHaveLength(2);
+
+      // Complete first request - should trigger third
+      requestCompletions[0]();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(requestOrder).toEqual([1, 2, 3]);
+
+      // Complete second request - should trigger fourth
+      requestCompletions[1]();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(requestOrder).toEqual([1, 2, 3, 4]);
+
+      // Complete remaining requests
+      requestCompletions[2]();
+      requestCompletions[3]();
+
+      await Promise.all(promises);
+    });
+
+    it("should use default maxConcurrentRequests of 2", async () => {
+      const server = new RedmineServer({
+        address: "https://redmine.example.com",
+        key: "test-api-key",
+        requestFn: createMockRequest(),
+      });
+
+      // Access private field for testing (not ideal but verifies default)
+      expect((server as unknown as { maxConcurrentRequests: number }).maxConcurrentRequests).toBe(2);
+    });
+
+    it("should allow configuring maxConcurrentRequests", async () => {
+      const server = new RedmineServer({
+        address: "https://redmine.example.com",
+        key: "test-api-key",
+        requestFn: createMockRequest(),
+        maxConcurrentRequests: 5,
+      });
+
+      expect((server as unknown as { maxConcurrentRequests: number }).maxConcurrentRequests).toBe(5);
+    });
+  });
 });

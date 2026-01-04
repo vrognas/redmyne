@@ -396,10 +396,18 @@ export async function pickIssueWithSearch(
  * Pick an issue with inline search (no activity selection)
  * Used for moving time entries to another issue
  */
+export interface PickIssueOptions {
+  /** Skip time tracking validation - allows selecting any issue */
+  skipTimeTrackingCheck?: boolean;
+}
+
 export async function pickIssue(
   server: RedmineServer,
-  title: string
+  title: string,
+  options: PickIssueOptions = {}
 ): Promise<Issue | undefined> {
+  const { skipTimeTrackingCheck = false } = options;
+
   // Get assigned issues
   let issues: Issue[];
   try {
@@ -410,39 +418,54 @@ export async function pickIssue(
     return undefined;
   }
 
-  // Check time_tracking for all projects
-  const projectIds = [...new Set(issues.map(i => i.project?.id).filter(Boolean))] as number[];
+  // Check time_tracking for all projects (unless skipped)
   const timeTrackingByProject = new Map<number, boolean>();
 
-  await Promise.all(
-    projectIds.map(async (projectId) => {
-      const enabled = await server.isTimeTrackingEnabled(projectId);
-      timeTrackingByProject.set(projectId, enabled);
-    })
-  );
+  if (!skipTimeTrackingCheck) {
+    const projectIds = [...new Set(issues.map(i => i.project?.id).filter(Boolean))] as number[];
+    await Promise.all(
+      projectIds.map(async (projectId) => {
+        const enabled = await server.isTimeTrackingEnabled(projectId);
+        timeTrackingByProject.set(projectId, enabled);
+      })
+    );
+  }
 
-  // Build base items: trackable first, then non-trackable (disabled)
-  const trackableIssues = issues.filter(
-    (issue) => issue.project?.id && timeTrackingByProject.get(issue.project.id)
-  );
-  const nonTrackableIssues = issues.filter(
-    (issue) => !issue.project?.id || !timeTrackingByProject.get(issue.project.id)
-  );
+  // Build base items
+  let baseItems: IssueQuickPickItem[];
 
-  const baseItems: IssueQuickPickItem[] = [
-    ...trackableIssues.map((issue) => ({
+  if (skipTimeTrackingCheck) {
+    // All issues selectable
+    baseItems = issues.map((issue) => ({
       label: `#${issue.id} ${issue.subject}`,
       description: issue.project?.name,
       issue,
       disabled: false,
-    })),
-    ...nonTrackableIssues.map((issue) => ({
-      label: `$(circle-slash) #${issue.id} ${issue.subject}`,
-      description: `${issue.project?.name ?? "Unknown"} (no time tracking)`,
-      issue,
-      disabled: true,
-    })),
-  ];
+    }));
+  } else {
+    // Split by time tracking: trackable first, then non-trackable (disabled)
+    const trackableIssues = issues.filter(
+      (issue) => issue.project?.id && timeTrackingByProject.get(issue.project.id)
+    );
+    const nonTrackableIssues = issues.filter(
+      (issue) => !issue.project?.id || !timeTrackingByProject.get(issue.project.id)
+    );
+
+    baseItems = [
+      ...trackableIssues.map((issue) => ({
+        label: `#${issue.id} ${issue.subject}`,
+        description: issue.project?.name,
+        issue,
+        disabled: false,
+      })),
+      ...nonTrackableIssues.map((issue) => ({
+        label: `$(circle-slash) #${issue.id} ${issue.subject}`,
+        description: `${issue.project?.name ?? "Unknown"} (no time tracking)`,
+        issue,
+        disabled: true,
+      })),
+    ];
+  }
 
   // Use createQuickPick for inline search
   return new Promise<Issue | undefined>((resolve) => {
@@ -526,18 +549,20 @@ export async function pickIssue(
 
         if (thisSearchVersion !== searchVersion || resolved) return;
 
-        // Check time tracking for any new projects in search results
-        const newProjectIds = [...new Set(
-          allResults
-            .map(i => i.project?.id)
-            .filter((id): id is number => id !== undefined && !timeTrackingByProject.has(id))
-        )];
-        await Promise.all(
-          newProjectIds.map(async (projectId) => {
-            const enabled = await server.isTimeTrackingEnabled(projectId);
-            timeTrackingByProject.set(projectId, enabled);
-          })
-        );
+        // Check time tracking for any new projects in search results (unless skipped)
+        if (!skipTimeTrackingCheck) {
+          const newProjectIds = [...new Set(
+            allResults
+              .map(i => i.project?.id)
+              .filter((id): id is number => id !== undefined && !timeTrackingByProject.has(id))
+          )];
+          await Promise.all(
+            newProjectIds.map(async (projectId) => {
+              const enabled = await server.isTimeTrackingEnabled(projectId);
+              timeTrackingByProject.set(projectId, enabled);
+            })
+          );
+        }
 
         if (thisSearchVersion !== searchVersion || resolved) return;
 
@@ -550,7 +575,7 @@ export async function pickIssue(
           : limitedResults.map((issue) => {
               const isAssigned = assignedIds.has(issue.id);
               const projectId = issue.project?.id;
-              const hasTimeTracking = projectId ? timeTrackingByProject.get(projectId) : false;
+              const hasTimeTracking = skipTimeTrackingCheck || (projectId ? timeTrackingByProject.get(projectId) : false);
               if (!hasTimeTracking) {
                 return {
                   label: `$(circle-slash) #${issue.id} ${issue.subject}`,
@@ -569,10 +594,14 @@ export async function pickIssue(
               };
             });
 
+        // Filter baseItems to exclude issues already in search results
+        const resultIds = new Set(limitedResults.map(i => i.id));
+        const filteredBaseItems = baseItems.filter(item => !item.issue || !resultIds.has(item.issue.id));
+
         quickPick.items = [
           ...resultItems,
           { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
-          ...baseItems,
+          ...filteredBaseItems,
         ];
       } catch {
         if (thisSearchVersion === searchVersion && !resolved) {

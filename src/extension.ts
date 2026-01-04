@@ -96,17 +96,19 @@ export function activate(context: vscode.ExtensionContext): void {
   const createServer = (
     options: RedmineServerConnectionOptions
   ): RedmineServer => {
-    const loggingEnabled =
-      vscode.workspace.getConfiguration("redmine").get<boolean>("logging.enabled") ||
-      false;
+    const config = vscode.workspace.getConfiguration("redmine");
+    const loggingEnabled = config.get<boolean>("logging.enabled") || false;
+    const maxConcurrentRequests = config.get<number>("maxConcurrentRequests") || 2;
+
+    const serverOptions = { ...options, maxConcurrentRequests };
 
     if (loggingEnabled) {
-      return new LoggingRedmineServer(options, outputChannel, {
+      return new LoggingRedmineServer(serverOptions, outputChannel, {
         enabled: true,
       });
     }
 
-    return new RedmineServer(options);
+    return new RedmineServer(serverOptions);
   };
 
   const projectsTree = new ProjectsTree(context.globalState);

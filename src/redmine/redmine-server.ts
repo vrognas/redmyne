@@ -40,6 +40,11 @@ export interface RedmineServerConnectionOptions {
    * @internal
    */
   requestFn?: typeof http.request;
+  /**
+   * Maximum concurrent API requests (default: 2)
+   * Prevents server overload by queuing excess requests
+   */
+  maxConcurrentRequests?: number;
 }
 
 interface RedmineServerOptions extends RedmineServerConnectionOptions {
@@ -50,11 +55,19 @@ export class RedmineOptionsError extends Error {
   name = "RedmineOptionsError";
 }
 
+/** Default max concurrent API requests */
+const DEFAULT_MAX_CONCURRENT_REQUESTS = 2;
+
 export class RedmineServer {
   options: RedmineServerOptions = {} as RedmineServerOptions;
 
   private timeEntryActivities: TimeEntryActivity[] | null = null;
   private cachedProjects: RedmineProject[] | null = null;
+
+  // Request queue to prevent server overload
+  private activeRequests = 0;
+  private readonly maxConcurrentRequests: number;
+  private readonly requestQueue: Array<() => void> = [];
 
   get request() {
     if (this.options.requestFn) {
@@ -101,6 +114,34 @@ export class RedmineServer {
   constructor(options: RedmineServerConnectionOptions) {
     this.validateOptions(options);
     this.setOptions(options);
+    this.maxConcurrentRequests = options.maxConcurrentRequests ?? DEFAULT_MAX_CONCURRENT_REQUESTS;
+  }
+
+  /**
+   * Acquire a request slot, waiting if at max concurrency
+   */
+  private acquireSlot(): Promise<void> {
+    if (this.activeRequests < this.maxConcurrentRequests) {
+      this.activeRequests++;
+      return Promise.resolve();
+    }
+    // Queue this request until a slot is available
+    return new Promise((resolve) => {
+      this.requestQueue.push(resolve);
+    });
+  }
+
+  /**
+   * Release a request slot and process next queued request
+   */
+  private releaseSlot(): void {
+    const next = this.requestQueue.shift();
+    if (next) {
+      // Don't decrement - slot transfers to next request
+      next();
+    } else {
+      this.activeRequests--;
+    }
   }
 
   /**
@@ -138,7 +179,19 @@ export class RedmineServer {
     // No-op by default, child classes can override
   }
 
-  doRequest<T>(path: string, method: HttpMethods, data?: Buffer): Promise<T> {
+  async doRequest<T>(path: string, method: HttpMethods, data?: Buffer): Promise<T> {
+    await this.acquireSlot();
+    try {
+      return await this.executeRequest<T>(path, method, data);
+    } finally {
+      this.releaseSlot();
+    }
+  }
+
+  /**
+   * Execute HTTP request (internal - use doRequest for queue management)
+   */
+  private executeRequest<T>(path: string, method: HttpMethods, data?: Buffer): Promise<T> {
     const { url, key, additionalHeaders } = this.options;
     const requestId = Symbol("request"); // Unique ID for hook correlation
     const options: https.RequestOptions = {
@@ -320,20 +373,28 @@ export class RedmineServer {
       return firstPage;
     }
 
-    // Calculate remaining offsets and fetch in parallel
+    // Calculate remaining offsets
     const remainingOffsets: number[] = [];
     for (let offset = limit; offset < totalCount; offset += limit) {
       remainingOffsets.push(offset);
     }
 
-    const remainingPages = await Promise.all(
-      remainingOffsets.map(async (offset) => {
-        const pageUrl = `${endpoint}${endpoint.includes("?") ? "&" : "?"}limit=${limit}&offset=${offset}`;
-        const response = await this.doRequest<Record<string, unknown>>(pageUrl, "GET");
-        const rawItems = (response?.[responseKey] || []) as TRaw[];
-        return transform ? transform(rawItems) : (rawItems as unknown as TResult[]);
-      })
-    );
+    // Fetch remaining pages in batches to avoid overwhelming the server
+    const paginationBatchSize = this.maxConcurrentRequests;
+    const remainingPages: TResult[][] = [];
+
+    for (let i = 0; i < remainingOffsets.length; i += paginationBatchSize) {
+      const batch = remainingOffsets.slice(i, i + paginationBatchSize);
+      const batchResults = await Promise.all(
+        batch.map(async (offset) => {
+          const pageUrl = `${endpoint}${endpoint.includes("?") ? "&" : "?"}limit=${limit}&offset=${offset}`;
+          const response = await this.doRequest<Record<string, unknown>>(pageUrl, "GET");
+          const rawItems = (response?.[responseKey] || []) as TRaw[];
+          return transform ? transform(rawItems) : (rawItems as unknown as TResult[]);
+        })
+      );
+      remainingPages.push(...batchResults);
+    }
 
     // Combine: first page + all remaining pages (flattened)
     return firstPage.concat(...remainingPages);

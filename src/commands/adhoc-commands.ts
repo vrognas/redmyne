@@ -3,6 +3,7 @@ import { adHocTracker } from "../utilities/adhoc-tracker";
 import { parseTargetIssueId } from "../utilities/contribution-calculator";
 import { TimeEntryNode } from "../trees/my-time-entries-tree";
 import { RedmineServer } from "../redmine/redmine-server";
+import { pickIssue } from "../utilities/issue-picker";
 
 /** Issue tree item passed from context menu */
 interface IssueItem {
@@ -69,29 +70,17 @@ export async function contributeToIssue(
     return;
   }
 
-  // Search for target issue within same project
-  const targetIdStr = await vscode.window.showInputBox({
-    prompt: "Enter target issue ID to contribute hours to",
-    placeHolder: "e.g., 1234",
-    validateInput: (value) => {
-      if (!value) return "Issue ID required";
-      if (!/^\d+$/.test(value)) return "Must be a number";
-      if (parseInt(value, 10) === issueId) return "Cannot contribute to self";
-      return null;
-    },
+  // Pick target issue using search (skip time tracking - we're linking, not logging)
+  const targetIssue = await pickIssue(server, "Contribute Time To...", {
+    skipTimeTrackingCheck: true,
   });
+  if (!targetIssue) return;
 
-  if (!targetIdStr) return;
+  const targetId = targetIssue.id;
 
-  const targetId = parseInt(targetIdStr, 10);
-
-  // Verify target issue exists
-  let targetIssue;
-  try {
-    const result = await server.getIssueById(targetId);
-    targetIssue = result.issue;
-  } catch {
-    vscode.window.showErrorMessage(`Issue #${targetId} not found`);
+  // Prevent self-contribution
+  if (targetId === issueId) {
+    vscode.window.showErrorMessage("Cannot contribute to self");
     return;
   }
 

@@ -10,6 +10,7 @@ export const window = {
   showInputBox: vi.fn(),
   showInformationMessage: vi.fn(),
   showErrorMessage: vi.fn(),
+  showWarningMessage: vi.fn(),
   withProgress: vi.fn((opts, task) => task({ report: vi.fn() })),
   createStatusBarItem: vi.fn(() => ({
     text: "",

@@ -11,9 +11,14 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Time entry contribution commands** - right-click time entries on ad-hoc issues to set/remove contribution target
 - **Gantt toggle ad-hoc** - right-click context menu to tag/untag issues as ad-hoc budget
 - **Gantt left column scroll** - horizontal scroll for issue/project names, hover shows full name
+- **Configurable concurrent requests** - `redmine.maxConcurrentRequests` setting (1-20, default 2)
 
 ### Changed
 
+- **Ad-hoc contribution uses issue picker** - "Contribute to Issue" now uses searchable issue picker instead of manual ID entry; allows selecting issues from projects without time tracking (contributions are links, not time entries)
+- **Time entries single fetch** - reduced API calls from 4 to 1 by fetching all periods at once and filtering client-side
+- **Request queue with concurrency limit** - API requests now queued with max 2 concurrent to prevent server overload (503 errors)
+- **Batched pagination** - pagination requests now fetched in batches of 2 instead of all at once
 - **Gantt bar labels outside** - %done badge and assignee now appear after bar; adaptive positioning flips to left when near edge
 - **Gantt toolbar redesign** - grouped controls, SVG icons, collapsible legend row, overflow menu
 - **Gantt default zoom** - changed from Day to Month level
@@ -24,6 +29,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 ### Fixed
 
 - **Gantt refresh on time entry changes** - Gantt now refreshes when time entries are added/edited/deleted
+- **Issue picker duplicate results** - search results no longer duplicate issues already shown in assigned list
 
 ## [3.19.0]
 
