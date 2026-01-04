@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   calculateDailyCapacity,
+  calculateCapacityByZoom,
   DailyCapacity,
+  PeriodCapacity,
 } from "../../../src/utilities/capacity-calculator";
 import type { Issue } from "../../../src/redmine/models/issue";
 import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "../../../src/utilities/flexibility-calculator";
@@ -283,5 +285,211 @@ describe("calculateDailyCapacity", () => {
       "2025-01-06"
     );
     expect(result3[0].status).toBe("overloaded"); // > 100%
+  });
+});
+
+describe("calculateCapacityByZoom", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-01-06")); // Monday
+  });
+
+  it("returns PeriodCapacity format for day zoom", () => {
+    const issues = [
+      createMockIssue({
+        id: 1,
+        start_date: "2025-01-06",
+        due_date: "2025-01-10",
+        estimated_hours: 40,
+      }),
+    ];
+
+    const result = calculateCapacityByZoom(
+      issues,
+      DEFAULT_WEEKLY_SCHEDULE,
+      "2025-01-06",
+      "2025-01-10",
+      "day"
+    );
+
+    expect(result.length).toBe(5);
+    // Each day should have startDate === endDate
+    expect(result[0].startDate).toBe("2025-01-06");
+    expect(result[0].endDate).toBe("2025-01-06");
+    expect(result[0].loadHours).toBe(8);
+    expect(result[0].capacityHours).toBe(8);
+    expect(result[0].percentage).toBe(100);
+  });
+
+  it("aggregates by week for week zoom", () => {
+    // Full week Mon-Fri = 5 working days
+    const issues = [
+      createMockIssue({
+        id: 1,
+        start_date: "2025-01-06", // Monday
+        due_date: "2025-01-10", // Friday
+        estimated_hours: 40, // 8h/day
+      }),
+    ];
+
+    const result = calculateCapacityByZoom(
+      issues,
+      DEFAULT_WEEKLY_SCHEDULE,
+      "2025-01-06",
+      "2025-01-10",
+      "week"
+    );
+
+    expect(result.length).toBe(1);
+    expect(result[0].startDate).toBe("2025-01-06");
+    expect(result[0].endDate).toBe("2025-01-10");
+    expect(result[0].loadHours).toBe(40); // Sum: 8 * 5
+    expect(result[0].capacityHours).toBe(40); // Sum: 8 * 5
+    expect(result[0].percentage).toBe(100);
+  });
+
+  it("aggregates across multiple weeks", () => {
+    // Two weeks: Jan 6-10 (Mon-Fri) and Jan 13-17 (Mon-Fri)
+    const issues = [
+      createMockIssue({
+        id: 1,
+        start_date: "2025-01-06",
+        due_date: "2025-01-17", // Spans 2 full weeks
+        estimated_hours: 80, // 8h/day for 10 days
+      }),
+    ];
+
+    const result = calculateCapacityByZoom(
+      issues,
+      DEFAULT_WEEKLY_SCHEDULE,
+      "2025-01-06",
+      "2025-01-17",
+      "week"
+    );
+
+    expect(result.length).toBe(2);
+    expect(result[0].loadHours).toBe(40);
+    expect(result[1].loadHours).toBe(40);
+  });
+
+  it("aggregates by month for month zoom", () => {
+    // January has 23 working days (excluding weekends)
+    const issues = [
+      createMockIssue({
+        id: 1,
+        start_date: "2025-01-01",
+        due_date: "2025-01-31",
+        estimated_hours: 184, // 8h/day * 23 working days
+      }),
+    ];
+
+    const result = calculateCapacityByZoom(
+      issues,
+      DEFAULT_WEEKLY_SCHEDULE,
+      "2025-01-01",
+      "2025-01-31",
+      "month"
+    );
+
+    expect(result.length).toBe(1);
+    // All days should be in the same month period
+    expect(result[0].startDate.startsWith("2025-01")).toBe(true);
+    expect(result[0].loadHours).toBe(184);
+  });
+
+  it("aggregates across multiple months", () => {
+    // Jan-Feb span
+    const issues = [
+      createMockIssue({
+        id: 1,
+        start_date: "2025-01-27", // Last week of Jan
+        due_date: "2025-02-07", // First week of Feb
+        estimated_hours: 80, // 8h/day for 10 working days
+      }),
+    ];
+
+    const result = calculateCapacityByZoom(
+      issues,
+      DEFAULT_WEEKLY_SCHEDULE,
+      "2025-01-27",
+      "2025-02-07",
+      "month"
+    );
+
+    expect(result.length).toBe(2);
+    expect(result[0].startDate.startsWith("2025-01")).toBe(true);
+    expect(result[1].startDate.startsWith("2025-02")).toBe(true);
+  });
+
+  it("aggregates by quarter for quarter zoom", () => {
+    // Q1 = Jan-Mar
+    const issues = [
+      createMockIssue({
+        id: 1,
+        start_date: "2025-01-06",
+        due_date: "2025-03-31",
+        estimated_hours: 480, // ~8h/day for ~60 working days
+      }),
+    ];
+
+    const result = calculateCapacityByZoom(
+      issues,
+      DEFAULT_WEEKLY_SCHEDULE,
+      "2025-01-06",
+      "2025-03-31",
+      "quarter"
+    );
+
+    expect(result.length).toBe(1); // All in Q1
+  });
+
+  it("aggregates by year for year zoom", () => {
+    const issues = [
+      createMockIssue({
+        id: 1,
+        start_date: "2025-01-06",
+        due_date: "2025-12-31",
+        estimated_hours: 2000,
+      }),
+    ];
+
+    const result = calculateCapacityByZoom(
+      issues,
+      DEFAULT_WEEKLY_SCHEDULE,
+      "2025-01-06",
+      "2025-12-31",
+      "year"
+    );
+
+    expect(result.length).toBe(1); // All in 2025
+    expect(result[0].startDate.startsWith("2025")).toBe(true);
+  });
+
+  it("returns empty array for no working days", () => {
+    // Weekend only - no working days
+    const result = calculateCapacityByZoom(
+      [],
+      DEFAULT_WEEKLY_SCHEDULE,
+      "2025-01-11", // Saturday
+      "2025-01-12", // Sunday
+      "day"
+    );
+
+    expect(result.length).toBe(0);
+  });
+
+  it("handles empty issues with day entries", () => {
+    const result = calculateCapacityByZoom(
+      [],
+      DEFAULT_WEEKLY_SCHEDULE,
+      "2025-01-06",
+      "2025-01-10",
+      "week"
+    );
+
+    expect(result.length).toBe(1);
+    expect(result[0].loadHours).toBe(0);
+    expect(result[0].capacityHours).toBe(40);
+    expect(result[0].status).toBe("available");
   });
 });

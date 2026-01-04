@@ -12,7 +12,7 @@ import { errorToString } from "../utilities/error-feedback";
 import { buildProjectHierarchy, buildResourceHierarchy, flattenHierarchyAll, FlatNodeWithVisibility, HierarchyNode } from "../utilities/hierarchy-builder";
 import { ProjectHealth } from "../utilities/project-health";
 import { DependencyGraph, buildDependencyGraph, countDownstream, getDownstream, getBlockers } from "../utilities/dependency-graph";
-import { calculateDailyCapacity } from "../utilities/capacity-calculator";
+import { calculateCapacityByZoom, type CapacityZoomLevel, type PeriodCapacity } from "../utilities/capacity-calculator";
 import { collapseState } from "../utilities/collapse-state";
 import { debounce, DebouncedFunction } from "../utilities/debounce";
 import { IssueFilter, DEFAULT_ISSUE_FILTER, GanttViewMode } from "../redmine/models/common";
@@ -3162,29 +3162,40 @@ ${style.tip}
     // Always calculate aggregate workload (needed for heatmap toggle without re-render)
     const workloadMap = calculateAggregateWorkload(this._issues, this._schedule, minDate, maxDate);
 
-    // Calculate capacity ribbon data (Person view only)
+    // Calculate capacity ribbon data (Person view only), aggregated by zoom level
     const minDateStr = minDate.toISOString().slice(0, 10);
-    const capacityData = this._viewFocus === "person"
-      ? calculateDailyCapacity(this._issues, this._schedule, minDateStr, maxDateStr)
+    const capacityZoomLevel = this._zoomLevel as CapacityZoomLevel;
+    const capacityData: PeriodCapacity[] = this._viewFocus === "person"
+      ? calculateCapacityByZoom(this._issues, this._schedule, minDateStr, maxDateStr, capacityZoomLevel)
       : [];
 
-    // Build capacity ribbon bars (one rect per day showing load status)
+    // Build capacity ribbon bars (one rect per period showing load status)
     const ribbonHeight = 20;
-    // Calculate actual day width (same formula as _generateDateMarkers) to handle min width and rounding
-    const actualDayWidth = timelineWidth / ((maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24));
-    const capacityRibbonBars = capacityData.map((day) => {
-      // Use UTC midnight to match minDate/maxDate (which are UTC-based)
-      const dayDate = new Date(day.date + "T00:00:00Z");
-      const dayX = ((dayDate.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
-      const dayWidth = actualDayWidth;
-      const fillColor = day.status === "available"
+    const capacityRibbonBars = capacityData.map((period) => {
+      // Calculate bar position from period start date
+      const startDateObj = new Date(period.startDate + "T00:00:00Z");
+      const startX = ((startDateObj.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
+
+      // Calculate bar width from period end date + 1 day (to include the end day)
+      const endDateObj = new Date(period.endDate + "T00:00:00Z");
+      endDateObj.setUTCDate(endDateObj.getUTCDate() + 1);
+      const endX = ((endDateObj.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
+      const barWidth = Math.max(2, endX - startX); // Min 2px for visibility
+
+      const fillColor = period.status === "available"
         ? "var(--vscode-charts-green)"
-        : day.status === "busy"
+        : period.status === "busy"
           ? "var(--vscode-charts-yellow)"
           : "var(--vscode-charts-red)";
-      const opacity = Math.min(0.8, 0.3 + (day.percentage / 200)); // Scale opacity with load
-      const tooltip = `${day.date}: ${day.loadHours}h / ${day.capacityHours}h (${day.percentage}%)\nClick to scroll to this date`;
-      return `<rect class="capacity-day-bar" x="${dayX}" y="0" width="${dayWidth}" height="${ribbonHeight}" fill="${fillColor}" opacity="${opacity}" data-date="${day.date}" data-date-ms="${dayDate.getTime()}"><title>${escapeHtml(tooltip)}</title></rect>`;
+      const opacity = Math.min(0.8, 0.3 + (period.percentage / 200)); // Scale opacity with load
+
+      // Show date range in tooltip for non-day zoom levels
+      const dateLabel = period.startDate === period.endDate
+        ? period.startDate
+        : `${period.startDate} to ${period.endDate}`;
+      const tooltip = `${dateLabel}: ${period.loadHours}h / ${period.capacityHours}h (${period.percentage}%)\nClick to scroll to this date`;
+
+      return `<rect class="capacity-day-bar" x="${startX}" y="0" width="${barWidth}" height="${ribbonHeight}" fill="${fillColor}" opacity="${opacity}" data-date="${period.startDate}" data-date-ms="${startDateObj.getTime()}"><title>${escapeHtml(tooltip)}</title></rect>`;
     }).join("");
 
     // Week boundaries for capacity ribbon (show Monday markers)
