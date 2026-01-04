@@ -12,7 +12,13 @@ import { errorToString } from "../utilities/error-feedback";
 import { buildProjectHierarchy, buildResourceHierarchy, flattenHierarchyAll, FlatNodeWithVisibility, HierarchyNode } from "../utilities/hierarchy-builder";
 import { ProjectHealth } from "../utilities/project-health";
 import { DependencyGraph, buildDependencyGraph, countDownstream, getDownstream, getBlockers } from "../utilities/dependency-graph";
-import { calculateCapacityByZoom, type CapacityZoomLevel, type PeriodCapacity } from "../utilities/capacity-calculator";
+import {
+  calculateScheduledCapacityByZoom,
+  type CapacityZoomLevel,
+  type PeriodCapacity,
+  type InternalEstimates,
+} from "../utilities/capacity-calculator";
+import { getInternalEstimates } from "../utilities/internal-estimates";
 import { collapseState } from "../utilities/collapse-state";
 import { debounce, DebouncedFunction } from "../utilities/debounce";
 import { IssueFilter, DEFAULT_ISSUE_FILTER, GanttViewMode } from "../redmine/models/common";
@@ -3015,11 +3021,24 @@ ${style.tip}
     const workloadMap = calculateAggregateWorkload(this._issues, this._schedule, minDate, maxDate);
 
     // Calculate capacity ribbon data (Person view only), aggregated by zoom level
-    // Use filteredIssues to only count the selected person's workload
+    // Use priority-based scheduling (frontloading) instead of uniform distribution
     const minDateStr = minDate.toISOString().slice(0, 10);
     const capacityZoomLevel = this._zoomLevel as CapacityZoomLevel;
+    const internalEstimates: InternalEstimates = GanttPanel._globalState
+      ? getInternalEstimates(GanttPanel._globalState)
+      : new Map();
     const capacityData: PeriodCapacity[] = this._viewFocus === "person"
-      ? calculateCapacityByZoom(filteredIssues, this._schedule, minDateStr, maxDateStr, capacityZoomLevel)
+      ? calculateScheduledCapacityByZoom(
+          filteredIssues,
+          this._schedule,
+          minDateStr,
+          maxDateStr,
+          depGraph,
+          internalEstimates,
+          capacityZoomLevel,
+          this._currentUserId ?? undefined,
+          issueMap
+        )
       : [];
 
     // Build capacity ribbon bars (one rect per period showing load status)

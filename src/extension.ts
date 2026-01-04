@@ -34,6 +34,7 @@ import { getTaskStatus } from "./kanban/kanban-state";
 import { registerTimeEntryCommands } from "./commands/time-entry-commands";
 import { registerMonthlyScheduleCommands } from "./commands/monthly-schedule-commands";
 import { registerGanttCommands } from "./commands/gantt-commands";
+import { registerInternalEstimateCommands } from "./commands/internal-estimate-commands";
 import { GanttPanel } from "./webviews/gantt-panel";
 import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "./utilities/flexibility-calculator";
 import { registerConfigureCommand } from "./commands/configure-command";
@@ -366,6 +367,9 @@ export function activate(context: vscode.ExtensionContext): void {
     getFilter: () => projectsTree.getFilter(),
     setFilter: (filter) => projectsTree.setFilter(filter),
   });
+
+  // Register internal estimate commands
+  registerInternalEstimateCommands(context);
 
   // Register Gantt panel serializer for window reload persistence
   vscode.window.registerWebviewPanelSerializer("redmineGantt", {

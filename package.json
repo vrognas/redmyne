@@ -172,6 +172,16 @@
         "icon": "$(graph)"
       },
       {
+        "command": "redmine.setInternalEstimate",
+        "title": "Set Internal Estimate",
+        "icon": "$(clock)"
+      },
+      {
+        "command": "redmine.clearInternalEstimate",
+        "title": "Clear Internal Estimate",
+        "icon": "$(trash)"
+      },
+      {
         "command": "redmine.setDoneRatio",
         "title": "Set % Done",
         "icon": "$(checklist)"
@@ -659,6 +669,14 @@
           "when": "false"
         },
         {
+          "command": "redmine.setInternalEstimate",
+          "when": "false"
+        },
+        {
+          "command": "redmine.clearInternalEstimate",
+          "when": "false"
+        },
+        {
           "command": "redmine.setDoneRatio",
           "when": "false"
         },
@@ -951,6 +969,26 @@
           "command": "redmine.setDoneRatio",
           "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
           "group": "redmine@2"
+        },
+        {
+          "command": "redmine.setInternalEstimate",
+          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^issue/",
+          "group": "redmine@3"
+        },
+        {
+          "command": "redmine.setInternalEstimate",
+          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
+          "group": "redmine@3"
+        },
+        {
+          "command": "redmine.clearInternalEstimate",
+          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^issue/",
+          "group": "redmine@3"
+        },
+        {
+          "command": "redmine.clearInternalEstimate",
+          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
+          "group": "redmine@3"
         },
         {
           "command": "redmine.quickLogTime",
