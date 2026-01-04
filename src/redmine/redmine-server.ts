@@ -727,10 +727,12 @@ export class RedmineServer {
       queryParams.set("to", params.to);
     }
 
-    return this.doRequest<{ time_entries: TimeEntry[] }>(
+    // Use pagination to fetch all entries (Redmine defaults to 25)
+    const time_entries = await this.paginate<TimeEntry>(
       `/time_entries.json?${queryParams.toString()}`,
-      "GET"
+      "time_entries"
     );
+    return { time_entries };
   }
 
   /**
