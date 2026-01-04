@@ -268,8 +268,26 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     }
 
     // Month group - return week subgroups
-    if (element.type === "month-group" && element._cachedEntries) {
-      return this.groupEntriesByWeek(element._cachedEntries);
+    if (element.type === "month-group") {
+      if (!element._cachedEntries) {
+        // Fallback: data not available, show refresh hint
+        return [{
+          label: "Refresh to load entries",
+          collapsibleState: vscode.TreeItemCollapsibleState.None,
+          type: "loading",
+          iconPath: new vscode.ThemeIcon("refresh"),
+        }];
+      }
+      const weekGroups = this.groupEntriesByWeek(element._cachedEntries);
+      if (weekGroups.length === 0) {
+        return [{
+          label: "No time entries",
+          collapsibleState: vscode.TreeItemCollapsibleState.None,
+          type: "loading",
+          iconPath: new vscode.ThemeIcon("info"),
+        }];
+      }
+      return weekGroups;
     }
 
     // Week subgroup - return day groups
