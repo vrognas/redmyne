@@ -32,7 +32,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Gantt by-person optimizations** - skip versions fetch in person mode; user filter for contribution fetching
 - **Gantt bar tooltip enhanced** - now shows progress %, estimated, spent, and contributed hours
 - **Gantt contribution fetch date filter** - only fetches time entries within displayed issues' date range
-- **Gantt timeline excludes ad-hoc** - ad-hoc issues don't affect timeline range (prevents old budget issues from extending view)
+- **Gantt timeline range by displayed issues** - timeline range uses only actually displayed issues, not all issues in same projects
 
 ### Fixed
 
@@ -43,6 +43,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Progress bar includes contributions** - visual progress now accounts for contributed hours from ad-hoc issues
 - **Issue picker duplicate results** - search results no longer duplicate issues already shown in assigned list
 - **Time entries empty month expansion** - "This Month" now shows fallback message when empty instead of failing to expand
+- **Gantt by-person timeline range** - timeline no longer extends to old issues assigned to others in same project
 
 ## [3.19.0]
 
