@@ -342,11 +342,11 @@ function formatHoursAsTime(hours: number | null): string {
 }
 
 /**
- * Get day name key for WeeklySchedule lookup
+ * Get day name key for WeeklySchedule lookup (uses local day)
  */
 function getDayKey(date: Date): keyof WeeklySchedule {
   const keys: (keyof WeeklySchedule)[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  return keys[date.getUTCDay()];
+  return keys[date.getDay()]; // Use local day, not UTC
 }
 
 /**
