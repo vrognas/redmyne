@@ -334,6 +334,7 @@ const URGENCY_WEIGHT = 10; // Points per day earlier due date
 const EXTERNAL_BLOCK_BONUS = 100; // Bonus for blocking external assignee
 const DOWNSTREAM_WEIGHT = 5; // Points per downstream issue
 const EXTERNAL_BLOCK_MULTIPLIER = 2; // 2x priority for external blocks
+const PREDICTION_CAPACITY_FACTOR = 0.75; // Only use 75% of capacity for predictions (buffer for meetings, etc.)
 
 /**
  * Calculate remaining work for an issue
@@ -557,7 +558,8 @@ export function calculateScheduledCapacity(
 
         const breakdown: IssueScheduleEntry[] = [];
         let loadHours = 0;
-        let available = capacityHours;
+        // Use reduced capacity for predictions (buffer for meetings, interruptions)
+        let available = capacityHours * PREDICTION_CAPACITY_FACTOR;
 
         for (const issue of todaysIssues) {
           if (available <= 0) break;
