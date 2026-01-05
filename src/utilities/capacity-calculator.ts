@@ -531,8 +531,8 @@ export function calculateScheduledCapacity(
 
     // Skip non-working days
     if (capacityHours > 0) {
-      // Check if this is past (use actual) or today/future (use prediction)
-      const usePrediction = !today || dateStr >= today;
+      // Check if this is past/today (use actual) or future (use prediction)
+      const usePrediction = !today || dateStr > today;
 
       if (usePrediction) {
         // FUTURE: Priority-based scheduling prediction
