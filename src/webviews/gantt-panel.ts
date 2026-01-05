@@ -4550,13 +4550,15 @@ ${style.tip}
     }
 
     // Single scroll container - no sync needed, just update minimap and save state
+    // Flag to prevent saving state during scroll restoration (would overwrite with wrong position)
+    let restoringScroll = true;
     let deferredScrollUpdate = null;
     if (ganttScroll) {
       ganttScroll.addEventListener('scroll', () => {
         cancelAnimationFrame(deferredScrollUpdate);
         deferredScrollUpdate = requestAnimationFrame(() => {
           updateMinimapViewport();
-          saveState();
+          if (!restoringScroll) saveState();
         });
       }, { passive: true });
     }
@@ -6404,6 +6406,8 @@ ${style.tip}
       }
       // Initialize minimap viewport (batched with scroll restoration)
       updateMinimapViewport();
+      // Allow scroll state saving after restoration completes
+      restoringScroll = false;
     });
 
     // Today button handler
