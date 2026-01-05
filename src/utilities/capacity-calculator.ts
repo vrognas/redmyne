@@ -478,11 +478,12 @@ export function calculateScheduledCapacity(
   actualTimeEntries?: ActualTimeEntries,
   today?: string
 ): ScheduledDailyCapacity[] {
-  // Filter to schedulable issues (has start_date AND work to schedule)
+  // Filter to schedulable issues (has start_date AND work to schedule AND not closed)
   // Work can come from estimated_hours OR internal estimate
   const schedulableIssues = issues.filter(
     (i) =>
       i.start_date &&
+      i.done_ratio !== 100 && // Exclude closed issues
       ((i.estimated_hours && i.estimated_hours > 0) || internalEstimates.has(i.id))
   );
 
