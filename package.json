@@ -941,17 +941,17 @@
       "view/item/context": [
         {
           "command": "redmine.editTimeEntry",
-          "when": "view == 'redmine-explorer-my-time-entries' && viewItem == 'time-entry'",
+          "when": "view == 'redmine-explorer-my-time-entries' && viewItem =~ /^time-entry/",
           "group": "1_edit@1"
         },
         {
           "command": "redmine.deleteTimeEntry",
-          "when": "view == 'redmine-explorer-my-time-entries' && viewItem == 'time-entry'",
+          "when": "view == 'redmine-explorer-my-time-entries' && viewItem =~ /^time-entry/",
           "group": "1_edit@2"
         },
         {
           "command": "redmine.openTimeEntryInBrowser",
-          "when": "view == 'redmine-explorer-my-time-entries' && viewItem == 'time-entry'",
+          "when": "view == 'redmine-explorer-my-time-entries' && viewItem =~ /^time-entry/",
           "group": "2_navigation@1"
         },
         {
