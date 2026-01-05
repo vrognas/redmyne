@@ -4500,7 +4500,11 @@ ${style.tip}
     // Convert scroll position to center date (milliseconds)
     function getCenterDateMs() {
       if (!ganttScroll) return null;
-      const centerX = ganttScroll.scrollLeft + ganttScroll.clientWidth / 2;
+      // Account for sticky left column (same as scrollToCenterDate)
+      const stickyLeft = document.querySelector('.gantt-body .gantt-sticky-left');
+      const stickyWidth = stickyLeft?.offsetWidth ?? 0;
+      const visibleTimelineWidth = ganttScroll.clientWidth - stickyWidth;
+      const centerX = ganttScroll.scrollLeft + visibleTimelineWidth / 2;
       const ratio = centerX / timelineWidth;
       return minDateMs + ratio * (maxDateMs - minDateMs);
     }
