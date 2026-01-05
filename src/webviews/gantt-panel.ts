@@ -5,7 +5,7 @@ import { Version } from "../redmine/models/version";
 import { RedmineServer } from "../redmine/redmine-server";
 import { RedmineProject } from "../redmine/redmine-project";
 import { FlexibilityScore, WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE, calculateFlexibility, ContributionData } from "../utilities/flexibility-calculator";
-import { calculateContributions } from "../utilities/contribution-calculator";
+import { calculateContributions, parseTargetIssueId } from "../utilities/contribution-calculator";
 import { adHocTracker } from "../utilities/adhoc-tracker";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { errorToString } from "../utilities/error-feedback";
@@ -1068,17 +1068,27 @@ export class GanttPanel {
         const { time_entries } = await this._server.getTimeEntries({ from: fromStr, to: toStr });
 
         // Build actualTimeEntries map: issueId -> date -> hours
+        // For ad-hoc issues with target references (#1234), add hours to TARGET issue
         this._actualTimeEntries = new Map();
         for (const entry of time_entries) {
           if (!entry.issue?.id || !entry.spent_on) continue;
-          const issueId = entry.issue.id;
+          const sourceIssueId = entry.issue.id;
           const date = entry.spent_on;
           const hours = parseFloat(entry.hours as unknown as string) || 0;
 
-          if (!this._actualTimeEntries.has(issueId)) {
-            this._actualTimeEntries.set(issueId, new Map());
+          // Check if this is an ad-hoc issue contributing to another issue
+          let targetIssueId = sourceIssueId;
+          if (adHocTracker.isAdHoc(sourceIssueId)) {
+            const parsed = parseTargetIssueId(entry.comments);
+            if (parsed) {
+              targetIssueId = parsed; // Map hours to target issue
+            }
           }
-          const issueMap = this._actualTimeEntries.get(issueId)!;
+
+          if (!this._actualTimeEntries.has(targetIssueId)) {
+            this._actualTimeEntries.set(targetIssueId, new Map());
+          }
+          const issueMap = this._actualTimeEntries.get(targetIssueId)!;
           issueMap.set(date, (issueMap.get(date) ?? 0) + hours);
         }
       } catch {
