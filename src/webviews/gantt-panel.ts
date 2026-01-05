@@ -3250,10 +3250,11 @@ ${style.tip}
 
       // Build breakdown for this period (aggregate across days in period)
       const periodBreakdown = new Map<number, { hours: number; project: string }>();
-      const periodStart = new Date(period.startDate + "T00:00:00Z");
-      const periodEnd = new Date(period.endDate + "T00:00:00Z");
-      for (let d = new Date(periodStart); d <= periodEnd; d.setUTCDate(d.getUTCDate() + 1)) {
-        const dateStr = d.toISOString().slice(0, 10);
+      // Use local dates to match dayScheduleMap keys (which use formatLocalDate)
+      const periodStart = parseLocalDate(period.startDate);
+      const periodEnd = parseLocalDate(period.endDate);
+      for (let d = new Date(periodStart); d <= periodEnd; d.setDate(d.getDate() + 1)) {
+        const dateStr = formatLocalDate(d);
         const dayEntries = dayScheduleMap.get(dateStr);
         if (dayEntries) {
           for (const entry of dayEntries) {
