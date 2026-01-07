@@ -293,7 +293,15 @@ function escapeHtml(str: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+    .replace(/'/g, "&#39;")
+    .replace(/\\/g, "&#92;")
+    .replace(/`/g, "&#96;")
+    .replace(/\$/g, "&#36;");
+}
+
+/** Escape string for use in HTML attribute (also escapes newlines) */
+function escapeAttr(str: string): string {
+  return escapeHtml(str).replace(/\n/g, "&#10;");
 }
 
 /** Extract initials from full name (e.g., "Viktor Rognås" → "VR") */
@@ -339,6 +347,17 @@ function formatHoursAsTime(hours: number | null): string {
   const h = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
   return `${h}:${m.toString().padStart(2, "0")}`;
+}
+
+/**
+ * Format name as "Firstname L." for compact display
+ */
+function formatShortName(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return name;
+  const firstName = parts[0];
+  const lastInitial = parts[parts.length - 1][0];
+  return `${firstName} ${lastInitial}.`;
 }
 
 /**
@@ -935,13 +954,13 @@ export class GanttPanel {
   </div>
   <div class="gantt-container">
     <div class="gantt-header-row">
-      <div class="gantt-left-header"></div>
+      <div class="gantt-left-header"><div class="gantt-col-header">Task</div></div>
       <div class="gantt-resize-handle-header"></div>
       <div class="gantt-col-id"><div class="gantt-col-header">#ID</div></div>
       <div class="gantt-col-start"><div class="gantt-col-header">Start</div></div>
       <div class="gantt-col-status"><div class="gantt-col-header">Status</div></div>
       <div class="gantt-col-due"><div class="gantt-col-header">Due</div></div>
-      <div class="gantt-col-assignee"><div class="gantt-col-header">Asn</div></div>
+      <div class="gantt-col-assignee"><div class="gantt-col-header">Who</div></div>
       <div class="gantt-timeline-header">
         <span class="loading-text">Loading issues...</span>
       </div>
@@ -2254,14 +2273,14 @@ export class GanttPanel {
             : row.description || "";
 
           return `
-            <g class="project-label gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-vscode-context='{"webviewSection":"projectLabel","projectId":${row.id},"projectIdentifier":"${row.identifier || ""}","preventDefaultContextMenuItems":true}' transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
+            <g class="project-label gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}' transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
+              <title>${escapeAttr(tooltip)}</title>
               ${chevron}
               <text x="${labelX}" y="${barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="12" font-weight="bold">
                 ${healthDot}${escapeHtml(row.label)}
               </text>
               ${progressBar}
               ${countsText}
-              <title>${escapeHtml(tooltip)}</title>
             </g>
           `;
         }
@@ -2375,11 +2394,11 @@ export class GanttPanel {
 
         return `
           <g class="issue-label gantt-row cursor-pointer" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"preventDefaultContextMenuItems":true}' transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Open issue #${issue.id}">
+            <title>${escapeAttr(tooltip)}</title>
             ${chevron}
             <text x="${5 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="${issue.isExternal ? "var(--vscode-descriptionForeground)" : "var(--vscode-foreground)"}" font-size="12">
               ${externalBadge}${projectBadge}${escapedSubject}
             </text>
-            <title>${tooltip}</title>
           </g>
         `;
       })
@@ -2407,8 +2426,8 @@ export class GanttPanel {
         const startDate = parseLocalDate(issue.start_date);
         const displayDate = startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
         return `<g transform="translate(0, ${y})">
+          <title>${escapeAttr(issue.start_date)}</title>
           <text class="gantt-col-cell" x="${startDateColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">${displayDate}</text>
-          <title>${issue.start_date}</title>
         </g>`;
       })
       .join("");
@@ -2431,10 +2450,10 @@ export class GanttPanel {
         // Truncate status name to fit
         const displayStatus = statusName.length > 12 ? statusName.substring(0, 11) + "…" : statusName;
         return `<g transform="translate(0, ${y})">
+          <title>${escapeAttr(statusName)}</title>
           <text class="gantt-col-cell ${statusClass}" x="${statusColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">
             ${escapeHtml(displayStatus)}
           </text>
-          <title>${escapeHtml(statusName)}</title>
         </g>`;
       })
       .join("");
@@ -2457,8 +2476,8 @@ export class GanttPanel {
         if (!issue.isClosed && issue.done_ratio < 100 && daysUntilDue < 0) dueClass = "due-overdue";
         else if (!issue.isClosed && issue.done_ratio < 100 && daysUntilDue <= 3) dueClass = "due-soon";
         return `<g transform="translate(0, ${y})">
+          <title>${escapeAttr(issue.due_date)}</title>
           <text class="gantt-col-cell ${dueClass}" x="${dueDateColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">${displayDate}</text>
-          <title>${issue.due_date}</title>
         </g>`;
       })
       .join("");
@@ -2477,9 +2496,9 @@ export class GanttPanel {
         const cx = assigneeColumnWidth / 2;
         const cy = barHeight / 2;
         return `<g transform="translate(0, ${y})" class="assignee-badge${isCurrentUser ? " current-user" : ""}">
+          <title>${escapeAttr(issue.assignee)}</title>
           <circle cx="${cx}" cy="${cy}" r="${radius}" fill="${bgColor}"/>
           <text x="${cx}" y="${cy + 4}" text-anchor="middle" fill="white" font-size="10" font-weight="600">${escapeHtml(initials)}</text>
-          <title>${escapeHtml(issue.assignee)}</title>
         </g>`;
       })
       .join("");
@@ -2812,6 +2831,7 @@ export class GanttPanel {
                data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"preventDefaultContextMenuItems":true}'
                transform="translate(0, ${y})"
                tabindex="0" role="button" aria-label="#${issue.id} ${escapedSubject} (parent, ${doneRatio}% done)">
+              <title>${escapeAttr(barTooltip + "\n\n(Parent issue - " + doneRatio + "% aggregated progress)")}</title>
               <!-- Summary bar: bracket-style with downward arrows at ends (0-based Y) -->
               <path class="bar-outline" d="M ${startX + 4} ${barHeight * 0.3}
                     L ${startX + 4} ${barHeight * 0.7}
@@ -2841,7 +2861,6 @@ export class GanttPanel {
                         text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${doneRatio}%</text>
                 </g>`;
               })()}
-              <title>${barTooltip}\n\n(Parent issue - ${doneRatio}% aggregated progress)</title>
             </g>
           `;
         }
@@ -2859,6 +2878,7 @@ export class GanttPanel {
              data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"preventDefaultContextMenuItems":true}'
              transform="translate(0, ${y})"
              tabindex="0" role="button" aria-label="#${issue.id} ${escapedSubject}${isOverdue ? " (overdue)" : ""}">
+            <title>${escapeAttr(barTooltip)}</title>
             <!-- Clip path for bar shape -->
             <defs>
               <clipPath id="bar-clip-${issue.id}">
@@ -2889,9 +2909,7 @@ export class GanttPanel {
             </g>
             <!-- Border/outline - pointer-events:all so clicks work even with fill:none -->
             <rect class="bar-outline cursor-move" x="${startX}" y="0" width="${width}" height="${barHeight}"
-                  fill="none" stroke="var(--vscode-panel-border)" stroke-width="1" rx="8" ry="8" pointer-events="all">
-              <title>${barTooltip}</title>
-            </rect>
+                  fill="none" stroke="var(--vscode-panel-border)" stroke-width="1" rx="8" ry="8" pointer-events="all"/>
             ${(() => {
               // Show subject text on bar if it fits (min 40px width, ~6px per char)
               const padding = 12;
@@ -2912,6 +2930,7 @@ export class GanttPanel {
                   fill="transparent"/>
             <!-- Link handle for creating relations (larger hit area for Fitts's Law) -->
             <g class="link-handle cursor-crosshair" data-cx="${endX + 8}" data-cy="${y + barHeight / 2}">
+              <title>Drag to link</title>
               <circle cx="${endX + 8}" cy="${barHeight / 2}" r="14" fill="transparent" pointer-events="all"/>
               <circle class="link-handle-visual" cx="${endX + 8}" cy="${barHeight / 2}" r="5"
                       fill="var(--vscode-button-background)" stroke="var(--vscode-button-foreground)"
@@ -2952,14 +2971,22 @@ export class GanttPanel {
 
               if (issue.isClosed) {
                 const checkX = onLeft ? labelX - 9 : labelX + 9;
-                const assigneeX = onLeft ? labelX - 22 : labelX + 38;
+                const assigneeX = onLeft ? labelX - 22 : labelX + 22;
+                const closedTooltip = `Closed: ${formatDateWithWeekday(issue.closed_on)}`;
                 return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
-                  <rect class="status-badge-bg" x="${onLeft ? labelX - 18 : labelX}" y="${barHeight / 2 - 8}" width="18" height="16" rx="2"
-                        fill="var(--vscode-charts-green)" opacity="0.2"/>
-                  <text class="status-badge" x="${checkX}" y="${barHeight / 2 + 4}"
-                        text-anchor="middle" fill="var(--vscode-charts-green)" font-size="12" font-weight="bold">✓</text>
-                  ${issue.assignee ? `<text class="bar-assignee${issue.assigneeId === this._currentUserId ? " current-user" : ""}" x="${assigneeX}" y="${barHeight / 2 + 4}"
-                        text-anchor="${onLeft ? "end" : "start"}" fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(issue.assignee.length > 12 ? issue.assignee.substring(0, 11) + "…" : issue.assignee)}</text>` : ""}
+                  <g class="status-badge-group">
+                    <title>${escapeAttr(closedTooltip)}</title>
+                    <rect class="status-badge-bg" x="${onLeft ? labelX - 18 : labelX}" y="${barHeight / 2 - 8}" width="18" height="16" rx="2"
+                          fill="var(--vscode-charts-green)" opacity="0.2"/>
+                    <rect x="${onLeft ? labelX - 18 : labelX}" y="${barHeight / 2 - 8}" width="18" height="16" fill="transparent"/>
+                    <text class="status-badge" x="${checkX}" y="${barHeight / 2 + 4}"
+                          text-anchor="middle" fill="var(--vscode-charts-green)" font-size="12" font-weight="bold">✓</text>
+                  </g>
+                  ${issue.assignee ? `<g class="bar-assignee-group">
+                    <title>${escapeAttr("Assigned to: " + issue.assignee)}</title>
+                    <text class="bar-assignee${issue.assigneeId === this._currentUserId ? " current-user" : ""}" x="${assigneeX}" y="${barHeight / 2 + 4}"
+                          text-anchor="${onLeft ? "end" : "start"}" fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(formatShortName(issue.assignee))}</text>
+                  </g>` : ""}
                 </g>`;
               }
 
@@ -2980,38 +3007,45 @@ export class GanttPanel {
               // Assignee position: after blocker badge (or last shown badge)
               const finalBadgeX = showBlocker ? blockerBadgeX : impactFinalX;
               const finalBadgeW = showBlocker ? blockerBadgeW : impactFinalW;
-              const assigneeX = onLeft ? finalBadgeX - finalBadgeW - 6 : finalBadgeX + finalBadgeW + 6;
+              const assigneeX = onLeft ? finalBadgeX - finalBadgeW - 4 : finalBadgeX + finalBadgeW + 4;
               return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
                 <g class="progress-badge-group" style="cursor: help;">
+                  <title>${escapeAttr(progressTooltip)}</title>
                   <rect class="status-badge-bg" x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" rx="2"
                         fill="var(--vscode-badge-background)" opacity="0.9"/>
+                  <rect x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" fill="transparent"/>
                   <text class="status-badge" x="${badgeCenterX}" y="${barHeight / 2 + 4}"
                         text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${isFallbackProgress ? "~" : ""}${visualDoneRatio}%</text>
-                  <title>${progressTooltip}</title>
                 </g>
                 ${showFlex ? `<g class="flex-badge-group" style="cursor: help;">
+                  <title>${escapeAttr(flexTooltip)}</title>
                   <rect class="flex-badge-bg" x="${onLeft ? flexBadgeX - flexBadgeW : flexBadgeX}" y="${barHeight / 2 - 8}" width="${flexBadgeW}" height="16" rx="2"
                         fill="${flexColor}" opacity="0.15"/>
+                  <rect x="${onLeft ? flexBadgeX - flexBadgeW : flexBadgeX}" y="${barHeight / 2 - 8}" width="${flexBadgeW}" height="16" fill="transparent"/>
                   <text class="flex-badge" x="${flexBadgeCenterX}" y="${barHeight / 2 + 4}"
                         text-anchor="middle" fill="${flexColor}" font-size="10" font-weight="500">${flexLabel}</text>
-                  <title>${flexTooltip}</title>
                 </g>` : ""}
                 ${showBlocks ? `<g class="blocks-badge-group" style="cursor: pointer;">
+                  <title>${escapeAttr(blocksTooltip)}</title>
                   <rect class="blocks-badge-bg" x="${onLeft ? impactBadgeX - impactBadgeW : impactBadgeX}" y="${barHeight / 2 - 8}" width="${impactBadgeW}" height="16" rx="2"
                         fill="${impactColor}" opacity="0.15"/>
+                  <rect x="${onLeft ? impactBadgeX - impactBadgeW : impactBadgeX}" y="${barHeight / 2 - 8}" width="${impactBadgeW}" height="16" fill="transparent"/>
                   <text class="blocks-badge" x="${impactBadgeCenterX}" y="${barHeight / 2 + 4}"
                         text-anchor="middle" fill="${impactColor}" font-size="10" font-weight="500">${impactLabel}</text>
-                  <title>${blocksTooltip}</title>
                 </g>` : ""}
                 ${showBlocker ? `<g class="blocker-badge" data-blocker-id="${firstBlockerId}" style="cursor: pointer;">
+                  <title>${escapeAttr(blockerTooltip)}</title>
                   <rect x="${onLeft ? blockerBadgeX - blockerBadgeW : blockerBadgeX}" y="${barHeight / 2 - 8}" width="${blockerBadgeW}" height="16" rx="2"
                         fill="var(--vscode-charts-red)" opacity="0.15"/>
+                  <rect x="${onLeft ? blockerBadgeX - blockerBadgeW : blockerBadgeX}" y="${barHeight / 2 - 8}" width="${blockerBadgeW}" height="16" fill="transparent"/>
                   <text x="${blockerBadgeCenterX}" y="${barHeight / 2 + 4}"
                         text-anchor="middle" fill="var(--vscode-charts-red)" font-size="10" font-weight="500">${blockerLabel}</text>
-                  <title>${blockerTooltip}</title>
                 </g>` : ""}
-                ${issue.assignee ? `<text class="bar-assignee${issue.assigneeId === this._currentUserId ? " current-user" : ""}" x="${assigneeX}" y="${barHeight / 2 + 4}"
-                      text-anchor="${onLeft ? "end" : "start"}" fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(issue.assignee.length > 12 ? issue.assignee.substring(0, 11) + "…" : issue.assignee)}</text>` : ""}
+                ${issue.assignee ? `<g class="bar-assignee-group">
+                  <title>${escapeAttr("Assigned to: " + issue.assignee)}</title>
+                  <text class="bar-assignee${issue.assigneeId === this._currentUserId ? " current-user" : ""}" x="${assigneeX}" y="${barHeight / 2 + 4}"
+                        text-anchor="${onLeft ? "end" : "start"}" fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(formatShortName(issue.assignee))}</text>
+                </g>` : ""}
               </g>`;
             })()}
           </g>
@@ -3146,15 +3180,14 @@ export class GanttPanel {
 
           const dashAttr = style.dash ? `stroke-dasharray="${style.dash}"` : "";
 
+          const arrowTooltip = `#${issue.id} ${style.label} #${rel.targetId}\n${style.tip}\n(right-click to delete)`;
           return `
             <g class="dependency-arrow rel-${rel.type} cursor-pointer" data-relation-id="${rel.id}" data-from="${issue.id}" data-to="${rel.targetId}">
+              <title>${escapeAttr(arrowTooltip)}</title>
               <!-- Wide invisible hit area for easier clicking -->
               <path class="arrow-hit-area" d="${path}" stroke="transparent" stroke-width="16" fill="none"/>
               <path class="arrow-line" d="${path}" stroke-width="2" fill="none" ${dashAttr}/>
               <path class="arrow-head" d="${arrowHead}"/>
-              <title>#${issue.id} ${style.label} #${rel.targetId}
-${style.tip}
-(right-click to delete)</title>
             </g>
           `;
         })
@@ -3176,6 +3209,7 @@ ${style.tip}
 
         return `
           <g class="milestone-marker" data-version-id="${version.id}">
+            <title>${escapeAttr(tooltip)}</title>
             <!-- Vertical dashed line spanning the entire height -->
             <line class="milestone-line" x1="${x}" y1="0" x2="${x}" y2="${contentHeight}"
                   stroke="var(--vscode-charts-purple)" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.6"/>
@@ -3186,7 +3220,6 @@ ${style.tip}
             <text class="milestone-label" x="${x + 4}" y="30" text-anchor="start"
                   fill="var(--vscode-charts-purple)" font-size="10" font-weight="500"
                   transform="rotate(90, ${x + 4}, 30)">${escapeHtml(truncatedName)}</text>
-            <title>${escapeHtml(tooltip)}</title>
           </g>
         `;
       })
@@ -3299,7 +3332,10 @@ ${style.tip}
 
       const tooltip = `${dateLabel}: ${period.loadHours.toFixed(1)}h / ${period.capacityHours}h (${period.percentage}%)${breakdownText}\n\nClick to scroll to this date`;
 
-      return `<rect class="capacity-day-bar" x="${startX}" y="0" width="${barWidth}" height="${ribbonHeight}" fill="${fillColor}" opacity="${opacity}" data-date="${period.startDate}" data-date-ms="${startDateObj.getTime()}"><title>${escapeHtml(tooltip)}</title></rect>`;
+      return `<g class="capacity-day-bar-group" data-date="${period.startDate}" data-date-ms="${startDateObj.getTime()}">
+        <title>${escapeAttr(tooltip)}</title>
+        <rect class="capacity-day-bar" x="${startX}" y="0" width="${barWidth}" height="${ribbonHeight}" fill="${fillColor}" opacity="${opacity}"/>
+      </g>`;
     }).join("");
 
     // Week boundaries for capacity ribbon (show Monday markers)
@@ -3495,8 +3531,8 @@ ${style.tip}
       background: var(--vscode-errorForeground);
     }
     .overload-badge.hidden { display: none; }
-    /* Toggle buttons - native toolbar style */
-    .toggle-btn {
+    /* Toggle buttons - native toolbar style (higher specificity to override .gantt-actions button) */
+    .gantt-actions .toggle-btn {
       padding: 4px;
       border: none;
       background: transparent;
@@ -3505,13 +3541,13 @@ ${style.tip}
       cursor: pointer;
       font-size: 13px;
     }
-    .toggle-btn:hover { background: var(--vscode-toolbar-hoverBackground); }
-    .toggle-btn:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
-    .toggle-btn.active {
+    .gantt-actions .toggle-btn:hover { background: var(--vscode-toolbar-hoverBackground); }
+    .gantt-actions .toggle-btn:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+    .gantt-actions .toggle-btn.active {
       background: var(--vscode-toolbar-activeBackground);
       color: var(--vscode-textLink-foreground);
     }
-    .toggle-btn svg { width: 14px; height: 14px; fill: currentColor; }
+    .gantt-actions .toggle-btn svg { width: 14px; height: 14px; fill: currentColor; }
     /* Dropdown menus (help, overflow) */
     .toolbar-dropdown { position: relative; }
     .toolbar-dropdown-menu {
@@ -3569,11 +3605,11 @@ ${style.tip}
       right: 0;
       top: 100%;
       margin-top: 4px;
-      background: var(--vscode-editorWidget-background);
-      border: 1px solid var(--vscode-editorWidget-border);
-      border-radius: 4px;
+      background: var(--vscode-editorHoverWidget-background);
+      color: var(--vscode-editorHoverWidget-foreground);
+      border-radius: 3px;
       padding: 8px 12px;
-      box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+      box-shadow: 0 0 8px 2px var(--vscode-widget-shadow);
       z-index: 1000;
       white-space: nowrap;
     }
@@ -3786,7 +3822,9 @@ ${style.tip}
     .bar-labels .blocks-badge-group,
     .bar-labels .blocker-badge,
     .bar-labels .flex-badge-group,
-    .bar-labels .progress-badge-group { pointer-events: all; }
+    .bar-labels .progress-badge-group,
+    .bar-labels .status-badge-group,
+    .bar-labels .bar-assignee-group { pointer-events: all; }
     .status-badge-bg { pointer-events: none; }
     .status-badge { pointer-events: none; font-weight: 500; }
     .bar-assignee { pointer-events: none; opacity: 0.85; }
@@ -4050,10 +4088,9 @@ ${style.tip}
     .minimap-bar.bar-past { opacity: 0.4; }
     .minimap-viewport {
       fill: var(--vscode-scrollbarSlider-background, rgba(100, 100, 100, 0.4));
-      cursor: grab;
     }
     .minimap-viewport:hover { fill: var(--vscode-scrollbarSlider-hoverBackground, rgba(100, 100, 100, 0.5)); }
-    .minimap-viewport:active { cursor: grabbing; fill: var(--vscode-scrollbarSlider-activeBackground, rgba(100, 100, 100, 0.6)); }
+    .minimap-viewport:active { fill: var(--vscode-scrollbarSlider-activeBackground, rgba(100, 100, 100, 0.6)); }
     .minimap-today { stroke: var(--vscode-charts-red); stroke-width: 1; }
     /* Milestone markers */
     .milestone-marker {
@@ -4090,7 +4127,7 @@ ${style.tip}
 <body>
   <div id="loadingOverlay" class="loading-overlay${this._isRefreshing ? " visible" : ""}"><div class="loading-spinner"></div></div>
   <div id="liveRegion" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
-  <div class="gantt-header">
+    <div class="gantt-header">
     <div class="gantt-actions" role="toolbar" aria-label="Gantt chart controls">
       <!-- Zoom -->
       <select id="zoomSelect" class="toolbar-select" title="Zoom level (1-5)">
@@ -4251,13 +4288,13 @@ ${style.tip}
       <!-- Header row - sticky at top -->
       <div class="gantt-header-row">
         <div class="gantt-sticky-left gantt-corner">
-          <div class="gantt-left-header" id="ganttLeftHeader"></div>
+          <div class="gantt-left-header" id="ganttLeftHeader"><div class="gantt-col-header">Task</div></div>
           <div class="gantt-resize-handle-header"></div>
           <div class="gantt-col-id"><div class="gantt-col-header sortable${this._sortBy === "id" ? " sorted" : ""}" data-sort="id">#ID${this._sortBy === "id" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
           <div class="gantt-col-start"><div class="gantt-col-header sortable${this._sortBy === "start" ? " sorted" : ""}" data-sort="start">Start${this._sortBy === "start" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
           <div class="gantt-col-status"><div class="gantt-col-header">Status</div></div>
           <div class="gantt-col-due"><div class="gantt-col-header sortable${this._sortBy === "due" ? " sorted" : ""}" data-sort="due">Due${this._sortBy === "due" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
-          <div class="gantt-col-assignee"><div class="gantt-col-header sortable${this._sortBy === "assignee" ? " sorted" : ""}" data-sort="assignee">Asn${this._sortBy === "assignee" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
+          <div class="gantt-col-assignee"><div class="gantt-col-header sortable${this._sortBy === "assignee" ? " sorted" : ""}" data-sort="assignee">Who${this._sortBy === "assignee" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
         </div>
         <div class="gantt-timeline-header" id="ganttTimelineHeader">
           <svg width="${timelineWidth}" height="${headerHeight}">
@@ -4773,8 +4810,8 @@ ${style.tip}
     });
 
     // Capacity ribbon click - scroll to clicked date
-    document.querySelectorAll('.capacity-day-bar').forEach(bar => {
-      bar.addEventListener('click', (e) => {
+    document.querySelectorAll('.capacity-day-bar-group').forEach(group => {
+      group.addEventListener('click', (e) => {
         const dateMs = parseInt(e.currentTarget.dataset.dateMs || '0', 10);
         if (dateMs > 0) {
           scrollToCenterDate(dateMs);
