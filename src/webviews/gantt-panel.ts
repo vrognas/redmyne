@@ -2859,26 +2859,34 @@ export class GanttPanel {
              data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"preventDefaultContextMenuItems":true}'
              transform="translate(0, ${y})"
              tabindex="0" role="button" aria-label="#${issue.id} ${escapedSubject}${isOverdue ? " (overdue)" : ""}">
-            ${hasIntensity ? `
-              <!-- Intensity segments -->
-              <g class="bar-intensity">${intensitySegments}</g>
-              <!-- Intensity line chart -->
-              ${intensityLine}
-            ` : `
-              <!-- Fallback: solid bar when no intensity data (0-based Y) -->
-              <rect class="bar-main" x="${startX}" y="0" width="${width}" height="${barHeight}"
-                    fill="${color}" rx="8" ry="8" opacity="0.85" filter="url(#barShadow)"/>
-            `}
-            ${hasPastPortion ? `
-              <!-- Past portion overlay with diagonal stripes -->
-              <rect class="past-overlay" x="${startX}" y="0" width="${pastWidth}" height="${barHeight}"
-                    fill="url(#past-stripes)" rx="8" ry="8"/>
-            ` : ""}
-            ${visualDoneRatio > 0 && visualDoneRatio < 100 ? `
-              <!-- Progress fill showing done_ratio -->
-              <rect class="progress-fill" x="${startX}" y="0" width="${doneWidth}" height="${barHeight}"
-                    fill="${color}" rx="8" ry="8" opacity="0.95" filter="url(#barShadow)"/>
-            ` : ""}
+            <!-- Clip path for bar shape -->
+            <defs>
+              <clipPath id="bar-clip-${issue.id}">
+                <rect x="${startX}" y="0" width="${width}" height="${barHeight}" rx="8" ry="8"/>
+              </clipPath>
+            </defs>
+            <g clip-path="url(#bar-clip-${issue.id})">
+              ${hasIntensity ? `
+                <!-- Intensity segments -->
+                <g class="bar-intensity">${intensitySegments}</g>
+                <!-- Intensity line chart -->
+                ${intensityLine}
+              ` : `
+                <!-- Fallback: solid bar when no intensity data (0-based Y) -->
+                <rect class="bar-main" x="${startX}" y="0" width="${width}" height="${barHeight}"
+                      fill="${color}" opacity="0.85" filter="url(#barShadow)"/>
+              `}
+              ${hasPastPortion ? `
+                <!-- Past portion overlay with diagonal stripes -->
+                <rect class="past-overlay" x="${startX}" y="0" width="${pastWidth}" height="${barHeight}"
+                      fill="url(#past-stripes)"/>
+              ` : ""}
+              ${visualDoneRatio > 0 && visualDoneRatio < 100 ? `
+                <!-- Progress fill showing done_ratio -->
+                <rect class="progress-fill" x="${startX}" y="0" width="${doneWidth}" height="${barHeight}"
+                      fill="${color}" opacity="0.95" filter="url(#barShadow)"/>
+              ` : ""}
+            </g>
             <!-- Border/outline - pointer-events:all so clicks work even with fill:none -->
             <rect class="bar-outline cursor-move" x="${startX}" y="0" width="${width}" height="${barHeight}"
                   fill="none" stroke="var(--vscode-panel-border)" stroke-width="1" rx="8" ry="8" pointer-events="all">
