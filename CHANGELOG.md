@@ -45,6 +45,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 ### Fixed
 
+- **Closed issues excluded from capacity/intensity** - issues with `closed_on` set now excluded from capacity and intensity calculations
 - **Gantt refresh on time entry changes** - Gantt now refreshes when time entries are added/edited/deleted
 - **Gantt refresh on contribution changes** - Gantt refreshes when setting/removing contribution targets
 - **Contributions from non-displayed ad-hoc issues** - contributions now calculated from ALL ad-hoc issues, not just displayed ones

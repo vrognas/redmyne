@@ -117,7 +117,8 @@ export function calculateDailyCapacity(
   endDate: string
 ): DailyCapacity[] {
   // Filter to leaf issues only (no children) to avoid double-counting
-  const leafIssues = issues.filter(i => !i.children || i.children.length === 0);
+  // Also exclude closed issues (closed_on set)
+  const leafIssues = issues.filter(i => (!i.children || i.children.length === 0) && !i.closed_on);
 
   if (leafIssues.length === 0) {
     // Still generate capacity entries for the range
@@ -483,7 +484,8 @@ export function calculateScheduledCapacity(
   const schedulableIssues = issues.filter(
     (i) =>
       i.start_date &&
-      i.done_ratio !== 100 && // Exclude closed issues
+      !i.closed_on && // Exclude closed issues
+      i.done_ratio !== 100 && // Exclude 100% done issues
       ((i.estimated_hours && i.estimated_hours > 0) || internalEstimates.has(i.id))
   );
 

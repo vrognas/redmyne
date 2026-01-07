@@ -27,7 +27,7 @@ function createMockIssue(overrides: Partial<Issue> & { id: number }): Issue {
     is_private: false,
     created_on: "2025-01-01T00:00:00Z",
     updated_on: "2025-01-01T00:00:00Z",
-    closed_on: null,
+    closed_on: overrides.closed_on ?? null,
     start_date: "start_date" in overrides ? overrides.start_date! : "2025-01-06",
     due_date: "due_date" in overrides ? overrides.due_date! : "2025-01-10",
     estimated_hours: "estimated_hours" in overrides ? overrides.estimated_hours! : 40,
@@ -291,6 +291,35 @@ describe("calculateDailyCapacity", () => {
     );
     expect(result3[0].status).toBe("overloaded"); // > 100%
   });
+
+  it("excludes closed issues (closed_on set)", () => {
+    const issues = [
+      createMockIssue({
+        id: 1,
+        start_date: "2025-01-06",
+        due_date: "2025-01-10",
+        estimated_hours: 40,
+        closed_on: "2025-01-07T12:00:00Z", // Closed
+      }),
+      createMockIssue({
+        id: 2,
+        start_date: "2025-01-06",
+        due_date: "2025-01-10",
+        estimated_hours: 40,
+        closed_on: null, // Open
+      }),
+    ];
+
+    const result = calculateDailyCapacity(
+      issues,
+      DEFAULT_WEEKLY_SCHEDULE,
+      "2025-01-06",
+      "2025-01-10"
+    );
+
+    // Only open issue should contribute (8h/day), closed excluded
+    expect(result[0].loadHours).toBe(8);
+  });
 });
 
 describe("calculateCapacityByZoom", () => {
@@ -539,6 +568,38 @@ describe("calculateScheduledCapacity", () => {
     expect(result[0].breakdown.length).toBe(1);
     expect(result[0].breakdown[0].issueId).toBe(1);
     expect(result[0].breakdown[0].hours).toBe(8);
+  });
+
+  it("excludes closed issues (closed_on set)", () => {
+    const issues = [
+      createMockIssue({
+        id: 1,
+        start_date: "2025-01-06",
+        due_date: "2025-01-10",
+        estimated_hours: 16,
+        closed_on: "2025-01-07T12:00:00Z", // Closed
+      }),
+      createMockIssue({
+        id: 2,
+        start_date: "2025-01-06",
+        due_date: "2025-01-10",
+        estimated_hours: 16,
+        closed_on: null, // Open
+      }),
+    ];
+
+    const result = calculateScheduledCapacity(
+      issues,
+      DEFAULT_WEEKLY_SCHEDULE,
+      "2025-01-06",
+      "2025-01-10",
+      emptyGraph,
+      emptyEstimates
+    );
+
+    // Only open issue (id=2) should be scheduled
+    expect(result[0].breakdown.length).toBe(1);
+    expect(result[0].breakdown[0].issueId).toBe(2);
   });
 
   it("prioritizes earlier due date", () => {
