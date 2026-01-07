@@ -479,11 +479,13 @@
       "redmine-explorer": [
         {
           "id": "redmine-explorer-timer",
-          "name": "Today's Plan"
+          "name": "Today's Plan",
+          "when": "redmine:configured"
         },
         {
           "id": "redmine-explorer-kanban",
-          "name": "Kanban"
+          "name": "Kanban",
+          "when": "redmine:configured"
         },
         {
           "id": "redmine-explorer-projects",
@@ -491,7 +493,8 @@
         },
         {
           "id": "redmine-explorer-my-time-entries",
-          "name": "Time Entries"
+          "name": "Time Entries",
+          "when": "redmine:configured"
         }
       ]
     },
@@ -502,27 +505,12 @@
         "when": "redmine:configured && !redmine:timerHasPlan"
       },
       {
-        "view": "redmine-explorer-timer",
-        "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmine.configure)\nSet up your Redmine server URL and API key to get started.",
-        "when": "!redmine:configured"
-      },
-      {
         "view": "redmine-explorer-kanban",
         "contents": "No kanban tasks yet.\n[Add Task](command:redmine.kanban.add)\n\n---\n\n**Tips:**\n- Right-click tasks for actions\n- Add tasks to Today's Plan\n- Link tasks to Redmine issues",
         "when": "redmine:configured"
       },
       {
-        "view": "redmine-explorer-kanban",
-        "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmine.configure)\nSet up your Redmine server URL and API key to get started.",
-        "when": "!redmine:configured"
-      },
-      {
         "view": "redmine-explorer-projects",
-        "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmine.configure)\nSet up your Redmine server URL and API key to get started.",
-        "when": "!redmine:configured"
-      },
-      {
-        "view": "redmine-explorer-my-time-entries",
         "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmine.configure)\nSet up your Redmine server URL and API key to get started.",
         "when": "!redmine:configured"
       }
