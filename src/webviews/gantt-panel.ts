@@ -588,7 +588,7 @@ export class GanttPanel {
   private _uniqueAssignees: string[] = []; // Extracted from issues
   private _showCapacityRibbon = true; // Capacity ribbon visible by default in My Work
   // Sort settings (null = no sorting, use natural/hierarchy order)
-  private _sortBy: "id" | "assignee" | "start" | "due" | null = null;
+  private _sortBy: "id" | "assignee" | "start" | "due" | "status" | null = null;
   private _sortOrder: "asc" | "desc" = "asc";
   // Actual time entries for past-day intensity (issueId -> date -> hours)
   private _actualTimeEntries: ActualTimeEntries = new Map();
@@ -689,10 +689,10 @@ export class GanttPanel {
     const barHeight = 30;
     const barGap = 10;
     const rowCount = 10;
-    const idColumnWidth = 55;
-    const startDateColumnWidth = 85;
-    const statusColumnWidth = 90;
-    const dueDateColumnWidth = 85;
+    const idColumnWidth = 50;
+    const startDateColumnWidth = 58;
+    const statusColumnWidth = 50; // Colored dot + header text
+    const dueDateColumnWidth = 58;
     const assigneeColumnWidth = 40;
 
     // Generate skeleton rows
@@ -733,10 +733,10 @@ export class GanttPanel {
       </g>
     `).join("");
 
-    // Status column skeleton (short text placeholders)
+    // Status column skeleton (dot placeholder)
     const statusSvg = skeletonRows.map((r, i) => r.isProject ? "" : `
       <g class="skeleton-label delay-${Math.min(i, 7)}">
-        <rect x="${(statusColumnWidth - 50) / 2}" y="${r.y + 10}" width="50" height="10" rx="2" fill="var(--vscode-panel-border)"/>
+        <circle cx="${statusColumnWidth / 2}" cy="${r.y + barHeight / 2}" r="5" fill="var(--vscode-panel-border)"/>
       </g>
     `).join("");
 
@@ -856,6 +856,7 @@ export class GanttPanel {
       justify-content: center;
       border-right: 1px solid var(--vscode-panel-border);
       box-sizing: border-box;
+      overflow: hidden;
     }
     .gantt-col-id { width: ${idColumnWidth}px; }
     .gantt-col-start { width: ${startDateColumnWidth}px; }
@@ -866,6 +867,9 @@ export class GanttPanel {
       font-size: 11px;
       color: var(--vscode-descriptionForeground);
     }
+    .gantt-left-header .gantt-col-header,
+    .gantt-col-start .gantt-col-header,
+    .gantt-col-due .gantt-col-header { justify-content: flex-start; padding-left: 4px; }
     .gantt-timeline-header {
       flex-grow: 1;
       display: flex;
@@ -896,6 +900,7 @@ export class GanttPanel {
       width: ${labelWidth}px;
       background: var(--vscode-editor-background);
       box-sizing: border-box;
+      overflow: hidden;
     }
     .gantt-resize-handle {
       width: 10px;
@@ -954,11 +959,11 @@ export class GanttPanel {
   </div>
   <div class="gantt-container">
     <div class="gantt-header-row">
+      <div class="gantt-col-status"><div class="gantt-col-header">Status</div></div>
+      <div class="gantt-col-id"><div class="gantt-col-header">#ID</div></div>
       <div class="gantt-left-header"><div class="gantt-col-header">Task</div></div>
       <div class="gantt-resize-handle-header"></div>
-      <div class="gantt-col-id"><div class="gantt-col-header">#ID</div></div>
       <div class="gantt-col-start"><div class="gantt-col-header">Start</div></div>
-      <div class="gantt-col-status"><div class="gantt-col-header">Status</div></div>
       <div class="gantt-col-due"><div class="gantt-col-header">Due</div></div>
       <div class="gantt-col-assignee"><div class="gantt-col-header">Who</div></div>
       <div class="gantt-timeline-header">
@@ -966,29 +971,29 @@ export class GanttPanel {
       </div>
     </div>
     <div class="gantt-body-scroll">
-      <div class="gantt-labels">
-        <svg width="${labelWidth * 2}" height="${bodyHeight}">
+      <div class="gantt-col-status">
+        <svg width="${statusColumnWidth}" height="${bodyHeight}">
           ${zebraStripes}
-          ${labelsSvg}
+          ${statusSvg}
         </svg>
       </div>
-      <div class="gantt-resize-handle"></div>
       <div class="gantt-col-id">
         <svg width="${idColumnWidth}" height="${bodyHeight}">
           ${zebraStripes}
           ${idSvg}
         </svg>
       </div>
+      <div class="gantt-labels">
+        <svg width="${labelWidth}" height="${bodyHeight}">
+          ${zebraStripes}
+          ${labelsSvg}
+        </svg>
+      </div>
+      <div class="gantt-resize-handle"></div>
       <div class="gantt-col-start">
         <svg width="${startDateColumnWidth}" height="${bodyHeight}">
           ${zebraStripes}
           ${startSvg}
-        </svg>
-      </div>
-      <div class="gantt-col-status">
-        <svg width="${statusColumnWidth}" height="${bodyHeight}">
-          ${zebraStripes}
-          ${statusSvg}
         </svg>
       </div>
       <div class="gantt-col-due">
@@ -1382,7 +1387,7 @@ export class GanttPanel {
     isExpanded?: boolean; // For collapseStateSync
     filter?: { assignee?: string; status?: string }; // For setFilter
     health?: string; // For setHealthFilter
-    sortBy?: "id" | "assignee" | "start" | "due" | null; // For setSort (null = no sort)
+    sortBy?: "id" | "assignee" | "start" | "due" | "status" | null; // For setSort (null = no sort)
     sortOrder?: "asc" | "desc"; // For setSort
     focus?: "project" | "person"; // For setViewFocus
     assignee?: string | null; // For setSelectedAssignee
@@ -1993,6 +1998,9 @@ export class GanttPanel {
         case "due":
           cmp = (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999");
           break;
+        case "status":
+          cmp = (a.status?.name ?? "").localeCompare(b.status?.name ?? "");
+          break;
       }
       return this._sortOrder === "desc" ? -cmp : cmp;
     });
@@ -2160,11 +2168,21 @@ export class GanttPanel {
     const pixelsPerDay = ZOOM_PIXELS_PER_DAY[this._zoomLevel];
     const timelineWidth = Math.max(600, totalDays * pixelsPerDay);
     const labelWidth = 250;
-    const idColumnWidth = 55;
-    const startDateColumnWidth = 85;
-    const statusColumnWidth = 90;
-    const dueDateColumnWidth = 85;
-    const assigneeColumnWidth = 40;
+
+    // Auto-fit column widths based on content
+    const charWidth = 7; // ~7px per char at 11px font
+    const colPadding = 10; // padding on both sides
+    let maxIdLen = 3; // minimum "#ID"
+    for (const row of allRows) {
+      if (row.type === "issue" && row.issue) {
+        maxIdLen = Math.max(maxIdLen, `#${row.issue.id}`.length);
+      }
+    }
+    const idColumnWidth = Math.max(40, Math.ceil(maxIdLen * charWidth + colPadding));
+    const startDateColumnWidth = 58; // Fixed: "MMM DD" format
+    const statusColumnWidth = 50; // Colored dot + header text
+    const dueDateColumnWidth = 58; // Fixed: "MMM DD" format
+    const assigneeColumnWidth = 40; // Fixed for avatar circles
     const extraColumnsWidth = idColumnWidth + startDateColumnWidth + statusColumnWidth + dueDateColumnWidth + assigneeColumnWidth;
     const resizeHandleWidth = 10;
     const stickyLeftWidth = labelWidth + resizeHandleWidth + extraColumnsWidth;
@@ -2422,38 +2440,36 @@ export class GanttPanel {
         const y = idx * (barHeight + barGap);
         if (row.type !== "issue") return `<g transform="translate(0, ${y})"></g>`;
         const issue = row.issue!;
-        if (!issue.start_date) return `<g transform="translate(0, ${y})"><text class="gantt-col-cell" x="${startDateColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">—</text></g>`;
+        if (!issue.start_date) return `<g transform="translate(0, ${y})"><text class="gantt-col-cell" x="4" y="${barHeight / 2 + 4}" text-anchor="start">—</text></g>`;
         const startDate = parseLocalDate(issue.start_date);
         const displayDate = startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
         return `<g transform="translate(0, ${y})">
           <title>${escapeAttr(issue.start_date)}</title>
-          <text class="gantt-col-cell" x="${startDateColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">${displayDate}</text>
+          <text class="gantt-col-cell" x="4" y="${barHeight / 2 + 4}" text-anchor="start">${displayDate}</text>
         </g>`;
       })
       .join("");
 
-    // Status column cells
+    // Status column cells - colored dots
     const statusCells = visibleRows
       .map((row, idx) => {
         const y = idx * (barHeight + barGap);
         if (row.type !== "issue") return `<g transform="translate(0, ${y})"><rect class="zebra-stripe" x="0" y="0" width="100%" height="${barHeight + barGap}"/></g>`;
         const issue = row.issue!;
         const statusName = issue.statusName ?? "Unknown";
-        // Determine status class based on done_ratio and status name
-        let statusClass = "status-new";
         const lowerStatus = statusName.toLowerCase();
+        // Determine dot color: green=closed, blue=in progress, gray=new/not started
+        let dotColor = "var(--vscode-descriptionForeground)"; // gray for new/not started
         if (issue.done_ratio === 100 || lowerStatus.includes("closed") || lowerStatus.includes("done") || lowerStatus.includes("resolved")) {
-          statusClass = "status-closed";
+          dotColor = "var(--vscode-charts-green)";
         } else if (issue.done_ratio > 0 || lowerStatus.includes("progress") || lowerStatus.includes("in ")) {
-          statusClass = "status-inprogress";
+          dotColor = "var(--vscode-charts-blue)";
         }
-        // Truncate status name to fit
-        const displayStatus = statusName.length > 12 ? statusName.substring(0, 11) + "…" : statusName;
+        const cx = statusColumnWidth / 2;
+        const cy = barHeight / 2;
         return `<g transform="translate(0, ${y})">
           <title>${escapeAttr(statusName)}</title>
-          <text class="gantt-col-cell ${statusClass}" x="${statusColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">
-            ${escapeHtml(displayStatus)}
-          </text>
+          <circle cx="${cx}" cy="${cy}" r="5" fill="${dotColor}"/>
         </g>`;
       })
       .join("");
@@ -2464,7 +2480,7 @@ export class GanttPanel {
         const y = idx * (barHeight + barGap);
         if (row.type !== "issue") return `<g transform="translate(0, ${y})"></g>`;
         const issue = row.issue!;
-        if (!issue.due_date) return `<g transform="translate(0, ${y})"><text class="gantt-col-cell" x="${dueDateColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">—</text></g>`;
+        if (!issue.due_date) return `<g transform="translate(0, ${y})"><text class="gantt-col-cell" x="4" y="${barHeight / 2 + 4}" text-anchor="start">—</text></g>`;
         // Format date as MMM DD (e.g., "Jan 15")
         const dueDate = parseLocalDate(issue.due_date);
         const today = getLocalToday();
@@ -2473,11 +2489,17 @@ export class GanttPanel {
         // Determine if overdue or due soon (closed issues are never overdue)
         const daysUntilDue = Math.floor((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
         let dueClass = "";
-        if (!issue.isClosed && issue.done_ratio < 100 && daysUntilDue < 0) dueClass = "due-overdue";
-        else if (!issue.isClosed && issue.done_ratio < 100 && daysUntilDue <= 3) dueClass = "due-soon";
+        let dueTooltip = issue.due_date;
+        if (!issue.isClosed && issue.done_ratio < 100 && daysUntilDue < 0) {
+          dueClass = "due-overdue";
+          dueTooltip = `${issue.due_date} (Overdue by ${Math.abs(daysUntilDue)} day${Math.abs(daysUntilDue) === 1 ? "" : "s"})`;
+        } else if (!issue.isClosed && issue.done_ratio < 100 && daysUntilDue <= 3) {
+          dueClass = "due-soon";
+          dueTooltip = daysUntilDue === 0 ? `${issue.due_date} (Due today)` : `${issue.due_date} (Due in ${daysUntilDue} day${daysUntilDue === 1 ? "" : "s"})`;
+        }
         return `<g transform="translate(0, ${y})">
-          <title>${escapeAttr(issue.due_date)}</title>
-          <text class="gantt-col-cell ${dueClass}" x="${dueDateColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">${displayDate}</text>
+          <title>${escapeAttr(dueTooltip)}</title>
+          <text class="gantt-col-cell ${dueClass}" x="4" y="${barHeight / 2 + 4}" text-anchor="start">${displayDate}</text>
         </g>`;
       })
       .join("");
@@ -2778,12 +2800,9 @@ export class GanttPanel {
               // Opacity: base 0.2 + normalized intensity * 0.6 (range 0.2 to 0.8)
               const normalizedForOpacity = Math.min(d.intensity, maxIntensityForOpacity) / maxIntensityForOpacity;
               const opacity = 0.2 + normalizedForOpacity * 0.6;
-              const isFirst = i === 0;
-              const isLast = i === dayCount - 1;
-              // Use clip-path for proper corner rounding on first/last
+              // clip-path handles corner rounding, no rx/ry needed on segments
               return `<rect x="${segX}" y="0" width="${segmentWidth + 0.5}" height="${barHeight}"
-                            fill="${color}" opacity="${opacity.toFixed(2)}"
-                            ${isFirst ? 'rx="8" ry="8"' : isLast ? 'rx="8" ry="8"' : ""}/>`;
+                            fill="${color}" opacity="${opacity.toFixed(2)}"/>`;
             })
             .join("");
 
@@ -2904,7 +2923,7 @@ export class GanttPanel {
               ${visualDoneRatio > 0 && visualDoneRatio < 100 ? `
                 <!-- Progress fill showing done_ratio -->
                 <rect class="progress-fill" x="${startX}" y="0" width="${doneWidth}" height="${barHeight}"
-                      fill="${color}" opacity="0.95" filter="url(#barShadow)"/>
+                      fill="${color}" opacity="0.95"/>
               ` : ""}
             </g>
             <!-- Border/outline - pointer-events:all so clicks work even with fill:none -->
@@ -2983,7 +3002,7 @@ export class GanttPanel {
                           text-anchor="middle" fill="var(--vscode-charts-green)" font-size="12" font-weight="bold">✓</text>
                   </g>
                   ${issue.assignee ? `<g class="bar-assignee-group">
-                    <title>${escapeAttr("Assigned to: " + issue.assignee)}</title>
+                    <title>${escapeAttr(issue.assignee)}</title>
                     <text class="bar-assignee${issue.assigneeId === this._currentUserId ? " current-user" : ""}" x="${assigneeX}" y="${barHeight / 2 + 4}"
                           text-anchor="${onLeft ? "end" : "start"}" fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(formatShortName(issue.assignee))}</text>
                   </g>` : ""}
@@ -3009,7 +3028,7 @@ export class GanttPanel {
               const finalBadgeW = showBlocker ? blockerBadgeW : impactFinalW;
               const assigneeX = onLeft ? finalBadgeX - finalBadgeW - 4 : finalBadgeX + finalBadgeW + 4;
               return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
-                <g class="progress-badge-group" style="cursor: help;">
+                <g class="progress-badge-group">
                   <title>${escapeAttr(progressTooltip)}</title>
                   <rect class="status-badge-bg" x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" rx="2"
                         fill="var(--vscode-badge-background)" opacity="0.9"/>
@@ -3017,7 +3036,7 @@ export class GanttPanel {
                   <text class="status-badge" x="${badgeCenterX}" y="${barHeight / 2 + 4}"
                         text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${isFallbackProgress ? "~" : ""}${visualDoneRatio}%</text>
                 </g>
-                ${showFlex ? `<g class="flex-badge-group" style="cursor: help;">
+                ${showFlex ? `<g class="flex-badge-group">
                   <title>${escapeAttr(flexTooltip)}</title>
                   <rect class="flex-badge-bg" x="${onLeft ? flexBadgeX - flexBadgeW : flexBadgeX}" y="${barHeight / 2 - 8}" width="${flexBadgeW}" height="16" rx="2"
                         fill="${flexColor}" opacity="0.15"/>
@@ -3042,7 +3061,7 @@ export class GanttPanel {
                         text-anchor="middle" fill="var(--vscode-charts-red)" font-size="10" font-weight="500">${blockerLabel}</text>
                 </g>` : ""}
                 ${issue.assignee ? `<g class="bar-assignee-group">
-                  <title>${escapeAttr("Assigned to: " + issue.assignee)}</title>
+                  <title>${escapeAttr(issue.assignee)}</title>
                   <text class="bar-assignee${issue.assigneeId === this._currentUserId ? " current-user" : ""}" x="${assigneeX}" y="${barHeight / 2 + 4}"
                         text-anchor="${onLeft ? "end" : "start"}" fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(formatShortName(issue.assignee))}</text>
                 </g>` : ""}
@@ -3471,8 +3490,8 @@ export class GanttPanel {
     .capacity-ribbon-row {
       display: flex;
       position: sticky;
-      top: 40px;
-      z-index: 5;
+      top: ${headerHeight}px;
+      z-index: 2;
       background: var(--vscode-editor-background);
       border-bottom: 1px solid var(--vscode-panel-border);
       width: max-content;
@@ -3483,6 +3502,7 @@ export class GanttPanel {
       display: flex;
       align-items: center;
       justify-content: flex-end;
+      gap: 6px;
       padding-right: 8px;
       font-size: 10px;
       color: var(--vscode-descriptionForeground);
@@ -3490,6 +3510,14 @@ export class GanttPanel {
       white-space: nowrap;
       box-sizing: border-box;
     }
+    .capacity-legend {
+      display: flex;
+      gap: 6px;
+    }
+    .capacity-label { font-size: 9px; }
+    .capacity-label.available { color: var(--vscode-charts-green); }
+    .capacity-label.busy { color: var(--vscode-charts-yellow); }
+    .capacity-label.overbooked { color: var(--vscode-charts-red); }
     .capacity-ribbon-timeline {
       flex: 1;
       overflow: hidden;
@@ -3659,8 +3687,9 @@ export class GanttPanel {
       display: flex;
       position: sticky;
       top: 0;
-      z-index: 20;
+      z-index: 3;
       height: ${headerHeight}px;
+      box-sizing: border-box;
       border-bottom: 1px solid var(--vscode-panel-border);
       background: var(--vscode-editor-background);
       width: max-content;
@@ -3678,11 +3707,11 @@ export class GanttPanel {
       flex-shrink: 0;
       position: sticky;
       left: 0;
-      z-index: 5;
+      z-index: 1;
       background: var(--vscode-editor-background);
     }
     .gantt-corner {
-      z-index: 25; /* Above both sticky header and sticky left */
+      z-index: 4; /* Above both sticky header and sticky left */
     }
     .gantt-left-header {
       flex-shrink: 0;
@@ -3754,6 +3783,9 @@ export class GanttPanel {
     .gantt-col-header.sortable { cursor: pointer; }
     .gantt-col-header.sortable:hover { color: var(--vscode-foreground); background: var(--vscode-list-hoverBackground); }
     .gantt-col-header.sorted { color: var(--vscode-foreground); font-weight: 600; }
+    .gantt-left-header .gantt-col-header,
+    .gantt-col-start .gantt-col-header,
+    .gantt-col-due .gantt-col-header { justify-content: flex-start; }
     .gantt-col-cell {
       font-size: 11px;
       fill: var(--vscode-descriptionForeground);
@@ -3780,7 +3812,8 @@ export class GanttPanel {
       top: 0;
       bottom: 0;
     }
-    .gantt-resize-handle:hover, .gantt-resize-handle.dragging { background: var(--vscode-focusBorder); }
+    .gantt-resize-handle:hover, .gantt-resize-handle.dragging,
+    .gantt-resize-handle-header:hover, .gantt-resize-handle-header.dragging { background: var(--vscode-focusBorder); }
     .gantt-timeline { flex-shrink: 0; }
     svg { display: block; }
     .issue-bar:hover .bar-main, .issue-bar:hover .bar-outline, .issue-label:hover { opacity: 1; }
@@ -4288,11 +4321,11 @@ export class GanttPanel {
       <!-- Header row - sticky at top -->
       <div class="gantt-header-row">
         <div class="gantt-sticky-left gantt-corner">
-          <div class="gantt-left-header" id="ganttLeftHeader"><div class="gantt-col-header">Task</div></div>
-          <div class="gantt-resize-handle-header"></div>
+          <div class="gantt-col-status"><div class="gantt-col-header sortable${this._sortBy === "status" ? " sorted" : ""}" data-sort="status">Status${this._sortBy === "status" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
           <div class="gantt-col-id"><div class="gantt-col-header sortable${this._sortBy === "id" ? " sorted" : ""}" data-sort="id">#ID${this._sortBy === "id" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
+          <div class="gantt-left-header" id="ganttLeftHeader"><div class="gantt-col-header">Task</div></div>
+          <div class="gantt-resize-handle-header" id="resizeHandleHeader"></div>
           <div class="gantt-col-start"><div class="gantt-col-header sortable${this._sortBy === "start" ? " sorted" : ""}" data-sort="start">Start${this._sortBy === "start" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
-          <div class="gantt-col-status"><div class="gantt-col-header">Status</div></div>
           <div class="gantt-col-due"><div class="gantt-col-header sortable${this._sortBy === "due" ? " sorted" : ""}" data-sort="due">Due${this._sortBy === "due" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
           <div class="gantt-col-assignee"><div class="gantt-col-header sortable${this._sortBy === "assignee" ? " sorted" : ""}" data-sort="assignee">Who${this._sortBy === "assignee" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
         </div>
@@ -4306,6 +4339,11 @@ export class GanttPanel {
       <div class="capacity-ribbon-row capacity-ribbon${this._viewFocus !== "person" || !this._showCapacityRibbon ? " hidden" : ""}">
         <div class="gantt-sticky-left gantt-corner">
           <div class="capacity-ribbon-label" style="width: ${stickyLeftWidth}px; height: ${ribbonHeight}px;">
+            <span class="capacity-legend">
+              <span class="capacity-label available">&lt;80%</span>
+              <span class="capacity-label busy">80-100%</span>
+              <span class="capacity-label overbooked">&gt;100%</span>
+            </span>
             Capacity
           </div>
         </div>
@@ -4320,6 +4358,18 @@ export class GanttPanel {
       <!-- Body -->
       <div class="gantt-body">
         <div class="gantt-sticky-left">
+          <div class="gantt-col-status">
+            <svg viewBox="0 0 ${statusColumnWidth} ${bodyHeight}" preserveAspectRatio="none" height="${bodyHeight}">
+              ${zebraStripes}
+              ${statusCells}
+            </svg>
+          </div>
+          <div class="gantt-col-id">
+            <svg viewBox="0 0 ${idColumnWidth} ${bodyHeight}" preserveAspectRatio="none" height="${bodyHeight}">
+              ${zebraStripes}
+              ${idCells}
+            </svg>
+          </div>
           <div class="gantt-labels" id="ganttLabels">
             <svg width="${labelWidth * 2}" height="${bodyHeight}" data-render-key="${this._renderKey}">
               ${zebraStripes}
@@ -4327,22 +4377,10 @@ export class GanttPanel {
             </svg>
           </div>
           <div class="gantt-resize-handle" id="resizeHandle"></div>
-          <div class="gantt-col-id">
-            <svg viewBox="0 0 ${idColumnWidth} ${bodyHeight}" preserveAspectRatio="none" height="${bodyHeight}">
-              ${zebraStripes}
-              ${idCells}
-            </svg>
-          </div>
           <div class="gantt-col-start">
             <svg viewBox="0 0 ${startDateColumnWidth} ${bodyHeight}" preserveAspectRatio="none" height="${bodyHeight}">
               ${zebraStripes}
               ${startDateCells}
-            </svg>
-          </div>
-          <div class="gantt-col-status">
-            <svg viewBox="0 0 ${statusColumnWidth} ${bodyHeight}" preserveAspectRatio="none" height="${bodyHeight}">
-              ${zebraStripes}
-              ${statusCells}
             </svg>
           </div>
           <div class="gantt-col-due">
@@ -6499,18 +6537,24 @@ export class GanttPanel {
 
     // Column resize handling
     const resizeHandle = document.getElementById('resizeHandle');
+    const resizeHandleHeader = document.getElementById('resizeHandleHeader');
     let isResizing = false;
     let resizeStartX = 0;
     let resizeStartWidth = 0;
+    let activeResizeHandle = null;
 
-    resizeHandle.addEventListener('mousedown', (e) => {
+    function startResize(e, handle) {
       isResizing = true;
+      activeResizeHandle = handle;
       resizeStartX = e.clientX;
       resizeStartWidth = labelsColumn.offsetWidth;
-      resizeHandle.classList.add('dragging');
+      handle.classList.add('dragging');
       document.body.classList.add('cursor-col-resize', 'user-select-none');
       e.preventDefault();
-    });
+    }
+
+    resizeHandle?.addEventListener('mousedown', (e) => startResize(e, resizeHandle));
+    resizeHandleHeader?.addEventListener('mousedown', (e) => startResize(e, resizeHandleHeader));
 
     // RAF throttle for smooth column resize
     let resizeRafPending = false;
@@ -6544,7 +6588,8 @@ export class GanttPanel {
     addDocListener('mouseup', () => {
       if (isResizing) {
         isResizing = false;
-        resizeHandle.classList.remove('dragging');
+        activeResizeHandle?.classList.remove('dragging');
+        activeResizeHandle = null;
         document.body.classList.remove('cursor-col-resize', 'user-select-none');
         saveState(); // Persist new column width
       }
