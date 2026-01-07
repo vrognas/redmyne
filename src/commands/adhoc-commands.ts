@@ -94,17 +94,18 @@ export async function contributeToIssue(
     if (proceed !== "Yes") return;
   }
 
-  // Update comment to include target reference
+  // Update comment to include target reference with subject
   const currentComment = entry.comments || "";
   const existingTarget = parseTargetIssueId(currentComment);
+  const targetRef = `#${targetId} ${targetIssue.subject}`;
 
   let newComment: string;
   if (existingTarget) {
-    // Replace existing #<id> with new target
-    newComment = currentComment.replace(/#\d+/, `#${targetId}`);
+    // Replace existing #<id> (and any following text) with new target
+    newComment = currentComment.replace(/#\d+.*$/, targetRef).trim();
   } else {
     // Append target reference
-    newComment = currentComment ? `${currentComment} #${targetId}` : `#${targetId}`;
+    newComment = currentComment ? `${currentComment} ${targetRef}` : targetRef;
   }
 
   try {
@@ -147,8 +148,8 @@ export async function removeContribution(
     return;
   }
 
-  // Remove #<id> from comment
-  const newComment = currentComment.replace(/#\d+\s*/, "").trim();
+  // Remove #<id> and any following subject text from comment
+  const newComment = currentComment.replace(/#\d+.*$/, "").trim();
 
   try {
     await server.updateTimeEntry(entry.id!, { comments: newComment });

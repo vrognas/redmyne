@@ -1563,6 +1563,16 @@ export class GanttPanel {
           vscode.commands.executeCommand("redmine.copyIssueUrl", { id: message.issueId });
         }
         break;
+      case "showStatus":
+        if (message.message) {
+          showStatusBarMessage(`$(check) ${message.message}`, 2000);
+        }
+        break;
+      case "setInternalEstimate":
+        if (message.issueId) {
+          vscode.commands.executeCommand("redmine.setInternalEstimate", { id: message.issueId });
+        }
+        break;
       case "toggleAutoUpdate":
         if (message.issueId) {
           vscode.commands.executeCommand("redmine.toggleAutoUpdateDoneRatio", { id: message.issueId });
@@ -2669,7 +2679,6 @@ export class GanttPanel {
           contributedHours > 0
             ? `Spent: ${formatHoursAsTime(issue.spent_hours)} + ${formatHoursAsTime(contributedHours)} contributed = ${formatHoursAsTime(effectiveSpentHours)}`
             : `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
-          !isParent ? `───\n←/→: Move  Shift+←/→: Resize  Alt+←/→: Start` : null,
         ].filter(Boolean).join("\n");
 
         // Progress tooltip: time tracking info
@@ -2724,13 +2733,14 @@ export class GanttPanel {
         const handleWidth = 8;
 
         // Calculate daily intensity for this issue (skip for parent issues - work is in subtasks)
-        // Use scheduled intensity (priority-based) in person view, uniform distribution otherwise
-        const intensities = this._showIntensity && !isParent
+        // Only show intensity in person view (not project view)
+        const showIntensityHere = this._showIntensity && this._viewFocus === "person" && !isParent;
+        const intensities = showIntensityHere
           ? (issueScheduleMap.size > 0
               ? getScheduledIntensity(issue, this._schedule, issueScheduleMap)
               : calculateDailyIntensity(issue, this._schedule))
           : [];
-        const hasIntensity = this._showIntensity && !isParent && intensities.length > 0 && issue.estimated_hours !== null;
+        const hasIntensity = showIntensityHere && intensities.length > 0 && issue.estimated_hours !== null;
 
         // Generate intensity segments and line chart
         let intensitySegments = "";
@@ -2794,6 +2804,7 @@ export class GanttPanel {
           return `
             <g class="issue-bar parent-bar gantt-row" data-issue-id="${issue.id}"
                data-project-id="${issue.projectId}"
+               data-subject="${escapedSubject}"
                data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
                data-start-date="${issue.start_date || ""}"
                data-due-date="${issue.due_date || ""}"
@@ -2840,6 +2851,7 @@ export class GanttPanel {
         return `
           <g class="issue-bar gantt-row${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${issue.isAdHoc ? " bar-adhoc" : ""}${isCritical ? " bar-critical" : ""}" data-issue-id="${issue.id}"
              data-project-id="${issue.projectId}"
+             data-subject="${escapedSubject}"
              data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
              data-start-date="${issue.start_date || ""}"
              data-due-date="${issue.due_date || ""}"
@@ -4336,6 +4348,7 @@ ${style.tip}
     const totalDays = ${totalDays};
     const dayWidth = timelineWidth / totalDays;
     const extendedRelationTypes = ${this._extendedRelationTypes};
+    const redmineBaseUrl = ${JSON.stringify(vscode.workspace.getConfiguration("redmine").get<string>("url") || "")};
 
     // Cleanup previous event listeners (prevents accumulation on re-render)
     if (window._ganttCleanup) {
@@ -5261,14 +5274,36 @@ ${style.tip}
         { label: 'Toggle Auto-update %', command: 'toggleAutoUpdate' },
         { label: 'Toggle Ad-hoc Budget', command: 'toggleAdHoc' },
         { label: 'Toggle Precedence', command: 'togglePrecedence' },
+        { label: 'Set Internal Estimate', command: 'setInternalEstimate' },
+        { label: 'Copy Link', command: 'copyLink', local: true },
         { label: 'Copy URL', command: 'copyUrl' },
       ];
 
       options.forEach(opt => {
         const btn = document.createElement('button');
         btn.textContent = opt.label;
-        btn.addEventListener('click', () => {
-          if (opt.local) {
+        btn.addEventListener('click', async () => {
+          if (opt.command === 'copyLink') {
+            // Copy with HTML format for Teams/rich text support
+            const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
+            const subject = bar?.dataset?.subject || 'Issue #' + issueId;
+            const url = redmineBaseUrl + '/issues/' + issueId;
+            const html = '<a href="' + url + '">#' + issueId + ' ' + subject + '</a>';
+            const plain = url;
+            try {
+              await navigator.clipboard.write([
+                new ClipboardItem({
+                  'text/plain': new Blob([plain], { type: 'text/plain' }),
+                  'text/html': new Blob([html], { type: 'text/html' })
+                })
+              ]);
+              vscode.postMessage({ command: 'showStatus', message: 'Copied #' + issueId + ' link' });
+            } catch (e) {
+              // Fallback to plain text
+              await navigator.clipboard.writeText(plain);
+              vscode.postMessage({ command: 'showStatus', message: 'Copied #' + issueId + ' URL' });
+            }
+          } else if (opt.local) {
             clearSelection();
           } else if (opt.bulk) {
             vscode.postMessage({ command: opt.command, issueIds: targetIds });
