@@ -4111,7 +4111,7 @@ export class GanttPanel {
     }
     .minimap-viewport:hover { fill: var(--vscode-scrollbarSlider-hoverBackground, rgba(100, 100, 100, 0.5)); }
     .minimap-viewport:active { fill: var(--vscode-scrollbarSlider-activeBackground, rgba(100, 100, 100, 0.6)); }
-    .minimap-today { stroke: var(--vscode-charts-red); stroke-width: 1; }
+    .minimap-today { stroke: var(--vscode-charts-red); stroke-width: 2; opacity: 0.9; }
     /* Milestone markers */
     .milestone-marker {
       pointer-events: all;
