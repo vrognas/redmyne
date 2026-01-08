@@ -2932,8 +2932,10 @@ export class GanttPanel {
                       stroke-width="1" pointer-events="none"/>
             </g>
             <!-- Labels outside bar: adaptive positioning (left if near edge, else right) -->
-            <!-- Badges: flex, blocks, blocker, assignee (progress % and checkmark removed per color harmonization) -->
+            <!-- Badges: progress, flex, blocks, blocker, assignee -->
             ${(() => {
+              // Progress badge width (varies by digit count)
+              const progressBadgeW = visualDoneRatio === 100 ? 32 : visualDoneRatio >= 10 ? 28 : 22;
               // Flexibility badge: "+5d", "0d", "-3d" (width ~28)
               const showFlex = flexSlack !== null && !issue.isClosed;
               const flexBadgeW = showFlex ? 28 : 0;
@@ -2960,15 +2962,22 @@ export class GanttPanel {
               const blockerLabel = showBlocker ? `⛔${blockerCount}` : "";
               const firstBlockerId = showBlocker ? issue.blockedBy[0].id : null;
               const assigneeW = issue.assignee ? 90 : 0;
-              // Total width: flex + blocks + blocker + assignee + spacing
-              const totalLabelW = flexBadgeW + impactBadgeW + blockerBadgeW + assigneeW + 24;
+              // Total width: progress + flex + blocks + blocker + assignee + spacing
+              const totalLabelW = progressBadgeW + flexBadgeW + impactBadgeW + blockerBadgeW + assigneeW + 24;
               const onLeft = endX + totalLabelW > timelineWidth;
               const labelX = onLeft ? startX - 8 : endX + 16;
 
-              // For closed issues, just show assignee (bar color is green, no checkmark needed)
+              // For closed issues, show progress (100%) and assignee
               if (issue.isClosed) {
-                const assigneeX = labelX;
+                const progressCenterX = onLeft ? labelX - progressBadgeW / 2 : labelX + progressBadgeW / 2;
+                const assigneeX = onLeft ? labelX - progressBadgeW - 4 : labelX + progressBadgeW + 4;
                 return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
+                  <g class="progress-badge-group">
+                    <rect class="status-badge-bg" x="${onLeft ? labelX - progressBadgeW : labelX}" y="${barHeight / 2 - 8}" width="${progressBadgeW}" height="16" rx="2"
+                          fill="var(--vscode-badge-background)" opacity="0.9"/>
+                    <text class="status-badge" x="${progressCenterX}" y="${barHeight / 2 + 4}"
+                          text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">100%</text>
+                  </g>
                   ${issue.assignee ? `<g class="bar-assignee-group">
                     <title>${escapeAttr(issue.assignee)}</title>
                     <text class="bar-assignee${issue.assigneeId === this._currentUserId ? " current-user" : ""}" x="${assigneeX}" y="${barHeight / 2 + 4}"
@@ -2977,24 +2986,32 @@ export class GanttPanel {
                 </g>`;
               }
 
-              // Flex badge position: first badge
-              const flexBadgeX = labelX;
+              // Progress badge position: first badge
+              const progressCenterX = onLeft ? labelX - progressBadgeW / 2 : labelX + progressBadgeW / 2;
+              // Flex badge position: after progress badge
+              const flexBadgeX = onLeft ? labelX - progressBadgeW - 4 : labelX + progressBadgeW + 4;
               const flexBadgeCenterX = onLeft ? flexBadgeX - flexBadgeW / 2 : flexBadgeX + flexBadgeW / 2;
-              // Impact badge position: after flex badge
-              const lastBadgeX = showFlex ? flexBadgeX : labelX;
-              const lastBadgeW = showFlex ? flexBadgeW : 0;
-              const impactBadgeX = showFlex ? (onLeft ? flexBadgeX - flexBadgeW - 4 : flexBadgeX + flexBadgeW + 4) : labelX;
+              // Impact badge position: after flex badge (or progress if no flex)
+              const afterProgressX = showFlex ? flexBadgeX : labelX;
+              const afterProgressW = showFlex ? flexBadgeW : progressBadgeW;
+              const impactBadgeX = onLeft ? afterProgressX - afterProgressW - 4 : afterProgressX + afterProgressW + 4;
               const impactBadgeCenterX = onLeft ? impactBadgeX - impactBadgeW / 2 : impactBadgeX + impactBadgeW / 2;
-              // Blocker badge position: after impact badge (or flex badge if no impact)
-              const prevBadgeX = showBlocks ? impactBadgeX : lastBadgeX;
-              const prevBadgeW = showBlocks ? impactBadgeW : lastBadgeW;
-              const blockerBadgeX = (showFlex || showBlocks) ? (onLeft ? prevBadgeX - prevBadgeW - 4 : prevBadgeX + prevBadgeW + 4) : labelX;
+              // Blocker badge position: after impact badge (or previous)
+              const afterImpactX = showBlocks ? impactBadgeX : afterProgressX;
+              const afterImpactW = showBlocks ? impactBadgeW : afterProgressW;
+              const blockerBadgeX = onLeft ? afterImpactX - afterImpactW - 4 : afterImpactX + afterImpactW + 4;
               const blockerBadgeCenterX = onLeft ? blockerBadgeX - blockerBadgeW / 2 : blockerBadgeX + blockerBadgeW / 2;
               // Assignee position: after last badge
-              const finalBadgeX = showBlocker ? blockerBadgeX : (showBlocks ? impactBadgeX : (showFlex ? flexBadgeX : labelX));
-              const finalBadgeW = showBlocker ? blockerBadgeW : (showBlocks ? impactBadgeW : (showFlex ? flexBadgeW : 0));
-              const assigneeX = (showFlex || showBlocks || showBlocker) ? (onLeft ? finalBadgeX - finalBadgeW - 4 : finalBadgeX + finalBadgeW + 4) : labelX;
+              const afterBlockerX = showBlocker ? blockerBadgeX : afterImpactX;
+              const afterBlockerW = showBlocker ? blockerBadgeW : afterImpactW;
+              const assigneeX = onLeft ? afterBlockerX - afterBlockerW - 4 : afterBlockerX + afterBlockerW + 4;
               return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
+                <g class="progress-badge-group">
+                  <rect class="status-badge-bg" x="${onLeft ? labelX - progressBadgeW : labelX}" y="${barHeight / 2 - 8}" width="${progressBadgeW}" height="16" rx="2"
+                        fill="var(--vscode-badge-background)" opacity="0.9"/>
+                  <text class="status-badge" x="${progressCenterX}" y="${barHeight / 2 + 4}"
+                        text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${isFallbackProgress ? "~" : ""}${visualDoneRatio}%</text>
+                </g>
                 ${showFlex ? `<g class="flex-badge-group">
                   <title>${escapeAttr(flexTooltip)}</title>
                   <rect class="flex-badge-bg" x="${onLeft ? flexBadgeX - flexBadgeW : flexBadgeX}" y="${barHeight / 2 - 8}" width="${flexBadgeW}" height="16" rx="2"
