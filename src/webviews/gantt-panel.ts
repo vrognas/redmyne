@@ -6699,8 +6699,7 @@ export class GanttPanel {
     const bodyGridLines: string[] = [];
     const bodyMarkers: string[] = [];
     const current = new Date(minDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayStr = getTodayStr(); // Use consistent YYYY-MM-DD format
 
     const dayWidth =
       (svgWidth - leftMargin) /
@@ -6855,8 +6854,9 @@ export class GanttPanel {
         `);
       }
 
-      // Today marker (all zoom levels)
-      if (current.toDateString() === today.toDateString()) {
+      // Today marker (all zoom levels) - use local date for consistency
+      const currentLocalStr = formatLocalDate(current);
+      if (currentLocalStr === todayStr) {
         bodyMarkers.push(`
           <line x1="${x}" y1="0" x2="${x}" y2="100%" class="today-marker"/>
         `);
