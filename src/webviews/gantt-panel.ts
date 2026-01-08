@@ -2987,6 +2987,7 @@ export class GanttPanel {
                     <title>${escapeAttr(progressTooltip)}</title>
                     <rect class="status-badge-bg" x="${onLeft ? labelX - checkBadgeW : labelX}" y="${barHeight / 2 - 8}" width="${checkBadgeW}" height="16" rx="2"
                           fill="var(--vscode-badge-background)" opacity="0.9"/>
+                    <rect x="${onLeft ? labelX - checkBadgeW : labelX}" y="${barHeight / 2 - 8}" width="${checkBadgeW}" height="16" fill="transparent"/>
                     <text class="status-badge" x="${checkCenterX}" y="${barHeight / 2 + 4}"
                           text-anchor="middle" fill="var(--vscode-charts-green)" font-size="12">✓</text>
                   </g>
@@ -3022,6 +3023,7 @@ export class GanttPanel {
                   <title>${escapeAttr(progressTooltip)}</title>
                   <rect class="status-badge-bg" x="${onLeft ? labelX - progressBadgeW : labelX}" y="${barHeight / 2 - 8}" width="${progressBadgeW}" height="16" rx="2"
                         fill="var(--vscode-badge-background)" opacity="0.9"/>
+                  <rect x="${onLeft ? labelX - progressBadgeW : labelX}" y="${barHeight / 2 - 8}" width="${progressBadgeW}" height="16" fill="transparent"/>
                   <text class="status-badge" x="${progressCenterX}" y="${barHeight / 2 + 4}"
                         text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${isFallbackProgress ? "~" : ""}${visualDoneRatio}%</text>
                 </g>
