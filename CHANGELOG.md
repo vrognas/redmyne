@@ -20,6 +20,10 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 ### Changed
 
+- **Color harmonization** - unified color semantics across Gantt: GREEN=done, BLUE=on-track (muted), YELLOW=at-risk, RED=overbooked; uses VS Code theme variables for full theme integration
+- **Gantt bar opacity** - on-track bars muted (60% opacity) to let alert states (red/yellow/green) pop per 60-30-10 UX rule
+- **Dependency arrows simplified** - consolidated from 6 colors to 3: blocking (red), scheduling (blue), informational (gray)
+- **Badges reduced** - removed progress % badge and checkmark; bar color + fill now conveys status; kept flex/blocks/blocker/assignee
 - **Ad-hoc contribution uses issue picker** - "Contribute to Issue" now uses searchable issue picker instead of manual ID entry; allows selecting issues from projects without time tracking (contributions are links, not time entries)
 - **Time entries single fetch** - reduced API calls from 4 to 1 by fetching all periods at once and filtering client-side
 - **Request queue with concurrency limit** - API requests now queued with max 2 concurrent to prevent server overload (503 errors)

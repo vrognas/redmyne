@@ -2632,6 +2632,7 @@ export class GanttPanel {
         const effectiveStatus = issue.isClosed ? "completed" : issue.status;
         const color = isParent ? "var(--vscode-descriptionForeground)" : this._getStatusColor(effectiveStatus);
         const textColor = isParent ? "var(--vscode-editor-foreground)" : this._getStatusTextColor(effectiveStatus);
+        const fillOpacity = isParent ? 0.5 : this._getStatusOpacity(effectiveStatus);
         const isPast = end < today;
         const isOverdue = !isParent && !issue.isClosed && issue.done_ratio < 100 && end < today;
 
@@ -2722,33 +2723,6 @@ export class GanttPanel {
             : `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
         ].filter(Boolean).join("\n");
 
-        // Progress tooltip: time tracking info
-        const barIsAdHoc = this._contributionData?.adHocIssues.has(issue.id);
-        const barDonated = this._donationTargets?.get(issue.id);
-        const barReceived = this._contributionSources?.get(issue.id);
-
-        const progressLines = [
-          `Progress: ${doneRatio}%${isFallbackProgress ? ` (~${visualDoneRatio}% from time)` : ""}${isManualDone && doneRatio > 0 ? " (manual)" : ""}`,
-          `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
-        ];
-        if (issueInternalEstimate) {
-          progressLines.push(`Remaining: ${formatHoursAsTime(issueInternalEstimate.hoursRemaining)} (internal)`);
-        }
-        if (barIsAdHoc && barDonated && barDonated.length > 0) {
-          const totalDonated = barDonated.reduce((sum, d) => sum + d.hours, 0);
-          progressLines.push(`Spent: ${formatHoursAsTime(issue.spent_hours)}`);
-          progressLines.push(`Donated: ${formatHoursAsTime(totalDonated)} to ${barDonated.length} issue(s)`);
-        } else if (barReceived && barReceived.length > 0) {
-          const totalReceived = barReceived.reduce((sum, r) => sum + r.hours, 0);
-          const directSpent = issue.spent_hours ?? 0;
-          progressLines.push(`Direct: ${formatHoursAsTime(directSpent)}`);
-          progressLines.push(`+ ${formatHoursAsTime(totalReceived)} from ad-hoc`);
-          progressLines.push(`Total: ${formatHoursAsTime(directSpent + totalReceived)}`);
-        } else {
-          progressLines.push(`Spent: ${formatHoursAsTime(issue.spent_hours)}`);
-        }
-        const progressTooltip = progressLines.join("\n");
-
         // Flexibility tooltip
         const flexTooltip = flexText || "";
 
@@ -2799,8 +2773,9 @@ export class GanttPanel {
               const segX = startX + i * segmentWidth;
               // Opacity: base 0.5 + normalized intensity * 0.4 (range 0.5 to 0.9)
               // Higher base ensures bar color stays saturated for text readability
+              // Multiply by fillOpacity to respect status-based muting (60-30-10 rule)
               const normalizedForOpacity = Math.min(d.intensity, maxIntensityForOpacity) / maxIntensityForOpacity;
-              const opacity = 0.5 + normalizedForOpacity * 0.4;
+              const opacity = (0.5 + normalizedForOpacity * 0.4) * fillOpacity;
               // clip-path handles corner rounding, no rx/ry needed on segments
               return `<rect x="${segX}" y="0" width="${segmentWidth + 0.5}" height="${barHeight}"
                             fill="${color}" opacity="${opacity.toFixed(2)}"/>`;
@@ -2914,7 +2889,7 @@ export class GanttPanel {
               ` : `
                 <!-- Fallback: solid bar when no intensity data (0-based Y) -->
                 <rect class="bar-main" x="${startX}" y="0" width="${width}" height="${barHeight}"
-                      fill="${color}" opacity="0.85" filter="url(#barShadow)"/>
+                      fill="${color}" opacity="${(0.85 * fillOpacity).toFixed(2)}" filter="url(#barShadow)"/>
               `}
               ${hasPastPortion ? `
                 <!-- Past portion overlay with diagonal stripes -->
@@ -2924,7 +2899,7 @@ export class GanttPanel {
               ${visualDoneRatio > 0 && visualDoneRatio < 100 ? `
                 <!-- Progress fill showing done_ratio -->
                 <rect class="progress-fill" x="${startX}" y="0" width="${doneWidth}" height="${barHeight}"
-                      fill="${color}" opacity="0.95"/>
+                      fill="${color}" opacity="${(0.95 * fillOpacity).toFixed(2)}"/>
               ` : ""}
             </g>
             <!-- Border/outline - pointer-events:all so clicks work even with fill:none -->
@@ -2957,9 +2932,9 @@ export class GanttPanel {
                       stroke-width="1" pointer-events="none"/>
             </g>
             <!-- Labels outside bar: adaptive positioning (left if near edge, else right) -->
+            <!-- Badges: flex, blocks, blocker, assignee (progress % and checkmark removed per color harmonization) -->
             ${(() => {
-              const badgeW = issue.isClosed ? 18 : (visualDoneRatio === 100 ? 32 : visualDoneRatio >= 10 ? 28 : 22);
-              // Flexibility badge: "+5d", "0d", "-3d" (width ~24-30)
+              // Flexibility badge: "+5d", "0d", "-3d" (width ~28)
               const showFlex = flexSlack !== null && !issue.isClosed;
               const flexBadgeW = showFlex ? 28 : 0;
               const flexLabel = showFlex ? (flexSlack > 0 ? `+${flexSlack}d` : `${flexSlack}d`) : "";
@@ -2985,23 +2960,15 @@ export class GanttPanel {
               const blockerLabel = showBlocker ? `⛔${blockerCount}` : "";
               const firstBlockerId = showBlocker ? issue.blockedBy[0].id : null;
               const assigneeW = issue.assignee ? 90 : 0;
-              const totalLabelW = badgeW + flexBadgeW + impactBadgeW + blockerBadgeW + assigneeW + 24;
+              // Total width: flex + blocks + blocker + assignee + spacing
+              const totalLabelW = flexBadgeW + impactBadgeW + blockerBadgeW + assigneeW + 24;
               const onLeft = endX + totalLabelW > timelineWidth;
               const labelX = onLeft ? startX - 8 : endX + 16;
 
+              // For closed issues, just show assignee (bar color is green, no checkmark needed)
               if (issue.isClosed) {
-                const checkX = onLeft ? labelX - 9 : labelX + 9;
-                const assigneeX = onLeft ? labelX - 22 : labelX + 22;
-                const closedTooltip = `Closed: ${formatDateWithWeekday(issue.closed_on)}`;
+                const assigneeX = labelX;
                 return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
-                  <g class="status-badge-group">
-                    <title>${escapeAttr(closedTooltip)}</title>
-                    <rect class="status-badge-bg" x="${onLeft ? labelX - 18 : labelX}" y="${barHeight / 2 - 8}" width="18" height="16" rx="2"
-                          fill="var(--vscode-charts-green)" opacity="0.2"/>
-                    <rect x="${onLeft ? labelX - 18 : labelX}" y="${barHeight / 2 - 8}" width="18" height="16" fill="transparent"/>
-                    <text class="status-badge" x="${checkX}" y="${barHeight / 2 + 4}"
-                          text-anchor="middle" fill="var(--vscode-charts-green)" font-size="12" font-weight="bold">✓</text>
-                  </g>
                   ${issue.assignee ? `<g class="bar-assignee-group">
                     <title>${escapeAttr(issue.assignee)}</title>
                     <text class="bar-assignee${issue.assigneeId === this._currentUserId ? " current-user" : ""}" x="${assigneeX}" y="${barHeight / 2 + 4}"
@@ -3010,33 +2977,24 @@ export class GanttPanel {
                 </g>`;
               }
 
-              const badgeCenterX = onLeft ? labelX - badgeW / 2 : labelX + badgeW / 2;
-              // Flex badge position: after progress badge
-              const flexBadgeX = onLeft ? labelX - badgeW - 4 : labelX + badgeW + 4;
+              // Flex badge position: first badge
+              const flexBadgeX = labelX;
               const flexBadgeCenterX = onLeft ? flexBadgeX - flexBadgeW / 2 : flexBadgeX + flexBadgeW / 2;
               // Impact badge position: after flex badge
               const lastBadgeX = showFlex ? flexBadgeX : labelX;
-              const lastBadgeW = showFlex ? flexBadgeW : badgeW;
-              const impactBadgeX = onLeft ? lastBadgeX - lastBadgeW - 4 : lastBadgeX + lastBadgeW + 4;
+              const lastBadgeW = showFlex ? flexBadgeW : 0;
+              const impactBadgeX = showFlex ? (onLeft ? flexBadgeX - flexBadgeW - 4 : flexBadgeX + flexBadgeW + 4) : labelX;
               const impactBadgeCenterX = onLeft ? impactBadgeX - impactBadgeW / 2 : impactBadgeX + impactBadgeW / 2;
-              // Blocker badge position: after impact badge (or last shown badge)
-              const impactFinalX = showBlocks ? impactBadgeX : lastBadgeX;
-              const impactFinalW = showBlocks ? impactBadgeW : lastBadgeW;
-              const blockerBadgeX = onLeft ? impactFinalX - impactFinalW - 4 : impactFinalX + impactFinalW + 4;
+              // Blocker badge position: after impact badge (or flex badge if no impact)
+              const prevBadgeX = showBlocks ? impactBadgeX : lastBadgeX;
+              const prevBadgeW = showBlocks ? impactBadgeW : lastBadgeW;
+              const blockerBadgeX = (showFlex || showBlocks) ? (onLeft ? prevBadgeX - prevBadgeW - 4 : prevBadgeX + prevBadgeW + 4) : labelX;
               const blockerBadgeCenterX = onLeft ? blockerBadgeX - blockerBadgeW / 2 : blockerBadgeX + blockerBadgeW / 2;
-              // Assignee position: after blocker badge (or last shown badge)
-              const finalBadgeX = showBlocker ? blockerBadgeX : impactFinalX;
-              const finalBadgeW = showBlocker ? blockerBadgeW : impactFinalW;
-              const assigneeX = onLeft ? finalBadgeX - finalBadgeW - 4 : finalBadgeX + finalBadgeW + 4;
+              // Assignee position: after last badge
+              const finalBadgeX = showBlocker ? blockerBadgeX : (showBlocks ? impactBadgeX : (showFlex ? flexBadgeX : labelX));
+              const finalBadgeW = showBlocker ? blockerBadgeW : (showBlocks ? impactBadgeW : (showFlex ? flexBadgeW : 0));
+              const assigneeX = (showFlex || showBlocks || showBlocker) ? (onLeft ? finalBadgeX - finalBadgeW - 4 : finalBadgeX + finalBadgeW + 4) : labelX;
               return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
-                <g class="progress-badge-group">
-                  <title>${escapeAttr(progressTooltip)}</title>
-                  <rect class="status-badge-bg" x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" rx="2"
-                        fill="var(--vscode-badge-background)" opacity="0.9"/>
-                  <rect x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" fill="transparent"/>
-                  <text class="status-badge" x="${badgeCenterX}" y="${barHeight / 2 + 4}"
-                        text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${isFallbackProgress ? "~" : ""}${visualDoneRatio}%</text>
-                </g>
                 ${showFlex ? `<g class="flex-badge-group">
                   <title>${escapeAttr(flexTooltip)}</title>
                   <rect class="flex-badge-bg" x="${onLeft ? flexBadgeX - flexBadgeW : flexBadgeX}" y="${barHeight / 2 - 8}" width="${flexBadgeW}" height="16" rx="2"
@@ -4072,34 +4030,32 @@ export class GanttPanel {
     .heatmap-color-yellow { background: var(--vscode-charts-yellow); }
     .heatmap-color-orange { background: var(--vscode-charts-orange); }
     .heatmap-color-red { background: var(--vscode-charts-red); }
-    /* Relation legend line colors */
+    /* Relation legend line colors - 3 semantic categories */
     .rel-line-blocks { background: var(--vscode-charts-red); }
-    .rel-line-precedes { background: var(--vscode-charts-blue); }
-    .rel-line-relates { background: var(--vscode-charts-lines); border-style: dashed; }
-    .rel-line-duplicates { background: var(--vscode-charts-lines); border-style: dotted; }
-    .rel-line-copied { background: var(--vscode-charts-lines); border-style: dashed; border-width: 2px; }
-    .rel-line-ss { background: var(--vscode-charts-green); border-style: dashed; }
-    .rel-line-ff { background: var(--vscode-charts-orange); border-style: dashed; }
-    .rel-line-sf { background: var(--vscode-charts-purple); border-style: dashed; }
-    /* SVG arrow colors - grouped by semantic meaning, differentiated by dash pattern */
+    .rel-line-scheduling { background: var(--vscode-charts-blue); }
+    .rel-line-informational { background: var(--vscode-charts-lines); border-style: dashed; }
+    /* SVG arrow colors - 3 semantic groups: blocking (red), scheduling (blue), informational (gray) */
+    /* Blocking - hard constraint, target blocked until source closes */
     .rel-blocks .arrow-line { stroke: var(--vscode-charts-red); }
     .rel-blocks .arrow-head { fill: var(--vscode-charts-red); }
-    .rel-precedes .arrow-line { stroke: var(--vscode-charts-blue); }
-    .rel-precedes .arrow-head { fill: var(--vscode-charts-blue); }
-    .rel-relates .arrow-line { stroke: var(--vscode-charts-lines); }
-    .rel-relates .arrow-head { fill: var(--vscode-charts-lines); }
-    .rel-duplicates .arrow-line { stroke: var(--vscode-charts-lines); }
-    .rel-duplicates .arrow-head { fill: var(--vscode-charts-lines); }
+    /* Scheduling - all scheduling relation types use blue */
+    .rel-precedes .arrow-line,
+    .rel-finish_to_start .arrow-line,
+    .rel-start_to_start .arrow-line,
+    .rel-finish_to_finish .arrow-line,
+    .rel-start_to_finish .arrow-line { stroke: var(--vscode-charts-blue); }
+    .rel-precedes .arrow-head,
+    .rel-finish_to_start .arrow-head,
+    .rel-start_to_start .arrow-head,
+    .rel-finish_to_finish .arrow-head,
+    .rel-start_to_finish .arrow-head { fill: var(--vscode-charts-blue); }
+    /* Informational - simple links, no hard constraints */
+    .rel-relates .arrow-line,
+    .rel-duplicates .arrow-line,
     .rel-copied_to .arrow-line { stroke: var(--vscode-charts-lines); }
+    .rel-relates .arrow-head,
+    .rel-duplicates .arrow-head,
     .rel-copied_to .arrow-head { fill: var(--vscode-charts-lines); }
-    .rel-finish_to_start .arrow-line { stroke: var(--vscode-charts-blue); }
-    .rel-finish_to_start .arrow-head { fill: var(--vscode-charts-blue); }
-    .rel-start_to_start .arrow-line { stroke: var(--vscode-charts-green); }
-    .rel-start_to_start .arrow-head { fill: var(--vscode-charts-green); }
-    .rel-finish_to_finish .arrow-line { stroke: var(--vscode-charts-orange); }
-    .rel-finish_to_finish .arrow-head { fill: var(--vscode-charts-orange); }
-    .rel-start_to_finish .arrow-line { stroke: var(--vscode-charts-purple); }
-    .rel-start_to_finish .arrow-head { fill: var(--vscode-charts-purple); }
     .color-swatch { display: inline-block; width: 12px; height: 3px; margin-right: 8px; vertical-align: middle; }
 
     /* Minimap - fixed at bottom of gantt-container, aligned with timeline */
@@ -4290,11 +4246,9 @@ export class GanttPanel {
             </div>
             <div class="help-section">
               <div class="help-title">Relations</div>
-              <span class="help-item"><span class="relation-legend-line rel-line-blocks"></span>blocks</span>
-              <span class="help-item"><span class="relation-legend-line rel-line-precedes"></span>precedes</span>
-              <span class="help-item"><span class="relation-legend-line rel-line-relates"></span>relates</span>
-              <span class="help-item"><span class="relation-legend-line rel-line-duplicates"></span>duplicates</span>
-              <span class="help-item"><span class="relation-legend-line rel-line-copied"></span>copied</span>
+              <span class="help-item"><span class="relation-legend-line rel-line-blocks"></span>blocking</span>
+              <span class="help-item"><span class="relation-legend-line rel-line-scheduling"></span>scheduling</span>
+              <span class="help-item"><span class="relation-legend-line rel-line-informational"></span>informational</span>
             </div>
             <div class="help-section">
               <div class="help-title">Shortcuts</div>
@@ -5574,23 +5528,23 @@ export class GanttPanel {
       const baseTypes = [
         { value: 'blocks', label: '🚫 Blocks', cssClass: 'rel-line-blocks',
           tooltip: 'Target cannot be closed until this issue is closed' },
-        { value: 'precedes', label: '➡️ Precedes', cssClass: 'rel-line-precedes',
+        { value: 'precedes', label: '➡️ Precedes', cssClass: 'rel-line-scheduling',
           tooltip: 'This issue must complete before target can start' },
-        { value: 'relates', label: '🔗 Relates to', cssClass: 'rel-line-relates',
+        { value: 'relates', label: '🔗 Relates to', cssClass: 'rel-line-informational',
           tooltip: 'Simple link between issues (no constraints)' },
-        { value: 'duplicates', label: '📋 Duplicates', cssClass: 'rel-line-duplicates',
+        { value: 'duplicates', label: '📋 Duplicates', cssClass: 'rel-line-informational',
           tooltip: 'Closing target will automatically close this issue' },
-        { value: 'copied_to', label: '📄 Copied to', cssClass: 'rel-line-copied',
+        { value: 'copied_to', label: '📄 Copied to', cssClass: 'rel-line-informational',
           tooltip: 'This issue was copied to create the target issue' }
       ];
       const extendedTypes = [
-        { value: 'finish_to_start', label: '⏩ Finish→Start', cssClass: 'rel-line-precedes',
+        { value: 'finish_to_start', label: '⏩ Finish→Start', cssClass: 'rel-line-scheduling',
           tooltip: 'Target starts after this issue finishes (FS)' },
-        { value: 'start_to_start', label: '▶️ Start→Start', cssClass: 'rel-line-ss',
+        { value: 'start_to_start', label: '▶️ Start→Start', cssClass: 'rel-line-scheduling',
           tooltip: 'Target starts when this issue starts (SS)' },
-        { value: 'finish_to_finish', label: '⏹️ Finish→Finish', cssClass: 'rel-line-ff',
+        { value: 'finish_to_finish', label: '⏹️ Finish→Finish', cssClass: 'rel-line-scheduling',
           tooltip: 'Target finishes when this issue finishes (FF)' },
-        { value: 'start_to_finish', label: '⏪ Start→Finish', cssClass: 'rel-line-sf',
+        { value: 'start_to_finish', label: '⏪ Start→Finish', cssClass: 'rel-line-scheduling',
           tooltip: 'Target finishes when this issue starts (SF)' }
       ];
       const types = extendedRelationTypes ? [...baseTypes, ...extendedTypes] : baseTypes;
@@ -6629,29 +6583,36 @@ export class GanttPanel {
 </html>`;
   }
 
-  /** Status colors with known luminance for text contrast calculation */
-  private static readonly STATUS_COLORS: Record<string, { color: string; luminance: number }> = {
-    overbooked: { color: "#e05252", luminance: 0.25 },   // Red
-    "at-risk": { color: "#e8a838", luminance: 0.52 },    // Orange/Yellow
-    "on-track": { color: "#3fb950", luminance: 0.45 },   // Green
-    completed: { color: "#388bfd", luminance: 0.32 },    // Blue
-    default: { color: "#808080", luminance: 0.22 },      // Gray
+  /** Status colors using VS Code theme variables with opacity for 60-30-10 UX rule */
+  private static readonly STATUS_COLORS: Record<string, { cssVar: string; darkText: boolean; opacity: number }> = {
+    overbooked: { cssVar: "var(--vscode-charts-red)", darkText: false, opacity: 1 },      // Critical (accent)
+    "at-risk": { cssVar: "var(--vscode-charts-yellow)", darkText: true, opacity: 1 },     // Warning (accent)
+    "on-track": { cssVar: "var(--vscode-charts-blue)", darkText: false, opacity: 0.6 },   // Normal (secondary, muted)
+    completed: { cssVar: "var(--vscode-charts-green)", darkText: false, opacity: 1 },     // Done (accent)
+    default: { cssVar: "var(--vscode-descriptionForeground)", darkText: false, opacity: 0.5 },
   };
 
   private _getStatusColor(
     status: FlexibilityScore["status"] | null
   ): string {
     const entry = GanttPanel.STATUS_COLORS[status ?? "default"] ?? GanttPanel.STATUS_COLORS.default;
-    return entry.color;
+    return entry.cssVar;
   }
 
-  /** Returns contrasting text color based on background luminance */
+  /** Returns contrasting text color based on background - dark text for yellow, light for others */
   private _getStatusTextColor(
     status: FlexibilityScore["status"] | null
   ): string {
     const entry = GanttPanel.STATUS_COLORS[status ?? "default"] ?? GanttPanel.STATUS_COLORS.default;
-    // WCAG contrast: dark text on light backgrounds (luminance > 0.45)
-    return entry.luminance > 0.45 ? "rgba(0,0,0,0.87)" : "rgba(255,255,255,0.95)";
+    return entry.darkText ? "rgba(0,0,0,0.87)" : "rgba(255,255,255,0.95)";
+  }
+
+  /** Returns opacity for status bar fill (muted for normal, full for alerts) */
+  private _getStatusOpacity(
+    status: FlexibilityScore["status"] | null
+  ): number {
+    const entry = GanttPanel.STATUS_COLORS[status ?? "default"] ?? GanttPanel.STATUS_COLORS.default;
+    return entry.opacity;
   }
 
   private _getStatusDescription(

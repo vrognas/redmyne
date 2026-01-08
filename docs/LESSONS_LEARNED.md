@@ -582,3 +582,36 @@ fi
 4. **Icons convey state**: Don't duplicate state in description when icon shows it
 5. **Tree commands enable keyboard**: Adding command property enables Enter/Space
 6. **Selection awareness**: Title bar buttons can check treeView.selection for context
+
+## Color Harmonization (2026-01-08)
+
+### UX Color Best Practices Applied
+
+**60-30-10 Rule**
+- 60% dominant: VS Code theme background
+- 30% secondary: muted blue (on-track bars at 0.6 opacity)
+- 10% accent: alert states (red/yellow/green at full opacity)
+
+**Color Psychology**
+- GREEN = done/success (completed issues)
+- BLUE = normal/trust (on-track issues, scheduling arrows)
+- YELLOW = attention (at-risk issues)
+- RED = error/critical (overbooked, blocked, blocking arrows)
+- GRAY = neutral (default state, informational arrows)
+
+**Theme Integration**
+- Use `--vscode-charts-*` CSS variables instead of hardcoded hex
+- `darkText` flag for WCAG contrast (yellow needs dark text, others light)
+- Let VS Code themes handle actual color values
+
+**Semantic Consistency**
+- Same color = same meaning across all UI (bars, status dots, arrows, badges)
+- Reduce redundant indicators (bar color conveys status, no need for checkmark badge)
+
+### Lessons
+
+1. **Mute the common case**: On-track bars at 60% opacity let alert states pop
+2. **Theme vars over hex**: Use VS Code CSS variables for automatic theme adaptation
+3. **Simplify arrow colors**: 6 colors → 3 (blocking/scheduling/informational) is enough
+4. **Remove redundancy**: If bar color shows "done", no need for checkmark badge
+5. **Grayscale test**: Verify distinguishability by value, not just hue
