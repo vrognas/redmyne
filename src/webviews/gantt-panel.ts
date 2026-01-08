@@ -2723,6 +2723,16 @@ export class GanttPanel {
             : `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
         ].filter(Boolean).join("\n");
 
+        // Progress badge tooltip
+        const progressTooltip = [
+          `Progress: ${doneRatio}%${isFallbackProgress ? ` (~${visualDoneRatio}% from time)` : ""}${isManualDone && doneRatio > 0 ? " (manual)" : ""}`,
+          `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
+          issueInternalEstimate ? `Remaining: ${formatHoursAsTime(issueInternalEstimate.hoursRemaining)} (internal)` : null,
+          contributedHours > 0
+            ? `Spent: ${formatHoursAsTime(issue.spent_hours)} + ${formatHoursAsTime(contributedHours)} contributed`
+            : `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
+        ].filter(Boolean).join("\n");
+
         // Flexibility tooltip
         const flexTooltip = flexText || "";
 
@@ -2967,16 +2977,18 @@ export class GanttPanel {
               const onLeft = endX + totalLabelW > timelineWidth;
               const labelX = onLeft ? startX - 8 : endX + 16;
 
-              // For closed issues, show progress (100%) and assignee
+              // For closed issues, show checkmark with tooltip
               if (issue.isClosed) {
-                const progressCenterX = onLeft ? labelX - progressBadgeW / 2 : labelX + progressBadgeW / 2;
-                const assigneeX = onLeft ? labelX - progressBadgeW - 4 : labelX + progressBadgeW + 4;
+                const checkBadgeW = 20;
+                const checkCenterX = onLeft ? labelX - checkBadgeW / 2 : labelX + checkBadgeW / 2;
+                const assigneeX = onLeft ? labelX - checkBadgeW - 4 : labelX + checkBadgeW + 4;
                 return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
                   <g class="progress-badge-group">
-                    <rect class="status-badge-bg" x="${onLeft ? labelX - progressBadgeW : labelX}" y="${barHeight / 2 - 8}" width="${progressBadgeW}" height="16" rx="2"
+                    <title>${escapeAttr(progressTooltip)}</title>
+                    <rect class="status-badge-bg" x="${onLeft ? labelX - checkBadgeW : labelX}" y="${barHeight / 2 - 8}" width="${checkBadgeW}" height="16" rx="2"
                           fill="var(--vscode-badge-background)" opacity="0.9"/>
-                    <text class="status-badge" x="${progressCenterX}" y="${barHeight / 2 + 4}"
-                          text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">100%</text>
+                    <text class="status-badge" x="${checkCenterX}" y="${barHeight / 2 + 4}"
+                          text-anchor="middle" fill="var(--vscode-charts-green)" font-size="12">✓</text>
                   </g>
                   ${issue.assignee ? `<g class="bar-assignee-group">
                     <title>${escapeAttr(issue.assignee)}</title>
@@ -3007,6 +3019,7 @@ export class GanttPanel {
               const assigneeX = onLeft ? afterBlockerX - afterBlockerW - 4 : afterBlockerX + afterBlockerW + 4;
               return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
                 <g class="progress-badge-group">
+                  <title>${escapeAttr(progressTooltip)}</title>
                   <rect class="status-badge-bg" x="${onLeft ? labelX - progressBadgeW : labelX}" y="${barHeight / 2 - 8}" width="${progressBadgeW}" height="16" rx="2"
                         fill="var(--vscode-badge-background)" opacity="0.9"/>
                   <text class="status-badge" x="${progressCenterX}" y="${barHeight / 2 + 4}"
@@ -4467,6 +4480,7 @@ export class GanttPanel {
     const minimapBarsData = ${minimapBarsJson};
     const minimapHeight = ${minimapHeight};
     const minimapBarHeight = ${minimapBarHeight};
+    const minimapTodayX = ${Math.round(todayX)};
 
     // Render minimap bars (deferred to avoid blocking initial paint)
     if (minimapSvg) {
@@ -4483,6 +4497,16 @@ export class GanttPanel {
           rect.setAttribute('fill', bar.color);
           minimapSvg.insertBefore(rect, minimapViewport);
         });
+        // Today marker line
+        if (minimapTodayX > 0 && minimapTodayX < timelineWidth) {
+          const todayLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          todayLine.setAttribute('class', 'minimap-today');
+          todayLine.setAttribute('x1', minimapTodayX.toString());
+          todayLine.setAttribute('y1', '0');
+          todayLine.setAttribute('x2', minimapTodayX.toString());
+          todayLine.setAttribute('y2', minimapHeight.toString());
+          minimapSvg.insertBefore(todayLine, minimapViewport);
+        }
       });
     }
 
