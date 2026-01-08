@@ -2859,11 +2859,16 @@ export class GanttPanel {
                 const onLeft = endX + badgeW + 16 > timelineWidth;
                 const labelX = onLeft ? startX - 8 : endX + 8;
                 const badgeCenterX = onLeft ? labelX - badgeW / 2 : labelX + badgeW / 2;
+                const parentProgressTip = `Aggregated progress: ${doneRatio}%\n(weighted average of subtasks)`;
                 return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
-                  <rect class="status-badge-bg" x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" rx="2"
-                        fill="var(--vscode-badge-background)" opacity="0.9"/>
-                  <text class="status-badge" x="${badgeCenterX}" y="${barHeight / 2 + 4}"
-                        text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${doneRatio}%</text>
+                  <g class="progress-badge-group">
+                    <title>${escapeAttr(parentProgressTip)}</title>
+                    <rect class="status-badge-bg" x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" rx="2"
+                          fill="var(--vscode-badge-background)" opacity="0.9"/>
+                    <rect x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" fill="transparent"/>
+                    <text class="status-badge" x="${badgeCenterX}" y="${barHeight / 2 + 4}"
+                          text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${doneRatio}%</text>
+                  </g>
                 </g>`;
               })()}
             </g>
