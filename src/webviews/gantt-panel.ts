@@ -6699,7 +6699,8 @@ export class GanttPanel {
     const bodyGridLines: string[] = [];
     const bodyMarkers: string[] = [];
     const current = new Date(minDate);
-    const todayStr = getTodayStr(); // Use consistent YYYY-MM-DD format
+    // Use UTC today string to match dateKey (headers use UTC methods)
+    const todayUTC = new Date().toISOString().slice(0, 10);
 
     const dayWidth =
       (svgWidth - leftMargin) /
@@ -6854,9 +6855,8 @@ export class GanttPanel {
         `);
       }
 
-      // Today marker (all zoom levels) - use local date for consistency
-      const currentLocalStr = formatLocalDate(current);
-      if (currentLocalStr === todayStr) {
+      // Today marker (all zoom levels) - use UTC dateKey to match header labels
+      if (dateKey === todayUTC) {
         bodyMarkers.push(`
           <line x1="${x}" y1="0" x2="${x}" y2="100%" class="today-marker"/>
         `);
