@@ -437,6 +437,10 @@
         "title": "Copy URL"
       },
       {
+        "command": "redmine.gantt.copyIssueId",
+        "title": "Copy Issue ID"
+      },
+      {
         "command": "redmine.gantt.openProjectInBrowser",
         "title": "Open Project in Browser"
       },
@@ -1213,6 +1217,16 @@
           "command": "redmine.gantt.copyUrl",
           "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
           "group": "9_clipboard@1"
+        },
+        {
+          "command": "redmine.gantt.copyIssueId",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "group": "9_clipboard@2"
+        },
+        {
+          "command": "redmine.gantt.copyIssueId",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueIdColumn'",
+          "group": "1_clipboard@1"
         },
         {
           "command": "redmine.gantt.openProjectInBrowser",

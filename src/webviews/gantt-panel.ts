@@ -2428,7 +2428,7 @@ export class GanttPanel {
         const y = idx * (barHeight + barGap);
         if (row.type !== "issue") return `<g transform="translate(0, ${y})"></g>`;
         const issue = row.issue!;
-        return `<g transform="translate(0, ${y})">
+        return `<g class="cursor-pointer" transform="translate(0, ${y})" data-vscode-context='{"webviewSection":"issueIdColumn","issueId":${issue.id},"preventDefaultContextMenuItems":true}'>
           <text class="gantt-col-cell" x="${idColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">#${issue.id}</text>
         </g>`;
       })

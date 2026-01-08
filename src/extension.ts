@@ -914,11 +914,14 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("redmine.revealIssueInTree", async (issueId: number) => {
       if (!issueId) return;
-      // Find the issue in the tree data
-      const issues = projectsTree.getAssignedIssues();
-      const issue = issues.find((i: Issue) => i.id === issueId);
+      // Find the issue in the tree data (search both assigned and dependency issues)
+      const assignedIssues = projectsTree.getAssignedIssues();
+      const dependencyIssues = projectsTree.getDependencyIssues();
+      const issue = assignedIssues.find((i: Issue) => i.id === issueId)
+        ?? dependencyIssues.find((i: Issue) => i.id === issueId);
       if (issue && cleanupResources.projectsTreeView) {
-        // Reveal the issue in the tree view
+        // Focus the Issues view first, then reveal
+        await vscode.commands.executeCommand("redmine-explorer-projects.focus");
         await cleanupResources.projectsTreeView.reveal(issue, { select: true, focus: true, expand: true });
       }
     })
@@ -1028,6 +1031,11 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("redmine.gantt.copyUrl", (ctx: { issueId: number }) => {
       if (ctx?.issueId) {
         vscode.commands.executeCommand("redmine.copyIssueUrl", { id: ctx.issueId });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.gantt.copyIssueId", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.env.clipboard.writeText(`#${ctx.issueId}`);
       }
     }),
     vscode.commands.registerCommand(
