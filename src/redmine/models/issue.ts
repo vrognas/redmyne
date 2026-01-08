@@ -1,4 +1,4 @@
-import { NamedEntity } from "./common";
+import { NamedEntity, IssueStatus } from "./common";
 import { VersionRef } from "./version";
 
 /**
@@ -64,7 +64,7 @@ export interface Issue {
   id: number;
   project: NamedEntity;
   tracker: NamedEntity;
-  status: NamedEntity;
+  status: IssueStatus;
   priority: NamedEntity;
   author: NamedEntity;
   assigned_to: NamedEntity;

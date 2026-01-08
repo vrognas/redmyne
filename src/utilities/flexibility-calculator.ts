@@ -50,6 +50,7 @@ export interface FlexibilityIssue {
   spent_hours?: number;
   done_ratio?: number;
   closed_on?: string | null;
+  status?: { is_closed?: boolean };
 }
 
 // Memoization cache for working days calculation
@@ -297,7 +298,8 @@ export function buildFlexibilityCache(
     const issueId = issueWithId.id;
 
     // Skip closed issues - no flexibility calculation needed
-    if (issue.closed_on !== null && issue.closed_on !== undefined) {
+    // IMPORTANT: Check status.is_closed, NOT closed_on date (reopened issues still have closed_on!)
+    if (issue.status?.is_closed === true) {
       cache.set(issueId, null);
       continue;
     }
