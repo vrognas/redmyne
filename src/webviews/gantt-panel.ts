@@ -2797,9 +2797,10 @@ export class GanttPanel {
           intensitySegments = intensities
             .map((d, i) => {
               const segX = startX + i * segmentWidth;
-              // Opacity: base 0.2 + normalized intensity * 0.6 (range 0.2 to 0.8)
+              // Opacity: base 0.5 + normalized intensity * 0.4 (range 0.5 to 0.9)
+              // Higher base ensures bar color stays saturated for text readability
               const normalizedForOpacity = Math.min(d.intensity, maxIntensityForOpacity) / maxIntensityForOpacity;
-              const opacity = 0.2 + normalizedForOpacity * 0.6;
+              const opacity = 0.5 + normalizedForOpacity * 0.4;
               // clip-path handles corner rounding, no rx/ry needed on segments
               return `<rect x="${segX}" y="0" width="${segmentWidth + 0.5}" height="${barHeight}"
                             fill="${color}" opacity="${opacity.toFixed(2)}"/>`;
@@ -2940,7 +2941,7 @@ export class GanttPanel {
                 ? issue.subject.substring(0, maxChars - 1) + "…"
                 : issue.subject;
               return `<text class="bar-subject" x="${startX + padding}" y="${barHeight / 2 + 4}"
-                    fill="${textColor}" font-size="10"
+                    fill="${textColor}" font-size="10" font-weight="500"
                     pointer-events="none">${escapeHtml(displaySubject)}</text>`;
             })()}
             <rect class="drag-handle drag-left cursor-ew-resize" x="${startX}" y="0" width="${handleWidth}" height="${barHeight}"
@@ -6628,39 +6629,29 @@ export class GanttPanel {
 </html>`;
   }
 
+  /** Status colors with known luminance for text contrast calculation */
+  private static readonly STATUS_COLORS: Record<string, { color: string; luminance: number }> = {
+    overbooked: { color: "#e05252", luminance: 0.25 },   // Red
+    "at-risk": { color: "#e8a838", luminance: 0.52 },    // Orange/Yellow
+    "on-track": { color: "#3fb950", luminance: 0.45 },   // Green
+    completed: { color: "#388bfd", luminance: 0.32 },    // Blue
+    default: { color: "#808080", luminance: 0.22 },      // Gray
+  };
+
   private _getStatusColor(
     status: FlexibilityScore["status"] | null
   ): string {
-    switch (status) {
-      case "overbooked":
-        return "var(--vscode-charts-red)";
-      case "at-risk":
-        return "var(--vscode-charts-orange)";
-      case "on-track":
-        return "var(--vscode-charts-green)";
-      case "completed":
-        return "var(--vscode-charts-blue)";
-      default:
-        return "var(--vscode-charts-foreground)";
-    }
+    const entry = GanttPanel.STATUS_COLORS[status ?? "default"] ?? GanttPanel.STATUS_COLORS.default;
+    return entry.color;
   }
 
-  /** Returns contrasting text color for bar labels based on status background */
+  /** Returns contrasting text color based on background luminance */
   private _getStatusTextColor(
     status: FlexibilityScore["status"] | null
   ): string {
-    switch (status) {
-      // Light backgrounds need dark text
-      case "on-track":
-      case "at-risk":
-        return "rgba(0,0,0,0.85)";
-      // Dark backgrounds need light text
-      case "overbooked":
-      case "completed":
-        return "rgba(255,255,255,0.9)";
-      default:
-        return "var(--vscode-editor-foreground)";
-    }
+    const entry = GanttPanel.STATUS_COLORS[status ?? "default"] ?? GanttPanel.STATUS_COLORS.default;
+    // WCAG contrast: dark text on light backgrounds (luminance > 0.45)
+    return entry.luminance > 0.45 ? "rgba(0,0,0,0.87)" : "rgba(255,255,255,0.95)";
   }
 
   private _getStatusDescription(
