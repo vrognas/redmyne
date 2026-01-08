@@ -2977,16 +2977,16 @@ export class GanttPanel {
               const onLeft = endX + totalLabelW > timelineWidth;
               const labelX = onLeft ? startX - 8 : endX + 16;
 
-              // For closed issues, show checkmark with tooltip
+              // For closed issues, show checkmark with simple tooltip
               if (issue.isClosed) {
                 const checkBadgeW = 20;
                 const checkCenterX = onLeft ? labelX - checkBadgeW / 2 : labelX + checkBadgeW / 2;
                 const assigneeX = onLeft ? labelX - checkBadgeW - 4 : labelX + checkBadgeW + 4;
                 return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
                   <g class="progress-badge-group">
-                    <title>${escapeAttr(progressTooltip)}</title>
+                    <title>Closed</title>
                     <rect class="status-badge-bg" x="${onLeft ? labelX - checkBadgeW : labelX}" y="${barHeight / 2 - 8}" width="${checkBadgeW}" height="16" rx="2"
-                          fill="var(--vscode-badge-background)" opacity="0.9"/>
+                          fill="var(--vscode-charts-green)" opacity="0.15"/>
                     <rect x="${onLeft ? labelX - checkBadgeW : labelX}" y="${barHeight / 2 - 8}" width="${checkBadgeW}" height="16" fill="transparent"/>
                     <text class="status-badge" x="${checkCenterX}" y="${barHeight / 2 + 4}"
                           text-anchor="middle" fill="var(--vscode-charts-green)" font-size="12">✓</text>
