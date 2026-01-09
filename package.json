@@ -1640,7 +1640,7 @@
     "@eslint/js": "^9.39.1",
     "@types/node": "^24.10.1",
     "@types/vscode": "^1.105.0",
-    "@vitest/coverage-v8": "^4.0.14",
+    "@vitest/coverage-v8": "^4.0.16",
     "esbuild": "^0.27.0",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
