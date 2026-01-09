@@ -10,19 +10,22 @@ vi.mock("vscode", () => ({
   },
 }));
 
-// Mock adhoc-tracker
-const mockAdHocIssues = new Set<number>();
+// Mock adhoc-tracker with vi.fn() that can be reconfigured per test
+const mockIsAdHoc = vi.fn<[number], boolean>().mockReturnValue(false);
+const mockGetAll = vi.fn<[], number[]>().mockReturnValue([]);
+
 vi.mock("../../../src/utilities/adhoc-tracker", () => ({
   adHocTracker: {
-    isAdHoc: (id: number) => mockAdHocIssues.has(id),
-    getAll: () => Array.from(mockAdHocIssues),
+    isAdHoc: (id: number) => mockIsAdHoc(id),
+    getAll: () => mockGetAll(),
   },
 }));
 
 describe("ContributionCalculator", () => {
   beforeEach(() => {
-    mockAdHocIssues.clear();
-    vi.resetModules(); // Force fresh module imports on each test
+    mockIsAdHoc.mockReset().mockReturnValue(false);
+    mockGetAll.mockReset().mockReturnValue([]);
+    vi.resetModules();
   });
 
   describe("parseTargetIssueId", () => {
@@ -66,7 +69,7 @@ describe("ContributionCalculator", () => {
     });
 
     it("calculates contributions from ad-hoc to target issues", async () => {
-      mockAdHocIssues.add(100); // Mark issue 100 as ad-hoc
+      mockIsAdHoc.mockImplementation((id) => id === 100);
 
       const { calculateContributions } = await import("../../../src/utilities/contribution-calculator");
       const entries: TimeEntry[] = [
@@ -81,7 +84,7 @@ describe("ContributionCalculator", () => {
     });
 
     it("ignores time entries without # in comment", async () => {
-      mockAdHocIssues.add(100);
+      mockIsAdHoc.mockImplementation((id) => id === 100);
 
       const { calculateContributions } = await import("../../../src/utilities/contribution-calculator");
       const entries: TimeEntry[] = [
@@ -108,7 +111,7 @@ describe("ContributionCalculator", () => {
     });
 
     it("tracks contributions to multiple target issues", async () => {
-      mockAdHocIssues.add(100);
+      mockIsAdHoc.mockImplementation((id) => id === 100);
 
       const { calculateContributions } = await import("../../../src/utilities/contribution-calculator");
       const entries: TimeEntry[] = [
@@ -124,8 +127,7 @@ describe("ContributionCalculator", () => {
     });
 
     it("tracks donations from multiple ad-hoc issues", async () => {
-      mockAdHocIssues.add(100);
-      mockAdHocIssues.add(101);
+      mockIsAdHoc.mockImplementation((id) => id === 100 || id === 101);
 
       const { calculateContributions } = await import("../../../src/utilities/contribution-calculator");
       const entries: TimeEntry[] = [
@@ -141,8 +143,7 @@ describe("ContributionCalculator", () => {
     });
 
     it("builds detailed sources for contributedTo", async () => {
-      mockAdHocIssues.add(100);
-      mockAdHocIssues.add(101);
+      mockIsAdHoc.mockImplementation((id) => id === 100 || id === 101);
 
       const { calculateContributions } = await import("../../../src/utilities/contribution-calculator");
       const entries: TimeEntry[] = [
@@ -159,7 +160,7 @@ describe("ContributionCalculator", () => {
     });
 
     it("builds detailed targets for donatedFrom", async () => {
-      mockAdHocIssues.add(100);
+      mockIsAdHoc.mockImplementation((id) => id === 100);
 
       const { calculateContributions } = await import("../../../src/utilities/contribution-calculator");
       const entries: TimeEntry[] = [
@@ -202,7 +203,7 @@ describe("ContributionCalculator", () => {
     });
 
     it("returns negative for ad-hoc issues (donated hours)", async () => {
-      mockAdHocIssues.add(100);
+      mockIsAdHoc.mockImplementation((id) => id === 100);
 
       const { getEffectiveSpentHours, ContributionResult: _ContributionResult } = await import("../../../src/utilities/contribution-calculator");
       const contributions: _ContributionResult = {
