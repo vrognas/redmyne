@@ -6,6 +6,8 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 ### Added
 
+- **Set % Done submenu** - Gantt bar context menu now has "Set % Done" submenu with 0-100% quick options (10% increments) plus "Custom..." for input picker
+- **Set Status submenu** - Gantt bar context menu now has "Set Status" submenu with "New", "In Progress", "Closed" quick options plus "Other..." for all statuses picker
 - **Actual time entry reconciliation** - past-day intensity now uses actual logged hours instead of predictions; today and future use priority-based scheduling
 - **Priority-based capacity scheduling** - capacity/intensity now uses frontloaded day-by-day simulation; prioritizes by due date urgency, external blocks (2x weight), and downstream count
 - **Gantt bar intensity visualization** - bars show scheduled work distribution (person view); intensity lines indicate when work is actually scheduled vs uniform spread
@@ -49,6 +51,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 ### Fixed
 
+- **Today-line timezone** - today marker now uses local date instead of UTC; fixes wrong day display around midnight
 - **Closed issues excluded from capacity/intensity** - issues with `closed_on` set now excluded from capacity and intensity calculations
 - **Gantt refresh on time entry changes** - Gantt now refreshes when time entries are added/edited/deleted
 - **Gantt refresh on contribution changes** - Gantt refreshes when setting/removing contribution targets

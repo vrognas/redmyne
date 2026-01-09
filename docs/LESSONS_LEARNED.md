@@ -615,3 +615,19 @@ fi
 3. **Simplify arrow colors**: 6 colors → 3 (blocking/scheduling/informational) is enough
 4. **Remove redundancy**: If bar color shows "done", no need for checkmark badge
 5. **Grayscale test**: Verify distinguishability by value, not just hue
+
+## Today-Line Timezone (2026-01-09)
+
+### User Expectation vs UTC
+
+**Problem**: Today-line displayed at wrong date (Jan 8) when local time was Jan 9 00:52 AM
+
+**Root Cause**: Code used `new Date().toISOString().slice(0,10)` (UTC) for "today" comparison. At 00:52 CET (UTC+1), UTC is 23:52 on previous day.
+
+**Solution**: Use local date functions (`getTodayStr()`, `formatLocalDate()`) for "today" marker
+
+### Lessons
+
+1. **"Today" should be local**: Users expect UI to show their local date, not UTC
+2. **Issue dates are dateless**: YYYY-MM-DD strings have no timezone - treat as local midnight
+3. **Don't flip-flop**: Previous fix (a1959b0) was correct; reverting to UTC (8e0ce55) broke it

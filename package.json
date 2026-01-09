@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "3.19.0",
+  "version": "3.20.0",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -421,6 +421,70 @@
         "title": "Set % Done"
       },
       {
+        "command": "redmine.gantt.setDoneRatio0",
+        "title": "0%"
+      },
+      {
+        "command": "redmine.gantt.setDoneRatio10",
+        "title": "10%"
+      },
+      {
+        "command": "redmine.gantt.setDoneRatio20",
+        "title": "20%"
+      },
+      {
+        "command": "redmine.gantt.setDoneRatio30",
+        "title": "30%"
+      },
+      {
+        "command": "redmine.gantt.setDoneRatio40",
+        "title": "40%"
+      },
+      {
+        "command": "redmine.gantt.setDoneRatio50",
+        "title": "50%"
+      },
+      {
+        "command": "redmine.gantt.setDoneRatio60",
+        "title": "60%"
+      },
+      {
+        "command": "redmine.gantt.setDoneRatio70",
+        "title": "70%"
+      },
+      {
+        "command": "redmine.gantt.setDoneRatio80",
+        "title": "80%"
+      },
+      {
+        "command": "redmine.gantt.setDoneRatio90",
+        "title": "90%"
+      },
+      {
+        "command": "redmine.gantt.setDoneRatio100",
+        "title": "100%"
+      },
+      {
+        "command": "redmine.gantt.setDoneRatioCustom",
+        "title": "Custom..."
+      },
+      {
+        "command": "redmine.gantt.setStatusNew",
+        "title": "New"
+      },
+      {
+        "command": "redmine.gantt.setStatusInProgress",
+        "title": "In Progress"
+      },
+      {
+        "command": "redmine.gantt.setStatusClosed",
+        "title": "Closed"
+      },
+      {
+        "command": "redmine.gantt.setStatusOther",
+        "title": "Other..."
+      },
+      {
         "command": "redmine.gantt.toggleAutoUpdate",
         "title": "Toggle Auto-update %"
       },
@@ -549,6 +613,14 @@
         "id": "redmine.timeSortMenu",
         "label": "Sort",
         "icon": "$(arrow-swap)"
+      },
+      {
+        "id": "redmine.gantt.setDoneRatioMenu",
+        "label": "Set % Done"
+      },
+      {
+        "id": "redmine.gantt.setStatusMenu",
+        "label": "Set Status"
       }
     ],
     "menus": {
@@ -1172,6 +1244,74 @@
           "group": "navigation@1"
         }
       ],
+      "redmine.gantt.setDoneRatioMenu": [
+        {
+          "command": "redmine.gantt.setDoneRatio0",
+          "group": "1_percentages@1"
+        },
+        {
+          "command": "redmine.gantt.setDoneRatio10",
+          "group": "1_percentages@2"
+        },
+        {
+          "command": "redmine.gantt.setDoneRatio20",
+          "group": "1_percentages@3"
+        },
+        {
+          "command": "redmine.gantt.setDoneRatio30",
+          "group": "1_percentages@4"
+        },
+        {
+          "command": "redmine.gantt.setDoneRatio40",
+          "group": "1_percentages@5"
+        },
+        {
+          "command": "redmine.gantt.setDoneRatio50",
+          "group": "1_percentages@6"
+        },
+        {
+          "command": "redmine.gantt.setDoneRatio60",
+          "group": "1_percentages@7"
+        },
+        {
+          "command": "redmine.gantt.setDoneRatio70",
+          "group": "1_percentages@8"
+        },
+        {
+          "command": "redmine.gantt.setDoneRatio80",
+          "group": "1_percentages@9"
+        },
+        {
+          "command": "redmine.gantt.setDoneRatio90",
+          "group": "1_percentages@10"
+        },
+        {
+          "command": "redmine.gantt.setDoneRatio100",
+          "group": "1_percentages@11"
+        },
+        {
+          "command": "redmine.gantt.setDoneRatioCustom",
+          "group": "2_custom@1"
+        }
+      ],
+      "redmine.gantt.setStatusMenu": [
+        {
+          "command": "redmine.gantt.setStatusNew",
+          "group": "1_status@1"
+        },
+        {
+          "command": "redmine.gantt.setStatusInProgress",
+          "group": "1_status@2"
+        },
+        {
+          "command": "redmine.gantt.setStatusClosed",
+          "group": "1_status@3"
+        },
+        {
+          "command": "redmine.gantt.setStatusOther",
+          "group": "2_other@1"
+        }
+      ],
       "webview/context": [
         {
           "command": "redmine.gantt.updateIssue",
@@ -1194,9 +1334,14 @@
           "group": "2_time@1"
         },
         {
-          "command": "redmine.gantt.setDoneRatio",
+          "submenu": "redmine.gantt.setDoneRatioMenu",
           "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
           "group": "2_time@2"
+        },
+        {
+          "submenu": "redmine.gantt.setStatusMenu",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "group": "2_time@3"
         },
         {
           "command": "redmine.gantt.toggleAutoUpdate",

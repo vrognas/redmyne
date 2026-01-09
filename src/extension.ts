@@ -755,66 +755,77 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Set done ratio (% Done) for issue (context menu)
   context.subscriptions.push(
-    vscode.commands.registerCommand("redmine.setDoneRatio", async (issue: { id: number; done_ratio?: number } | undefined) => {
-      if (!issue?.id) {
-        vscode.window.showErrorMessage("Could not determine issue ID");
-        return;
-      }
-      const server = projectsTree.server;
-      if (!server) {
-        vscode.window.showErrorMessage("No Redmine server configured");
-        return;
-      }
-
-      const options = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((pct) => ({
-        label: `${pct}%`,
-        value: pct,
-        picked: issue.done_ratio === pct,
-      }));
-
-      const selected = await vscode.window.showQuickPick(options, {
-        placeHolder: `Set % Done for #${issue.id}`,
-      });
-
-      if (selected === undefined) return;
-
-      try {
-        await server.updateDoneRatio(issue.id, selected.value);
-        // Disable auto-update for this issue since user manually set %done
-        autoUpdateTracker.disable(issue.id);
-
-        // Prompt for internal estimate (time remaining until 100% done)
-        const hoursInput = await vscode.window.showInputBox({
-          title: `Internal Estimate: #${issue.id}`,
-          prompt: `Hours remaining until 100% done (e.g., 5, 2.5, 1:30, 2h 30min)`,
-          placeHolder: "Leave blank to skip",
-          validateInput: (value) => {
-            if (!value.trim()) return null; // Empty is OK (skip)
-            const parsed = parseTimeInput(value);
-            if (parsed === null) return "Invalid format. Use: 5, 2.5, 1:30, or 2h 30min";
-            if (parsed < 0) return "Hours cannot be negative";
-            return null;
-          },
-        });
-
-        if (hoursInput && hoursInput.trim()) {
-          const hours = parseTimeInput(hoursInput);
-          if (hours !== null) {
-            await setInternalEstimate(context.globalState, issue.id, hours);
-            showStatusBarMessage(`$(check) #${issue.id} set to ${selected.value}% with ${hours}h remaining`, 2000);
-          }
-        } else {
-          showStatusBarMessage(`$(check) #${issue.id} set to ${selected.value}%`, 2000);
+    vscode.commands.registerCommand(
+      "redmine.setDoneRatio",
+      async (issue: { id: number; done_ratio?: number; percentage?: number } | undefined) => {
+        if (!issue?.id) {
+          vscode.window.showErrorMessage("Could not determine issue ID");
+          return;
+        }
+        const server = projectsTree.server;
+        if (!server) {
+          vscode.window.showErrorMessage("No Redmine server configured");
+          return;
         }
 
-        // Update only the Gantt panel if open, avoid full tree refresh
-        GanttPanel.currentPanel?.updateIssueDoneRatio(issue.id, selected.value);
-        // Refresh Gantt data to recalculate capacity
-        vscode.commands.executeCommand("redmine.refreshGanttData");
-      } catch (error) {
-        vscode.window.showErrorMessage(`Failed to update: ${error}`);
+        let selectedValue: number;
+
+        // If percentage provided directly, use it; otherwise show picker
+        if (issue.percentage !== undefined) {
+          selectedValue = issue.percentage;
+        } else {
+          const options = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((pct) => ({
+            label: `${pct}%`,
+            value: pct,
+            picked: issue.done_ratio === pct,
+          }));
+
+          const selected = await vscode.window.showQuickPick(options, {
+            placeHolder: `Set % Done for #${issue.id}`,
+          });
+
+          if (selected === undefined) return;
+          selectedValue = selected.value;
+        }
+
+        try {
+          await server.updateDoneRatio(issue.id, selectedValue);
+          // Disable auto-update for this issue since user manually set %done
+          autoUpdateTracker.disable(issue.id);
+
+          // Prompt for internal estimate (time remaining until 100% done)
+          const hoursInput = await vscode.window.showInputBox({
+            title: `Internal Estimate: #${issue.id}`,
+            prompt: `Hours remaining until 100% done (e.g., 5, 2.5, 1:30, 2h 30min)`,
+            placeHolder: "Leave blank to skip",
+            validateInput: (value) => {
+              if (!value.trim()) return null; // Empty is OK (skip)
+              const parsed = parseTimeInput(value);
+              if (parsed === null) return "Invalid format. Use: 5, 2.5, 1:30, or 2h 30min";
+              if (parsed < 0) return "Hours cannot be negative";
+              return null;
+            },
+          });
+
+          if (hoursInput && hoursInput.trim()) {
+            const hours = parseTimeInput(hoursInput);
+            if (hours !== null) {
+              await setInternalEstimate(context.globalState, issue.id, hours);
+              showStatusBarMessage(`$(check) #${issue.id} set to ${selectedValue}% with ${hours}h remaining`, 2000);
+            }
+          } else {
+            showStatusBarMessage(`$(check) #${issue.id} set to ${selectedValue}%`, 2000);
+          }
+
+          // Update only the Gantt panel if open, avoid full tree refresh
+          GanttPanel.currentPanel?.updateIssueDoneRatio(issue.id, selectedValue);
+          // Refresh Gantt data to recalculate capacity
+          vscode.commands.executeCommand("redmine.refreshGanttData");
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to update: ${error}`);
+        }
       }
-    })
+    )
   );
 
   // Bulk set done ratio for multiple issues (Gantt multi-select)
@@ -879,6 +890,71 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.window.showErrorMessage(`Failed to update: ${error}`);
       }
     })
+  );
+
+  // Set issue status (context menu)
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "redmine.setIssueStatus",
+      async (issue: { id: number; statusPattern?: "new" | "in_progress" | "closed" } | undefined) => {
+        if (!issue?.id) {
+          vscode.window.showErrorMessage("Could not determine issue ID");
+          return;
+        }
+        const server = projectsTree.server;
+        if (!server) {
+          vscode.window.showErrorMessage("No Redmine server configured");
+          return;
+        }
+
+        try {
+          const statuses = (await server.getIssueStatuses()).issue_statuses;
+          let targetStatus: { id: number; name: string; is_closed: boolean } | undefined;
+
+          if (issue.statusPattern) {
+            // Find status by pattern
+            if (issue.statusPattern === "new") {
+              // Find first non-closed status (typically "New")
+              targetStatus = statuses.find((s) => !s.is_closed);
+            } else if (issue.statusPattern === "in_progress") {
+              // Find status with "progress" in name, or second non-closed status
+              targetStatus =
+                statuses.find((s) => !s.is_closed && s.name.toLowerCase().includes("progress")) ||
+                statuses.filter((s) => !s.is_closed)[1];
+            } else if (issue.statusPattern === "closed") {
+              // Find first closed status
+              targetStatus = statuses.find((s) => s.is_closed);
+            }
+
+            if (!targetStatus) {
+              vscode.window.showErrorMessage(`No matching status found for pattern: ${issue.statusPattern}`);
+              return;
+            }
+          } else {
+            // Show picker with all statuses
+            const options = statuses.map((s) => ({
+              label: s.name,
+              description: s.is_closed ? "(closed)" : "",
+              status: s,
+            }));
+
+            const selected = await vscode.window.showQuickPick(options, {
+              placeHolder: `Set status for #${issue.id}`,
+            });
+
+            if (!selected) return;
+            targetStatus = selected.status;
+          }
+
+          await server.setIssueStatus({ id: issue.id } as any, targetStatus.id);
+          showStatusBarMessage(`$(check) #${issue.id} set to ${targetStatus.name}`, 2000);
+          GanttPanel.currentPanel?.refresh();
+          vscode.commands.executeCommand("redmine.refreshGanttData");
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to update status: ${error}`);
+        }
+      }
+    )
   );
 
   // Open project in browser (context menu)
@@ -1011,6 +1087,40 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("redmine.gantt.setDoneRatio", (ctx: { issueId: number }) => {
       if (ctx?.issueId) {
         vscode.commands.executeCommand("redmine.setDoneRatio", { id: ctx.issueId });
+      }
+    }),
+    // Submenu commands for quick % Done selection
+    ...[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((pct) =>
+      vscode.commands.registerCommand(`redmine.gantt.setDoneRatio${pct}`, (ctx: { issueId: number }) => {
+        if (ctx?.issueId) {
+          vscode.commands.executeCommand("redmine.setDoneRatio", { id: ctx.issueId, percentage: pct });
+        }
+      })
+    ),
+    vscode.commands.registerCommand("redmine.gantt.setDoneRatioCustom", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.setDoneRatio", { id: ctx.issueId });
+      }
+    }),
+    // Submenu commands for quick status selection
+    vscode.commands.registerCommand("redmine.gantt.setStatusNew", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.setIssueStatus", { id: ctx.issueId, statusPattern: "new" });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.gantt.setStatusInProgress", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.setIssueStatus", { id: ctx.issueId, statusPattern: "in_progress" });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.gantt.setStatusClosed", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.setIssueStatus", { id: ctx.issueId, statusPattern: "closed" });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.gantt.setStatusOther", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.setIssueStatus", { id: ctx.issueId });
       }
     }),
     vscode.commands.registerCommand("redmine.gantt.toggleAutoUpdate", (ctx: { issueId: number }) => {
