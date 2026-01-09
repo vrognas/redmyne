@@ -87,6 +87,10 @@ interface GanttIssue {
   blockedBy: Array<{ id: number; subject: string; assignee: string | null }>;
   /** True if this issue is tagged as an ad-hoc budget pool */
   isAdHoc?: boolean;
+  /** Priority name from Redmine */
+  priorityName: string;
+  /** Priority ID for filtering/sorting */
+  priorityId: number;
 }
 
 interface GanttRow {
@@ -198,6 +202,8 @@ function toGanttIssue(
     blocks: blockedIssues,
     blockedBy: blockers,
     isAdHoc: adHocTracker.isAdHoc(issue.id),
+    priorityName: issue.priority?.name ?? "Unknown",
+    priorityId: issue.priority?.id ?? 0,
   };
 }
 
@@ -2446,12 +2452,11 @@ export class GanttPanel {
         if (row.type !== "issue") return `<g transform="translate(0, ${y})"><rect class="zebra-stripe" x="0" y="0" width="100%" height="${barHeight + barGap}"/></g>`;
         const issue = row.issue!;
         const statusName = issue.statusName ?? "Unknown";
-        const lowerStatus = statusName.toLowerCase();
-        // Determine dot color: green=closed, blue=in progress, gray=new/not started
+        // Determine dot color: green=closed (from server is_closed), blue=in progress, gray=not started
         let dotColor = "var(--vscode-descriptionForeground)"; // gray for new/not started
-        if (issue.done_ratio === 100 || lowerStatus.includes("closed") || lowerStatus.includes("done") || lowerStatus.includes("resolved")) {
+        if (issue.done_ratio === 100 || issue.isClosed) {
           dotColor = "var(--vscode-charts-green)";
-        } else if (issue.done_ratio > 0 || lowerStatus.includes("progress") || lowerStatus.includes("in ")) {
+        } else if (issue.done_ratio > 0) {
           dotColor = "var(--vscode-charts-blue)";
         }
         const cx = statusColumnWidth / 2;
