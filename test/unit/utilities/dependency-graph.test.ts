@@ -3,7 +3,6 @@ import {
   buildDependencyGraph,
   countDownstream,
   getBlockers,
-  DependencyGraph,
 } from "../../../src/utilities/dependency-graph";
 import type { Issue } from "../../../src/redmine/models/issue";
 

@@ -863,7 +863,7 @@ export class RedmineServer {
   /**
    * Returns promise, that resolves, when issue status is set
    */
-  async setIssueStatus(issue: Issue, statusId: number): Promise<unknown> {
+  async setIssueStatus(issue: Pick<Issue, "id">, statusId: number): Promise<unknown> {
     const result = await this.doRequest<{ issue: Issue }>(
       `/issues/${issue.id}.json`,
       "PUT",

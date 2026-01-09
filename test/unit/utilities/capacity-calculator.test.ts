@@ -3,9 +3,6 @@ import {
   calculateDailyCapacity,
   calculateCapacityByZoom,
   calculateScheduledCapacity,
-  DailyCapacity,
-  PeriodCapacity,
-  ScheduledDailyCapacity,
 } from "../../../src/utilities/capacity-calculator";
 import { Issue } from "../../../src/redmine/models/issue";
 import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "../../../src/utilities/flexibility-calculator";

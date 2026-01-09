@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  calculateProjectHealth,
-  ProjectHealth,
-} from "../../../src/utilities/project-health";
+import { calculateProjectHealth } from "../../../src/utilities/project-health";
 import type { Issue } from "../../../src/redmine/models/issue";
 
 function createMockIssue(overrides: Partial<Issue> & { id: number }): Issue {

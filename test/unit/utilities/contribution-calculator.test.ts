@@ -177,8 +177,8 @@ describe("ContributionCalculator", () => {
 
   describe("getEffectiveSpentHours", () => {
     it("returns spent hours for normal issues without contributions", async () => {
-      const { getEffectiveSpentHours, ContributionResult } = await import("../../../src/utilities/contribution-calculator");
-      const contributions: ContributionResult = {
+      const { getEffectiveSpentHours, ContributionResult: _ContributionResult } = await import("../../../src/utilities/contribution-calculator");
+      const contributions: _ContributionResult = {
         contributedTo: new Map(),
         donatedFrom: new Map(),
         contributionSources: new Map(),
@@ -189,8 +189,8 @@ describe("ContributionCalculator", () => {
     });
 
     it("adds contributed hours for normal issues", async () => {
-      const { getEffectiveSpentHours, ContributionResult } = await import("../../../src/utilities/contribution-calculator");
-      const contributions: ContributionResult = {
+      const { getEffectiveSpentHours, ContributionResult: _ContributionResult } = await import("../../../src/utilities/contribution-calculator");
+      const contributions: _ContributionResult = {
         contributedTo: new Map([[100, 5]]),
         donatedFrom: new Map(),
         contributionSources: new Map(),
@@ -203,8 +203,8 @@ describe("ContributionCalculator", () => {
     it("returns negative for ad-hoc issues (donated hours)", async () => {
       mockAdHocIssues.add(100);
 
-      const { getEffectiveSpentHours, ContributionResult } = await import("../../../src/utilities/contribution-calculator");
-      const contributions: ContributionResult = {
+      const { getEffectiveSpentHours, ContributionResult: _ContributionResult } = await import("../../../src/utilities/contribution-calculator");
+      const contributions: _ContributionResult = {
         contributedTo: new Map(),
         donatedFrom: new Map([[100, 5]]),
         contributionSources: new Map(),

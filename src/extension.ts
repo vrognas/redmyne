@@ -946,7 +946,7 @@ export function activate(context: vscode.ExtensionContext): void {
             targetStatus = selected.status;
           }
 
-          await server.setIssueStatus({ id: issue.id } as any, targetStatus.id);
+          await server.setIssueStatus({ id: issue.id }, targetStatus.id);
           showStatusBarMessage(`$(check) #${issue.id} set to ${targetStatus.name}`, 2000);
           GanttPanel.currentPanel?.refresh();
           vscode.commands.executeCommand("redmine.refreshGanttData");

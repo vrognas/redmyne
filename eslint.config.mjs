@@ -43,6 +43,22 @@ export default [
     },
   },
 
+  // Relax rules for test files (allow any for mocking, unused vars for test setup)
+  {
+    files: ["test/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+        },
+      ],
+    },
+  },
+
   // Prettier integration (must be last to override conflicting rules)
   eslintConfigPrettier,
 ];

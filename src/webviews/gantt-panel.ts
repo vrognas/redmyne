@@ -1049,7 +1049,7 @@ export class GanttPanel {
     // Build O(1) lookup map (includes dependencies for arrow rendering)
     const allIssues = [...this._issues, ...this._dependencyIssues];
     this._issueById = new Map(allIssues.map(i => [i.id, i]));
-    this._projects = projects.filter(p => p != null);
+    this._projects = projects.filter(p => p !== null);
     this._flexibilityCache = flexibilityCache;
 
     // Invalidate hierarchy cache when data changes
@@ -2196,18 +2196,6 @@ export class GanttPanel {
 
     // Collect all expandable keys (rows with children) for "Expand All" functionality
     const allExpandableKeys = rows.filter(r => r.hasChildren).map(r => r.collapseKey);
-
-    // Calculate health stats for summary (before filtering)
-    let criticalCount = 0, warningCount = 0, healthyCount = 0, blockedCount = 0;
-    for (const r of rows) {
-      if (r.type === "issue" && r.issue && r.isVisible && !r.issue.isClosed) {
-        const s = r.issue.status;
-        if (s === "overbooked") criticalCount++;
-        else if (s === "at-risk") warningCount++;
-        else if (s === "on-track" || s === "completed") healthyCount++;
-        if (r.issue.blockedBy.length > 0) blockedCount++;
-      }
-    }
 
     // Filter visible rows ONCE upfront (avoid multiple .filter() calls)
     // Also apply health filter if set (issues only - projects/time-groups always pass)
