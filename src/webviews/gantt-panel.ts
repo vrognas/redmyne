@@ -2826,6 +2826,9 @@ export class GanttPanel {
                transform="translate(0, ${y})"
                tabindex="0" role="button" aria-label="#${issue.id} ${escapedSubject} (parent, ${doneRatio}% done)">
               <title>${escapeAttr(barTooltip + "\n\n(Parent issue - " + doneRatio + "% aggregated progress)")}</title>
+              <!-- Invisible hit area for easier hovering -->
+              <rect class="parent-hit-area" x="${startX}" y="0" width="${endX - startX}" height="${barHeight}"
+                    fill="transparent" pointer-events="all"/>
               <!-- Summary bar: bracket-style with downward arrows at ends (0-based Y) -->
               <path class="bar-outline" d="M ${startX + 4} ${barHeight * 0.3}
                     L ${startX + 4} ${barHeight * 0.7}
