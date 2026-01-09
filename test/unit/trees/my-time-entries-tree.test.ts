@@ -48,7 +48,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
 
   // Helper to wait for async loading to complete
   const waitForLoad = async () => {
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 10));
   };
 
   // Helper to get loaded groups
