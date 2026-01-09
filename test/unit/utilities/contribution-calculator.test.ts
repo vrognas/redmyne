@@ -22,6 +22,7 @@ vi.mock("../../../src/utilities/adhoc-tracker", () => ({
 describe("ContributionCalculator", () => {
   beforeEach(() => {
     mockAdHocIssues.clear();
+    vi.resetModules(); // Force fresh module imports on each test
   });
 
   describe("parseTargetIssueId", () => {
