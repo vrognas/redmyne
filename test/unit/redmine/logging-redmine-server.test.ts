@@ -96,6 +96,8 @@ describe("LoggingRedmineServer", () => {
   let mockChannel: { appendLine: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllTimers();
     mockChannel = { appendLine: vi.fn() };
   });
 
