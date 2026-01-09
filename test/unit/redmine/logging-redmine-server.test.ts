@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type * as vscode from "vscode";
 import { LoggingRedmineServer } from "../../../src/redmine/logging-redmine-server";
 import * as http from "http";
@@ -96,7 +96,12 @@ describe("LoggingRedmineServer", () => {
   let mockChannel: { appendLine: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     mockChannel = { appendLine: vi.fn() };
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("logs when enabled", async () => {
