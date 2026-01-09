@@ -2901,9 +2901,11 @@ export class GanttPanel {
                       fill="url(#past-stripes)"/>
               ` : ""}
               ${visualDoneRatio > 0 && visualDoneRatio < 100 ? `
-                <!-- Progress fill showing done_ratio -->
-                <rect class="progress-fill" x="${startX}" y="0" width="${doneWidth}" height="${barHeight}"
-                      fill="${color}" opacity="${(0.95 * fillOpacity).toFixed(2)}"/>
+                <!-- Progress: dim unfilled portion + divider line -->
+                <rect class="progress-unfilled" x="${startX + doneWidth}" y="0" width="${width - doneWidth}" height="${barHeight}"
+                      fill="black" opacity="0.3"/>
+                <line class="progress-divider" x1="${startX + doneWidth}" y1="2" x2="${startX + doneWidth}" y2="${barHeight - 2}"
+                      stroke="white" stroke-width="2" opacity="0.6"/>
               ` : ""}
             </g>
             <!-- Border/outline - pointer-events:all so clicks work even with fill:none -->
@@ -3389,6 +3391,7 @@ export class GanttPanel {
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
   <title>Redmine Gantt</title>
   <style>
+    :root { --today-color: var(--vscode-charts-red); }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     body {
       margin: 0;
@@ -3508,7 +3511,7 @@ export class GanttPanel {
       overflow: hidden;
     }
     .capacity-today-marker {
-      stroke: var(--vscode-charts-red);
+      stroke: var(--today-color);
       stroke-width: 2;
       stroke-dasharray: 4 2;
     }
@@ -3801,15 +3804,8 @@ export class GanttPanel {
     .gantt-resize-handle-header:hover, .gantt-resize-handle-header.dragging { background: var(--vscode-focusBorder); }
     .gantt-timeline { flex-shrink: 0; }
     svg { display: block; }
-    .issue-bar:hover .bar-main, .issue-bar:hover .bar-outline, .issue-label:hover { opacity: 1; }
-    .issue-bar:hover .bar-intensity rect { opacity: 1; }
-    /* Suppress bar hover when hovering badges */
-    .issue-bar:has(.blocks-badge-group:hover) .bar-main,
-    .issue-bar:has(.blocks-badge-group:hover) .bar-outline,
-    .issue-bar:has(.blocker-badge:hover) .bar-main,
-    .issue-bar:has(.blocker-badge:hover) .bar-outline { opacity: inherit; }
-    .issue-bar:has(.blocks-badge-group:hover) .bar-intensity rect,
-    .issue-bar:has(.blocker-badge:hover) .bar-intensity rect { filter: none; }
+    .issue-bar:hover .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
+    .issue-label:hover { opacity: 1; }
     .issue-bar.bar-past { filter: saturate(0.4) opacity(0.7); }
     .issue-bar.bar-past:hover { filter: saturate(0.6) opacity(0.85); }
     .issue-bar.bar-open-ended .bar-outline { stroke-dasharray: 6, 3; stroke-dashoffset: -6; }
@@ -3835,7 +3831,7 @@ export class GanttPanel {
     .issue-bar.parent-bar { opacity: 0.7; }
     .issue-bar.parent-bar:hover { opacity: 1; }
     .past-overlay { pointer-events: none; }
-    .progress-fill { pointer-events: none; }
+    .progress-unfilled, .progress-divider { pointer-events: none; }
     .bar-labels { pointer-events: none; }
     .bar-labels .blocks-badge-group,
     .bar-labels .blocker-badge,
@@ -4002,7 +3998,9 @@ export class GanttPanel {
     .zebra-stripe { fill: var(--vscode-list-hoverBackground); opacity: 0.15; pointer-events: none; }
     .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 1; opacity: 0.25; }
     .date-marker { stroke: var(--vscode-editorRuler-foreground); stroke-dasharray: 2,2; }
-    .today-marker { stroke: var(--vscode-charts-red); stroke-width: 2; }
+    .today-marker { stroke: var(--today-color); stroke-width: 2; stroke-dasharray: 4 2; }
+    .today-header-bg { fill: var(--today-color); fill-opacity: 0.2; }
+    .today-day-label { fill: var(--today-color) !important; font-weight: bold; }
     /* Base transitions for dependency focus fade-back */
     .issue-bar, .issue-label, .project-label, .aggregate-bars { transition: opacity 0.15s ease-out; }
     /* Respect reduced motion preference */
@@ -4107,7 +4105,7 @@ export class GanttPanel {
     }
     .minimap-viewport:hover { fill: var(--vscode-scrollbarSlider-hoverBackground, rgba(100, 100, 100, 0.5)); }
     .minimap-viewport:active { fill: var(--vscode-scrollbarSlider-activeBackground, rgba(100, 100, 100, 0.6)); }
-    .minimap-today { stroke: var(--vscode-charts-red); stroke-width: 3; }
+    .minimap-today { stroke: var(--today-color); stroke-width: 3; }
     /* Milestone markers */
     .milestone-marker {
       pointer-events: all;
@@ -4392,6 +4390,7 @@ export class GanttPanel {
             <g class="dependency-layer${this._showDependencies ? "" : " hidden"}">${dependencyArrows}</g>
             ${bars}
             <g class="milestone-layer">${milestoneMarkers}</g>
+            ${dateMarkers.todayMarker}
           </svg>
         </div>
       </div>
@@ -6681,15 +6680,59 @@ export class GanttPanel {
     zoomLevel: ZoomLevel = "day",
     workloadMap: Map<string, number>,
     showHeatmap: boolean
-  ): { header: string; body: string } {
+  ): { header: string; body: string; todayMarker: string } {
     const headerContent: string[] = [];
     const heatmapBackgrounds: string[] = [];
     const weekendBackgrounds: string[] = [];
     const bodyGridLines: string[] = [];
     const bodyMarkers: string[] = [];
+    let todayMarkerSvg = "";
+    let currentPeriodHighlight = "";
     const current = new Date(minDate);
     // Use local today for user's perspective (user expects today = their local date)
     const todayLocal = getTodayStr();
+
+    // Calculate current period range for highlight based on zoom level
+    const today = getLocalToday();
+    const todayYear = today.getUTCFullYear();
+    const todayMonth = today.getUTCMonth();
+    const todayQuarter = Math.floor(todayMonth / 3);
+    const todayDayOfWeek = today.getUTCDay();
+
+    // Get start of current period (for highlight)
+    let periodStart: Date;
+    let periodDays: number;
+    switch (zoomLevel) {
+      case "day":
+        periodStart = today;
+        periodDays = 1;
+        break;
+      case "week": {
+        // Start of week (Monday)
+        periodStart = new Date(today);
+        const daysFromMonday = todayDayOfWeek === 0 ? 6 : todayDayOfWeek - 1;
+        periodStart.setUTCDate(periodStart.getUTCDate() - daysFromMonday);
+        periodDays = 7;
+        break;
+      }
+      case "month":
+        periodStart = new Date(Date.UTC(todayYear, todayMonth, 1));
+        periodDays = new Date(Date.UTC(todayYear, todayMonth + 1, 0)).getUTCDate();
+        break;
+      case "quarter": {
+        const quarterStartMonth = todayQuarter * 3;
+        periodStart = new Date(Date.UTC(todayYear, quarterStartMonth, 1));
+        const quarterEndMonth = quarterStartMonth + 3;
+        const quarterEnd = new Date(Date.UTC(todayYear, quarterEndMonth, 0));
+        periodDays = Math.round((quarterEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        break;
+      }
+      case "year":
+        periodStart = new Date(Date.UTC(todayYear, 0, 1));
+        periodDays = (todayYear % 4 === 0 && (todayYear % 100 !== 0 || todayYear % 400 === 0)) ? 366 : 365;
+        break;
+    }
+    const periodStartStr = formatLocalDate(periodStart);
 
     const dayWidth =
       (svgWidth - leftMargin) /
@@ -6844,15 +6887,22 @@ export class GanttPanel {
         `);
       }
 
-      // Today marker (all zoom levels) - use local date for user's perspective
+      // Current period highlight (zoom-level dependent)
       const currentLocal = formatLocalDate(current);
+      if (currentLocal === periodStartStr) {
+        const highlightWidth = dayWidth * periodDays;
+        // Header highlight for current period
+        currentPeriodHighlight = `
+          <rect x="${x}" y="0" width="${highlightWidth}" height="40" class="today-header-bg"/>
+        `;
+      }
+
+      // Today marker line (all zoom levels) - always on current day, only in body (not header)
       if (currentLocal === todayLocal) {
-        bodyMarkers.push(`
+        // Separate today-marker for highest z-index (rendered after all bars/milestones)
+        todayMarkerSvg = `
           <line x1="${x}" y1="0" x2="${x}" y2="100%" class="today-marker"/>
-        `);
-        headerContent.push(`
-          <line x1="${x}" y1="0" x2="${x}" y2="40" class="today-marker"/>
-        `);
+        `;
       }
 
       current.setUTCDate(current.getUTCDate() + 1);
@@ -6863,8 +6913,9 @@ export class GanttPanel {
     const weekendGroup = `<g class="weekend-layer${showHeatmap ? " hidden" : ""}">${weekendBackgrounds.join("")}</g>`;
 
     return {
-      header: headerContent.join(""),
+      header: currentPeriodHighlight + headerContent.join(""),
       body: heatmapGroup + weekendGroup + bodyGridLines.join("") + bodyMarkers.join(""),
+      todayMarker: todayMarkerSvg,
     };
   }
 
