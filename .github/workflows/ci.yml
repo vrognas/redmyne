@@ -120,7 +120,7 @@ jobs:
           echo "✅ Size check passed: ${SIZE_KB}KB / 150KB"
 
       - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: vsix-package
           path: "*.vsix"
