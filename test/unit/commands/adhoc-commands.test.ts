@@ -59,7 +59,7 @@ describe("contributeToIssue", () => {
       { skipTimeTrackingCheck: true }
     );
     expect(mockServer.updateTimeEntry).toHaveBeenCalledWith(1, {
-      comments: "#200",
+      comments: "#200 Target Issue",
     });
     expect(refreshCallback).toHaveBeenCalled();
   });

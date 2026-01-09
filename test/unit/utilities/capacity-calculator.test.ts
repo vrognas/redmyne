@@ -538,7 +538,7 @@ describe("calculateScheduledCapacity", () => {
   const emptyEstimates: InternalEstimates = new Map();
 
   it("frontloads single issue to first working days", () => {
-    // 16h estimated over 5 days = should fill Mon (8h) + Tue (8h), not 3.2h/day
+    // 16h estimated over 5 days, 6h/day available (8h * 0.75 factor) = Mon (6h) + Tue (6h) + Wed (4h)
     const issues = [
       createMockIssue({
         id: 1,
@@ -558,16 +558,16 @@ describe("calculateScheduledCapacity", () => {
     );
 
     expect(result.length).toBe(5); // Mon-Fri
-    expect(result[0].loadHours).toBe(8); // Mon: full day
-    expect(result[1].loadHours).toBe(8); // Tue: remaining 8h
-    expect(result[2].loadHours).toBe(0); // Wed: done
+    expect(result[0].loadHours).toBe(6); // Mon: 6h (capacity * 0.75)
+    expect(result[1].loadHours).toBe(6); // Tue: 6h
+    expect(result[2].loadHours).toBe(4); // Wed: remaining 4h
     expect(result[3].loadHours).toBe(0); // Thu: done
     expect(result[4].loadHours).toBe(0); // Fri: done
 
     // Check breakdown shows which issue
     expect(result[0].breakdown.length).toBe(1);
     expect(result[0].breakdown[0].issueId).toBe(1);
-    expect(result[0].breakdown[0].hours).toBe(8);
+    expect(result[0].breakdown[0].hours).toBe(6);
   });
 
   it("excludes closed issues (closed_on set)", () => {
@@ -605,6 +605,7 @@ describe("calculateScheduledCapacity", () => {
   it("prioritizes earlier due date", () => {
     // Issue 1: due Friday, 8h
     // Issue 2: due Wednesday, 8h (higher priority)
+    // With 6h/day capacity: Issue 2 takes Mon (6h) + Tue (2h), then Issue 1 Tue (4h) + Wed (4h)
     const issues = [
       createMockIssue({
         id: 1,
@@ -629,19 +630,22 @@ describe("calculateScheduledCapacity", () => {
       emptyEstimates
     );
 
-    // Monday: Issue 2 (earlier due) takes full capacity
+    // Monday: Issue 2 (earlier due) takes full capacity (6h)
     expect(result[0].breakdown[0].issueId).toBe(2);
-    expect(result[0].breakdown[0].hours).toBe(8);
+    expect(result[0].breakdown[0].hours).toBe(6);
 
-    // Tuesday: Issue 1 (Issue 2 is done)
-    expect(result[1].breakdown[0].issueId).toBe(1);
-    expect(result[1].breakdown[0].hours).toBe(8);
+    // Tuesday: Issue 2 finishes (2h), Issue 1 starts (4h)
+    expect(result[1].breakdown[0].issueId).toBe(2);
+    expect(result[1].breakdown[0].hours).toBe(2);
+    expect(result[1].breakdown[1].issueId).toBe(1);
+    expect(result[1].breakdown[1].hours).toBe(4);
   });
 
   it("gives 2x priority to issues blocking external assignee", () => {
     // Issue 1: due Friday, blocks external user
     // Issue 2: due Wednesday (earlier), but doesn't block anyone
     // Issue 1 should win due to 2x external block bonus
+    // With 6h/day capacity: Issue 1 takes Mon (6h)
     const issues = [
       createMockIssue({
         id: 1,
@@ -694,20 +698,22 @@ describe("calculateScheduledCapacity", () => {
       issueMap
     );
 
-    // Issue 1 should be scheduled first (blocks external)
+    // Issue 1 should be scheduled first (blocks external), 6h on Monday
     expect(result[0].breakdown[0].issueId).toBe(1);
+    expect(result[0].breakdown[0].hours).toBe(6);
   });
 
   it("cannot schedule issue until blockers complete (hard constraint)", () => {
     // Issue 1: blocks Issue 2
     // Issue 2: blocked by Issue 1, cannot be scheduled until Issue 1 done
+    // With 6h/day: Issue 1 (8h) takes Mon (6h) + Tue (2h), Issue 2 starts Wed
     const issues = [
       createMockIssue({
         id: 1,
         subject: "Blocker",
         start_date: "2025-01-06",
         due_date: "2025-01-08",
-        estimated_hours: 8, // Will complete Monday
+        estimated_hours: 8, // Will complete Tuesday (6h Mon + 2h Tue)
         relations: [
           { id: 100, issue_id: 1, issue_to_id: 2, relation_type: "blocks" },
         ],
@@ -732,17 +738,23 @@ describe("calculateScheduledCapacity", () => {
       emptyEstimates
     );
 
-    // Monday: Only Issue 1 (Issue 2 is blocked)
+    // Monday: Only Issue 1 (Issue 2 is blocked), 6h
     expect(result[0].breakdown.length).toBe(1);
     expect(result[0].breakdown[0].issueId).toBe(1);
+    expect(result[0].breakdown[0].hours).toBe(6);
 
-    // Tuesday: Issue 2 can now be scheduled (Issue 1 completed)
+    // Tuesday: Issue 1 finishes (2h), Issue 2 blocked until Issue 1 completes (within same day is not unblocked yet)
     expect(result[1].breakdown.length).toBe(1);
-    expect(result[1].breakdown[0].issueId).toBe(2);
+    expect(result[1].breakdown[0].issueId).toBe(1);
+    expect(result[1].breakdown[0].hours).toBe(2);
+
+    // Wednesday: Issue 2 can now be scheduled (Issue 1 completed)
+    expect(result[2].breakdown.length).toBe(1);
+    expect(result[2].breakdown[0].issueId).toBe(2);
   });
 
   it("continues work across multiple days when exceeds capacity", () => {
-    // 20h of work, 8h/day capacity = 3 days
+    // 20h of work, 6h/day available (8h * 0.75) = 4 days (6+6+6+2)
     const issues = [
       createMockIssue({
         id: 1,
@@ -761,10 +773,10 @@ describe("calculateScheduledCapacity", () => {
       emptyEstimates
     );
 
-    expect(result[0].loadHours).toBe(8); // Mon
-    expect(result[1].loadHours).toBe(8); // Tue
-    expect(result[2].loadHours).toBe(4); // Wed: remaining 4h
-    expect(result[3].loadHours).toBe(0); // Thu: done
+    expect(result[0].loadHours).toBe(6); // Mon
+    expect(result[1].loadHours).toBe(6); // Tue
+    expect(result[2].loadHours).toBe(6); // Wed
+    expect(result[3].loadHours).toBe(2); // Thu: remaining 2h
   });
 
   it("marks work past due date as slippage", () => {
@@ -797,14 +809,15 @@ describe("calculateScheduledCapacity", () => {
     // Let me adjust: 32h = 4 days
   });
 
-  it("marks slippage when work extends past due date", () => {
-    // Issue due Tuesday, but needs 24h (3 days)
+  it("stops scheduling work past due date", () => {
+    // Issue due Tuesday, but needs 24h (4 days at 6h/day)
+    // Scheduler stops allocating at due date - work past due is not scheduled
     const issues = [
       createMockIssue({
         id: 1,
         start_date: "2025-01-06", // Monday
         due_date: "2025-01-07", // Tuesday
-        estimated_hours: 24, // 3 days needed
+        estimated_hours: 24, // Would need 4 days at 6h/day
       }),
     ];
 
@@ -817,12 +830,15 @@ describe("calculateScheduledCapacity", () => {
       emptyEstimates
     );
 
-    // Mon, Tue: within due date
-    expect(result[0].breakdown[0].isSlippage).toBe(false);
-    expect(result[1].breakdown[0].isSlippage).toBe(false);
+    // Mon, Tue: within due date (6h each), scheduled
+    expect(result[0].loadHours).toBe(6); // Mon
+    expect(result[1].loadHours).toBe(6); // Tue (due date)
 
-    // Wed: past due date = slippage
-    expect(result[2].breakdown[0].isSlippage).toBe(true);
+    // Wed, Thu, Fri: past due date - scheduler doesn't allocate
+    // (remaining 12h not scheduled because issue is past due)
+    expect(result[2].loadHours).toBe(0); // Wed: no work scheduled
+    expect(result[3].loadHours).toBe(0); // Thu: no work scheduled
+    expect(result[4].loadHours).toBe(0); // Fri: no work scheduled
   });
 
   it("uses internal estimate over done_ratio when available", () => {
@@ -915,6 +931,7 @@ describe("calculateScheduledCapacity", () => {
 
   it("respects start_date constraint (cannot schedule before start)", () => {
     // Issue starts Wednesday, should not be scheduled Mon-Tue
+    // With 6h/day: Wed 6h, Thu 2h
     const issues = [
       createMockIssue({
         id: 1,
@@ -935,6 +952,7 @@ describe("calculateScheduledCapacity", () => {
 
     expect(result[0].loadHours).toBe(0); // Mon: before start
     expect(result[1].loadHours).toBe(0); // Tue: before start
-    expect(result[2].loadHours).toBe(8); // Wed: issue starts, scheduled
+    expect(result[2].loadHours).toBe(6); // Wed: issue starts, 6h scheduled
+    expect(result[3].loadHours).toBe(2); // Thu: remaining 2h
   });
 });
