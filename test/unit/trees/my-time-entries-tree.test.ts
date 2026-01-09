@@ -59,6 +59,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
   };
 
   beforeEach(() => {
+    vi.resetModules();
     mockServer = {
       getTimeEntries: vi.fn(),
       getIssueById: vi.fn().mockImplementation((id: number) => {
