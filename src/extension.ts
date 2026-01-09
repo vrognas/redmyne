@@ -948,7 +948,6 @@ export function activate(context: vscode.ExtensionContext): void {
 
           await server.setIssueStatus({ id: issue.id }, targetStatus.id);
           showStatusBarMessage(`$(check) #${issue.id} set to ${targetStatus.name}`, 2000);
-          GanttPanel.currentPanel?.refresh();
           vscode.commands.executeCommand("redmine.refreshGanttData");
         } catch (error) {
           vscode.window.showErrorMessage(`Failed to update status: ${error}`);

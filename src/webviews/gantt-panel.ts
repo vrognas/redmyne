@@ -1391,6 +1391,7 @@ export class GanttPanel {
     sortOrder?: "asc" | "desc"; // For setSort
     focus?: "project" | "person"; // For setViewFocus
     assignee?: string | null; // For setSelectedAssignee
+    message?: string; // For showStatus
   }): void {
     switch (message.command) {
       case "openIssue":
