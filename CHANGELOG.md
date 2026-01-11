@@ -6,6 +6,14 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 ### Added
 
+- **Priority submenu** - set issue priority from context menu (Low, Normal, High, Urgent, Immediate, Other) in both Gantt and sidebar
+- **% Done submenu for sidebar** - sidebar issues now have same quick % Done options as Gantt
+- **Status submenu for sidebar** - sidebar issues now have same quick status options as Gantt
+- **On/Off submenus** - Auto-update %, Ad-hoc Budget, and Precedence now use explicit On/Off submenus instead of toggle commands
+- **Internal Estimate submenu** - Set.../Clear options in both Gantt and sidebar
+- **Create Sub-Issue conditional** - option hidden for issues that are already children of another issue
+- **Issue Priority support** - display, change, and filter by Redmine priority; priority shown in tree tooltips, Gantt data, and issue actions menu; API filtering via `getFilteredIssues({ priority: id })`
+- **showCalculatedPriority config** - optional setting to show calculated priority score (based on due date urgency, downstream dependencies, external blocks) in Gantt tooltips
 - **Set % Done submenu** - Gantt bar context menu now has "Set % Done" submenu with 0-100% quick options (10% increments) plus "Custom..." for input picker
 - **Set Status submenu** - Gantt bar context menu now has "Set Status" submenu with "New", "In Progress", "Closed" quick options plus "Other..." for all statuses picker
 - **Actual time entry reconciliation** - past-day intensity now uses actual logged hours instead of predictions; today and future use priority-based scheduling
@@ -22,6 +30,9 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 ### Changed
 
+- **Context menu harmonization** - Gantt and sidebar context menus now have consistent structure; grouped by intent (navigation, actions, properties, time, settings, integrations, clipboard)
+- **Submenu labels shortened** - removed "Set" prefix from "% Done", "Status", "Priority" submenus
+- **Show in Issues renamed** - "Show in Issues" → "Show in Sidebar" for clarity
 - **Color harmonization** - unified color semantics across Gantt: GREEN=done, BLUE=on-track (muted), YELLOW=at-risk, RED=overbooked; uses VS Code theme variables for full theme integration
 - **Gantt bar opacity** - on-track bars muted (60% opacity) to let alert states (red/yellow/green) pop per 60-30-10 UX rule
 - **Dependency arrows simplified** - consolidated from 6 colors to 3: blocking (red), scheduling (blue), informational (gray)
@@ -48,6 +59,11 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Internal estimate prompt on %done** - setting manual %done now prompts for hours remaining
 - **Gantt native context menu** - issue bars now use VS Code native context menus instead of custom HTML
 - **Gantt project context menu** - project labels now have native VS Code context menu with "Open in Browser" and "Show in Gantt"
+- **Gantt VS Code-style chevrons** - collapse/expand arrows now match native VS Code tree view with rotation animation
+- **Gantt font size harmonization** - column text sizes aligned with VS Code defaults (13px body, 12px headers)
+- **Sidebar loading indicator** - simplified to single row with spinning disc and "Loading..." text
+- **Gantt per-project view** - top-level project row removed; shows "Client: Project" title in header
+- **Gantt continuous indent guides** - vertical lines rendered as single continuous SVG layer without row gaps
 
 ### Fixed
 
@@ -61,9 +77,15 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Issue picker duplicate results** - search results no longer duplicate issues already shown in assigned list
 - **Time entries empty month expansion** - "This Month" now shows fallback message when empty instead of failing to expand
 - **Gantt by-person timeline range** - timeline no longer extends to old issues assigned to others in same project
+- **Gantt zebra stripe overlap on collapse** - stripes now shrink correctly when parent issues are collapsed; child gaps no longer cause overlap with sibling stripes
 - **Intensity off-by-1** - fixed timezone mismatch causing intensity bars to show on wrong day
 - **Internal estimates in scheduling** - issues with internal estimates but no Redmine estimate now included
 - **Week subgroup ID collision** - fixed duplicate week ID error when same week spans multiple month groups
+- **Gantt column cells collapse** - Status, ID, Start, Due, Assignee columns now hide when parent collapsed
+- **Gantt parent issues collapse** - click-to-collapse/expand now works for parent issues, not just projects
+- **Gantt dependency arrows collapse** - arrows now hide when source or target issue is collapsed
+- **Gantt time-group collapse** - time-group rows now properly collapse/expand
+- **Gantt Today button disabled** - button grayed out with tooltip when today is outside timeline range; T hotkey shows modal
 
 ## [3.19.0]
 
