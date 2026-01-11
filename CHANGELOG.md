@@ -78,6 +78,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Time entries empty month expansion** - "This Month" now shows fallback message when empty instead of failing to expand
 - **Gantt by-person timeline range** - timeline no longer extends to old issues assigned to others in same project
 - **Gantt zebra stripe overlap on collapse** - stripes now shrink correctly when parents collapsed; delta calculated from contributions ensuring consistent behavior across project and person views
+- **Gantt by-project collapse-all** - issues no longer disappear when collapse-all used in by-person view then switching to by-project
 - **Intensity off-by-1** - fixed timezone mismatch causing intensity bars to show on wrong day
 - **Internal estimates in scheduling** - issues with internal estimates but no Redmine estimate now included
 - **Week subgroup ID collision** - fixed duplicate week ID error when same week spans multiple month groups
