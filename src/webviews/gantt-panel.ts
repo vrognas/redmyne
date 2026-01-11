@@ -2279,56 +2279,24 @@ export class GanttPanel {
     const rowHeights: number[] = [];
     let cumulativeY = 0;
 
-    // Helper to get gap before a row based on visual grouping hierarchy
-    // Creates "families": project → issues, parent issue → children
-    const getGapBefore = (row: typeof visibleRows[0], idx: number): number => {
-      if (idx === 0) return 0;
-      const prevRow = visibleRows[idx - 1];
-
-      // Group boundary: project/time-group after content
-      const isGroupHeader = row.type === "project" || row.type === "time-group";
-      const prevIsContent = prevRow.type === "issue";
-      if (isGroupHeader && prevIsContent) {
-        return 16; // Separator between project groups
-      }
-
-      // Content starting after project header - attach closely
-      if (row.type === "issue" && (prevRow.type === "project" || prevRow.type === "time-group")) {
-        return 4;
-      }
-
-      // Child issues (depth 2+): very tight clustering
-      if (row.depth >= 2) {
-        return 2; // Tight - children feel "attached" to parent
-      }
-
-      // Family boundary is now handled via row height (gap added AFTER last child)
-      // NOT before next sibling - this makes the gap "belong" to the closing group
-
-      // Peer issues at depth 1
-      return 8;
-    };
+    // Zero gap between rows - matches VS Code native tree view
+    // Visual grouping via zebra stripes and indentation
+    const getGapBefore = (_row: typeof visibleRows[0], _idx: number): number => 0;
 
     for (let i = 0; i < visibleRowCount; i++) {
       const row = visibleRows[i];
       const gapBefore = getGapBefore(row, i);
-      const nextRow = i < visibleRowCount - 1 ? visibleRows[i + 1] : null;
 
       // Add gap BEFORE this row (creates whitespace separator)
       cumulativeY += gapBefore;
 
       rowYPositions.push(cumulativeY);
 
-      // Row height = barHeight + optional family-closing padding
-      // If this is a child (depth 2+) followed by a sibling (depth at min issue level),
-      // add extra padding AFTER this row to visually close the family group
-      const isLastChildInFamily = row.depth >= 2 && nextRow &&
-        nextRow.type === "issue" && nextRow.depth < row.depth;
-      const familyClosePadding = isLastChildInFamily ? 8 : 0;
-      rowHeights.push(barHeight + familyClosePadding);
+      // Uniform row height - no family-close padding
+      rowHeights.push(barHeight);
 
-      // Move past this row's content + any family-close padding
-      cumulativeY += barHeight + familyClosePadding;
+      // Move past this row's content
+      cumulativeY += barHeight;
     }
     // Ensure minimum height to fill viewport (roughly 100vh - 200px for header/toolbar)
     const minContentHeight = 600;
@@ -2663,9 +2631,9 @@ export class GanttPanel {
 
         return `
           <g class="issue-label gantt-row cursor-pointer" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${y}" data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}' transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Open issue #${issue.id}">
-            <title>${escapeAttr(tooltip)}</title>
+            <rect class="row-hit-area" x="0" y="0" width="100%" height="${barHeight}" fill="transparent"><title>${escapeAttr(tooltip)}</title></rect>
             ${chevron}
-            <text x="${10 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="${issue.isExternal ? "var(--vscode-descriptionForeground)" : "var(--vscode-foreground)"}" font-size="13" opacity="${taskOpacity}">
+            <text class="issue-text" x="${10 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="${issue.isExternal ? "var(--vscode-descriptionForeground)" : "var(--vscode-foreground)"}" font-size="13" opacity="${taskOpacity}">
               ${externalBadge}${projectBadge}${escapedSubject}
             </text>
           </g>
@@ -4175,31 +4143,34 @@ export class GanttPanel {
     button:focus { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
     .issue-bar:focus { outline: none; } /* Use stroke instead of outline for SVG */
     .issue-bar:focus .bar-outline, .issue-bar:focus-within .bar-outline, .issue-bar.focused .bar-outline { stroke-width: 3; stroke: var(--vscode-focusBorder); }
-    .issue-label:hover, .project-label:hover, .time-group-label:hover {
+    .project-label:hover, .time-group-label:hover {
       background: var(--vscode-list-hoverBackground);
       border-radius: 4px;
+    }
+    /* VS Code native-style row highlighting via hit area rect */
+    .issue-label:hover .row-hit-area {
+      fill: var(--vscode-list-hoverBackground);
     }
     .issue-label:hover text, .project-label:hover text, .time-group-label:hover text {
       fill: var(--vscode-list-hoverForeground) !important;
     }
     .issue-label:focus, .project-label:focus, .time-group-label:focus {
-      outline: 2px solid var(--vscode-focusBorder);
-      outline-offset: 1px;
-      background: var(--vscode-list-activeSelectionBackground);
-      border-radius: 4px;
+      outline: none;
     }
-    .issue-label.active, .project-label.active, .time-group-label.active {
+    .issue-label:focus .row-hit-area {
+      fill: var(--vscode-list-activeSelectionBackground);
+    }
+    .issue-label.active .row-hit-area {
+      fill: var(--vscode-list-hoverBackground);
+    }
+    .project-label.active, .time-group-label.active {
       background: var(--vscode-list-inactiveSelectionBackground);
       border-radius: 4px;
-    }
-    .issue-label.active:hover, .project-label.active:hover, .time-group-label.active:hover {
-      background: var(--vscode-list-inactiveSelectionBackground);
     }
     /* Collapse toggle chevron - VS Code style */
     .collapse-toggle {
       cursor: pointer;
       opacity: 0.7;
-      transition: transform 0.1s ease-out;
     }
     .collapse-toggle:hover { opacity: 1; }
     .collapse-toggle.expanded { transform: rotate(90deg); }
@@ -6507,12 +6478,14 @@ export class GanttPanel {
         // Chevron has its own handler with stopPropagation - won't reach here
         if (e.target.classList?.contains('collapse-toggle') || e.target.classList?.contains('chevron-hit-area')) return;
 
-        // Open quick-pick for issues (skip focus to avoid stealing from dialog)
         const issueId = el.dataset.issueId;
-        if (issueId) {
+        // Only open quick-pick if clicking directly on the issue text
+        const clickedOnText = e.target.classList?.contains('issue-text') || e.target.closest('.issue-text');
+        if (issueId && clickedOnText) {
           setActiveLabel(el, false, false, true); // skipFocus=true
           vscode.postMessage({ command: 'openIssue', issueId: parseInt(issueId, 10) });
         } else {
+          // Clicking elsewhere on the row just selects it
           setActiveLabel(el);
         }
       });
