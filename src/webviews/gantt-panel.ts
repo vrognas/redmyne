@@ -2223,6 +2223,9 @@ export class GanttPanel {
     const resizeHandleWidth = 10;
     const stickyLeftWidth = labelWidth + resizeHandleWidth + extraColumnsWidth;
     const barHeight = 22; // VS Code native tree row height
+    const barPadding = 3; // Vertical padding for bar content
+    const barY = barPadding;
+    const barContentHeight = barHeight - barPadding * 2; // 16px
     const barGap = 10;
     const headerHeight = 40;
     const indentSize = 8; // VS Code native tree indent
@@ -2508,7 +2511,7 @@ export class GanttPanel {
           // Projects are containers, not content - issues should be primary focus
           return `
             <g class="project-label gantt-row cursor-pointer" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${y}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}' transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
-              <title>${escapeAttr(tooltip)}</title>
+              <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent"><title>${escapeAttr(tooltip)}</title></rect>
               ${chevron}
               <text x="${labelX}" y="${barHeight / 2 + 5}" fill="var(--vscode-descriptionForeground)" font-size="13">
                 ${healthDot}${escapeHtml(row.label)}
@@ -2525,6 +2528,7 @@ export class GanttPanel {
           const countBadge = row.childCount ? ` (${row.childCount})` : "";
           return `
             <g class="time-group-label gantt-row ${timeGroupClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-time-group="${row.timeGroup}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${y}" transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Toggle ${escapeHtml(row.label)}">
+              <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent"><title>${escapeHtml(row.label)}</title></rect>
               ${chevron}
               <text x="${10 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="13" font-weight="bold">
                 ${row.icon || ""} ${escapeHtml(row.label)}${countBadge}
@@ -4144,12 +4148,10 @@ export class GanttPanel {
     button:focus { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
     .issue-bar:focus { outline: none; } /* Use stroke instead of outline for SVG */
     .issue-bar:focus .bar-outline, .issue-bar:focus-within .bar-outline, .issue-bar.focused .bar-outline { stroke-width: 3; stroke: var(--vscode-focusBorder); }
-    .project-label:hover, .time-group-label:hover {
-      background: var(--vscode-list-hoverBackground);
-      border-radius: 4px;
-    }
     /* VS Code native-style row highlighting via hit area rect */
-    .issue-label:hover .row-hit-area {
+    .issue-label:hover .row-hit-area,
+    .project-label:hover .row-hit-area,
+    .time-group-label:hover .row-hit-area {
       fill: var(--vscode-list-hoverBackground);
     }
     .issue-label:hover text, .project-label:hover text, .time-group-label:hover text {
@@ -4158,15 +4160,15 @@ export class GanttPanel {
     .issue-label:focus, .project-label:focus, .time-group-label:focus {
       outline: none;
     }
-    .issue-label:focus .row-hit-area {
+    .issue-label:focus .row-hit-area,
+    .project-label:focus .row-hit-area,
+    .time-group-label:focus .row-hit-area {
       fill: var(--vscode-list-activeSelectionBackground);
     }
-    .issue-label.active .row-hit-area {
+    .issue-label.active .row-hit-area,
+    .project-label.active .row-hit-area,
+    .time-group-label.active .row-hit-area {
       fill: var(--vscode-list-inactiveSelectionBackground);
-    }
-    .project-label.active, .time-group-label.active {
-      background: var(--vscode-list-inactiveSelectionBackground);
-      border-radius: 4px;
     }
     /* Collapse toggle chevron - VS Code style */
     .collapse-toggle {
@@ -6490,6 +6492,16 @@ export class GanttPanel {
         if (e.target.classList?.contains('collapse-toggle') || e.target.classList?.contains('chevron-hit-area')) return;
 
         const issueId = el.dataset.issueId;
+        const isProject = el.classList.contains('project-label');
+        const isTimeGroup = el.classList.contains('time-group-label');
+
+        // Project/time-group labels: toggle collapse on click
+        if ((isProject || isTimeGroup) && el.dataset.hasChildren === 'true') {
+          setActiveLabel(el);
+          toggleCollapseClientSide(el.dataset.collapseKey);
+          return;
+        }
+
         // Only open quick-pick if clicking directly on the issue text
         const clickedOnText = e.target.classList?.contains('issue-text') || e.target.closest('.issue-text');
         if (issueId && clickedOnText) {
