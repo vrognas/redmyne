@@ -6321,22 +6321,24 @@ export class GanttPanel {
       const descendants = findDescendants(collapseKey);
       if (descendants.length === 0) return;
 
-      // Calculate actual delta from Y positions (not ROW_HEIGHT which may differ from actual spacing)
-      const descendantYs = descendants.map(key => rowIndex.get(key)?.originalY).filter(y => y !== undefined);
-      const minDescendantY = Math.min(...descendantYs);
+      const descendantSet = new Set(descendants);
       const parentEntry = rowIndex.get(collapseKey);
       const parentY = parentEntry?.originalY ?? 0;
 
-      // Find the first non-descendant row below the parent
-      let firstShiftedY = Infinity;
-      rowIndex.forEach(({ originalY }, key) => {
-        if (originalY > parentY && !descendants.includes(key) && originalY < firstShiftedY) {
-          firstShiftedY = originalY;
+      // Calculate delta from stripe contributions (each row owns gap BEFORE it)
+      // Only count each row once (stripes are duplicated across columns)
+      const countedKeys = new Set();
+      let actualDelta = 0;
+      document.querySelectorAll('.zebra-stripe').forEach(stripe => {
+        const contributions = JSON.parse(stripe.dataset.rowContributions || '{}');
+        for (const [key, contribution] of Object.entries(contributions)) {
+          if (descendantSet.has(key) && !countedKeys.has(key)) {
+            actualDelta += parseFloat(contribution);
+            countedKeys.add(key);
+          }
         }
       });
 
-      // Delta is the distance from first descendant to first shifted row
-      const actualDelta = firstShiftedY !== Infinity ? (firstShiftedY - minDescendantY) : (descendants.length * ROW_HEIGHT);
       const delta = shouldExpand ? actualDelta : -actualDelta;
 
       // Toggle visibility of descendants
@@ -6409,7 +6411,6 @@ export class GanttPanel {
       });
 
       // Handle zebra stripes: hide stripes covering descendants, shift stripes below
-      const descendantSet = new Set(descendants);
       document.querySelectorAll('.zebra-stripe').forEach(stripe => {
         const originalY = parseFloat(stripe.dataset.originalY || '0');
         const contributions = JSON.parse(stripe.dataset.rowContributions || '{}');
