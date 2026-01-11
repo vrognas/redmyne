@@ -683,7 +683,7 @@ export class GanttPanel {
     const nonce = getNonce();
     const labelWidth = 250;
     const headerHeight = 40;
-    const barHeight = 30;
+    const barHeight = 22; // VS Code native tree row height
     const barGap = 10;
     const rowCount = 10;
     const idColumnWidth = 50;
@@ -2222,10 +2222,10 @@ export class GanttPanel {
     const extraColumnsWidth = idColumnWidth + startDateColumnWidth + statusColumnWidth + dueDateColumnWidth + assigneeColumnWidth;
     const resizeHandleWidth = 10;
     const stickyLeftWidth = labelWidth + resizeHandleWidth + extraColumnsWidth;
-    const barHeight = 30;
+    const barHeight = 22; // VS Code native tree row height
     const barGap = 10;
     const headerHeight = 40;
-    const indentSize = 16;
+    const indentSize = 8; // VS Code native tree indent
 
     // All projects are visible - no hidden project filtering
     const rows = allRows;
@@ -2631,7 +2631,7 @@ export class GanttPanel {
 
         return `
           <g class="issue-label gantt-row cursor-pointer" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${y}" data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}' transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Open issue #${issue.id}">
-            <rect class="row-hit-area" x="0" y="0" width="100%" height="${barHeight}" fill="transparent"><title>${escapeAttr(tooltip)}</title></rect>
+            <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent"><title>${escapeAttr(tooltip)}</title></rect>
             ${chevron}
             <text class="issue-text" x="${10 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="${issue.isExternal ? "var(--vscode-descriptionForeground)" : "var(--vscode-foreground)"}" font-size="13" opacity="${taskOpacity}">
               ${externalBadge}${projectBadge}${escapedSubject}
@@ -4161,7 +4161,7 @@ export class GanttPanel {
       fill: var(--vscode-list-activeSelectionBackground);
     }
     .issue-label.active .row-hit-area {
-      fill: var(--vscode-list-hoverBackground);
+      fill: var(--vscode-list-inactiveSelectionBackground);
     }
     .project-label.active, .time-group-label.active {
       background: var(--vscode-list-inactiveSelectionBackground);
@@ -6204,6 +6204,16 @@ export class GanttPanel {
     window.addEventListener('focus', () => {
       if (activeLabel && isLabelVisible(activeLabel)) {
         activeLabel.focus();
+      }
+    });
+
+    // Escape to deselect active label
+    addDocListener('keydown', (e) => {
+      if (e.key === 'Escape' && activeLabel) {
+        activeLabel.classList.remove('active');
+        activeLabel.blur();
+        activeLabel = null;
+        vscode.postMessage({ command: 'setSelectedKey', collapseKey: null });
       }
     });
 
