@@ -2337,7 +2337,7 @@ export class GanttPanel {
     // Pre-calculate visible indices for each row
     const rowVisibleIndices = new Map<string, number>();
     visibleRows.forEach((row, idx) => rowVisibleIndices.set(row.collapseKey, idx));
-    const chevronWidth = 14;
+    const chevronWidth = 10;
 
     // Generate FULL-HEIGHT group backgrounds (Gestalt "common region" / enclosure)
     // Adaptive grouping strategy:
@@ -2490,19 +2490,20 @@ export class GanttPanel {
 
         // VS Code-style chevron: right-pointing arrow that rotates 90deg when expanded
         // Includes larger invisible hit area for easier clicking
-        const chevronX = 6 + indent;
+        const chevronX = 10 + indent;
         const chevronY = barHeight / 2;
         const hitAreaSize = 18;
         const chevron = row.hasChildren
           ? `<g class="collapse-toggle user-select-none${row.isExpanded ? " expanded" : ""}" transform-origin="${chevronX} ${chevronY}"><rect x="${chevronX - hitAreaSize / 2}" y="${chevronY - hitAreaSize / 2}" width="${hitAreaSize}" height="${hitAreaSize}" fill="transparent" class="chevron-hit-area"/><path d="M${chevronX - 3},${chevronY - 4} L${chevronX + 2},${chevronY} L${chevronX - 3},${chevronY + 4}" fill="none" stroke="var(--vscode-foreground)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></g>`
           : "";
-        const textOffset = row.hasChildren ? chevronWidth : 0;
+        // Always reserve space for chevron to align text regardless of hasChildren
+        const textOffset = chevronWidth;
 
         if (row.type === "project") {
           // Project header row with health indicators
           const health = row.health;
           const healthDot = health ? this.getHealthDot(health.status) : "";
-          const labelX = 5 + indent + textOffset;
+          const labelX = 10 + indent + textOffset;
 
           // Build counts string: "12 open · 2 blocked · 1 overdue"
           let countsStr = "";
@@ -2557,7 +2558,7 @@ export class GanttPanel {
           return `
             <g class="time-group-label gantt-row ${timeGroupClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-time-group="${row.timeGroup}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${y}" transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Toggle ${escapeHtml(row.label)}">
               ${chevron}
-              <text x="${5 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="13" font-weight="bold">
+              <text x="${10 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="13" font-weight="bold">
                 ${row.icon || ""} ${escapeHtml(row.label)}${countBadge}
               </text>
             </g>
@@ -2664,7 +2665,7 @@ export class GanttPanel {
           <g class="issue-label gantt-row cursor-pointer" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${y}" data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}' transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Open issue #${issue.id}">
             <title>${escapeAttr(tooltip)}</title>
             ${chevron}
-            <text x="${5 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="${issue.isExternal ? "var(--vscode-descriptionForeground)" : "var(--vscode-foreground)"}" font-size="13" opacity="${taskOpacity}">
+            <text x="${10 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="${issue.isExternal ? "var(--vscode-descriptionForeground)" : "var(--vscode-foreground)"}" font-size="13" opacity="${taskOpacity}">
               ${externalBadge}${projectBadge}${escapedSubject}
             </text>
           </g>
