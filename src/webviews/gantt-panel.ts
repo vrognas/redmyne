@@ -3916,7 +3916,8 @@ export class GanttPanel {
       height: calc(100% + 17px); /* Push horizontal scrollbar below wrapper (17px = typical scrollbar height) */
       overflow: scroll;
     }
-    .gantt-scroll::-webkit-scrollbar { width: 8px; }
+    .gantt-scroll::-webkit-scrollbar { width: 8px; height: 0; }
+    .gantt-scroll::-webkit-scrollbar:horizontal { display: none; }
     .gantt-scroll::-webkit-scrollbar-thumb { background: var(--vscode-scrollbarSlider-background); border-radius: 4px; }
     .gantt-scroll::-webkit-scrollbar-corner { background: transparent; }
     .gantt-header-row {
