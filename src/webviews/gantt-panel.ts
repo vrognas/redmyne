@@ -747,7 +747,7 @@ export class GanttPanel {
     // Assignee column skeleton (circle avatars)
     const assigneeSvg = skeletonRows.map((r, i) => r.isProject ? "" : `
       <g class="skeleton-label delay-${Math.min(i, 7)}">
-        <circle cx="${assigneeColumnWidth / 2}" cy="${r.y + barHeight / 2}" r="12" fill="var(--vscode-panel-border)"/>
+        <circle cx="${assigneeColumnWidth / 2}" cy="${r.y + barHeight / 2}" r="9" fill="var(--vscode-panel-border)"/>
       </g>
     `).join("");
 
@@ -2732,13 +2732,13 @@ export class GanttPanel {
         const initials = getInitials(issue.assignee);
         const bgColor = getAvatarColor(issue.assignee);
         const isCurrentUser = issue.assigneeId === this._currentUserId;
-        const radius = 12;
+        const radius = 9; // Fits in 22px row height
         const cx = assigneeColumnWidth / 2;
         const cy = barHeight / 2;
         return `<g class="gantt-row assignee-badge${isCurrentUser ? " current-user" : ""}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${y}" transform="translate(0, ${y})">
           <title>${escapeAttr(issue.assignee)}</title>
           <circle cx="${cx}" cy="${cy}" r="${radius}" fill="${bgColor}"/>
-          <text x="${cx}" y="${cy + 4}" text-anchor="middle" fill="white" font-size="10" font-weight="600">${escapeHtml(initials)}</text>
+          <text x="${cx}" y="${cy + 3}" text-anchor="middle" fill="white" font-size="9" font-weight="600">${escapeHtml(initials)}</text>
         </g>`;
       })
       .join("");
