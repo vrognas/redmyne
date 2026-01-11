@@ -2245,7 +2245,9 @@ export class GanttPanel {
     // Find the top-level project's collapseKey to clear parent references
     const topProjectKey = skipTopProjectRow ? rows.find(r => r.type === "project" && r.depth === 0)?.collapseKey : null;
     const visibleRows = rows.filter(r => {
-      if (!r.isVisible) return false;
+      // In by-project view, direct children of skipped project are always visible
+      const isTopProjectChild = skipTopProjectRow && topProjectKey && r.parentKey === topProjectKey;
+      if (!r.isVisible && !isTopProjectChild) return false;
       // Skip top-level project row in per-project view
       if (skipTopProjectRow && r.type === "project" && r.depth === 0) return false;
       if (healthFilter === "all") return true;
