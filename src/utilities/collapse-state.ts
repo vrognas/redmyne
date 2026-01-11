@@ -7,7 +7,7 @@ import * as vscode from "vscode";
  * Default behavior: everything is COLLAPSED
  * We track EXPANDED keys (not collapsed) so default = collapsed
  */
-class CollapseStateManager {
+export class CollapseStateManager {
   private _expandedKeys = new Set<string>();
   private _onDidChange = new vscode.EventEmitter<{ key: string; collapsed: boolean }>();
 
@@ -81,5 +81,5 @@ class CollapseStateManager {
   }
 }
 
-/** Singleton instance for shared state */
+/** Singleton instance for shared state (tree views) */
 export const collapseState = new CollapseStateManager();
