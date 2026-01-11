@@ -2446,12 +2446,6 @@ export class GanttPanel {
       indentGuides.set(i, activeParents);
     }
 
-    // Helper to get parent depth for a given parentKey
-    const getParentDepth = (parentKey: string): number => {
-      const parent = visibleRows.find(r => r.collapseKey === parentKey);
-      return parent ? parent.depth : -1;
-    };
-
     // Compute continuous vertical indent guide lines (rendered as single layer)
     // For each parent row, draw ONE continuous line covering ALL descendants (not just direct children)
     const continuousIndentLines: string[] = [];
