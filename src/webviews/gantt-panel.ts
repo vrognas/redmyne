@@ -581,7 +581,6 @@ export class GanttPanel {
   private _closedStatusIds: Set<number> = new Set();
   private _debouncedCollapseUpdate: DebouncedFunction<() => void>;
   private _cachedHierarchy?: HierarchyNode[];
-  private _skipCollapseRerender = false; // Skip re-render when collapse is from client-side
   private _collapseState = new CollapseStateManager(); // Gantt-specific collapse state (independent from tree view)
   private _renderKey = 0; // Incremented on each render to force SVG re-creation
   private _isRefreshing = false; // Show loading overlay during data refresh
@@ -1424,6 +1423,7 @@ export class GanttPanel {
     focus?: "project" | "person"; // For setViewFocus
     assignee?: string | null; // For setSelectedAssignee
     message?: string; // For showStatus
+    years?: string; // For setLookback
   }): void {
     switch (message.command) {
       case "openIssue":
@@ -1453,7 +1453,7 @@ export class GanttPanel {
         }
         break;
       case "setLookback":
-        this._lookbackYears = message.years === "" ? null : parseInt(message.years, 10) as 2 | 5 | 10;
+        this._lookbackYears = !message.years || message.years === "" ? null : parseInt(message.years, 10) as 2 | 5 | 10;
         GanttPanel._globalState?.update(LOOKBACK_YEARS_KEY, this._lookbackYears);
         // Clear contribution cache and re-fetch with new lookback
         this._contributionData = undefined;
@@ -1535,8 +1535,7 @@ export class GanttPanel {
         if (message.collapseKey) {
           const key = message.collapseKey as string;
           // Skip the debounced update from onDidChange - we'll update directly
-          this._skipCollapseRerender = true;
-          // Use shared collapse state (syncs with Issues pane)
+                    // Use shared collapse state (syncs with Issues pane)
           // action: 'collapse' = only collapse, 'expand' = only expand, undefined = toggle
           if (message.action === "collapse") {
             this._collapseState.collapse(key);
@@ -1550,21 +1549,18 @@ export class GanttPanel {
         }
         break;
       case "expandAll":
-        this._skipCollapseRerender = true;
-        this._collapseState.expandAll(message.keys);
+                this._collapseState.expandAll(message.keys);
         this._updateContent();
         break;
       case "collapseAll":
-        this._skipCollapseRerender = true;
-        this._collapseState.collapseAll();
+                this._collapseState.collapseAll();
         this._updateContent();
         break;
       case "collapseStateSync":
         // Client-side collapse already done, just sync state for persistence
         // Set flag to skip re-render since client already updated UI
         if (message.collapseKey) {
-          this._skipCollapseRerender = true;
-          if (message.isExpanded) {
+                    if (message.isExpanded) {
             this._collapseState.expand(message.collapseKey);
           } else {
             this._collapseState.collapse(message.collapseKey);
