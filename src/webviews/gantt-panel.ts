@@ -4165,10 +4165,16 @@ export class GanttPanel {
     .time-group-label:focus .row-hit-area {
       fill: var(--vscode-list-activeSelectionBackground);
     }
+    .issue-label:focus text, .project-label:focus text, .time-group-label:focus text {
+      fill: var(--vscode-list-activeSelectionForeground) !important;
+    }
     .issue-label.active .row-hit-area,
     .project-label.active .row-hit-area,
     .time-group-label.active .row-hit-area {
       fill: var(--vscode-list-inactiveSelectionBackground);
+    }
+    .issue-label.active text, .project-label.active text, .time-group-label.active text {
+      fill: var(--vscode-list-inactiveSelectionForeground) !important;
     }
     /* Collapse toggle chevron - VS Code style */
     .collapse-toggle {
