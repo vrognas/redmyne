@@ -2774,7 +2774,7 @@ export class GanttPanel {
               const endX = ((endPlusOne.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
               const width = Math.max(4, endX - startX);
 
-              return `<rect class="aggregate-bar" x="${startX}" y="4" width="${width}" height="${barHeight - 8}"
+              return `<rect class="aggregate-bar" x="${startX}" y="${barY}" width="${width}" height="${barContentHeight}"
                             fill="var(--vscode-descriptionForeground)" opacity="0.5" rx="2" ry="2"/>`;
             })
             .join("");
@@ -2808,7 +2808,7 @@ export class GanttPanel {
               const endX = ((endPlusOne.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
               const width = Math.max(4, endX - startX);
 
-              return `<rect class="aggregate-bar" x="${startX}" y="4" width="${width}" height="${barHeight - 8}"
+              return `<rect class="aggregate-bar" x="${startX}" y="${barY}" width="${width}" height="${barContentHeight}"
                             fill="${timeGroupColor}" opacity="0.4" rx="2" ry="2"/>`;
             })
             .join("");
@@ -3009,7 +3009,7 @@ export class GanttPanel {
               const normalizedForOpacity = Math.min(d.intensity, maxIntensityForOpacity) / maxIntensityForOpacity;
               const opacity = (0.5 + normalizedForOpacity * 0.4) * fillOpacity;
               // clip-path handles corner rounding, no rx/ry needed on segments
-              return `<rect x="${segX}" y="0" width="${segmentWidth + 0.5}" height="${barHeight}"
+              return `<rect x="${segX}" y="${barY}" width="${segmentWidth + 0.5}" height="${barContentHeight}"
                             fill="${color}" opacity="${opacity.toFixed(2)}"/>`;
             })
             .join("");
@@ -3021,9 +3021,9 @@ export class GanttPanel {
           intensities.forEach((d, i) => {
             const dayStartX = startX + i * segmentWidth;
             const dayEndX = startX + (i + 1) * segmentWidth;
-            // Line Y: bottom of bar minus normalized intensity * bar height (0-based)
+            // Line Y: bottom of bar minus normalized intensity * bar content height
             const normalizedIntensity = Math.min(d.intensity, maxIntensity) / maxIntensity;
-            const py = barHeight - normalizedIntensity * (barHeight - 4);
+            const py = barY + barContentHeight - normalizedIntensity * (barContentHeight - 2);
             if (i === 0) {
               // Move to start of first day
               stepPoints.push(`M ${dayStartX.toFixed(1)},${py.toFixed(1)}`);
@@ -3063,21 +3063,21 @@ export class GanttPanel {
               <!-- Invisible hit area for easier hovering -->
               <rect class="parent-hit-area" x="${startX}" y="0" width="${endX - startX}" height="${barHeight}"
                     fill="transparent" pointer-events="all"/>
-              <!-- Summary bar: bracket-style with downward arrows at ends (0-based Y) -->
-              <path class="bar-outline" d="M ${startX + 4} ${barHeight * 0.3}
-                    L ${startX + 4} ${barHeight * 0.7}
-                    L ${startX} ${barHeight}
-                    M ${startX + 4} ${barHeight * 0.5}
-                    H ${endX - 4}
-                    M ${endX - 4} ${barHeight * 0.3}
-                    L ${endX - 4} ${barHeight * 0.7}
-                    L ${endX} ${barHeight}"
+              <!-- Summary bar: bracket-style with downward arrows at ends -->
+              <path class="bar-outline" d="M ${startX + 3} ${barY + barContentHeight * 0.2}
+                    L ${startX + 3} ${barY + barContentHeight * 0.8}
+                    L ${startX} ${barY + barContentHeight}
+                    M ${startX + 3} ${barY + barContentHeight * 0.5}
+                    H ${endX - 3}
+                    M ${endX - 3} ${barY + barContentHeight * 0.2}
+                    L ${endX - 3} ${barY + barContentHeight * 0.8}
+                    L ${endX} ${barY + barContentHeight}"
                     fill="none" stroke="${color}" stroke-width="2" opacity="0.8" class="cursor-pointer"/>
               ${doneRatio > 0 ? `
                 <!-- Progress line showing done_ratio on parent -->
-                <line class="parent-progress" x1="${startX + 4}" y1="${barHeight * 0.5}"
-                      x2="${startX + 4 + parentDoneWidth}" y2="${barHeight * 0.5}"
-                      stroke="var(--vscode-charts-green)" stroke-width="3" opacity="0.8"/>
+                <line class="parent-progress" x1="${startX + 3}" y1="${barY + barContentHeight * 0.5}"
+                      x2="${startX + 3 + parentDoneWidth}" y2="${barY + barContentHeight * 0.5}"
+                      stroke="var(--vscode-charts-green)" stroke-width="2" opacity="0.8"/>
               ` : ""}
               <!-- Status badge for parent (adaptive positioning) -->
               ${(() => {
@@ -3089,9 +3089,9 @@ export class GanttPanel {
                 return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
                   <g class="progress-badge-group">
                     <title>${escapeAttr(parentProgressTip)}</title>
-                    <rect class="status-badge-bg" x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" rx="2"
+                    <rect class="status-badge-bg" x="${onLeft ? labelX - badgeW : labelX}" y="${barY + barContentHeight / 2 - 6}" width="${badgeW}" height="12" rx="2"
                           fill="var(--vscode-badge-background)" opacity="0.9"/>
-                    <rect x="${onLeft ? labelX - badgeW : labelX}" y="${barHeight / 2 - 8}" width="${badgeW}" height="16" fill="transparent"/>
+                    <rect x="${onLeft ? labelX - badgeW : labelX}" y="${barY + barContentHeight / 2 - 6}" width="${badgeW}" height="12" fill="transparent"/>
                     <text class="status-badge" x="${badgeCenterX}" y="${barHeight / 2 + 4}"
                           text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${doneRatio}%</text>
                   </g>
@@ -3119,7 +3119,7 @@ export class GanttPanel {
             <!-- Clip path for bar shape -->
             <defs>
               <clipPath id="bar-clip-${issue.id}">
-                <rect x="${startX}" y="0" width="${width}" height="${barHeight}" rx="8" ry="8"/>
+                <rect x="${startX}" y="${barY}" width="${width}" height="${barContentHeight}" rx="6" ry="6"/>
               </clipPath>
             </defs>
             <g clip-path="url(#bar-clip-${issue.id})">
@@ -3129,26 +3129,26 @@ export class GanttPanel {
                 <!-- Intensity line chart -->
                 ${intensityLine}
               ` : `
-                <!-- Fallback: solid bar when no intensity data (0-based Y) -->
-                <rect class="bar-main" x="${startX}" y="0" width="${width}" height="${barHeight}"
+                <!-- Fallback: solid bar when no intensity data -->
+                <rect class="bar-main" x="${startX}" y="${barY}" width="${width}" height="${barContentHeight}"
                       fill="${color}" opacity="${(0.85 * fillOpacity).toFixed(2)}" filter="url(#barShadow)"/>
               `}
               ${hasPastPortion ? `
                 <!-- Past portion overlay with diagonal stripes -->
-                <rect class="past-overlay" x="${startX}" y="0" width="${pastWidth}" height="${barHeight}"
+                <rect class="past-overlay" x="${startX}" y="${barY}" width="${pastWidth}" height="${barContentHeight}"
                       fill="url(#past-stripes)"/>
               ` : ""}
               ${visualDoneRatio > 0 && visualDoneRatio < 100 ? `
                 <!-- Progress: dim unfilled portion + divider line -->
-                <rect class="progress-unfilled" x="${startX + doneWidth}" y="0" width="${width - doneWidth}" height="${barHeight}"
+                <rect class="progress-unfilled" x="${startX + doneWidth}" y="${barY}" width="${width - doneWidth}" height="${barContentHeight}"
                       fill="black" opacity="0.3"/>
-                <line class="progress-divider" x1="${startX + doneWidth}" y1="2" x2="${startX + doneWidth}" y2="${barHeight - 2}"
+                <line class="progress-divider" x1="${startX + doneWidth}" y1="${barY + 1}" x2="${startX + doneWidth}" y2="${barY + barContentHeight - 1}"
                       stroke="white" stroke-width="2" opacity="0.6"/>
               ` : ""}
             </g>
             <!-- Border/outline - pointer-events:all so clicks work even with fill:none -->
-            <rect class="bar-outline cursor-move" x="${startX}" y="0" width="${width}" height="${barHeight}"
-                  fill="none" stroke="var(--vscode-panel-border)" stroke-width="1" rx="8" ry="8" pointer-events="all"/>
+            <rect class="bar-outline cursor-move" x="${startX}" y="${barY}" width="${width}" height="${barContentHeight}"
+                  fill="none" stroke="var(--vscode-panel-border)" stroke-width="1" rx="6" ry="6" pointer-events="all"/>
             ${(() => {
               // Show subject text on bar if it fits (min 40px width, ~6px per char)
               const padding = 12;
@@ -3159,8 +3159,8 @@ export class GanttPanel {
               const displaySubject = issue.subject.length > maxChars
                 ? issue.subject.substring(0, maxChars - 1) + "…"
                 : issue.subject;
-              return `<text class="bar-subject" x="${startX + padding}" y="${barHeight / 2 + 4}"
-                    fill="${textColor}" font-size="10" font-weight="500"
+              return `<text class="bar-subject" x="${startX + padding}" y="${barY + barContentHeight / 2 + 3}"
+                    fill="${textColor}" font-size="9" font-weight="500"
                     pointer-events="none">${escapeHtml(displaySubject)}</text>`;
             })()}
             <rect class="drag-handle drag-left cursor-ew-resize" x="${startX}" y="0" width="${handleWidth}" height="${barHeight}"
@@ -3168,10 +3168,10 @@ export class GanttPanel {
             <rect class="drag-handle drag-right cursor-ew-resize" x="${startX + width - handleWidth}" y="0" width="${handleWidth}" height="${barHeight}"
                   fill="transparent"/>
             <!-- Link handle for creating relations (larger hit area for Fitts's Law) -->
-            <g class="link-handle cursor-crosshair" data-cx="${endX + 8}" data-cy="${y + barHeight / 2}">
+            <g class="link-handle cursor-crosshair" data-cx="${endX + 8}" data-cy="${y + barY + barContentHeight / 2}">
               <title>Drag to link</title>
-              <circle cx="${endX + 8}" cy="${barHeight / 2}" r="14" fill="transparent" pointer-events="all"/>
-              <circle class="link-handle-visual" cx="${endX + 8}" cy="${barHeight / 2}" r="5"
+              <circle cx="${endX + 8}" cy="${barY + barContentHeight / 2}" r="12" fill="transparent" pointer-events="all"/>
+              <circle class="link-handle-visual" cx="${endX + 8}" cy="${barY + barContentHeight / 2}" r="4"
                       fill="var(--vscode-button-background)" stroke="var(--vscode-button-foreground)"
                       stroke-width="1" pointer-events="none"/>
             </g>
@@ -3219,9 +3219,9 @@ export class GanttPanel {
                 return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
                   <g class="progress-badge-group">
                     <title>Closed</title>
-                    <rect class="status-badge-bg" x="${onLeft ? labelX - checkBadgeW : labelX}" y="${barHeight / 2 - 8}" width="${checkBadgeW}" height="16" rx="2"
+                    <rect class="status-badge-bg" x="${onLeft ? labelX - checkBadgeW : labelX}" y="${barY + barContentHeight / 2 - 6}" width="${checkBadgeW}" height="12" rx="2"
                           fill="var(--vscode-charts-green)" opacity="0.15"/>
-                    <rect x="${onLeft ? labelX - checkBadgeW : labelX}" y="${barHeight / 2 - 8}" width="${checkBadgeW}" height="16" fill="transparent"/>
+                    <rect x="${onLeft ? labelX - checkBadgeW : labelX}" y="${barY + barContentHeight / 2 - 6}" width="${checkBadgeW}" height="12" fill="transparent"/>
                     <text class="status-badge" x="${checkCenterX}" y="${barHeight / 2 + 4}"
                           text-anchor="middle" fill="var(--vscode-charts-green)" font-size="12">✓</text>
                   </g>
@@ -3255,33 +3255,33 @@ export class GanttPanel {
               return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
                 <g class="progress-badge-group">
                   <title>${escapeAttr(progressTooltip)}</title>
-                  <rect class="status-badge-bg" x="${onLeft ? labelX - progressBadgeW : labelX}" y="${barHeight / 2 - 8}" width="${progressBadgeW}" height="16" rx="2"
+                  <rect class="status-badge-bg" x="${onLeft ? labelX - progressBadgeW : labelX}" y="${barY + barContentHeight / 2 - 6}" width="${progressBadgeW}" height="12" rx="2"
                         fill="var(--vscode-badge-background)" opacity="0.9"/>
-                  <rect x="${onLeft ? labelX - progressBadgeW : labelX}" y="${barHeight / 2 - 8}" width="${progressBadgeW}" height="16" fill="transparent"/>
+                  <rect x="${onLeft ? labelX - progressBadgeW : labelX}" y="${barY + barContentHeight / 2 - 6}" width="${progressBadgeW}" height="12" fill="transparent"/>
                   <text class="status-badge" x="${progressCenterX}" y="${barHeight / 2 + 4}"
                         text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${isFallbackProgress ? "~" : ""}${visualDoneRatio}%</text>
                 </g>
                 ${showFlex ? `<g class="flex-badge-group">
                   <title>${escapeAttr(flexTooltip)}</title>
-                  <rect class="flex-badge-bg" x="${onLeft ? flexBadgeX - flexBadgeW : flexBadgeX}" y="${barHeight / 2 - 8}" width="${flexBadgeW}" height="16" rx="2"
+                  <rect class="flex-badge-bg" x="${onLeft ? flexBadgeX - flexBadgeW : flexBadgeX}" y="${barY + barContentHeight / 2 - 6}" width="${flexBadgeW}" height="12" rx="2"
                         fill="${flexColor}" opacity="0.15"/>
-                  <rect x="${onLeft ? flexBadgeX - flexBadgeW : flexBadgeX}" y="${barHeight / 2 - 8}" width="${flexBadgeW}" height="16" fill="transparent"/>
+                  <rect x="${onLeft ? flexBadgeX - flexBadgeW : flexBadgeX}" y="${barY + barContentHeight / 2 - 6}" width="${flexBadgeW}" height="12" fill="transparent"/>
                   <text class="flex-badge" x="${flexBadgeCenterX}" y="${barHeight / 2 + 4}"
                         text-anchor="middle" fill="${flexColor}" font-size="10" font-weight="500">${flexLabel}</text>
                 </g>` : ""}
                 ${showBlocks ? `<g class="blocks-badge-group" style="cursor: pointer;">
                   <title>${escapeAttr(blocksTooltip)}</title>
-                  <rect class="blocks-badge-bg" x="${onLeft ? impactBadgeX - impactBadgeW : impactBadgeX}" y="${barHeight / 2 - 8}" width="${impactBadgeW}" height="16" rx="2"
+                  <rect class="blocks-badge-bg" x="${onLeft ? impactBadgeX - impactBadgeW : impactBadgeX}" y="${barY + barContentHeight / 2 - 6}" width="${impactBadgeW}" height="12" rx="2"
                         fill="${impactColor}" opacity="0.15"/>
-                  <rect x="${onLeft ? impactBadgeX - impactBadgeW : impactBadgeX}" y="${barHeight / 2 - 8}" width="${impactBadgeW}" height="16" fill="transparent"/>
+                  <rect x="${onLeft ? impactBadgeX - impactBadgeW : impactBadgeX}" y="${barY + barContentHeight / 2 - 6}" width="${impactBadgeW}" height="12" fill="transparent"/>
                   <text class="blocks-badge" x="${impactBadgeCenterX}" y="${barHeight / 2 + 4}"
                         text-anchor="middle" fill="${impactColor}" font-size="10" font-weight="500">${impactLabel}</text>
                 </g>` : ""}
                 ${showBlocker ? `<g class="blocker-badge" data-blocker-id="${firstBlockerId}" style="cursor: pointer;">
                   <title>${escapeAttr(blockerTooltip)}</title>
-                  <rect x="${onLeft ? blockerBadgeX - blockerBadgeW : blockerBadgeX}" y="${barHeight / 2 - 8}" width="${blockerBadgeW}" height="16" rx="2"
+                  <rect x="${onLeft ? blockerBadgeX - blockerBadgeW : blockerBadgeX}" y="${barY + barContentHeight / 2 - 6}" width="${blockerBadgeW}" height="12" rx="2"
                         fill="var(--vscode-charts-red)" opacity="0.15"/>
-                  <rect x="${onLeft ? blockerBadgeX - blockerBadgeW : blockerBadgeX}" y="${barHeight / 2 - 8}" width="${blockerBadgeW}" height="16" fill="transparent"/>
+                  <rect x="${onLeft ? blockerBadgeX - blockerBadgeW : blockerBadgeX}" y="${barY + barContentHeight / 2 - 6}" width="${blockerBadgeW}" height="12" fill="transparent"/>
                   <text x="${blockerBadgeCenterX}" y="${barHeight / 2 + 4}"
                         text-anchor="middle" fill="var(--vscode-charts-red)" font-size="10" font-weight="500">${blockerLabel}</text>
                 </g>` : ""}
