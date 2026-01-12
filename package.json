@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "3.20.0",
+  "version": "3.22.0",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -51,7 +51,7 @@
       },
       {
         "command": "redmine.quickLogTime",
-        "title": "Redmine: Quick Log Time (Ctrl+Y Y)"
+        "title": "Log Time"
       },
       {
         "command": "redmine.changeDefaultServer",
@@ -174,11 +174,13 @@
       {
         "command": "redmine.setInternalEstimate",
         "title": "Set Internal Estimate",
+        "shortTitle": "Set...",
         "icon": "$(clock)"
       },
       {
         "command": "redmine.clearInternalEstimate",
         "title": "Clear Internal Estimate",
+        "shortTitle": "Clear",
         "icon": "$(trash)"
       },
       {
@@ -187,8 +189,105 @@
         "icon": "$(checklist)"
       },
       {
+        "command": "redmine.setStatus",
+        "title": "Set Status",
+        "icon": "$(symbol-event)"
+      },
+      {
+        "command": "redmine.setDoneRatio0",
+        "title": "0%"
+      },
+      {
+        "command": "redmine.setDoneRatio10",
+        "title": "10%"
+      },
+      {
+        "command": "redmine.setDoneRatio20",
+        "title": "20%"
+      },
+      {
+        "command": "redmine.setDoneRatio30",
+        "title": "30%"
+      },
+      {
+        "command": "redmine.setDoneRatio40",
+        "title": "40%"
+      },
+      {
+        "command": "redmine.setDoneRatio50",
+        "title": "50%"
+      },
+      {
+        "command": "redmine.setDoneRatio60",
+        "title": "60%"
+      },
+      {
+        "command": "redmine.setDoneRatio70",
+        "title": "70%"
+      },
+      {
+        "command": "redmine.setDoneRatio80",
+        "title": "80%"
+      },
+      {
+        "command": "redmine.setDoneRatio90",
+        "title": "90%"
+      },
+      {
+        "command": "redmine.setDoneRatio100",
+        "title": "100%"
+      },
+      {
+        "command": "redmine.setDoneRatioCustom",
+        "title": "Custom..."
+      },
+      {
+        "command": "redmine.setIssuePriority",
+        "title": "Set Priority",
+        "icon": "$(arrow-both)"
+      },
+      {
+        "command": "redmine.autoUpdateOn",
+        "title": "On"
+      },
+      {
+        "command": "redmine.autoUpdateOff",
+        "title": "Off"
+      },
+      {
+        "command": "redmine.adHocOn",
+        "title": "On"
+      },
+      {
+        "command": "redmine.adHocOff",
+        "title": "Off"
+      },
+      {
+        "command": "redmine.precedenceOn",
+        "title": "On"
+      },
+      {
+        "command": "redmine.precedenceOff",
+        "title": "Off"
+      },
+      {
         "command": "redmine.copyIssueUrl",
-        "title": "Copy Issue URL",
+        "title": "Copy URL",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "redmine.copyIssueId",
+        "title": "Copy Issue ID",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "redmine.copyProjectId",
+        "title": "Copy Project ID",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "redmine.copyProjectUrl",
+        "title": "Copy Project URL",
         "icon": "$(copy)"
       },
       {
@@ -214,6 +313,11 @@
         "command": "redmine.quickCreateIssue",
         "title": "Redmine: Quick Create Issue (Ctrl+Y N)",
         "icon": "$(add)"
+      },
+      {
+        "command": "redmine.updateIssue",
+        "title": "Update Issue...",
+        "icon": "$(edit)"
       },
       {
         "command": "redmine.quickCreateSubIssue",
@@ -410,7 +514,23 @@
       },
       {
         "command": "redmine.gantt.showInIssues",
-        "title": "Show in Issues"
+        "title": "Show in Sidebar"
+      },
+      {
+        "command": "redmine.gantt.createSubIssue",
+        "title": "Create Sub-Issue"
+      },
+      {
+        "command": "redmine.gantt.createIssue",
+        "title": "Create Issue"
+      },
+      {
+        "command": "redmine.gantt.createVersion",
+        "title": "Create Version"
+      },
+      {
+        "command": "redmine.gantt.addToKanban",
+        "title": "Add to Kanban"
       },
       {
         "command": "redmine.gantt.logTime",
@@ -469,32 +589,44 @@
         "title": "Custom..."
       },
       {
-        "command": "redmine.gantt.setStatusNew",
-        "title": "New"
+        "command": "redmine.gantt.setStatus",
+        "title": "Set Status"
       },
       {
-        "command": "redmine.gantt.setStatusInProgress",
-        "title": "In Progress"
+        "command": "redmine.gantt.setIssuePriority",
+        "title": "Set Priority"
       },
       {
-        "command": "redmine.gantt.setStatusClosed",
-        "title": "Closed"
+        "command": "redmine.gantt.autoUpdateOn",
+        "title": "On"
       },
       {
-        "command": "redmine.gantt.setStatusOther",
-        "title": "Other..."
+        "command": "redmine.gantt.autoUpdateOff",
+        "title": "Off"
       },
       {
-        "command": "redmine.gantt.toggleAutoUpdate",
-        "title": "Toggle Auto-update %"
+        "command": "redmine.gantt.adHocOn",
+        "title": "On"
       },
       {
-        "command": "redmine.gantt.toggleAdHoc",
-        "title": "Toggle Ad-hoc Budget"
+        "command": "redmine.gantt.adHocOff",
+        "title": "Off"
       },
       {
-        "command": "redmine.gantt.togglePrecedence",
-        "title": "Toggle Precedence"
+        "command": "redmine.gantt.precedenceOn",
+        "title": "On"
+      },
+      {
+        "command": "redmine.gantt.precedenceOff",
+        "title": "Off"
+      },
+      {
+        "command": "redmine.gantt.setInternalEstimate",
+        "title": "Set..."
+      },
+      {
+        "command": "redmine.gantt.clearInternalEstimate",
+        "title": "Clear"
       },
       {
         "command": "redmine.gantt.copyUrl",
@@ -505,12 +637,24 @@
         "title": "Copy Issue ID"
       },
       {
+        "command": "redmine.gantt.copyProjectId",
+        "title": "Copy Project ID"
+      },
+      {
+        "command": "redmine.gantt.copyProjectUrl",
+        "title": "Copy Project URL"
+      },
+      {
         "command": "redmine.gantt.openProjectInBrowser",
-        "title": "Open Project in Browser"
+        "title": "Open in Browser"
       },
       {
         "command": "redmine.gantt.showProjectInGantt",
         "title": "Show Project in Gantt"
+      },
+      {
+        "command": "redmine.gantt.showProjectInIssues",
+        "title": "Show in Sidebar"
       },
       {
         "command": "redmine.contributeToIssue",
@@ -615,12 +759,44 @@
         "icon": "$(arrow-swap)"
       },
       {
-        "id": "redmine.gantt.setDoneRatioMenu",
-        "label": "Set % Done"
+        "id": "redmine.gantt.doneRatioMenu",
+        "label": "% Done"
       },
       {
-        "id": "redmine.gantt.setStatusMenu",
-        "label": "Set Status"
+        "id": "redmine.gantt.autoUpdateMenu",
+        "label": "Auto-update %"
+      },
+      {
+        "id": "redmine.gantt.adHocMenu",
+        "label": "Ad-hoc Budget"
+      },
+      {
+        "id": "redmine.gantt.precedenceMenu",
+        "label": "Precedence"
+      },
+      {
+        "id": "redmine.gantt.internalEstimateMenu",
+        "label": "Internal Estimate"
+      },
+      {
+        "id": "redmine.doneRatioMenu",
+        "label": "% Done"
+      },
+      {
+        "id": "redmine.autoUpdateMenu",
+        "label": "Auto-update %"
+      },
+      {
+        "id": "redmine.adHocMenu",
+        "label": "Ad-hoc Budget"
+      },
+      {
+        "id": "redmine.precedenceMenu",
+        "label": "Precedence"
+      },
+      {
+        "id": "redmine.internalEstimateMenu",
+        "label": "Internal Estimate"
       }
     ],
     "menus": {
@@ -1035,128 +1211,108 @@
         },
         {
           "command": "redmine.openIssueInBrowser",
-          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^issue/",
-          "group": "navigation@1"
-        },
-        {
-          "command": "redmine.openIssueInBrowser",
-          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
-          "group": "navigation@1"
+          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "group": "1_navigation@1"
         },
         {
           "command": "redmine.openIssueInGantt",
-          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^issue/",
-          "group": "navigation@2"
+          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "group": "1_navigation@2"
         },
         {
-          "command": "redmine.openIssueInGantt",
-          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
-          "group": "navigation@2"
+          "command": "redmine.updateIssue",
+          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "group": "2_actions@1"
+        },
+        {
+          "command": "redmine.quickCreateSubIssue",
+          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/ && viewItem !~ /-child/",
+          "group": "2_actions@2"
+        },
+        {
+          "submenu": "redmine.doneRatioMenu",
+          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "group": "3_properties@1"
+        },
+        {
+          "command": "redmine.setStatus",
+          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "group": "3_properties@2"
+        },
+        {
+          "command": "redmine.setIssuePriority",
+          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "group": "3_properties@3"
+        },
+        {
+          "command": "redmine.quickLogTime",
+          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue-active/",
+          "group": "4_time@1"
+        },
+        {
+          "submenu": "redmine.autoUpdateMenu",
+          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "group": "5_settings@1"
+        },
+        {
+          "submenu": "redmine.adHocMenu",
+          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "group": "5_settings@2"
+        },
+        {
+          "submenu": "redmine.precedenceMenu",
+          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "group": "5_settings@3"
+        },
+        {
+          "submenu": "redmine.internalEstimateMenu",
+          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "group": "5_settings@4"
+        },
+        {
+          "command": "redmine.addIssueToKanban",
+          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "group": "6_integrations@1"
+        },
+        {
+          "command": "redmine.copyIssueUrl",
+          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "group": "9_clipboard@1"
+        },
+        {
+          "command": "redmine.copyIssueId",
+          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "group": "9_clipboard@2"
         },
         {
           "command": "redmine.openProjectInBrowser",
           "when": "view == 'redmine-explorer-projects' && viewItem =~ /^project/",
-          "group": "navigation@1"
+          "group": "1_navigation@1"
         },
         {
           "command": "redmine.showProjectInGantt",
           "when": "view == 'redmine-explorer-projects' && viewItem =~ /^project/",
-          "group": "navigation@2"
+          "group": "1_navigation@2"
         },
         {
           "command": "redmine.quickCreateIssue",
           "when": "view == 'redmine-explorer-projects' && viewItem =~ /^project/",
-          "group": "redmine@1"
+          "group": "2_actions@1"
         },
         {
           "command": "redmine.quickCreateVersion",
           "when": "view == 'redmine-explorer-projects' && viewItem =~ /^project/",
-          "group": "redmine@2"
+          "group": "2_actions@2"
         },
         {
-          "command": "redmine.setDoneRatio",
-          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^issue/",
-          "group": "redmine@2"
+          "command": "redmine.copyProjectUrl",
+          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^project/",
+          "group": "9_clipboard@1"
         },
         {
-          "command": "redmine.setDoneRatio",
-          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
-          "group": "redmine@2"
-        },
-        {
-          "command": "redmine.setInternalEstimate",
-          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^issue/",
-          "group": "redmine@3"
-        },
-        {
-          "command": "redmine.setInternalEstimate",
-          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
-          "group": "redmine@3"
-        },
-        {
-          "command": "redmine.clearInternalEstimate",
-          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^issue/",
-          "group": "redmine@3"
-        },
-        {
-          "command": "redmine.clearInternalEstimate",
-          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
-          "group": "redmine@3"
-        },
-        {
-          "command": "redmine.quickLogTime",
-          "when": "view == 'redmine-explorer-projects' && viewItem == 'issue-active'",
-          "group": "redmine@1"
-        },
-        {
-          "command": "redmine.quickLogTime",
-          "when": "view == 'redmine-explorer-my-issues' && viewItem == 'issue-active'",
-          "group": "redmine@1"
-        },
-        {
-          "command": "redmine.copyIssueUrl",
-          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^issue/",
-          "group": "9_cutcopypaste@1"
-        },
-        {
-          "command": "redmine.copyIssueUrl",
-          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
-          "group": "9_cutcopypaste@1"
-        },
-        {
-          "command": "redmine.quickCreateSubIssue",
-          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^issue/",
-          "group": "redmine@2"
-        },
-        {
-          "command": "redmine.quickCreateSubIssue",
-          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
-          "group": "redmine@2"
-        },
-        {
-          "command": "redmine.toggleAutoUpdateDoneRatio",
-          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^issue/",
-          "group": "redmine@3"
-        },
-        {
-          "command": "redmine.toggleAutoUpdateDoneRatio",
-          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
-          "group": "redmine@3"
-        },
-        {
-          "command": "redmine.toggleAdHoc",
-          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^issue/",
-          "group": "redmine@4"
-        },
-        {
-          "command": "redmine.toggleAdHoc",
-          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
-          "group": "redmine@4"
-        },
-        {
-          "command": "redmine.addIssueToKanban",
-          "when": "view == 'redmine-explorer-my-issues' && viewItem =~ /^issue/",
-          "group": "redmine@3"
+          "command": "redmine.copyProjectId",
+          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^project/",
+          "group": "9_clipboard@2"
         },
         {
           "command": "redmine.timer.startUnit",
@@ -1244,7 +1400,7 @@
           "group": "navigation@1"
         }
       ],
-      "redmine.gantt.setDoneRatioMenu": [
+      "redmine.gantt.doneRatioMenu": [
         {
           "command": "redmine.gantt.setDoneRatio0",
           "group": "1_percentages@1"
@@ -1294,69 +1450,117 @@
           "group": "2_custom@1"
         }
       ],
-      "redmine.gantt.setStatusMenu": [
-        {
-          "command": "redmine.gantt.setStatusNew",
-          "group": "1_status@1"
-        },
-        {
-          "command": "redmine.gantt.setStatusInProgress",
-          "group": "1_status@2"
-        },
-        {
-          "command": "redmine.gantt.setStatusClosed",
-          "group": "1_status@3"
-        },
-        {
-          "command": "redmine.gantt.setStatusOther",
-          "group": "2_other@1"
-        }
+      "redmine.gantt.autoUpdateMenu": [
+        { "command": "redmine.gantt.autoUpdateOn", "group": "1_toggle@1" },
+        { "command": "redmine.gantt.autoUpdateOff", "group": "1_toggle@2" }
+      ],
+      "redmine.gantt.adHocMenu": [
+        { "command": "redmine.gantt.adHocOn", "group": "1_toggle@1" },
+        { "command": "redmine.gantt.adHocOff", "group": "1_toggle@2" }
+      ],
+      "redmine.gantt.precedenceMenu": [
+        { "command": "redmine.gantt.precedenceOn", "group": "1_toggle@1" },
+        { "command": "redmine.gantt.precedenceOff", "group": "1_toggle@2" }
+      ],
+      "redmine.gantt.internalEstimateMenu": [
+        { "command": "redmine.gantt.setInternalEstimate", "group": "1_estimate@1" },
+        { "command": "redmine.gantt.clearInternalEstimate", "group": "1_estimate@2" }
+      ],
+      "redmine.doneRatioMenu": [
+        { "command": "redmine.setDoneRatio0", "group": "1_percentages@1" },
+        { "command": "redmine.setDoneRatio10", "group": "1_percentages@2" },
+        { "command": "redmine.setDoneRatio20", "group": "1_percentages@3" },
+        { "command": "redmine.setDoneRatio30", "group": "1_percentages@4" },
+        { "command": "redmine.setDoneRatio40", "group": "1_percentages@5" },
+        { "command": "redmine.setDoneRatio50", "group": "1_percentages@6" },
+        { "command": "redmine.setDoneRatio60", "group": "1_percentages@7" },
+        { "command": "redmine.setDoneRatio70", "group": "1_percentages@8" },
+        { "command": "redmine.setDoneRatio80", "group": "1_percentages@9" },
+        { "command": "redmine.setDoneRatio90", "group": "1_percentages@10" },
+        { "command": "redmine.setDoneRatio100", "group": "1_percentages@11" },
+        { "command": "redmine.setDoneRatioCustom", "group": "2_custom@1" }
+      ],
+      "redmine.autoUpdateMenu": [
+        { "command": "redmine.autoUpdateOn", "group": "1_toggle@1" },
+        { "command": "redmine.autoUpdateOff", "group": "1_toggle@2" }
+      ],
+      "redmine.adHocMenu": [
+        { "command": "redmine.adHocOn", "group": "1_toggle@1" },
+        { "command": "redmine.adHocOff", "group": "1_toggle@2" }
+      ],
+      "redmine.precedenceMenu": [
+        { "command": "redmine.precedenceOn", "group": "1_toggle@1" },
+        { "command": "redmine.precedenceOff", "group": "1_toggle@2" }
+      ],
+      "redmine.internalEstimateMenu": [
+        { "command": "redmine.setInternalEstimate", "group": "1_estimate@1" },
+        { "command": "redmine.clearInternalEstimate", "group": "1_estimate@2" }
       ],
       "webview/context": [
         {
-          "command": "redmine.gantt.updateIssue",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
-          "group": "1_actions@1"
-        },
-        {
           "command": "redmine.gantt.openInBrowser",
           "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
-          "group": "1_actions@2"
+          "group": "1_navigation@1"
         },
         {
           "command": "redmine.gantt.showInIssues",
           "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
-          "group": "1_actions@3"
+          "group": "1_navigation@2"
+        },
+        {
+          "command": "redmine.gantt.updateIssue",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "group": "2_actions@1"
+        },
+        {
+          "command": "redmine.gantt.createSubIssue",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar' && !hasParent",
+          "group": "2_actions@2"
+        },
+        {
+          "submenu": "redmine.gantt.doneRatioMenu",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "group": "3_properties@1"
+        },
+        {
+          "command": "redmine.gantt.setStatus",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "group": "3_properties@2"
+        },
+        {
+          "command": "redmine.gantt.setIssuePriority",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "group": "3_properties@3"
         },
         {
           "command": "redmine.gantt.logTime",
           "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
-          "group": "2_time@1"
+          "group": "4_time@1"
         },
         {
-          "submenu": "redmine.gantt.setDoneRatioMenu",
+          "submenu": "redmine.gantt.autoUpdateMenu",
           "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
-          "group": "2_time@2"
+          "group": "5_settings@1"
         },
         {
-          "submenu": "redmine.gantt.setStatusMenu",
+          "submenu": "redmine.gantt.adHocMenu",
           "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
-          "group": "2_time@3"
+          "group": "5_settings@2"
         },
         {
-          "command": "redmine.gantt.toggleAutoUpdate",
+          "submenu": "redmine.gantt.precedenceMenu",
           "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
-          "group": "3_toggles@1"
+          "group": "5_settings@3"
         },
         {
-          "command": "redmine.gantt.toggleAdHoc",
+          "submenu": "redmine.gantt.internalEstimateMenu",
           "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
-          "group": "3_toggles@2"
+          "group": "5_settings@4"
         },
         {
-          "command": "redmine.gantt.togglePrecedence",
+          "command": "redmine.gantt.addToKanban",
           "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
-          "group": "3_toggles@3"
+          "group": "6_integrations@1"
         },
         {
           "command": "redmine.gantt.copyUrl",
@@ -1376,12 +1580,32 @@
         {
           "command": "redmine.gantt.openProjectInBrowser",
           "when": "webviewId == 'redmineGantt' && webviewSection == 'projectLabel'",
-          "group": "1_actions@1"
+          "group": "1_navigation@1"
         },
         {
-          "command": "redmine.gantt.showProjectInGantt",
+          "command": "redmine.gantt.showProjectInIssues",
           "when": "webviewId == 'redmineGantt' && webviewSection == 'projectLabel'",
-          "group": "1_actions@2"
+          "group": "1_navigation@2"
+        },
+        {
+          "command": "redmine.gantt.createIssue",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'projectLabel'",
+          "group": "2_actions@1"
+        },
+        {
+          "command": "redmine.gantt.createVersion",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'projectLabel'",
+          "group": "2_actions@2"
+        },
+        {
+          "command": "redmine.gantt.copyProjectUrl",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'projectLabel'",
+          "group": "9_clipboard@1"
+        },
+        {
+          "command": "redmine.gantt.copyProjectId",
+          "when": "webviewId == 'redmineGantt' && webviewSection == 'projectLabel'",
+          "group": "9_clipboard@2"
         }
       ]
     },
@@ -1425,6 +1649,12 @@
           "type": "boolean",
           "description": "Auto-update % Done based on spent/estimated hours when logging time. Caps at 99% (100% must be manual). Skips if over budget.",
           "default": true,
+          "scope": "application"
+        },
+        "redmine.showCalculatedPriority": {
+          "type": "boolean",
+          "description": "Show calculated priority score in Gantt tooltips (based on due date urgency, downstream dependencies, external blocks)",
+          "default": false,
           "scope": "application"
         },
         "redmine.workingHours.hoursPerDay": {

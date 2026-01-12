@@ -2,7 +2,7 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
-## [Unreleased]
+## [3.22.0]
 
 ### Added
 

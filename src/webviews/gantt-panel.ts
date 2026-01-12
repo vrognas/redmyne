@@ -1560,19 +1560,15 @@ export class GanttPanel {
         // Client-side collapse already done, just sync state for persistence
         // Set flag to skip re-render since client already updated UI
         if (message.collapseKey) {
-          console.log("[collapseStateSync] key:", message.collapseKey, "isExpanded:", message.isExpanded);
           if (message.isExpanded) {
             this._collapseState.expand(message.collapseKey);
           } else {
             this._collapseState.collapse(message.collapseKey);
           }
-          console.log("[collapseStateSync] expandedKeys after:", Array.from(this._collapseState.getExpandedKeys()));
         }
         break;
       case "requestRerender":
         // Re-render requested (e.g., to fix zebra stripes after fallback toggle)
-        console.log("[requestRerender] expandedKeys:", Array.from(this._collapseState.getExpandedKeys()));
-        console.log("[requestRerender] _expandAllOnNextRender:", this._expandAllOnNextRender);
         this._updateContent();
         break;
       case "scrollPosition":
@@ -2075,7 +2071,6 @@ export class GanttPanel {
     }
     // Auto-expand all when switching project/person (before flattening)
     if (this._expandAllOnNextRender) {
-      console.log("[_updateContent] _expandAllOnNextRender is TRUE, expanding all");
       this._expandAllOnNextRender = false;
       const collectKeys = (nodes: HierarchyNode[]): string[] => {
         const keys: string[] = [];
@@ -2090,17 +2085,7 @@ export class GanttPanel {
     }
     // Get ALL nodes with visibility flags for client-side collapse management
     const expandedKeys = this._collapseState.getExpandedKeys();
-    console.log("[_updateContent] expandedKeys size:", expandedKeys.size, "keys:", Array.from(expandedKeys).slice(0, 5));
     const flatNodes = flattenHierarchyAll(this._cachedHierarchy, expandedKeys);
-    // Log first 15 nodes to see visibility pattern
-    console.log("[_updateContent] first 15 nodes:", flatNodes.slice(0, 15).map(n => ({
-      key: n.collapseKey,
-      type: n.type,
-      label: n.label?.slice(0, 30),
-      isVisible: n.isVisible,
-      isExpanded: n.isExpanded,
-      parentKey: n.parentKey
-    })));
     // Build dependency graph for downstream impact calculation
     const depGraph = buildDependencyGraph(sortedIssues);
     const issueMap = new Map(sortedIssues.map(i => [i.id, i]));
