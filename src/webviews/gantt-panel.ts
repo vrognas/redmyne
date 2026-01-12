@@ -1553,19 +1553,27 @@ export class GanttPanel {
         this._updateContent();
         break;
       case "collapseAll":
-                this._collapseState.collapseAll();
+        this._collapseState.collapseAll();
         this._updateContent();
         break;
       case "collapseStateSync":
         // Client-side collapse already done, just sync state for persistence
         // Set flag to skip re-render since client already updated UI
         if (message.collapseKey) {
-                    if (message.isExpanded) {
+          console.log("[collapseStateSync] key:", message.collapseKey, "isExpanded:", message.isExpanded);
+          if (message.isExpanded) {
             this._collapseState.expand(message.collapseKey);
           } else {
             this._collapseState.collapse(message.collapseKey);
           }
+          console.log("[collapseStateSync] expandedKeys after:", Array.from(this._collapseState.getExpandedKeys()));
         }
+        break;
+      case "requestRerender":
+        // Re-render requested (e.g., to fix zebra stripes after fallback toggle)
+        console.log("[requestRerender] expandedKeys:", Array.from(this._collapseState.getExpandedKeys()));
+        console.log("[requestRerender] _expandAllOnNextRender:", this._expandAllOnNextRender);
+        this._updateContent();
         break;
       case "scrollPosition":
         // Store scroll position for restoration after update
@@ -2067,6 +2075,7 @@ export class GanttPanel {
     }
     // Auto-expand all when switching project/person (before flattening)
     if (this._expandAllOnNextRender) {
+      console.log("[_updateContent] _expandAllOnNextRender is TRUE, expanding all");
       this._expandAllOnNextRender = false;
       const collectKeys = (nodes: HierarchyNode[]): string[] => {
         const keys: string[] = [];
@@ -2080,7 +2089,18 @@ export class GanttPanel {
       if (allKeys.length > 0) this._collapseState.expandAll(allKeys);
     }
     // Get ALL nodes with visibility flags for client-side collapse management
-    const flatNodes = flattenHierarchyAll(this._cachedHierarchy, this._collapseState.getExpandedKeys());
+    const expandedKeys = this._collapseState.getExpandedKeys();
+    console.log("[_updateContent] expandedKeys size:", expandedKeys.size, "keys:", Array.from(expandedKeys).slice(0, 5));
+    const flatNodes = flattenHierarchyAll(this._cachedHierarchy, expandedKeys);
+    // Log first 15 nodes to see visibility pattern
+    console.log("[_updateContent] first 15 nodes:", flatNodes.slice(0, 15).map(n => ({
+      key: n.collapseKey,
+      type: n.type,
+      label: n.label?.slice(0, 30),
+      isVisible: n.isVisible,
+      isExpanded: n.isExpanded,
+      parentKey: n.parentKey
+    })));
     // Build dependency graph for downstream impact calculation
     const depGraph = buildDependencyGraph(sortedIssues);
     const issueMap = new Map(sortedIssues.map(i => [i.id, i]));
@@ -2243,10 +2263,10 @@ export class GanttPanel {
     const skipTopProjectRow = this._viewFocus === "project";
     // Find the top-level project's collapseKey to clear parent references
     const topProjectKey = skipTopProjectRow ? rows.find(r => r.type === "project" && r.depth === 0)?.collapseKey : null;
-    const visibleRows = rows.filter(r => {
-      // In by-project view, direct children of skipped project are always visible
-      const isTopProjectChild = skipTopProjectRow && topProjectKey && r.parentKey === topProjectKey;
-      if (!r.isVisible && !isTopProjectChild) return false;
+
+    // Render ALL rows (including hidden) for instant client-side expand/collapse
+    // Hidden rows exist in DOM with visibility:hidden, allowing instant toggle
+    const filteredRows = rows.filter(r => {
       // Skip top-level project row in per-project view
       if (skipTopProjectRow && r.type === "project" && r.depth === 0) return false;
       if (healthFilter === "all") return true;
@@ -2263,45 +2283,70 @@ export class GanttPanel {
     }).map(r => {
       // Adjust depth and parentKey when top project row is skipped
       if (skipTopProjectRow && topProjectKey) {
+        const isTopProjectChild = r.parentKey === topProjectKey;
         return {
           ...r,
           depth: Math.max(0, r.depth - 1),
           parentKey: r.parentKey === topProjectKey ? "" : r.parentKey,
+          // Top project children are always visible
+          isVisible: isTopProjectChild ? true : r.isVisible,
         };
       }
       return r;
     });
+    const filteredRowCount = filteredRows.length;
+
+    // Calculate Y positions for ALL rows (fully expanded state)
+    // Each row at index * barHeight
+    const filteredRowYPositions: number[] = [];
+    for (let i = 0; i < filteredRowCount; i++) {
+      filteredRowYPositions.push(i * barHeight);
+    }
+
+    // Track visible rows for stripe calculations
+    const visibleRows = filteredRows.filter(r => r.isVisible);
     const visibleRowCount = visibleRows.length;
 
-    // Pre-calculate Y positions with graduated spacing for visual hierarchy
-    // Gestalt proximity: group boundary = extra gap, within group = standard/tight
-    // - Group boundary (project after content): 18px (separates project groups)
-    // - Peers (project after project, issue after issue): 10px (standard)
-    // - Sub-issues (depth 2+): 6px (tight clustering with parent)
+    // Calculate Y positions for visible rows (for stripes and initial collapsed layout)
     const rowYPositions: number[] = [];
     const rowHeights: number[] = [];
-    let cumulativeY = 0;
-
-    // Zero gap between rows - matches VS Code native tree view
-    // Visual grouping via zebra stripes and indentation
-    const getGapBefore = (_row: typeof visibleRows[0], _idx: number): number => 0;
-
     for (let i = 0; i < visibleRowCount; i++) {
-      const row = visibleRows[i];
-      const gapBefore = getGapBefore(row, i);
-
-      // Add gap BEFORE this row (creates whitespace separator)
-      cumulativeY += gapBefore;
-
-      rowYPositions.push(cumulativeY);
-
-      // Uniform row height - no family-close padding
+      rowYPositions.push(i * barHeight);
       rowHeights.push(barHeight);
-
-      // Move past this row's content
-      cumulativeY += barHeight;
     }
-    // Ensure minimum height to fill viewport (roughly 100vh - 200px for header/toolbar)
+    const cumulativeY = visibleRowCount * barHeight;
+
+    // Map collapseKey to visible index (for stripe calculations)
+    const visibleIndexMap = new Map<string, number>();
+    visibleRows.forEach((row, idx) => visibleIndexMap.set(row.collapseKey, idx));
+
+    // Calculate initial Y for each row (collapsed state)
+    // Visible rows: sequential positions
+    // Hidden rows: positioned right after their nearest visible ancestor
+    const initialYPositions: number[] = [];
+    let visibleIdx = 0;
+    // Track last visible row's Y for positioning hidden children
+    let lastVisibleY = 0;
+    // Map parentKey to its visible Y position
+    const parentYMap = new Map<string, number>();
+    for (let i = 0; i < filteredRowCount; i++) {
+      const row = filteredRows[i];
+      if (row.isVisible) {
+        const y = visibleIdx * barHeight;
+        initialYPositions.push(y);
+        lastVisibleY = y;
+        parentYMap.set(row.collapseKey, y);
+        visibleIdx++;
+      } else {
+        // Hidden rows: position at parent's Y (they're invisible, will be moved on expand)
+        const parentY = row.parentKey ? (parentYMap.get(row.parentKey) ?? lastVisibleY) : lastVisibleY;
+        initialYPositions.push(parentY);
+        // Also register this row's Y in case it has hidden children
+        parentYMap.set(row.collapseKey, parentY);
+      }
+    }
+
+    // Ensure minimum height to fill viewport
     const minContentHeight = 600;
     const contentHeight = Math.max(cumulativeY > 0 ? cumulativeY + barGap : 0, minContentHeight);
 
@@ -2360,6 +2405,13 @@ export class GanttPanel {
     if (visibleRowCount > 0 && currentGroupStart < visibleRowCount) {
       groupRanges.push({ startIdx: currentGroupStart, endIdx: visibleRowCount - 1, groupIdx: currentGroupIdx });
     }
+
+    // Helper to calculate gap before a row (for stripe height calculations)
+    const getGapBefore = (_row: typeof visibleRows[0], idx: number): number => {
+      if (idx === 0) return rowYPositions[0]; // Gap from top of chart to first row
+      // Gap = current row Y - (previous row Y + previous row height)
+      return rowYPositions[idx] - (rowYPositions[idx - 1] + rowHeights[idx - 1]);
+    };
 
     // All groups get visual enclosure, alternating between two subtle treatments
     // This creates consistent rhythm without leaving any group "bare"
@@ -2454,9 +2506,12 @@ export class GanttPanel {
       ? `<g class="indent-guides-layer">${continuousIndentLines.join("")}</g>`
       : "";
 
-    const labels = visibleRows
+    const labels = filteredRows
       .map((row, idx) => {
-        const y = rowYPositions[idx];
+        const y = initialYPositions[idx];
+        const originalY = filteredRowYPositions[idx];
+        const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
+        const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
         const indent = row.depth * indentSize;
 
         // VS Code-style chevron: right-pointing arrow that rotates 90deg when expanded
@@ -2510,7 +2565,7 @@ export class GanttPanel {
           // De-emphasized project headers: regular weight, muted color
           // Projects are containers, not content - issues should be primary focus
           return `
-            <g class="project-label gantt-row cursor-pointer" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${y}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}' transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
+            <g class="project-label gantt-row cursor-pointer${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${originalY}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}' transform="translate(0, ${y})"${hiddenAttr} tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
               <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent" pointer-events="all"><title>${escapeAttr(tooltip)}</title></rect>
               ${chevron}
               <text x="${labelX}" y="${barHeight / 2 + 5}" fill="var(--vscode-descriptionForeground)" font-size="13" pointer-events="none">
@@ -2527,7 +2582,7 @@ export class GanttPanel {
           const timeGroupClass = `time-group-${row.timeGroup}`;
           const countBadge = row.childCount ? ` (${row.childCount})` : "";
           return `
-            <g class="time-group-label gantt-row ${timeGroupClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-time-group="${row.timeGroup}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${y}" transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Toggle ${escapeHtml(row.label)}">
+            <g class="time-group-label gantt-row ${timeGroupClass}${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-time-group="${row.timeGroup}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr} tabindex="0" role="button" aria-label="Toggle ${escapeHtml(row.label)}">
               <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent" pointer-events="all"><title>${escapeHtml(row.label)}</title></rect>
               ${chevron}
               <text x="${10 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="13" font-weight="bold" pointer-events="none">
@@ -2634,7 +2689,7 @@ export class GanttPanel {
         const taskOpacity = issue.isClosed ? "0.5" : "1";
 
         return `
-          <g class="issue-label gantt-row cursor-pointer" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${y}" data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}' transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Open issue #${issue.id}">
+          <g class="issue-label gantt-row cursor-pointer${hiddenClass}" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${originalY}" data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}' transform="translate(0, ${y})"${hiddenAttr} tabindex="0" role="button" aria-label="Open issue #${issue.id}">
             <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent" pointer-events="all"><title>${escapeAttr(tooltip)}</title></rect>
             ${chevron}
             <text class="issue-text" x="${10 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="${issue.isExternal ? "var(--vscode-descriptionForeground)" : "var(--vscode-foreground)"}" font-size="13" opacity="${taskOpacity}">
@@ -2646,27 +2701,33 @@ export class GanttPanel {
       .join("");
 
     // ID column cells
-    const idCells = visibleRows
+    const idCells = filteredRows
       .map((row, idx) => {
-        const y = rowYPositions[idx];
-        if (row.type !== "issue") return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${y}" transform="translate(0, ${y})"></g>`;
+        const y = initialYPositions[idx];
+        const originalY = filteredRowYPositions[idx];
+        const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
+        const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
+        if (row.type !== "issue") return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
         const issue = row.issue!;
-        return `<g class="gantt-row cursor-pointer" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${y}" transform="translate(0, ${y})" data-vscode-context='{"webviewSection":"issueIdColumn","issueId":${issue.id},"preventDefaultContextMenuItems":true}'>
+        return `<g class="gantt-row cursor-pointer${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr} data-vscode-context='{"webviewSection":"issueIdColumn","issueId":${issue.id},"preventDefaultContextMenuItems":true}'>
           <text class="gantt-col-cell" x="${idColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">#${issue.id}</text>
         </g>`;
       })
       .join("");
 
     // Start date column cells
-    const startDateCells = visibleRows
+    const startDateCells = filteredRows
       .map((row, idx) => {
-        const y = rowYPositions[idx];
-        if (row.type !== "issue") return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${y}" transform="translate(0, ${y})"></g>`;
+        const y = initialYPositions[idx];
+        const originalY = filteredRowYPositions[idx];
+        const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
+        const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
+        if (row.type !== "issue") return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
         const issue = row.issue!;
-        if (!issue.start_date) return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${y}" transform="translate(0, ${y})"><text class="gantt-col-cell" x="4" y="${barHeight / 2 + 4}" text-anchor="start">—</text></g>`;
+        if (!issue.start_date) return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}><text class="gantt-col-cell" x="4" y="${barHeight / 2 + 4}" text-anchor="start">—</text></g>`;
         const startDate = parseLocalDate(issue.start_date);
         const displayDate = startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${y}" transform="translate(0, ${y})">
+        return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}>
           <title>${escapeAttr(issue.start_date)}</title>
           <text class="gantt-col-cell" x="4" y="${barHeight / 2 + 4}" text-anchor="start">${displayDate}</text>
         </g>`;
@@ -2674,10 +2735,13 @@ export class GanttPanel {
       .join("");
 
     // Status column cells - colored dots
-    const statusCells = visibleRows
+    const statusCells = filteredRows
       .map((row, idx) => {
-        const y = rowYPositions[idx];
-        if (row.type !== "issue") return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${y}" transform="translate(0, ${y})"></g>`;
+        const y = initialYPositions[idx];
+        const originalY = filteredRowYPositions[idx];
+        const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
+        const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
+        if (row.type !== "issue") return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
         const issue = row.issue!;
         const statusName = issue.statusName ?? "Unknown";
         // Determine dot color: green=closed (from server is_closed), blue=in progress, gray=not started
@@ -2689,7 +2753,7 @@ export class GanttPanel {
         }
         const cx = statusColumnWidth / 2;
         const cy = barHeight / 2;
-        return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${y}" transform="translate(0, ${y})">
+        return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}>
           <title>${escapeAttr(statusName)}</title>
           <circle cx="${cx}" cy="${cy}" r="5" fill="${dotColor}"/>
         </g>`;
@@ -2697,12 +2761,15 @@ export class GanttPanel {
       .join("");
 
     // Due date column cells
-    const dueCells = visibleRows
+    const dueCells = filteredRows
       .map((row, idx) => {
-        const y = rowYPositions[idx];
-        if (row.type !== "issue") return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${y}" transform="translate(0, ${y})"></g>`;
+        const y = initialYPositions[idx];
+        const originalY = filteredRowYPositions[idx];
+        const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
+        const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
+        if (row.type !== "issue") return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
         const issue = row.issue!;
-        if (!issue.due_date) return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${y}" transform="translate(0, ${y})"><text class="gantt-col-cell" x="4" y="${barHeight / 2 + 4}" text-anchor="start">—</text></g>`;
+        if (!issue.due_date) return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}><text class="gantt-col-cell" x="4" y="${barHeight / 2 + 4}" text-anchor="start">—</text></g>`;
         // Format date as MMM DD (e.g., "Jan 15")
         const dueDate = parseLocalDate(issue.due_date);
         const today = getLocalToday();
@@ -2719,7 +2786,7 @@ export class GanttPanel {
           dueClass = "due-soon";
           dueTooltip = daysUntilDue === 0 ? `${issue.due_date} (Due today)` : `${issue.due_date} (Due in ${daysUntilDue} day${daysUntilDue === 1 ? "" : "s"})`;
         }
-        return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${y}" transform="translate(0, ${y})">
+        return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}>
           <title>${escapeAttr(dueTooltip)}</title>
           <text class="gantt-col-cell ${dueClass}" x="4" y="${barHeight / 2 + 4}" text-anchor="start">${displayDate}</text>
         </g>`;
@@ -2727,19 +2794,22 @@ export class GanttPanel {
       .join("");
 
     // Assignee column cells - circular avatar badges with initials
-    const assigneeCells = visibleRows
+    const assigneeCells = filteredRows
       .map((row, idx) => {
-        const y = rowYPositions[idx];
-        if (row.type !== "issue") return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${y}" transform="translate(0, ${y})"></g>`;
+        const y = initialYPositions[idx];
+        const originalY = filteredRowYPositions[idx];
+        const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
+        const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
+        if (row.type !== "issue") return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
         const issue = row.issue!;
-        if (!issue.assignee) return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${y}" transform="translate(0, ${y})"><text class="gantt-col-cell" x="${assigneeColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">—</text></g>`;
+        if (!issue.assignee) return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}><text class="gantt-col-cell" x="${assigneeColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">—</text></g>`;
         const initials = getInitials(issue.assignee);
         const bgColor = getAvatarColor(issue.assignee);
         const isCurrentUser = issue.assigneeId === this._currentUserId;
         const radius = 9; // Fits in 22px row height
         const cx = assigneeColumnWidth / 2;
         const cy = barHeight / 2;
-        return `<g class="gantt-row assignee-badge${isCurrentUser ? " current-user" : ""}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${y}" transform="translate(0, ${y})">
+        return `<g class="gantt-row assignee-badge${isCurrentUser ? " current-user" : ""}${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}>
           <title>${escapeAttr(issue.assignee)}</title>
           <circle cx="${cx}" cy="${cy}" r="${radius}" fill="${bgColor}"/>
           <text x="${cx}" y="${cy + 3}" text-anchor="middle" fill="white" font-size="9" font-weight="600">${escapeHtml(initials)}</text>
@@ -2747,16 +2817,19 @@ export class GanttPanel {
       })
       .join("");
 
-    // Right bars (scrollable timeline) - only visible rows for performance
-    // Generate bars for all visible rows
-    const bars = visibleRows
+    // Right bars (scrollable timeline) - render all rows for instant toggle
+    // Generate bars for all rows (hidden rows have visibility:hidden)
+    const bars = filteredRows
       .map((row, idx) => {
-        const y = rowYPositions[idx];
+        const y = initialYPositions[idx];
+        const originalY = filteredRowYPositions[idx];
+        const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
+        const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
 
         // Project headers: always render aggregate bars (with visibility class)
         if (row.type === "project") {
           if (!row.childDateRanges || row.childDateRanges.length === 0) {
-            return "";
+            return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
           }
 
           // Render aggregate bars for each child issue date range
@@ -2779,13 +2852,13 @@ export class GanttPanel {
             })
             .join("");
 
-          return `<g class="aggregate-bars gantt-row" data-project-id="${row.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${y}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}' transform="translate(0, ${y})">${aggregateBars}</g>`;
+          return `<g class="aggregate-bars gantt-row${hiddenClass}" data-project-id="${row.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}' transform="translate(0, ${y})"${hiddenAttr}>${aggregateBars}</g>`;
         }
 
         // Time group headers: render aggregate bars for child issues
         if (row.type === "time-group") {
           if (!row.childDateRanges || row.childDateRanges.length === 0) {
-            return "";
+            return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
           }
 
           // Render aggregate bars for each child issue date range
@@ -2813,7 +2886,7 @@ export class GanttPanel {
             })
             .join("");
 
-          return `<g class="aggregate-bars time-group-bars gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-time-group="${row.timeGroup}" data-original-y="${y}" transform="translate(0, ${y})">${aggregateBars}</g>`;
+          return `<g class="aggregate-bars time-group-bars gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-time-group="${row.timeGroup}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}>${aggregateBars}</g>`;
         }
 
         // Skip non-issue types (container nodes, etc.)
@@ -3048,16 +3121,16 @@ export class GanttPanel {
           // Parent done_ratio is weighted average of subtasks
           const parentDoneWidth = (doneRatio / 100) * (endX - startX - 8);
           return `
-            <g class="issue-bar parent-bar gantt-row" data-issue-id="${issue.id}"
+            <g class="issue-bar parent-bar gantt-row${hiddenClass}" data-issue-id="${issue.id}"
                data-project-id="${issue.projectId}"
                data-subject="${escapedSubject}"
                data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
-               data-original-y="${y}"
+               data-original-y="${originalY}"
                data-start-date="${issue.start_date || ""}"
                data-due-date="${issue.due_date || ""}"
                data-start-x="${startX}" data-end-x="${endX}"
                data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}'
-               transform="translate(0, ${y})"
+               transform="translate(0, ${y})"${hiddenAttr}
                tabindex="0" role="button" aria-label="#${issue.id} ${escapedSubject} (parent, ${doneRatio}% done)">
               <title>${escapeAttr(barTooltip + "\n\n(Parent issue - " + doneRatio + "% aggregated progress)")}</title>
               <!-- Invisible hit area for easier hovering -->
@@ -3104,16 +3177,16 @@ export class GanttPanel {
         // Critical path: zero or negative flexibility
         const isCritical = flexSlack !== null && flexSlack <= 0 && !issue.isClosed;
         return `
-          <g class="issue-bar gantt-row${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${issue.isAdHoc ? " bar-adhoc" : ""}${isCritical ? " bar-critical" : ""}" data-issue-id="${issue.id}"
+          <g class="issue-bar gantt-row${hiddenClass}${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${issue.isAdHoc ? " bar-adhoc" : ""}${isCritical ? " bar-critical" : ""}" data-issue-id="${issue.id}"
              data-project-id="${issue.projectId}"
              data-subject="${escapedSubject}"
              data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
-             data-original-y="${y}"
+             data-original-y="${originalY}"
              data-start-date="${issue.start_date || ""}"
              data-due-date="${issue.due_date || ""}"
              data-start-x="${startX}" data-end-x="${endX}"
              data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}'
-             transform="translate(0, ${y})"
+             transform="translate(0, ${y})"${hiddenAttr}
              tabindex="0" role="button" aria-label="#${issue.id} ${escapedSubject}${isOverdue ? " (overdue)" : ""}">
             <title>${escapeAttr(barTooltip)}</title>
             <!-- Clip path for bar shape -->
@@ -6132,6 +6205,7 @@ export class GanttPanel {
         const label = el.closest('[data-collapse-key]');
         const collapseKey = label?.dataset.collapseKey;
         if (collapseKey) {
+          // Instant client-side toggle (all rows are in DOM)
           toggleCollapseClientSide(collapseKey);
         }
       });
@@ -6232,7 +6306,8 @@ export class GanttPanel {
 
     function buildRowIndex() {
       rowIndex.clear();
-      document.querySelectorAll('[data-collapse-key][data-original-y]').forEach(el => {
+      const elements = document.querySelectorAll('[data-collapse-key][data-original-y]');
+      elements.forEach(el => {
         const key = el.dataset.collapseKey;
         const originalY = parseFloat(el.dataset.originalY);
         if (!rowIndex.has(key)) {
@@ -6244,7 +6319,8 @@ export class GanttPanel {
 
     function buildAncestorCache() {
       ancestorCache.clear();
-      document.querySelectorAll('[data-collapse-key][data-parent-key]').forEach(el => {
+      const elements = document.querySelectorAll('[data-collapse-key][data-parent-key]');
+      elements.forEach(el => {
         const key = el.dataset.collapseKey;
         if (ancestorCache.has(key)) return; // Already built for this key
         const ancestors = [];
@@ -6282,62 +6358,158 @@ export class GanttPanel {
       return result;
     }
 
-    // Client-side collapse toggle for instant response (no re-render)
-    // Uses delta-based shifting: only descendants are hidden, rows below shift by delta
-    function toggleCollapseClientSide(collapseKey, action) {
-      const ROW_HEIGHT = ${barHeight};
+    // Find descendants that should be VISIBLE when expanding parentKey
+    // Only includes descendants whose entire ancestor chain (up to parentKey) is expanded
+    function findVisibleDescendants(parentKey) {
+      const result = [];
+      ancestorCache.forEach((ancestors, key) => {
+        const idx = ancestors.indexOf(parentKey);
+        if (idx === -1) return; // Not a descendant of parentKey
 
+        // Check all ancestors between this node and parentKey
+        // ancestors[0] is immediate parent, ancestors[idx] is parentKey
+        // All ancestors from 0 to idx-1 must be expanded for this node to be visible
+        let allAncestorsExpanded = true;
+        for (let i = 0; i < idx; i++) {
+          const ancestorKey = ancestors[i];
+          const ancestorLabel = document.querySelector('[data-collapse-key="' + ancestorKey + '"].project-label, [data-collapse-key="' + ancestorKey + '"].issue-label, [data-collapse-key="' + ancestorKey + '"].time-group-label');
+          if (!ancestorLabel || ancestorLabel.dataset.expanded !== 'true') {
+            allAncestorsExpanded = false;
+            break;
+          }
+        }
+        if (allAncestorsExpanded) {
+          result.push(key);
+        }
+      });
+      return result;
+    }
+
+    // Client-side collapse/expand toggle for instant response
+    // All rows are rendered in DOM (hidden rows have visibility:hidden)
+    // This enables instant toggle without VS Code re-render roundtrip
+    function toggleCollapseClientSide(collapseKey, action) {
       // Find the parent label element (must be a label with hasChildren)
       const parentLabel = document.querySelector('[data-collapse-key="' + collapseKey + '"].project-label, [data-collapse-key="' + collapseKey + '"].time-group-label, [data-collapse-key="' + collapseKey + '"].issue-label');
-      if (!parentLabel || parentLabel.dataset.hasChildren !== 'true') return;
+      if (!parentLabel || parentLabel.dataset.hasChildren !== 'true') {
+        return;
+      }
 
       const wasExpanded = parentLabel.dataset.expanded === 'true';
       const shouldExpand = action === 'expand' ? true : action === 'collapse' ? false : !wasExpanded;
-      if (shouldExpand === wasExpanded) return;
+      if (shouldExpand === wasExpanded) {
+        return;
+      }
 
-      // Update chevron state
+      // Update chevron state FIRST (before findVisibleDescendants checks it)
       parentLabel.dataset.expanded = shouldExpand ? 'true' : 'false';
       const chevron = parentLabel.querySelector('.collapse-toggle');
       if (chevron) chevron.classList.toggle('expanded', shouldExpand);
 
-      // Find all descendants to hide/show
-      const descendants = findDescendants(collapseKey);
-      if (descendants.length === 0) return;
+      // For EXPAND: only show descendants whose ancestor chain is expanded
+      // For COLLAPSE: hide ALL descendants
+      const allDescendants = findDescendants(collapseKey);
+      const visibleDescendants = shouldExpand ? findVisibleDescendants(collapseKey) : [];
 
-      const descendantSet = new Set(descendants);
+      // DEBUG: Log nested expanded states
+      if (shouldExpand) {
+        const nestedExpanded = [];
+        document.querySelectorAll('.project-label[data-expanded="true"], .issue-label[data-expanded="true"], .time-group-label[data-expanded="true"]').forEach(lbl => {
+          nestedExpanded.push(lbl.dataset.collapseKey);
+        });
+        console.log('[TOGGLE DEBUG] expanding:', collapseKey, 'allDesc:', allDescendants.length, 'visibleDesc:', visibleDescendants.length, 'nestedExpanded:', nestedExpanded);
+        console.log('[TOGGLE DEBUG] visibleDescendants:', visibleDescendants);
+      }
+
+      if (allDescendants.length === 0) {
+        // No descendants, just sync state
+        vscode.postMessage({ command: 'collapseStateSync', collapseKey, isExpanded: shouldExpand });
+        return;
+      }
+
+      const descendantSet = new Set(allDescendants);
+      const visibleSet = new Set(visibleDescendants);
       const parentEntry = rowIndex.get(collapseKey);
-      const parentY = parentEntry?.originalY ?? 0;
+      const parentRowY = parentEntry?.originalY ?? 0; // Row coordinate system
 
-      // Calculate delta from stripe contributions (each row owns gap BEFORE it)
-      // Only count each row once (stripes are duplicated across columns)
+      // Calculate delta from stripe contributions for CURRENTLY VISIBLE descendants only
+      // When collapsing: only count rows that are currently visible (not already hidden by nested collapse)
+      // When expanding: only count rows that will become visible (respecting nested expanded states)
+      // Also find the parent's stripe Y position (different coordinate system than rows)
       const countedKeys = new Set();
       let actualDelta = 0;
+      let parentStripeY = 0;
+      // For collapse: calculate visible descendants (excluding already-hidden nested items)
+      const currentlyVisibleDescendants = shouldExpand ? visibleDescendants : findVisibleDescendants(collapseKey);
+      const deltaDescendants = currentlyVisibleDescendants;
+      const deltaSet = new Set(deltaDescendants);
       document.querySelectorAll('.zebra-stripe').forEach(stripe => {
         const contributions = JSON.parse(stripe.dataset.rowContributions || '{}');
+        // Find parent's stripe Y (stripe containing the collapseKey)
+        if (collapseKey in contributions && parentStripeY === 0) {
+          parentStripeY = parseFloat(stripe.dataset.originalY || '0');
+        }
         for (const [key, contribution] of Object.entries(contributions)) {
-          if (descendantSet.has(key) && !countedKeys.has(key)) {
+          if (deltaSet.has(key) && !countedKeys.has(key)) {
             actualDelta += parseFloat(contribution);
             countedKeys.add(key);
           }
         }
       });
 
+      // Fallback: if no contributions found, use re-render
+      const barHeight = ${barHeight};
+      if (actualDelta === 0 && deltaDescendants.length > 0) {
+        vscode.postMessage({ command: 'collapseStateSync', collapseKey, isExpanded: shouldExpand });
+        vscode.postMessage({ command: 'requestRerender' });
+        return;
+      }
+
       const delta = shouldExpand ? actualDelta : -actualDelta;
 
-      // Toggle visibility of descendants
-      descendants.forEach(key => {
-        const entry = rowIndex.get(key);
-        if (entry) {
-          entry.elements.forEach(el => {
-            setSvgVisibility(el, !shouldExpand);
-          });
+      // Get parent's CURRENT Y position (from transform, not originalY)
+      let parentCurrentY = parentRowY;
+      if (parentEntry && parentEntry.elements.length > 0) {
+        const parentTransform = parentEntry.elements[0].getAttribute('transform') || '';
+        const parentYMatch = parentTransform.match(/translate\\([^,]+,\\s*([-\\d.]+)/);
+        if (parentYMatch) {
+          parentCurrentY = parseFloat(parentYMatch[1]);
         }
-      });
+      }
+
+      // Toggle visibility of descendants and position them correctly
+      let nextY = parentCurrentY + barHeight; // First child goes right after parent
+      if (shouldExpand) {
+        // EXPAND: only show visibleDescendants, position them sequentially
+        visibleDescendants.forEach(key => {
+          const entry = rowIndex.get(key);
+          if (entry) {
+            entry.elements.forEach(el => {
+              const transform = el.getAttribute('transform') || '';
+              const xMatch = transform.match(/translate\\(([-\\d.]+)/);
+              const x = xMatch ? xMatch[1] : '0';
+              el.setAttribute('transform', 'translate(' + x + ', ' + nextY + ')');
+              setSvgVisibility(el, false); // Show
+            });
+            nextY += barHeight;
+          }
+        });
+      } else {
+        // COLLAPSE: hide ALL descendants
+        allDescendants.forEach(key => {
+          const entry = rowIndex.get(key);
+          if (entry) {
+            entry.elements.forEach(el => {
+              setSvgVisibility(el, true); // Hide
+            });
+          }
+        });
+      }
 
       // Shift rows BELOW the parent (not descendants, not above)
       rowIndex.forEach(({ originalY, elements }, key) => {
-        // Only shift rows that are below the parent and not descendants
-        if (originalY > parentY && !descendants.includes(key)) {
+        // Only shift rows that are below the parent and not any descendant
+        if (originalY > parentRowY && !descendantSet.has(key)) {
           elements.forEach(el => {
             const transform = el.getAttribute('transform') || '';
             // Extract current X (for timeline bars)
@@ -6394,8 +6566,13 @@ export class GanttPanel {
       });
 
       // Handle zebra stripes: hide stripes covering descendants, shift stripes below
-      document.querySelectorAll('.zebra-stripe').forEach(stripe => {
+      // First pass: calculate actions for each unique stripe (by originalY)
+      const stripeActions = new Map(); // originalY -> { action, newHeight?, newY? }
+      const allStripes = document.querySelectorAll('.zebra-stripe');
+      allStripes.forEach((stripe) => {
         const originalY = parseFloat(stripe.dataset.originalY || '0');
+        if (stripeActions.has(originalY)) return; // Skip duplicates
+
         const contributions = JSON.parse(stripe.dataset.rowContributions || '{}');
         const contributingKeys = Object.keys(contributions);
 
@@ -6403,30 +6580,55 @@ export class GanttPanel {
         const coversOnlyDescendants = contributingKeys.length > 0 &&
           contributingKeys.every(key => descendantSet.has(key));
         const coversAnyDescendant = contributingKeys.some(key => descendantSet.has(key));
-        const isBelowParent = originalY > parentY;
+        const isBelowParent = originalY > parentStripeY;
 
         if (coversOnlyDescendants) {
-          // Stripe only covers descendants being toggled - hide/show it
-          setSvgVisibility(stripe, shouldExpand);
+          stripeActions.set(originalY, { action: 'toggle-visibility', hide: !shouldExpand });
         } else if (coversAnyDescendant) {
-          // Stripe covers parent + descendants (mixed) - shrink/expand height
           if (!shouldExpand) {
-            // COLLAPSING: shrink to only non-descendant rows
             let newHeight = 0;
             for (const [key, contribution] of Object.entries(contributions)) {
               if (!descendantSet.has(key)) {
                 newHeight += parseFloat(contribution);
               }
             }
-            stripe.setAttribute('height', String(newHeight));
+            stripeActions.set(originalY, { action: 'shrink', newHeight });
           } else {
-            // EXPANDING: restore original height
-            stripe.setAttribute('height', stripe.dataset.originalHeight || '0');
+            // EXPANDING: calculate correct height based on visible descendants (not originalHeight)
+            // Include parent (not in descendantSet) + visible descendants
+            let newHeight = 0;
+            for (const [key, contribution] of Object.entries(contributions)) {
+              if (!descendantSet.has(key) || visibleSet.has(key)) {
+                newHeight += parseFloat(contribution);
+              }
+            }
+            stripeActions.set(originalY, { action: 'expand', newHeight });
           }
         } else if (isBelowParent) {
-          // Stripe is below collapsed area - shift it
           const currentY = parseFloat(stripe.getAttribute('y') || String(originalY));
-          stripe.setAttribute('y', String(currentY + delta));
+          stripeActions.set(originalY, { action: 'shift', newY: currentY + delta });
+        }
+      });
+
+      // Second pass: apply actions to ALL stripes (including duplicates across SVGs)
+      allStripes.forEach((stripe) => {
+        const originalY = parseFloat(stripe.dataset.originalY || '0');
+        const action = stripeActions.get(originalY);
+        if (!action) return;
+
+        switch (action.action) {
+          case 'toggle-visibility':
+            setSvgVisibility(stripe, action.hide);
+            break;
+          case 'shrink':
+            stripe.setAttribute('height', String(action.newHeight));
+            break;
+          case 'expand':
+            stripe.setAttribute('height', String(action.newHeight));
+            break;
+          case 'shift':
+            stripe.setAttribute('y', String(action.newY));
+            break;
         }
       });
 
@@ -6459,7 +6661,7 @@ export class GanttPanel {
         // Shift indent guides for parents below the collapsed row
         if (!shouldHide) {
           const parentOfGuide = rowIndex.get(forParent);
-          if (parentOfGuide && parentOfGuide.originalY > parentY) {
+          if (parentOfGuide && parentOfGuide.originalY > parentRowY) {
             // This guide's parent is below collapsed row - shift it
             const y1 = parseFloat(line.getAttribute('y1') || '0');
             const y2 = parseFloat(line.getAttribute('y2') || '0');
@@ -6494,12 +6696,8 @@ export class GanttPanel {
 
     allLabels.forEach((el, index) => {
       el.addEventListener('click', (e) => {
-        console.log('[DEBUG] Click on label:', el.className, 'hasChildren:', el.dataset.hasChildren, 'collapseKey:', el.dataset.collapseKey);
-
         // Chevron has its own handler with stopPropagation - won't reach here
-        // Use closest() for more reliable detection
         if (e.target.closest?.('.collapse-toggle') || e.target.closest?.('.chevron-hit-area')) {
-          console.log('[DEBUG] Early return - chevron');
           return;
         }
 
@@ -6508,27 +6706,29 @@ export class GanttPanel {
         const isTimeGroup = el.classList.contains('time-group-label');
         const collapseKey = el.dataset.collapseKey;
 
-        console.log('[DEBUG] isProject:', isProject, 'isTimeGroup:', isTimeGroup);
-
         // Project/time-group labels: toggle collapse on click (if has children)
         if ((isProject || isTimeGroup) && collapseKey) {
-          console.log('[DEBUG] Project/time-group with collapseKey, hasChildren:', el.dataset.hasChildren);
           setActiveLabel(el);
-          // Only toggle if has children, otherwise just select
           if (el.dataset.hasChildren === 'true') {
-            console.log('[DEBUG] Calling toggleCollapseClientSide:', collapseKey);
+            // Instant client-side toggle (all rows are in DOM)
             toggleCollapseClientSide(collapseKey);
           }
           return;
         }
 
-        // Only open quick-pick if clicking directly on the issue text
+        // Issue labels
         const clickedOnText = e.target.classList?.contains('issue-text') || e.target.closest('.issue-text');
         if (issueId && clickedOnText) {
+          // Clicking on text opens quick-pick
           setActiveLabel(el, false, false, true); // skipFocus=true
           vscode.postMessage({ command: 'openIssue', issueId: parseInt(issueId, 10) });
+        } else if (el.dataset.hasChildren === 'true' && collapseKey) {
+          // Parent issue: clicking elsewhere toggles collapse
+          setActiveLabel(el);
+          // Instant client-side toggle (all rows are in DOM)
+          toggleCollapseClientSide(collapseKey);
         } else {
-          // Clicking elsewhere on the row just selects it
+          // Regular issue: clicking elsewhere just selects
           setActiveLabel(el);
         }
       });
@@ -6561,6 +6761,7 @@ export class GanttPanel {
             e.preventDefault();
             // VS Code behavior: if expanded, collapse; if collapsed, go to parent
             if (el.dataset.hasChildren === 'true' && el.dataset.expanded === 'true') {
+              // Instant client-side collapse (all rows are in DOM)
               toggleCollapseClientSide(collapseKey, 'collapse');
             } else if (el.dataset.parentKey) {
               // Navigate to parent
@@ -6572,6 +6773,7 @@ export class GanttPanel {
             e.preventDefault();
             // VS Code behavior: if collapsed, expand; if expanded, go to first child
             if (el.dataset.hasChildren === 'true' && el.dataset.expanded === 'false') {
+              // Instant client-side expand (all rows are in DOM)
               toggleCollapseClientSide(collapseKey, 'expand');
             } else if (el.dataset.hasChildren === 'true' && el.dataset.expanded === 'true') {
               // Navigate to first visible child
