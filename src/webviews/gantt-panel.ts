@@ -2637,7 +2637,7 @@ export class GanttPanel {
           <g class="issue-label gantt-row cursor-pointer" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${y}" data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}' transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Open issue #${issue.id}">
             <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent" pointer-events="all"><title>${escapeAttr(tooltip)}</title></rect>
             ${chevron}
-            <text class="issue-text" x="${10 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="${issue.isExternal ? "var(--vscode-descriptionForeground)" : "var(--vscode-foreground)"}" font-size="13" opacity="${taskOpacity}" pointer-events="none">
+            <text class="issue-text" x="${10 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="${issue.isExternal ? "var(--vscode-descriptionForeground)" : "var(--vscode-foreground)"}" font-size="13" opacity="${taskOpacity}">
               ${externalBadge}${projectBadge}${escapedSubject}
             </text>
           </g>
