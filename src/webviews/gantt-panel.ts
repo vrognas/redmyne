@@ -6494,20 +6494,29 @@ export class GanttPanel {
 
     allLabels.forEach((el, index) => {
       el.addEventListener('click', (e) => {
+        console.log('[DEBUG] Click on label:', el.className, 'hasChildren:', el.dataset.hasChildren, 'collapseKey:', el.dataset.collapseKey);
+
         // Chevron has its own handler with stopPropagation - won't reach here
         // Use closest() for more reliable detection
-        if (e.target.closest?.('.collapse-toggle') || e.target.closest?.('.chevron-hit-area')) return;
+        if (e.target.closest?.('.collapse-toggle') || e.target.closest?.('.chevron-hit-area')) {
+          console.log('[DEBUG] Early return - chevron');
+          return;
+        }
 
         const issueId = el.dataset.issueId;
         const isProject = el.classList.contains('project-label');
         const isTimeGroup = el.classList.contains('time-group-label');
         const collapseKey = el.dataset.collapseKey;
 
+        console.log('[DEBUG] isProject:', isProject, 'isTimeGroup:', isTimeGroup);
+
         // Project/time-group labels: toggle collapse on click (if has children)
         if ((isProject || isTimeGroup) && collapseKey) {
+          console.log('[DEBUG] Project/time-group with collapseKey, hasChildren:', el.dataset.hasChildren);
           setActiveLabel(el);
           // Only toggle if has children, otherwise just select
           if (el.dataset.hasChildren === 'true') {
+            console.log('[DEBUG] Calling toggleCollapseClientSide:', collapseKey);
             toggleCollapseClientSide(collapseKey);
           }
           return;
