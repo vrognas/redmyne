@@ -6494,11 +6494,15 @@ export class GanttPanel {
         const issueId = el.dataset.issueId;
         const isProject = el.classList.contains('project-label');
         const isTimeGroup = el.classList.contains('time-group-label');
+        const collapseKey = el.dataset.collapseKey;
 
-        // Project/time-group labels: toggle collapse on click
-        if ((isProject || isTimeGroup) && el.dataset.hasChildren === 'true') {
+        // Project/time-group labels: toggle collapse on click (if has children)
+        if ((isProject || isTimeGroup) && collapseKey) {
           setActiveLabel(el);
-          toggleCollapseClientSide(el.dataset.collapseKey);
+          // Only toggle if has children, otherwise just select
+          if (el.dataset.hasChildren === 'true') {
+            toggleCollapseClientSide(collapseKey);
+          }
           return;
         }
 
