@@ -2511,9 +2511,9 @@ export class GanttPanel {
           // Projects are containers, not content - issues should be primary focus
           return `
             <g class="project-label gantt-row cursor-pointer" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${y}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}' transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
-              <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent"><title>${escapeAttr(tooltip)}</title></rect>
+              <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent" pointer-events="all"><title>${escapeAttr(tooltip)}</title></rect>
               ${chevron}
-              <text x="${labelX}" y="${barHeight / 2 + 5}" fill="var(--vscode-descriptionForeground)" font-size="13">
+              <text x="${labelX}" y="${barHeight / 2 + 5}" fill="var(--vscode-descriptionForeground)" font-size="13" pointer-events="none">
                 ${healthDot}${escapeHtml(row.label)}
               </text>
               ${progressBar}
@@ -2528,9 +2528,9 @@ export class GanttPanel {
           const countBadge = row.childCount ? ` (${row.childCount})` : "";
           return `
             <g class="time-group-label gantt-row ${timeGroupClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-time-group="${row.timeGroup}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${y}" transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Toggle ${escapeHtml(row.label)}">
-              <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent"><title>${escapeHtml(row.label)}</title></rect>
+              <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent" pointer-events="all"><title>${escapeHtml(row.label)}</title></rect>
               ${chevron}
-              <text x="${10 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="13" font-weight="bold">
+              <text x="${10 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="13" font-weight="bold" pointer-events="none">
                 ${row.icon || ""} ${escapeHtml(row.label)}${countBadge}
               </text>
             </g>
@@ -2635,9 +2635,9 @@ export class GanttPanel {
 
         return `
           <g class="issue-label gantt-row cursor-pointer" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${y}" data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}' transform="translate(0, ${y})" tabindex="0" role="button" aria-label="Open issue #${issue.id}">
-            <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent"><title>${escapeAttr(tooltip)}</title></rect>
+            <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent" pointer-events="all"><title>${escapeAttr(tooltip)}</title></rect>
             ${chevron}
-            <text class="issue-text" x="${10 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="${issue.isExternal ? "var(--vscode-descriptionForeground)" : "var(--vscode-foreground)"}" font-size="13" opacity="${taskOpacity}">
+            <text class="issue-text" x="${10 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="${issue.isExternal ? "var(--vscode-descriptionForeground)" : "var(--vscode-foreground)"}" font-size="13" opacity="${taskOpacity}" pointer-events="none">
               ${externalBadge}${projectBadge}${escapedSubject}
             </text>
           </g>
@@ -6495,7 +6495,8 @@ export class GanttPanel {
     allLabels.forEach((el, index) => {
       el.addEventListener('click', (e) => {
         // Chevron has its own handler with stopPropagation - won't reach here
-        if (e.target.classList?.contains('collapse-toggle') || e.target.classList?.contains('chevron-hit-area')) return;
+        // Use closest() for more reliable detection
+        if (e.target.closest?.('.collapse-toggle') || e.target.closest?.('.chevron-hit-area')) return;
 
         const issueId = el.dataset.issueId;
         const isProject = el.classList.contains('project-label');
