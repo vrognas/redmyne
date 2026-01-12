@@ -1638,8 +1638,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
-    "@types/node": "^24.10.1",
-    "@types/vscode": "^1.105.0",
+    "@types/node": "^25.0.6",
+    "@types/vscode": "^1.108.1",
     "@vitest/coverage-v8": "^4.0.16",
     "esbuild": "^0.27.2",
     "eslint": "^9.39.2",
