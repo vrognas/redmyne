@@ -92,16 +92,19 @@ export function createEnhancedIssueTreeItem(
     // Rich tooltip with full details including blocked/billable info
     treeItem.tooltip = createFlexibilityTooltip(issue, flexibility, server);
 
-    // Context value for menus
+    // Context value for menus - append -child suffix if issue has parent
+    const childSuffix = issue.parent ? "-child" : "";
     treeItem.contextValue =
-      flexibility.status === "completed" ? "issue-completed" : "issue-active";
+      flexibility.status === "completed" ? `issue-completed${childSuffix}` : `issue-active${childSuffix}`;
   } else {
     // No flexibility data - show hours only, neutral icon
     const baseDesc = `${formatHoursAsHHMM(spentHours)}/${formatHoursAsHHMM(estHours)}`;
     const descIndicator = hasDescription ? " ⋯" : "";
     treeItem.description = assignee ? `${baseDesc} • ${assignee}${descIndicator}` : `${baseDesc}${descIndicator}`;
     treeItem.iconPath = new vscode.ThemeIcon("circle-outline", new vscode.ThemeColor("list.deemphasizedForeground"));
-    treeItem.contextValue = "issue";
+    // Append -child suffix if issue has parent
+    const childSuffix = issue.parent ? "-child" : "";
+    treeItem.contextValue = `issue${childSuffix}`;
 
     // Basic tooltip without flexibility
     treeItem.tooltip = createBasicTooltip(issue, server);
@@ -135,6 +138,7 @@ function createFlexibilityTooltip(
 
   md.appendMarkdown(`**#${issue.id}: ${issue.subject.trim()}**\n\n`);
   md.appendMarkdown(`**Tracker:** ${issue.tracker?.name?.trim() ?? "Unknown"}\n\n`);
+  md.appendMarkdown(`**Priority:** ${issue.priority?.name?.trim() ?? "Unknown"}\n\n`);
   md.appendMarkdown(`**Progress:** ${formatHoursAsHHMM(spentHours)} / ${formatHoursAsHHMM(estHours)} (${progress}%)\n\n`);
 
   if (flexibility.status !== "completed") {
@@ -184,6 +188,7 @@ function createBasicTooltip(
 
   md.appendMarkdown(`**#${issue.id}: ${issue.subject.trim()}**\n\n`);
   md.appendMarkdown(`**Tracker:** ${issue.tracker?.name?.trim() ?? "Unknown"}\n\n`);
+  md.appendMarkdown(`**Priority:** ${issue.priority?.name?.trim() ?? "Unknown"}\n\n`);
   md.appendMarkdown(`**Status:** ${issue.status?.name?.trim() ?? "Unknown"}\n\n`);
 
   if (issue.due_date) {
