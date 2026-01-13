@@ -65,7 +65,7 @@ export function registerGanttCommands(
     }),
 
     // Open specific issue in Gantt (context menu)
-    vscode.commands.registerCommand("redmine.openIssueInGantt", async (issue: { id: number } | undefined) => {
+    vscode.commands.registerCommand("redmine.openIssueInGantt", async (issue: { id: number; project?: { id: number } } | undefined) => {
       if (!issue?.id) {
         vscode.window.showErrorMessage("Could not determine issue ID");
         return;
@@ -87,8 +87,15 @@ export function registerGanttCommands(
       panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule, deps.getFilter(), deps.getDependencyIssues(), deps.getServer());
       panel.setFilterChangeCallback((filter) => deps.setFilter(filter));
 
+      // Find the issue's project and switch to it so the issue is visible
+      const targetIssue = issues.find(i => i.id === issue.id);
+      const projectId = issue.project?.id ?? targetIssue?.project?.id;
+      if (projectId) {
+        panel.showProject(projectId);
+      }
+
       // Wait for webview to render, then scroll to issue
-      setTimeout(() => panel.scrollToIssue(issue.id), 100);
+      setTimeout(() => panel.scrollToIssue(issue.id), 150);
     })
   );
 }
