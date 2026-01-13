@@ -11,6 +11,10 @@ export interface IssueStatus extends NamedEntity {
   is_closed: boolean;
 }
 
+export interface IssuePriority extends NamedEntity {
+  is_default?: boolean;
+}
+
 export interface TimeEntryActivity extends NamedEntity {
   is_default?: boolean;
 }
@@ -22,6 +26,7 @@ export interface TimeEntryActivity extends NamedEntity {
 export interface IssueFilter {
   assignee: "me" | "any";
   status: "open" | "closed" | "any";
+  priority?: number | "any";
 }
 
 /**

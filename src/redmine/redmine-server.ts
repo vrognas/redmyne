@@ -12,7 +12,7 @@ import { Project } from "./models/project";
 import { TimeEntry } from "./models/time-entry";
 import { Issue } from "./models/issue";
 import { Version } from "./models/version";
-import { IssueStatus as RedmineIssueStatus } from "./models/common";
+import { IssueStatus as RedmineIssueStatus, IssuePriority } from "./models/common";
 import { Membership as RedmineMembership } from "./models/membership";
 
 type HttpMethods = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
@@ -1068,6 +1068,7 @@ export class RedmineServer {
   }
 
   issueStatuses: { issue_statuses: RedmineIssueStatus[] } | null = null;
+  issuePriorities: { issue_priorities: IssuePriority[] } | null = null;
 
   /**
    * Returns promise, that resolves to list of issue statuses in provided redmine server
@@ -1096,6 +1097,34 @@ export class RedmineServer {
     const statuses = await this.getIssueStatuses();
     return (statuses?.issue_statuses || []).map((s) => new IssueStatus(s.id, s.name));
   }
+
+  /**
+   * Returns issue priorities (cached per server instance)
+   */
+  async getIssuePriorities(): Promise<{ issue_priorities: IssuePriority[] }> {
+    if (this.issuePriorities) return this.issuePriorities;
+    const obj = await this.doRequest<{ issue_priorities: IssuePriority[] }>(
+      "/enumerations/issue_priorities.json",
+      "GET"
+    );
+    if (obj?.issue_priorities) {
+      this.issuePriorities = obj;
+    }
+    return { issue_priorities: obj?.issue_priorities || [] };
+  }
+
+  /**
+   * Set issue priority
+   */
+  async setIssuePriority(issueId: number, priorityId: number): Promise<void> {
+    await this.doRequest(
+      `/issues/${issueId}.json`,
+      "PUT",
+      this.encodeJson({ issue: { priority_id: priorityId } })
+    );
+    this.invalidateIssueCache(issueId);
+  }
+
   async getMemberships(projectId: number): Promise<Membership[]> {
     const membershipsResponse = await this.doRequest<{
       memberships: RedmineMembership[];
@@ -1169,6 +1198,7 @@ export class RedmineServer {
   async getFilteredIssues(filter: {
     assignee: "me" | "any";
     status: "open" | "closed" | "any";
+    priority?: number | "any";
   }): Promise<{ issues: Issue[] }> {
     const params = new URLSearchParams();
     params.set("include", "children,relations");
@@ -1187,6 +1217,11 @@ export class RedmineServer {
       params.set("assigned_to_id", "me");
     }
     // 'any' = no assigned_to_id param
+
+    // Priority filter
+    if (filter.priority && filter.priority !== "any") {
+      params.set("priority_id", String(filter.priority));
+    }
 
     const issues = await this.paginate<Issue>(
       `/issues.json?${params.toString()}`,
