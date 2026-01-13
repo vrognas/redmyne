@@ -38,43 +38,23 @@ export function createLoadingTreeItem(message = "Loading..."): vscode.TreeItem {
   return item;
 }
 
-/** Skeleton bar patterns using Braille characters for modern appearance */
-const SKELETON_PATTERNS = [
-  "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿",
-  "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿",
-  "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿",
-  "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿",
-  "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿",
-];
-
 /**
- * Create skeleton placeholder items for loading state.
- * Returns array of placeholders that look like content loading.
+ * Create a single loading placeholder for tree views.
+ * @param _count Ignored - always returns single placeholder for simplicity
  */
-export function createSkeletonPlaceholders(count = 5): LoadingPlaceholder[] {
-  return Array.from({ length: count }, (_, i) => ({
-    isLoadingPlaceholder: true as const,
-    skeletonIndex: i,
-  }));
+export function createSkeletonPlaceholders(_count = 1): LoadingPlaceholder[] {
+  return [{ isLoadingPlaceholder: true as const, message: "Loading..." }];
 }
 
 /**
- * Create a VS Code TreeItem for skeleton loading state.
- * Uses light shade blocks with animated icon for pulsating effect.
+ * Create a VS Code TreeItem for loading state.
+ * Shows spinning disc with "Loading..." text.
  */
 export function createSkeletonTreeItem(placeholder: LoadingPlaceholder): vscode.TreeItem {
-  const index = placeholder.skeletonIndex ?? 0;
-  const pattern = SKELETON_PATTERNS[index % SKELETON_PATTERNS.length];
-
   const item = new vscode.TreeItem(
-    pattern,
+    placeholder.message ?? "Loading...",
     vscode.TreeItemCollapsibleState.None
   );
-  // Animated icon for pulsating effect
-  item.iconPath = new vscode.ThemeIcon(
-    "loading~spin",
-    new vscode.ThemeColor("disabledForeground")
-  );
-  item.description = "";
+  item.iconPath = new vscode.ThemeIcon("loading~spin");
   return item;
 }
