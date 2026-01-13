@@ -654,6 +654,13 @@ export function registerTimerCommands(
         const newBreak = parseInt(input, 10);
         const newWork = currentUnit - newBreak;
         await context.globalState.update("redmine.timer.workDuration", newWork);
+        // Update pending plan units with new work duration
+        const plan = controller.getPlan();
+        const newWorkSeconds = newWork * 60;
+        const updated = plan.map(u =>
+          u.unitPhase === "pending" ? { ...u, secondsLeft: newWorkSeconds } : u
+        );
+        controller.setPlan(updated);
         showStatusBarMessage(`$(check) Break set to ${newBreak}min (work: ${newWork}min)`, 2000);
         return;
       }
@@ -677,6 +684,14 @@ export function registerTimerCommands(
 
       const value = parseInt(input, 10);
       await context.globalState.update(`redmine.timer.${choice.setting}`, value);
+      // Update pending plan units with new work duration
+      const effectiveWork = getWorkDuration();
+      const plan = controller.getPlan();
+      const newWorkSeconds = effectiveWork * 60;
+      const updated = plan.map(u =>
+        u.unitPhase === "pending" ? { ...u, secondsLeft: newWorkSeconds } : u
+      );
+      controller.setPlan(updated);
       showStatusBarMessage(`$(check) ${choice.setting === "unitDuration" ? "Unit" : "Work"} duration set to ${value}min`, 2000);
     })
   );
