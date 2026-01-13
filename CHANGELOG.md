@@ -2,6 +2,18 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [3.23.0]
+
+### Fixed
+
+- **Timer settings now update pending plan units** - changing work/break duration updates all pending (not yet started) units in today's plan
+- **Kanban add-to-plan uses current timer settings** - previously used stale value captured at extension activation
+- **Open issue in Gantt shows correct project** - switches to issue's project view before scrolling
+
+### Changed
+
+- **Simplified loading placeholder** - cleaner "Loading..." text instead of skeleton blocks
+
 ## [3.22.0]
 
 ### Added
