@@ -2,6 +2,13 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [3.23.1]
+
+### Changed
+
+- **Minimum VS Code version** - now requires VS Code ^1.106.0 (was ^1.105.0)
+- **Minimum Positron version** - now requires Positron ^2025.12.0 (was ^2025.06.0)
+
 ## [3.23.0]
 
 ### Fixed
