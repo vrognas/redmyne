@@ -46,7 +46,7 @@ import { WorkloadStatusBar } from "./status-bars/workload-status-bar";
 import { autoUpdateTracker } from "./utilities/auto-update-tracker";
 import { adHocTracker } from "./utilities/adhoc-tracker";
 import { toggleAdHoc, contributeToIssue, removeContribution } from "./commands/adhoc-commands";
-import { togglePrecedence } from "./utilities/precedence-tracker";
+import { togglePrecedence, setPrecedence, clearPrecedence } from "./utilities/precedence-tracker";
 import { debounce, DebouncedFunction } from "./utilities/debounce";
 
 // Constants
@@ -337,7 +337,11 @@ export function activate(context: vscode.ExtensionContext): void {
       kanbanController,
       () => projectsTree.server,
       () => timerController,
-      () => workDuration * 60
+      () => {
+        const unit = context.globalState.get<number>("redmine.timer.unitDuration", 60);
+        const work = context.globalState.get<number>("redmine.timer.workDuration", 45);
+        return Math.max(1, Math.min(work, unit)) * 60;
+      }
     )
   );
 
@@ -753,6 +757,48 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  // Copy issue ID to clipboard (sidebar context menu)
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.copyIssueId", async (issue: { id: number } | undefined) => {
+      if (!issue?.id) {
+        vscode.window.showErrorMessage('Could not determine issue ID');
+        return;
+      }
+      await vscode.env.clipboard.writeText(`#${issue.id}`);
+      showStatusBarMessage(`$(check) Copied #${issue.id}`, 2000);
+    })
+  );
+
+  // Copy project ID to clipboard (sidebar context menu)
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.copyProjectId", async (project: { id: number } | undefined) => {
+      if (!project?.id) {
+        vscode.window.showErrorMessage('Could not determine project ID');
+        return;
+      }
+      await vscode.env.clipboard.writeText(`#${project.id}`);
+      showStatusBarMessage(`$(check) Copied project #${project.id}`, 2000);
+    })
+  );
+
+  // Copy project URL to clipboard (sidebar context menu)
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.copyProjectUrl", async (project: { id: number; identifier?: string } | undefined) => {
+      if (!project?.identifier) {
+        vscode.window.showErrorMessage('Could not determine project identifier');
+        return;
+      }
+      const url = vscode.workspace.getConfiguration("redmine").get<string>("url");
+      if (!url) {
+        vscode.window.showErrorMessage('No Redmine URL configured');
+        return;
+      }
+      const projectUrl = `${url}/projects/${project.identifier}`;
+      await vscode.env.clipboard.writeText(projectUrl);
+      showStatusBarMessage(`$(check) Copied project URL`, 2000);
+    })
+  );
+
   // Set done ratio (% Done) for issue (context menu)
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -820,6 +866,48 @@ export function activate(context: vscode.ExtensionContext): void {
           // Update only the Gantt panel if open, avoid full tree refresh
           GanttPanel.currentPanel?.updateIssueDoneRatio(issue.id, selectedValue);
           // Refresh Gantt data to recalculate capacity
+          vscode.commands.executeCommand("redmine.refreshGanttData");
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to update: ${error}`);
+        }
+      }
+    )
+  );
+
+  // Set status for issue (sidebar context menu)
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "redmine.setStatus",
+      async (issue: { id: number; status?: { id: number; name: string } } | undefined) => {
+        if (!issue?.id) {
+          vscode.window.showErrorMessage("Could not determine issue ID");
+          return;
+        }
+        const server = projectsTree.server;
+        if (!server) {
+          vscode.window.showErrorMessage("No Redmine server configured");
+          return;
+        }
+
+        try {
+          const statuses = await server.getIssueStatusesTyped();
+          const options = statuses.map((s) => ({
+            label: s.name,
+            value: s.statusId,
+            picked: issue.status?.id === s.statusId,
+          }));
+
+          const selected = await vscode.window.showQuickPick(options, {
+            placeHolder: `Set status for #${issue.id}`,
+          });
+
+          if (selected === undefined) return;
+
+          await server.setIssueStatus({ id: issue.id }, selected.value);
+          showStatusBarMessage(`$(check) #${issue.id} set to ${selected.label}`, 2000);
+
+          // Refresh trees and Gantt
+          projectsTree.refresh();
           vscode.commands.executeCommand("redmine.refreshGanttData");
         } catch (error) {
           vscode.window.showErrorMessage(`Failed to update: ${error}`);
@@ -912,18 +1000,20 @@ export function activate(context: vscode.ExtensionContext): void {
           let targetStatus: { id: number; name: string; is_closed: boolean } | undefined;
 
           if (issue.statusPattern) {
-            // Find status by pattern
+            // Find status by pattern - prefer exact name match, then heuristic
             if (issue.statusPattern === "new") {
-              // Find first non-closed status (typically "New")
-              targetStatus = statuses.find((s) => !s.is_closed);
+              // Exact "new", then first non-closed
+              targetStatus = statuses.find((s) => s.name.toLowerCase() === "new")
+                ?? statuses.find((s) => !s.is_closed);
             } else if (issue.statusPattern === "in_progress") {
-              // Find status with "progress" in name, or second non-closed status
-              targetStatus =
-                statuses.find((s) => !s.is_closed && s.name.toLowerCase().includes("progress")) ||
-                statuses.filter((s) => !s.is_closed)[1];
+              // Exact "in progress", then contains "progress", then second non-closed
+              targetStatus = statuses.find((s) => s.name.toLowerCase() === "in progress")
+                ?? statuses.find((s) => !s.is_closed && s.name.toLowerCase().includes("progress"))
+                ?? statuses.filter((s) => !s.is_closed)[1];
             } else if (issue.statusPattern === "closed") {
-              // Find first closed status
-              targetStatus = statuses.find((s) => s.is_closed);
+              // Exact "closed", then first is_closed
+              targetStatus = statuses.find((s) => s.name.toLowerCase() === "closed")
+                ?? statuses.find((s) => s.is_closed);
             }
 
             if (!targetStatus) {
@@ -975,13 +1065,15 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Show project in Gantt (context menu)
   context.subscriptions.push(
-    vscode.commands.registerCommand("redmine.showProjectInGantt", async (node: { project?: { id?: number } } | undefined) => {
-      if (!node?.project?.id) {
+    vscode.commands.registerCommand("redmine.showProjectInGantt", async (node: { project?: { id?: number }; id?: number } | undefined) => {
+      const projectId = node?.project?.id ?? node?.id;
+      if (!projectId) {
         vscode.window.showErrorMessage("Could not determine project ID");
         return;
       }
-      // Open Gantt - it will show all issues from the current filter
+      // Open Gantt and switch to project view with this project selected
       await vscode.commands.executeCommand("redmine.showGantt");
+      GanttPanel.currentPanel?.showProject(projectId);
     })
   );
 
@@ -998,6 +1090,21 @@ export function activate(context: vscode.ExtensionContext): void {
         // Focus the Issues view first, then reveal
         await vscode.commands.executeCommand("redmine-explorer-projects.focus");
         await cleanupResources.projectsTreeView.reveal(issue, { select: true, focus: true, expand: true });
+      }
+    })
+  );
+
+  // Reveal project in tree (from Gantt context menu)
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.revealProjectInTree", async (projectId: number) => {
+      if (!projectId) return;
+      // Find the project in the tree data
+      const projects = projectsTree.getProjects();
+      const project = projects.find((p) => p.id === projectId);
+      if (project && cleanupResources.projectsTreeView) {
+        // Focus the Issues view first, then reveal
+        await vscode.commands.executeCommand("redmine-explorer-projects.focus");
+        await cleanupResources.projectsTreeView.reveal(project, { select: true, focus: true, expand: true });
       }
     })
   );
@@ -1060,6 +1167,118 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  // Set issue priority (pattern-based or picker)
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "redmine.setIssuePriority",
+      async (issue: { id: number; priorityPattern?: string } | undefined) => {
+        if (!issue?.id) {
+          vscode.window.showErrorMessage("Could not determine issue ID");
+          return;
+        }
+        const server = projectsTree.server;
+        if (!server) {
+          vscode.window.showErrorMessage("No Redmine server configured");
+          return;
+        }
+
+        try {
+          // Use cached priorities for performance
+          const { issue_priorities: priorities } = await server.getIssuePriorities();
+          let targetPriority: { id: number; name: string } | undefined;
+
+          if (issue.priorityPattern) {
+            // Find priority by pattern - prefer exact match, fallback to includes
+            const pattern = issue.priorityPattern.toLowerCase();
+            targetPriority = priorities.find((p) => p.name.toLowerCase() === pattern)
+              ?? priorities.find((p) => p.name.toLowerCase().includes(pattern));
+
+            if (!targetPriority) {
+              vscode.window.showErrorMessage(`No matching priority found for: ${issue.priorityPattern}`);
+              return;
+            }
+          } else {
+            // Show picker
+            const options = priorities.map((p) => ({ label: p.name, priority: p }));
+            const selected = await vscode.window.showQuickPick(options, {
+              placeHolder: `Set priority for #${issue.id}`,
+            });
+            if (!selected) return;
+            targetPriority = selected.priority;
+          }
+
+          await server.setIssuePriority(issue.id, targetPriority.id);
+          showStatusBarMessage(`$(check) #${issue.id} priority set to ${targetPriority.name}`, 2000);
+          vscode.commands.executeCommand("redmine.refreshGanttData");
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to update priority: ${error}`);
+        }
+      }
+    )
+  );
+
+  // Set auto-update %done (explicit on/off)
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "redmine.setAutoUpdateDoneRatio",
+      async (issue: { id: number; value: boolean } | undefined) => {
+        if (!issue?.id) {
+          vscode.window.showErrorMessage("Could not determine issue ID");
+          return;
+        }
+        if (issue.value) {
+          autoUpdateTracker.enable(issue.id);
+          showStatusBarMessage(`$(check) Auto-update %done enabled for #${issue.id}`, 2000);
+        } else {
+          autoUpdateTracker.disable(issue.id);
+          showStatusBarMessage(`$(x) Auto-update %done disabled for #${issue.id}`, 2000);
+        }
+      }
+    )
+  );
+
+  // Set ad-hoc budget (explicit on/off)
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "redmine.setAdHoc",
+      async (issue: { id: number; value: boolean } | undefined) => {
+        if (!issue?.id) {
+          vscode.window.showErrorMessage("Could not determine issue ID");
+          return;
+        }
+        if (issue.value) {
+          adHocTracker.tag(issue.id);
+          showStatusBarMessage(`$(check) #${issue.id} tagged as ad-hoc budget`, 2000);
+        } else {
+          adHocTracker.untag(issue.id);
+          showStatusBarMessage(`$(check) #${issue.id} ad-hoc budget removed`, 2000);
+        }
+        vscode.commands.executeCommand("redmine.refreshGanttData");
+      }
+    )
+  );
+
+  // Set precedence (explicit on/off)
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "redmine.setPrecedence",
+      async (issue: { id: number; value: boolean } | undefined) => {
+        if (!issue?.id) {
+          vscode.window.showErrorMessage("Could not determine issue ID");
+          return;
+        }
+        if (issue.value) {
+          await setPrecedence(context.globalState, issue.id);
+          showStatusBarMessage(`$(check) #${issue.id} tagged with precedence`, 2000);
+        } else {
+          await clearPrecedence(context.globalState, issue.id);
+          showStatusBarMessage(`$(check) #${issue.id} precedence removed`, 2000);
+        }
+        vscode.commands.executeCommand("redmine.refreshGanttData");
+      }
+    )
+  );
+
   // Gantt webview context menu commands
   // These receive { webviewSection, issueId } from data-vscode-context
   context.subscriptions.push(
@@ -1075,7 +1294,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand("redmine.gantt.showInIssues", (ctx: { issueId: number }) => {
       if (ctx?.issueId) {
-        vscode.commands.executeCommand("redmine.openIssueInGantt", { id: ctx.issueId });
+        vscode.commands.executeCommand("redmine.revealIssueInTree", ctx.issueId);
       }
     }),
     vscode.commands.registerCommand("redmine.gantt.logTime", (ctx: { issueId: number }) => {
@@ -1086,6 +1305,16 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("redmine.gantt.setDoneRatio", (ctx: { issueId: number }) => {
       if (ctx?.issueId) {
         vscode.commands.executeCommand("redmine.setDoneRatio", { id: ctx.issueId });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.gantt.setStatus", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.setStatus", { id: ctx.issueId });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.gantt.setIssuePriority", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.setIssuePriority", { id: ctx.issueId });
       }
     }),
     // Submenu commands for quick % Done selection
@@ -1147,6 +1376,35 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.env.clipboard.writeText(`#${ctx.issueId}`);
       }
     }),
+    vscode.commands.registerCommand("redmine.gantt.copyProjectId", (ctx: { projectId: number }) => {
+      if (ctx?.projectId) {
+        vscode.env.clipboard.writeText(`#${ctx.projectId}`);
+      }
+    }),
+    vscode.commands.registerCommand(
+      "redmine.gantt.copyProjectUrl",
+      (ctx: { projectId: number; projectIdentifier: string }) => {
+        if (ctx?.projectIdentifier) {
+          const url = vscode.workspace.getConfiguration("redmine").get<string>("url");
+          if (url) {
+            const projectUrl = `${url}/projects/${ctx.projectIdentifier}`;
+            vscode.env.clipboard.writeText(projectUrl);
+            showStatusBarMessage("$(check) Copied project URL", 2000);
+          }
+        }
+      }
+    ),
+    vscode.commands.registerCommand(
+      "redmine.gantt.createSubIssue",
+      (ctx: { issueId: number; projectId: number }) => {
+        if (ctx?.issueId && ctx?.projectId) {
+          vscode.commands.executeCommand("redmine.quickCreateSubIssue", {
+            id: ctx.issueId,
+            project: { id: ctx.projectId },
+          });
+        }
+      }
+    ),
     vscode.commands.registerCommand(
       "redmine.gantt.openProjectInBrowser",
       (ctx: { projectId: number; projectIdentifier: string }) => {
@@ -1166,7 +1424,212 @@ export function activate(context: vscode.ExtensionContext): void {
           });
         }
       }
-    )
+    ),
+    vscode.commands.registerCommand(
+      "redmine.gantt.showProjectInIssues",
+      (ctx: { projectId: number }) => {
+        if (ctx?.projectId) {
+          vscode.commands.executeCommand("redmine.revealProjectInTree", ctx.projectId);
+        }
+      }
+    ),
+    // Priority submenu commands for Gantt
+    vscode.commands.registerCommand("redmine.gantt.setPriorityLow", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.setIssuePriority", { id: ctx.issueId, priorityPattern: "low" });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.gantt.setPriorityNormal", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.setIssuePriority", { id: ctx.issueId, priorityPattern: "normal" });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.gantt.setPriorityHigh", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.setIssuePriority", { id: ctx.issueId, priorityPattern: "high" });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.gantt.setPriorityUrgent", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.setIssuePriority", { id: ctx.issueId, priorityPattern: "urgent" });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.gantt.setPriorityImmediate", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.setIssuePriority", { id: ctx.issueId, priorityPattern: "immediate" });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.gantt.setPriorityOther", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.setIssuePriority", { id: ctx.issueId });
+      }
+    }),
+    // Auto-update On/Off for Gantt
+    vscode.commands.registerCommand("redmine.gantt.autoUpdateOn", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.setAutoUpdateDoneRatio", { id: ctx.issueId, value: true });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.gantt.autoUpdateOff", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.setAutoUpdateDoneRatio", { id: ctx.issueId, value: false });
+      }
+    }),
+    // Ad-hoc On/Off for Gantt
+    vscode.commands.registerCommand("redmine.gantt.adHocOn", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.setAdHoc", { id: ctx.issueId, value: true });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.gantt.adHocOff", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.setAdHoc", { id: ctx.issueId, value: false });
+      }
+    }),
+    // Precedence On/Off for Gantt
+    vscode.commands.registerCommand("redmine.gantt.precedenceOn", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.setPrecedence", { id: ctx.issueId, value: true });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.gantt.precedenceOff", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.setPrecedence", { id: ctx.issueId, value: false });
+      }
+    }),
+    // Internal Estimate for Gantt
+    vscode.commands.registerCommand("redmine.gantt.setInternalEstimate", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.setInternalEstimate", { id: ctx.issueId });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.gantt.clearInternalEstimate", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.clearInternalEstimate", { id: ctx.issueId });
+      }
+    }),
+    // Add to Kanban for Gantt
+    vscode.commands.registerCommand("redmine.gantt.addToKanban", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmine.addIssueToKanban", { id: ctx.issueId });
+      }
+    }),
+    // Create Issue for Gantt project context
+    vscode.commands.registerCommand("redmine.gantt.createIssue", (ctx: { projectId: number }) => {
+      if (ctx?.projectId) {
+        vscode.commands.executeCommand("redmine.quickCreateIssue", { project: { id: ctx.projectId } });
+      }
+    }),
+    // Create Version for Gantt project context
+    vscode.commands.registerCommand("redmine.gantt.createVersion", (ctx: { projectId: number }) => {
+      if (ctx?.projectId) {
+        vscode.commands.executeCommand("redmine.quickCreateVersion", { project: { id: ctx.projectId } });
+      }
+    }),
+    // Sidebar submenu commands for % Done
+    ...[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((pct) =>
+      vscode.commands.registerCommand(`redmine.setDoneRatio${pct}`, (issue: { id: number }) => {
+        if (issue?.id) {
+          vscode.commands.executeCommand("redmine.setDoneRatio", { id: issue.id, percentage: pct });
+        }
+      })
+    ),
+    vscode.commands.registerCommand("redmine.setDoneRatioCustom", (issue: { id: number }) => {
+      if (issue?.id) {
+        vscode.commands.executeCommand("redmine.setDoneRatio", { id: issue.id });
+      }
+    }),
+    // Sidebar submenu commands for Status
+    vscode.commands.registerCommand("redmine.setStatusNew", (issue: { id: number }) => {
+      if (issue?.id) {
+        vscode.commands.executeCommand("redmine.setIssueStatus", { id: issue.id, statusPattern: "new" });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.setStatusInProgress", (issue: { id: number }) => {
+      if (issue?.id) {
+        vscode.commands.executeCommand("redmine.setIssueStatus", { id: issue.id, statusPattern: "in_progress" });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.setStatusClosed", (issue: { id: number }) => {
+      if (issue?.id) {
+        vscode.commands.executeCommand("redmine.setIssueStatus", { id: issue.id, statusPattern: "closed" });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.setStatusOther", (issue: { id: number }) => {
+      if (issue?.id) {
+        vscode.commands.executeCommand("redmine.setIssueStatus", { id: issue.id });
+      }
+    }),
+    // Sidebar submenu commands for Priority
+    vscode.commands.registerCommand("redmine.setPriorityLow", (issue: { id: number }) => {
+      if (issue?.id) {
+        vscode.commands.executeCommand("redmine.setIssuePriority", { id: issue.id, priorityPattern: "low" });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.setPriorityNormal", (issue: { id: number }) => {
+      if (issue?.id) {
+        vscode.commands.executeCommand("redmine.setIssuePriority", { id: issue.id, priorityPattern: "normal" });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.setPriorityHigh", (issue: { id: number }) => {
+      if (issue?.id) {
+        vscode.commands.executeCommand("redmine.setIssuePriority", { id: issue.id, priorityPattern: "high" });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.setPriorityUrgent", (issue: { id: number }) => {
+      if (issue?.id) {
+        vscode.commands.executeCommand("redmine.setIssuePriority", { id: issue.id, priorityPattern: "urgent" });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.setPriorityImmediate", (issue: { id: number }) => {
+      if (issue?.id) {
+        vscode.commands.executeCommand("redmine.setIssuePriority", { id: issue.id, priorityPattern: "immediate" });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.setPriorityOther", (issue: { id: number }) => {
+      if (issue?.id) {
+        vscode.commands.executeCommand("redmine.setIssuePriority", { id: issue.id });
+      }
+    }),
+    // Sidebar On/Off commands for Auto-update
+    vscode.commands.registerCommand("redmine.autoUpdateOn", (issue: { id: number }) => {
+      if (issue?.id) {
+        vscode.commands.executeCommand("redmine.setAutoUpdateDoneRatio", { id: issue.id, value: true });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.autoUpdateOff", (issue: { id: number }) => {
+      if (issue?.id) {
+        vscode.commands.executeCommand("redmine.setAutoUpdateDoneRatio", { id: issue.id, value: false });
+      }
+    }),
+    // Sidebar On/Off commands for Ad-hoc
+    vscode.commands.registerCommand("redmine.adHocOn", (issue: { id: number }) => {
+      if (issue?.id) {
+        vscode.commands.executeCommand("redmine.setAdHoc", { id: issue.id, value: true });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.adHocOff", (issue: { id: number }) => {
+      if (issue?.id) {
+        vscode.commands.executeCommand("redmine.setAdHoc", { id: issue.id, value: false });
+      }
+    }),
+    // Sidebar On/Off commands for Precedence
+    vscode.commands.registerCommand("redmine.precedenceOn", (issue: { id: number }) => {
+      if (issue?.id) {
+        vscode.commands.executeCommand("redmine.setPrecedence", { id: issue.id, value: true });
+      }
+    }),
+    vscode.commands.registerCommand("redmine.precedenceOff", (issue: { id: number }) => {
+      if (issue?.id) {
+        vscode.commands.executeCommand("redmine.setPrecedence", { id: issue.id, value: false });
+      }
+    }),
+    // Update Issue for sidebar (opens issue controller)
+    vscode.commands.registerCommand("redmine.updateIssue", (issue: { id: number }) => {
+      if (issue?.id) {
+        vscode.commands.executeCommand("redmine.issueActions", false, {}, `${issue.id}`);
+      }
+    })
   );
 
   // Register view commands
