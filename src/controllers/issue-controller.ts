@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { QuickUpdate, Membership, IssueStatus } from "./domain";
 import { RedmineServer } from "../redmine/redmine-server";
 import { Issue } from "../redmine/models/issue";
-import { IssueStatus as RedmineIssueStatus, TimeEntryActivity } from "../redmine/models/common";
+import { IssueStatus as RedmineIssueStatus, IssuePriority, TimeEntryActivity } from "../redmine/models/common";
 import { errorToString } from "../utilities/error-feedback";
 import { parseTimeInput, validateTimeInput, formatHoursAsHHMM } from "../utilities/time-input";
 import { showStatusBarMessage } from "../utilities/status-bar";
@@ -108,6 +108,33 @@ export class IssueController {
     }
   }
 
+  async changeIssuePriority(priorities: IssuePriority[]) {
+    const item = await vscode.window.showQuickPick(
+      priorities.map((p) => ({
+        label: p.name,
+        description: p.id === this.issue.priority.id ? "(current)" : undefined,
+        priority: p,
+      })),
+      {
+        title: `Change Priority - #${this.issue.id}`,
+        placeHolder: `Current: ${this.issue.priority.name}`,
+      }
+    );
+    if (!item || item.priority.id === this.issue.priority.id) return;
+
+    try {
+      await this.redmine.setIssuePriority(this.issue.id, item.priority.id);
+      showStatusBarMessage(
+        `$(check) #${this.issue.id} priority → ${item.priority.name}`,
+        2000
+      );
+      this.onIssueUpdated?.();
+      vscode.commands.executeCommand("redmine.refreshAfterIssueUpdate");
+    } catch (error) {
+      vscode.window.showErrorMessage(errorToString(error));
+    }
+  }
+
   private async openInBrowser() {
     try {
       await vscode.commands.executeCommand(
@@ -124,6 +151,11 @@ export class IssueController {
   private async changeStatus() {
     const statuses = await this.redmine.getIssueStatuses();
     this.changeIssueStatus(statuses.issue_statuses);
+  }
+
+  private async changePriority() {
+    const { issue_priorities } = await this.redmine.getIssuePriorities();
+    this.changeIssuePriority(issue_priorities);
   }
 
   private async addTimeEntry() {
@@ -274,6 +306,12 @@ export class IssueController {
             detail: issueDetails,
           },
           {
+            action: "changePriority",
+            label: "$(flame) Change priority",
+            description: `Current: ${this.issue.priority.name}`,
+            detail: issueDetails,
+          },
+          {
             action: "openInBrowser",
             label: "$(link-external) Open in browser",
             description: "View issue in Redmine",
@@ -297,6 +335,9 @@ export class IssueController {
       }
       if (option.action === "changeStatus") {
         this.changeStatus();
+      }
+      if (option.action === "changePriority") {
+        this.changePriority();
       }
       if (option.action === "addTimeEntry") {
         this.addTimeEntry();
