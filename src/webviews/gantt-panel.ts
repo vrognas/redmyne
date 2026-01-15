@@ -29,6 +29,7 @@ import { debounce, DebouncedFunction } from "../utilities/debounce";
 import { IssueFilter, DEFAULT_ISSUE_FILTER, GanttViewMode } from "../redmine/models/common";
 import { parseLocalDate, getLocalToday, formatLocalDate } from "../utilities/date-utils";
 import { GanttWebviewMessage, parseLookbackYears } from "./gantt-webview-messages";
+import { escapeAttr, escapeHtml } from "./gantt-html-escape";
 
 /** Get today's date as YYYY-MM-DD string */
 const getTodayStr = (): string => formatLocalDate(getLocalToday());
@@ -289,27 +290,6 @@ function nodeToGanttRow(
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-
-/**
- * Escape HTML/SVG special characters to prevent XSS
- * User data (issue subjects, project names) must be escaped before SVG insertion
- */
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;")
-    .replace(/\\/g, "&#92;")
-    .replace(/`/g, "&#96;")
-    .replace(/\$/g, "&#36;");
-}
-
-/** Escape string for use in HTML attribute (also escapes newlines) */
-function escapeAttr(str: string): string {
-  return escapeHtml(str).replace(/\n/g, "&#10;");
-}
 
 /** Extract initials from full name (e.g., "Viktor Rognås" → "VR") */
 function getInitials(name: string): string {
