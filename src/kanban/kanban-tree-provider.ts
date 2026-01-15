@@ -301,15 +301,26 @@ export class KanbanTreeProvider
 
   /**
    * Get client (parent project) folders for a status board.
-   * Tasks without a parent project go under "No Client" (clientId = 0).
+   * Tasks without a parent project show as project folders directly (no "No Client" wrapper).
    */
   private getClientFolders(status: TaskStatus, tasks: KanbanTask[]): TaskTreeItem[] {
-    // Group tasks by client (parent project)
-    const clientMap = new Map<number, { name: string; tasks: KanbanTask[] }>();
+    // Separate tasks with and without parent project
+    const tasksWithClient: KanbanTask[] = [];
+    const tasksWithoutClient: KanbanTask[] = [];
 
     for (const task of tasks) {
-      const clientId = task.linkedParentProjectId ?? 0;
-      const clientName = task.linkedParentProjectName ?? "No Client";
+      if (task.linkedParentProjectId) {
+        tasksWithClient.push(task);
+      } else {
+        tasksWithoutClient.push(task);
+      }
+    }
+
+    // Group tasks with client by parent project
+    const clientMap = new Map<number, { name: string; tasks: KanbanTask[] }>();
+    for (const task of tasksWithClient) {
+      const clientId = task.linkedParentProjectId!;
+      const clientName = task.linkedParentProjectName!;
 
       const existing = clientMap.get(clientId);
       if (existing) {
@@ -319,19 +330,35 @@ export class KanbanTreeProvider
       }
     }
 
-    // Convert to folder items, sorted by client name ("No Client" last)
-    return Array.from(clientMap.entries())
-      .sort((a, b) => {
-        if (a[0] === 0) return 1; // "No Client" last
-        if (b[0] === 0) return -1;
-        return a[1].name.localeCompare(b[1].name);
-      })
+    // Build client folder items (sorted alphabetically)
+    const clientFolders: TaskTreeItem[] = Array.from(clientMap.entries())
+      .sort((a, b) => a[1].name.localeCompare(b[1].name))
       .map(([clientId, { name }]) => ({
         type: "client-folder" as const,
         status,
         clientId,
         clientName: name,
       }));
+
+    // Build project folders for tasks without client (sorted alphabetically, after client folders)
+    const projectMap = new Map<number, { name: string }>();
+    for (const task of tasksWithoutClient) {
+      if (!projectMap.has(task.linkedProjectId)) {
+        projectMap.set(task.linkedProjectId, { name: task.linkedProjectName });
+      }
+    }
+
+    const projectFolders: TaskTreeItem[] = Array.from(projectMap.entries())
+      .sort((a, b) => a[1].name.localeCompare(b[1].name))
+      .map(([projectId, { name }]) => ({
+        type: "project-folder" as const,
+        status,
+        projectId,
+        projectName: name,
+      }));
+
+    // Client folders first, then standalone project folders
+    return [...clientFolders, ...projectFolders];
   }
 
   /**
@@ -381,6 +408,8 @@ export class KanbanTreeProvider
 
   /**
    * Get tasks for a status, project, and optionally client.
+   * When clientId is undefined, returns tasks WITHOUT a parent project.
+   * When clientId is set, returns tasks with that parent project.
    */
   private getTasksForStatusAndProject(
     status: TaskStatus,
@@ -390,10 +419,11 @@ export class KanbanTreeProvider
     return this.getTasksForStatus(status).filter((t) => {
       if (t.linkedProjectId !== projectId) return false;
       if (clientId !== undefined) {
-        const taskClientId = t.linkedParentProjectId ?? 0;
-        return taskClientId === clientId;
+        // Under a client folder - match tasks with this parent project
+        return t.linkedParentProjectId === clientId;
       }
-      return true;
+      // Standalone project folder - only tasks WITHOUT parent project
+      return !t.linkedParentProjectId;
     });
   }
 
