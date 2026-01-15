@@ -1191,6 +1191,11 @@
           "group": "navigation@2"
         },
         {
+          "command": "redmine.timer.configureTimer",
+          "when": "view == 'redmine-explorer-kanban'",
+          "group": "navigation@3"
+        },
+        {
           "command": "redmine.configure",
           "when": "view == 'redmine-explorer-projects'",
           "group": "navigation"
