@@ -306,6 +306,7 @@ export class KanbanController {
       activityName: undefined,
       lastActiveAt: undefined,
       doingAt: undefined,
+      completedAt: undefined, // Clear if moving from Done
       loggedHours: 0,
       updatedAt: new Date().toISOString(),
     };
