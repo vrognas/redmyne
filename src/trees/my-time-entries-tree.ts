@@ -31,14 +31,18 @@ export interface TimeEntryNode {
   iconPath?: vscode.ThemeIcon;
   collapsibleState: vscode.TreeItemCollapsibleState;
   contextValue?: string;
-  type: "loading" | "group" | "week-group" | "day-group" | "month-group" | "week-subgroup" | "entry";
+  type: "loading" | "group" | "week-group" | "day-group" | "month-group" | "week-subgroup" | "entry" | "load-earlier";
   _cachedEntries?: TimeEntry[];
   _entry?: TimeEntry;
   _dateRange?: { start: string; end: string }; // For filling empty working days
   _date?: string; // ISO date for day-group nodes (YYYY-MM-DD)
+  _monthYear?: { year: number; month: number }; // For lazy-loaded month nodes
 }
 
 export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNode> {
+  private static readonly INITIAL_MONTHS = 3;
+  private static readonly LOAD_BATCH_SIZE = 3;
+
   private isLoading = false;
   server?: RedmineServer;
   private issueCache = new Map<number, { id: number; subject: string; projectId?: number; project: string; client?: string }>();
@@ -48,8 +52,16 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   private showAllUsers = false; // false = my entries only, true = all users
   private entrySort: SortConfig<TimeEntrySortField> | null = null;
 
+  // Lazy loading state for month nodes
+  private visibleMonths: { year: number; month: number }[] = [];
+  private loadedMonthEntries = new Map<string, TimeEntry[]>(); // key: "YYYY-MM"
+  private loadingMonths = new Set<string>(); // key: "YYYY-MM"
+  private todayEntries?: TimeEntry[];
+  private weekEntries?: TimeEntry[];
+
   constructor() {
     super();
+    this.initializeVisibleMonths();
     // Refresh when working hours config changes
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration((e) => {
@@ -60,6 +72,15 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         }
       })
     );
+  }
+
+  private initializeVisibleMonths(): void {
+    const now = new Date();
+    this.visibleMonths = [];
+    for (let i = 0; i < MyTimeEntriesTreeDataProvider.INITIAL_MONTHS; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      this.visibleMonths.push({ year: date.getFullYear(), month: date.getMonth() });
+    }
   }
 
   /**
@@ -98,19 +119,29 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     // Clear cache when server changes
     this.issueCache.clear();
     this.cachedGroups = undefined;
+    this.loadedMonthEntries.clear();
+    this.loadingMonths.clear();
+    this.todayEntries = undefined;
+    this.weekEntries = undefined;
+    this.initializeVisibleMonths();
   }
 
   override refresh(): void {
-    // Clear issue cache but keep tree data visible during refresh
+    // Clear all caches
     this.issueCache.clear();
-    // Fetch new data in background, keeping old data visible
+    this.cachedGroups = undefined;
+    this.loadedMonthEntries.clear();
+    this.loadingMonths.clear();
+    this.todayEntries = undefined;
+    this.weekEntries = undefined;
+    // Fetch new data in background
     if (!this.isLoading && this.server) {
       this.isLoading = true;
-      this.loadTimeEntries();
+      this.loadTodayAndThisWeek();
     }
   }
 
-  private async loadTimeEntries(): Promise<void> {
+  private async loadTodayAndThisWeek(): Promise<void> {
     if (!this.server) {
       this.isLoading = false;
       return;
@@ -119,71 +150,183 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     try {
       const today = formatLocalDate(new Date());
       const weekStart = getWeekStart();
-      const monthStart = getMonthStart();
-      const lastMonth = getLastMonthRange();
 
-      // Single fetch covering all periods (lastMonth.start to today)
-      // Then filter client-side - reduces 4 API requests to 1
-      const allUsers = this.showAllUsers;
+      // Only fetch this week's entries (includes today)
       const result = await this.server.getTimeEntries({
-        from: lastMonth.start,
+        from: weekStart,
         to: today,
-        allUsers,
+        allUsers: this.showAllUsers,
       });
 
-      // Filter entries client-side by date range (spent_on is YYYY-MM-DD string)
       const allEntries = result.time_entries;
-      const todayEntries = allEntries.filter((e) => e.spent_on === today);
-      const weekEntries = allEntries.filter(
-        (e) => e.spent_on && e.spent_on >= weekStart && e.spent_on <= today
-      );
-      const monthEntries = allEntries.filter(
-        (e) => e.spent_on && e.spent_on >= monthStart && e.spent_on <= today
-      );
-      const lastMonthEntries = allEntries.filter(
-        (e) => e.spent_on && e.spent_on >= lastMonth.start && e.spent_on <= lastMonth.end
-      );
+      this.todayEntries = allEntries.filter((e) => e.spent_on === today);
+      this.weekEntries = allEntries;
+    } catch {
+      this.todayEntries = [];
+      this.weekEntries = [];
+    } finally {
+      this.isLoading = false;
+      this._onDidChangeTreeData.fire(undefined);
+    }
+  }
 
-      const todayTotal = calculateTotal(todayEntries);
-      const weekTotal = calculateTotal(weekEntries);
-      const monthTotal = calculateTotal(monthEntries);
-      const lastMonthTotal = calculateTotal(lastMonthEntries);
+  private getMonthKey(year: number, month: number): string {
+    return `${year}-${String(month + 1).padStart(2, "0")}`;
+  }
 
+  private getMonthDateRange(monthYear: { year: number; month: number }): { start: string; end: string } {
+    const start = new Date(monthYear.year, monthYear.month, 1);
+    const end = new Date(monthYear.year, monthYear.month + 1, 0); // Last day of month
+    const today = new Date();
+    // Cap end at today if current/future month
+    if (end > today) {
+      return { start: formatLocalDate(start), end: formatLocalDate(today) };
+    }
+    return { start: formatLocalDate(start), end: formatLocalDate(end) };
+  }
+
+  private createMonthNode(year: number, month: number): TimeEntryNode {
+    const monthKey = this.getMonthKey(year, month);
+    const nodeId = `month-${monthKey}`;
+    const date = new Date(year, month, 1);
+    const monthName = date.toLocaleDateString("en-US", { month: "long" });
+    const shortMonthName = date.toLocaleDateString("en-US", { month: "short" });
+
+    // Determine label: "This Month (Jan)", "Last Month (Dec)", or "November 2025"
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const lastMonthDate = new Date(currentYear, currentMonth - 1, 1);
+    const lastMonthYear = lastMonthDate.getFullYear();
+    const lastMonth = lastMonthDate.getMonth();
+
+    let label: string;
+    if (year === currentYear && month === currentMonth) {
+      label = `This Month (${shortMonthName})`;
+    } else if (year === lastMonthYear && month === lastMonth) {
+      label = `Last Month (${shortMonthName})`;
+    } else {
+      label = `${monthName} ${year}`;
+    }
+
+    const isLoaded = this.loadedMonthEntries.has(monthKey);
+    const entries = this.loadedMonthEntries.get(monthKey) || [];
+    const total = calculateTotal(entries);
+
+    let description = "";
+    if (isLoaded) {
       const defaultSchedule = getWeeklySchedule();
-
-      // Calculate available hours for each period (using monthly overrides)
-      const todayAvailable = getHoursForDateMonthly(
-        new Date(),
+      const { start, end } = this.getMonthDateRange({ year, month });
+      const available = countAvailableHoursMonthly(
+        new Date(start + "T12:00:00"),
+        new Date(end + "T12:00:00"),
         this.monthlySchedules,
         defaultSchedule
       );
+      description = formatHoursWithComparison(total, available);
+    }
+
+    return {
+      id: nodeId,
+      label,
+      description,
+      collapsibleState: this.getCollapsibleState(nodeId, true),
+      type: "month-group",
+      _monthYear: { year, month },
+    };
+  }
+
+  private async loadMonthEntries(monthYear: { year: number; month: number }): Promise<TimeEntry[]> {
+    if (!this.server) return [];
+
+    const monthKey = this.getMonthKey(monthYear.year, monthYear.month);
+
+    // Return cached if already loaded
+    if (this.loadedMonthEntries.has(monthKey)) {
+      return this.loadedMonthEntries.get(monthKey)!;
+    }
+
+    // Return empty if already loading (avoid duplicate calls)
+    if (this.loadingMonths.has(monthKey)) {
+      return [];
+    }
+
+    this.loadingMonths.add(monthKey);
+    try {
+      const { start, end } = this.getMonthDateRange(monthYear);
+      const result = await this.server.getTimeEntries({
+        from: start,
+        to: end,
+        allUsers: this.showAllUsers,
+      });
+      this.loadedMonthEntries.set(monthKey, result.time_entries);
+      return result.time_entries;
+    } catch {
+      this.loadedMonthEntries.set(monthKey, []);
+      return [];
+    } finally {
+      this.loadingMonths.delete(monthKey);
+    }
+  }
+
+  loadEarlierMonths(): void {
+    const lastVisible = this.visibleMonths[this.visibleMonths.length - 1];
+    for (let i = 1; i <= MyTimeEntriesTreeDataProvider.LOAD_BATCH_SIZE; i++) {
+      const date = new Date(lastVisible.year, lastVisible.month - i, 1);
+      this.visibleMonths.push({ year: date.getFullYear(), month: date.getMonth() });
+    }
+    this._onDidChangeTreeData.fire(undefined);
+  }
+
+  async getChildren(element?: TimeEntryNode): Promise<TimeEntryNode[]> {
+    // No server configured - return empty
+    if (!this.server) {
+      return [];
+    }
+
+    // Root level - Today, This Week, month nodes, Load Earlier
+    if (!element) {
+      // If today/week not loaded yet, trigger load
+      if (this.todayEntries === undefined && !this.isLoading) {
+        this.isLoading = true;
+        this.loadTodayAndThisWeek();
+        return [{
+          label: "Loading time entries...",
+          iconPath: new vscode.ThemeIcon("loading~spin"),
+          collapsibleState: vscode.TreeItemCollapsibleState.None,
+          type: "loading",
+        }];
+      }
+
+      // Still loading
+      if (this.isLoading) {
+        return [{
+          label: "Loading time entries...",
+          iconPath: new vscode.ThemeIcon("loading~spin"),
+          collapsibleState: vscode.TreeItemCollapsibleState.None,
+          type: "loading",
+        }];
+      }
+
+      const today = formatLocalDate(new Date());
+      const weekStart = getWeekStart();
+      const now = new Date();
+      const dayName = now.toLocaleDateString("en-US", { weekday: "short" });
+      const dayNum = now.getDate();
+      const weekNum = getISOWeekNumber(now);
+      const defaultSchedule = getWeeklySchedule();
+
+      const todayTotal = calculateTotal(this.todayEntries || []);
+      const weekTotal = calculateTotal(this.weekEntries || []);
+      const todayAvailable = getHoursForDateMonthly(new Date(), this.monthlySchedules, defaultSchedule);
       const weekAvailable = countAvailableHoursMonthly(
         new Date(weekStart),
         new Date(today),
         this.monthlySchedules,
         defaultSchedule
       );
-      const monthAvailable = countAvailableHoursMonthly(
-        new Date(monthStart),
-        new Date(today),
-        this.monthlySchedules,
-        defaultSchedule
-      );
-      const lastMonthAvailable = countAvailableHoursMonthly(
-        new Date(lastMonth.start + "T12:00:00"),
-        new Date(lastMonth.end + "T12:00:00"),
-        this.monthlySchedules,
-        defaultSchedule
-      );
 
-      // Format labels with current date context
-      const now = new Date();
-      const dayName = now.toLocaleDateString("en-US", { weekday: "short" });
-      const dayNum = now.getDate();
-      const weekNum = getISOWeekNumber(now);
-      const monthName = now.toLocaleDateString("en-US", { month: "short" });
-
-      this.cachedGroups = [
+      const nodes: TimeEntryNode[] = [
         {
           id: "group-today",
           label: `Today (${dayName} ${dayNum})`,
@@ -191,7 +334,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
           collapsibleState: this.getCollapsibleState("group-today", true),
           type: "group",
           contextValue: "day-group",
-          _cachedEntries: todayEntries,
+          _cachedEntries: this.todayEntries,
           _date: today,
         },
         {
@@ -201,65 +344,28 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
           tooltip: "Shows working days from Monday up to today",
           collapsibleState: this.getCollapsibleState("group-week", true),
           type: "week-group",
-          _cachedEntries: weekEntries,
+          _cachedEntries: this.weekEntries,
           _dateRange: { start: weekStart, end: today },
         },
-        {
-          id: "group-month",
-          label: `This Month (${monthName})`,
-          description: formatHoursWithComparison(monthTotal, monthAvailable),
-          tooltip: "Shows working days from 1st up to today",
-          collapsibleState: this.getCollapsibleState("group-month", true),
-          type: "month-group",
-          _cachedEntries: monthEntries,
-        },
-        {
-          id: "group-last-month",
-          label: `Last Month (${lastMonth.name})`,
-          description: formatHoursWithComparison(lastMonthTotal, lastMonthAvailable),
-          tooltip: `${lastMonth.start} to ${lastMonth.end}`,
-          collapsibleState: this.getCollapsibleState("group-last-month", true),
-          type: "month-group",
-          _cachedEntries: lastMonthEntries,
-        },
       ];
-    } catch {
-      // On error, show empty state
-      this.cachedGroups = [];
-    } finally {
-      this.isLoading = false;
-      // Trigger re-render with actual data
-      this._onDidChangeTreeData.fire(undefined);
-    }
-  }
 
-  async getChildren(element?: TimeEntryNode): Promise<TimeEntryNode[]> {
-    // No server configured - return empty
-    if (!this.server) {
-      return [];
-    }
-
-    // Root level - date groups
-    if (!element) {
-      // Return cached if available
-      if (this.cachedGroups) {
-        return this.cachedGroups;
+      // Add visible month nodes
+      for (const { year, month } of this.visibleMonths) {
+        nodes.push(this.createMonthNode(year, month));
       }
 
-      // Return loading state and fetch in background
-      if (!this.isLoading) {
-        this.isLoading = true;
-        this.loadTimeEntries();
-      }
+      // Add "Load Earlier..." node
+      nodes.push({
+        id: "load-earlier",
+        label: "Load Earlier...",
+        description: `(${MyTimeEntriesTreeDataProvider.LOAD_BATCH_SIZE} more months)`,
+        iconPath: new vscode.ThemeIcon("history"),
+        collapsibleState: vscode.TreeItemCollapsibleState.None,
+        type: "load-earlier",
+        contextValue: "load-earlier",
+      });
 
-      return [
-        {
-          label: "Loading time entries...",
-          iconPath: new vscode.ThemeIcon("loading~spin"),
-          collapsibleState: vscode.TreeItemCollapsibleState.None,
-          type: "loading",
-        },
-      ];
+      return nodes;
     }
 
     // Week group - return day groups
@@ -267,18 +373,38 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       return this.groupEntriesByDay(element._cachedEntries, element._dateRange, "week");
     }
 
-    // Month group - return week subgroups
-    if (element.type === "month-group") {
-      if (!element._cachedEntries) {
-        // Fallback: data not available, show refresh hint
+    // Month group - lazy load entries
+    if (element.type === "month-group" && element._monthYear) {
+      const monthKey = this.getMonthKey(element._monthYear.year, element._monthYear.month);
+
+      // Check if currently loading
+      if (this.loadingMonths.has(monthKey)) {
         return [{
-          label: "Refresh to load entries",
+          label: "Loading...",
+          iconPath: new vscode.ThemeIcon("loading~spin"),
           collapsibleState: vscode.TreeItemCollapsibleState.None,
           type: "loading",
-          iconPath: new vscode.ThemeIcon("refresh"),
         }];
       }
-      const weekGroups = this.groupEntriesByWeek(element._cachedEntries, element.id || "month");
+
+      // Load entries if not cached
+      if (!this.loadedMonthEntries.has(monthKey)) {
+        // Start loading and show loading state
+        this.loadMonthEntries(element._monthYear).then(() => {
+          // Refresh this node and its parent to update description
+          this._onDidChangeTreeData.fire(element);
+          this._onDidChangeTreeData.fire(undefined);
+        });
+        return [{
+          label: "Loading...",
+          iconPath: new vscode.ThemeIcon("loading~spin"),
+          collapsibleState: vscode.TreeItemCollapsibleState.None,
+          type: "loading",
+        }];
+      }
+
+      const entries = this.loadedMonthEntries.get(monthKey) || [];
+      const weekGroups = this.groupEntriesByWeek(entries, element.id || "month");
       if (weekGroups.length === 0) {
         return [{
           label: "No time entries",
@@ -540,6 +666,12 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     treeItem.tooltip = node.tooltip;
     treeItem.iconPath = node.iconPath;
     treeItem.contextValue = node.contextValue;
+    if (node.type === "load-earlier") {
+      treeItem.command = {
+        command: "redmine.loadEarlierTimeEntries",
+        title: "Load Earlier Time Entries",
+      };
+    }
     return treeItem;
   }
 

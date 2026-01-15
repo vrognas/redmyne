@@ -20,14 +20,8 @@ import { MyTimeEntriesTreeDataProvider } from "./trees/my-time-entries-tree";
 import { RedmineSecretManager } from "./utilities/secret-manager";
 import { setApiKey } from "./commands/set-api-key";
 import { MonthlyScheduleOverrides, loadMonthlySchedules } from "./utilities/monthly-schedule";
-import { formatSecondsAsMMSS } from "./utilities/time-input";
 import { disposeStatusBar, showStatusBarMessage } from "./utilities/status-bar";
-import { TimerController } from "./timer/timer-controller";
-import { TimerStatusBar } from "./timer/timer-status-bar";
-import { TimerTreeProvider } from "./timer/timer-tree-provider";
-import { registerTimerCommands } from "./timer/timer-commands";
-import { toPersistedState, fromPersistedState, PersistedTimerState } from "./timer/timer-state";
-import { playCompletionSound } from "./timer/timer-sound";
+import { playCompletionSound } from "./utilities/completion-sound";
 import { KanbanController } from "./kanban/kanban-controller";
 import { KanbanStatusBar } from "./kanban/kanban-status-bar";
 import { KanbanTreeProvider } from "./kanban/kanban-tree-provider";
@@ -61,13 +55,9 @@ let cleanupResources: {
   myTimeEntriesTree?: MyTimeEntriesTreeDataProvider;
   projectsTreeView?: vscode.TreeView<unknown>;
   myTimeEntriesTreeView?: vscode.TreeView<unknown>;
-  timerTreeView?: vscode.TreeView<unknown>;
   kanbanTreeView?: vscode.TreeView<unknown>;
   workloadStatusBar?: WorkloadStatusBar;
   debouncedConfigChange?: DebouncedFunction<(event: vscode.ConfigurationChangeEvent) => void>;
-  timerController?: TimerController;
-  timerStatusBar?: TimerStatusBar;
-  timerTreeProvider?: TimerTreeProvider;
   kanbanController?: KanbanController;
   kanbanStatusBar?: KanbanStatusBar;
   kanbanTreeProvider?: KanbanTreeProvider;
@@ -165,139 +155,7 @@ export function activate(context: vscode.ExtensionContext): void {
     context.globalState.get<number>("redmine.timer.workDuration", 45),
     unitDuration
   ));
-  const breakDuration = unitDuration - workDuration;
-  const showTimerInStatusBar = vscode.workspace.getConfiguration("redmine.timer")
-    .get<boolean>("showInStatusBar", true);
-
-  // Controller expects seconds, config is in minutes
-  const timerController = new TimerController(workDuration * 60, breakDuration * 60);
-  cleanupResources.timerController = timerController;
-  context.subscriptions.push({ dispose: () => timerController.dispose() });
-
-  // Timer status bar (opt-in via config)
-  if (showTimerInStatusBar) {
-    const timerStatusBar = new TimerStatusBar(timerController);
-    cleanupResources.timerStatusBar = timerStatusBar;
-    context.subscriptions.push({ dispose: () => timerStatusBar.dispose() });
-  }
-
-  // Timer tree view
-  const timerTreeProvider = new TimerTreeProvider(timerController);
-  cleanupResources.timerTreeProvider = timerTreeProvider;
-  cleanupResources.timerTreeView = vscode.window.createTreeView("redmine-explorer-timer", {
-    treeDataProvider: timerTreeProvider,
-  });
-  context.subscriptions.push(cleanupResources.timerTreeView);
-
-  // Update timer context variables for menu visibility and tree view title
-  const updateTimerContext = () => {
-    const phase = timerController.getPhase();
-    const hasPlan = timerController.getPlan().length > 0;
-    vscode.commands.executeCommand("setContext", "redmine:timerPhase", phase);
-    vscode.commands.executeCommand("setContext", "redmine:timerHasPlan", hasPlan);
-
-    // Update tree view title based on phase (4.6 Timer Phase Clarity)
-    if (cleanupResources.timerTreeView) {
-      const phaseTitles: Record<string, string> = {
-        idle: hasPlan ? "Today's Plan" : "Today's Plan",
-        working: "Today's Plan (Working)",
-        paused: "Today's Plan (Paused)",
-        logging: "Today's Plan (Log Time)",
-        break: "Today's Plan (Break)",
-      };
-      cleanupResources.timerTreeView.title = phaseTitles[phase] || "Today's Plan";
-    }
-  };
-
-  // Initial context update
-  updateTimerContext();
-
-  // Update context on state changes
-  context.subscriptions.push(
-    timerController.onStateChange(() => {
-      updateTimerContext();
-      // Auto-save state
-      const persisted = toPersistedState(timerController.getState());
-      context.globalState.update("redmine.timer.state", persisted);
-    })
-  );
-
-  // Restore timer state (persists until manually cleared)
-  const restoreTimerState = async () => {
-    const persisted = context.globalState.get<PersistedTimerState>("redmine.timer.state");
-    if (!persisted) return;
-
-    // Restore state
-    if (persisted.plan.length > 0) {
-      const restored = fromPersistedState(persisted);
-
-      // Handle working phase - adjust working unit's timer for elapsed time
-      if (persisted.phase === "working") {
-        const elapsedSeconds = Math.floor(
-          (Date.now() - new Date(persisted.lastActiveAt).getTime()) / 1000
-        );
-
-        // Find working unit and adjust its timer
-        const workingIdx = restored.plan.findIndex(u => u.unitPhase === "working");
-        if (workingIdx >= 0) {
-          const unit = restored.plan[workingIdx];
-          const adjustedSecondsLeft = Math.max(0, unit.secondsLeft - elapsedSeconds);
-
-          if (adjustedSecondsLeft <= 0) {
-            // Timer would have completed - restore in logging phase
-            restored.plan[workingIdx] = { ...unit, secondsLeft: 0 };
-            restored.phase = "logging"; // Set to logging so markLogged/skipLogging work
-            timerController.restoreState(restored);
-            // Override the idle phase that restoreState sets
-            // by directly triggering the log dialog which handles the logging phase
-            vscode.commands.executeCommand("redmine.timer.showLogDialog");
-            return;
-          }
-
-          // Adjust timer and offer to continue
-          restored.plan[workingIdx] = { ...unit, secondsLeft: adjustedSecondsLeft };
-          const pendingCount = restored.plan.filter(u => u.unitPhase !== "completed").length;
-          const action = await vscode.window.showWarningMessage(
-            `Timer recovered: ${formatSecondsAsMMSS(adjustedSecondsLeft)} left (${pendingCount} unit${pendingCount !== 1 ? "s" : ""})`,
-            { modal: true },
-            "Continue",
-            "Start Fresh"
-          );
-          if (action === "Continue") {
-            timerController.restoreState(restored);
-            timerController.start();
-          } else {
-            await context.globalState.update("redmine.timer.state", undefined);
-          }
-          return;
-        }
-      }
-
-      // Paused or other states - just offer to restore plan
-      const pausedUnit = restored.plan.find(u => u.unitPhase === "paused");
-      if (pausedUnit) {
-        const pendingCount = restored.plan.filter(u => u.unitPhase !== "completed").length;
-        const action = await vscode.window.showWarningMessage(
-          `Timer recovered: ${formatSecondsAsMMSS(pausedUnit.secondsLeft)} left, paused (${pendingCount} unit${pendingCount !== 1 ? "s" : ""})`,
-          { modal: true },
-          "Continue",
-          "Start Fresh"
-        );
-        if (action === "Continue") {
-          timerController.restoreState(restored);
-        } else {
-          await context.globalState.update("redmine.timer.state", undefined);
-        }
-      } else {
-        // Not working/paused - silently restore plan
-        timerController.restoreState(restored);
-      }
-    }
-  };
-
-  restoreTimerState();
-
-  // Initialize Kanban (before timer commands so we can pass the callback)
+  // Initialize Kanban
   const kanbanController = new KanbanController(context.globalState, {
     workDurationSeconds: workDuration * 60,
   });
@@ -379,20 +237,6 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       vscode.window.showInformationMessage("Break over! Ready to start next task.");
     })
-  );
-
-  // Register timer commands (needs server access and tree view for selection)
-  registerTimerCommands(
-    context,
-    timerController,
-    () => projectsTree.server,
-    cleanupResources.timerTreeView as vscode.TreeView<{ type?: string; index?: number }>,
-    {
-      onTimeLogged: async (kanbanTaskId, hours) => {
-        await kanbanController.addLoggedHours(kanbanTaskId, hours);
-      },
-      kanbanController,
-    }
   );
 
   const kanbanTreeProvider = new KanbanTreeProvider(kanbanController);
@@ -795,6 +639,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
   registerCommand("refreshTimeEntries", () => {
     myTimeEntriesTree.refresh();
+  });
+
+  registerCommand("loadEarlierTimeEntries", () => {
+    myTimeEntriesTree.loadEarlierMonths();
   });
 
   // Refresh after issue update (status change, etc.) - updates workload and trees
@@ -1749,21 +1597,6 @@ export function deactivate(): void {
   if (cleanupResources.myTimeEntriesTreeView) {
     cleanupResources.myTimeEntriesTreeView.dispose();
   }
-  if (cleanupResources.timerTreeView) {
-    cleanupResources.timerTreeView.dispose();
-  }
-
-  // Dispose timer resources
-  if (cleanupResources.timerStatusBar) {
-    cleanupResources.timerStatusBar.dispose();
-  }
-  if (cleanupResources.timerTreeProvider) {
-    cleanupResources.timerTreeProvider.dispose();
-  }
-  if (cleanupResources.timerController) {
-    cleanupResources.timerController.dispose();
-  }
-
   // Dispose kanban resources
   if (cleanupResources.kanbanTreeView) {
     cleanupResources.kanbanTreeView.dispose();

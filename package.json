@@ -146,6 +146,10 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "redmine.loadEarlierTimeEntries",
+        "title": "Load Earlier Time Entries"
+      },
+      {
         "command": "redmine.openTimeEntryInBrowser",
         "title": "Open in Browser"
       },
@@ -335,121 +339,6 @@
         "icon": "$(checklist)"
       },
       {
-        "command": "redmine.timer.planDay",
-        "title": "Redmine: Plan Day",
-        "icon": "$(calendar)"
-      },
-      {
-        "command": "redmine.timer.start",
-        "title": "Redmine: Start Timer",
-        "icon": "$(play)"
-      },
-      {
-        "command": "redmine.timer.pause",
-        "title": "Redmine: Pause Timer",
-        "icon": "$(debug-pause)"
-      },
-      {
-        "command": "redmine.timer.resume",
-        "title": "Redmine: Resume Timer",
-        "icon": "$(play)"
-      },
-      {
-        "command": "redmine.timer.stop",
-        "title": "Redmine: Stop Timer",
-        "icon": "$(debug-stop)"
-      },
-      {
-        "command": "redmine.timer.toggle",
-        "title": "Redmine: Toggle Timer (Ctrl+Y T)"
-      },
-      {
-        "command": "redmine.timer.startNextUnit",
-        "title": "Redmine: Start Next Unit"
-      },
-      {
-        "command": "redmine.timer.skipBreak",
-        "title": "Redmine: Skip Break"
-      },
-      {
-        "command": "redmine.timer.showLogDialog",
-        "title": "Redmine: Log Time Dialog"
-      },
-      {
-        "command": "redmine.timer.addUnit",
-        "title": "Add Unit",
-        "icon": "$(add)"
-      },
-      {
-        "command": "redmine.timer.clearPlan",
-        "title": "Clear Plan",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "redmine.timer.removeUnit",
-        "title": "Remove Unit",
-        "icon": "$(trash)"
-      },
-      {
-        "command": "redmine.timer.editUnit",
-        "title": "Edit Unit",
-        "icon": "$(edit)"
-      },
-      {
-        "command": "redmine.timer.startUnit",
-        "title": "Start This Unit",
-        "icon": "$(play)"
-      },
-      {
-        "command": "redmine.timer.configureTimer",
-        "title": "Timer Settings",
-        "icon": "$(gear)"
-      },
-      {
-        "command": "redmine.timer.revealTimeEntry",
-        "title": "Reveal in My Time Entries",
-        "icon": "$(eye)"
-      },
-      {
-        "command": "redmine.timer.moveUnitUp",
-        "title": "Move Up",
-        "icon": "$(arrow-up)"
-      },
-      {
-        "command": "redmine.timer.moveUnitDown",
-        "title": "Move Down",
-        "icon": "$(arrow-down)"
-      },
-      {
-        "command": "redmine.timer.resetUnit",
-        "title": "Reset Timer",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "redmine.timer.logUnitNow",
-        "title": "Log Now",
-        "icon": "$(check)"
-      },
-      {
-        "command": "redmine.timer.logAndContinue",
-        "title": "Log & Continue",
-        "icon": "$(arrow-right)"
-      },
-      {
-        "command": "redmine.timer.switchSubtask",
-        "title": "Switch Subtask",
-        "icon": "$(replace)"
-      },
-      {
-        "command": "redmine.timer.copySubject",
-        "title": "Copy Issue Subject",
-        "icon": "$(copy)"
-      },
-      {
-        "command": "redmine.timer.toggleSelectedUnit",
-        "title": "Toggle Selected Unit"
-      },
-      {
         "command": "redmine.kanban.add",
         "title": "Add Kanban Task",
         "icon": "$(add)"
@@ -562,6 +451,11 @@
         "command": "redmine.kanban.revealTimeEntry",
         "title": "Reveal Time Entry",
         "icon": "$(eye)"
+      },
+      {
+        "command": "redmine.kanban.configureTimer",
+        "title": "Timer Settings",
+        "icon": "$(gear)"
       },
       {
         "command": "redmine.toggleAutoUpdateDoneRatio",
@@ -764,11 +658,6 @@
     "views": {
       "redmine-explorer": [
         {
-          "id": "redmine-explorer-timer",
-          "name": "Today's Plan",
-          "when": "redmine:configured"
-        },
-        {
           "id": "redmine-explorer-kanban",
           "name": "Kanban",
           "when": "redmine:configured"
@@ -786,13 +675,8 @@
     },
     "viewsWelcome": [
       {
-        "view": "redmine-explorer-timer",
-        "contents": "No plan for today.\n[Plan Your Day](command:redmine.timer.planDay)\n\n---\n\n**Tips:**\n- Right-click units for more actions\n- `Ctrl+Y T` toggles timer\n- Click a unit to start/pause",
-        "when": "redmine:configured && !redmine:timerHasPlan"
-      },
-      {
         "view": "redmine-explorer-kanban",
-        "contents": "No kanban tasks yet.\n[Add Task](command:redmine.kanban.add)\n\n---\n\n**Tips:**\n- Right-click tasks for actions\n- Add tasks to Today's Plan\n- Link tasks to Redmine issues",
+        "contents": "No kanban tasks yet.\n[Add Task](command:redmine.kanban.add)\n\n---\n\n**Tips:**\n- Right-click tasks for actions\n- Drag tasks between columns\n- Link tasks to Redmine issues",
         "when": "redmine:configured"
       },
       {
@@ -1008,6 +892,10 @@
           "when": "false"
         },
         {
+          "command": "redmine.loadEarlierTimeEntries",
+          "when": "false"
+        },
+        {
           "command": "redmine.openTimeEntryInBrowser",
           "when": "false"
         },
@@ -1053,78 +941,6 @@
         },
         {
           "command": "redmine.addIssueToKanban",
-          "when": "false"
-        },
-        {
-          "command": "redmine.timer.start",
-          "when": "false"
-        },
-        {
-          "command": "redmine.timer.pause",
-          "when": "false"
-        },
-        {
-          "command": "redmine.timer.resume",
-          "when": "false"
-        },
-        {
-          "command": "redmine.timer.startNextUnit",
-          "when": "false"
-        },
-        {
-          "command": "redmine.timer.skipBreak",
-          "when": "false"
-        },
-        {
-          "command": "redmine.timer.showLogDialog",
-          "when": "false"
-        },
-        {
-          "command": "redmine.timer.addUnit",
-          "when": "false"
-        },
-        {
-          "command": "redmine.timer.removeUnit",
-          "when": "false"
-        },
-        {
-          "command": "redmine.timer.editUnit",
-          "when": "false"
-        },
-        {
-          "command": "redmine.timer.startUnit",
-          "when": "false"
-        },
-        {
-          "command": "redmine.timer.moveUnitUp",
-          "when": "false"
-        },
-        {
-          "command": "redmine.timer.moveUnitDown",
-          "when": "false"
-        },
-        {
-          "command": "redmine.timer.resetUnit",
-          "when": "false"
-        },
-        {
-          "command": "redmine.timer.revealTimeEntry",
-          "when": "false"
-        },
-        {
-          "command": "redmine.timer.logUnitNow",
-          "when": "false"
-        },
-        {
-          "command": "redmine.timer.logAndContinue",
-          "when": "false"
-        },
-        {
-          "command": "redmine.timer.switchSubtask",
-          "when": "false"
-        },
-        {
-          "command": "redmine.timer.copySubject",
           "when": "false"
         },
         {
@@ -1213,6 +1029,10 @@
         },
         {
           "command": "redmine.kanban.revealTimeEntry",
+          "when": "false"
+        },
+        {
+          "command": "redmine.kanban.configureTimer",
           "when": "false"
         },
         {
@@ -1305,16 +1125,6 @@
         }
       ],
       "view/title": [
-        {
-          "command": "redmine.timer.clearPlan",
-          "when": "view == 'redmine-explorer-timer' && redmine:timerHasPlan",
-          "group": "navigation@1"
-        },
-        {
-          "command": "redmine.timer.configureTimer",
-          "when": "view == 'redmine-explorer-timer'",
-          "group": "navigation@2"
-        },
         {
           "command": "redmine.kanban.refreshParentProjects",
           "when": "view == 'redmine-explorer-kanban' && redmine:configured",
@@ -1512,56 +1322,6 @@
           "group": "9_clipboard@2"
         },
         {
-          "command": "redmine.timer.startUnit",
-          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit-(pending|paused)$/",
-          "group": "timer@1"
-        },
-        {
-          "command": "redmine.timer.editUnit",
-          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit-(pending|working|paused)$/",
-          "group": "timer@2"
-        },
-        {
-          "command": "redmine.timer.removeUnit",
-          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit-(pending|paused|completed)$/",
-          "group": "timer@3"
-        },
-        {
-          "command": "redmine.timer.moveUnitUp",
-          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit-(pending|working|paused)$/",
-          "group": "reorder@1"
-        },
-        {
-          "command": "redmine.timer.moveUnitDown",
-          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit-(pending|working|paused)$/",
-          "group": "reorder@2"
-        },
-        {
-          "command": "redmine.timer.resetUnit",
-          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit-(pending|working|paused)$/",
-          "group": "timer@4"
-        },
-        {
-          "command": "redmine.timer.logUnitNow",
-          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit-(working|paused)$/",
-          "group": "timer@5"
-        },
-        {
-          "command": "redmine.timer.logAndContinue",
-          "when": "view == 'redmine-explorer-timer' && viewItem == 'timer-unit-working'",
-          "group": "timer@6"
-        },
-        {
-          "command": "redmine.timer.switchSubtask",
-          "when": "view == 'redmine-explorer-timer' && viewItem == 'timer-unit-working'",
-          "group": "timer@7"
-        },
-        {
-          "command": "redmine.timer.revealTimeEntry",
-          "when": "view == 'redmine-explorer-timer' && viewItem == 'timer-unit-completed'",
-          "group": "timer@1"
-        },
-        {
           "command": "redmine.kanban.startTimer",
           "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|doing|doing-initialized)$/ && viewItem != 'task-doing-working' && viewItem != 'task-doing-paused'",
           "group": "timer@1"
@@ -1672,11 +1432,6 @@
           "group": "9_clipboard@1"
         },
         {
-          "command": "redmine.timer.copySubject",
-          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit-/",
-          "group": "9_clipboard@1"
-        },
-        {
           "command": "redmine.kanban.clearDone",
           "when": "view == 'redmine-explorer-kanban' && viewItem == 'status-header-done'",
           "group": "inline"
@@ -1687,7 +1442,7 @@
           "group": "inline"
         },
         {
-          "command": "redmine.timer.configureTimer",
+          "command": "redmine.kanban.configureTimer",
           "when": "view == 'redmine-explorer-kanban' && viewItem == 'status-header-doing'",
           "group": "inline"
         }
@@ -2044,12 +1799,6 @@
           "scope": "application",
           "markdownDescription": "**Show workload overview in status bar**\n\nDisplays remaining work and capacity buffer.\n\n**Note:** Opt-in to reduce noise. Enable if you need capacity planning at a glance.\n\n**Format:** `25h left, +8h buffer`"
         },
-        "redmine.timer.showInStatusBar": {
-          "type": "boolean",
-          "default": true,
-          "scope": "application",
-          "description": "Show timer in status bar"
-        },
         "redmine.gantt.extendedRelationTypes": {
           "type": "boolean",
           "default": false,
@@ -2128,7 +1877,7 @@
           {
             "id": "redmine.goDeeper",
             "title": "Go Deeper",
-            "description": "Gantt chart, Timer, Kanban — when you're ready.\n\n[Open Gantt](command:redmine.showGantt)",
+            "description": "Gantt chart, Kanban board — when you're ready.\n\n[Open Gantt](command:redmine.showGantt)",
             "media": {
               "markdown": "media/walkthrough/timeline.md"
             },

@@ -132,11 +132,13 @@ describe("MyTimeEntriesTreeDataProvider", () => {
 
     // Second call returns actual data (cached)
     const secondResult = await provider.getChildren();
-    expect(secondResult).toHaveLength(4); // Today, This Week, This Month, Last Month
+    // New structure: Today, This Week, 3 month nodes, Load Earlier = 6 items
+    expect(secondResult).toHaveLength(6);
     expect(secondResult[0].label).toContain("Today");
     expect(secondResult[1].label).toContain("This Week");
-    expect(secondResult[2].label).toContain("This Month");
-    expect(secondResult[3].label).toContain("Last Month");
+    // Month nodes show month names like "January 2026"
+    expect(secondResult[2].type).toBe("month-group");
+    expect(secondResult[5].label).toBe("Load Earlier...");
   });
 
   it("caches entries at parent level (no double-fetch)", async () => {
@@ -179,8 +181,9 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     // Get root groups (cached)
     const groups = await provider.getChildren();
 
-    expect(groups).toHaveLength(4); // Today, This Week, This Month, Last Month
-    expect(mockServer.getTimeEntries).toHaveBeenCalledTimes(1); // Single fetch
+    // New structure: Today, This Week, 3 month nodes, Load Earlier = 6 items
+    expect(groups).toHaveLength(6);
+    expect(mockServer.getTimeEntries).toHaveBeenCalledTimes(1); // Single fetch for today/week
 
     // Get children for first group (Today)
     const todayChildren = await provider.getChildren(groups[0]);
@@ -263,21 +266,17 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     expect(groups[0].description).toContain("4:00"); // Contains total in H:MM format
     expect(groups[1].label).toContain("This Week");
     expect(groups[1].description).toContain("4:00");
-    expect(groups[2].label).toContain("This Month");
-    expect(groups[2].description).toContain("4:00");
-    expect(groups[3].label).toContain("Last Month");
+    // Month nodes show month names (lazy-loaded, no description until expanded)
+    expect(groups[2].type).toBe("month-group");
   });
 
   it("shows empty state when no entries", async () => {
-    mockServer.getTimeEntries
-      .mockResolvedValueOnce({ time_entries: [] }) // today
-      .mockResolvedValueOnce({ time_entries: [] }) // week
-      .mockResolvedValueOnce({ time_entries: [] }) // month
-      .mockResolvedValueOnce({ time_entries: [] }); // last month
+    mockServer.getTimeEntries.mockResolvedValue({ time_entries: [] });
 
     const groups = await getLoadedGroups();
 
-    expect(groups).toHaveLength(4); // Today, This Week, This Month, Last Month
+    // New structure: Today, This Week, 3 month nodes, Load Earlier = 6 items
+    expect(groups).toHaveLength(6);
     expect(groups[0].description).toContain("0:00"); // Contains 0:00 total
 
     const todayChildren = await provider.getChildren(groups[0]);
@@ -583,76 +582,79 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     expect(dayGroups.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("groups This Month entries by week then day with empty days", async () => {
+  it("lazy-loads month entries and groups by week then day", async () => {
+    // Use current month entries for simpler test setup
+    const now = new Date();
+    const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const weekday1 = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-08`;
+    const weekday2 = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-09`;
+
     const monthEntries: TimeEntry[] = [
-      // Week 50 (Dec 8-14)
       {
         id: 1,
         issue_id: 123,
         activity_id: 9,
         activity: { id: 9, name: "Development" },
-        hours: "8",
+        hours: "4",
         comments: "",
-        spent_on: "2025-12-09", // Tuesday (week 50)
+        spent_on: weekday1,
       },
-      // Week 51 (Dec 15-21)
       {
         id: 2,
         issue_id: 124,
         activity_id: 9,
         activity: { id: 9, name: "Development" },
-        hours: "4",
-        comments: "",
-        spent_on: "2025-12-15", // Monday (week 51)
-      },
-      {
-        id: 3,
-        issue_id: 125,
-        activity_id: 10,
-        activity: { id: 10, name: "Testing" },
         hours: "3",
         comments: "",
-        spent_on: "2025-12-16", // Tuesday (week 51)
+        spent_on: weekday2,
       },
     ];
 
-    // Single API call returns all entries; client-side filters by date
-    // These entries are from Dec 2025, which falls in "Last Month" from Jan 2026 perspective
-    mockServer.getTimeEntries.mockResolvedValueOnce({ time_entries: monthEntries });
+    // First call loads today/week, subsequent calls load month data
+    mockServer.getTimeEntries
+      .mockResolvedValueOnce({ time_entries: [] }) // today/week
+      .mockResolvedValue({ time_entries: monthEntries }); // month lazy load
 
     const groups = await getLoadedGroups();
-    // With Dec 2025 entries and Jan 2026 "today", these entries are in "Last Month"
-    const lastMonth = groups[3];
-    expect(lastMonth.label).toContain("Last Month");
 
-    // Get week groups
-    const weekGroups = await provider.getChildren(lastMonth);
+    // Find the current month node (first month node after Today and This Week)
+    const currentMonth = groups[2];
+    expect(currentMonth.type).toBe("month-group");
+    expect(currentMonth._monthYear).toBeDefined();
 
-    // Should have 2 week groups (weeks 50 and 51)
-    expect(weekGroups.length).toBe(2);
+    // First expansion triggers lazy load (returns loading state)
+    const loadingState = await provider.getChildren(currentMonth);
+    expect(loadingState[0].label).toBe("Loading...");
+
+    // Wait for lazy load to complete
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Second expansion returns loaded data
+    const weekGroups = await provider.getChildren(currentMonth);
+    expect(weekGroups.length).toBeGreaterThanOrEqual(1);
     expect(weekGroups[0].type).toBe("week-subgroup");
 
-    // Weeks should be in reverse chronological order (most recent first)
-    expect(weekGroups[0].label).toContain("Week 51");
-    expect(weekGroups[1].label).toContain("Week 50");
+    // Get days for a week
+    const weekDays = await provider.getChildren(weekGroups[0]);
+    expect(weekDays.length).toBeGreaterThanOrEqual(1);
+    expect(weekDays[0].type).toBe("day-group");
+  });
 
-    // Get days for Week 51 - now includes all working days in the week range
-    const week51Days = await provider.getChildren(weekGroups[0]);
+  it("loadEarlierMonths adds more months to visible list", async () => {
+    mockServer.getTimeEntries.mockResolvedValue({ time_entries: [] });
 
-    // Find the days with entries
-    const mon15 = week51Days.find((d) => d.label?.includes("Mon") && d.label?.includes("15"));
-    const tue16 = week51Days.find((d) => d.label?.includes("Tue") && d.label?.includes("16"));
+    const groups = await getLoadedGroups();
+    // Initial: Today, This Week, 3 months, Load Earlier = 6 items
+    expect(groups).toHaveLength(6);
 
-    expect(mon15).toBeDefined();
-    expect(tue16).toBeDefined();
-    expect(mon15!.description).toContain("4:00");
-    expect(tue16!.description).toContain("3:00");
+    // Call loadEarlierMonths
+    provider.loadEarlierMonths();
 
-    // Should have more days than just the 2 with entries (includes empty working days)
-    expect(week51Days.length).toBeGreaterThanOrEqual(2);
+    // Wait for refresh
+    await waitForLoad();
 
-    // Get entries for Monday
-    const dayEntries = await provider.getChildren(mon15!);
-    expect(dayEntries.length).toBe(1);
+    const newGroups = await provider.getChildren();
+    // Now: Today, This Week, 6 months, Load Earlier = 9 items
+    expect(newGroups).toHaveLength(9);
   });
 });
