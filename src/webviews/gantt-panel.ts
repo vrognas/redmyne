@@ -3113,7 +3113,7 @@ export class GanttPanel {
                data-original-y="${originalY}"
                data-start-date="${issue.start_date || ""}"
                data-due-date="${issue.due_date || ""}"
-               data-start-x="${startX}" data-end-x="${endX}"
+               data-start-x="${startX}" data-end-x="${endX}" data-center-y="${y + barHeight / 2}"
                data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}'
                transform="translate(0, ${y})"${hiddenAttr}
                tabindex="0" role="button" aria-label="#${issue.id} ${escapedSubject} (parent, ${doneRatio}% done)">
@@ -3169,7 +3169,7 @@ export class GanttPanel {
              data-original-y="${originalY}"
              data-start-date="${issue.start_date || ""}"
              data-due-date="${issue.due_date || ""}"
-             data-start-x="${startX}" data-end-x="${endX}"
+             data-start-x="${startX}" data-end-x="${endX}" data-center-y="${y + barHeight / 2}"
              data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}'
              transform="translate(0, ${y})"${hiddenAttr}
              tabindex="0" role="button" aria-label="#${issue.id} ${escapedSubject}${isOverdue ? " (overdue)" : ""}">
@@ -3653,8 +3653,9 @@ export class GanttPanel {
       }
     }
 
-    // Today marker for capacity ribbon
-    const capacityTodayX = ((today.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
+    // Today marker for capacity ribbon (use UTC midnight to match minDate/maxDate reference frame)
+    const todayUTC = new Date(formatLocalDate(today));
+    const capacityTodayX = ((todayUTC.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
     const capacityTodayMarker = this._viewFocus === "person" && capacityTodayX >= 0 && capacityTodayX <= timelineWidth
       ? `<line x1="${capacityTodayX}" y1="0" x2="${capacityTodayX}" y2="${ribbonHeight}" class="capacity-today-marker"/>`
       : "";
@@ -3975,11 +3976,13 @@ export class GanttPanel {
       margin-bottom: 30px; /* Reserve space for minimap */
     }
     .gantt-scroll {
-      height: calc(100% + 17px); /* Push horizontal scrollbar below wrapper (17px = typical scrollbar height) */
-      overflow: scroll;
+      overflow-x: scroll;
+      overflow-y: scroll;
+      scrollbar-gutter: stable;
+      height: calc(100% + 20px); /* Push horizontal scrollbar outside wrapper */
     }
-    .gantt-scroll::-webkit-scrollbar { width: 8px; height: 0; }
-    .gantt-scroll::-webkit-scrollbar:horizontal { display: none; }
+    .gantt-scroll { scrollbar-width: thin; }
+    .gantt-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
     .gantt-scroll::-webkit-scrollbar-thumb { background: var(--vscode-scrollbarSlider-background); border-radius: 4px; }
     .gantt-scroll::-webkit-scrollbar-corner { background: transparent; }
     .gantt-header-row {
@@ -4150,8 +4153,9 @@ export class GanttPanel {
     .bar-labels .progress-badge-group,
     .bar-labels .status-badge-group,
     .bar-labels .bar-assignee-group { pointer-events: all; }
-    .status-badge-bg { pointer-events: none; }
-    .status-badge { pointer-events: none; font-weight: 500; }
+    .status-badge-bg { pointer-events: all; }
+    .status-badge { pointer-events: all; font-weight: 500; }
+    .flex-badge-bg, .flex-badge { pointer-events: all; }
     .bar-assignee { pointer-events: none; opacity: 0.85; }
     .bar-assignee.current-user { fill: var(--vscode-charts-blue) !important; font-weight: 600; opacity: 1; }
     .issue-bar .drag-handle:hover { fill: var(--vscode-focusBorder); opacity: 0.5; }
@@ -4202,6 +4206,21 @@ export class GanttPanel {
     .relation-picker { position: fixed; background: var(--vscode-menu-background); border: 1px solid var(--vscode-menu-border); border-radius: 2px; padding: 4px 0; z-index: 1000; box-shadow: 0 2px 8px var(--vscode-widget-shadow); }
     .relation-picker button { display: block; width: 100%; padding: 4px 12px; border: none; background: transparent; color: var(--vscode-menu-foreground); text-align: left; cursor: pointer; font-size: 13px; }
     .relation-picker button:hover, .relation-picker button:focus { background: var(--vscode-menu-selectionBackground); color: var(--vscode-menu-selectionForeground); }
+    /* Drag date tooltip */
+    .drag-date-tooltip { position: fixed; pointer-events: none; z-index: 1000; background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-editorWidget-border); border-radius: 3px; box-shadow: 0 2px 4px var(--vscode-widget-shadow); padding: 3px 6px; font-size: 11px; font-family: var(--vscode-font-family); color: var(--vscode-editorWidget-foreground); white-space: nowrap; transform: translateX(-50%); }
+    .drag-date-tooltip::after { content: ''; position: absolute; left: 50%; transform: translateX(-50%); bottom: -5px; border: 5px solid transparent; border-top-color: var(--vscode-editorWidget-border); }
+    .drag-date-tooltip.flipped::after { bottom: auto; top: -5px; border-top-color: transparent; border-bottom-color: var(--vscode-editorWidget-border); }
+    /* Drag confirmation modal */
+    .drag-confirm-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 1001; display: none; align-items: center; justify-content: center; }
+    .drag-confirm-modal { background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-editorWidget-border); border-radius: 6px; box-shadow: 0 4px 16px var(--vscode-widget-shadow); padding: 16px; min-width: 280px; max-width: 400px; }
+    .drag-confirm-modal h3 { margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: var(--vscode-foreground); }
+    .drag-confirm-modal p { margin: 0 0 16px 0; font-size: 13px; color: var(--vscode-descriptionForeground); line-height: 1.4; }
+    .drag-confirm-buttons { display: flex; gap: 8px; justify-content: flex-end; }
+    .drag-confirm-buttons button { padding: 6px 14px; border-radius: 3px; font-size: 13px; cursor: pointer; border: none; }
+    .drag-confirm-buttons .confirm-btn { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+    .drag-confirm-buttons .confirm-btn:hover { background: var(--vscode-button-hoverBackground); }
+    .drag-confirm-buttons .cancel-btn { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+    .drag-confirm-buttons .cancel-btn:hover { background: var(--vscode-button-secondaryHoverBackground); }
     /* Focus indicators for accessibility */
     button:focus { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
     .issue-bar:focus { outline: none; } /* Use stroke instead of outline for SVG */
@@ -4772,6 +4791,17 @@ export class GanttPanel {
       <svg id="minimapSvg" viewBox="0 0 ${timelineWidth} ${minimapHeight}" preserveAspectRatio="none">
         <rect class="minimap-viewport" id="minimapViewport" x="0" y="0" width="100" height="${minimapHeight}"/>
       </svg>
+    </div>
+  </div>
+  <div id="dragDateTooltip" class="drag-date-tooltip" style="display: none;"></div>
+  <div id="dragConfirmOverlay" class="drag-confirm-overlay">
+    <div class="drag-confirm-modal">
+      <h3>Confirm date change</h3>
+      <p id="dragConfirmMessage"></p>
+      <div class="drag-confirm-buttons">
+        <button class="cancel-btn" id="dragConfirmCancel">Cancel</button>
+        <button class="confirm-btn" id="dragConfirmOk">Save to Redmine</button>
+      </div>
     </div>
   </div>
   <script nonce="${nonce}">
@@ -5812,13 +5842,228 @@ export class GanttPanel {
       return d.toISOString().slice(0, 10);
     }
 
+    // Convert end x position to due date (bar endX is at due_date + 1, so subtract 1 day)
+    function xToDueDate(x) {
+      const ms = minDateMs + (x / timelineWidth) * (maxDateMs - minDateMs) - 86400000;
+      const d = new Date(ms);
+      return d.toISOString().slice(0, 10);
+    }
+
+    // Drag date tooltip helpers
+    const dragTooltip = document.getElementById('dragDateTooltip');
+    let lastTooltipDate = null;
+
+    function formatDateShort(dateStr) {
+      const d = new Date(dateStr + 'T00:00:00');
+      const month = d.toLocaleDateString('en-US', { month: 'short' });
+      const day = d.getDate();
+      const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
+      return month + ' ' + day + ' (' + weekday + ')';
+    }
+
+    function formatDateRange(startStr, endStr) {
+      const sd = new Date(startStr + 'T00:00:00'), ed = new Date(endStr + 'T00:00:00');
+      const sm = sd.toLocaleDateString('en-US', { month: 'short' });
+      const em = ed.toLocaleDateString('en-US', { month: 'short' });
+      return sm === em ? sm + ' ' + sd.getDate() + '-' + ed.getDate()
+                       : sm + ' ' + sd.getDate() + '-' + em + ' ' + ed.getDate();
+    }
+
+    function showDragTooltip(text) {
+      dragTooltip.textContent = text;
+      dragTooltip.style.display = 'block';
+      lastTooltipDate = text;
+    }
+
+    function updateDragTooltip(text) {
+      if (text === lastTooltipDate) return;
+      dragTooltip.textContent = text;
+      lastTooltipDate = text;
+    }
+
+    function positionDragTooltip(clientX, clientY) {
+      // Position above cursor, flip below if near top
+      let top = clientY - 28;
+      let flipped = false;
+      if (top < 40) {
+        top = clientY + 20;
+        flipped = true;
+      }
+      dragTooltip.style.left = clientX + 'px';
+      dragTooltip.style.top = top + 'px';
+      dragTooltip.classList.toggle('flipped', flipped);
+    }
+
+    function hideDragTooltip() {
+      dragTooltip.style.display = 'none';
+      lastTooltipDate = null;
+    }
+
+    // Arrow path calculation for drag updates
+    const arrowSize = 6;
+    function calcArrowPath(x1, y1, x2, y2, isScheduling) {
+      const goingRight = x2 > x1;
+      const horizontalDist = Math.abs(x2 - x1);
+      const nearlyVertical = horizontalDist < 30;
+      const sameRow = Math.abs(y1 - y2) < 5;
+
+      let path;
+      if (sameRow && goingRight) {
+        path = 'M ' + x1 + ' ' + y1 + ' H ' + (x2 - arrowSize);
+      } else if (!sameRow && nearlyVertical) {
+        const jogX = 20;
+        const midY = (y1 + y2) / 2;
+        path = 'M ' + x1 + ' ' + y1 + ' H ' + (x1 + jogX) + ' V ' + midY + ' H ' + (x2 - jogX) + ' V ' + y2 + ' H ' + (x2 - arrowSize);
+      } else if (goingRight) {
+        const midX = (x1 + x2) / 2;
+        path = 'M ' + x1 + ' ' + y1 + ' H ' + midX + ' V ' + y2 + ' H ' + (x2 - arrowSize);
+      } else if (sameRow) {
+        const gap = 12;
+        const routeY = y1 - barHeight;
+        path = 'M ' + x1 + ' ' + y1 + ' V ' + routeY + ' H ' + (x2 - gap) + ' V ' + y2 + ' H ' + (x2 - arrowSize);
+      } else {
+        const gap = 12;
+        const midY = (y1 + y2) / 2;
+        path = 'M ' + x1 + ' ' + y1 + ' V ' + midY + ' H ' + (x2 - gap) + ' V ' + y2 + ' H ' + (x2 - arrowSize);
+      }
+      const arrowHead = 'M ' + x2 + ' ' + y2 + ' l -' + arrowSize + ' -' + (arrowSize * 0.6) + ' l 0 ' + (arrowSize * 1.2) + ' Z';
+      return { path, arrowHead };
+    }
+
+    function getConnectedArrows(issueId) {
+      const arrows = [];
+      const selector = '.dependency-arrow[data-from="' + issueId + '"], .dependency-arrow[data-to="' + issueId + '"]';
+      document.querySelectorAll(selector).forEach(arrow => {
+        const fromId = arrow.getAttribute('data-from');
+        const toId = arrow.getAttribute('data-to');
+        const classList = arrow.getAttribute('class') || '';
+        const relMatch = classList.match(/rel-(\S+)/);
+        const relType = relMatch ? relMatch[1] : 'relates';
+        const isScheduling = ['blocks', 'precedes', 'finish_to_start', 'start_to_start', 'finish_to_finish', 'start_to_finish'].includes(relType);
+        // Get source/target bar positions
+        const fromBar = document.querySelector('.issue-bar[data-issue-id="' + fromId + '"]');
+        const toBar = document.querySelector('.issue-bar[data-issue-id="' + toId + '"]');
+        if (!fromBar || !toBar) return;
+        arrows.push({
+          element: arrow,
+          fromId, toId, isScheduling,
+          fromBar, toBar,
+          linePath: arrow.querySelector('.arrow-line'),
+          hitPath: arrow.querySelector('.arrow-hit-area'),
+          headPath: arrow.querySelector('.arrow-head')
+        });
+      });
+      return arrows;
+    }
+
+    function updateArrowPositions(arrows, draggedIssueId, newStartX, newEndX) {
+      arrows.forEach(a => {
+        // Get current positions (may be dragged or original)
+        const fromStartX = a.fromId == draggedIssueId ? newStartX : parseFloat(a.fromBar.dataset.startX);
+        const fromEndX = a.fromId == draggedIssueId ? newEndX : parseFloat(a.fromBar.dataset.endX);
+        const fromY = parseFloat(a.fromBar.dataset.centerY);
+        const toStartX = a.toId == draggedIssueId ? newStartX : parseFloat(a.toBar.dataset.startX);
+        const toEndX = a.toId == draggedIssueId ? newEndX : parseFloat(a.toBar.dataset.endX);
+        const toY = parseFloat(a.toBar.dataset.centerY);
+
+        let x1, y1, x2, y2;
+        if (a.isScheduling) {
+          x1 = fromEndX + 2; y1 = fromY;
+          x2 = toStartX - 2; y2 = toY;
+        } else {
+          x1 = (fromStartX + fromEndX) / 2; y1 = fromY;
+          x2 = (toStartX + toEndX) / 2; y2 = toY;
+        }
+
+        const { path, arrowHead } = calcArrowPath(x1, y1, x2, y2, a.isScheduling);
+        if (a.linePath) a.linePath.setAttribute('d', path);
+        if (a.hitPath) a.hitPath.setAttribute('d', path);
+        if (a.headPath) a.headPath.setAttribute('d', arrowHead);
+      });
+    }
+
+    // Drag confirmation modal
+    const dragConfirmOverlay = document.getElementById('dragConfirmOverlay');
+    const dragConfirmMessage = document.getElementById('dragConfirmMessage');
+    const dragConfirmOk = document.getElementById('dragConfirmOk');
+    const dragConfirmCancel = document.getElementById('dragConfirmCancel');
+    let pendingDragConfirm = null;
+
+    // Scroll protection flag (declared here, initialized below)
+    let allowScrollChange = false;
+
+    function showDragConfirmModal(message, onConfirm, onCancel) {
+      if (!dragConfirmOverlay || !dragConfirmMessage) return;
+      dragConfirmMessage.textContent = message;
+      pendingDragConfirm = { onConfirm, onCancel };
+      allowScrollChange = true; // Keep scroll at new position while modal is visible
+      dragConfirmOverlay.style.display = 'flex';
+      if (dragConfirmOk) dragConfirmOk.focus();
+    }
+
+    function hideDragConfirmModal() {
+      if (dragConfirmOverlay) dragConfirmOverlay.style.display = 'none';
+      pendingDragConfirm = null;
+    }
+
+    function restoreScrollPosition() {
+      if (ganttScroll && dragScrollSnapshot) {
+        ganttScroll.scrollLeft = dragScrollSnapshot.left;
+        ganttScroll.scrollTop = dragScrollSnapshot.top;
+      }
+      dragScrollSnapshot = null;
+    }
+
+    dragConfirmOk?.addEventListener('click', () => {
+      if (pendingDragConfirm?.onConfirm) pendingDragConfirm.onConfirm();
+      dragScrollSnapshot = null; // Clear snapshot on confirm (change accepted)
+      hideDragConfirmModal();
+    });
+
+    dragConfirmCancel?.addEventListener('click', () => {
+      if (pendingDragConfirm?.onCancel) pendingDragConfirm.onCancel();
+      restoreScrollPosition();
+      hideDragConfirmModal();
+    });
+
+    // Close on Escape or overlay click
+    dragConfirmOverlay?.addEventListener('click', (e) => {
+      if (e.target === dragConfirmOverlay) {
+        if (pendingDragConfirm?.onCancel) pendingDragConfirm.onCancel();
+        restoreScrollPosition();
+        hideDragConfirmModal();
+      }
+    });
+
+    // Keyboard handling for modal
+    document.addEventListener('keydown', (e) => {
+      if (!pendingDragConfirm) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (pendingDragConfirm.onCancel) pendingDragConfirm.onCancel();
+        restoreScrollPosition();
+        hideDragConfirmModal();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (pendingDragConfirm.onConfirm) pendingDragConfirm.onConfirm();
+        dragScrollSnapshot = null; // Clear snapshot on confirm (change accepted)
+        hideDragConfirmModal();
+      }
+    });
+
+
     // Drag state
     let dragState = null;
+    let dragScrollSnapshot = null; // Scroll position at drag start, for restoration (modal cancel)
+    let justEndedDrag = false; // Flag to skip click handler after drag ends
 
     // Handle drag start on handles
     document.querySelectorAll('.drag-handle').forEach(handle => {
       handle.addEventListener('mousedown', (e) => {
+        e.preventDefault(); // Prevent focus/scroll anchoring
         e.stopPropagation();
+        // Save scroll position at drag start for later restoration
+        dragScrollSnapshot = { left: ganttScroll?.scrollLeft, top: ganttScroll?.scrollTop };
         const bar = handle.closest('.issue-bar');
         const isLeft = handle.classList.contains('drag-left');
         const issueId = parseInt(bar.dataset.issueId);
@@ -5833,6 +6078,10 @@ export class GanttPanel {
         const rightHandle = bar.querySelector('.drag-right');
 
         bar.classList.add('dragging');
+        const barLabels = bar.querySelector('.bar-labels');
+        const labelsOnLeft = barLabels?.classList.contains('labels-left');
+        const connectedArrows = getConnectedArrows(issueId);
+        const linkHandle = bar.querySelector('.link-handle');
         dragState = {
           issueId,
           isLeft,
@@ -5846,8 +6095,20 @@ export class GanttPanel {
           barMain,
           leftHandle,
           rightHandle,
-          bar
+          bar,
+          barLabels,
+          labelsOnLeft,
+          connectedArrows,
+          linkHandle
         };
+
+        // Show drag date tooltip
+        const edgeX = isLeft ? startX : endX;
+        const currentDate = isLeft ? oldStartDate : oldDueDate;
+        if (currentDate) {
+          showDragTooltip((isLeft ? 'Start: ' : 'Due: ') + formatDateShort(currentDate));
+          positionDragTooltip(e.clientX, e.clientY);
+        }
       });
     });
 
@@ -5858,7 +6119,10 @@ export class GanttPanel {
         if (e.target.classList.contains('drag-handle')) return;
         // Skip if Ctrl/Shift held (selection mode)
         if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+        e.preventDefault(); // Prevent focus/scroll anchoring
         e.stopPropagation();
+        // Save scroll position at drag start for later restoration
+        dragScrollSnapshot = { left: ganttScroll?.scrollLeft, top: ganttScroll?.scrollTop };
         const bar = outline.closest('.issue-bar');
         if (!bar) return;
         const issueId = bar.dataset.issueId;
@@ -5880,11 +6144,19 @@ export class GanttPanel {
           barMain: b.querySelector('.bar-main'),
           leftHandle: b.querySelector('.drag-left'),
           rightHandle: b.querySelector('.drag-right'),
-          bar: b
+          bar: b,
+          barLabels: b.querySelector('.bar-labels'),
+          labelsOnLeft: b.querySelector('.bar-labels')?.classList.contains('labels-left'),
+          connectedArrows: getConnectedArrows(b.dataset.issueId),
+          linkHandle: b.querySelector('.link-handle')
         }));
 
         bulkBars.forEach(b => b.bar.classList.add('dragging'));
 
+        const singleBarLabels = bar.querySelector('.bar-labels');
+        const singleLabelsOnLeft = singleBarLabels?.classList.contains('labels-left');
+        const connectedArrows = getConnectedArrows(issueId);
+        const singleLinkHandle = bar.querySelector('.link-handle');
         dragState = {
           issueId: parseInt(issueId),
           isLeft: false,
@@ -5900,8 +6172,18 @@ export class GanttPanel {
           barMain: bar.querySelector('.bar-main'),
           leftHandle: bar.querySelector('.drag-left'),
           rightHandle: bar.querySelector('.drag-right'),
-          bar
+          bar,
+          barLabels: singleBarLabels,
+          labelsOnLeft: singleLabelsOnLeft,
+          connectedArrows,
+          linkHandle: singleLinkHandle
         };
+
+        // Show drag date tooltip for single bar move (not bulk)
+        if (!isBulkDrag && bar.dataset.startDate && bar.dataset.dueDate) {
+          showDragTooltip(formatDateRange(bar.dataset.startDate, bar.dataset.dueDate));
+          positionDragTooltip(e.clientX, e.clientY);
+        }
       });
     });
 
@@ -5993,18 +6275,13 @@ export class GanttPanel {
 
     // Handle click on bar - scroll to issue start date and highlight
     // Double-click enters focus mode (highlights dependency chain)
+    const interactiveSelector = '.drag-handle, .link-handle, .bar-outline, ' +
+      '.blocks-badge-group, .blocker-badge, .progress-badge-group, .flex-badge-group';
     document.querySelectorAll('.issue-bar').forEach(bar => {
       bar.addEventListener('click', (e) => {
-        // Ignore if clicking on drag handles, link handle, or bar-outline (for move drag)
-        const target = e.target;
-        if (target.classList.contains('drag-handle') ||
-            target.classList.contains('drag-left') ||
-            target.classList.contains('drag-right') ||
-            target.classList.contains('link-handle') ||
-            target.classList.contains('bar-outline')) {
-          return;
-        }
-        if (dragState || linkingState) return;
+        // Ignore clicks on interactive elements (handles, badges, outline)
+        if (e.target.closest(interactiveSelector)) return;
+        if (dragState || linkingState || justEndedDrag) return;
         // Clear focus mode on single click
         if (focusedIssueId) {
           clearFocus();
@@ -6012,7 +6289,7 @@ export class GanttPanel {
         scrollToAndHighlight(bar.dataset.issueId);
       });
       bar.addEventListener('dblclick', (e) => {
-        if (dragState || linkingState) return;
+        if (dragState || linkingState || justEndedDrag) return;
         e.preventDefault();
         focusOnDependencyChain(bar.dataset.issueId);
       });
@@ -6046,7 +6323,13 @@ export class GanttPanel {
 
     // Blocks badge click - highlight arrows FROM this issue (issues it blocks)
     document.querySelectorAll('.blocks-badge-group').forEach(badge => {
+      // Prevent focus on mousedown (before click fires)
+      badge.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
       badge.addEventListener('click', (e) => {
+        e.preventDefault();
         e.stopPropagation();
         const issueBar = badge.closest('.issue-bar');
         if (!issueBar) return;
@@ -6056,21 +6339,21 @@ export class GanttPanel {
       });
     });
 
-    // Blocker badge click - highlight arrows TO this issue and navigate to first blocker
+    // Blocker badge click - highlight arrows TO this issue (no scroll, like blocks-badge)
     document.querySelectorAll('.blocker-badge').forEach(badge => {
+      // Prevent focus on mousedown (before click fires)
+      badge.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
       badge.addEventListener('click', (e) => {
+        e.preventDefault();
         e.stopPropagation();
         const issueBar = badge.closest('.issue-bar');
         if (!issueBar) return;
         const issueId = issueBar.dataset.issueId;
         const arrows = Array.from(document.querySelectorAll(\`.dependency-arrow[data-to="\${issueId}"]\`));
         highlightArrows(arrows, issueId);
-
-        // Also navigate to first blocker if available
-        const blockerId = badge.dataset.blockerId;
-        if (blockerId) {
-          scrollToAndHighlight(blockerId);
-        }
       });
     });
 
@@ -6860,6 +7143,19 @@ export class GanttPanel {
             b.rightHandle.setAttribute('x', newEndX - 8);
             b.newStartX = newStartX;
             b.newEndX = newEndX;
+            // Update badge position
+            if (b.barLabels) {
+              const labelDelta = b.labelsOnLeft ? (newStartX - b.startX) : (newEndX - b.endX);
+              b.barLabels.setAttribute('transform', 'translate(' + labelDelta + ', 0)');
+            }
+            // Update connected arrows
+            if (b.connectedArrows) {
+              updateArrowPositions(b.connectedArrows, b.issueId, newStartX, newEndX);
+            }
+            // Update link handle position
+            if (b.linkHandle) {
+              b.linkHandle.querySelectorAll('circle').forEach(c => c.setAttribute('cx', String(newEndX + 8)));
+            }
           });
           dragState.snappedDelta = snappedDelta;
         } else {
@@ -6889,6 +7185,39 @@ export class GanttPanel {
           dragState.rightHandle.setAttribute('x', newEndX - 8);
           dragState.newStartX = newStartX;
           dragState.newEndX = newEndX;
+
+          // Update badge position
+          if (dragState.barLabels) {
+            const labelDelta = dragState.labelsOnLeft ? (newStartX - dragState.startX) : (newEndX - dragState.endX);
+            dragState.barLabels.setAttribute('transform', 'translate(' + labelDelta + ', 0)');
+          }
+
+          // Update connected arrows
+          if (dragState.connectedArrows) {
+            updateArrowPositions(dragState.connectedArrows, dragState.issueId, newStartX, newEndX);
+          }
+
+          // Update link handle position
+          if (dragState.linkHandle) {
+            dragState.linkHandle.querySelectorAll('circle').forEach(c => c.setAttribute('cx', String(newEndX + 8)));
+          }
+
+          // Update drag date tooltip
+          if (dragState.isMove && !dragState.isBulkDrag) {
+            const newStartDate = xToDate(newStartX);
+            const newDueDate = xToDueDate(newEndX);
+            const changed = newStartDate !== dragState.oldStartDate;
+            const text = changed
+              ? formatDateRange(dragState.oldStartDate, dragState.oldDueDate) + ' → ' + formatDateRange(newStartDate, newDueDate)
+              : formatDateRange(newStartDate, newDueDate);
+            updateDragTooltip(text);
+            positionDragTooltip(evt.clientX, evt.clientY);
+          } else if (!dragState.isMove) {
+            const edgeX = dragState.isLeft ? newStartX : newEndX;
+            const newDate = dragState.isLeft ? xToDate(edgeX) : xToDueDate(edgeX);
+            updateDragTooltip((dragState.isLeft ? 'Start: ' : 'Due: ') + formatDateShort(newDate));
+            positionDragTooltip(evt.clientX, evt.clientY);
+          }
         }
       }
 
@@ -6919,11 +7248,37 @@ export class GanttPanel {
       }); // end RAF
     }); // end mousemove
 
+    // Restore bar to original position (used by cancel)
+    function restoreBarPosition(state) {
+      if (!state) return;
+      const { bar, barOutline, barMain, leftHandle, rightHandle, barLabels, startX, endX, connectedArrows, issueId, linkHandle } = state;
+      const width = endX - startX;
+      if (barOutline) {
+        barOutline.setAttribute('x', String(startX));
+        barOutline.setAttribute('width', String(width));
+      }
+      if (barMain) {
+        barMain.setAttribute('x', String(startX));
+        barMain.setAttribute('width', String(width));
+      }
+      if (leftHandle) leftHandle.setAttribute('x', String(startX));
+      if (rightHandle) rightHandle.setAttribute('x', String(endX - 8));
+      if (barLabels) barLabels.removeAttribute('transform');
+      if (connectedArrows && connectedArrows.length > 0) {
+        updateArrowPositions(connectedArrows, issueId, startX, endX);
+      }
+      if (linkHandle) {
+        linkHandle.querySelectorAll('circle').forEach(c => c.setAttribute('cx', String(endX + 8)));
+      }
+      if (bar) bar.classList.remove('dragging');
+    }
+
     // Handle drag end (resizing, moving, and linking)
     addDocListener('mouseup', (e) => {
       // Handle resize/move drag end
       if (dragState) {
-        const { issueId, isLeft, isMove, isBulkDrag, bulkBars, newStartX, newEndX, bar, startX, endX, oldStartDate, oldDueDate } = dragState;
+        const { issueId, isLeft, isMove, isBulkDrag, bulkBars, newStartX, newEndX, bar, startX, endX, oldStartDate, oldDueDate, barOutline, barMain, leftHandle, rightHandle, barLabels, connectedArrows } = dragState;
+        const savedState = { ...dragState }; // Save for restoration
 
         // Handle bulk drag end
         if (isBulkDrag && bulkBars && isMove) {
@@ -6935,35 +7290,53 @@ export class GanttPanel {
           bulkBars.forEach(b => {
             if (b.newStartX !== undefined && b.newStartX !== b.startX) {
               const newStart = xToDate(b.newStartX);
-              const newDue = xToDate(b.newEndX);
+              const newDue = xToDueDate(b.newEndX);
               if (newStart !== b.oldStartDate || newDue !== b.oldDueDate) {
                 changes.push({
                   issueId: parseInt(b.issueId),
                   oldStartDate: b.oldStartDate,
                   oldDueDate: b.oldDueDate,
                   newStartDate: newStart,
-                  newDueDate: newDue
+                  newDueDate: newDue,
+                  barData: b
                 });
               }
             }
           });
 
           if (changes.length > 0) {
-            // Push bulk change to undo stack
-            undoStack.push({ type: 'bulk', changes });
-            redoStack.length = 0;
-            updateUndoRedoButtons();
-            // Send update for each bar
-            changes.forEach(c => {
-              vscode.postMessage({ command: 'updateDates', issueId: c.issueId, startDate: c.newStartDate, dueDate: c.newDueDate });
-            });
+            hideDragTooltip();
+            const message = 'Move ' + changes.length + ' issue(s) to new dates?';
+            showDragConfirmModal(message,
+              () => {
+                // Confirm: commit changes
+                undoStack.push({ type: 'bulk', changes: changes.map(c => ({ issueId: c.issueId, oldStartDate: c.oldStartDate, oldDueDate: c.oldDueDate, newStartDate: c.newStartDate, newDueDate: c.newDueDate })) });
+                redoStack.length = 0;
+                updateUndoRedoButtons();
+                saveState();
+                changes.forEach(c => {
+                  vscode.postMessage({ command: 'updateDates', issueId: c.issueId, startDate: c.newStartDate, dueDate: c.newDueDate });
+                });
+              },
+              () => {
+                // Cancel: restore all bars
+                bulkBars.forEach(b => restoreBarPosition(b));
+              }
+            );
+          } else {
+            // No changes - restore all bars
+            hideDragTooltip();
+            bulkBars.forEach(b => restoreBarPosition(b));
           }
           dragState = null;
+          justEndedDrag = true;
+          requestAnimationFrame(() => justEndedDrag = false);
           return;
         }
 
         // Single bar drag end
         bar.classList.remove('dragging');
+        hideDragTooltip();
 
         if (newStartX !== undefined || newEndX !== undefined) {
           let calcStartDate = null;
@@ -6973,31 +7346,59 @@ export class GanttPanel {
             // Move: update both dates if position changed
             if (newStartX !== startX) {
               calcStartDate = xToDate(newStartX);
-              calcDueDate = xToDate(newEndX);
+              calcDueDate = xToDueDate(newEndX);
             }
           } else if (isLeft) {
             calcStartDate = newStartX !== startX ? xToDate(newStartX) : null;
           } else {
-            calcDueDate = newEndX !== endX ? xToDate(newEndX) : null;
+            calcDueDate = newEndX !== endX ? xToDueDate(newEndX) : null;
           }
 
           const newStartDate = calcStartDate && calcStartDate !== oldStartDate ? calcStartDate : null;
           const newDueDate = calcDueDate && calcDueDate !== oldDueDate ? calcDueDate : null;
 
           if (newStartDate || newDueDate) {
-            undoStack.push({
-              issueId,
-              oldStartDate: newStartDate ? oldStartDate : null,
-              oldDueDate: newDueDate ? oldDueDate : null,
-              newStartDate,
-              newDueDate
-            });
-            redoStack.length = 0;
-            updateUndoRedoButtons();
-            vscode.postMessage({ command: 'updateDates', issueId, startDate: newStartDate, dueDate: newDueDate });
+            // Build confirmation message
+            let message = 'Issue #' + issueId + ': ';
+            if (newStartDate && newDueDate) {
+              message += formatDateRange(oldStartDate, oldDueDate) + ' → ' + formatDateRange(newStartDate, newDueDate);
+            } else if (newStartDate) {
+              message += 'Start: ' + formatDateShort(oldStartDate) + ' → ' + formatDateShort(newStartDate);
+            } else {
+              message += 'Due: ' + formatDateShort(oldDueDate) + ' → ' + formatDateShort(newDueDate);
+            }
+
+            showDragConfirmModal(message,
+              () => {
+                // Confirm: commit change
+                undoStack.push({
+                  issueId,
+                  oldStartDate: newStartDate ? oldStartDate : null,
+                  oldDueDate: newDueDate ? oldDueDate : null,
+                  newStartDate,
+                  newDueDate
+                });
+                redoStack.length = 0;
+                updateUndoRedoButtons();
+                saveState();
+                vscode.postMessage({ command: 'updateDates', issueId, startDate: newStartDate, dueDate: newDueDate });
+              },
+              () => {
+                // Cancel: restore bar
+                restoreBarPosition(savedState);
+              }
+            );
+          } else {
+            // No date change - restore bar to original position
+            restoreBarPosition(savedState);
           }
+        } else {
+          // No drag movement detected - restore bar
+          restoreBarPosition(savedState);
         }
         dragState = null;
+        justEndedDrag = true;
+        requestAnimationFrame(() => justEndedDrag = false);
       }
 
       // Handle linking drag end
@@ -7011,6 +7412,11 @@ export class GanttPanel {
           }
         }
         cancelLinking();
+      }
+
+      // Restore scroll position if no modal shown (no-change cases)
+      if (!pendingDragConfirm) {
+        restoreScrollPosition();
       }
     });
 
@@ -7362,6 +7768,7 @@ export class GanttPanel {
     // Scroll to and highlight an issue (for click/keyboard navigation)
     function scrollToAndHighlight(issueId) {
       if (!issueId) return;
+      allowScrollChange = true; // Intentional scroll
       const label = document.querySelector('.issue-label[data-issue-id="' + issueId + '"]');
       const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
       if (label) {
