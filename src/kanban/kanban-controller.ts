@@ -16,20 +16,40 @@ export interface MockGlobalState {
 }
 
 /**
- * Controller for kanban tasks with CRUD, persistence, and events
+ * Controller options
+ */
+export interface KanbanControllerOptions {
+  workDurationSeconds?: number;
+}
+
+/**
+ * Controller for kanban tasks with CRUD, timer, persistence, and events
  */
 export class KanbanController {
   private tasks: KanbanTask[] = [];
+  private intervalId: ReturnType<typeof setInterval> | null = null;
+  private disposed = false;
+  private readonly workDurationSeconds: number;
 
   private readonly _onTasksChange = new vscode.EventEmitter<void>();
   readonly onTasksChange = this._onTasksChange.event;
 
-  constructor(private readonly globalState: MockGlobalState) {
+  private readonly _onTimerComplete = new vscode.EventEmitter<KanbanTask>();
+  readonly onTimerComplete = this._onTimerComplete.event;
+
+  constructor(
+    private readonly globalState: MockGlobalState,
+    options?: KanbanControllerOptions
+  ) {
+    this.workDurationSeconds = options?.workDurationSeconds ?? 45 * 60;
     this.restore();
   }
 
   dispose(): void {
+    this.disposed = true;
+    this.stopInterval();
     this._onTasksChange.dispose();
+    this._onTimerComplete.dispose();
   }
 
   // --- Getters ---
@@ -149,6 +169,192 @@ export class KanbanController {
     this._onTasksChange.fire();
   }
 
+  // --- Timer Operations ---
+
+  /**
+   * Get task with active timer (timerPhase = "working")
+   */
+  getActiveTask(): KanbanTask | undefined {
+    return this.tasks.find((t) => t.timerPhase === "working");
+  }
+
+  /**
+   * Start timer for a task
+   */
+  async startTimer(
+    id: string,
+    activityId: number,
+    activityName: string
+  ): Promise<void> {
+    const index = this.tasks.findIndex((t) => t.id === id);
+    if (index === -1) return;
+
+    // Auto-pause any currently working task
+    const activeIndex = this.tasks.findIndex((t) => t.timerPhase === "working");
+    if (activeIndex >= 0 && activeIndex !== index) {
+      this.tasks[activeIndex] = {
+        ...this.tasks[activeIndex],
+        timerPhase: "paused",
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Start timer on this task
+    this.tasks[index] = {
+      ...this.tasks[index],
+      timerPhase: "working",
+      timerSecondsLeft: this.tasks[index].timerSecondsLeft ?? this.workDurationSeconds,
+      activityId,
+      activityName,
+      lastActiveAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.startInterval();
+    await this.persist();
+    this._onTasksChange.fire();
+  }
+
+  /**
+   * Pause timer for a task
+   */
+  async pauseTimer(id: string): Promise<void> {
+    const index = this.tasks.findIndex((t) => t.id === id);
+    if (index === -1) return;
+    if (this.tasks[index].timerPhase !== "working") return;
+
+    this.stopInterval();
+    this.tasks[index] = {
+      ...this.tasks[index],
+      timerPhase: "paused",
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.persist();
+    this._onTasksChange.fire();
+  }
+
+  /**
+   * Resume timer for a paused task
+   */
+  async resumeTimer(id: string): Promise<void> {
+    const index = this.tasks.findIndex((t) => t.id === id);
+    if (index === -1) return;
+    if (this.tasks[index].timerPhase !== "paused") return;
+
+    // Auto-pause any currently working task
+    const activeIndex = this.tasks.findIndex((t) => t.timerPhase === "working");
+    if (activeIndex >= 0) {
+      this.tasks[activeIndex] = {
+        ...this.tasks[activeIndex],
+        timerPhase: "paused",
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    this.tasks[index] = {
+      ...this.tasks[index],
+      timerPhase: "working",
+      lastActiveAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.startInterval();
+    await this.persist();
+    this._onTasksChange.fire();
+  }
+
+  /**
+   * Stop timer for a task (clears timer state, keeps logged hours)
+   */
+  async stopTimer(id: string): Promise<void> {
+    const index = this.tasks.findIndex((t) => t.id === id);
+    if (index === -1) return;
+
+    if (this.tasks[index].timerPhase === "working") {
+      this.stopInterval();
+    }
+
+    this.tasks[index] = {
+      ...this.tasks[index],
+      timerPhase: undefined,
+      timerSecondsLeft: undefined,
+      lastActiveAt: undefined,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.persist();
+    this._onTasksChange.fire();
+  }
+
+  /**
+   * Move task back to todo (clears timer state AND logged hours)
+   */
+  async moveToTodo(id: string): Promise<void> {
+    const index = this.tasks.findIndex((t) => t.id === id);
+    if (index === -1) return;
+
+    if (this.tasks[index].timerPhase === "working") {
+      this.stopInterval();
+    }
+
+    this.tasks[index] = {
+      ...this.tasks[index],
+      timerPhase: undefined,
+      timerSecondsLeft: undefined,
+      activityId: undefined,
+      activityName: undefined,
+      lastActiveAt: undefined,
+      loggedHours: 0,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.persist();
+    this._onTasksChange.fire();
+  }
+
+  // --- Timer Internals ---
+
+  private startInterval(): void {
+    this.stopInterval();
+    this.intervalId = setInterval(() => this.tick(), 1000);
+  }
+
+  private stopInterval(): void {
+    if (this.intervalId !== null) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+  }
+
+  private tick(): void {
+    if (this.disposed) return;
+
+    const activeIndex = this.tasks.findIndex((t) => t.timerPhase === "working");
+    if (activeIndex < 0) return;
+
+    const task = this.tasks[activeIndex];
+    const secondsLeft = task.timerSecondsLeft ?? 0;
+
+    if (secondsLeft <= 1) {
+      this.tasks[activeIndex] = {
+        ...task,
+        timerSecondsLeft: 0,
+        updatedAt: new Date().toISOString(),
+      };
+      this.stopInterval();
+      this._onTimerComplete.fire(this.tasks[activeIndex]);
+    } else {
+      this.tasks[activeIndex] = {
+        ...task,
+        timerSecondsLeft: secondsLeft - 1,
+        lastActiveAt: new Date().toISOString(),
+      };
+    }
+
+    this._onTasksChange.fire();
+  }
+
   // --- Persistence ---
 
   private async persist(): Promise<void> {
@@ -158,6 +364,24 @@ export class KanbanController {
   private restore(): void {
     const stored = this.globalState.get<unknown[]>(STORAGE_KEY, []);
     this.tasks = this.validateAndFilter(stored);
+
+    // Session recovery: adjust timer for elapsed time since last active
+    const now = Date.now();
+    for (let i = 0; i < this.tasks.length; i++) {
+      const task = this.tasks[i];
+      if (task.timerPhase === "working" && task.lastActiveAt && task.timerSecondsLeft) {
+        const lastActive = new Date(task.lastActiveAt).getTime();
+        const elapsedSeconds = Math.floor((now - lastActive) / 1000);
+        const adjustedSeconds = Math.max(0, task.timerSecondsLeft - elapsedSeconds);
+
+        // Pause the task (user must explicitly resume)
+        this.tasks[i] = {
+          ...task,
+          timerPhase: "paused",
+          timerSecondsLeft: adjustedSeconds,
+        };
+      }
+    }
   }
 
   private validateAndFilter(data: unknown[]): KanbanTask[] {
