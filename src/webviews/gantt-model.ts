@@ -213,6 +213,7 @@ export function nodeToGanttRow(
       collapseKey: node.collapseKey,
       parentKey: node.parentKey,
       hasChildren: node.children.length > 0,
+      childDateRanges: node.childDateRanges,
       isVisible: node.isVisible,
       isExpanded: node.isExpanded,
       timeGroup: node.timeGroup,
