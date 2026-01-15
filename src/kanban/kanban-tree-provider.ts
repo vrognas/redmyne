@@ -4,7 +4,6 @@ import {
   KanbanTask,
   TaskStatus,
   getTaskStatus,
-  groupTasksByStatus,
   sortTasksByPriority,
 } from "./kanban-state";
 import { formatHoursAsHHMM } from "../utilities/time-input";
@@ -244,29 +243,16 @@ export class KanbanTreeProvider
     // No children for other elements
     if (element) return [];
 
-    // Root level
-    const tasks = this.controller.getTasks();
-    const grouped = groupTasksByStatus(tasks);
-
+    // Root level - always show all 3 columns for drag-drop targets
     const items: TaskTreeItem[] = [];
 
     // Add button first
     items.push({ type: "add-button" });
 
-    // Doing header (if any)
-    if (grouped.doing.length > 0) {
-      items.push({ type: "status-header", status: "doing" });
-    }
-
-    // To Do header (if any)
-    if (grouped.todo.length > 0) {
-      items.push({ type: "status-header", status: "todo" });
-    }
-
-    // Done header (if any)
-    if (grouped.done.length > 0) {
-      items.push({ type: "status-header", status: "done" });
-    }
+    // Always show all status headers (needed for drag-drop)
+    items.push({ type: "status-header", status: "doing" });
+    items.push({ type: "status-header", status: "todo" });
+    items.push({ type: "status-header", status: "done" });
 
     return items;
   }
