@@ -63,8 +63,18 @@ export class KanbanTreeProvider extends BaseTreeProvider<TaskTreeItem> {
     const status = getTaskStatus(task);
     const item = new vscode.TreeItem(task.title);
 
-    // Icon based on priority and status
-    if (status === "done") {
+    // Icon based on timer phase, then priority/status
+    if (task.timerPhase === "working") {
+      item.iconPath = new vscode.ThemeIcon(
+        "pulse",
+        new vscode.ThemeColor("charts.green")
+      );
+    } else if (task.timerPhase === "paused") {
+      item.iconPath = new vscode.ThemeIcon(
+        "debug-pause",
+        new vscode.ThemeColor("charts.yellow")
+      );
+    } else if (status === "done") {
       item.iconPath = new vscode.ThemeIcon(
         "check",
         new vscode.ThemeColor("testing.iconPassed")
@@ -73,13 +83,23 @@ export class KanbanTreeProvider extends BaseTreeProvider<TaskTreeItem> {
       item.iconPath = this.getPriorityIcon(task.priority);
     }
 
-    // Description: "#ID Project (Xh logged)"
-    const hoursStr =
-      task.loggedHours > 0 ? ` (${formatHoursAsHHMM(task.loggedHours)} logged)` : "";
-    item.description = `#${task.linkedIssueId} ${task.linkedProjectName}${hoursStr}`;
+    // Description: timer info if active, else project/hours
+    if (task.timerPhase && task.timerSecondsLeft !== undefined) {
+      const timeStr = this.formatSecondsAsMmSs(task.timerSecondsLeft);
+      const activityStr = task.activityName ? ` [${task.activityName}]` : "";
+      item.description = `${timeStr}${activityStr} #${task.linkedIssueId}`;
+    } else {
+      const hoursStr =
+        task.loggedHours > 0 ? ` (${formatHoursAsHHMM(task.loggedHours)} logged)` : "";
+      item.description = `#${task.linkedIssueId} ${task.linkedProjectName}${hoursStr}`;
+    }
 
-    // Context value for menus
-    item.contextValue = `task-${status}`;
+    // Context value for menus: task-{status}-{timerPhase?}
+    if (task.timerPhase) {
+      item.contextValue = `task-${status}-${task.timerPhase}`;
+    } else {
+      item.contextValue = `task-${status}`;
+    }
 
     // Tooltip
     const md = new vscode.MarkdownString();
@@ -89,6 +109,13 @@ export class KanbanTreeProvider extends BaseTreeProvider<TaskTreeItem> {
     );
     md.appendMarkdown(`Project: ${task.linkedProjectName}\n\n`);
     md.appendMarkdown(`Priority: ${task.priority}\n\n`);
+    if (task.timerPhase && task.timerSecondsLeft !== undefined) {
+      const timeStr = this.formatSecondsAsMmSs(task.timerSecondsLeft);
+      md.appendMarkdown(`Timer: ${timeStr} (${task.timerPhase})\n\n`);
+    }
+    if (task.activityName) {
+      md.appendMarkdown(`Activity: ${task.activityName}\n\n`);
+    }
     if (task.description) {
       md.appendMarkdown(`---\n\n${task.description}\n\n`);
     }
@@ -100,14 +127,34 @@ export class KanbanTreeProvider extends BaseTreeProvider<TaskTreeItem> {
     }
     item.tooltip = md;
 
-    // Command to add to Today's Plan on click
-    item.command = {
-      command: "redmine.kanban.addToPlan",
-      title: "Add to Today's Plan",
-      arguments: [task.id],
-    };
+    // Command on click: toggle timer for doing tasks, start timer for todo
+    if (task.timerPhase === "working") {
+      item.command = {
+        command: "redmine.kanban.pauseTimer",
+        title: "Pause Timer",
+        arguments: [task.id],
+      };
+    } else if (task.timerPhase === "paused") {
+      item.command = {
+        command: "redmine.kanban.resumeTimer",
+        title: "Resume Timer",
+        arguments: [task.id],
+      };
+    } else if (status !== "done") {
+      item.command = {
+        command: "redmine.kanban.startTimer",
+        title: "Start Timer",
+        arguments: [task.id],
+      };
+    }
 
     return item;
+  }
+
+  private formatSecondsAsMmSs(seconds: number): string {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   }
 
   getChildren(element?: TaskTreeItem): TaskTreeItem[] {
