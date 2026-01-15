@@ -5,6 +5,7 @@ import { showCreateTaskDialog, showEditTaskDialog } from "./kanban-dialogs";
 import { RedmineServer } from "../redmine/redmine-server";
 import { pickActivityForProject } from "../utilities/issue-picker";
 import { showActionableError } from "../utilities/error-feedback";
+import { showStatusBarMessage } from "../utilities/status-bar";
 
 interface TaskTreeItem {
   task?: KanbanTask;
@@ -14,7 +15,7 @@ interface TaskTreeItem {
  * Register all kanban commands
  */
 export function registerKanbanCommands(
-  _context: vscode.ExtensionContext,
+  context: vscode.ExtensionContext,
   controller: KanbanController,
   getServer: () => RedmineServer | undefined
 ): vscode.Disposable[] {
@@ -572,6 +573,100 @@ export function registerKanbanCommands(
         );
       }
     )
+  );
+
+  // Configure Timer Settings
+  disposables.push(
+    vscode.commands.registerCommand("redmine.kanban.configureTimer", async () => {
+      const currentUnit = context.globalState.get<number>("redmine.timer.unitDuration", 60);
+      const currentWork = context.globalState.get<number>("redmine.timer.workDuration", 45);
+      const currentBreak = currentUnit - currentWork;
+      const currentSound = context.globalState.get<boolean>("redmine.timer.soundEnabled", true);
+
+      const choice = await vscode.window.showQuickPick(
+        [
+          {
+            label: `$(clock) Unit Duration: ${currentUnit} min`,
+            description: "Total time logged per unit",
+            setting: "unitDuration",
+          },
+          {
+            label: `$(pulse) Work Duration: ${currentWork} min`,
+            description: "Active work time before break",
+            setting: "workDuration",
+          },
+          {
+            label: `$(coffee) Break Duration: ${currentBreak} min`,
+            description: "Adjusts work duration to match",
+            setting: "break",
+          },
+          {
+            label: `$(unmute) Sound: ${currentSound ? "On" : "Off"}`,
+            description: "Play sound when timer completes",
+            setting: "sound",
+          },
+        ],
+        { placeHolder: "Configure timer" }
+      );
+
+      if (!choice) return;
+
+      if (choice.setting === "sound") {
+        await context.globalState.update("redmine.timer.soundEnabled", !currentSound);
+        showStatusBarMessage(`$(check) Sound ${!currentSound ? "enabled" : "disabled"}`, 2000);
+        return;
+      }
+
+      if (choice.setting === "break") {
+        const input = await vscode.window.showInputBox({
+          prompt: `Break = Unit (${currentUnit}min) - Work. Enter new break duration:`,
+          value: currentBreak.toString(),
+          validateInput: (v) => {
+            const n = parseInt(v, 10);
+            if (isNaN(n) || n < 0) return "Minimum 0 minutes";
+            if (n >= currentUnit) return `Must be less than unit duration (${currentUnit}min)`;
+            return null;
+          },
+        });
+        if (!input) return;
+        const newBreak = parseInt(input, 10);
+        const newWork = currentUnit - newBreak;
+        await context.globalState.update("redmine.timer.workDuration", newWork);
+        showStatusBarMessage(`$(check) Break set to ${newBreak}min (work: ${newWork}min)`, 2000);
+        return;
+      }
+
+      const prompt = choice.setting === "unitDuration"
+        ? "Enter unit duration (minutes):"
+        : "Enter work duration (minutes):";
+      const current = choice.setting === "unitDuration" ? currentUnit : currentWork;
+      const max = choice.setting === "unitDuration" ? 480 : currentUnit;
+
+      const input = await vscode.window.showInputBox({
+        prompt,
+        value: current.toString(),
+        validateInput: (v) => {
+          const n = parseInt(v, 10);
+          if (isNaN(n) || n < 1) return "Minimum 1 minute";
+          if (n > max) return `Maximum ${max} minutes`;
+          return null;
+        },
+      });
+      if (!input) return;
+
+      const value = parseInt(input, 10);
+      if (choice.setting === "unitDuration") {
+        await context.globalState.update("redmine.timer.unitDuration", value);
+        // Adjust work duration if needed
+        if (currentWork > value) {
+          await context.globalState.update("redmine.timer.workDuration", value);
+        }
+        showStatusBarMessage(`$(check) Unit duration set to ${value}min`, 2000);
+      } else {
+        await context.globalState.update("redmine.timer.workDuration", value);
+        showStatusBarMessage(`$(check) Work duration set to ${value}min`, 2000);
+      }
+    })
   );
 
   return disposables;

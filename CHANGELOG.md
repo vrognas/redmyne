@@ -2,6 +2,21 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [3.25.0]
+
+### Added
+
+- **Plan your day → Kanban** - "Plan your day" wizard now creates Kanban tasks in Doing board instead of Today's Plan
+- **Client folders** - Kanban groups tasks by parent project (client) → project hierarchy in To Do and Done boards
+- **Refresh parent projects** - button to populate parent project info for existing tasks
+
+### Changed
+
+- **Done board at top** - Kanban board order is now Done → Doing → To Do
+- **Projects without parent** - shown directly under status header (no "No Client" wrapper)
+- **Folder icons** - match Issues view styling (folder-opened with accent color)
+- **Hidden Gantt commands** - webview commands no longer clutter command palette
+
 ## [3.24.0]
 
 ### Added

@@ -80,6 +80,7 @@ export class KanbanStatusBar {
       this.statusBarItem.text = `$(play) Ready (${doneCount}/${tasks.length})`;
       this.statusBarItem.tooltip = this.buildIdleTooltip(doingTask, doneCount, tasks.length, totalLoggedHours);
       this.statusBarItem.command = doingTask ? {
+        title: "Start Timer",
         command: "redmine.kanban.startTimer",
         arguments: [doingTask.id],
       } : undefined;
