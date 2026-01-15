@@ -214,7 +214,7 @@ export class KanbanTreeProvider
     } else {
       const hoursStr =
         task.loggedHours > 0 ? ` (${formatHoursAsHHMM(task.loggedHours)} logged)` : "";
-      item.description = `#${task.linkedIssueId} ${task.linkedProjectName}${hoursStr}`;
+      item.description = `#${task.linkedIssueId} ${task.linkedIssueSubject}${hoursStr}`;
     }
 
     // Context value for menus: task-{status}-{timerPhase?}

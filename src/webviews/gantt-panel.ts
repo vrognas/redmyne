@@ -28,6 +28,7 @@ import { CollapseStateManager } from "../utilities/collapse-state";
 import { debounce, DebouncedFunction } from "../utilities/debounce";
 import { IssueFilter, DEFAULT_ISSUE_FILTER, GanttViewMode } from "../redmine/models/common";
 import { parseLocalDate, getLocalToday, formatLocalDate } from "../utilities/date-utils";
+import { GanttWebviewMessage, parseLookbackYears } from "./gantt-webview-messages";
 
 /** Get today's date as YYYY-MM-DD string */
 const getTodayStr = (): string => formatLocalDate(getLocalToday());
@@ -1395,36 +1396,7 @@ export class GanttPanel {
     this._isRefreshing = false; // Reset after render
   }
 
-  private _handleMessage(message: {
-    command: string;
-    issueId?: number;
-    issueIds?: number[]; // For bulk operations
-    startDate?: string | null;
-    dueDate?: string | null;
-    zoomLevel?: ZoomLevel;
-    viewMode?: GanttViewMode; // For setViewMode
-    relationId?: number;
-    targetIssueId?: number;
-    relationType?: CreatableRelationType;
-    left?: number;
-    top?: number;
-    operation?: string;
-    collapseKey?: string;
-    action?: string;
-    keys?: string[];
-    projectId?: number;
-    projectIds?: number[]; // For setAllProjectsVisibility
-    visible?: boolean; // For setAllProjectsVisibility
-    isExpanded?: boolean; // For collapseStateSync
-    filter?: { assignee?: string; status?: string }; // For setFilter
-    health?: string; // For setHealthFilter
-    sortBy?: "id" | "assignee" | "start" | "due" | "status" | null; // For setSort (null = no sort)
-    sortOrder?: "asc" | "desc"; // For setSort
-    focus?: "project" | "person"; // For setViewFocus
-    assignee?: string | null; // For setSelectedAssignee
-    message?: string; // For showStatus
-    years?: string; // For setLookback
-  }): void {
+  private _handleMessage(message: GanttWebviewMessage): void {
     switch (message.command) {
       case "openIssue":
         if (message.issueId && this._server) {
@@ -1453,7 +1425,7 @@ export class GanttPanel {
         }
         break;
       case "setLookback":
-        this._lookbackYears = !message.years || message.years === "" ? null : parseInt(message.years, 10) as 2 | 5 | 10;
+        this._lookbackYears = parseLookbackYears(message.years, this._lookbackYears);
         GanttPanel._globalState?.update(LOOKBACK_YEARS_KEY, this._lookbackYears);
         // Clear contribution cache and re-fetch with new lookback
         this._contributionData = undefined;
