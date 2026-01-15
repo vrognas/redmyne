@@ -1176,6 +1176,78 @@
         {
           "command": "redmine.removeContribution",
           "when": "false"
+        },
+        {
+          "command": "redmine.gantt.createSubIssue",
+          "when": "false"
+        },
+        {
+          "command": "redmine.gantt.createIssue",
+          "when": "false"
+        },
+        {
+          "command": "redmine.gantt.createVersion",
+          "when": "false"
+        },
+        {
+          "command": "redmine.gantt.updateIssue",
+          "when": "false"
+        },
+        {
+          "command": "redmine.gantt.openInBrowser",
+          "when": "false"
+        },
+        {
+          "command": "redmine.gantt.showInIssues",
+          "when": "false"
+        },
+        {
+          "command": "redmine.gantt.addToKanban",
+          "when": "false"
+        },
+        {
+          "command": "redmine.gantt.logTime",
+          "when": "false"
+        },
+        {
+          "command": "redmine.gantt.setDoneRatio",
+          "when": "false"
+        },
+        {
+          "command": "redmine.gantt.setStatus",
+          "when": "false"
+        },
+        {
+          "command": "redmine.gantt.setIssuePriority",
+          "when": "false"
+        },
+        {
+          "command": "redmine.gantt.copyUrl",
+          "when": "false"
+        },
+        {
+          "command": "redmine.gantt.copyIssueId",
+          "when": "false"
+        },
+        {
+          "command": "redmine.gantt.copyProjectId",
+          "when": "false"
+        },
+        {
+          "command": "redmine.gantt.copyProjectUrl",
+          "when": "false"
+        },
+        {
+          "command": "redmine.gantt.openProjectInBrowser",
+          "when": "false"
+        },
+        {
+          "command": "redmine.gantt.showProjectInGantt",
+          "when": "false"
+        },
+        {
+          "command": "redmine.gantt.showProjectInIssues",
+          "when": "false"
         }
       ],
       "view/title": [
