@@ -10,6 +10,7 @@ import { showActionableError } from "../utilities/error-feedback";
 interface TreeItem {
   type?: string;
   index?: number;
+  unit?: { issueSubject?: string };
 }
 
 interface TimerCommandsOptions {
@@ -551,6 +552,19 @@ export function registerTimerCommands(
       });
 
       showStatusBarMessage(`$(check) Switched to: ${newComment || "(no comment)"}`, 2000);
+    })
+  );
+
+  // Copy issue subject
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmine.timer.copySubject", async (item: TreeItem) => {
+      const unit = item?.unit ?? (item?.index !== undefined ? controller.getPlan()[item.index] : undefined);
+      if (!unit?.issueSubject) {
+        vscode.window.showWarningMessage("No issue subject to copy");
+        return;
+      }
+      await vscode.env.clipboard.writeText(unit.issueSubject);
+      vscode.window.showInformationMessage("Copied issue subject");
     })
   );
 

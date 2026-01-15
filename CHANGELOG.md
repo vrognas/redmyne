@@ -2,6 +2,13 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [3.24.0]
+
+### Added
+
+- **Drag date tooltip** - shows target date when dragging Gantt bar edges (start/due); displays "Start: Jan 15 (Wed)" or "Due: Jan 18 (Sat)" for resize, range arrow for move
+- **Copy subject commands** - right-click Kanban tasks or Timer units to copy subject to clipboard
+
 ## [3.23.1]
 
 ### Changed

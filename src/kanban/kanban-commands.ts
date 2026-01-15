@@ -236,6 +236,18 @@ export function registerKanbanCommands(
     )
   );
 
+  // Copy Task Subject
+  disposables.push(
+    vscode.commands.registerCommand(
+      "redmine.kanban.copySubject",
+      async (item: TaskTreeItem) => {
+        if (!item?.task) return;
+        await vscode.env.clipboard.writeText(item.task.title);
+        vscode.window.showInformationMessage("Copied task subject");
+      }
+    )
+  );
+
   // Add issue from My Issues tree to Kanban
   disposables.push(
     vscode.commands.registerCommand(

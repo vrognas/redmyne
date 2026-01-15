@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "3.23.1",
+  "version": "3.24.0",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -441,6 +441,11 @@
         "icon": "$(replace)"
       },
       {
+        "command": "redmine.timer.copySubject",
+        "title": "Copy Issue Subject",
+        "icon": "$(copy)"
+      },
+      {
         "command": "redmine.timer.toggleSelectedUnit",
         "title": "Toggle Selected Unit"
       },
@@ -488,6 +493,11 @@
         "command": "redmine.kanban.addToPlan",
         "title": "Add to Today's Plan",
         "icon": "$(calendar)"
+      },
+      {
+        "command": "redmine.kanban.copySubject",
+        "title": "Copy Task Subject",
+        "icon": "$(copy)"
       },
       {
         "command": "redmine.toggleAutoUpdateDoneRatio",
@@ -1050,6 +1060,10 @@
           "when": "false"
         },
         {
+          "command": "redmine.timer.copySubject",
+          "when": "false"
+        },
+        {
           "command": "redmine.kanban.add",
           "when": "false"
         },
@@ -1083,6 +1097,10 @@
         },
         {
           "command": "redmine.kanban.addToPlan",
+          "when": "false"
+        },
+        {
+          "command": "redmine.kanban.copySubject",
           "when": "false"
         },
         {
@@ -1398,6 +1416,16 @@
           "command": "redmine.kanban.openInBrowser",
           "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-/",
           "group": "navigation@1"
+        },
+        {
+          "command": "redmine.kanban.copySubject",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-/",
+          "group": "9_clipboard@1"
+        },
+        {
+          "command": "redmine.timer.copySubject",
+          "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit-/",
+          "group": "9_clipboard@1"
         }
       ],
       "redmine.gantt.doneRatioMenu": [

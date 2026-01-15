@@ -5937,7 +5937,7 @@ export class GanttPanel {
         const fromId = arrow.getAttribute('data-from');
         const toId = arrow.getAttribute('data-to');
         const classList = arrow.getAttribute('class') || '';
-        const relMatch = classList.match(/rel-(\S+)/);
+        const relMatch = classList.match(/rel-(\\w+)/);
         const relType = relMatch ? relMatch[1] : 'relates';
         const isScheduling = ['blocks', 'precedes', 'finish_to_start', 'start_to_start', 'finish_to_finish', 'start_to_finish'].includes(relType);
         // Get source/target bar positions
