@@ -299,9 +299,9 @@ export class KanbanTreeProvider
 
     // Root level - always show all 3 columns for drag-drop targets
     return [
+      { type: "status-header", status: "done" },
       { type: "status-header", status: "doing" },
       { type: "status-header", status: "todo" },
-      { type: "status-header", status: "done" },
     ] as TaskTreeItem[];
   }
 
