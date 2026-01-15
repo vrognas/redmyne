@@ -490,6 +490,11 @@
         "icon": "$(trash)"
       },
       {
+        "command": "redmine.kanban.refreshParentProjects",
+        "title": "Refresh Parent Projects",
+        "icon": "$(sync)"
+      },
+      {
         "command": "redmine.kanban.addToPlan",
         "title": "Add to Today's Plan",
         "icon": "$(calendar)"
@@ -1125,6 +1130,10 @@
           "when": "false"
         },
         {
+          "command": "redmine.kanban.refreshParentProjects",
+          "when": "false"
+        },
+        {
           "command": "redmine.kanban.addToPlan",
           "when": "false"
         },
@@ -1189,6 +1198,11 @@
           "command": "redmine.kanban.clearDone",
           "when": "view == 'redmine-explorer-kanban' && redmine:hasKanbanDoneTasks",
           "group": "navigation@2"
+        },
+        {
+          "command": "redmine.kanban.refreshParentProjects",
+          "when": "view == 'redmine-explorer-kanban' && redmine:configured",
+          "group": "navigation@4"
         },
         {
           "command": "redmine.timer.configureTimer",

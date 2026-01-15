@@ -173,6 +173,55 @@ export function registerKanbanCommands(
     })
   );
 
+  // Refresh Parent Projects (migrate existing tasks)
+  disposables.push(
+    vscode.commands.registerCommand("redmine.kanban.refreshParentProjects", async () => {
+      const server = getServer();
+      if (!server) {
+        showActionableError("Redmine not configured", [
+          { title: "Configure", command: "redmine.configure" },
+        ]);
+        return;
+      }
+
+      const tasks = controller.getTasks();
+      if (tasks.length === 0) {
+        vscode.window.showInformationMessage("No tasks to refresh");
+        return;
+      }
+
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Refreshing parent projects...",
+          cancellable: false,
+        },
+        async (progress) => {
+          const projects = await server.getProjects();
+          const projectMap = new Map(projects.map((p) => [p.id, p]));
+
+          let updated = 0;
+          for (let i = 0; i < tasks.length; i++) {
+            const task = tasks[i];
+            progress.report({ increment: (100 / tasks.length), message: `${i + 1}/${tasks.length}` });
+
+            const project = projectMap.get(task.linkedProjectId);
+            const parentId = project?.parent?.id;
+            const parentName = project?.parent?.name;
+
+            // Only update if parent info changed
+            if (task.linkedParentProjectId !== parentId || task.linkedParentProjectName !== parentName) {
+              await controller.updateParentProject(task.id, parentId, parentName);
+              updated++;
+            }
+          }
+
+          vscode.window.showInformationMessage(`Updated ${updated} task(s) with parent project info`);
+        }
+      );
+    })
+  );
+
   // Add to Today's Plan
   disposables.push(
     vscode.commands.registerCommand(

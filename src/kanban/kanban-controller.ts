@@ -110,6 +110,27 @@ export class KanbanController {
     this._onTasksChange.fire();
   }
 
+  /**
+   * Update parent project info for a task
+   */
+  async updateParentProject(
+    id: string,
+    linkedParentProjectId: number | undefined,
+    linkedParentProjectName: string | undefined
+  ): Promise<void> {
+    const index = this.tasks.findIndex((t) => t.id === id);
+    if (index === -1) return;
+
+    this.tasks[index] = {
+      ...this.tasks[index],
+      linkedParentProjectId,
+      linkedParentProjectName,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.persist();
+    this._onTasksChange.fire();
+  }
+
   async deleteTask(id: string): Promise<void> {
     const index = this.tasks.findIndex((t) => t.id === id);
     if (index === -1) return;
