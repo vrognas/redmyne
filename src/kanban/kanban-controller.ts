@@ -369,17 +369,27 @@ export class KanbanController {
     const now = Date.now();
     for (let i = 0; i < this.tasks.length; i++) {
       const task = this.tasks[i];
-      if (task.timerPhase === "working" && task.lastActiveAt && task.timerSecondsLeft) {
+      if (task.timerPhase === "working" && task.lastActiveAt && task.timerSecondsLeft !== undefined) {
         const lastActive = new Date(task.lastActiveAt).getTime();
         const elapsedSeconds = Math.floor((now - lastActive) / 1000);
         const adjustedSeconds = Math.max(0, task.timerSecondsLeft - elapsedSeconds);
 
-        // Pause the task (user must explicitly resume)
-        this.tasks[i] = {
-          ...task,
-          timerPhase: "paused",
-          timerSecondsLeft: adjustedSeconds,
-        };
+        if (adjustedSeconds === 0) {
+          // Timer had completed - clear timer state, user can start fresh
+          this.tasks[i] = {
+            ...task,
+            timerPhase: undefined,
+            timerSecondsLeft: undefined,
+            lastActiveAt: undefined,
+          };
+        } else {
+          // Pause the task (user must explicitly resume)
+          this.tasks[i] = {
+            ...task,
+            timerPhase: "paused",
+            timerSecondsLeft: adjustedSeconds,
+          };
+        }
       }
     }
   }

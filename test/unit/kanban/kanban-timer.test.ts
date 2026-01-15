@@ -185,5 +185,72 @@ describe("KanbanController Timer", () => {
 
       newController.dispose();
     });
+
+    it("clears timer if it would have completed during restart", async () => {
+      // Timer was working with 10 seconds left, 60 seconds ago (would have completed)
+      const now = new Date();
+      const sixtySecondsAgo = new Date(now.getTime() - 60000);
+
+      mockState.update("redmine.kanban", [
+        {
+          id: "completed-id",
+          title: "Completed task",
+          priority: "medium",
+          linkedIssueId: 2,
+          linkedIssueSubject: "Issue 2",
+          linkedProjectId: 1,
+          linkedProjectName: "Project",
+          loggedHours: 0,
+          createdAt: "2025-01-01",
+          updatedAt: "2025-01-01",
+          timerSecondsLeft: 10,
+          timerPhase: "working",
+          activityId: 1,
+          activityName: "Dev",
+          lastActiveAt: sixtySecondsAgo.toISOString(),
+        },
+      ]);
+
+      const newController = new KanbanController(mockState, { workDurationSeconds: 10 });
+      const task = newController.getTaskById("completed-id");
+
+      // Timer should be cleared (not stuck in working with 0 seconds)
+      expect(task?.timerPhase).toBeUndefined();
+      expect(task?.timerSecondsLeft).toBeUndefined();
+
+      newController.dispose();
+    });
+
+    it("clears timer if timerSecondsLeft was exactly 0", async () => {
+      // Edge case: timer completed but extension restarted before user responded
+      mockState.update("redmine.kanban", [
+        {
+          id: "zero-id",
+          title: "Zero seconds task",
+          priority: "medium",
+          linkedIssueId: 3,
+          linkedIssueSubject: "Issue 3",
+          linkedProjectId: 1,
+          linkedProjectName: "Project",
+          loggedHours: 0,
+          createdAt: "2025-01-01",
+          updatedAt: "2025-01-01",
+          timerSecondsLeft: 0,
+          timerPhase: "working",
+          activityId: 1,
+          activityName: "Dev",
+          lastActiveAt: new Date().toISOString(),
+        },
+      ]);
+
+      const newController = new KanbanController(mockState, { workDurationSeconds: 10 });
+      const task = newController.getTaskById("zero-id");
+
+      // Timer should be cleared (not stuck in working with 0 seconds)
+      expect(task?.timerPhase).toBeUndefined();
+      expect(task?.timerSecondsLeft).toBeUndefined();
+
+      newController.dispose();
+    });
   });
 });
