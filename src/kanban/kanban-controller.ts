@@ -305,7 +305,27 @@ export class KanbanController {
       activityId: undefined,
       activityName: undefined,
       lastActiveAt: undefined,
+      doingAt: undefined,
       loggedHours: 0,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.persist();
+    this._onTasksChange.fire();
+  }
+
+  /**
+   * Move task to Doing (initializes timer but doesn't start countdown)
+   */
+  async moveToDoing(id: string): Promise<void> {
+    const index = this.tasks.findIndex((t) => t.id === id);
+    if (index === -1) return;
+
+    this.tasks[index] = {
+      ...this.tasks[index],
+      doingAt: new Date().toISOString(),
+      timerSecondsLeft: this.workDurationSeconds,
+      completedAt: undefined, // Clear if reopening from Done
       updatedAt: new Date().toISOString(),
     };
 

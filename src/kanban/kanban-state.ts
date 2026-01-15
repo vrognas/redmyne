@@ -33,6 +33,7 @@ export interface KanbanTask {
   createdAt: string; // ISO
   updatedAt: string; // ISO
   completedAt?: string; // ISO - set when manually marked done
+  doingAt?: string; // ISO - set when moved to Doing via drag-drop
 }
 
 export type TaskPriority = "low" | "medium" | "high";
@@ -51,6 +52,7 @@ export type TaskStatus = "todo" | "doing" | "done";
 export function getTaskStatus(task: KanbanTask): TaskStatus {
   if (task.completedAt) return "done";
   if (
+    task.doingAt ||
     task.loggedHours > 0 ||
     task.timerPhase === "working" ||
     task.timerPhase === "paused"

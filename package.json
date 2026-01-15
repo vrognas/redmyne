@@ -1433,8 +1433,13 @@
         },
         {
           "command": "redmine.kanban.startTimer",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|doing)$/ && viewItem != 'task-doing-working' && viewItem != 'task-doing-paused'",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|doing|doing-initialized)$/ && viewItem != 'task-doing-working' && viewItem != 'task-doing-paused'",
           "group": "timer@1"
+        },
+        {
+          "command": "redmine.kanban.startTimer",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|doing-initialized)$/",
+          "group": "inline"
         },
         {
           "command": "redmine.kanban.pauseTimer",
@@ -1442,9 +1447,19 @@
           "group": "timer@1"
         },
         {
+          "command": "redmine.kanban.pauseTimer",
+          "when": "view == 'redmine-explorer-kanban' && viewItem == 'task-doing-working'",
+          "group": "inline"
+        },
+        {
           "command": "redmine.kanban.resumeTimer",
           "when": "view == 'redmine-explorer-kanban' && viewItem == 'task-doing-paused'",
           "group": "timer@1"
+        },
+        {
+          "command": "redmine.kanban.resumeTimer",
+          "when": "view == 'redmine-explorer-kanban' && viewItem == 'task-doing-paused'",
+          "group": "inline"
         },
         {
           "command": "redmine.kanban.stopTimer",
@@ -1465,6 +1480,11 @@
           "command": "redmine.kanban.markDone",
           "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|doing)/",
           "group": "kanban@2"
+        },
+        {
+          "command": "redmine.kanban.markDone",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|doing)/",
+          "group": "inline"
         },
         {
           "command": "redmine.kanban.reopen",

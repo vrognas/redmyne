@@ -110,6 +110,54 @@ describe("KanbanController Timer", () => {
       expect(updated?.loggedHours).toBe(0);
       expect(getTaskStatus(updated!)).toBe("todo");
     });
+
+    it("clears doingAt when moving to todo", async () => {
+      const task = await controller.addTask("Test", 1, "Issue", 1, "Project");
+      await controller.moveToDoing(task.id);
+      await controller.moveToTodo(task.id);
+
+      const updated = controller.getTaskById(task.id);
+      expect(updated?.doingAt).toBeUndefined();
+      expect(updated?.timerSecondsLeft).toBeUndefined();
+      expect(getTaskStatus(updated!)).toBe("todo");
+    });
+  });
+
+  describe("moveToDoing", () => {
+    it("sets doingAt and initializes timerSecondsLeft", async () => {
+      const task = await controller.addTask("Test", 1, "Issue", 1, "Project");
+      await controller.moveToDoing(task.id);
+
+      const updated = controller.getTaskById(task.id);
+      expect(updated?.doingAt).toBeDefined();
+      expect(updated?.timerSecondsLeft).toBe(10); // workDurationSeconds from test setup
+      expect(updated?.timerPhase).toBeUndefined(); // NOT running
+      expect(getTaskStatus(updated!)).toBe("doing");
+    });
+
+    it("clears completedAt when moving from done to doing", async () => {
+      const task = await controller.addTask("Test", 1, "Issue", 1, "Project");
+      await controller.markDone(task.id);
+      expect(getTaskStatus(controller.getTaskById(task.id)!)).toBe("done");
+
+      await controller.moveToDoing(task.id);
+
+      const updated = controller.getTaskById(task.id);
+      expect(updated?.completedAt).toBeUndefined();
+      expect(updated?.doingAt).toBeDefined();
+      expect(getTaskStatus(updated!)).toBe("doing");
+    });
+
+    it("does not start timer interval (not running)", async () => {
+      const task = await controller.addTask("Test", 1, "Issue", 1, "Project");
+      await controller.moveToDoing(task.id);
+
+      vi.advanceTimersByTime(5000);
+
+      // Timer should NOT have decremented since it's only initialized
+      const updated = controller.getTaskById(task.id);
+      expect(updated?.timerSecondsLeft).toBe(10);
+    });
   });
 
   describe("timer tick", () => {

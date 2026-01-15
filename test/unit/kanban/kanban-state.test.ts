@@ -66,6 +66,28 @@ describe("getTaskStatus", () => {
       const task = createTask({ timerPhase: "completed", loggedHours: 0 });
       expect(getTaskStatus(task)).toBe("todo");
     });
+
+    it("returns doing for task with doingAt set (drag-drop initialized)", () => {
+      const task = createTask({ doingAt: "2025-01-02T00:00:00Z", loggedHours: 0 });
+      expect(getTaskStatus(task)).toBe("doing");
+    });
+
+    it("returns doing for task with doingAt + timerSecondsLeft (initialized timer)", () => {
+      const task = createTask({
+        doingAt: "2025-01-02T00:00:00Z",
+        timerSecondsLeft: 2700, // 45 min
+        loggedHours: 0,
+      });
+      expect(getTaskStatus(task)).toBe("doing");
+    });
+
+    it("done takes precedence over doingAt", () => {
+      const task = createTask({
+        doingAt: "2025-01-02T00:00:00Z",
+        completedAt: "2025-01-03T00:00:00Z",
+      });
+      expect(getTaskStatus(task)).toBe("done");
+    });
   });
 });
 

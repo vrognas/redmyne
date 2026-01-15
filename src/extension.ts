@@ -357,6 +357,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
   cleanupResources.kanbanTreeView = vscode.window.createTreeView("redmine-explorer-kanban", {
     treeDataProvider: kanbanTreeProvider,
+    dragAndDropController: kanbanTreeProvider,
+    canSelectMany: true,
   });
   context.subscriptions.push(cleanupResources.kanbanTreeView);
 
