@@ -17,6 +17,8 @@ export interface CreateTaskResult {
   linkedIssueSubject: string;
   linkedProjectId: number;
   linkedProjectName: string;
+  linkedParentProjectId?: number;
+  linkedParentProjectName?: string;
   description?: string;
   priority: TaskPriority;
   estimatedHours?: number;
@@ -69,12 +71,31 @@ export async function showCreateTaskDialog(
   });
   const estimatedHours = hoursStr ? parseFloat(hoursStr) : undefined;
 
+  // Look up parent project from cached projects
+  let linkedParentProjectId: number | undefined;
+  let linkedParentProjectName: string | undefined;
+  const projectId = selectedIssue.project?.id;
+  if (projectId) {
+    try {
+      const projects = await server.getProjects();
+      const project = projects.find((p) => p.id === projectId);
+      if (project?.parent) {
+        linkedParentProjectId = project.parent.id;
+        linkedParentProjectName = project.parent.name;
+      }
+    } catch {
+      // Parent project lookup failed - continue without it
+    }
+  }
+
   return {
     title: title.trim(),
     linkedIssueId: selectedIssue.id,
     linkedIssueSubject: selectedIssue.subject,
     linkedProjectId: selectedIssue.project?.id ?? 0,
     linkedProjectName: selectedIssue.project?.name ?? "Unknown",
+    linkedParentProjectId,
+    linkedParentProjectName,
     priority,
     estimatedHours,
   };

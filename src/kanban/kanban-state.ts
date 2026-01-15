@@ -17,6 +17,8 @@ export interface KanbanTask {
   linkedIssueSubject: string;
   linkedProjectId: number;
   linkedProjectName: string;
+  linkedParentProjectId?: number;
+  linkedParentProjectName?: string;
 
   // Time tracking
   estimatedHours?: number;
@@ -86,6 +88,8 @@ export function createKanbanTask(
     description?: string;
     priority?: TaskPriority;
     estimatedHours?: number;
+    linkedParentProjectId?: number;
+    linkedParentProjectName?: string;
   }
 ): KanbanTask {
   const now = new Date().toISOString();
@@ -98,6 +102,8 @@ export function createKanbanTask(
     linkedIssueSubject,
     linkedProjectId,
     linkedProjectName,
+    linkedParentProjectId: options?.linkedParentProjectId,
+    linkedParentProjectName: options?.linkedParentProjectName,
     estimatedHours: options?.estimatedHours,
     loggedHours: 0,
     createdAt: now,

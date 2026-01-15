@@ -47,6 +47,8 @@ export function registerKanbanCommands(
         {
           priority: result.priority,
           estimatedHours: result.estimatedHours,
+          linkedParentProjectId: result.linkedParentProjectId,
+          linkedParentProjectName: result.linkedParentProjectName,
         }
       );
     })
@@ -258,12 +260,35 @@ export function registerKanbanCommands(
           return;
         }
 
+        const server = getServer();
+
+        // Look up parent project from cached projects
+        let linkedParentProjectId: number | undefined;
+        let linkedParentProjectName: string | undefined;
+        const projectId = issue.project?.id;
+        if (projectId && server) {
+          try {
+            const projects = await server.getProjects();
+            const project = projects.find((p) => p.id === projectId);
+            if (project?.parent) {
+              linkedParentProjectId = project.parent.id;
+              linkedParentProjectName = project.parent.name;
+            }
+          } catch {
+            // Parent project lookup failed - continue without it
+          }
+        }
+
         await controller.addTask(
           issue.subject,
           issue.id,
           issue.subject,
           issue.project?.id ?? 0,
-          issue.project?.name ?? ""
+          issue.project?.name ?? "",
+          {
+            linkedParentProjectId,
+            linkedParentProjectName,
+          }
         );
 
         vscode.window.showInformationMessage(
@@ -357,14 +382,6 @@ export function registerKanbanCommands(
       "redmine.kanban.moveToTodo",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
-
-        const confirm = await vscode.window.showWarningMessage(
-          `Move "${item.task.title}" back to To Do? This will clear logged hours.`,
-          { modal: true },
-          "Move"
-        );
-        if (confirm !== "Move") return;
-
         await controller.moveToTodo(item.task.id);
       }
     )

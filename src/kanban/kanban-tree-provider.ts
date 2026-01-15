@@ -9,12 +9,15 @@ import {
 import { formatHoursAsHHMM } from "../utilities/time-input";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
 
-type TaskTreeItemType = "status-header" | "project-folder" | "task";
+type TaskTreeItemType = "status-header" | "client-folder" | "project-folder" | "task";
 
 export interface TaskTreeItem {
   type: TaskTreeItemType;
   status?: TaskStatus;
   task?: KanbanTask;
+  // For client (parent project) folders
+  clientId?: number;
+  clientName?: string;
   // For project folders
   projectId?: number;
   projectName?: string;
@@ -113,10 +116,23 @@ export class KanbanTreeProvider
       return item;
     }
 
+    if (element.type === "client-folder") {
+      const tasks = this.getTasksForStatusAndClient(element.status!, element.clientId!);
+      const item = new vscode.TreeItem(
+        `${element.clientName} (${tasks.length})`,
+        vscode.TreeItemCollapsibleState.Collapsed
+      );
+      item.id = `kanban-client-${element.status}-${element.clientId}`;
+      item.iconPath = new vscode.ThemeIcon("organization");
+      item.contextValue = `client-folder-${element.status}`;
+      return item;
+    }
+
     if (element.type === "project-folder") {
       const tasks = this.getTasksForStatusAndProject(
         element.status!,
-        element.projectId!
+        element.projectId!,
+        element.clientId
       );
       const item = new vscode.TreeItem(
         `${element.projectName} (${tasks.length})`,
@@ -253,13 +269,19 @@ export class KanbanTreeProvider
         }));
       }
 
-      // To Do and Done boards: group by project
-      return this.getProjectFolders(element.status, tasks);
+      // To Do and Done boards: group by client (parent project), then project
+      return this.getClientFolders(element.status, tasks);
+    }
+
+    // Children of a client folder
+    if (element?.type === "client-folder" && element.status && element.clientId !== undefined) {
+      const tasks = this.getTasksForStatusAndClient(element.status, element.clientId);
+      return this.getProjectFoldersForClient(element.status, element.clientId, tasks);
     }
 
     // Children of a project folder
     if (element?.type === "project-folder" && element.status && element.projectId) {
-      const tasks = this.getTasksForStatusAndProject(element.status, element.projectId);
+      const tasks = this.getTasksForStatusAndProject(element.status, element.projectId, element.clientId);
       return sortTasksByPriority(tasks).map((task) => ({
         type: "task" as const,
         task,
@@ -277,9 +299,52 @@ export class KanbanTreeProvider
     ] as TaskTreeItem[];
   }
 
-  private getProjectFolders(status: TaskStatus, tasks: KanbanTask[]): TaskTreeItem[] {
+  /**
+   * Get client (parent project) folders for a status board.
+   * Tasks without a parent project go under "No Client" (clientId = 0).
+   */
+  private getClientFolders(status: TaskStatus, tasks: KanbanTask[]): TaskTreeItem[] {
+    // Group tasks by client (parent project)
+    const clientMap = new Map<number, { name: string; tasks: KanbanTask[] }>();
+
+    for (const task of tasks) {
+      const clientId = task.linkedParentProjectId ?? 0;
+      const clientName = task.linkedParentProjectName ?? "No Client";
+
+      const existing = clientMap.get(clientId);
+      if (existing) {
+        existing.tasks.push(task);
+      } else {
+        clientMap.set(clientId, { name: clientName, tasks: [task] });
+      }
+    }
+
+    // Convert to folder items, sorted by client name ("No Client" last)
+    return Array.from(clientMap.entries())
+      .sort((a, b) => {
+        if (a[0] === 0) return 1; // "No Client" last
+        if (b[0] === 0) return -1;
+        return a[1].name.localeCompare(b[1].name);
+      })
+      .map(([clientId, { name }]) => ({
+        type: "client-folder" as const,
+        status,
+        clientId,
+        clientName: name,
+      }));
+  }
+
+  /**
+   * Get project folders within a client folder.
+   */
+  private getProjectFoldersForClient(
+    status: TaskStatus,
+    clientId: number,
+    tasks: KanbanTask[]
+  ): TaskTreeItem[] {
     // Group tasks by project
     const projectMap = new Map<number, { name: string; tasks: KanbanTask[] }>();
+
     for (const task of tasks) {
       const existing = projectMap.get(task.linkedProjectId);
       if (existing) {
@@ -298,15 +363,38 @@ export class KanbanTreeProvider
       .map(([projectId, { name }]) => ({
         type: "project-folder" as const,
         status,
+        clientId,
         projectId,
         projectName: name,
       }));
   }
 
-  private getTasksForStatusAndProject(status: TaskStatus, projectId: number): KanbanTask[] {
-    return this.getTasksForStatus(status).filter(
-      (t) => t.linkedProjectId === projectId
-    );
+  /**
+   * Get tasks for a status and client (parent project).
+   */
+  private getTasksForStatusAndClient(status: TaskStatus, clientId: number): KanbanTask[] {
+    return this.getTasksForStatus(status).filter((t) => {
+      const taskClientId = t.linkedParentProjectId ?? 0;
+      return taskClientId === clientId;
+    });
+  }
+
+  /**
+   * Get tasks for a status, project, and optionally client.
+   */
+  private getTasksForStatusAndProject(
+    status: TaskStatus,
+    projectId: number,
+    clientId?: number
+  ): KanbanTask[] {
+    return this.getTasksForStatus(status).filter((t) => {
+      if (t.linkedProjectId !== projectId) return false;
+      if (clientId !== undefined) {
+        const taskClientId = t.linkedParentProjectId ?? 0;
+        return taskClientId === clientId;
+      }
+      return true;
+    });
   }
 
   private getTasksForStatus(status: TaskStatus): KanbanTask[] {
