@@ -113,7 +113,7 @@ describe("KanbanController", () => {
       expect(updated?.completedAt).toBeUndefined();
     });
 
-    it("tracks in-progress status when hours logged", async () => {
+    it("tracks doing status when hours logged", async () => {
       const task = await controller.addTask(
         "Work in progress",
         1234,
@@ -125,7 +125,7 @@ describe("KanbanController", () => {
       await controller.addLoggedHours(task.id, 0.5);
 
       const updated = controller.getTaskById(task.id);
-      expect(getTaskStatus(updated!)).toBe("in-progress");
+      expect(getTaskStatus(updated!)).toBe("doing");
       expect(updated?.loggedHours).toBe(0.5);
 
       // Add more hours

@@ -1,4 +1,9 @@
 /**
+ * Timer phase for embedded timer
+ */
+export type TimerPhase = "pending" | "working" | "paused" | "completed";
+
+/**
  * Kanban task (local subtask under a Redmine issue)
  */
 export interface KanbanTask {
@@ -17,6 +22,13 @@ export interface KanbanTask {
   estimatedHours?: number;
   loggedHours: number; // Accumulated from logging
 
+  // Timer state (embedded from former Today's Plan)
+  timerSecondsLeft?: number;
+  timerPhase?: TimerPhase;
+  activityId?: number;
+  activityName?: string;
+  lastActiveAt?: string; // ISO for session recovery
+
   // Metadata
   createdAt: string; // ISO
   updatedAt: string; // ISO
@@ -26,16 +38,25 @@ export interface KanbanTask {
 export type TaskPriority = "low" | "medium" | "high";
 
 /**
- * Derived status based on loggedHours and completedAt
+ * Derived status: 3-column kanban (todo, doing, done)
  */
-export type TaskStatus = "todo" | "in-progress" | "done";
+export type TaskStatus = "todo" | "doing" | "done";
 
 /**
- * Get derived status for a task
+ * Get derived status for a task:
+ * - done: completedAt is set
+ * - doing: has logged hours OR active/paused timer
+ * - todo: neither
  */
 export function getTaskStatus(task: KanbanTask): TaskStatus {
   if (task.completedAt) return "done";
-  if (task.loggedHours > 0) return "in-progress";
+  if (
+    task.loggedHours > 0 ||
+    task.timerPhase === "working" ||
+    task.timerPhase === "paused"
+  ) {
+    return "doing";
+  }
   return "todo";
 }
 
@@ -83,25 +104,25 @@ export function createKanbanTask(
 }
 
 /**
- * Group tasks by derived status
+ * Group tasks by derived status (3 columns)
  */
 export function groupTasksByStatus(tasks: KanbanTask[]): {
   todo: KanbanTask[];
-  inProgress: KanbanTask[];
+  doing: KanbanTask[];
   done: KanbanTask[];
 } {
   const todo: KanbanTask[] = [];
-  const inProgress: KanbanTask[] = [];
+  const doing: KanbanTask[] = [];
   const done: KanbanTask[] = [];
 
   for (const task of tasks) {
     const status = getTaskStatus(task);
     if (status === "todo") todo.push(task);
-    else if (status === "in-progress") inProgress.push(task);
+    else if (status === "doing") doing.push(task);
     else done.push(task);
   }
 
-  return { todo, inProgress, done };
+  return { todo, doing, done };
 }
 
 /**

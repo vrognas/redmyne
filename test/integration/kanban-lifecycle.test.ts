@@ -46,17 +46,17 @@ describe("Integration: Kanban Task Lifecycle", () => {
     await controller.updateTask(task.id, { title: "Implement secure feature" });
     expect(controller.getTaskById(task.id)?.title).toBe("Implement secure feature");
 
-    // Log hours → in-progress
+    // Log hours → doing
     await controller.addLoggedHours(task.id, 2.5);
-    expect(getTaskStatus(controller.getTaskById(task.id)!)).toBe("in-progress");
+    expect(getTaskStatus(controller.getTaskById(task.id)!)).toBe("doing");
 
     // Mark done
     await controller.markDone(task.id);
     expect(getTaskStatus(controller.getTaskById(task.id)!)).toBe("done");
 
-    // Reopen (stays in-progress due to logged hours)
+    // Reopen (stays in doing due to logged hours)
     await controller.reopen(task.id);
-    expect(getTaskStatus(controller.getTaskById(task.id)!)).toBe("in-progress");
+    expect(getTaskStatus(controller.getTaskById(task.id)!)).toBe("doing");
 
     // Delete
     await controller.deleteTask(task.id);

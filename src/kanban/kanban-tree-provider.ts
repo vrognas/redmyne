@@ -132,9 +132,9 @@ export class KanbanTreeProvider extends BaseTreeProvider<TaskTreeItem> {
     // Add button first
     items.push({ type: "add-button" });
 
-    // In Progress header (if any)
-    if (grouped.inProgress.length > 0) {
-      items.push({ type: "status-header", status: "in-progress" });
+    // Doing header (if any)
+    if (grouped.doing.length > 0) {
+      items.push({ type: "status-header", status: "doing" });
     }
 
     // To Do header (if any)
@@ -157,8 +157,8 @@ export class KanbanTreeProvider extends BaseTreeProvider<TaskTreeItem> {
 
   private getStatusLabel(status: TaskStatus): string {
     switch (status) {
-      case "in-progress":
-        return "In Progress";
+      case "doing":
+        return "Doing";
       case "todo":
         return "To Do";
       case "done":
@@ -168,7 +168,7 @@ export class KanbanTreeProvider extends BaseTreeProvider<TaskTreeItem> {
 
   private getStatusIcon(status: TaskStatus): vscode.ThemeIcon {
     switch (status) {
-      case "in-progress":
+      case "doing":
         return new vscode.ThemeIcon(
           "pulse",
           new vscode.ThemeColor("charts.blue")
