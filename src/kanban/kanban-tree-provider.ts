@@ -123,7 +123,10 @@ export class KanbanTreeProvider
         vscode.TreeItemCollapsibleState.Collapsed
       );
       item.id = `kanban-client-${element.status}-${element.clientId}`;
-      item.iconPath = new vscode.ThemeIcon("organization");
+      item.iconPath = new vscode.ThemeIcon(
+        "folder-opened",
+        new vscode.ThemeColor("list.highlightForeground")
+      );
       item.contextValue = `client-folder-${element.status}`;
       return item;
     }
@@ -139,7 +142,10 @@ export class KanbanTreeProvider
         vscode.TreeItemCollapsibleState.Collapsed
       );
       item.id = `kanban-project-${element.status}-${element.projectId}`;
-      item.iconPath = new vscode.ThemeIcon("folder");
+      item.iconPath = new vscode.ThemeIcon(
+        "folder-opened",
+        new vscode.ThemeColor("list.highlightForeground")
+      );
       item.contextValue = `project-folder-${element.status}`;
       return item;
     }
