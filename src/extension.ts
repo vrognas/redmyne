@@ -295,8 +295,49 @@ export function activate(context: vscode.ExtensionContext): void {
   restoreTimerState();
 
   // Initialize Kanban (before timer commands so we can pass the callback)
-  const kanbanController = new KanbanController(context.globalState);
+  const kanbanController = new KanbanController(context.globalState, {
+    workDurationSeconds: workDuration * 60,
+  });
   cleanupResources.kanbanController = kanbanController;
+
+  // Handle kanban timer completion - show log dialog
+  context.subscriptions.push(
+    kanbanController.onTimerComplete(async (task) => {
+      const server = projectsTree.server;
+      if (!server) return;
+
+      // Show completion dialog to log time
+      const hoursWorked = workDuration / 60; // Convert minutes to hours
+      const action = await vscode.window.showInformationMessage(
+        `Timer complete: ${task.title}`,
+        { modal: true },
+        `Log ${hoursWorked}h`,
+        "Skip"
+      );
+
+      if (action?.startsWith("Log")) {
+        try {
+          await server.addTimeEntry(
+            task.linkedIssueId,
+            task.activityId ?? 0,
+            hoursWorked.toString(),
+            task.title // Comment
+          );
+          await kanbanController.addLoggedHours(task.id, hoursWorked);
+          await kanbanController.stopTimer(task.id);
+          showStatusBarMessage(`$(check) Logged ${hoursWorked}h to #${task.linkedIssueId}`, 2000);
+          myTimeEntriesTree.refresh();
+          // Refresh Gantt if open
+          vscode.commands.executeCommand("redmine.refreshGanttData");
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to log time: ${error}`);
+        }
+      } else {
+        // Just stop the timer without logging
+        await kanbanController.stopTimer(task.id);
+      }
+    })
+  );
 
   // Register timer commands (needs server access and tree view for selection)
   registerTimerCommands(

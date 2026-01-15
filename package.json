@@ -500,6 +500,35 @@
         "icon": "$(copy)"
       },
       {
+        "command": "redmine.kanban.startTimer",
+        "title": "Start Timer",
+        "icon": "$(play)"
+      },
+      {
+        "command": "redmine.kanban.pauseTimer",
+        "title": "Pause Timer",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "redmine.kanban.resumeTimer",
+        "title": "Resume Timer",
+        "icon": "$(play)"
+      },
+      {
+        "command": "redmine.kanban.stopTimer",
+        "title": "Stop Timer",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "redmine.kanban.moveToTodo",
+        "title": "Move to To Do",
+        "icon": "$(arrow-left)"
+      },
+      {
+        "command": "redmine.kanban.toggleTimer",
+        "title": "Toggle Timer"
+      },
+      {
         "command": "redmine.toggleAutoUpdateDoneRatio",
         "title": "Toggle Auto-update % Done",
         "icon": "$(sync)"
@@ -691,7 +720,7 @@
         "when": "!terminalFocus && !inDebugMode && !inQuickOpen"
       },
       {
-        "command": "redmine.timer.toggle",
+        "command": "redmine.kanban.toggleTimer",
         "key": "ctrl+y ctrl+t",
         "mac": "cmd+y cmd+t",
         "when": "!terminalFocus && !inDebugMode && !inQuickOpen"
@@ -1104,6 +1133,26 @@
           "when": "false"
         },
         {
+          "command": "redmine.kanban.startTimer",
+          "when": "false"
+        },
+        {
+          "command": "redmine.kanban.pauseTimer",
+          "when": "false"
+        },
+        {
+          "command": "redmine.kanban.resumeTimer",
+          "when": "false"
+        },
+        {
+          "command": "redmine.kanban.stopTimer",
+          "when": "false"
+        },
+        {
+          "command": "redmine.kanban.moveToTodo",
+          "when": "false"
+        },
+        {
           "command": "redmine.toggleAutoUpdateDoneRatio",
           "when": "false"
         },
@@ -1383,13 +1432,38 @@
           "group": "timer@1"
         },
         {
+          "command": "redmine.kanban.startTimer",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|doing)$/ && viewItem != 'task-doing-working' && viewItem != 'task-doing-paused'",
+          "group": "timer@1"
+        },
+        {
+          "command": "redmine.kanban.pauseTimer",
+          "when": "view == 'redmine-explorer-kanban' && viewItem == 'task-doing-working'",
+          "group": "timer@1"
+        },
+        {
+          "command": "redmine.kanban.resumeTimer",
+          "when": "view == 'redmine-explorer-kanban' && viewItem == 'task-doing-paused'",
+          "group": "timer@1"
+        },
+        {
+          "command": "redmine.kanban.stopTimer",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-doing-(working|paused)$/",
+          "group": "timer@2"
+        },
+        {
+          "command": "redmine.kanban.moveToTodo",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-doing/",
+          "group": "timer@3"
+        },
+        {
           "command": "redmine.kanban.addToPlan",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|in-progress)$/",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|doing)/",
           "group": "kanban@1"
         },
         {
           "command": "redmine.kanban.markDone",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|in-progress)$/",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|doing)/",
           "group": "kanban@2"
         },
         {
@@ -1399,7 +1473,7 @@
         },
         {
           "command": "redmine.kanban.setPriority",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|in-progress)$/",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|doing)/",
           "group": "kanban@3"
         },
         {
