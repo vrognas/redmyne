@@ -9,7 +9,7 @@ import {
 import { formatHoursAsHHMM } from "../utilities/time-input";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
 
-type TaskTreeItemType = "add-button" | "status-header" | "task";
+type TaskTreeItemType = "status-header" | "task";
 
 export interface TaskTreeItem {
   type: TaskTreeItemType;
@@ -95,16 +95,6 @@ export class KanbanTreeProvider
   }
 
   getTreeItem(element: TaskTreeItem): vscode.TreeItem {
-    if (element.type === "add-button") {
-      const item = new vscode.TreeItem("Add task...");
-      item.iconPath = new vscode.ThemeIcon("add");
-      item.command = {
-        command: "redmine.kanban.add",
-        title: "Add Task",
-      };
-      return item;
-    }
-
     if (element.type === "status-header") {
       const tasks = this.getTasksForStatus(element.status!);
       const label = this.getStatusLabel(element.status!);
@@ -244,17 +234,11 @@ export class KanbanTreeProvider
     if (element) return [];
 
     // Root level - always show all 3 columns for drag-drop targets
-    const items: TaskTreeItem[] = [];
-
-    // Add button first
-    items.push({ type: "add-button" });
-
-    // Always show all status headers (needed for drag-drop)
-    items.push({ type: "status-header", status: "doing" });
-    items.push({ type: "status-header", status: "todo" });
-    items.push({ type: "status-header", status: "done" });
-
-    return items;
+    return [
+      { type: "status-header", status: "doing" },
+      { type: "status-header", status: "todo" },
+      { type: "status-header", status: "done" },
+    ] as TaskTreeItem[];
   }
 
   private getTasksForStatus(status: TaskStatus): KanbanTask[] {
