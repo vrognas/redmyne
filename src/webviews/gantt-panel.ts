@@ -31,6 +31,7 @@ import { parseLocalDate, getLocalToday, formatLocalDate } from "../utilities/dat
 import { GanttWebviewMessage, parseLookbackYears } from "./gantt-webview-messages";
 import { escapeAttr, escapeHtml } from "./gantt-html-escape";
 import { CreatableRelationType, GanttIssue, GanttRow, nodeToGanttRow } from "./gantt-model";
+import { deriveAssigneeState, filterIssuesForView } from "./gantt-view-filter";
 
 /** Get today's date as YYYY-MM-DD string */
 const getTodayStr = (): string => formatLocalDate(getLocalToday());
@@ -1672,67 +1673,24 @@ export class GanttPanel {
     // Today for calculations (start of today in local timezone)
     const today = getLocalToday();
 
-    // Extract unique assignees from ALL issues (sorted alphabetically)
-    // Also capture current user's ID and name from issues if not yet set
-    const assigneeSet = new Set<string>();
-    for (const issue of this._issues) {
-      if (issue.assigned_to?.name) {
-        assigneeSet.add(issue.assigned_to.name);
-        // Capture current user's ID and name from issues
-        if (issue.assigned_to.id === this._currentUserId && !this._currentUserName) {
-          this._currentUserName = issue.assigned_to.name;
-        }
-      }
-    }
-    // Sort assignees: current user first, then alphabetical
-    this._uniqueAssignees = [...assigneeSet].sort((a, b) => {
-      if (a === this._currentUserName) return -1;
-      if (b === this._currentUserName) return 1;
-      return a.localeCompare(b);
-    });
+    const assigneeState = deriveAssigneeState(this._issues, this._currentUserId, this._currentUserName);
+    this._uniqueAssignees = assigneeState.uniqueAssignees;
+    this._currentUserName = assigneeState.currentUserName;
 
-    // Apply view focus filtering: either by project OR by person
-    let filteredIssues: typeof this._issues;
-    if (this._viewFocus === "person") {
-      // Person view: filter by assignee (default to current user or first available)
-      const effectiveAssignee = this._selectedAssignee
-        ?? this._currentUserName
-        ?? this._uniqueAssignees[0]
-        ?? null;
-      if (effectiveAssignee && effectiveAssignee !== this._selectedAssignee) {
-        this._selectedAssignee = effectiveAssignee;
-      }
-      filteredIssues = effectiveAssignee
-        ? this._issues.filter(i => i.assigned_to?.name === effectiveAssignee)
-        : this._issues;
-    } else {
-      // Project view: filter by project and all subprojects
-      const effectiveProjectId = this._selectedProjectId ?? this._projects[0]?.id ?? null;
-      if (effectiveProjectId && effectiveProjectId !== this._selectedProjectId) {
-        this._selectedProjectId = effectiveProjectId;
-      }
-      // Build set of project IDs including all descendants (with cycle protection)
-      const projectIdsToInclude = new Set<number>();
-      if (effectiveProjectId !== null) {
-        const addDescendants = (pid: number) => {
-          if (projectIdsToInclude.has(pid)) return; // Cycle protection
-          projectIdsToInclude.add(pid);
-          for (const p of this._projects) {
-            if (p.parent?.id === pid) {
-              addDescendants(p.id);
-            }
-          }
-        };
-        addDescendants(effectiveProjectId);
-      }
-      filteredIssues = projectIdsToInclude.size > 0
-        ? this._issues.filter(i => i.project?.id !== undefined && projectIdsToInclude.has(i.project.id))
-        : this._issues;
-      // Apply "My issues" filter locally (filter by current user ID)
-      if (this._currentFilter.assignee === "me" && this._currentUserId !== null) {
-        filteredIssues = filteredIssues.filter(i => i.assigned_to?.id === this._currentUserId);
-      }
-    }
+    const viewFilter = filterIssuesForView({
+      issues: this._issues,
+      projects: this._projects,
+      viewFocus: this._viewFocus,
+      selectedAssignee: this._selectedAssignee,
+      currentUserName: this._currentUserName,
+      uniqueAssignees: this._uniqueAssignees,
+      selectedProjectId: this._selectedProjectId,
+      currentFilter: this._currentFilter,
+      currentUserId: this._currentUserId,
+    });
+    this._selectedAssignee = viewFilter.selectedAssignee;
+    this._selectedProjectId = viewFilter.selectedProjectId;
+    let filteredIssues = viewFilter.filteredIssues;
 
     // Sort issues before building hierarchy (null = no sorting, keep natural order)
     const sortedIssues = this._sortBy === null ? [...filteredIssues] : [...filteredIssues].sort((a, b) => {
