@@ -273,5 +273,122 @@ export function registerKanbanCommands(
     )
   );
 
+  // --- Timer Commands ---
+
+  // Start Timer
+  disposables.push(
+    vscode.commands.registerCommand(
+      "redmine.kanban.startTimer",
+      async (taskId: string | TaskTreeItem) => {
+        const id = typeof taskId === "string" ? taskId : taskId?.task?.id;
+        if (!id) return;
+
+        const task = controller.getTaskById(id);
+        if (!task) return;
+
+        const status = getTaskStatus(task);
+        if (status === "done") {
+          vscode.window.showInformationMessage("Cannot start timer on done tasks");
+          return;
+        }
+
+        const server = getServer();
+        if (!server) {
+          showActionableError("Redmine not configured", [
+            { title: "Configure", command: "redmine.configure" },
+          ]);
+          return;
+        }
+
+        // Pick activity for the linked issue's project
+        const picked = await pickActivityForProject(
+          server,
+          task.linkedProjectId,
+          "Start Timer",
+          `#${task.linkedIssueId}`
+        );
+        if (!picked) return;
+
+        await controller.startTimer(task.id, picked.activityId, picked.activityName);
+      }
+    )
+  );
+
+  // Pause Timer
+  disposables.push(
+    vscode.commands.registerCommand(
+      "redmine.kanban.pauseTimer",
+      async (taskId: string | TaskTreeItem) => {
+        const id = typeof taskId === "string" ? taskId : taskId?.task?.id;
+        if (!id) return;
+
+        await controller.pauseTimer(id);
+      }
+    )
+  );
+
+  // Resume Timer
+  disposables.push(
+    vscode.commands.registerCommand(
+      "redmine.kanban.resumeTimer",
+      async (taskId: string | TaskTreeItem) => {
+        const id = typeof taskId === "string" ? taskId : taskId?.task?.id;
+        if (!id) return;
+
+        await controller.resumeTimer(id);
+      }
+    )
+  );
+
+  // Stop Timer
+  disposables.push(
+    vscode.commands.registerCommand(
+      "redmine.kanban.stopTimer",
+      async (item: TaskTreeItem) => {
+        if (!item?.task) return;
+        await controller.stopTimer(item.task.id);
+      }
+    )
+  );
+
+  // Move to To Do (clears timer and hours)
+  disposables.push(
+    vscode.commands.registerCommand(
+      "redmine.kanban.moveToTodo",
+      async (item: TaskTreeItem) => {
+        if (!item?.task) return;
+
+        const confirm = await vscode.window.showWarningMessage(
+          `Move "${item.task.title}" back to To Do? This will clear logged hours.`,
+          { modal: true },
+          "Move"
+        );
+        if (confirm !== "Move") return;
+
+        await controller.moveToTodo(item.task.id);
+      }
+    )
+  );
+
+  // Toggle Timer (keyboard shortcut)
+  disposables.push(
+    vscode.commands.registerCommand("redmine.kanban.toggleTimer", async () => {
+      const active = controller.getActiveTask();
+      if (active) {
+        await controller.pauseTimer(active.id);
+        return;
+      }
+
+      // Find first paused task to resume
+      const paused = controller.getTasks().find((t) => t.timerPhase === "paused");
+      if (paused) {
+        await controller.resumeTimer(paused.id);
+        return;
+      }
+
+      vscode.window.showInformationMessage("No active or paused timer to toggle");
+    })
+  );
+
   return disposables;
 }
