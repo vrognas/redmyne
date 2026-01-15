@@ -491,8 +491,8 @@
       },
       {
         "command": "redmine.kanban.refreshParentProjects",
-        "title": "Refresh Parent Projects",
-        "icon": "$(sync)"
+        "title": "Refresh",
+        "icon": "$(refresh)"
       },
       {
         "command": "redmine.kanban.addToPlan",
