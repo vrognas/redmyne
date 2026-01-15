@@ -9,7 +9,7 @@ import {
 import { formatHoursAsHHMM } from "../utilities/time-input";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
 
-type TaskTreeItemType = "status-header" | "client-folder" | "project-folder" | "task";
+type TaskTreeItemType = "status-header" | "client-folder" | "project-folder" | "task" | "break-status";
 
 export interface TaskTreeItem {
   type: TaskTreeItemType;
@@ -21,6 +21,8 @@ export interface TaskTreeItem {
   // For project folders
   projectId?: number;
   projectName?: string;
+  // For break status
+  breakSecondsLeft?: number;
 }
 
 const MIME_TYPE = "application/vnd.code.tree.redmyne-kanban";
@@ -101,6 +103,24 @@ export class KanbanTreeProvider
   }
 
   getTreeItem(element: TaskTreeItem): vscode.TreeItem {
+    if (element.type === "break-status") {
+      const timeStr = this.formatSecondsAsMmSs(element.breakSecondsLeft ?? 0);
+      const item = new vscode.TreeItem(`☕ Break: ${timeStr}`, vscode.TreeItemCollapsibleState.None);
+      item.id = "kanban-break";
+      item.iconPath = new vscode.ThemeIcon("coffee", new vscode.ThemeColor("charts.blue"));
+      item.contextValue = "break-status";
+      item.command = {
+        command: "redmine.kanban.skipBreak",
+        title: "Skip Break",
+      };
+      const md = new vscode.MarkdownString();
+      md.appendMarkdown("**Break time**\n\n");
+      md.appendMarkdown(`${timeStr} remaining\n\n`);
+      md.appendMarkdown("*Click to skip break*");
+      item.tooltip = md;
+      return item;
+    }
+
     if (element.type === "status-header") {
       const tasks = this.getTasksForStatus(element.status!);
       const label = this.getStatusLabel(element.status!);
@@ -298,11 +318,23 @@ export class KanbanTreeProvider
     if (element) return [];
 
     // Root level - always show all 3 columns for drag-drop targets
-    return [
+    const items: TaskTreeItem[] = [];
+
+    // Show break status if on break
+    if (this.controller.isOnBreak()) {
+      items.push({
+        type: "break-status",
+        breakSecondsLeft: this.controller.getBreakSecondsLeft(),
+      });
+    }
+
+    items.push(
       { type: "status-header", status: "done" },
       { type: "status-header", status: "doing" },
       { type: "status-header", status: "todo" },
-    ] as TaskTreeItem[];
+    );
+
+    return items;
   }
 
   /**

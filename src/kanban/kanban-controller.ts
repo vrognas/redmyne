@@ -3,6 +3,8 @@ import {
   KanbanTask,
   TaskPriority,
   createKanbanTask,
+  getTaskStatus,
+  sortTasksByPriority,
 } from "./kanban-state";
 
 const STORAGE_KEY = "redmine.kanban";
@@ -20,6 +22,7 @@ export interface MockGlobalState {
  */
 export interface KanbanControllerOptions {
   workDurationSeconds?: number;
+  breakDurationSeconds?: number;
 }
 
 /**
@@ -28,8 +31,12 @@ export interface KanbanControllerOptions {
 export class KanbanController {
   private tasks: KanbanTask[] = [];
   private intervalId: ReturnType<typeof setInterval> | null = null;
+  private breakIntervalId: ReturnType<typeof setInterval> | null = null;
   private disposed = false;
   private readonly workDurationSeconds: number;
+  private readonly breakDurationSeconds: number;
+  private breakSecondsLeft: number = 0;
+  private deferredMinutes: number = 0;
 
   private readonly _onTasksChange = new vscode.EventEmitter<void>();
   readonly onTasksChange = this._onTasksChange.event;
@@ -37,19 +44,25 @@ export class KanbanController {
   private readonly _onTimerComplete = new vscode.EventEmitter<KanbanTask>();
   readonly onTimerComplete = this._onTimerComplete.event;
 
+  private readonly _onBreakComplete = new vscode.EventEmitter<void>();
+  readonly onBreakComplete = this._onBreakComplete.event;
+
   constructor(
     private readonly globalState: MockGlobalState,
     options?: KanbanControllerOptions
   ) {
     this.workDurationSeconds = options?.workDurationSeconds ?? 45 * 60;
+    this.breakDurationSeconds = options?.breakDurationSeconds ?? 15 * 60;
     this.restore();
   }
 
   dispose(): void {
     this.disposed = true;
     this.stopInterval();
+    this.stopBreakInterval();
     this._onTasksChange.dispose();
     this._onTimerComplete.dispose();
+    this._onBreakComplete.dispose();
   }
 
   // --- Getters ---
@@ -66,6 +79,51 @@ export class KanbanController {
     return this.tasks.filter((t) => t.linkedIssueId === issueId);
   }
 
+  /**
+   * Check if currently on break
+   */
+  isOnBreak(): boolean {
+    return this.breakSecondsLeft > 0;
+  }
+
+  /**
+   * Get break seconds remaining
+   */
+  getBreakSecondsLeft(): number {
+    return this.breakSecondsLeft;
+  }
+
+  /**
+   * Get configured work duration in seconds
+   */
+  getWorkDurationSeconds(): number {
+    return this.workDurationSeconds;
+  }
+
+  /**
+   * Get deferred minutes (accumulated from previous tasks)
+   */
+  getDeferredMinutes(): number {
+    return this.deferredMinutes;
+  }
+
+  /**
+   * Add deferred minutes (called when deferring a task)
+   */
+  addDeferredMinutes(minutes: number): void {
+    this.deferredMinutes += minutes;
+    this._onTasksChange.fire();
+  }
+
+  /**
+   * Consume deferred minutes (called when logging - returns total and resets)
+   */
+  consumeDeferredMinutes(): number {
+    const deferred = this.deferredMinutes;
+    this.deferredMinutes = 0;
+    return deferred;
+  }
+
   // --- CRUD ---
 
   async addTask(
@@ -78,6 +136,8 @@ export class KanbanController {
       description?: string;
       priority?: TaskPriority;
       estimatedHours?: number;
+      linkedParentProjectId?: number;
+      linkedParentProjectName?: string;
     }
   ): Promise<KanbanTask> {
     const task = createKanbanTask(
@@ -186,6 +246,86 @@ export class KanbanController {
 
   async clearDone(): Promise<void> {
     this.tasks = this.tasks.filter((t) => !t.completedAt);
+    await this.persist();
+    this._onTasksChange.fire();
+  }
+
+  // --- Reorder Operations ---
+
+  /**
+   * Move task up in its status column
+   */
+  async moveUp(id: string): Promise<void> {
+    const task = this.tasks.find((t) => t.id === id);
+    if (!task) return;
+
+    const status = getTaskStatus(task);
+    const sameStatusTasks = sortTasksByPriority(
+      this.tasks.filter((t) => getTaskStatus(t) === status)
+    );
+
+    const currentIndex = sameStatusTasks.findIndex((t) => t.id === id);
+    if (currentIndex <= 0) return; // Already at top
+
+    // Ensure both tasks have sortOrder, then swap
+    const prevTask = sameStatusTasks[currentIndex - 1];
+    const currentOrder = task.sortOrder ?? currentIndex;
+    const prevOrder = prevTask.sortOrder ?? currentIndex - 1;
+
+    // Find and update in main array
+    const taskIdx = this.tasks.findIndex((t) => t.id === id);
+    const prevIdx = this.tasks.findIndex((t) => t.id === prevTask.id);
+
+    this.tasks[taskIdx] = {
+      ...this.tasks[taskIdx],
+      sortOrder: prevOrder,
+      updatedAt: new Date().toISOString(),
+    };
+    this.tasks[prevIdx] = {
+      ...this.tasks[prevIdx],
+      sortOrder: currentOrder,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.persist();
+    this._onTasksChange.fire();
+  }
+
+  /**
+   * Move task down in its status column
+   */
+  async moveDown(id: string): Promise<void> {
+    const task = this.tasks.find((t) => t.id === id);
+    if (!task) return;
+
+    const status = getTaskStatus(task);
+    const sameStatusTasks = sortTasksByPriority(
+      this.tasks.filter((t) => getTaskStatus(t) === status)
+    );
+
+    const currentIndex = sameStatusTasks.findIndex((t) => t.id === id);
+    if (currentIndex < 0 || currentIndex >= sameStatusTasks.length - 1) return; // Already at bottom
+
+    // Ensure both tasks have sortOrder, then swap
+    const nextTask = sameStatusTasks[currentIndex + 1];
+    const currentOrder = task.sortOrder ?? currentIndex;
+    const nextOrder = nextTask.sortOrder ?? currentIndex + 1;
+
+    // Find and update in main array
+    const taskIdx = this.tasks.findIndex((t) => t.id === id);
+    const nextIdx = this.tasks.findIndex((t) => t.id === nextTask.id);
+
+    this.tasks[taskIdx] = {
+      ...this.tasks[taskIdx],
+      sortOrder: nextOrder,
+      updatedAt: new Date().toISOString(),
+    };
+    this.tasks[nextIdx] = {
+      ...this.tasks[nextIdx],
+      sortOrder: currentOrder,
+      updatedAt: new Date().toISOString(),
+    };
+
     await this.persist();
     this._onTasksChange.fire();
   }
@@ -392,6 +532,49 @@ export class KanbanController {
         timerSecondsLeft: secondsLeft - 1,
         lastActiveAt: new Date().toISOString(),
       };
+    }
+
+    this._onTasksChange.fire();
+  }
+
+  // --- Break Timer ---
+
+  /**
+   * Start break timer after work session
+   */
+  startBreak(): void {
+    this.breakSecondsLeft = this.breakDurationSeconds;
+    this.stopBreakInterval();
+    this.breakIntervalId = setInterval(() => this.breakTick(), 1000);
+    this._onTasksChange.fire();
+  }
+
+  /**
+   * Skip remaining break time
+   */
+  skipBreak(): void {
+    this.stopBreakInterval();
+    this.breakSecondsLeft = 0;
+    this._onBreakComplete.fire();
+    this._onTasksChange.fire();
+  }
+
+  private stopBreakInterval(): void {
+    if (this.breakIntervalId !== null) {
+      clearInterval(this.breakIntervalId);
+      this.breakIntervalId = null;
+    }
+  }
+
+  private breakTick(): void {
+    if (this.disposed) return;
+
+    if (this.breakSecondsLeft <= 1) {
+      this.breakSecondsLeft = 0;
+      this.stopBreakInterval();
+      this._onBreakComplete.fire();
+    } else {
+      this.breakSecondsLeft--;
     }
 
     this._onTasksChange.fire();

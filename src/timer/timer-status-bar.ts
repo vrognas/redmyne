@@ -120,7 +120,7 @@ export class TimerStatusBar {
   private buildIdleNoPlansTooltip(): vscode.MarkdownString {
     const md = new vscode.MarkdownString();
     md.appendMarkdown("**No plan for today**\n\n");
-    md.appendMarkdown("Click to plan your work units.\n\n");
+    md.appendMarkdown("Click to add tasks to Kanban Doing board.\n\n");
     md.appendMarkdown("---\n\n");
     md.appendMarkdown("*Tip: `Ctrl+Y T` toggles timer*");
     return md;
@@ -155,7 +155,7 @@ export class TimerStatusBar {
     md.appendMarkdown(`${total} units completed\n\n`);
     md.appendMarkdown(`${formatHoursAsHHMM(hoursLogged)} logged today\n\n`);
     md.appendMarkdown("---\n\n");
-    md.appendMarkdown("*Click to plan more work*");
+    md.appendMarkdown("*Click to add more tasks to Kanban*");
     return md;
   }
 

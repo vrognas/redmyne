@@ -3,8 +3,6 @@ import { KanbanController } from "./kanban-controller";
 import { KanbanTask, TaskPriority, getTaskStatus } from "./kanban-state";
 import { showCreateTaskDialog, showEditTaskDialog } from "./kanban-dialogs";
 import { RedmineServer } from "../redmine/redmine-server";
-import { TimerController } from "../timer/timer-controller";
-import { createWorkUnit } from "../timer/timer-state";
 import { pickActivityForProject } from "../utilities/issue-picker";
 import { showActionableError } from "../utilities/error-feedback";
 
@@ -18,9 +16,7 @@ interface TaskTreeItem {
 export function registerKanbanCommands(
   _context: vscode.ExtensionContext,
   controller: KanbanController,
-  getServer: () => RedmineServer | undefined,
-  getTimerController: () => TimerController | undefined,
-  getWorkDurationSeconds: () => number
+  getServer: () => RedmineServer | undefined
 ): vscode.Disposable[] {
   const disposables: vscode.Disposable[] = [];
 
@@ -222,71 +218,6 @@ export function registerKanbanCommands(
     })
   );
 
-  // Add to Today's Plan
-  disposables.push(
-    vscode.commands.registerCommand(
-      "redmine.kanban.addToPlan",
-      async (taskId: string | TaskTreeItem) => {
-        const id = typeof taskId === "string" ? taskId : taskId?.task?.id;
-        if (!id) return;
-
-        const task = controller.getTaskById(id);
-        if (!task) return;
-
-        const status = getTaskStatus(task);
-        if (status === "done") {
-          vscode.window.showInformationMessage("Cannot add done tasks to plan");
-          return;
-        }
-
-        const server = getServer();
-        if (!server) {
-          showActionableError("Redmine not configured", [
-          { title: "Configure", command: "redmine.configure" },
-        ]);
-          return;
-        }
-
-        const timerController = getTimerController();
-        if (!timerController) {
-          vscode.window.showErrorMessage("Timer not available");
-          return;
-        }
-
-        // Pick activity for the linked issue's project
-        const picked = await pickActivityForProject(
-          server,
-          task.linkedProjectId,
-          "Add to Today's Plan",
-          `#${task.linkedIssueId}`
-        );
-        if (!picked) return;
-
-        // Create work unit with task title as comment
-        const workDuration = getWorkDurationSeconds();
-        const unit = createWorkUnit(
-          task.linkedIssueId,
-          task.linkedIssueSubject,
-          picked.activityId,
-          picked.activityName,
-          workDuration,
-          task.title // Task title becomes comment
-        );
-
-        // Link back to personal task for syncing logged hours
-        unit.personalTaskId = task.id;
-
-        // Add to plan
-        const currentPlan = timerController.getPlan();
-        timerController.setPlan([...currentPlan, unit]);
-
-        vscode.window.showInformationMessage(
-          `Added "${task.title}" to Today's Plan`
-        );
-      }
-    )
-  );
-
   // Copy Task Subject
   disposables.push(
     vscode.commands.registerCommand(
@@ -454,6 +385,193 @@ export function registerKanbanCommands(
 
       vscode.window.showInformationMessage("No active or paused timer to toggle");
     })
+  );
+
+  // Skip Break
+  disposables.push(
+    vscode.commands.registerCommand("redmine.kanban.skipBreak", async () => {
+      if (!controller.isOnBreak()) {
+        vscode.window.showInformationMessage("No break in progress");
+        return;
+      }
+      controller.skipBreak();
+    })
+  );
+
+  // Log Early (proportional time)
+  disposables.push(
+    vscode.commands.registerCommand(
+      "redmine.kanban.logEarly",
+      async (item: TaskTreeItem) => {
+        if (!item?.task) return;
+
+        const task = item.task;
+        if (!task.timerPhase || task.timerSecondsLeft === undefined) {
+          vscode.window.showInformationMessage("No active timer to log");
+          return;
+        }
+
+        const server = getServer();
+        if (!server) {
+          showActionableError("Redmine not configured", [
+            { title: "Configure", command: "redmine.configure" },
+          ]);
+          return;
+        }
+
+        // Calculate elapsed time
+        const workDuration = controller.getWorkDurationSeconds();
+        const elapsedSeconds = workDuration - task.timerSecondsLeft;
+        const hours = elapsedSeconds / 3600;
+
+        if (hours < 0.01) {
+          vscode.window.showInformationMessage("Not enough time elapsed to log");
+          return;
+        }
+
+        const roundedHours = Math.round(hours * 100) / 100;
+        const confirm = await vscode.window.showWarningMessage(
+          `Log ${roundedHours}h for #${task.linkedIssueId}?`,
+          { modal: true },
+          "Log"
+        );
+        if (confirm !== "Log") return;
+
+        try {
+          await server.addTimeEntry(
+            task.linkedIssueId,
+            task.activityId ?? 0,
+            roundedHours.toString(),
+            task.title
+          );
+          await controller.addLoggedHours(task.id, roundedHours);
+          await controller.stopTimer(task.id);
+          vscode.window.showInformationMessage(`Logged ${roundedHours}h`);
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to log time: ${error}`);
+        }
+      }
+    )
+  );
+
+  // Defer Time (stop timer, carry time to next task)
+  disposables.push(
+    vscode.commands.registerCommand(
+      "redmine.kanban.deferTime",
+      async (item: TaskTreeItem) => {
+        if (!item?.task) return;
+
+        const task = item.task;
+        if (!task.timerPhase || task.timerSecondsLeft === undefined) {
+          vscode.window.showInformationMessage("No active timer to defer");
+          return;
+        }
+
+        // Calculate elapsed time
+        const workDuration = controller.getWorkDurationSeconds();
+        const elapsedSeconds = workDuration - task.timerSecondsLeft;
+        const elapsedMinutes = Math.round(elapsedSeconds / 60);
+
+        if (elapsedMinutes < 1) {
+          vscode.window.showInformationMessage("Not enough time elapsed to defer");
+          return;
+        }
+
+        const confirm = await vscode.window.showWarningMessage(
+          `Defer ${elapsedMinutes}min to next task?`,
+          { modal: true },
+          "Defer"
+        );
+        if (confirm !== "Defer") return;
+
+        controller.addDeferredMinutes(elapsedMinutes);
+        await controller.stopTimer(task.id);
+        vscode.window.showInformationMessage(`Deferred ${elapsedMinutes}min to next task`);
+      }
+    )
+  );
+
+  // Log and Continue (log full duration, reset timer)
+  disposables.push(
+    vscode.commands.registerCommand(
+      "redmine.kanban.logAndContinue",
+      async (item: TaskTreeItem) => {
+        if (!item?.task) return;
+
+        const task = item.task;
+        if (!task.timerPhase) {
+          vscode.window.showInformationMessage("No active timer");
+          return;
+        }
+
+        const server = getServer();
+        if (!server) {
+          showActionableError("Redmine not configured", [
+            { title: "Configure", command: "redmine.configure" },
+          ]);
+          return;
+        }
+
+        const workDuration = controller.getWorkDurationSeconds();
+        const hours = workDuration / 3600;
+        const roundedHours = Math.round(hours * 100) / 100;
+
+        try {
+          await server.addTimeEntry(
+            task.linkedIssueId,
+            task.activityId ?? 0,
+            roundedHours.toString(),
+            task.title
+          );
+          await controller.addLoggedHours(task.id, roundedHours);
+          // Reset timer to full duration and keep running
+          await controller.startTimer(task.id, task.activityId ?? 0, task.activityName ?? "");
+          vscode.window.showInformationMessage(`Logged ${roundedHours}h, timer restarted`);
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to log time: ${error}`);
+        }
+      }
+    )
+  );
+
+  // Move Up
+  disposables.push(
+    vscode.commands.registerCommand(
+      "redmine.kanban.moveUp",
+      async (item: TaskTreeItem) => {
+        if (!item?.task) return;
+        await controller.moveUp(item.task.id);
+      }
+    )
+  );
+
+  // Move Down
+  disposables.push(
+    vscode.commands.registerCommand(
+      "redmine.kanban.moveDown",
+      async (item: TaskTreeItem) => {
+        if (!item?.task) return;
+        await controller.moveDown(item.task.id);
+      }
+    )
+  );
+
+  // Reveal Time Entry (focus My Time Entries view)
+  disposables.push(
+    vscode.commands.registerCommand(
+      "redmine.kanban.revealTimeEntry",
+      async (item: TaskTreeItem) => {
+        if (!item?.task) return;
+
+        // Focus the time entries view and refresh
+        await vscode.commands.executeCommand("redmine-explorer-my-time-entries.focus");
+        await vscode.commands.executeCommand("redmine.refreshTimeEntries");
+
+        vscode.window.showInformationMessage(
+          `Look for entries on #${item.task.linkedIssueId}`
+        );
+      }
+    )
   );
 
   return disposables;

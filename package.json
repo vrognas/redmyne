@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "3.24.0",
+  "version": "3.25.0",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -495,11 +495,6 @@
         "icon": "$(refresh)"
       },
       {
-        "command": "redmine.kanban.addToPlan",
-        "title": "Add to Today's Plan",
-        "icon": "$(calendar)"
-      },
-      {
         "command": "redmine.kanban.copySubject",
         "title": "Copy Task Subject",
         "icon": "$(copy)"
@@ -532,6 +527,41 @@
       {
         "command": "redmine.kanban.toggleTimer",
         "title": "Toggle Timer"
+      },
+      {
+        "command": "redmine.kanban.skipBreak",
+        "title": "Skip Break",
+        "icon": "$(debug-step-over)"
+      },
+      {
+        "command": "redmine.kanban.logEarly",
+        "title": "Log Early",
+        "icon": "$(history)"
+      },
+      {
+        "command": "redmine.kanban.logAndContinue",
+        "title": "Log & Continue",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "redmine.kanban.deferTime",
+        "title": "Defer Time",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "redmine.kanban.moveUp",
+        "title": "Move Up",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "redmine.kanban.moveDown",
+        "title": "Move Down",
+        "icon": "$(arrow-down)"
+      },
+      {
+        "command": "redmine.kanban.revealTimeEntry",
+        "title": "Reveal Time Entry",
+        "icon": "$(eye)"
       },
       {
         "command": "redmine.toggleAutoUpdateDoneRatio",
@@ -1134,10 +1164,6 @@
           "when": "false"
         },
         {
-          "command": "redmine.kanban.addToPlan",
-          "when": "false"
-        },
-        {
           "command": "redmine.kanban.copySubject",
           "when": "false"
         },
@@ -1159,6 +1185,34 @@
         },
         {
           "command": "redmine.kanban.moveToTodo",
+          "when": "false"
+        },
+        {
+          "command": "redmine.kanban.skipBreak",
+          "when": "false"
+        },
+        {
+          "command": "redmine.kanban.logEarly",
+          "when": "false"
+        },
+        {
+          "command": "redmine.kanban.logAndContinue",
+          "when": "false"
+        },
+        {
+          "command": "redmine.kanban.deferTime",
+          "when": "false"
+        },
+        {
+          "command": "redmine.kanban.moveUp",
+          "when": "false"
+        },
+        {
+          "command": "redmine.kanban.moveDown",
+          "when": "false"
+        },
+        {
+          "command": "redmine.kanban.revealTimeEntry",
           "when": "false"
         },
         {
@@ -1262,24 +1316,9 @@
           "group": "navigation@2"
         },
         {
-          "command": "redmine.kanban.add",
-          "when": "view == 'redmine-explorer-kanban' && redmine:configured",
-          "group": "navigation@1"
-        },
-        {
-          "command": "redmine.kanban.clearDone",
-          "when": "view == 'redmine-explorer-kanban' && redmine:hasKanbanDoneTasks",
-          "group": "navigation@2"
-        },
-        {
           "command": "redmine.kanban.refreshParentProjects",
           "when": "view == 'redmine-explorer-kanban' && redmine:configured",
           "group": "navigation@4"
-        },
-        {
-          "command": "redmine.timer.configureTimer",
-          "when": "view == 'redmine-explorer-kanban'",
-          "group": "navigation@3"
         },
         {
           "command": "redmine.configure",
@@ -1384,7 +1423,7 @@
         },
         {
           "command": "redmine.quickCreateSubIssue",
-          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/ && viewItem !~ /-child/",
+          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/ && viewItem !~ /-child/ && view != 'redmine-explorer-kanban' && view != 'redmine-explorer-my-time-entries'",
           "group": "2_actions@2"
         },
         {
@@ -1558,14 +1597,24 @@
           "group": "timer@2"
         },
         {
-          "command": "redmine.kanban.moveToTodo",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-doing/",
+          "command": "redmine.kanban.logEarly",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-doing-(working|paused)$/",
           "group": "timer@3"
         },
         {
-          "command": "redmine.kanban.addToPlan",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|doing)/",
-          "group": "kanban@1"
+          "command": "redmine.kanban.logAndContinue",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-doing-(working|paused)$/",
+          "group": "timer@4"
+        },
+        {
+          "command": "redmine.kanban.deferTime",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-doing-(working|paused)$/",
+          "group": "timer@5"
+        },
+        {
+          "command": "redmine.kanban.moveToTodo",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-doing/",
+          "group": "timer@6"
         },
         {
           "command": "redmine.kanban.markDone",
@@ -1586,6 +1635,21 @@
           "command": "redmine.kanban.setPriority",
           "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|doing)/",
           "group": "kanban@3"
+        },
+        {
+          "command": "redmine.kanban.moveUp",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-/",
+          "group": "kanban@4"
+        },
+        {
+          "command": "redmine.kanban.moveDown",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-/",
+          "group": "kanban@5"
+        },
+        {
+          "command": "redmine.kanban.revealTimeEntry",
+          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-/",
+          "group": "kanban@6"
         },
         {
           "command": "redmine.kanban.edit",
@@ -1611,6 +1675,21 @@
           "command": "redmine.timer.copySubject",
           "when": "view == 'redmine-explorer-timer' && viewItem =~ /^timer-unit-/",
           "group": "9_clipboard@1"
+        },
+        {
+          "command": "redmine.kanban.clearDone",
+          "when": "view == 'redmine-explorer-kanban' && viewItem == 'status-header-done'",
+          "group": "inline"
+        },
+        {
+          "command": "redmine.kanban.add",
+          "when": "view == 'redmine-explorer-kanban' && viewItem == 'status-header-todo'",
+          "group": "inline"
+        },
+        {
+          "command": "redmine.timer.configureTimer",
+          "when": "view == 'redmine-explorer-kanban' && viewItem == 'status-header-doing'",
+          "group": "inline"
         }
       ],
       "redmine.gantt.doneRatioMenu": [

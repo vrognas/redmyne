@@ -27,7 +27,9 @@ import { TimerStatusBar } from "./timer/timer-status-bar";
 import { TimerTreeProvider } from "./timer/timer-tree-provider";
 import { registerTimerCommands } from "./timer/timer-commands";
 import { toPersistedState, fromPersistedState, PersistedTimerState } from "./timer/timer-state";
+import { playCompletionSound } from "./timer/timer-sound";
 import { KanbanController } from "./kanban/kanban-controller";
+import { KanbanStatusBar } from "./kanban/kanban-status-bar";
 import { KanbanTreeProvider } from "./kanban/kanban-tree-provider";
 import { registerKanbanCommands } from "./kanban/kanban-commands";
 import { getTaskStatus } from "./kanban/kanban-state";
@@ -67,6 +69,7 @@ let cleanupResources: {
   timerStatusBar?: TimerStatusBar;
   timerTreeProvider?: TimerTreeProvider;
   kanbanController?: KanbanController;
+  kanbanStatusBar?: KanbanStatusBar;
   kanbanTreeProvider?: KanbanTreeProvider;
   bucket?: {
     servers: RedmineServer[];
@@ -300,42 +303,81 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   cleanupResources.kanbanController = kanbanController;
 
+  // Kanban status bar (always shown)
+  const kanbanStatusBar = new KanbanStatusBar(kanbanController);
+  cleanupResources.kanbanStatusBar = kanbanStatusBar;
+  context.subscriptions.push({ dispose: () => kanbanStatusBar.dispose() });
+
   // Handle kanban timer completion - show log dialog
   context.subscriptions.push(
     kanbanController.onTimerComplete(async (task) => {
       const server = projectsTree.server;
       if (!server) return;
 
+      // Play sound if enabled
+      const soundEnabled = context.globalState.get<boolean>("redmine.timer.soundEnabled", true);
+      if (soundEnabled) {
+        playCompletionSound();
+      }
+
+      // Calculate hours with deferred time
+      const baseHours = workDuration / 60;
+      const deferredMinutes = kanbanController.getDeferredMinutes();
+      const deferredHours = deferredMinutes / 60;
+      const totalHours = baseHours + deferredHours;
+      const deferredInfo = deferredMinutes > 0 ? ` (+${deferredMinutes}min)` : "";
+
       // Show completion dialog to log time
-      const hoursWorked = workDuration / 60; // Convert minutes to hours
-      const action = await vscode.window.showInformationMessage(
-        `Timer complete: ${task.title}`,
+      const action = await vscode.window.showWarningMessage(
+        `Timer complete: ${task.title}${deferredInfo}`,
         { modal: true },
-        `Log ${hoursWorked}h`,
+        `Log ${totalHours}h`,
+        "Defer",
         "Skip"
       );
 
       if (action?.startsWith("Log")) {
         try {
+          kanbanController.consumeDeferredMinutes(); // Clear deferred time
           await server.addTimeEntry(
             task.linkedIssueId,
             task.activityId ?? 0,
-            hoursWorked.toString(),
+            totalHours.toString(),
             task.title // Comment
           );
-          await kanbanController.addLoggedHours(task.id, hoursWorked);
+          await kanbanController.addLoggedHours(task.id, totalHours);
           await kanbanController.stopTimer(task.id);
-          showStatusBarMessage(`$(check) Logged ${hoursWorked}h to #${task.linkedIssueId}`, 2000);
+          showStatusBarMessage(`$(check) Logged ${totalHours}h to #${task.linkedIssueId}`, 2000);
           myTimeEntriesTree.refresh();
           // Refresh Gantt if open
           vscode.commands.executeCommand("redmine.refreshGanttData");
+          // Start break timer
+          kanbanController.startBreak();
         } catch (error) {
           vscode.window.showErrorMessage(`Failed to log time: ${error}`);
         }
+      } else if (action === "Defer") {
+        // Add work duration to deferred pool
+        kanbanController.addDeferredMinutes(workDuration);
+        await kanbanController.stopTimer(task.id);
+        showStatusBarMessage(`$(clock) Deferred ${workDuration}min to next task`, 2000);
+        // Start break timer
+        kanbanController.startBreak();
       } else {
         // Just stop the timer without logging
         await kanbanController.stopTimer(task.id);
       }
+    })
+  );
+
+  // Handle break completion
+  context.subscriptions.push(
+    kanbanController.onBreakComplete(async () => {
+      const soundEnabled = context.globalState.get<boolean>("redmine.timer.soundEnabled", true);
+      if (soundEnabled) {
+        playCompletionSound();
+      }
+      vscode.window.showInformationMessage("Break over! Ready to start next task.");
     })
   );
 
@@ -349,6 +391,7 @@ export function activate(context: vscode.ExtensionContext): void {
       onTimeLogged: async (kanbanTaskId, hours) => {
         await kanbanController.addLoggedHours(kanbanTaskId, hours);
       },
+      kanbanController,
     }
   );
 
@@ -378,13 +421,7 @@ export function activate(context: vscode.ExtensionContext): void {
     ...registerKanbanCommands(
       context,
       kanbanController,
-      () => projectsTree.server,
-      () => timerController,
-      () => {
-        const unit = context.globalState.get<number>("redmine.timer.unitDuration", 60);
-        const work = context.globalState.get<number>("redmine.timer.workDuration", 45);
-        return Math.max(1, Math.min(work, unit)) * 60;
-      }
+      () => projectsTree.server
     )
   );
 

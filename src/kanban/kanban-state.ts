@@ -36,6 +36,7 @@ export interface KanbanTask {
   updatedAt: string; // ISO
   completedAt?: string; // ISO - set when manually marked done
   doingAt?: string; // ISO - set when moved to Doing via drag-drop
+  sortOrder?: number; // Manual sort order (lower = higher in list)
 }
 
 export type TaskPriority = "low" | "medium" | "high";
@@ -134,7 +135,7 @@ export function groupTasksByStatus(tasks: KanbanTask[]): {
 }
 
 /**
- * Sort tasks by priority (high first), then by creation date (newest first)
+ * Sort tasks by sortOrder (if set), then priority (high first), then creation date (newest first)
  */
 export function sortTasksByPriority(tasks: KanbanTask[]): KanbanTask[] {
   const priorityOrder: Record<TaskPriority, number> = {
@@ -143,6 +144,10 @@ export function sortTasksByPriority(tasks: KanbanTask[]): KanbanTask[] {
     low: 2,
   };
   return [...tasks].sort((a, b) => {
+    // Manual sort order takes precedence (lower = higher in list)
+    const aOrder = a.sortOrder ?? Infinity;
+    const bOrder = b.sortOrder ?? Infinity;
+    if (aOrder !== bOrder) return aOrder - bOrder;
     // Default to medium (1) if priority is invalid
     const aPriority = priorityOrder[a.priority] ?? 1;
     const bPriority = priorityOrder[b.priority] ?? 1;
