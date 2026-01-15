@@ -104,6 +104,7 @@ export class KanbanTreeProvider
           : vscode.TreeItemCollapsibleState.Expanded;
 
       const item = new vscode.TreeItem(`${label} (${tasks.length})`, collapsed);
+      item.id = `kanban-header-${element.status}`; // Stable ID preserves collapse state
       item.iconPath = this.getStatusIcon(element.status!);
       item.contextValue = `status-header-${element.status}`;
       return item;
@@ -119,6 +120,7 @@ export class KanbanTreeProvider
   private createTaskTreeItem(task: KanbanTask): vscode.TreeItem {
     const status = getTaskStatus(task);
     const item = new vscode.TreeItem(task.title);
+    item.id = `kanban-task-${task.id}`; // Stable ID preserves state across refresh
 
     // Icon based on timer phase, then priority/status
     if (task.timerPhase === "working") {
