@@ -107,6 +107,18 @@ export function setupCollapse(ctx) {
   // Row index for O(1) lookups during collapse
   const rowIndex = new Map(); // collapseKey → { originalY, elements: [] }
   const ancestorCache = new Map(); // collapseKey → [parentKey, grandparentKey, ...]
+  const stripeContributionsCache = new Map(); // stripe originalY → parsed contributions object
+
+  // Parse stripe contributions with caching (avoids repeated JSON.parse)
+  function getStripeContributions(stripe) {
+    const originalY = stripe.dataset.originalY;
+    if (stripeContributionsCache.has(originalY)) {
+      return stripeContributionsCache.get(originalY);
+    }
+    const contributions = JSON.parse(stripe.dataset.rowContributions || '{}');
+    stripeContributionsCache.set(originalY, contributions);
+    return contributions;
+  }
 
   function buildRowIndex() {
     rowIndex.clear();
@@ -238,7 +250,7 @@ export function setupCollapse(ctx) {
     const deltaDescendants = currentlyVisibleDescendants;
     const deltaSet = new Set(deltaDescendants);
     document.querySelectorAll('.zebra-stripe').forEach(stripe => {
-      const contributions = JSON.parse(stripe.dataset.rowContributions || '{}');
+      const contributions = getStripeContributions(stripe);
       // Find parent's stripe Y (stripe containing the collapseKey)
       if (collapseKey in contributions && parentStripeY === 0) {
         parentStripeY = parseFloat(stripe.dataset.originalY || '0');
@@ -366,7 +378,7 @@ export function setupCollapse(ctx) {
       const originalY = parseFloat(stripe.dataset.originalY || '0');
       if (stripeActions.has(originalY)) return; // Skip duplicates
 
-      const contributions = JSON.parse(stripe.dataset.rowContributions || '{}');
+      const contributions = getStripeContributions(stripe);
       const contributingKeys = Object.keys(contributions);
 
       // Check what this stripe covers

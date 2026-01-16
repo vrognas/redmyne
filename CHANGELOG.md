@@ -2,6 +2,17 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [3.25.1]
+
+### Changed
+
+- **Gantt performance** - instant toggles (heatmap, capacity, intensity, dependencies) via CSS-only updates
+- **Computation caching** - workload/capacity data cached with revision counters; invalidates on filter changes
+- **Selection optimization** - O(1) bar lookup for single-item selection updates
+- **Collapse caching** - stripe contributions parsed once, cached for reuse
+- **Intensity toggle O(1)** - uses container class instead of iterating all bars
+- **Perf logging config** - `redmine.gantt.perfDebug` setting gates timing logs in both extension and webview
+
 ## [3.25.0]
 
 ### Added

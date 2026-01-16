@@ -33,6 +33,28 @@ import { escapeAttr, escapeHtml } from "./gantt-html-escape";
 import { CreatableRelationType, GanttIssue, GanttRow, nodeToGanttRow } from "./gantt-model";
 import { deriveAssigneeState, filterIssuesForView } from "./gantt-view-filter";
 
+// Performance instrumentation (gated behind redmine.gantt.perfDebug config)
+const perfTimers: Map<string, number> = new Map();
+function isPerfDebugEnabled(): boolean {
+  return vscode.workspace.getConfiguration("redmine.gantt").get<boolean>("perfDebug", false);
+}
+function perfStart(name: string): void {
+  if (isPerfDebugEnabled()) {
+    perfTimers.set(name, performance.now());
+  }
+}
+function perfEnd(name: string, extra?: string): void {
+  if (isPerfDebugEnabled()) {
+    const start = perfTimers.get(name);
+    if (start !== undefined) {
+      const duration = performance.now() - start;
+      // eslint-disable-next-line no-console
+      console.log(`[Gantt Perf] ${name}: ${duration.toFixed(2)}ms${extra ? ` (${extra})` : ""}`);
+      perfTimers.delete(name);
+    }
+  }
+}
+
 /** Get today's date as YYYY-MM-DD string */
 const getTodayStr = (): string => formatLocalDate(getLocalToday());
 
@@ -76,6 +98,7 @@ interface GanttRenderState {
   dueDateColumnWidth: number;
   assigneeColumnWidth: number;
   stickyLeftWidth: number;
+  perfDebug: boolean;
 }
 
 interface GanttRenderPayload {
@@ -369,6 +392,11 @@ export class GanttPanel {
   private _cachedHierarchy?: HierarchyNode[];
   private _collapseState = new CollapseStateManager(); // Gantt-specific collapse state (independent from tree view)
   private _renderKey = 0; // Incremented on each render to force SVG re-creation
+  // Performance cache for expensive computations (invalidated on data/settings change)
+  private _workloadCache?: { key: string; data: Map<string, number> };
+  private _capacityCache?: { key: string; data: PeriodCapacity[] };
+  private _dataRevision = 0; // Incremented on any data mutation to invalidate caches
+  private _disposed = false; // Set on dispose to prevent late webview access
   private _isRefreshing = false; // Show loading overlay during data refresh
   private _baseHtmlSet = false;
   private _webviewReady = false;
@@ -693,6 +721,7 @@ export class GanttPanel {
   }
 
   private _queueRender(payload: GanttRenderPayload): void {
+    if (this._disposed) return; // Skip if panel was disposed
     this._ensureWebviewHtml();
     if (this._webviewReady) {
       this._pendingRender = undefined;
@@ -717,6 +746,7 @@ export class GanttPanel {
     const stickyLeftWidth = labelWidth + resizeHandleWidth + extraColumnsWidth;
     const ganttConfig = vscode.workspace.getConfiguration("redmine.gantt");
     const extendedRelationTypes = ganttConfig.get<boolean>("extendedRelationTypes", false);
+    const perfDebug = ganttConfig.get<boolean>("perfDebug", false);
     const redmineBaseUrl = vscode.workspace.getConfiguration("redmine").get<string>("url") || "";
 
     const baseState: GanttRenderState = {
@@ -748,6 +778,7 @@ export class GanttPanel {
       dueDateColumnWidth,
       assigneeColumnWidth,
       stickyLeftWidth,
+      perfDebug,
     };
 
     return { ...baseState, ...overrides };
@@ -784,8 +815,8 @@ export class GanttPanel {
     this._projects = projects.filter(p => p !== null);
     this._flexibilityCache = flexibilityCache;
 
-    // Invalidate hierarchy cache when data changes
-    this._cachedHierarchy = undefined;
+    // Invalidate caches when data changes
+    this._bumpRevision();
 
     // Fetch closed status IDs if not cached
     if (this._closedStatusIds.size === 0 && this._server) {
@@ -1058,6 +1089,7 @@ export class GanttPanel {
     const issue = this._issueById.get(issueId);
     if (issue) {
       issue.done_ratio = doneRatio;
+      this._bumpRevision();
       this._updateContent();
     }
   }
@@ -1072,7 +1104,7 @@ export class GanttPanel {
 
     // Select the project
     this._selectedProjectId = projectId;
-    this._cachedHierarchy = undefined;
+    this._bumpRevision();
     this._expandAllOnNextRender = true;
     GanttPanel._globalState?.update(SELECTED_PROJECT_KEY, this._selectedProjectId);
 
@@ -1099,6 +1131,7 @@ export class GanttPanel {
         issue_to_id: targetIssueId,
         relation_type: relationType as IssueRelation["relation_type"],
       });
+      this._bumpRevision();
       this._updateContent();
     }
   }
@@ -1112,6 +1145,7 @@ export class GanttPanel {
         const idx = issue.relations.findIndex((r) => r.id === relationId);
         if (idx !== -1) {
           issue.relations.splice(idx, 1);
+          this._bumpRevision();
           this._updateContent();
           return;
         }
@@ -1136,10 +1170,20 @@ export class GanttPanel {
     this._filterChangeCallback = callback;
   }
 
+  /** Bump revision counter and clear caches (call on any data mutation) */
+  private _bumpRevision(): void {
+    this._dataRevision++;
+    this._workloadCache = undefined;
+    this._capacityCache = undefined;
+    this._cachedHierarchy = undefined;
+  }
+
   private _updateContent(): void {
+    perfStart("_updateContent");
     this._renderKey++; // Force SVG re-creation on each render
     this._queueRender(this._getRenderPayload());
     this._isRefreshing = false; // Reset after render
+    perfEnd("_updateContent");
   }
 
   private _handleMessage(message: GanttWebviewMessage): void {
@@ -1196,20 +1240,20 @@ export class GanttPanel {
         break;
       case "setViewFocus":
         this._viewFocus = message.focus === "person" ? "person" : "project";
-        this._cachedHierarchy = undefined;
+        this._bumpRevision();
         GanttPanel._globalState?.update(VIEW_FOCUS_KEY, this._viewFocus);
         this._updateContent();
         break;
       case "setSelectedProject":
         this._selectedProjectId = message.projectId ?? null;
-        this._cachedHierarchy = undefined;
+        this._bumpRevision();
         this._expandAllOnNextRender = true;
         GanttPanel._globalState?.update(SELECTED_PROJECT_KEY, this._selectedProjectId);
         this._updateContent();
         break;
       case "setSelectedAssignee":
         this._selectedAssignee = message.assignee ?? null;
-        this._cachedHierarchy = undefined;
+        this._bumpRevision();
         this._expandAllOnNextRender = true;
         GanttPanel._globalState?.update(SELECTED_ASSIGNEE_KEY, this._selectedAssignee);
         this._updateContent();
@@ -1248,8 +1292,11 @@ export class GanttPanel {
         break;
       case "toggleIntensity":
         this._showIntensity = !this._showIntensity;
-        // Intensity affects bar rendering, so we need to re-render
-        this._updateContent();
+        // CSS-only toggle: send message to webview to flip classes (no re-render)
+        this._panel.webview.postMessage({
+          command: "setIntensityState",
+          enabled: this._showIntensity,
+        });
         break;
       case "refresh":
         // Set refreshing flag so next render shows loading overlay
@@ -1407,8 +1454,8 @@ export class GanttPanel {
           // Persist filter state
           GanttPanel._globalState?.update(FILTER_ASSIGNEE_KEY, newFilter.assignee);
           GanttPanel._globalState?.update(FILTER_STATUS_KEY, newFilter.status);
-          // Apply filter locally and re-render
-          this._cachedHierarchy = undefined;
+          // Apply filter locally and re-render (bump revision to invalidate capacity cache)
+          this._bumpRevision();
           this._updateContent();
           // Notify callback to sync with ProjectsTree (triggers data refresh)
           if (this._filterChangeCallback) {
@@ -1456,6 +1503,7 @@ export class GanttPanel {
         if (dueDate !== null) issue.due_date = dueDate;
       }
       // Re-render to reflect changes (needed for undo/redo)
+      this._bumpRevision();
       this._updateContent();
       showStatusBarMessage(`$(check) #${issueId} dates saved`, 2000);
     } catch (error) {
@@ -1512,6 +1560,7 @@ export class GanttPanel {
           issue.relations = issue.relations.filter((r) => r.id !== relationId);
         }
       }
+      this._bumpRevision();
       this._updateContent();
       showStatusBarMessage("$(check) Relation deleted", 2000);
     } catch (error) {
@@ -1666,6 +1715,7 @@ export class GanttPanel {
   }
 
   public dispose(): void {
+    this._disposed = true; // Prevent late webview access from async ops
     GanttPanel.currentPanel = undefined;
     this._debouncedCollapseUpdate.cancel();
     this._panel.dispose();
@@ -1676,6 +1726,7 @@ export class GanttPanel {
   }
 
   private _getRenderPayload(): GanttRenderPayload {
+    perfStart("_getRenderPayload");
     // Read gantt config settings
     const ganttConfig = vscode.workspace.getConfiguration("redmine.gantt");
     this._extendedRelationTypes = ganttConfig.get<boolean>("extendedRelationTypes", false);
@@ -1842,10 +1893,12 @@ export class GanttPanel {
       : new Set();
     const issueScheduleMap = new Map<number, Map<string, number>>();
     const dayScheduleMap = new Map<string, { issueId: number; hours: number; project: string }[]>();
-    const shouldBuildIssueScheduleMap = this._viewFocus === "person" && this._showIntensity;
+    // Always build issueScheduleMap in person view for instant intensity toggle
+    const shouldBuildIssueScheduleMap = this._viewFocus === "person";
     if (this._viewFocus === "person") {
       // Get today's date for past/future split in capacity calculation
       const todayStr = getTodayStr();
+      perfStart("calculateScheduledCapacity");
       const scheduledDays: ScheduledDailyCapacity[] = calculateScheduledCapacity(
         filteredIssues,
         this._schedule,
@@ -1859,6 +1912,7 @@ export class GanttPanel {
         this._actualTimeEntries,
         todayStr
       );
+      perfEnd("calculateScheduledCapacity");
       // Build both maps from breakdown
       for (const day of scheduledDays) {
         const dayEntries: { issueId: number; hours: number; project: string }[] = [];
@@ -2705,20 +2759,20 @@ export class GanttPanel {
         const handleWidth = 8;
 
         // Calculate daily intensity for this issue (skip for parent issues - work is in subtasks)
-        // Only show intensity in person view (not project view)
-        const showIntensityHere = this._showIntensity && this._viewFocus === "person" && !isParent;
-        const intensities = showIntensityHere
+        // Always compute in person view for instant toggle (CSS controls visibility)
+        const canShowIntensity = this._viewFocus === "person" && !isParent;
+        const intensities = canShowIntensity
           ? (issueScheduleMap.size > 0
               ? getScheduledIntensity(issue, this._schedule, issueScheduleMap)
               : calculateDailyIntensity(issue, this._schedule))
           : [];
-        const hasIntensity = showIntensityHere && intensities.length > 0 && issue.estimated_hours !== null;
+        const hasIntensityData = canShowIntensity && intensities.length > 0 && issue.estimated_hours !== null;
 
-        // Generate intensity segments and line chart
+        // Generate intensity segments and line chart (always if data exists for instant toggle)
         let intensitySegments = "";
         let intensityLine = "";
 
-        if (hasIntensity && intensities.length > 0) {
+        if (hasIntensityData && intensities.length > 0) {
           const dayCount = intensities.length;
           const segmentWidth = width / dayCount;
 
@@ -2848,13 +2902,14 @@ export class GanttPanel {
               </clipPath>
             </defs>
             <g clip-path="url(#bar-clip-${issue.id})">
-              ${hasIntensity ? `
-                <!-- Intensity segments -->
-                <g class="bar-intensity">${intensitySegments}</g>
-                <!-- Intensity line chart -->
-                ${intensityLine}
+              ${hasIntensityData ? `
+                <!-- Intensity segments (visibility controlled via .intensity-enabled on container) -->
+                <g class="bar-intensity">${intensitySegments}${intensityLine}</g>
+                <!-- Solid bar shown when intensity is off (via CSS) -->
+                <rect class="bar-main bar-solid-fallback" x="${startX}" y="${barY}" width="${width}" height="${barContentHeight}"
+                      fill="${color}" opacity="${(0.85 * fillOpacity).toFixed(2)}" filter="url(#barShadow)"/>
               ` : `
-                <!-- Fallback: solid bar when no intensity data -->
+                <!-- Solid bar when no intensity data available -->
                 <rect class="bar-main" x="${startX}" y="${barY}" width="${width}" height="${barContentHeight}"
                       fill="${color}" opacity="${(0.85 * fillOpacity).toFixed(2)}" filter="url(#barShadow)"/>
               `}
@@ -3220,14 +3275,30 @@ export class GanttPanel {
         const color = this._getStatusColor(minimapEffectiveStatus);
         return { startPct, endPct, classes, color };
       });
-    // Always calculate aggregate workload (needed for heatmap toggle without re-render)
-    const workloadMap = calculateAggregateWorkload(this._issues, this._schedule, minDate, maxDate);
+    // Calculate aggregate workload with caching (for heatmap)
+    // Key includes revision counter + filter to invalidate on data/filter changes
+    const filterKey = `${this._currentFilter.assignee}-${this._currentFilter.status}`;
+    const workloadCacheKey = `${this._dataRevision}-${this._viewFocus}-${this._selectedAssignee}-${filterKey}-${minDateStr}-${maxDateStr}-${JSON.stringify(this._schedule)}`;
+    let workloadMap: Map<string, number>;
+    if (this._workloadCache?.key === workloadCacheKey) {
+      workloadMap = this._workloadCache.data;
+    } else {
+      perfStart("calculateAggregateWorkload");
+      workloadMap = calculateAggregateWorkload(this._issues, this._schedule, minDate, maxDate);
+      perfEnd("calculateAggregateWorkload");
+      this._workloadCache = { key: workloadCacheKey, data: workloadMap };
+    }
 
-    // Calculate capacity ribbon data (Person view only), aggregated by zoom level
-    // Use priority-based scheduling (frontloading) instead of uniform distribution
+    // Calculate capacity ribbon data (Person view only) with caching
     const capacityZoomLevel = this._zoomLevel as CapacityZoomLevel;
-    const capacityData: PeriodCapacity[] = this._viewFocus === "person"
-      ? calculateScheduledCapacityByZoom(
+    let capacityData: PeriodCapacity[] = [];
+    if (this._viewFocus === "person") {
+      const capacityCacheKey = `${this._dataRevision}-${this._viewFocus}-${this._selectedAssignee}-${filterKey}-${minDateStr}-${maxDateStr}-${capacityZoomLevel}-${this._currentUserId}-${JSON.stringify(this._schedule)}`;
+      if (this._capacityCache?.key === capacityCacheKey) {
+        capacityData = this._capacityCache.data;
+      } else {
+        perfStart("calculateScheduledCapacityByZoom");
+        capacityData = calculateScheduledCapacityByZoom(
           filteredIssues,
           this._schedule,
           minDateStr,
@@ -3240,8 +3311,11 @@ export class GanttPanel {
           precedenceIssues,
           this._actualTimeEntries,
           getTodayStr()
-        )
-      : [];
+        );
+        perfEnd("calculateScheduledCapacityByZoom");
+        this._capacityCache = { key: capacityCacheKey, data: capacityData };
+      }
+    }
 
     // Build capacity ribbon bars (one rect per period showing load status)
     const ribbonHeight = 20;
@@ -3326,6 +3400,7 @@ export class GanttPanel {
       : "";
 
     // Date markers split into fixed header and scrollable body
+    perfStart("_generateDateMarkers");
     const dateMarkers = this._generateDateMarkers(
       minDate,
       maxDate,
@@ -3335,6 +3410,7 @@ export class GanttPanel {
       workloadMap,
       this._showWorkloadHeatmap
     );
+    perfEnd("_generateDateMarkers");
 
     // Calculate today's position for auto-scroll (reuse today from above)
     const todayX =
@@ -3522,7 +3598,7 @@ export class GanttPanel {
       <span id="selectionCount" class="selection-count hidden"></span>
     </div>
   </div>
-    <div class="gantt-container">
+    <div class="gantt-container${this._showIntensity ? " intensity-enabled" : ""}">
     <!-- Wrapper clips horizontal scrollbar -->
     <div class="gantt-scroll-wrapper">
       <div class="gantt-scroll" id="ganttScroll" data-render-key="${this._renderKey}" data-all-expandable-keys='${JSON.stringify(allExpandableKeys)}'>
@@ -3676,8 +3752,10 @@ export class GanttPanel {
       dueDateColumnWidth,
       assigneeColumnWidth,
       stickyLeftWidth,
+      perfDebug: isPerfDebugEnabled(),
     };
 
+    perfEnd("_getRenderPayload", `issues=${this._issues.length}, rows=${filteredRowCount}, days=${totalDays}`);
     return { html, state: renderState };
   }
 

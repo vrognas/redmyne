@@ -759,6 +759,10 @@
     }
     /* Utility classes for CSP compliance */
     .hidden { display: none; }
+    /* Intensity toggle via root class (O(1) toggle instead of iterating bars) */
+    .bar-intensity { display: none; }
+    .intensity-enabled .bar-intensity { display: block; }
+    .intensity-enabled .bar-solid-fallback { display: none; }
     /* Loading overlay */
     .loading-overlay {
       position: fixed;

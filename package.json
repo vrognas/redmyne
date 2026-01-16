@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "3.25.0",
+  "version": "3.25.1",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -1824,6 +1824,12 @@
           "uniqueItems": true,
           "scope": "application",
           "markdownDescription": "**Relation types to show as dependency arrows**\n\n- `blocks` / `precedes` — Scheduling relations (default)\n- `relates` — General association\n- `duplicates` — Duplicate tracking\n- `copied_to` — Copy history\n\nOnly scheduling types affect project planning."
+        },
+        "redmine.gantt.perfDebug": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "markdownDescription": "**Enable performance logging**\n\nLogs timing data to console for debugging performance issues.\n\n**Note:** For development only."
         },
         "redmine.maxConcurrentRequests": {
           "type": "number",

@@ -519,6 +519,56 @@ fi
 4. **Cache by access pattern**: Rarely-changing data deserves TTL cache
 5. **Pagination with intent**: Fetch what UI needs, not everything
 
+## Gantt Performance Optimization (2026-01-16)
+
+### Toggle Performance
+
+**Problem**: Toggle operations (heatmap, capacity, intensity, dependencies) triggered full re-renders
+
+**Solution**: CSS-only toggles via container class
+- Always render both states (intensity segments + solid bar) in HTML
+- Add toggle class to container (e.g., `.intensity-enabled`) not individual elements
+- Use CSS descendant selectors: `.intensity-enabled .bar-intensity { display: block }`
+- Toggle sends message to webview to flip ONE class on container
+- Result: < 16ms toggle response, O(1) class toggle, no DOM iteration
+
+### Computation Caching
+
+**Problem**: O(days × issues) computations ran on every render even for toggles
+
+**Solution**: Instance-level cache with revision-counter invalidation
+- Use `_dataRevision` counter (incremented on any data mutation)
+- Cache key: `${revision}-${viewFocus}-${assignee}-${minDate}-${maxDate}-${schedule}`
+- Don't use `issues.length` alone (edits don't change length but do change data)
+- Call `_bumpRevision()` at every mutation point: updateIssues, date changes, relations, etc.
+
+### Selection Hot-Path
+
+**Problem**: O(N) iteration over all bars for single-item selection
+
+**Solution**: Diff-based updates
+- Build `barsByIssueId` map on init (O(1) lookup)
+- Track changed IDs, update only those bars
+- `toggleSelection(id)` now O(1) instead of O(N)
+
+### Collapse JSON Parsing
+
+**Problem**: `data-row-contributions` parsed on every collapse operation
+
+**Solution**: Cache parsed results
+- `stripeContributionsCache`: Map<originalY, contributions>
+- Parse once per stripe, reuse across operations
+- No invalidation needed (static data per render)
+
+### Lessons
+
+1. **Always-render for instant toggle**: Pre-render both states, toggle via CSS
+2. **Container class > per-element toggle**: O(1) class on parent vs O(N) iteration
+3. **Revision counters > length-based keys**: Data content changes without length changes
+4. **Diff for incremental updates**: Track what changed, update only that
+5. **Parse once, cache forever**: Static DOM data should be parsed and cached
+6. **Gate perf logging**: Use config flag (default: off) not hardcoded booleans
+
 ## Per-Unit Timer Architecture (2025-12-21)
 
 ### State Consistency in Multi-Unit Timers

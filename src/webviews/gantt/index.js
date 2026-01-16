@@ -5,6 +5,36 @@ import { setupKeyboard } from './gantt-keyboard.js';
 
 const vscode = acquireVsCodeApi();
 
+// Performance instrumentation (controlled by redmine.gantt.perfDebug setting)
+let PERF_DEBUG = false; // Updated from state.perfDebug on render
+function perfMark(name) {
+  if (PERF_DEBUG && typeof performance !== 'undefined') {
+    performance.mark(name);
+  }
+}
+function perfMeasure(name, startMark, endMark) {
+  if (PERF_DEBUG && typeof performance !== 'undefined') {
+    try {
+      performance.measure(name, startMark, endMark);
+      const entries = performance.getEntriesByName(name, 'measure');
+      if (entries.length > 0) {
+        console.log(`[Gantt Perf] ${name}: ${entries[entries.length - 1].duration.toFixed(2)}ms`);
+      }
+      performance.clearMarks(startMark);
+      performance.clearMarks(endMark);
+      performance.clearMeasures(name);
+    } catch (e) { /* ignore */ }
+  }
+}
+function logDomStats() {
+  if (PERF_DEBUG) {
+    const root = document.getElementById('ganttRoot');
+    const nodeCount = root ? root.querySelectorAll('*').length : 0;
+    const svgCount = root ? root.querySelectorAll('svg *').length : 0;
+    console.log(`[Gantt Perf] DOM nodes: ${nodeCount}, SVG elements: ${svgCount}`);
+  }
+}
+
 function applyCssVars(state) {
   if (!state) return;
   const root = document.documentElement;
@@ -20,11 +50,22 @@ function applyCssVars(state) {
 
 function render(payload) {
   if (!payload) return;
+  // Update perf debug flag from config (passed via state)
+  if (payload.state) {
+    PERF_DEBUG = payload.state.perfDebug ?? false;
+  }
+  perfMark('render-start');
   const root = document.getElementById('ganttRoot');
   if (!root) return;
   applyCssVars(payload.state);
+  perfMark('innerHTML-start');
   root.innerHTML = payload.html || '';
+  perfMark('innerHTML-end');
+  perfMeasure('innerHTML', 'innerHTML-start', 'innerHTML-end');
   initializeGantt(payload.state);
+  perfMark('render-end');
+  perfMeasure('render', 'render-start', 'render-end');
+  logDomStats();
 }
 
 window.addEventListener('message', event => {
@@ -46,6 +87,7 @@ if (initialPayload) {
 vscode.postMessage({ command: 'webviewReady' });
 
 function initializeGantt(state) {
+  perfMark('initializeGantt-start');
   if (!state) return;
   const {
     timelineWidth,
@@ -260,6 +302,18 @@ function initializeGantt(state) {
         } else {
           if (capacityRibbon) capacityRibbon.classList.add('hidden');
           if (menuCapacity) menuCapacity.classList.remove('active');
+        }
+      } else if (message.command === 'setIntensityState') {
+        // Toggle intensity visualization via container class (O(1) toggle)
+        const ganttContainer = document.querySelector('.gantt-container');
+        const menuIntensity = document.getElementById('menuIntensity');
+
+        if (message.enabled) {
+          ganttContainer?.classList.add('intensity-enabled');
+          if (menuIntensity) menuIntensity.classList.add('active');
+        } else {
+          ganttContainer?.classList.remove('intensity-enabled');
+          if (menuIntensity) menuIntensity.classList.remove('active');
         }
       } else if (message.command === 'pushUndoAction') {
         // Push relation action to undo stack
@@ -547,18 +601,45 @@ function initializeGantt(state) {
     }
     const getFocusedIssueId = () => focusedIssueId;
 
-    // Multi-select state
+    // Multi-select state with O(1) bar lookup for efficient selection updates
     const selectedIssues = new Set();
     let lastClickedIssueId = null;
     const selectionCountEl = document.getElementById('selectionCount');
     const allIssueBars = Array.from(document.querySelectorAll('.issue-bar'));
+    // Build bar lookup map for O(1) selection updates
+    const barsByIssueId = new Map();
+    allIssueBars.forEach(bar => {
+      const id = bar.dataset.issueId;
+      if (id) {
+        if (!barsByIssueId.has(id)) barsByIssueId.set(id, []);
+        barsByIssueId.get(id).push(bar);
+      }
+    });
 
+    // Update selection for specific changed IDs (O(changed) instead of O(all))
+    function updateSelectionForIds(changedIds) {
+      changedIds.forEach(issueId => {
+        const bars = barsByIssueId.get(issueId);
+        if (bars) {
+          bars.forEach(bar => bar.classList.toggle('selected', selectedIssues.has(issueId)));
+        }
+      });
+      // Update selection count display
+      if (selectedIssues.size > 0) {
+        selectionCountEl.textContent = `${selectedIssues.size} selected`;
+        selectionCountEl.classList.remove('hidden');
+        ganttContainer.classList.add('multi-select-mode');
+      } else {
+        selectionCountEl.classList.add('hidden');
+        ganttContainer.classList.remove('multi-select-mode');
+      }
+    }
+
+    // Full UI update (for bulk operations like selectAll or clearSelection)
     function updateSelectionUI() {
-      // Update visual selection on bars
       allIssueBars.forEach(bar => {
         bar.classList.toggle('selected', selectedIssues.has(bar.dataset.issueId));
       });
-      // Update selection count
       if (selectedIssues.size > 0) {
         selectionCountEl.textContent = `${selectedIssues.size} selected`;
         selectionCountEl.classList.remove('hidden');
@@ -570,9 +651,10 @@ function initializeGantt(state) {
     }
 
     function clearSelection() {
+      const changedIds = [...selectedIssues]; // Copy before clearing
       selectedIssues.clear();
       lastClickedIssueId = null;
-      updateSelectionUI();
+      updateSelectionForIds(changedIds);
     }
 
     function toggleSelection(issueId) {
@@ -582,7 +664,7 @@ function initializeGantt(state) {
         selectedIssues.add(issueId);
       }
       lastClickedIssueId = issueId;
-      updateSelectionUI();
+      updateSelectionForIds([issueId]); // O(1) update for single selection
     }
 
     function selectRange(fromId, toId) {
@@ -591,10 +673,15 @@ function initializeGantt(state) {
       if (fromIndex === -1 || toIndex === -1) return;
       const start = Math.min(fromIndex, toIndex);
       const end = Math.max(fromIndex, toIndex);
+      const changedIds = [];
       for (let i = start; i <= end; i++) {
-        selectedIssues.add(allIssueBars[i].dataset.issueId);
+        const id = allIssueBars[i].dataset.issueId;
+        if (!selectedIssues.has(id)) {
+          selectedIssues.add(id);
+          changedIds.push(id);
+        }
       }
-      updateSelectionUI();
+      updateSelectionForIds(changedIds);
     }
 
     function selectAll() {
@@ -1101,4 +1188,6 @@ function initializeGantt(state) {
     requestAnimationFrame(() => {
       document.getElementById('loadingOverlay')?.classList.remove('visible');
     });
+    perfMark('initializeGantt-end');
+    perfMeasure('initializeGantt', 'initializeGantt-start', 'initializeGantt-end');
 }
