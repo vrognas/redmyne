@@ -26,7 +26,12 @@
       "Bash(sort:*)",
       "Bash(git mv:*)",
       "WebFetch(domain:microsoft.github.io)",
-      "WebFetch(domain:vscode-elements.github.io)"
+      "WebFetch(domain:vscode-elements.github.io)",
+      "mcp__context7-mcp__resolve-library-id",
+      "mcp__context7-mcp__query-docs",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(node esbuild.cjs:*)",
+      "Bash(npm run lint)"
     ],
     "deny": [],
     "ask": []

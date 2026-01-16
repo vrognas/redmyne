@@ -10,7 +10,7 @@ export default [
 
   // Ignore build output, dependencies, and scripts
   {
-    ignores: ["out/", "dist/", "node_modules/", "*.js", "*.cjs", "*.mjs", "scripts/"],
+    ignores: ["out/", "dist/", "node_modules/", "media/", "src/webviews/gantt/", "*.js", "*.cjs", "*.mjs", "scripts/"],
   },
 
   // ESLint recommended rules

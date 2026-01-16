@@ -13,8 +13,6 @@ import {
 import { clearFlexibilityCache, getWeeklySchedule } from "../utilities/flexibility-calculator";
 import {
   getWeekStart,
-  getMonthStart,
-  getLastMonthRange,
   getDateRange,
   getISOWeekNumber,
   getISOWeekYear,
@@ -46,7 +44,6 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   private isLoading = false;
   server?: RedmineServer;
   private issueCache = new Map<number, { id: number; subject: string; projectId?: number; project: string; client?: string }>();
-  private cachedGroups?: TimeEntryNode[];
   private expandedIds = new Set<string>();
   private monthlySchedules: MonthlyScheduleOverrides = {};
   private showAllUsers = false; // false = my entries only, true = all users
@@ -67,8 +64,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration("redmine.workingHours")) {
           clearFlexibilityCache();
-          this.cachedGroups = undefined;
-          this._onDidChangeTreeData.fire(undefined);
+                    this._onDidChangeTreeData.fire(undefined);
         }
       })
     );
@@ -118,8 +114,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     this.server = server;
     // Clear cache when server changes
     this.issueCache.clear();
-    this.cachedGroups = undefined;
-    this.loadedMonthEntries.clear();
+        this.loadedMonthEntries.clear();
     this.loadingMonths.clear();
     this.todayEntries = undefined;
     this.weekEntries = undefined;
@@ -129,8 +124,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   override refresh(): void {
     // Clear all caches
     this.issueCache.clear();
-    this.cachedGroups = undefined;
-    this.loadedMonthEntries.clear();
+        this.loadedMonthEntries.clear();
     this.loadingMonths.clear();
     this.todayEntries = undefined;
     this.weekEntries = undefined;
@@ -681,8 +675,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   setShowAllUsers(showAll: boolean): void {
     if (this.showAllUsers === showAll) return;
     this.showAllUsers = showAll;
-    this.cachedGroups = undefined;
-    this.issueCache.clear();
+        this.issueCache.clear();
     this.refresh();
   }
 

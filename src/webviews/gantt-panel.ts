@@ -1221,7 +1221,7 @@ export class GanttPanel {
         break;
       case "createRelation":
         if (message.issueId && message.targetIssueId && message.relationType && this._server) {
-          this._createRelation(message.issueId, message.targetIssueId, message.relationType);
+          this._createRelation(message.issueId, message.targetIssueId, message.relationType as CreatableRelationType);
         }
         break;
       case "toggleWorkloadHeatmap":
@@ -1702,7 +1702,7 @@ export class GanttPanel {
     });
     this._selectedAssignee = viewFilter.selectedAssignee;
     this._selectedProjectId = viewFilter.selectedProjectId;
-    let filteredIssues = viewFilter.filteredIssues;
+    const filteredIssues = viewFilter.filteredIssues;
 
     // Sort issues before building hierarchy (null = no sorting, keep natural order)
     const sortedIssues = this._sortBy === null ? [...filteredIssues] : [...filteredIssues].sort((a, b) => {

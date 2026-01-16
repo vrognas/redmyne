@@ -585,7 +585,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
   it("lazy-loads month entries and groups by week then day", async () => {
     // Use current month entries for simpler test setup
     const now = new Date();
-    const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const _currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
     const weekday1 = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-08`;
     const weekday2 = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-09`;
 
