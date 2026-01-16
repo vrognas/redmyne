@@ -10,6 +10,8 @@ export interface DependencyNode {
 
 export type DependencyGraph = Map<number, DependencyNode>;
 
+let downstreamCountCache = new WeakMap<DependencyGraph, Map<number, number>>();
+
 /**
  * Blocker info for display
  */
@@ -82,7 +84,7 @@ export function buildDependencyGraph(issues: Issue[]): DependencyGraph {
  * Count all downstream issues (transitive closure)
  * Returns how many issues depend on this one directly or indirectly
  */
-export function countDownstream(issueId: number, graph: DependencyGraph): number {
+function computeDownstreamCount(issueId: number, graph: DependencyGraph): number {
   const node = graph.get(issueId);
   if (!node) return 0;
 
@@ -105,6 +107,29 @@ export function countDownstream(issueId: number, graph: DependencyGraph): number
   }
 
   return visited.size;
+}
+
+export function countDownstream(issueId: number, graph: DependencyGraph): number {
+  let cache = downstreamCountCache.get(graph);
+  if (!cache) {
+    cache = new Map();
+    downstreamCountCache.set(graph, cache);
+  }
+
+  const cached = cache.get(issueId);
+  if (cached !== undefined) return cached;
+
+  const count = computeDownstreamCount(issueId, graph);
+  cache.set(issueId, count);
+  return count;
+}
+
+export function resetDownstreamCountCache(graph?: DependencyGraph): void {
+  if (graph) {
+    downstreamCountCache.delete(graph);
+    return;
+  }
+  downstreamCountCache = new WeakMap();
 }
 
 /**

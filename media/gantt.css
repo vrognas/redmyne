@@ -1,0 +1,882 @@
+:root {
+  --today-color: var(--vscode-charts-red);
+  --gantt-header-height: 40px;
+  --gantt-label-width: 250px;
+  --gantt-id-column-width: 50px;
+  --gantt-start-date-column-width: 58px;
+  --gantt-status-column-width: 50px;
+  --gantt-due-date-column-width: 58px;
+  --gantt-assignee-column-width: 40px;
+  --gantt-sticky-left-width: calc(
+    var(--gantt-label-width)
+    + var(--gantt-id-column-width)
+    + var(--gantt-start-date-column-width)
+    + var(--gantt-status-column-width)
+    + var(--gantt-due-date-column-width)
+    + var(--gantt-assignee-column-width)
+    + 10px
+  );
+}
+
+* { box-sizing: border-box; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.skeleton-label, .skeleton-bar-group {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.delay-0 { animation-delay: 0s; }
+.delay-1 { animation-delay: 0.1s; }
+.delay-2 { animation-delay: 0.2s; }
+.delay-3 { animation-delay: 0.3s; }
+.delay-4 { animation-delay: 0.4s; }
+.delay-5 { animation-delay: 0.5s; }
+.delay-6 { animation-delay: 0.6s; }
+.delay-7 { animation-delay: 0.7s; }
+
+#ganttRoot {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.gantt-empty {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1 1 auto;
+  padding: 24px;
+  border: 1px dashed var(--vscode-panel-border);
+  border-radius: 4px;
+}
+.gantt-empty h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.gantt-empty p {
+  margin: 0;
+  color: var(--vscode-descriptionForeground);
+}
+.loading-text {
+  font-size: 11px;
+  opacity: 0.7;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+    body {
+      margin: 0;
+      padding: 8px;
+      background: var(--vscode-editor-background);
+      color: var(--vscode-foreground);
+      font-family: var(--vscode-font-family);
+      font-size: 13px;
+      overflow: hidden;
+      height: 100vh;
+      box-sizing: border-box;
+      animation: fadeIn 0.15s ease-out;
+      display: flex;
+      flex-direction: column;
+    }
+    .gantt-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      flex-shrink: 0;
+    }
+    .gantt-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--vscode-foreground);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 400px;
+    }
+    .gantt-title .client-name {
+      color: var(--vscode-descriptionForeground);
+    }
+    .gantt-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .gantt-actions button {
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: none;
+      padding: 4px 8px;
+      border-radius: 2px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .gantt-actions button:hover:not(:disabled) {
+      background: var(--vscode-button-secondaryHoverBackground);
+    }
+    .gantt-actions button:focus-visible {
+      outline: 2px solid var(--vscode-focusBorder);
+      outline-offset: -1px;
+    }
+    .gantt-actions button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .gantt-actions button.active {
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+    }
+    /* Toggle buttons (distinct from action buttons) */
+    .gantt-actions button[aria-pressed] {
+      background: transparent;
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+    }
+    .gantt-actions button[aria-pressed]:hover:not(:disabled) {
+      background: var(--vscode-list-hoverBackground);
+      border-color: var(--vscode-focusBorder);
+    }
+    .gantt-actions button[aria-pressed="true"],
+    .gantt-actions button[aria-pressed].active {
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border-color: var(--vscode-button-background);
+    }
+    .toolbar-select {
+      background: var(--vscode-dropdown-background);
+      color: var(--vscode-dropdown-foreground);
+      border: 1px solid var(--vscode-dropdown-border);
+      padding: 3px 6px;
+      font-size: 12px;
+      font-family: var(--vscode-font-family);
+      border-radius: 2px;
+      cursor: pointer;
+      max-width: 180px;
+    }
+    .toolbar-select:hover { border-color: var(--vscode-focusBorder); }
+    .toolbar-select:focus {
+      outline: 1px solid var(--vscode-focusBorder);
+      outline-offset: -1px;
+    }
+    .capacity-ribbon-row {
+      display: flex;
+      position: sticky;
+      top: var(--gantt-header-height);
+      z-index: 2;
+      background: var(--vscode-editor-background);
+      border-bottom: 1px solid var(--vscode-panel-border);
+      width: max-content;
+      min-width: 100%;
+    }
+    .capacity-ribbon-row.hidden { display: none; }
+    .capacity-ribbon-label {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+      padding-right: 8px;
+      font-size: 10px;
+      color: var(--vscode-descriptionForeground);
+      background: var(--vscode-editor-background);
+      white-space: nowrap;
+      box-sizing: border-box;
+    }
+    .capacity-legend {
+      display: flex;
+      gap: 6px;
+    }
+    .capacity-label { font-size: 9px; }
+    .capacity-label.available { color: var(--vscode-charts-green); }
+    .capacity-label.busy { color: var(--vscode-charts-yellow); }
+    .capacity-label.overbooked { color: var(--vscode-charts-red); }
+    .capacity-ribbon-timeline {
+      flex: 1;
+      overflow: hidden;
+    }
+    .capacity-today-marker {
+      stroke: var(--today-color);
+      stroke-width: 2;
+      stroke-dasharray: 4 2;
+    }
+    .capacity-week-marker {
+      stroke: var(--vscode-panel-border);
+      stroke-width: 1;
+      opacity: 0.5;
+    }
+    .capacity-day-bar {
+      cursor: pointer;
+    }
+    .capacity-day-bar:hover {
+      opacity: 1 !important;
+      stroke: var(--vscode-focusBorder);
+      stroke-width: 1;
+    }
+    .overload-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 16px;
+      height: 16px;
+      padding: 0 4px;
+      margin-left: 4px;
+      font-size: 10px;
+      font-weight: bold;
+      border-radius: 4px;
+      background: var(--vscode-charts-red);
+      color: var(--vscode-editor-background);
+      cursor: pointer;
+    }
+    .overload-badge:hover {
+      background: var(--vscode-errorForeground);
+    }
+    .overload-badge.hidden { display: none; }
+    /* Toggle buttons - native toolbar style (higher specificity to override .gantt-actions button) */
+    .gantt-actions .toggle-btn {
+      padding: 4px;
+      border: none;
+      background: transparent;
+      color: var(--vscode-foreground);
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .gantt-actions .toggle-btn:hover { background: var(--vscode-toolbar-hoverBackground); }
+    .gantt-actions .toggle-btn:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+    .gantt-actions .toggle-btn:disabled { opacity: 0.5; cursor: default; }
+    .gantt-actions .toggle-btn.active {
+      background: var(--vscode-toolbar-activeBackground);
+      color: var(--vscode-textLink-foreground);
+    }
+    .gantt-actions .toggle-btn svg { width: 14px; height: 14px; fill: currentColor; }
+    /* Dropdown menus (help, overflow) */
+    .toolbar-dropdown { position: relative; }
+    .toolbar-dropdown-menu {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 100%;
+      z-index: 1000;
+      min-width: 140px;
+      padding-top: 4px;
+    }
+    .toolbar-dropdown-menu-inner {
+      background: var(--vscode-editorWidget-background);
+      border: 1px solid var(--vscode-editorWidget-border);
+      border-radius: 4px;
+      padding: 4px 0;
+      box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+    }
+    .toolbar-dropdown:hover .toolbar-dropdown-menu { display: block; }
+    .toolbar-dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--vscode-foreground);
+      white-space: nowrap;
+    }
+    .toolbar-dropdown-item:hover { background: var(--vscode-list-hoverBackground); }
+    .toolbar-dropdown-item.active { background: var(--vscode-list-activeSelectionBackground); }
+    .toolbar-dropdown-item:disabled, .toolbar-dropdown-item[disabled] {
+      opacity: 0.5;
+      cursor: default;
+    }
+    .toolbar-dropdown-item:disabled:hover, .toolbar-dropdown-item[disabled]:hover {
+      background: transparent;
+    }
+    .toolbar-dropdown-divider {
+      height: 1px;
+      background: var(--vscode-panel-border);
+      margin: 4px 0;
+    }
+    .toolbar-dropdown-item .icon { width: 16px; text-align: center; }
+    .toolbar-dropdown-item .shortcut {
+      margin-left: auto;
+      opacity: 0.6;
+      font-size: 11px;
+    }
+    /* Help tooltip (special styling) */
+    .help-dropdown { position: relative; }
+    .help-tooltip {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 100%;
+      margin-top: 4px;
+      background: var(--vscode-editorHoverWidget-background);
+      color: var(--vscode-editorHoverWidget-foreground);
+      border-radius: 3px;
+      padding: 8px 12px;
+      box-shadow: 0 0 8px 2px var(--vscode-widget-shadow);
+      z-index: 1000;
+      white-space: nowrap;
+    }
+    .help-dropdown:hover .help-tooltip { display: block; }
+    .help-section { display: flex; flex-direction: column; gap: 3px; font-size: 11px; }
+    .help-section + .help-section { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--vscode-panel-border); }
+    .help-title { font-weight: 600; margin-bottom: 2px; color: var(--vscode-foreground); }
+    .help-item { opacity: 0.9; display: flex; align-items: center; gap: 6px; }
+    .help-item kbd {
+      background: var(--vscode-keybindingLabel-background);
+      color: var(--vscode-keybindingLabel-foreground);
+      border: 1px solid var(--vscode-keybindingLabel-border);
+      border-radius: 3px;
+      padding: 1px 4px;
+      font-family: var(--vscode-editor-font-family);
+      font-size: 10px;
+      min-width: 18px;
+      text-align: center;
+    }
+    .gantt-container {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 2px;
+      flex-grow: 1;
+      min-height: 0;
+      position: relative;
+      --sticky-left-width: var(--gantt-sticky-left-width);
+    }
+    /* Single scroll container - push horizontal scrollbar outside visible area */
+    .gantt-scroll-wrapper {
+      flex-grow: 1;
+      overflow: hidden; /* Clips the pushed-out horizontal scrollbar */
+      min-height: 0;
+      position: relative;
+      margin-bottom: 30px; /* Reserve space for minimap */
+    }
+    .gantt-scroll {
+      overflow-x: scroll;
+      overflow-y: scroll;
+      scrollbar-gutter: stable;
+      height: calc(100% + 20px); /* Push horizontal scrollbar outside wrapper */
+    }
+    .gantt-scroll { scrollbar-width: thin; }
+    .gantt-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+    .gantt-scroll::-webkit-scrollbar-thumb { background: var(--vscode-scrollbarSlider-background); border-radius: 4px; }
+    .gantt-scroll::-webkit-scrollbar-corner { background: transparent; }
+    .gantt-header-row {
+      display: flex;
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      height: var(--gantt-header-height);
+      box-sizing: border-box;
+      border-bottom: 1px solid var(--vscode-panel-border);
+      background: var(--vscode-editor-background);
+      width: max-content;
+      min-width: 100%;
+    }
+    .gantt-header-row > * { background: var(--vscode-editor-background); }
+    .gantt-body {
+      display: flex;
+      width: max-content;
+      min-width: 100%;
+      min-height: calc(100vh - 200px); /* Fill available space when collapsed */
+    }
+    .gantt-sticky-left {
+      display: flex;
+      flex-shrink: 0;
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      background: var(--vscode-editor-background);
+    }
+    .gantt-corner {
+      z-index: 4; /* Above both sticky header and sticky left */
+    }
+    .gantt-left-header {
+      flex-shrink: 0;
+      width: var(--gantt-label-width);
+      min-width: 120px;
+      max-width: 600px;
+      display: flex;
+      gap: 4px;
+      padding: 4px 8px;
+      box-sizing: border-box;
+      align-items: center;
+    }
+    .gantt-left-header button { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
+    .gantt-left-header button:hover { background: var(--vscode-button-secondaryHoverBackground); }
+    .gantt-resize-handle-header {
+      width: 10px;
+      background: var(--vscode-panel-border);
+      cursor: col-resize;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .gantt-resize-handle-header::before {
+      content: '';
+      position: absolute;
+      left: -4px;
+      right: -4px;
+      top: 0;
+      bottom: 0;
+    }
+    .gantt-timeline-header { flex-shrink: 0; background: var(--vscode-editor-background); }
+    .gantt-labels svg { display: block; min-width: 100%; }
+    .gantt-labels {
+      flex-shrink: 0;
+      width: var(--gantt-label-width);
+      min-width: 120px;
+      max-width: 600px;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    .gantt-col-id, .gantt-col-start, .gantt-col-status, .gantt-col-due, .gantt-col-assignee {
+      flex-shrink: 0;
+      overflow: hidden;
+      border-right: 1px solid var(--vscode-panel-border);
+      box-sizing: border-box;
+    }
+    .gantt-col-id svg, .gantt-col-start svg, .gantt-col-status svg, .gantt-col-due svg, .gantt-col-assignee svg {
+      display: block;
+      width: 100%;
+    }
+    .gantt-col-id { width: var(--gantt-id-column-width); }
+    .gantt-col-start { width: var(--gantt-start-date-column-width); }
+    .gantt-col-status { width: var(--gantt-status-column-width); }
+    .gantt-col-due { width: var(--gantt-due-date-column-width); }
+    .gantt-col-assignee { width: var(--gantt-assignee-column-width); }
+    .gantt-col-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--vscode-descriptionForeground);
+      padding: 0 4px;
+      box-sizing: border-box;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .gantt-col-header.sortable { cursor: pointer; }
+    .gantt-col-header.sortable:hover { color: var(--vscode-foreground); background: var(--vscode-list-hoverBackground); }
+    .gantt-col-header.sorted { color: var(--vscode-foreground); font-weight: 600; }
+    .gantt-left-header .gantt-col-header,
+    .gantt-col-start .gantt-col-header,
+    .gantt-col-due .gantt-col-header { justify-content: flex-start; }
+    .gantt-col-cell {
+      font-size: 13px;
+      fill: var(--vscode-descriptionForeground);
+    }
+    .assignee-badge circle { cursor: default; }
+    .assignee-badge.current-user circle { stroke: var(--vscode-focusBorder); stroke-width: 2; }
+    .gantt-col-cell.status-closed { fill: var(--vscode-charts-green); }
+    .gantt-col-cell.status-inprogress { fill: var(--vscode-charts-blue); }
+    .gantt-col-cell.status-new { fill: var(--vscode-descriptionForeground); }
+    .gantt-col-cell.due-overdue { fill: var(--vscode-charts-red); font-weight: 600; }
+    .gantt-col-cell.due-soon { fill: var(--vscode-charts-orange); }
+    .gantt-resize-handle {
+      width: 10px;
+      background: var(--vscode-panel-border);
+      cursor: col-resize;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .gantt-resize-handle::before {
+      content: '';
+      position: absolute;
+      left: -4px;
+      right: -4px;
+      top: 0;
+      bottom: 0;
+    }
+    .gantt-resize-handle:hover, .gantt-resize-handle.dragging,
+    .gantt-resize-handle-header:hover, .gantt-resize-handle-header.dragging { background: var(--vscode-focusBorder); }
+    .gantt-timeline { flex-shrink: 0; }
+    svg { display: block; }
+    .issue-bar:hover .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
+    .issue-label:hover { opacity: 1; }
+    .issue-bar.bar-past { filter: saturate(0.4) opacity(0.7); }
+    .issue-bar.bar-past:hover { filter: saturate(0.6) opacity(0.85); }
+    .issue-bar.bar-open-ended .bar-outline { stroke-dasharray: 6, 3; stroke-dashoffset: -6; }
+    .issue-bar.bar-open-ended .bar-main { mask-image: linear-gradient(90deg, black 80%, transparent 100%); -webkit-mask-image: linear-gradient(90deg, black 80%, transparent 100%); }
+    .issue-bar.bar-overdue .bar-outline { stroke: var(--vscode-charts-red) !important; stroke-width: 2; }
+    .issue-bar.bar-overdue:hover .bar-outline { stroke-width: 3; }
+    /* Critical path bars (zero/negative flexibility - pulsing border) */
+    .issue-bar.bar-critical:not(.bar-overdue) .bar-outline { stroke: var(--vscode-charts-orange) !important; stroke-width: 2; animation: critical-pulse 2s ease-in-out infinite; }
+    @keyframes critical-pulse { 0%, 100% { stroke-width: 2; } 50% { stroke-width: 3; } }
+    /* External dependency bars (dimmed, dashed, no drag handles) */
+    .issue-bar.bar-external { opacity: 0.5; pointer-events: none; }
+    .issue-bar.bar-external .bar-outline { stroke-dasharray: 4, 2; stroke: var(--vscode-descriptionForeground); }
+    .issue-bar.bar-external .bar-main { opacity: 0.4; }
+    .issue-bar.bar-external .drag-handle,
+    .issue-bar.bar-external .link-handle { display: none; }
+    /* Ad-hoc budget pool bars (purple dotted outline) */
+    .issue-bar.bar-adhoc .bar-outline { stroke: var(--vscode-charts-purple) !important; stroke-width: 2; stroke-dasharray: 3, 2; }
+    .issue-bar.bar-adhoc .bar-main { opacity: 0.6; }
+    .issue-bar.selected .bar-outline { stroke: var(--vscode-focusBorder) !important; stroke-width: 2; }
+    .issue-bar.selected .bar-main { opacity: 1; }
+    .multi-select-mode .issue-bar { cursor: pointer; }
+    .selection-count { margin-left: 8px; font-size: 11px; color: var(--vscode-descriptionForeground); }
+    .issue-bar.parent-bar { opacity: 0.7; }
+    .issue-bar.parent-bar:hover { opacity: 1; }
+    .past-overlay { pointer-events: none; }
+    .progress-unfilled, .progress-divider { pointer-events: none; }
+    .bar-labels { pointer-events: none; }
+    .bar-labels .blocks-badge-group,
+    .bar-labels .blocker-badge,
+    .bar-labels .flex-badge-group,
+    .bar-labels .progress-badge-group,
+    .bar-labels .status-badge-group,
+    .bar-labels .bar-assignee-group { pointer-events: all; }
+    .status-badge-bg { pointer-events: all; }
+    .status-badge { pointer-events: all; font-weight: 500; }
+    .flex-badge-bg, .flex-badge { pointer-events: all; }
+    .bar-assignee { pointer-events: none; opacity: 0.85; }
+    .bar-assignee.current-user { fill: var(--vscode-charts-blue) !important; font-weight: 600; opacity: 1; }
+    .issue-bar .drag-handle:hover { fill: var(--vscode-focusBorder); opacity: 0.5; }
+    .issue-bar:hover .drag-handle { fill: var(--vscode-list-hoverBackground); opacity: 0.3; }
+    .issue-bar:hover .link-handle-visual { opacity: 0.7; }
+    .issue-bar .link-handle:hover .link-handle-visual { opacity: 1; transform-origin: center; }
+    .issue-bar.dragging .bar-main, .issue-bar.dragging .bar-intensity { opacity: 0.5; }
+    .issue-bar.linking-source .bar-outline { stroke-width: 3; stroke: var(--vscode-focusBorder); }
+    .issue-bar.linking-source .link-handle-visual { opacity: 1; }
+    .issue-bar.link-target .bar-outline { stroke-width: 2; stroke: var(--vscode-charts-green); }
+    @keyframes highlight-pulse { 0%, 100% { filter: drop-shadow(0 0 6px var(--vscode-focusBorder)); } 50% { filter: drop-shadow(0 0 12px var(--vscode-focusBorder)); } }
+    .issue-bar.highlighted .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 3; }
+    .issue-label.highlighted { animation: highlight-pulse 0.5s ease-in-out 4; }
+    .issue-bar.highlighted { animation: highlight-pulse 0.5s ease-in-out 4; }
+    .temp-link-arrow { pointer-events: none; }
+    .dependency-arrow .arrow-line { transition: stroke-width 0.15s, filter 0.15s; }
+    .dependency-arrow .arrow-head { transition: filter 0.15s; }
+    .dependency-arrow:hover .arrow-line { stroke-width: 3 !important; }
+    .dependency-arrow.selected .arrow-line { stroke-width: 4 !important; }
+    .arrow-selection-mode .issue-bar { opacity: 0.3; }
+    .arrow-selection-mode .issue-bar.arrow-connected { opacity: 1; }
+    .arrow-selection-mode .issue-bar.arrow-connected .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
+    .arrow-selection-mode .issue-label,
+    .arrow-selection-mode .project-label,
+    .arrow-selection-mode .time-group-label { opacity: 0.15; }
+    .arrow-selection-mode .issue-label.arrow-connected,
+    .arrow-selection-mode .project-label.arrow-connected,
+    .arrow-selection-mode .time-group-label.arrow-connected { opacity: 1; }
+    .arrow-selection-mode .dependency-arrow { opacity: 0.2; }
+    .arrow-selection-mode .dependency-arrow.selected { opacity: 1; }
+    .arrow-selection-mode .dependency-arrow.selected .arrow-line { stroke-width: 3; }
+    /* Hover highlighting - fade labels only for dependency arrow hovers */
+    .hover-focus.dependency-hover .issue-label,
+    .hover-focus.dependency-hover .project-label,
+    .hover-focus.dependency-hover .time-group-label { opacity: 0.15; transition: opacity 0.15s ease-out; }
+    .hover-focus.dependency-hover .issue-label.hover-highlighted,
+    .hover-focus.dependency-hover .project-label.hover-highlighted,
+    .hover-focus.dependency-hover .time-group-label.hover-highlighted { opacity: 1 !important; }
+    /* Highlight hovered bar */
+    .hover-focus .issue-bar.hover-highlighted .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
+    /* Dependency hover - glow on hovered arrow */
+    .hover-focus.dependency-hover .dependency-arrow.hover-source .arrow-line { stroke-width: 3; }
+    /* Relation type colors in legend */
+    .relation-legend { display: flex; gap: 12px; font-size: 11px; margin-left: 12px; align-items: center; }
+    .relation-legend-item { display: flex; align-items: center; gap: 4px; opacity: 0.8; }
+    .relation-legend-item:hover { opacity: 1; }
+    .relation-legend-line { width: 20px; height: 2px; }
+    .relation-picker { position: fixed; background: var(--vscode-menu-background); border: 1px solid var(--vscode-menu-border); border-radius: 2px; padding: 4px 0; z-index: 1000; box-shadow: 0 2px 8px var(--vscode-widget-shadow); }
+    .relation-picker button { display: block; width: 100%; padding: 4px 12px; border: none; background: transparent; color: var(--vscode-menu-foreground); text-align: left; cursor: pointer; font-size: 13px; }
+    .relation-picker button:hover, .relation-picker button:focus { background: var(--vscode-menu-selectionBackground); color: var(--vscode-menu-selectionForeground); }
+    /* Drag date tooltip */
+    .drag-date-tooltip { position: fixed; pointer-events: none; z-index: 1000; background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-editorWidget-border); border-radius: 3px; box-shadow: 0 2px 4px var(--vscode-widget-shadow); padding: 3px 6px; font-size: 11px; font-family: var(--vscode-font-family); color: var(--vscode-editorWidget-foreground); white-space: nowrap; transform: translateX(-50%); }
+    .drag-date-tooltip::after { content: ''; position: absolute; left: 50%; transform: translateX(-50%); bottom: -5px; border: 5px solid transparent; border-top-color: var(--vscode-editorWidget-border); }
+    .drag-date-tooltip.flipped::after { bottom: auto; top: -5px; border-top-color: transparent; border-bottom-color: var(--vscode-editorWidget-border); }
+    /* Drag confirmation modal */
+    .drag-confirm-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 1001; display: none; align-items: center; justify-content: center; }
+    .drag-confirm-modal { background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-editorWidget-border); border-radius: 6px; box-shadow: 0 4px 16px var(--vscode-widget-shadow); padding: 16px; min-width: 280px; max-width: 400px; }
+    .drag-confirm-modal h3 { margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: var(--vscode-foreground); }
+    .drag-confirm-modal p { margin: 0 0 16px 0; font-size: 13px; color: var(--vscode-descriptionForeground); line-height: 1.4; }
+    .drag-confirm-buttons { display: flex; gap: 8px; justify-content: flex-end; }
+    .drag-confirm-buttons button { padding: 6px 14px; border-radius: 3px; font-size: 13px; cursor: pointer; border: none; }
+    .drag-confirm-buttons .confirm-btn { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+    .drag-confirm-buttons .confirm-btn:hover { background: var(--vscode-button-hoverBackground); }
+    .drag-confirm-buttons .cancel-btn { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+    .drag-confirm-buttons .cancel-btn:hover { background: var(--vscode-button-secondaryHoverBackground); }
+    /* Focus indicators for accessibility */
+    button:focus { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
+    .issue-bar:focus { outline: none; } /* Use stroke instead of outline for SVG */
+    .issue-bar:focus .bar-outline, .issue-bar:focus-within .bar-outline, .issue-bar.focused .bar-outline { stroke-width: 3; stroke: var(--vscode-focusBorder); }
+    /* VS Code native-style row highlighting via hit area rect */
+    .issue-label:hover .row-hit-area,
+    .project-label:hover .row-hit-area,
+    .time-group-label:hover .row-hit-area {
+      fill: var(--vscode-list-hoverBackground);
+    }
+    .issue-label:hover text, .project-label:hover text, .time-group-label:hover text {
+      fill: var(--vscode-list-hoverForeground) !important;
+    }
+    .issue-label:focus, .project-label:focus, .time-group-label:focus {
+      outline: none;
+    }
+    .issue-label:focus .row-hit-area,
+    .project-label:focus .row-hit-area,
+    .time-group-label:focus .row-hit-area {
+      fill: var(--vscode-list-activeSelectionBackground);
+    }
+    .issue-label:focus text, .project-label:focus text, .time-group-label:focus text {
+      fill: var(--vscode-list-activeSelectionForeground) !important;
+    }
+    .issue-label.active .row-hit-area,
+    .project-label.active .row-hit-area,
+    .time-group-label.active .row-hit-area {
+      fill: var(--vscode-list-inactiveSelectionBackground);
+    }
+    .issue-label.active text, .project-label.active text, .time-group-label.active text {
+      fill: var(--vscode-list-inactiveSelectionForeground) !important;
+    }
+    /* Collapse toggle chevron - VS Code style */
+    .collapse-toggle {
+      cursor: pointer;
+      opacity: 0.7;
+    }
+    .collapse-toggle:hover { opacity: 1; }
+    .collapse-toggle.expanded { transform: rotate(90deg); }
+    .chevron-hit-area { cursor: pointer; }
+    /* Client-side collapse: hide descendants of collapsed rows */
+    .gantt-row-hidden,
+    g.gantt-row-hidden,
+    svg .gantt-row-hidden,
+    .issue-label.gantt-row-hidden,
+    .project-label.gantt-row-hidden,
+    .time-group-label.gantt-row-hidden,
+    .issue-bar.gantt-row-hidden,
+    .aggregate-bars.gantt-row-hidden,
+    .indent-guide-line.gantt-row-hidden,
+    .dependency-arrow.gantt-row-hidden {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+    }
+    /* Screen reader only class */
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+    /* Quick search overlay */
+    .quick-search {
+      position: fixed;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+    }
+    .quick-search input {
+      width: 300px;
+      padding: 8px 12px;
+      font-size: 14px;
+      background: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+      border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+      border-radius: 4px;
+      outline: none;
+      box-shadow: 0 4px 12px var(--vscode-widget-shadow);
+    }
+    .quick-search input:focus {
+      border-color: var(--vscode-focusBorder);
+    }
+    .issue-label.search-match {
+      background: var(--vscode-editor-findMatchHighlightBackground);
+      border-radius: 2px;
+    }
+    /* Keyboard help overlay */
+    .keyboard-help {
+      position: fixed;
+      inset: 0;
+      background: var(--vscode-editor-background);
+      opacity: 0.85;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .keyboard-help-content {
+      background: var(--vscode-editor-background);
+      border: 1px solid var(--vscode-panel-border);
+      border-radius: 4px;
+      padding: 20px 24px;
+      max-width: 600px;
+      box-shadow: 0 8px 32px var(--vscode-widget-shadow);
+    }
+    .keyboard-help h3 {
+      margin: 0 0 16px;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--vscode-foreground);
+    }
+    .shortcut-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+    .shortcut-section h4 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--vscode-descriptionForeground);
+    }
+    .shortcut-section > div {
+      font-size: 12px;
+      color: var(--vscode-foreground);
+      margin-bottom: 4px;
+    }
+    .keyboard-help kbd {
+      display: inline-block;
+      padding: 2px 6px;
+      font-size: 11px;
+      font-family: var(--vscode-editor-font-family, monospace);
+      background: var(--vscode-keybindingLabel-background);
+      color: var(--vscode-keybindingLabel-foreground);
+      border: 1px solid var(--vscode-keybindingLabel-border, var(--vscode-panel-border));
+      border-radius: 3px;
+      margin-right: 2px;
+    }
+    .keyboard-help-close {
+      margin: 16px 0 0;
+      font-size: 11px;
+      color: var(--vscode-descriptionForeground);
+      text-align: center;
+    }
+    .weekend-bg { fill: var(--vscode-editor-inactiveSelectionBackground); opacity: 0.3; }
+    .zebra-stripe { fill: var(--vscode-foreground); pointer-events: none; }
+    .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 1; opacity: 0.25; }
+    .date-marker { stroke: var(--vscode-editorRuler-foreground); stroke-dasharray: 2,2; }
+    .today-marker { stroke: var(--today-color); stroke-width: 2; stroke-dasharray: 4 2; }
+    .today-header-bg { fill: var(--today-color); fill-opacity: 0.2; }
+    .today-day-label { fill: var(--today-color) !important; font-weight: bold; }
+    /* Base transitions for dependency focus fade-back */
+    .issue-bar, .issue-label, .project-label, .aggregate-bars { transition: opacity 0.15s ease-out; }
+    /* Respect reduced motion preference */
+    @media (prefers-reduced-motion: reduce) {
+      body { animation: none; }
+      .spinner { animation: none; }
+      .skeleton-bar { animation: none; opacity: 0.5; }
+      .gantt-resize-handle { transition: none; }
+      .dependency-arrow .arrow-line { transition: none; }
+      .dependency-arrow .arrow-head { transition: none; }
+      .issue-bar, .issue-label, .project-label, .aggregate-bars { transition: none; }
+    }
+    /* Utility classes for CSP compliance */
+    .hidden { display: none; }
+    /* Loading overlay */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--vscode-editor-background);
+      opacity: 0.8;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    .loading-overlay.visible { display: flex; }
+    .loading-spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--vscode-foreground);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .cursor-pointer { cursor: pointer; }
+    .cursor-ew-resize { cursor: ew-resize; }
+    .cursor-crosshair { cursor: crosshair; }
+    .cursor-col-resize { cursor: col-resize; }
+    .cursor-move { cursor: move; }
+    .user-select-none { user-select: none; }
+    .opacity-02 { opacity: 0.2; }
+    .w-45 { width: 45%; }
+    .w-60 { width: 60%; }
+    .w-70 { width: 70%; }
+    .w-80 { width: 80%; }
+    .heatmap-color-green { background: var(--vscode-charts-green); }
+    .heatmap-color-yellow { background: var(--vscode-charts-yellow); }
+    .heatmap-color-orange { background: var(--vscode-charts-orange); }
+    .heatmap-color-red { background: var(--vscode-charts-red); }
+    /* Relation legend line colors - 3 semantic categories */
+    .rel-line-blocks { background: var(--vscode-charts-red); }
+    .rel-line-scheduling { background: var(--vscode-charts-blue); }
+    .rel-line-informational { background: var(--vscode-charts-lines); border-style: dashed; }
+    /* SVG arrow colors - 3 semantic groups: blocking (red), scheduling (blue), informational (gray) */
+    /* Blocking - hard constraint, target blocked until source closes */
+    .rel-blocks .arrow-line { stroke: var(--vscode-charts-red); }
+    .rel-blocks .arrow-head { fill: var(--vscode-charts-red); }
+    /* Scheduling - all scheduling relation types use blue */
+    .rel-precedes .arrow-line,
+    .rel-finish_to_start .arrow-line,
+    .rel-start_to_start .arrow-line,
+    .rel-finish_to_finish .arrow-line,
+    .rel-start_to_finish .arrow-line { stroke: var(--vscode-charts-blue); }
+    .rel-precedes .arrow-head,
+    .rel-finish_to_start .arrow-head,
+    .rel-start_to_start .arrow-head,
+    .rel-finish_to_finish .arrow-head,
+    .rel-start_to_finish .arrow-head { fill: var(--vscode-charts-blue); }
+    /* Informational - simple links, no hard constraints */
+    .rel-relates .arrow-line,
+    .rel-duplicates .arrow-line,
+    .rel-copied_to .arrow-line { stroke: var(--vscode-charts-lines); }
+    .rel-relates .arrow-head,
+    .rel-duplicates .arrow-head,
+    .rel-copied_to .arrow-head { fill: var(--vscode-charts-lines); }
+    .color-swatch { display: inline-block; width: 12px; height: 3px; margin-right: 8px; vertical-align: middle; }
+
+    /* Minimap - fixed at bottom of gantt-container, aligned with timeline */
+    .minimap-container {
+      position: absolute;
+      bottom: 0;
+      left: var(--sticky-left-width);
+      right: 8px; /* Leave space for vertical scrollbar */
+      height: 30px;
+      background: var(--vscode-editor-background);
+      border-top: 1px solid var(--vscode-panel-border);
+      z-index: 6;
+    }
+    .minimap-container svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .minimap-bar { opacity: 0.85; }
+    .minimap-bar.bar-past { opacity: 0.4; }
+    .minimap-viewport {
+      fill: var(--vscode-scrollbarSlider-background, rgba(100, 100, 100, 0.4));
+    }
+    .minimap-viewport:hover { fill: var(--vscode-scrollbarSlider-hoverBackground, rgba(100, 100, 100, 0.5)); }
+    .minimap-viewport:active { fill: var(--vscode-scrollbarSlider-activeBackground, rgba(100, 100, 100, 0.6)); }
+    .minimap-today { stroke: var(--today-color); stroke-width: 3; }
+    /* Milestone markers */
+    .milestone-marker {
+      pointer-events: all;
+      cursor: pointer;
+    }
+    .milestone-marker:hover .milestone-line {
+      opacity: 1;
+      stroke-width: 2;
+    }
+    .milestone-marker:hover .milestone-diamond {
+      stroke-width: 3;
+    }
+    .milestone-label {
+      pointer-events: none;
+      font-family: var(--vscode-font-family);
+    }
+    /* Focus mode: highlight dependency chain */
+    .focus-mode .issue-bar { opacity: 0.25; }
+    .focus-mode .issue-label { opacity: 0.25; }
+    .focus-mode .dependency-arrow { opacity: 0.15; }
+    .focus-mode .issue-bar.focus-highlighted { opacity: 1; }
+    .focus-mode .issue-label.focus-highlighted { opacity: 1; }
+    .focus-mode .dependency-arrow.focus-highlighted { opacity: 1; stroke-width: 2.5; }
+    .focus-mode .issue-bar.focus-highlighted .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
+    /* Blocker badge styling */
+    .blocker-badge { pointer-events: all; }
+    .blocker-badge:hover rect { opacity: 0.35 !important; }
+    /* Blocks badge styling */
+    .blocks-badge-group { cursor: pointer; }
+    .blocks-badge-group:hover .blocks-badge-bg { opacity: 0.35 !important; }

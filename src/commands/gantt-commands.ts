@@ -43,7 +43,7 @@ export function registerGanttCommands(
       const scheduleConfig = vscode.workspace.getConfiguration("redmine.workingHours");
       const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
 
-      const panel = GanttPanel.createOrShow(deps.getServer());
+      const panel = GanttPanel.createOrShow(context.extensionUri, deps.getServer());
       panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule, deps.getFilter(), deps.getDependencyIssues(), deps.getServer());
       panel.setFilterChangeCallback((filter) => deps.setFilter(filter));
     }),
@@ -83,7 +83,7 @@ export function registerGanttCommands(
       const scheduleConfig = vscode.workspace.getConfiguration("redmine.workingHours");
       const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
 
-      const panel = GanttPanel.createOrShow(deps.getServer());
+      const panel = GanttPanel.createOrShow(context.extensionUri, deps.getServer());
       panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule, deps.getFilter(), deps.getDependencyIssues(), deps.getServer());
       panel.setFilterChangeCallback((filter) => deps.setFilter(filter));
 

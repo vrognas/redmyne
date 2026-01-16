@@ -11,7 +11,7 @@ import { showStatusBarMessage } from "../utilities/status-bar";
 import { errorToString } from "../utilities/error-feedback";
 import { buildProjectHierarchy, buildResourceHierarchy, flattenHierarchyAll, HierarchyNode } from "../utilities/hierarchy-builder";
 import { ProjectHealth } from "../utilities/project-health";
-import { buildDependencyGraph } from "../utilities/dependency-graph";
+import { buildDependencyGraph, resetDownstreamCountCache } from "../utilities/dependency-graph";
 import {
   calculateScheduledCapacity,
   calculateScheduledCapacityByZoom,
@@ -39,6 +39,49 @@ const getTodayStr = (): string => formatLocalDate(getLocalToday());
 const COLLAPSE_DEBOUNCE_MS = 50;
 
 type ZoomLevel = "day" | "week" | "month" | "quarter" | "year";
+
+interface GanttMinimapBar {
+  startPct: number;
+  endPct: number;
+  classes: string;
+  color: string;
+}
+
+interface GanttRenderState {
+  timelineWidth: number;
+  minDateMs: number;
+  maxDateMs: number;
+  totalDays: number;
+  extendedRelationTypes: boolean;
+  redmineBaseUrl: string;
+  minimapBarsData: GanttMinimapBar[];
+  minimapHeight: number;
+  minimapBarHeight: number;
+  minimapTodayX: number;
+  extScrollLeft: number;
+  extScrollTop: number;
+  labelWidth: number;
+  leftExtrasWidth: number;
+  healthFilter: "all" | "healthy" | "warning" | "critical";
+  sortBy: "id" | "assignee" | "start" | "due" | "status" | null;
+  sortOrder: "asc" | "desc";
+  selectedCollapseKey: string | null;
+  barHeight: number;
+  todayX: number;
+  todayInRange: boolean;
+  headerHeight: number;
+  idColumnWidth: number;
+  startDateColumnWidth: number;
+  statusColumnWidth: number;
+  dueDateColumnWidth: number;
+  assigneeColumnWidth: number;
+  stickyLeftWidth: number;
+}
+
+interface GanttRenderPayload {
+  html: string;
+  state: GanttRenderState;
+}
 
 
 // Pixels per day for each zoom level
@@ -304,6 +347,7 @@ export class GanttPanel {
   }
 
   private readonly _panel: vscode.WebviewPanel;
+  private readonly _extensionUri: vscode.Uri;
   private _disposables: vscode.Disposable[] = [];
   private _issues: Issue[] = [];
   private _dependencyIssues: Issue[] = []; // External scheduling dependencies
@@ -326,7 +370,12 @@ export class GanttPanel {
   private _collapseState = new CollapseStateManager(); // Gantt-specific collapse state (independent from tree view)
   private _renderKey = 0; // Incremented on each render to force SVG re-creation
   private _isRefreshing = false; // Show loading overlay during data refresh
+  private _baseHtmlSet = false;
+  private _webviewReady = false;
+  private _pendingRender?: GanttRenderPayload;
   private _contributionsLoading = false; // Prevent duplicate contribution fetches
+  private _versionsLoading = false; // Prevent duplicate version fetches
+  private _supplementalLoadId = 0; // Monotonic id to ignore stale async loads
   private _currentFilter: IssueFilter = { ...DEFAULT_ISSUE_FILTER };
   private _healthFilter: "all" | "healthy" | "warning" | "critical" = "all";
   private _filterChangeCallback?: (filter: IssueFilter) => void;
@@ -355,8 +404,9 @@ export class GanttPanel {
   private _contributionSources?: Map<number, { fromIssueId: number; hours: number }[]>;
   private _donationTargets?: Map<number, { toIssueId: number; hours: number }[]>;
 
-  private constructor(panel: vscode.WebviewPanel, server?: RedmineServer) {
+  private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, server?: RedmineServer) {
     this._panel = panel;
+    this._extensionUri = extensionUri;
     this._server = server;
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
     this._panel.webview.onDidReceiveMessage(
@@ -384,7 +434,7 @@ export class GanttPanel {
     this._debouncedCollapseUpdate = debounce(COLLAPSE_DEBOUNCE_MS, () => this._updateContent());
   }
 
-  public static createOrShow(server?: RedmineServer): GanttPanel {
+  public static createOrShow(extensionUri: vscode.Uri, server?: RedmineServer): GanttPanel {
     const column = vscode.ViewColumn.One;
 
     if (GanttPanel.currentPanel) {
@@ -403,10 +453,11 @@ export class GanttPanel {
       {
         enableScripts: true,
         retainContextWhenHidden: true,
+        localResourceRoots: [vscode.Uri.joinPath(extensionUri, "media")],
       }
     );
 
-    GanttPanel.currentPanel = new GanttPanel(panel, server);
+    GanttPanel.currentPanel = new GanttPanel(panel, extensionUri, server);
     // Show loading skeleton immediately
     GanttPanel.currentPanel._showLoadingSkeleton();
     return GanttPanel.currentPanel;
@@ -415,14 +466,13 @@ export class GanttPanel {
   /**
    * Restore panel from serialized state (after window reload)
    */
-  public static restore(panel: vscode.WebviewPanel, server?: RedmineServer): GanttPanel {
-    GanttPanel.currentPanel = new GanttPanel(panel, server);
+  public static restore(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, server?: RedmineServer): GanttPanel {
+    GanttPanel.currentPanel = new GanttPanel(panel, extensionUri, server);
     GanttPanel.currentPanel._showLoadingSkeleton();
     return GanttPanel.currentPanel;
   }
 
   private _showLoadingSkeleton(): void {
-    const nonce = getNonce();
     const labelWidth = 250;
     const headerHeight = 40;
     const barHeight = 22; // VS Code native tree row height
@@ -433,6 +483,9 @@ export class GanttPanel {
     const statusColumnWidth = 50; // Colored dot + header text
     const dueDateColumnWidth = 58;
     const assigneeColumnWidth = 40;
+    const resizeHandleWidth = 10;
+    const extraColumnsWidth = idColumnWidth + startDateColumnWidth + statusColumnWidth + dueDateColumnWidth + assigneeColumnWidth;
+    const stickyLeftWidth = labelWidth + resizeHandleWidth + extraColumnsWidth;
 
     // Generate skeleton rows
     const skeletonRows = Array.from({ length: rowCount }, (_, i) => {
@@ -500,186 +553,7 @@ export class GanttPanel {
 
     const bodyHeight = rowCount * (barHeight + barGap);
 
-    this._panel.webview.html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}';">
-  <title>Redmine Gantt</title>
-  <style nonce="${nonce}">
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      padding: 8px;
-      background: var(--vscode-editor-background);
-      color: var(--vscode-foreground);
-      font-family: var(--vscode-font-family);
-      font-size: 13px;
-      overflow: hidden;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-    .gantt-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-      flex-shrink: 0;
-    }
-    .gantt-title {
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--vscode-foreground);
-    }
-    .gantt-actions {
-      display: flex;
-      gap: 4px;
-      align-items: center;
-    }
-    .toolbar-separator {
-      width: 1px;
-      height: 20px;
-      background: var(--vscode-panel-border);
-      margin: 0 8px;
-      flex-shrink: 0;
-    }
-    .toggle-btn {
-      padding: 4px;
-      border: none;
-      background: transparent;
-      color: var(--vscode-foreground);
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 13px;
-    }
-    .toggle-btn:disabled { opacity: 0.5; cursor: default; }
-    .toolbar-select {
-      padding: 2px 6px;
-      border: 1px solid var(--vscode-dropdown-border);
-      background: var(--vscode-dropdown-background);
-      color: var(--vscode-dropdown-foreground);
-      border-radius: 2px;
-      font-size: 13px;
-    }
-    .toolbar-select:disabled { opacity: 0.5; }
-    .gantt-container {
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      border: 1px solid var(--vscode-panel-border);
-      border-radius: 2px;
-      flex-grow: 1;
-      min-height: 0;
-    }
-    .gantt-header-row {
-      display: flex;
-      flex-shrink: 0;
-      height: ${headerHeight}px;
-      border-bottom: 1px solid var(--vscode-panel-border);
-      background: var(--vscode-editor-background);
-    }
-    .gantt-left-header {
-      flex-shrink: 0;
-      width: ${labelWidth}px;
-      display: flex;
-      align-items: center;
-      padding: 4px 8px;
-      gap: 4px;
-      box-sizing: border-box;
-    }
-    .gantt-resize-handle-header {
-      width: 10px;
-      background: var(--vscode-panel-border);
-      flex-shrink: 0;
-    }
-    .gantt-col-id, .gantt-col-start, .gantt-col-status, .gantt-col-due, .gantt-col-assignee {
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-right: 1px solid var(--vscode-panel-border);
-      box-sizing: border-box;
-      overflow: hidden;
-    }
-    .gantt-col-id { width: ${idColumnWidth}px; }
-    .gantt-col-start { width: ${startDateColumnWidth}px; }
-    .gantt-col-status { width: ${statusColumnWidth}px; }
-    .gantt-col-due { width: ${dueDateColumnWidth}px; }
-    .gantt-col-assignee { width: ${assigneeColumnWidth}px; }
-    .gantt-col-header {
-      font-size: 12px;
-      color: var(--vscode-descriptionForeground);
-    }
-    .gantt-left-header .gantt-col-header,
-    .gantt-col-start .gantt-col-header,
-    .gantt-col-due .gantt-col-header { justify-content: flex-start; padding-left: 4px; }
-    .gantt-timeline-header {
-      flex-grow: 1;
-      display: flex;
-      align-items: center;
-    }
-    .loading-text {
-      font-size: 11px;
-      opacity: 0.7;
-      animation: pulse 1.5s ease-in-out infinite;
-    }
-    .gantt-body-scroll {
-      display: flex;
-      flex-grow: 1;
-      overflow: hidden;
-    }
-    .gantt-body-scroll .gantt-col-id,
-    .gantt-body-scroll .gantt-col-start,
-    .gantt-body-scroll .gantt-col-status,
-    .gantt-body-scroll .gantt-col-due,
-    .gantt-body-scroll .gantt-col-assignee {
-      align-items: flex-start;
-    }
-    .gantt-checkboxes {
-      display: none; /* Removed: now viewing one project/person at a time */
-    }
-    .gantt-labels {
-      flex-shrink: 0;
-      width: ${labelWidth}px;
-      background: var(--vscode-editor-background);
-      box-sizing: border-box;
-      overflow: hidden;
-    }
-    .gantt-resize-handle {
-      width: 10px;
-      background: var(--vscode-panel-border);
-      flex-shrink: 0;
-    }
-    .gantt-timeline {
-      flex-grow: 1;
-      overflow: hidden;
-    }
-    svg { display: block; }
-    @keyframes pulse {
-      0%, 100% { opacity: 0.3; }
-      50% { opacity: 0.7; }
-    }
-    .skeleton-label, .skeleton-bar-group {
-      animation: pulse 1.5s ease-in-out infinite;
-    }
-    .delay-0 { animation-delay: 0s; }
-    .delay-1 { animation-delay: 0.1s; }
-    .delay-2 { animation-delay: 0.2s; }
-    .delay-3 { animation-delay: 0.3s; }
-    .delay-4 { animation-delay: 0.4s; }
-    .delay-5 { animation-delay: 0.5s; }
-    .delay-6 { animation-delay: 0.6s; }
-    .delay-7 { animation-delay: 0.7s; }
-    .minimap-container {
-      height: 44px;
-      flex-shrink: 0;
-      background: var(--vscode-minimap-background, var(--vscode-editor-background));
-      border-top: 1px solid var(--vscode-panel-border);
-    }
-  </style>
-</head>
-<body>
+    const html = `
   <div class="gantt-header">
     <div class="gantt-title"></div>
     <div class="gantt-actions" role="toolbar" aria-label="Gantt chart controls">
@@ -762,8 +636,121 @@ export class GanttPanel {
     </div>
   </div>
   <div class="minimap-container"></div>
+`;
+
+    const state = this._getFallbackState({
+      labelWidth,
+      headerHeight,
+      barHeight,
+      idColumnWidth,
+      startDateColumnWidth,
+      statusColumnWidth,
+      dueDateColumnWidth,
+      assigneeColumnWidth,
+      leftExtrasWidth: resizeHandleWidth + extraColumnsWidth,
+      stickyLeftWidth,
+    });
+
+    this._queueRender({ html, state });
+  }
+
+  private _getBaseHtml(): string {
+    const nonce = getNonce();
+    const webview = this._panel.webview;
+    const cssUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "media", "gantt.css"));
+    const jsUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "media", "gantt.js"));
+    const csp = [
+      "default-src 'none'",
+      `img-src ${webview.cspSource} data:`,
+      `style-src ${webview.cspSource} 'unsafe-inline'`,
+      `script-src ${webview.cspSource} 'nonce-${nonce}'`,
+    ].join("; ");
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="${csp}">
+  <title>Redmine Gantt</title>
+  <link rel="stylesheet" href="${cssUri}">
+</head>
+<body>
+  <div id="ganttRoot"></div>
+  <script nonce="${nonce}">
+    window.__GANTT_INITIAL_PAYLOAD__ = null;
+  </script>
+  <script nonce="${nonce}" src="${jsUri}"></script>
 </body>
 </html>`;
+  }
+
+  private _ensureWebviewHtml(): void {
+    if (this._baseHtmlSet) return;
+    this._panel.webview.html = this._getBaseHtml();
+    this._baseHtmlSet = true;
+    this._webviewReady = false;
+  }
+
+  private _queueRender(payload: GanttRenderPayload): void {
+    this._ensureWebviewHtml();
+    if (this._webviewReady) {
+      this._pendingRender = undefined;
+      void this._panel.webview.postMessage({ command: "render", payload });
+    } else {
+      this._pendingRender = payload;
+    }
+  }
+
+  private _getFallbackState(overrides: Partial<GanttRenderState> = {}): GanttRenderState {
+    const now = Date.now();
+    const labelWidth = 250;
+    const headerHeight = 40;
+    const barHeight = 22;
+    const idColumnWidth = 50;
+    const startDateColumnWidth = 58;
+    const statusColumnWidth = 50;
+    const dueDateColumnWidth = 58;
+    const assigneeColumnWidth = 40;
+    const resizeHandleWidth = 10;
+    const extraColumnsWidth = idColumnWidth + startDateColumnWidth + statusColumnWidth + dueDateColumnWidth + assigneeColumnWidth;
+    const stickyLeftWidth = labelWidth + resizeHandleWidth + extraColumnsWidth;
+    const ganttConfig = vscode.workspace.getConfiguration("redmine.gantt");
+    const extendedRelationTypes = ganttConfig.get<boolean>("extendedRelationTypes", false);
+    const redmineBaseUrl = vscode.workspace.getConfiguration("redmine").get<string>("url") || "";
+
+    const baseState: GanttRenderState = {
+      timelineWidth: 600,
+      minDateMs: now,
+      maxDateMs: now + 86400000,
+      totalDays: 1,
+      extendedRelationTypes,
+      redmineBaseUrl,
+      minimapBarsData: [],
+      minimapHeight: 30,
+      minimapBarHeight: 5,
+      minimapTodayX: 0,
+      extScrollLeft: this._scrollPosition.left,
+      extScrollTop: this._scrollPosition.top,
+      labelWidth,
+      leftExtrasWidth: resizeHandleWidth + extraColumnsWidth,
+      healthFilter: this._healthFilter,
+      sortBy: this._sortBy,
+      sortOrder: this._sortOrder,
+      selectedCollapseKey: this._selectedCollapseKey,
+      barHeight,
+      todayX: 0,
+      todayInRange: false,
+      headerHeight,
+      idColumnWidth,
+      startDateColumnWidth,
+      statusColumnWidth,
+      dueDateColumnWidth,
+      assigneeColumnWidth,
+      stickyLeftWidth,
+    };
+
+    return { ...baseState, ...overrides };
   }
 
   public async updateIssues(
@@ -867,13 +854,23 @@ export class GanttPanel {
     }
 
     this._updateContent();
+    void this._refreshSupplementalData();
+  }
 
-    // Load contributions if any ad-hoc issues exist
-    this._loadContributions();
+  /**
+   * Load supplemental data (contributions + versions) and re-render once if needed.
+   */
+  private async _refreshSupplementalData(): Promise<void> {
+    const loadId = ++this._supplementalLoadId;
+    const shouldLoadVersions = this._viewFocus !== "person";
+    const [contributionsChanged, versionsChanged] = await Promise.all([
+      this._loadContributions(loadId),
+      shouldLoadVersions ? this._loadVersions(loadId) : Promise.resolve(false),
+    ]);
 
-    // Load versions (milestones) - skip in person mode (not relevant)
-    if (this._viewFocus !== "person") {
-      this._loadVersions();
+    if (this._supplementalLoadId !== loadId) return;
+    if (contributionsChanged || versionsChanged) {
+      this._updateContent();
     }
   }
 
@@ -881,33 +878,31 @@ export class GanttPanel {
    * Load time entries and calculate contributions for ad-hoc budget issues.
    * Rebuilds flexibility cache with effective spent hours.
    */
-  private async _loadContributions(): Promise<void> {
-    if (!this._server || this._issues.length === 0) return;
-    if (this._contributionsLoading) return; // Prevent duplicate fetches
+  private async _loadContributions(loadId: number): Promise<boolean> {
+    if (!this._server || this._issues.length === 0) return false;
+    if (this._contributionsLoading) return false; // Prevent duplicate fetches
     this._contributionsLoading = true;
 
-    // Get unique project IDs from displayed issues
-    const projectIds = new Set<number>();
-    for (const issue of this._issues) {
-      if (issue.project?.id) {
-        projectIds.add(issue.project.id);
-      }
-    }
-
-    if (projectIds.size === 0) {
-      this._contributionsLoading = false;
-      return;
-    }
-
-    // Get all ad-hoc issue IDs - we need to fetch time entries from ALL of them
-    // to calculate contributions TO displayed issues (even if ad-hoc source isn't displayed)
-    const adHocIssueIds = new Set(adHocTracker.getAll());
-    if (adHocIssueIds.size === 0) {
-      this._contributionsLoading = false;
-      return;
-    }
-
     try {
+      // Get unique project IDs from displayed issues
+      const projectIds = new Set<number>();
+      for (const issue of this._issues) {
+        if (issue.project?.id) {
+          projectIds.add(issue.project.id);
+        }
+      }
+
+      if (projectIds.size === 0) {
+        return false;
+      }
+
+      // Get all ad-hoc issue IDs - we need to fetch time entries from ALL of them
+      // to calculate contributions TO displayed issues (even if ad-hoc source isn't displayed)
+      const adHocIssueIds = new Set(adHocTracker.getAll());
+      if (adHocIssueIds.size === 0) {
+        return false;
+      }
+
       // Fetch time entries for ALL ad-hoc issues (not just displayed)
       // This ensures contributions to displayed issues are calculated
       const allAdHocIds = Array.from(adHocIssueIds);
@@ -950,8 +945,8 @@ export class GanttPanel {
         userId,
       });
 
-      // Calculate contributions
       const contributions = calculateContributions(allTimeEntries);
+      if (loadId !== this._supplementalLoadId) return false;
 
       // Build contribution data for flexibility calculation
       const contributionData: ContributionData = {
@@ -998,11 +993,11 @@ export class GanttPanel {
         }
       }
 
-      // Re-render with updated flexibility data
       this._cachedHierarchy = undefined;
-      this._updateContent();
+      return true;
     } catch {
       // Silently fail - contributions are optional enhancement
+      return false;
     } finally {
       this._contributionsLoading = false;
     }
@@ -1012,8 +1007,10 @@ export class GanttPanel {
    * Load versions (milestones) for all displayed projects.
    * Fetches in parallel and stores for rendering as milestone markers.
    */
-  private async _loadVersions(): Promise<void> {
-    if (!this._server || this._projects.length === 0) return;
+  private async _loadVersions(loadId: number): Promise<boolean> {
+    if (!this._server || this._projects.length === 0) return false;
+    if (this._versionsLoading) return false;
+    this._versionsLoading = true;
 
     try {
       // Get unique project IDs
@@ -1037,12 +1034,20 @@ export class GanttPanel {
       // Sort by due date
       allVersions.sort((a, b) => (a.due_date ?? "").localeCompare(b.due_date ?? ""));
 
-      this._versions = allVersions;
+      if (loadId !== this._supplementalLoadId) return false;
+      const hasChanges = !this._versions.every((version, idx) => {
+        const next = allVersions[idx];
+        return next && version.id === next.id && version.name === next.name && version.due_date === next.due_date;
+      }) || this._versions.length !== allVersions.length;
 
-      // Re-render with milestones
-      this._updateContent();
+      if (!hasChanges) return false;
+      this._versions = allVersions;
+      return true;
     } catch {
       // Silently fail - versions are optional
+      return false;
+    } finally {
+      this._versionsLoading = false;
     }
   }
 
@@ -1133,12 +1138,20 @@ export class GanttPanel {
 
   private _updateContent(): void {
     this._renderKey++; // Force SVG re-creation on each render
-    this._panel.webview.html = this._getHtmlContent();
+    this._queueRender(this._getRenderPayload());
     this._isRefreshing = false; // Reset after render
   }
 
   private _handleMessage(message: GanttWebviewMessage): void {
     switch (message.command) {
+      case "webviewReady":
+        this._webviewReady = true;
+        if (this._pendingRender) {
+          const payload = this._pendingRender;
+          this._pendingRender = undefined;
+          void this._panel.webview.postMessage({ command: "render", payload });
+        }
+        break;
       case "openIssue":
         if (message.issueId && this._server) {
           // Open issue actions (refresh is handled by individual actions if needed)
@@ -1241,6 +1254,7 @@ export class GanttPanel {
       case "refresh":
         // Set refreshing flag so next render shows loading overlay
         this._isRefreshing = true;
+        resetDownstreamCountCache();
         // Clear cache and refetch data (including new relations)
         vscode.commands.executeCommand("redmine.refreshIssues");
         break;
@@ -1661,9 +1675,7 @@ export class GanttPanel {
     }
   }
 
-  private _getHtmlContent(): string {
-    const nonce = getNonce();
-
+  private _getRenderPayload(): GanttRenderPayload {
     // Read gantt config settings
     const ganttConfig = vscode.workspace.getConfiguration("redmine.gantt");
     this._extendedRelationTypes = ganttConfig.get<boolean>("extendedRelationTypes", false);
@@ -1793,7 +1805,7 @@ export class GanttPanel {
 
     // If no issues at all, show empty state
     if (this._issues.length === 0) {
-      return this._getEmptyHtml();
+      return this._getEmptyPayload();
     }
 
     // When no visible dates, use today +/- 30 days as default range
@@ -1830,6 +1842,7 @@ export class GanttPanel {
       : new Set();
     const issueScheduleMap = new Map<number, Map<string, number>>();
     const dayScheduleMap = new Map<string, { issueId: number; hours: number; project: string }[]>();
+    const shouldBuildIssueScheduleMap = this._viewFocus === "person" && this._showIntensity;
     if (this._viewFocus === "person") {
       // Get today's date for past/future split in capacity calculation
       const todayStr = getTodayStr();
@@ -1851,10 +1864,12 @@ export class GanttPanel {
         const dayEntries: { issueId: number; hours: number; project: string }[] = [];
         for (const entry of day.breakdown) {
           // issueScheduleMap for intensity bars
-          if (!issueScheduleMap.has(entry.issueId)) {
-            issueScheduleMap.set(entry.issueId, new Map());
+          if (shouldBuildIssueScheduleMap) {
+            if (!issueScheduleMap.has(entry.issueId)) {
+              issueScheduleMap.set(entry.issueId, new Map());
+            }
+            issueScheduleMap.get(entry.issueId)!.set(day.date, entry.hours);
           }
-          issueScheduleMap.get(entry.issueId)!.set(day.date, entry.hours);
           // dayScheduleMap for capacity tooltip
           const issue = issueMap.get(entry.issueId);
           if (issue && entry.hours > 0) {
@@ -2099,31 +2114,24 @@ export class GanttPanel {
 
     // Left labels (fixed column) - visible rows only for performance
 
-    // Pre-compute indent guides: for each row, which ancestor lines should continue
-    // A line continues at depth D if there are more siblings (same parent) below
-    const indentGuides: Map<number, Set<string>> = new Map(); // rowIdx -> set of parentKeys with continuing lines
-    for (let i = 0; i < visibleRows.length; i++) {
-      const activeParents = new Set<string>();
-      const row = visibleRows[i];
-      // Walk up the parent chain and check if each ancestor has more children below
-      let checkKey = row.parentKey;
-      while (checkKey) {
-        // Find if there's any row below with this same parentKey
-        const hasMoreSiblings = visibleRows.slice(i + 1).some(r => r.parentKey === checkKey);
-        if (hasMoreSiblings) {
-          activeParents.add(checkKey);
-        }
-        // Move up to grandparent
-        const parentRow = visibleRows.find(r => r.collapseKey === checkKey);
-        checkKey = parentRow?.parentKey || "";
-      }
-      indentGuides.set(i, activeParents);
-    }
-
     // Compute continuous vertical indent guide lines (rendered as single layer)
     // For each parent row, draw ONE continuous line covering ALL descendants (not just direct children)
-    const continuousIndentLines: string[] = [];
+    const subtreeEndIndex = new Array<number>(visibleRows.length);
+    const parentStack: number[] = [];
+    for (let i = 0; i < visibleRows.length; i++) {
+      const depth = visibleRows[i].depth;
+      while (parentStack.length > 0 && depth <= visibleRows[parentStack[parentStack.length - 1]].depth) {
+        const idx = parentStack.pop()!;
+        subtreeEndIndex[idx] = i - 1;
+      }
+      parentStack.push(i);
+    }
+    while (parentStack.length > 0) {
+      const idx = parentStack.pop()!;
+      subtreeEndIndex[idx] = visibleRows.length - 1;
+    }
 
+    const continuousIndentLines: string[] = [];
     for (let i = 0; i < visibleRows.length; i++) {
       const row = visibleRows[i];
 
@@ -2131,22 +2139,11 @@ export class GanttPanel {
       if (!row.hasChildren) continue;
 
       const parentDepth = row.depth;
-      const parentIndex = i;
-
-      // First descendant is the next row
-      const firstDescendantIndex = parentIndex + 1;
+      const firstDescendantIndex = i + 1;
       if (firstDescendantIndex >= visibleRows.length) continue;
-
-      // Verify first descendant is at greater depth
       if (visibleRows[firstDescendantIndex].depth <= parentDepth) continue;
-
-      // Find last descendant: scan forward until we hit a row at <= parent depth
-      // In a flattened tree, all descendants are consecutive until we reach a sibling/ancestor
-      let lastDescendantIndex = firstDescendantIndex;
-      for (let j = firstDescendantIndex + 1; j < visibleRows.length; j++) {
-        if (visibleRows[j].depth <= parentDepth) break;
-        lastDescendantIndex = j;
-      }
+      const lastDescendantIndex = subtreeEndIndex[i];
+      if (lastDescendantIndex <= i) continue;
 
       // Draw line at parent's depth position (guides appear inside children's indent area)
       const lineX = 8 + parentDepth * indentSize;
@@ -3223,8 +3220,6 @@ export class GanttPanel {
         const color = this._getStatusColor(minimapEffectiveStatus);
         return { startPct, endPct, classes, color };
       });
-    const minimapBarsJson = JSON.stringify(minimapBars);
-
     // Always calculate aggregate workload (needed for heatmap toggle without re-render)
     const workloadMap = calculateAggregateWorkload(this._issues, this._schedule, minDate, maxDate);
 
@@ -3351,833 +3346,8 @@ export class GanttPanel {
     // Body height matches visible content (no hidden project checkboxes at bottom)
     const bodyHeight = contentHeight;
 
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
-  <title>Redmine Gantt</title>
-  <style>
-    :root { --today-color: var(--vscode-charts-red); }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    body {
-      margin: 0;
-      padding: 8px;
-      background: var(--vscode-editor-background);
-      color: var(--vscode-foreground);
-      font-family: var(--vscode-font-family);
-      font-size: 13px;
-      overflow: hidden;
-      height: 100vh;
-      box-sizing: border-box;
-      animation: fadeIn 0.15s ease-out;
-      display: flex;
-      flex-direction: column;
-    }
-    .gantt-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-      flex-shrink: 0;
-    }
-    .gantt-title {
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--vscode-foreground);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 400px;
-    }
-    .gantt-title .client-name {
-      color: var(--vscode-descriptionForeground);
-    }
-    .gantt-actions {
-      display: flex;
-      gap: 4px;
-      flex-shrink: 0;
-    }
-    .gantt-actions button {
-      background: var(--vscode-button-secondaryBackground);
-      color: var(--vscode-button-secondaryForeground);
-      border: none;
-      padding: 4px 8px;
-      border-radius: 2px;
-      cursor: pointer;
-      font-size: 13px;
-    }
-    .gantt-actions button:hover:not(:disabled) {
-      background: var(--vscode-button-secondaryHoverBackground);
-    }
-    .gantt-actions button:focus-visible {
-      outline: 2px solid var(--vscode-focusBorder);
-      outline-offset: -1px;
-    }
-    .gantt-actions button:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-    .gantt-actions button.active {
-      background: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
-    }
-    /* Toggle buttons (distinct from action buttons) */
-    .gantt-actions button[aria-pressed] {
-      background: transparent;
-      border: 1px solid var(--vscode-panel-border);
-      border-radius: 4px;
-    }
-    .gantt-actions button[aria-pressed]:hover:not(:disabled) {
-      background: var(--vscode-list-hoverBackground);
-      border-color: var(--vscode-focusBorder);
-    }
-    .gantt-actions button[aria-pressed="true"],
-    .gantt-actions button[aria-pressed].active {
-      background: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
-      border-color: var(--vscode-button-background);
-    }
-    .toolbar-select {
-      background: var(--vscode-dropdown-background);
-      color: var(--vscode-dropdown-foreground);
-      border: 1px solid var(--vscode-dropdown-border);
-      padding: 3px 6px;
-      font-size: 12px;
-      font-family: var(--vscode-font-family);
-      border-radius: 2px;
-      cursor: pointer;
-      max-width: 180px;
-    }
-    .toolbar-select:hover { border-color: var(--vscode-focusBorder); }
-    .toolbar-select:focus {
-      outline: 1px solid var(--vscode-focusBorder);
-      outline-offset: -1px;
-    }
-    .capacity-ribbon-row {
-      display: flex;
-      position: sticky;
-      top: ${headerHeight}px;
-      z-index: 2;
-      background: var(--vscode-editor-background);
-      border-bottom: 1px solid var(--vscode-panel-border);
-      width: max-content;
-      min-width: 100%;
-    }
-    .capacity-ribbon-row.hidden { display: none; }
-    .capacity-ribbon-label {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 6px;
-      padding-right: 8px;
-      font-size: 10px;
-      color: var(--vscode-descriptionForeground);
-      background: var(--vscode-editor-background);
-      white-space: nowrap;
-      box-sizing: border-box;
-    }
-    .capacity-legend {
-      display: flex;
-      gap: 6px;
-    }
-    .capacity-label { font-size: 9px; }
-    .capacity-label.available { color: var(--vscode-charts-green); }
-    .capacity-label.busy { color: var(--vscode-charts-yellow); }
-    .capacity-label.overbooked { color: var(--vscode-charts-red); }
-    .capacity-ribbon-timeline {
-      flex: 1;
-      overflow: hidden;
-    }
-    .capacity-today-marker {
-      stroke: var(--today-color);
-      stroke-width: 2;
-      stroke-dasharray: 4 2;
-    }
-    .capacity-week-marker {
-      stroke: var(--vscode-panel-border);
-      stroke-width: 1;
-      opacity: 0.5;
-    }
-    .capacity-day-bar {
-      cursor: pointer;
-    }
-    .capacity-day-bar:hover {
-      opacity: 1 !important;
-      stroke: var(--vscode-focusBorder);
-      stroke-width: 1;
-    }
-    .overload-badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 16px;
-      height: 16px;
-      padding: 0 4px;
-      margin-left: 4px;
-      font-size: 10px;
-      font-weight: bold;
-      border-radius: 4px;
-      background: var(--vscode-charts-red);
-      color: var(--vscode-editor-background);
-      cursor: pointer;
-    }
-    .overload-badge:hover {
-      background: var(--vscode-errorForeground);
-    }
-    .overload-badge.hidden { display: none; }
-    /* Toggle buttons - native toolbar style (higher specificity to override .gantt-actions button) */
-    .gantt-actions .toggle-btn {
-      padding: 4px;
-      border: none;
-      background: transparent;
-      color: var(--vscode-foreground);
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 13px;
-    }
-    .gantt-actions .toggle-btn:hover { background: var(--vscode-toolbar-hoverBackground); }
-    .gantt-actions .toggle-btn:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
-    .gantt-actions .toggle-btn:disabled { opacity: 0.5; cursor: default; }
-    .gantt-actions .toggle-btn.active {
-      background: var(--vscode-toolbar-activeBackground);
-      color: var(--vscode-textLink-foreground);
-    }
-    .gantt-actions .toggle-btn svg { width: 14px; height: 14px; fill: currentColor; }
-    /* Dropdown menus (help, overflow) */
-    .toolbar-dropdown { position: relative; }
-    .toolbar-dropdown-menu {
-      display: none;
-      position: absolute;
-      right: 0;
-      top: 100%;
-      z-index: 1000;
-      min-width: 140px;
-      padding-top: 4px;
-    }
-    .toolbar-dropdown-menu-inner {
-      background: var(--vscode-editorWidget-background);
-      border: 1px solid var(--vscode-editorWidget-border);
-      border-radius: 4px;
-      padding: 4px 0;
-      box-shadow: 0 2px 8px var(--vscode-widget-shadow);
-    }
-    .toolbar-dropdown:hover .toolbar-dropdown-menu { display: block; }
-    .toolbar-dropdown-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 4px 12px;
-      cursor: pointer;
-      font-size: 12px;
-      color: var(--vscode-foreground);
-      white-space: nowrap;
-    }
-    .toolbar-dropdown-item:hover { background: var(--vscode-list-hoverBackground); }
-    .toolbar-dropdown-item.active { background: var(--vscode-list-activeSelectionBackground); }
-    .toolbar-dropdown-item:disabled, .toolbar-dropdown-item[disabled] {
-      opacity: 0.5;
-      cursor: default;
-    }
-    .toolbar-dropdown-item:disabled:hover, .toolbar-dropdown-item[disabled]:hover {
-      background: transparent;
-    }
-    .toolbar-dropdown-divider {
-      height: 1px;
-      background: var(--vscode-panel-border);
-      margin: 4px 0;
-    }
-    .toolbar-dropdown-item .icon { width: 16px; text-align: center; }
-    .toolbar-dropdown-item .shortcut {
-      margin-left: auto;
-      opacity: 0.6;
-      font-size: 11px;
-    }
-    /* Help tooltip (special styling) */
-    .help-dropdown { position: relative; }
-    .help-tooltip {
-      display: none;
-      position: absolute;
-      right: 0;
-      top: 100%;
-      margin-top: 4px;
-      background: var(--vscode-editorHoverWidget-background);
-      color: var(--vscode-editorHoverWidget-foreground);
-      border-radius: 3px;
-      padding: 8px 12px;
-      box-shadow: 0 0 8px 2px var(--vscode-widget-shadow);
-      z-index: 1000;
-      white-space: nowrap;
-    }
-    .help-dropdown:hover .help-tooltip { display: block; }
-    .help-section { display: flex; flex-direction: column; gap: 3px; font-size: 11px; }
-    .help-section + .help-section { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--vscode-panel-border); }
-    .help-title { font-weight: 600; margin-bottom: 2px; color: var(--vscode-foreground); }
-    .help-item { opacity: 0.9; display: flex; align-items: center; gap: 6px; }
-    .help-item kbd {
-      background: var(--vscode-keybindingLabel-background);
-      color: var(--vscode-keybindingLabel-foreground);
-      border: 1px solid var(--vscode-keybindingLabel-border);
-      border-radius: 3px;
-      padding: 1px 4px;
-      font-family: var(--vscode-editor-font-family);
-      font-size: 10px;
-      min-width: 18px;
-      text-align: center;
-    }
-    .gantt-container {
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      border: 1px solid var(--vscode-panel-border);
-      border-radius: 2px;
-      flex-grow: 1;
-      min-height: 0;
-      position: relative;
-      --sticky-left-width: ${stickyLeftWidth}px;
-    }
-    /* Single scroll container - push horizontal scrollbar outside visible area */
-    .gantt-scroll-wrapper {
-      flex-grow: 1;
-      overflow: hidden; /* Clips the pushed-out horizontal scrollbar */
-      min-height: 0;
-      position: relative;
-      margin-bottom: 30px; /* Reserve space for minimap */
-    }
-    .gantt-scroll {
-      overflow-x: scroll;
-      overflow-y: scroll;
-      scrollbar-gutter: stable;
-      height: calc(100% + 20px); /* Push horizontal scrollbar outside wrapper */
-    }
-    .gantt-scroll { scrollbar-width: thin; }
-    .gantt-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
-    .gantt-scroll::-webkit-scrollbar-thumb { background: var(--vscode-scrollbarSlider-background); border-radius: 4px; }
-    .gantt-scroll::-webkit-scrollbar-corner { background: transparent; }
-    .gantt-header-row {
-      display: flex;
-      position: sticky;
-      top: 0;
-      z-index: 3;
-      height: ${headerHeight}px;
-      box-sizing: border-box;
-      border-bottom: 1px solid var(--vscode-panel-border);
-      background: var(--vscode-editor-background);
-      width: max-content;
-      min-width: 100%;
-    }
-    .gantt-header-row > * { background: var(--vscode-editor-background); }
-    .gantt-body {
-      display: flex;
-      width: max-content;
-      min-width: 100%;
-      min-height: calc(100vh - 200px); /* Fill available space when collapsed */
-    }
-    .gantt-sticky-left {
-      display: flex;
-      flex-shrink: 0;
-      position: sticky;
-      left: 0;
-      z-index: 1;
-      background: var(--vscode-editor-background);
-    }
-    .gantt-corner {
-      z-index: 4; /* Above both sticky header and sticky left */
-    }
-    .gantt-left-header {
-      flex-shrink: 0;
-      width: ${labelWidth}px;
-      min-width: 120px;
-      max-width: 600px;
-      display: flex;
-      gap: 4px;
-      padding: 4px 8px;
-      box-sizing: border-box;
-      align-items: center;
-    }
-    .gantt-left-header button { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
-    .gantt-left-header button:hover { background: var(--vscode-button-secondaryHoverBackground); }
-    .gantt-resize-handle-header {
-      width: 10px;
-      background: var(--vscode-panel-border);
-      cursor: col-resize;
-      flex-shrink: 0;
-      position: relative;
-    }
-    .gantt-resize-handle-header::before {
-      content: '';
-      position: absolute;
-      left: -4px;
-      right: -4px;
-      top: 0;
-      bottom: 0;
-    }
-    .gantt-timeline-header { flex-shrink: 0; background: var(--vscode-editor-background); }
-    .gantt-labels svg { display: block; min-width: 100%; }
-    .gantt-labels {
-      flex-shrink: 0;
-      width: ${labelWidth}px;
-      min-width: 120px;
-      max-width: 600px;
-      overflow: hidden;
-      box-sizing: border-box;
-    }
-    .gantt-col-id, .gantt-col-start, .gantt-col-status, .gantt-col-due, .gantt-col-assignee {
-      flex-shrink: 0;
-      overflow: hidden;
-      border-right: 1px solid var(--vscode-panel-border);
-      box-sizing: border-box;
-    }
-    .gantt-col-id svg, .gantt-col-start svg, .gantt-col-status svg, .gantt-col-due svg, .gantt-col-assignee svg {
-      display: block;
-      width: 100%;
-    }
-    .gantt-col-id { width: ${idColumnWidth}px; }
-    .gantt-col-start { width: ${startDateColumnWidth}px; }
-    .gantt-col-status { width: ${statusColumnWidth}px; }
-    .gantt-col-due { width: ${dueDateColumnWidth}px; }
-    .gantt-col-assignee { width: ${assigneeColumnWidth}px; }
-    .gantt-col-header {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      height: 100%;
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--vscode-descriptionForeground);
-      padding: 0 4px;
-      box-sizing: border-box;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .gantt-col-header.sortable { cursor: pointer; }
-    .gantt-col-header.sortable:hover { color: var(--vscode-foreground); background: var(--vscode-list-hoverBackground); }
-    .gantt-col-header.sorted { color: var(--vscode-foreground); font-weight: 600; }
-    .gantt-left-header .gantt-col-header,
-    .gantt-col-start .gantt-col-header,
-    .gantt-col-due .gantt-col-header { justify-content: flex-start; }
-    .gantt-col-cell {
-      font-size: 13px;
-      fill: var(--vscode-descriptionForeground);
-    }
-    .assignee-badge circle { cursor: default; }
-    .assignee-badge.current-user circle { stroke: var(--vscode-focusBorder); stroke-width: 2; }
-    .gantt-col-cell.status-closed { fill: var(--vscode-charts-green); }
-    .gantt-col-cell.status-inprogress { fill: var(--vscode-charts-blue); }
-    .gantt-col-cell.status-new { fill: var(--vscode-descriptionForeground); }
-    .gantt-col-cell.due-overdue { fill: var(--vscode-charts-red); font-weight: 600; }
-    .gantt-col-cell.due-soon { fill: var(--vscode-charts-orange); }
-    .gantt-resize-handle {
-      width: 10px;
-      background: var(--vscode-panel-border);
-      cursor: col-resize;
-      flex-shrink: 0;
-      position: relative;
-    }
-    .gantt-resize-handle::before {
-      content: '';
-      position: absolute;
-      left: -4px;
-      right: -4px;
-      top: 0;
-      bottom: 0;
-    }
-    .gantt-resize-handle:hover, .gantt-resize-handle.dragging,
-    .gantt-resize-handle-header:hover, .gantt-resize-handle-header.dragging { background: var(--vscode-focusBorder); }
-    .gantt-timeline { flex-shrink: 0; }
-    svg { display: block; }
-    .issue-bar:hover .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
-    .issue-label:hover { opacity: 1; }
-    .issue-bar.bar-past { filter: saturate(0.4) opacity(0.7); }
-    .issue-bar.bar-past:hover { filter: saturate(0.6) opacity(0.85); }
-    .issue-bar.bar-open-ended .bar-outline { stroke-dasharray: 6, 3; stroke-dashoffset: -6; }
-    .issue-bar.bar-open-ended .bar-main { mask-image: linear-gradient(90deg, black 80%, transparent 100%); -webkit-mask-image: linear-gradient(90deg, black 80%, transparent 100%); }
-    .issue-bar.bar-overdue .bar-outline { stroke: var(--vscode-charts-red) !important; stroke-width: 2; }
-    .issue-bar.bar-overdue:hover .bar-outline { stroke-width: 3; }
-    /* Critical path bars (zero/negative flexibility - pulsing border) */
-    .issue-bar.bar-critical:not(.bar-overdue) .bar-outline { stroke: var(--vscode-charts-orange) !important; stroke-width: 2; animation: critical-pulse 2s ease-in-out infinite; }
-    @keyframes critical-pulse { 0%, 100% { stroke-width: 2; } 50% { stroke-width: 3; } }
-    /* External dependency bars (dimmed, dashed, no drag handles) */
-    .issue-bar.bar-external { opacity: 0.5; pointer-events: none; }
-    .issue-bar.bar-external .bar-outline { stroke-dasharray: 4, 2; stroke: var(--vscode-descriptionForeground); }
-    .issue-bar.bar-external .bar-main { opacity: 0.4; }
-    .issue-bar.bar-external .drag-handle,
-    .issue-bar.bar-external .link-handle { display: none; }
-    /* Ad-hoc budget pool bars (purple dotted outline) */
-    .issue-bar.bar-adhoc .bar-outline { stroke: var(--vscode-charts-purple) !important; stroke-width: 2; stroke-dasharray: 3, 2; }
-    .issue-bar.bar-adhoc .bar-main { opacity: 0.6; }
-    .issue-bar.selected .bar-outline { stroke: var(--vscode-focusBorder) !important; stroke-width: 2; }
-    .issue-bar.selected .bar-main { opacity: 1; }
-    .multi-select-mode .issue-bar { cursor: pointer; }
-    .selection-count { margin-left: 8px; font-size: 11px; color: var(--vscode-descriptionForeground); }
-    .issue-bar.parent-bar { opacity: 0.7; }
-    .issue-bar.parent-bar:hover { opacity: 1; }
-    .past-overlay { pointer-events: none; }
-    .progress-unfilled, .progress-divider { pointer-events: none; }
-    .bar-labels { pointer-events: none; }
-    .bar-labels .blocks-badge-group,
-    .bar-labels .blocker-badge,
-    .bar-labels .flex-badge-group,
-    .bar-labels .progress-badge-group,
-    .bar-labels .status-badge-group,
-    .bar-labels .bar-assignee-group { pointer-events: all; }
-    .status-badge-bg { pointer-events: all; }
-    .status-badge { pointer-events: all; font-weight: 500; }
-    .flex-badge-bg, .flex-badge { pointer-events: all; }
-    .bar-assignee { pointer-events: none; opacity: 0.85; }
-    .bar-assignee.current-user { fill: var(--vscode-charts-blue) !important; font-weight: 600; opacity: 1; }
-    .issue-bar .drag-handle:hover { fill: var(--vscode-focusBorder); opacity: 0.5; }
-    .issue-bar:hover .drag-handle { fill: var(--vscode-list-hoverBackground); opacity: 0.3; }
-    .issue-bar:hover .link-handle-visual { opacity: 0.7; }
-    .issue-bar .link-handle:hover .link-handle-visual { opacity: 1; transform-origin: center; }
-    .issue-bar.dragging .bar-main, .issue-bar.dragging .bar-intensity { opacity: 0.5; }
-    .issue-bar.linking-source .bar-outline { stroke-width: 3; stroke: var(--vscode-focusBorder); }
-    .issue-bar.linking-source .link-handle-visual { opacity: 1; }
-    .issue-bar.link-target .bar-outline { stroke-width: 2; stroke: var(--vscode-charts-green); }
-    @keyframes highlight-pulse { 0%, 100% { filter: drop-shadow(0 0 6px var(--vscode-focusBorder)); } 50% { filter: drop-shadow(0 0 12px var(--vscode-focusBorder)); } }
-    .issue-bar.highlighted .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 3; }
-    .issue-label.highlighted { animation: highlight-pulse 0.5s ease-in-out 4; }
-    .issue-bar.highlighted { animation: highlight-pulse 0.5s ease-in-out 4; }
-    .temp-link-arrow { pointer-events: none; }
-    .dependency-arrow .arrow-line { transition: stroke-width 0.15s, filter 0.15s; }
-    .dependency-arrow .arrow-head { transition: filter 0.15s; }
-    .dependency-arrow:hover .arrow-line { stroke-width: 3 !important; }
-    .dependency-arrow.selected .arrow-line { stroke-width: 4 !important; }
-    .arrow-selection-mode .issue-bar { opacity: 0.3; }
-    .arrow-selection-mode .issue-bar.arrow-connected { opacity: 1; }
-    .arrow-selection-mode .issue-bar.arrow-connected .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
-    .arrow-selection-mode .issue-label,
-    .arrow-selection-mode .project-label,
-    .arrow-selection-mode .time-group-label { opacity: 0.15; }
-    .arrow-selection-mode .issue-label.arrow-connected,
-    .arrow-selection-mode .project-label.arrow-connected,
-    .arrow-selection-mode .time-group-label.arrow-connected { opacity: 1; }
-    .arrow-selection-mode .dependency-arrow { opacity: 0.2; }
-    .arrow-selection-mode .dependency-arrow.selected { opacity: 1; }
-    .arrow-selection-mode .dependency-arrow.selected .arrow-line { stroke-width: 3; }
-    /* Hover highlighting - fade labels only for dependency arrow hovers */
-    .hover-focus.dependency-hover .issue-label,
-    .hover-focus.dependency-hover .project-label,
-    .hover-focus.dependency-hover .time-group-label { opacity: 0.15; transition: opacity 0.15s ease-out; }
-    .hover-focus.dependency-hover .issue-label.hover-highlighted,
-    .hover-focus.dependency-hover .project-label.hover-highlighted,
-    .hover-focus.dependency-hover .time-group-label.hover-highlighted { opacity: 1 !important; }
-    /* Highlight hovered bar */
-    .hover-focus .issue-bar.hover-highlighted .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
-    /* Dependency hover - glow on hovered arrow */
-    .hover-focus.dependency-hover .dependency-arrow.hover-source .arrow-line { stroke-width: 3; }
-    /* Relation type colors in legend */
-    .relation-legend { display: flex; gap: 12px; font-size: 11px; margin-left: 12px; align-items: center; }
-    .relation-legend-item { display: flex; align-items: center; gap: 4px; opacity: 0.8; }
-    .relation-legend-item:hover { opacity: 1; }
-    .relation-legend-line { width: 20px; height: 2px; }
-    .relation-picker { position: fixed; background: var(--vscode-menu-background); border: 1px solid var(--vscode-menu-border); border-radius: 2px; padding: 4px 0; z-index: 1000; box-shadow: 0 2px 8px var(--vscode-widget-shadow); }
-    .relation-picker button { display: block; width: 100%; padding: 4px 12px; border: none; background: transparent; color: var(--vscode-menu-foreground); text-align: left; cursor: pointer; font-size: 13px; }
-    .relation-picker button:hover, .relation-picker button:focus { background: var(--vscode-menu-selectionBackground); color: var(--vscode-menu-selectionForeground); }
-    /* Drag date tooltip */
-    .drag-date-tooltip { position: fixed; pointer-events: none; z-index: 1000; background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-editorWidget-border); border-radius: 3px; box-shadow: 0 2px 4px var(--vscode-widget-shadow); padding: 3px 6px; font-size: 11px; font-family: var(--vscode-font-family); color: var(--vscode-editorWidget-foreground); white-space: nowrap; transform: translateX(-50%); }
-    .drag-date-tooltip::after { content: ''; position: absolute; left: 50%; transform: translateX(-50%); bottom: -5px; border: 5px solid transparent; border-top-color: var(--vscode-editorWidget-border); }
-    .drag-date-tooltip.flipped::after { bottom: auto; top: -5px; border-top-color: transparent; border-bottom-color: var(--vscode-editorWidget-border); }
-    /* Drag confirmation modal */
-    .drag-confirm-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 1001; display: none; align-items: center; justify-content: center; }
-    .drag-confirm-modal { background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-editorWidget-border); border-radius: 6px; box-shadow: 0 4px 16px var(--vscode-widget-shadow); padding: 16px; min-width: 280px; max-width: 400px; }
-    .drag-confirm-modal h3 { margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: var(--vscode-foreground); }
-    .drag-confirm-modal p { margin: 0 0 16px 0; font-size: 13px; color: var(--vscode-descriptionForeground); line-height: 1.4; }
-    .drag-confirm-buttons { display: flex; gap: 8px; justify-content: flex-end; }
-    .drag-confirm-buttons button { padding: 6px 14px; border-radius: 3px; font-size: 13px; cursor: pointer; border: none; }
-    .drag-confirm-buttons .confirm-btn { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
-    .drag-confirm-buttons .confirm-btn:hover { background: var(--vscode-button-hoverBackground); }
-    .drag-confirm-buttons .cancel-btn { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
-    .drag-confirm-buttons .cancel-btn:hover { background: var(--vscode-button-secondaryHoverBackground); }
-    /* Focus indicators for accessibility */
-    button:focus { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
-    .issue-bar:focus { outline: none; } /* Use stroke instead of outline for SVG */
-    .issue-bar:focus .bar-outline, .issue-bar:focus-within .bar-outline, .issue-bar.focused .bar-outline { stroke-width: 3; stroke: var(--vscode-focusBorder); }
-    /* VS Code native-style row highlighting via hit area rect */
-    .issue-label:hover .row-hit-area,
-    .project-label:hover .row-hit-area,
-    .time-group-label:hover .row-hit-area {
-      fill: var(--vscode-list-hoverBackground);
-    }
-    .issue-label:hover text, .project-label:hover text, .time-group-label:hover text {
-      fill: var(--vscode-list-hoverForeground) !important;
-    }
-    .issue-label:focus, .project-label:focus, .time-group-label:focus {
-      outline: none;
-    }
-    .issue-label:focus .row-hit-area,
-    .project-label:focus .row-hit-area,
-    .time-group-label:focus .row-hit-area {
-      fill: var(--vscode-list-activeSelectionBackground);
-    }
-    .issue-label:focus text, .project-label:focus text, .time-group-label:focus text {
-      fill: var(--vscode-list-activeSelectionForeground) !important;
-    }
-    .issue-label.active .row-hit-area,
-    .project-label.active .row-hit-area,
-    .time-group-label.active .row-hit-area {
-      fill: var(--vscode-list-inactiveSelectionBackground);
-    }
-    .issue-label.active text, .project-label.active text, .time-group-label.active text {
-      fill: var(--vscode-list-inactiveSelectionForeground) !important;
-    }
-    /* Collapse toggle chevron - VS Code style */
-    .collapse-toggle {
-      cursor: pointer;
-      opacity: 0.7;
-    }
-    .collapse-toggle:hover { opacity: 1; }
-    .collapse-toggle.expanded { transform: rotate(90deg); }
-    .chevron-hit-area { cursor: pointer; }
-    /* Client-side collapse: hide descendants of collapsed rows */
-    .gantt-row-hidden,
-    g.gantt-row-hidden,
-    svg .gantt-row-hidden,
-    .issue-label.gantt-row-hidden,
-    .project-label.gantt-row-hidden,
-    .time-group-label.gantt-row-hidden,
-    .issue-bar.gantt-row-hidden,
-    .aggregate-bars.gantt-row-hidden,
-    .indent-guide-line.gantt-row-hidden,
-    .dependency-arrow.gantt-row-hidden {
-      display: none !important;
-      visibility: hidden !important;
-      opacity: 0 !important;
-    }
-    /* Screen reader only class */
-    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
-    /* Quick search overlay */
-    .quick-search {
-      position: fixed;
-      top: 80px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 1000;
-    }
-    .quick-search input {
-      width: 300px;
-      padding: 8px 12px;
-      font-size: 14px;
-      background: var(--vscode-input-background);
-      color: var(--vscode-input-foreground);
-      border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
-      border-radius: 4px;
-      outline: none;
-      box-shadow: 0 4px 12px var(--vscode-widget-shadow);
-    }
-    .quick-search input:focus {
-      border-color: var(--vscode-focusBorder);
-    }
-    .issue-label.search-match {
-      background: var(--vscode-editor-findMatchHighlightBackground);
-      border-radius: 2px;
-    }
-    /* Keyboard help overlay */
-    .keyboard-help {
-      position: fixed;
-      inset: 0;
-      background: var(--vscode-editor-background);
-      opacity: 0.85;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-    }
-    .keyboard-help-content {
-      background: var(--vscode-editor-background);
-      border: 1px solid var(--vscode-panel-border);
-      border-radius: 4px;
-      padding: 20px 24px;
-      max-width: 600px;
-      box-shadow: 0 8px 32px var(--vscode-widget-shadow);
-    }
-    .keyboard-help h3 {
-      margin: 0 0 16px;
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--vscode-foreground);
-    }
-    .shortcut-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 16px;
-    }
-    .shortcut-section h4 {
-      margin: 0 0 8px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--vscode-descriptionForeground);
-    }
-    .shortcut-section > div {
-      font-size: 12px;
-      color: var(--vscode-foreground);
-      margin-bottom: 4px;
-    }
-    .keyboard-help kbd {
-      display: inline-block;
-      padding: 2px 6px;
-      font-size: 11px;
-      font-family: var(--vscode-editor-font-family, monospace);
-      background: var(--vscode-keybindingLabel-background);
-      color: var(--vscode-keybindingLabel-foreground);
-      border: 1px solid var(--vscode-keybindingLabel-border, var(--vscode-panel-border));
-      border-radius: 3px;
-      margin-right: 2px;
-    }
-    .keyboard-help-close {
-      margin: 16px 0 0;
-      font-size: 11px;
-      color: var(--vscode-descriptionForeground);
-      text-align: center;
-    }
-    .weekend-bg { fill: var(--vscode-editor-inactiveSelectionBackground); opacity: 0.3; }
-    .zebra-stripe { fill: var(--vscode-foreground); pointer-events: none; }
-    .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 1; opacity: 0.25; }
-    .date-marker { stroke: var(--vscode-editorRuler-foreground); stroke-dasharray: 2,2; }
-    .today-marker { stroke: var(--today-color); stroke-width: 2; stroke-dasharray: 4 2; }
-    .today-header-bg { fill: var(--today-color); fill-opacity: 0.2; }
-    .today-day-label { fill: var(--today-color) !important; font-weight: bold; }
-    /* Base transitions for dependency focus fade-back */
-    .issue-bar, .issue-label, .project-label, .aggregate-bars { transition: opacity 0.15s ease-out; }
-    /* Respect reduced motion preference */
-    @media (prefers-reduced-motion: reduce) {
-      body { animation: none; }
-      .spinner { animation: none; }
-      .skeleton-bar { animation: none; opacity: 0.5; }
-      .gantt-resize-handle { transition: none; }
-      .dependency-arrow .arrow-line { transition: none; }
-      .dependency-arrow .arrow-head { transition: none; }
-      .issue-bar, .issue-label, .project-label, .aggregate-bars { transition: none; }
-    }
-    /* Utility classes for CSP compliance */
-    .hidden { display: none; }
-    /* Loading overlay */
-    .loading-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: var(--vscode-editor-background);
-      opacity: 0.8;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-    }
-    .loading-overlay.visible { display: flex; }
-    .loading-spinner {
-      width: 32px;
-      height: 32px;
-      border: 3px solid var(--vscode-foreground);
-      border-top-color: transparent;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .cursor-pointer { cursor: pointer; }
-    .cursor-ew-resize { cursor: ew-resize; }
-    .cursor-crosshair { cursor: crosshair; }
-    .cursor-col-resize { cursor: col-resize; }
-    .cursor-move { cursor: move; }
-    .user-select-none { user-select: none; }
-    .opacity-02 { opacity: 0.2; }
-    .w-45 { width: 45%; }
-    .w-60 { width: 60%; }
-    .w-70 { width: 70%; }
-    .w-80 { width: 80%; }
-    .heatmap-color-green { background: var(--vscode-charts-green); }
-    .heatmap-color-yellow { background: var(--vscode-charts-yellow); }
-    .heatmap-color-orange { background: var(--vscode-charts-orange); }
-    .heatmap-color-red { background: var(--vscode-charts-red); }
-    /* Relation legend line colors - 3 semantic categories */
-    .rel-line-blocks { background: var(--vscode-charts-red); }
-    .rel-line-scheduling { background: var(--vscode-charts-blue); }
-    .rel-line-informational { background: var(--vscode-charts-lines); border-style: dashed; }
-    /* SVG arrow colors - 3 semantic groups: blocking (red), scheduling (blue), informational (gray) */
-    /* Blocking - hard constraint, target blocked until source closes */
-    .rel-blocks .arrow-line { stroke: var(--vscode-charts-red); }
-    .rel-blocks .arrow-head { fill: var(--vscode-charts-red); }
-    /* Scheduling - all scheduling relation types use blue */
-    .rel-precedes .arrow-line,
-    .rel-finish_to_start .arrow-line,
-    .rel-start_to_start .arrow-line,
-    .rel-finish_to_finish .arrow-line,
-    .rel-start_to_finish .arrow-line { stroke: var(--vscode-charts-blue); }
-    .rel-precedes .arrow-head,
-    .rel-finish_to_start .arrow-head,
-    .rel-start_to_start .arrow-head,
-    .rel-finish_to_finish .arrow-head,
-    .rel-start_to_finish .arrow-head { fill: var(--vscode-charts-blue); }
-    /* Informational - simple links, no hard constraints */
-    .rel-relates .arrow-line,
-    .rel-duplicates .arrow-line,
-    .rel-copied_to .arrow-line { stroke: var(--vscode-charts-lines); }
-    .rel-relates .arrow-head,
-    .rel-duplicates .arrow-head,
-    .rel-copied_to .arrow-head { fill: var(--vscode-charts-lines); }
-    .color-swatch { display: inline-block; width: 12px; height: 3px; margin-right: 8px; vertical-align: middle; }
-
-    /* Minimap - fixed at bottom of gantt-container, aligned with timeline */
-    .minimap-container {
-      position: absolute;
-      bottom: 0;
-      left: var(--sticky-left-width);
-      right: 8px; /* Leave space for vertical scrollbar */
-      height: 30px;
-      background: var(--vscode-editor-background);
-      border-top: 1px solid var(--vscode-panel-border);
-      z-index: 6;
-    }
-    .minimap-container svg {
-      display: block;
-      width: 100%;
-      height: 100%;
-    }
-    .minimap-bar { opacity: 0.85; }
-    .minimap-bar.bar-past { opacity: 0.4; }
-    .minimap-viewport {
-      fill: var(--vscode-scrollbarSlider-background, rgba(100, 100, 100, 0.4));
-    }
-    .minimap-viewport:hover { fill: var(--vscode-scrollbarSlider-hoverBackground, rgba(100, 100, 100, 0.5)); }
-    .minimap-viewport:active { fill: var(--vscode-scrollbarSlider-activeBackground, rgba(100, 100, 100, 0.6)); }
-    .minimap-today { stroke: var(--today-color); stroke-width: 3; }
-    /* Milestone markers */
-    .milestone-marker {
-      pointer-events: all;
-      cursor: pointer;
-    }
-    .milestone-marker:hover .milestone-line {
-      opacity: 1;
-      stroke-width: 2;
-    }
-    .milestone-marker:hover .milestone-diamond {
-      stroke-width: 3;
-    }
-    .milestone-label {
-      pointer-events: none;
-      font-family: var(--vscode-font-family);
-    }
-    /* Focus mode: highlight dependency chain */
-    .focus-mode .issue-bar { opacity: 0.25; }
-    .focus-mode .issue-label { opacity: 0.25; }
-    .focus-mode .dependency-arrow { opacity: 0.15; }
-    .focus-mode .issue-bar.focus-highlighted { opacity: 1; }
-    .focus-mode .issue-label.focus-highlighted { opacity: 1; }
-    .focus-mode .dependency-arrow.focus-highlighted { opacity: 1; stroke-width: 2.5; }
-    .focus-mode .issue-bar.focus-highlighted .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
-    /* Blocker badge styling */
-    .blocker-badge { pointer-events: all; }
-    .blocker-badge:hover rect { opacity: 0.35 !important; }
-    /* Blocks badge styling */
-    .blocks-badge-group { cursor: pointer; }
-    .blocks-badge-group:hover .blocks-badge-bg { opacity: 0.35 !important; }
-  </style>
-</head>
-<body>
-  <div id="loadingOverlay" class="loading-overlay${this._isRefreshing ? " visible" : ""}"><div class="loading-spinner"></div></div>
+    const html = `
+<div id="loadingOverlay" class="loading-overlay${this._isRefreshing ? " visible" : ""}"><div class="loading-spinner"></div></div>
   <div id="liveRegion" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
     <div class="gantt-header">
     ${(() => {
@@ -4474,3113 +3644,52 @@ export class GanttPanel {
       </div>
     </div>
   </div>
-  <script nonce="${nonce}">
-    const vscode = acquireVsCodeApi();
-    const timelineWidth = ${timelineWidth};
-    const minDateMs = ${minDate.getTime()};
-    const maxDateMs = ${maxDate.getTime()};
-    const totalDays = ${totalDays};
-    const dayWidth = timelineWidth / totalDays;
-    const extendedRelationTypes = ${this._extendedRelationTypes};
-    const redmineBaseUrl = ${JSON.stringify(vscode.workspace.getConfiguration("redmine").get<string>("url") || "")};
+`;
 
-    // Cleanup previous event listeners (prevents accumulation on re-render)
-    if (window._ganttCleanup) {
-      window._ganttCleanup();
-    }
-    const docListeners = [];
-    const winListeners = [];
-    function addDocListener(type, handler, options) {
-      document.addEventListener(type, handler, options);
-      docListeners.push({ type, handler, options });
-    }
-    function addWinListener(type, handler, options) {
-      window.addEventListener(type, handler, options);
-      winListeners.push({ type, handler, options });
-    }
-    window._ganttCleanup = () => {
-      docListeners.forEach(l => document.removeEventListener(l.type, l.handler, l.options));
-      winListeners.forEach(l => window.removeEventListener(l.type, l.handler, l.options));
+    const redmineBaseUrl = vscode.workspace.getConfiguration("redmine").get<string>("url") || "";
+    const renderState: GanttRenderState = {
+      timelineWidth,
+      minDateMs: minDate.getTime(),
+      maxDateMs: maxDate.getTime(),
+      totalDays,
+      extendedRelationTypes: this._extendedRelationTypes,
+      redmineBaseUrl,
+      minimapBarsData: minimapBars,
+      minimapHeight,
+      minimapBarHeight,
+      minimapTodayX: Math.round(todayX),
+      extScrollLeft: this._scrollPosition.left,
+      extScrollTop: this._scrollPosition.top,
+      labelWidth,
+      leftExtrasWidth: resizeHandleWidth + extraColumnsWidth,
+      healthFilter: this._healthFilter,
+      sortBy: this._sortBy,
+      sortOrder: this._sortOrder,
+      selectedCollapseKey: this._selectedCollapseKey,
+      barHeight,
+      todayX: Math.round(todayX),
+      todayInRange,
+      headerHeight,
+      idColumnWidth,
+      startDateColumnWidth,
+      statusColumnWidth,
+      dueDateColumnWidth,
+      assigneeColumnWidth,
+      stickyLeftWidth,
     };
 
-    // Helper: close element on outside click (used by pickers/menus)
-    function closeOnOutsideClick(element) {
-      setTimeout(() => {
-        document.addEventListener('click', function closeHandler(e) {
-          if (!element.contains(e.target)) {
-            element.remove();
-            document.removeEventListener('click', closeHandler);
-          }
-        });
-      }, 0);
-    }
-
-    // Snap x position to nearest day boundary
-    function snapToDay(x) {
-      return Math.round(x / dayWidth) * dayWidth;
-    }
-
-    // Get DOM elements
-    const ganttScroll = document.getElementById('ganttScroll');
-    const ganttLeftHeader = document.getElementById('ganttLeftHeader');
-    const labelsColumn = document.getElementById('ganttLabels');
-    const timelineColumn = document.getElementById('ganttTimeline');
-    const menuUndo = document.getElementById('menuUndo');
-    const menuRedo = document.getElementById('menuRedo');
-    const minimapSvg = document.getElementById('minimapSvg');
-    const minimapViewport = document.getElementById('minimapViewport');
-    const minimapContainer = document.getElementById('minimapContainer');
-
-    // Position minimap to align with timeline (skip sticky-left columns)
-    function updateMinimapPosition() {
-      const stickyLeft = document.querySelector('.gantt-body .gantt-sticky-left');
-      const ganttContainer = document.querySelector('.gantt-container');
-      if (stickyLeft && ganttContainer) {
-        ganttContainer.style.setProperty('--sticky-left-width', stickyLeft.offsetWidth + 'px');
-      }
-    }
-    // Defer to next frame to ensure layout is complete (fixes minimap alignment on project switch)
-    requestAnimationFrame(updateMinimapPosition);
-
-    // Minimap setup
-    const minimapBarsData = ${minimapBarsJson};
-    const minimapHeight = ${minimapHeight};
-    const minimapBarHeight = ${minimapBarHeight};
-    const minimapTodayX = ${Math.round(todayX)};
-
-    // Render minimap bars (deferred to avoid blocking initial paint)
-    if (minimapSvg) {
-      requestAnimationFrame(() => {
-        const barSpacing = minimapHeight / (minimapBarsData.length + 1);
-        minimapBarsData.forEach((bar, i) => {
-          const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-          rect.setAttribute('class', bar.classes);
-          rect.setAttribute('x', (bar.startPct * timelineWidth).toString());
-          rect.setAttribute('y', (barSpacing * (i + 0.5)).toString());
-          rect.setAttribute('width', Math.max(2, (bar.endPct - bar.startPct) * timelineWidth).toString());
-          rect.setAttribute('height', minimapBarHeight.toString());
-          rect.setAttribute('rx', '1');
-          rect.setAttribute('fill', bar.color);
-          minimapSvg.insertBefore(rect, minimapViewport);
-        });
-        // Today marker line
-        if (minimapTodayX > 0 && minimapTodayX < timelineWidth) {
-          const todayLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-          todayLine.setAttribute('class', 'minimap-today');
-          todayLine.setAttribute('x1', minimapTodayX.toString());
-          todayLine.setAttribute('y1', '0');
-          todayLine.setAttribute('x2', minimapTodayX.toString());
-          todayLine.setAttribute('y2', minimapHeight.toString());
-          minimapSvg.insertBefore(todayLine, minimapViewport);
-        }
-      });
-    }
-
-    // Update minimap viewport on scroll
-    // Use ganttScroll for single-container scroll
-    function updateMinimapViewport() {
-      if (!ganttScroll || !minimapViewport) return;
-      const scrollableRange = Math.max(1, ganttScroll.scrollWidth - ganttScroll.clientWidth);
-      const scrollRatio = Math.min(1, ganttScroll.scrollLeft / scrollableRange);
-      const viewportRatio = Math.min(1, ganttScroll.clientWidth / ganttScroll.scrollWidth);
-      const viewportWidth = Math.max(20, viewportRatio * timelineWidth);
-      const viewportX = scrollRatio * (timelineWidth - viewportWidth);
-      minimapViewport.setAttribute('x', viewportX.toString());
-      minimapViewport.setAttribute('width', viewportWidth.toString());
-    }
-
-    // Handle minimap click/drag to scroll
-    let minimapDragging = false;
-    let minimapDragOffset = 0; // Offset within viewport where drag started
-
-    function scrollFromMinimap(e, useOffset = false) {
-      if (!ganttScroll || !minimapSvg || !minimapViewport) return;
-      const rect = minimapSvg.getBoundingClientRect();
-      const viewportWidth = parseFloat(minimapViewport.getAttribute('width') || '0');
-      const viewportWidthPx = (viewportWidth / timelineWidth) * rect.width;
-
-      // Calculate target position, accounting for drag offset if dragging viewport
-      let targetX = e.clientX - rect.left;
-      if (useOffset) {
-        targetX -= minimapDragOffset;
-      } else {
-        // Center viewport on click position
-        targetX -= viewportWidthPx / 2;
-      }
-
-      // Use ganttScroll for single-container scroll
-      const clickRatio = Math.max(0, Math.min(1, targetX / (rect.width - viewportWidthPx)));
-      const scrollableRange = Math.max(0, ganttScroll.scrollWidth - ganttScroll.clientWidth);
-      ganttScroll.scrollLeft = clickRatio * scrollableRange;
-    }
-
-    if (minimapSvg && minimapViewport) {
-      // Clicking on viewport - drag from current position
-      minimapViewport.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
-        minimapDragging = true;
-        const rect = minimapSvg.getBoundingClientRect();
-        const viewportX = parseFloat(minimapViewport.getAttribute('x') || '0');
-        const viewportXPx = (viewportX / timelineWidth) * rect.width;
-        minimapDragOffset = e.clientX - rect.left - viewportXPx;
-      });
-
-      // Clicking outside viewport - jump to position (center viewport on click)
-      minimapSvg.addEventListener('mousedown', (e) => {
-        if (e.target === minimapViewport) return;
-        minimapDragging = true;
-        // Set offset to viewport center so dragging maintains centering (like VS Code)
-        const rect = minimapSvg.getBoundingClientRect();
-        const viewportWidth = parseFloat(minimapViewport.getAttribute('width') || '0');
-        minimapDragOffset = (viewportWidth / 100) * rect.width / 2;
-        scrollFromMinimap(e, true);
-      });
-
-      addDocListener('mousemove', (e) => {
-        if (minimapDragging) scrollFromMinimap(e, true);
-      });
-      addDocListener('mouseup', () => {
-        minimapDragging = false;
-      });
-    }
-
-    // Restore state from previous session (use extension-stored position as fallback)
-    const extScrollLeft = ${this._scrollPosition.left};
-    const extScrollTop = ${this._scrollPosition.top};
-    const previousState = vscode.getState() || { undoStack: [], redoStack: [], labelWidth: ${labelWidth}, scrollLeft: null, scrollTop: null, centerDateMs: null };
-    const undoStack = previousState.undoStack || [];
-    const redoStack = previousState.redoStack || [];
-    // Use webview state if available, otherwise use extension-stored position
-    let savedScrollLeft = previousState.scrollLeft ?? (extScrollLeft > 0 ? extScrollLeft : null);
-    let savedScrollTop = previousState.scrollTop ?? (extScrollTop > 0 ? extScrollTop : null);
-    let savedCenterDateMs = previousState.centerDateMs;
-
-    // Convert scroll position to center date (milliseconds)
-    function getCenterDateMs() {
-      if (!ganttScroll) return null;
-      // Account for sticky left column (same as scrollToCenterDate)
-      const stickyLeft = document.querySelector('.gantt-body .gantt-sticky-left');
-      const stickyWidth = stickyLeft?.offsetWidth ?? 0;
-      const visibleTimelineWidth = ganttScroll.clientWidth - stickyWidth;
-      const centerX = ganttScroll.scrollLeft + visibleTimelineWidth / 2;
-      const ratio = centerX / timelineWidth;
-      return minDateMs + ratio * (maxDateMs - minDateMs);
-    }
-
-    // Scroll to center a specific date
-    function scrollToCenterDate(dateMs) {
-      if (!ganttScroll) return;
-      const ratio = (dateMs - minDateMs) / (maxDateMs - minDateMs);
-      const centerX = ratio * timelineWidth;
-      const stickyLeft = document.querySelector('.gantt-body .gantt-sticky-left');
-      const stickyWidth = stickyLeft?.offsetWidth ?? 0;
-      const visibleTimelineWidth = ganttScroll.clientWidth - stickyWidth;
-      ganttScroll.scrollLeft = Math.max(0, centerX - visibleTimelineWidth / 2);
-    }
-
-    function saveState() {
-      // Always save centerDateMs for date-based scroll restoration
-      // This ensures correct position when date range changes (e.g., visibility toggle)
-      vscode.setState({
-        undoStack,
-        redoStack,
-        labelWidth: labelsColumn?.offsetWidth || ${labelWidth},
-        scrollLeft: null, // Deprecated: use centerDateMs instead
-        scrollTop: ganttScroll?.scrollTop ?? null,
-        centerDateMs: getCenterDateMs()
-      });
-    }
-
-    // Alias for backward compatibility (zoom changes now use same logic)
-    const saveStateForZoom = saveState;
-
-    function updateUndoRedoButtons() {
-      if (menuUndo) menuUndo.toggleAttribute('disabled', undoStack.length === 0);
-      if (menuRedo) menuRedo.toggleAttribute('disabled', redoStack.length === 0);
-      saveState();
-    }
-
-    // Apply saved label width
-    if (previousState.labelWidth && ganttLeftHeader && labelsColumn) {
-      ganttLeftHeader.style.width = previousState.labelWidth + 'px';
-      labelsColumn.style.width = previousState.labelWidth + 'px';
-      // Also update capacity ribbon label to stay aligned
-      const capacityLabel = document.querySelector('.capacity-ribbon-label');
-      if (capacityLabel) {
-        capacityLabel.style.width = (previousState.labelWidth + ${resizeHandleWidth + extraColumnsWidth}) + 'px';
-      }
-    }
-
-    // Single scroll container - no sync needed, just update minimap and save state
-    // Flag to prevent saving state during scroll restoration (would overwrite with wrong position)
-    let restoringScroll = true;
-    let deferredScrollUpdate = null;
-    if (ganttScroll) {
-      ganttScroll.addEventListener('scroll', () => {
-        cancelAnimationFrame(deferredScrollUpdate);
-        deferredScrollUpdate = requestAnimationFrame(() => {
-          updateMinimapViewport();
-          if (!restoringScroll) saveState();
-        });
-      }, { passive: true });
-    }
-
-    // Initial button state (defer to avoid forced reflow after style writes)
-    requestAnimationFrame(() => updateUndoRedoButtons());
-
-    // Handle messages from extension (for state updates without full re-render)
-    addWinListener('message', event => {
-      const message = event.data;
-      if (message.command === 'setHeatmapState') {
-        const heatmapLayer = document.querySelector('.heatmap-layer');
-        const weekendLayer = document.querySelector('.weekend-layer');
-        const menuHeatmap = document.getElementById('menuHeatmap');
-
-        if (message.enabled) {
-          if (heatmapLayer) heatmapLayer.classList.remove('hidden');
-          if (weekendLayer) weekendLayer.classList.add('hidden');
-          if (menuHeatmap) menuHeatmap.classList.add('active');
-        } else {
-          if (heatmapLayer) heatmapLayer.classList.add('hidden');
-          if (weekendLayer) weekendLayer.classList.remove('hidden');
-          if (menuHeatmap) menuHeatmap.classList.remove('active');
-        }
-      } else if (message.command === 'setDependenciesState') {
-        const dependencyLayer = document.querySelector('.dependency-layer');
-        const menuDeps = document.getElementById('menuDeps');
-
-        if (message.enabled) {
-          if (dependencyLayer) dependencyLayer.classList.remove('hidden');
-          if (menuDeps) menuDeps.classList.add('active');
-        } else {
-          if (dependencyLayer) dependencyLayer.classList.add('hidden');
-          if (menuDeps) menuDeps.classList.remove('active');
-        }
-      } else if (message.command === 'setCapacityRibbonState') {
-        const capacityRibbon = document.querySelector('.capacity-ribbon');
-        const menuCapacity = document.getElementById('menuCapacity');
-
-        if (message.enabled) {
-          if (capacityRibbon) capacityRibbon.classList.remove('hidden');
-          if (menuCapacity) menuCapacity.classList.add('active');
-        } else {
-          if (capacityRibbon) capacityRibbon.classList.add('hidden');
-          if (menuCapacity) menuCapacity.classList.remove('active');
-        }
-      } else if (message.command === 'pushUndoAction') {
-        // Push relation action to undo stack
-        undoStack.push(message.action);
-        redoStack.length = 0;
-        updateUndoRedoButtons();
-        saveState();
-      } else if (message.command === 'updateRelationId') {
-        // Update relationId in most recent relation action (after undo/redo recreates relation)
-        const stack = message.stack === 'undo' ? undoStack : redoStack;
-        if (stack.length > 0) {
-          const lastAction = stack[stack.length - 1];
-          if (lastAction.type === 'relation') {
-            lastAction.relationId = message.newRelationId;
-            saveState();
-          }
-        }
-      } else if (message.command === 'scrollToIssue') {
-        // Scroll to, focus, and highlight a specific issue
-        const issueId = message.issueId;
-        const label = document.querySelector('.issue-label[data-issue-id="' + issueId + '"]');
-        const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
-        const scrollContainer = document.getElementById('ganttScroll');
-        const headerRow = document.querySelector('.gantt-header-row');
-        const headerHeight = headerRow?.getBoundingClientRect().height || 60;
-
-        if (!scrollContainer) return;
-
-        // Calculate target scroll positions
-        let targetScrollTop = scrollContainer.scrollTop;
-        let targetScrollLeft = scrollContainer.scrollLeft;
-
-        if (label) {
-          // Calculate vertical scroll position within container (not scrollIntoView which affects document)
-          const labelRow = label.closest('.gantt-row');
-          if (labelRow) {
-            const rowTop = labelRow.offsetTop;
-            const rowHeight = labelRow.getBoundingClientRect().height;
-            const viewportHeight = scrollContainer.clientHeight - headerHeight;
-            // Center the row vertically in the visible area below header
-            targetScrollTop = Math.max(0, rowTop - headerHeight - (viewportHeight - rowHeight) / 2);
-          }
-          label.focus();
-          label.classList.add('highlighted');
-          setTimeout(() => label.classList.remove('highlighted'), 2000);
-        }
-
-        if (bar) {
-          // Calculate horizontal scroll to show the bar
-          const startX = parseFloat(bar.getAttribute('data-start-x') || '0');
-          const endX = parseFloat(bar.getAttribute('data-end-x') || '0');
-          const barWidth = endX - startX;
-          const viewportWidth = scrollContainer.clientWidth;
-          const stickyLeftWidth = document.querySelector('.gantt-sticky-left')?.getBoundingClientRect().width || 0;
-          const availableWidth = viewportWidth - stickyLeftWidth;
-
-          if (barWidth <= availableWidth - 100) {
-            // Bar fits: center it in the available viewport
-            targetScrollLeft = startX - (availableWidth - barWidth) / 2;
-          } else {
-            // Bar too wide: show start with some padding
-            targetScrollLeft = startX - 50;
-          }
-          targetScrollLeft = Math.max(0, targetScrollLeft);
-
-          bar.classList.add('highlighted');
-          setTimeout(() => bar.classList.remove('highlighted'), 2000);
-        }
-
-        // Single combined scroll call
-        scrollContainer.scrollTo({ left: targetScrollLeft, top: targetScrollTop, behavior: 'smooth' });
-      }
-    });
-
-    // Lookback period select handler
-    document.getElementById('lookbackSelect')?.addEventListener('change', (e) => {
-      vscode.postMessage({ command: 'setLookback', years: e.target.value });
-    });
-
-    // Zoom select handler
-    document.getElementById('zoomSelect')?.addEventListener('change', (e) => {
-      saveStateForZoom();
-      vscode.postMessage({ command: 'setZoom', zoomLevel: e.target.value });
-    });
-
-    // View focus select handler
-    document.getElementById('viewFocusSelect')?.addEventListener('change', (e) => {
-      vscode.postMessage({ command: 'setViewFocus', focus: e.target.value });
-    });
-
-    // Project selector handler (native select)
-    const projectSelector = document.getElementById('projectSelector');
-    projectSelector?.addEventListener('change', (e) => {
-      const value = e.target.value;
-      const projectId = value ? parseInt(value, 10) : null;
-      vscode.postMessage({ command: 'setSelectedProject', projectId });
-    });
-
-    // Person selector handler (focusSelector in person focus mode)
-    const focusSelector = document.getElementById('focusSelector');
-    focusSelector?.addEventListener('change', (e) => {
-      const value = e.target.value;
-      vscode.postMessage({
-        command: 'setSelectedAssignee',
-        assignee: value || null
-      });
-    });
-
-    // Filter dropdown handlers
-    document.getElementById('filterAssignee')?.addEventListener('change', (e) => {
-      const value = e.target.value;
-      vscode.postMessage({ command: 'setFilter', filter: { assignee: value } });
-    });
-    document.getElementById('filterStatus')?.addEventListener('change', (e) => {
-      const value = e.target.value;
-      vscode.postMessage({ command: 'setFilter', filter: { status: value } });
-    });
-    // Health filter menu item (cycles through options)
-    document.getElementById('menuFilterHealth')?.addEventListener('click', () => {
-      const options = ['all', 'critical', 'warning', 'healthy'];
-      const currentHealth = '${this._healthFilter}';
-      const currentIdx = options.indexOf(currentHealth);
-      const nextIdx = (currentIdx + 1) % options.length;
-      vscode.postMessage({ command: 'setHealthFilter', health: options[nextIdx] });
-    });
-
-    // Sortable column header handlers (cycle: asc → desc → none)
-    document.querySelectorAll('.gantt-col-header.sortable').forEach(header => {
-      header.addEventListener('click', () => {
-        const sortField = header.dataset.sort;
-        const currentSort = '${this._sortBy}';
-        const currentOrder = '${this._sortOrder}';
-        if (sortField === currentSort) {
-          // Same field: asc → desc → none
-          if (currentOrder === 'asc') {
-            vscode.postMessage({ command: 'setSort', sortOrder: 'desc' });
-          } else {
-            // desc → none (clear sort)
-            vscode.postMessage({ command: 'setSort', sortBy: null });
-          }
-        } else {
-          // Different field: start with ascending
-          vscode.postMessage({ command: 'setSort', sortBy: sortField, sortOrder: 'asc' });
-        }
-      });
-    });
-
-    // Heatmap toggle handler (menu item)
-    document.getElementById('menuHeatmap')?.addEventListener('click', () => {
-      if (document.getElementById('menuHeatmap')?.hasAttribute('disabled')) return;
-      saveState();
-      vscode.postMessage({ command: 'toggleWorkloadHeatmap' });
-    });
-
-    // Capacity ribbon toggle handler (menu item)
-    document.getElementById('menuCapacity')?.addEventListener('click', () => {
-      if (document.getElementById('menuCapacity')?.hasAttribute('disabled')) return;
-      saveState();
-      vscode.postMessage({ command: 'toggleCapacityRibbon' });
-    });
-
-    // Intensity toggle handler (menu item)
-    document.getElementById('menuIntensity')?.addEventListener('click', () => {
-      if (document.getElementById('menuIntensity')?.hasAttribute('disabled')) return;
-      saveState();
-      vscode.postMessage({ command: 'toggleIntensity' });
-    });
-
-    // Overload badge click - jump to first overloaded day
-    document.getElementById('overloadBadge')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const badge = e.currentTarget;
-      const firstOverloadMs = parseInt(badge.dataset.firstOverloadMs || '0', 10);
-      if (firstOverloadMs > 0) {
-        scrollToCenterDate(firstOverloadMs);
-        saveState();
-      }
-    });
-
-    // Capacity ribbon click - scroll to clicked date
-    document.querySelectorAll('.capacity-day-bar-group').forEach(group => {
-      group.addEventListener('click', (e) => {
-        const dateMs = parseInt(e.currentTarget.dataset.dateMs || '0', 10);
-        if (dateMs > 0) {
-          scrollToCenterDate(dateMs);
-          saveState();
-        }
-      });
-    });
-
-    // Dependencies toggle handler (menu item)
-    document.getElementById('menuDeps')?.addEventListener('click', () => {
-      saveState();
-      vscode.postMessage({ command: 'toggleDependencies' });
-    });
-
-    const ganttContainer = document.querySelector('.gantt-container');
-
-    // Build blocking graph from dependency arrows (used by focus mode)
-    function buildBlockingGraph() {
-      const graph = new Map(); // issueId -> [targetIds that this issue blocks/precedes]
-      const reverseGraph = new Map(); // issueId -> [sourceIds that block/precede this issue]
-      document.querySelectorAll('.dependency-arrow').forEach(arrow => {
-        const relType = arrow.classList.contains('rel-blocks') || arrow.classList.contains('rel-precedes');
-        if (!relType) return;
-        const fromId = arrow.dataset.from;
-        const toId = arrow.dataset.to;
-        if (!graph.has(fromId)) graph.set(fromId, []);
-        graph.get(fromId).push(toId);
-        if (!reverseGraph.has(toId)) reverseGraph.set(toId, []);
-        reverseGraph.get(toId).push(fromId);
-      });
-      return { graph, reverseGraph };
-    }
-
-    // Focus mode: click on issue to highlight its dependency chain
-    let focusedIssueId = null;
-
-    function getAllConnected(issueId, graph, reverseGraph) {
-      const connected = new Set([issueId]);
-      const queue = [issueId];
-      // Traverse downstream (issues blocked by this one)
-      while (queue.length > 0) {
-        const current = queue.shift();
-        const downstream = graph.get(current) || [];
-        for (const dep of downstream) {
-          if (!connected.has(dep)) {
-            connected.add(dep);
-            queue.push(dep);
-          }
-        }
-      }
-      // Traverse upstream (issues that block this one)
-      const upQueue = [issueId];
-      while (upQueue.length > 0) {
-        const current = upQueue.shift();
-        const upstream = reverseGraph.get(current) || [];
-        for (const dep of upstream) {
-          if (!connected.has(dep)) {
-            connected.add(dep);
-            upQueue.push(dep);
-          }
-        }
-      }
-      return connected;
-    }
-
-    function focusOnDependencyChain(issueId) {
-      // Clear previous focus
-      clearFocus();
-      if (!issueId) return;
-
-      focusedIssueId = issueId;
-      const { graph, reverseGraph } = buildBlockingGraph();
-      const connected = getAllConnected(issueId, graph, reverseGraph);
-
-      // Add focus mode class to container
-      ganttContainer.classList.add('focus-mode');
-
-      // Highlight connected issues
-      document.querySelectorAll('.issue-bar').forEach(bar => {
-        if (connected.has(bar.dataset.issueId)) {
-          bar.classList.add('focus-highlighted');
-        }
-      });
-      document.querySelectorAll('.issue-label').forEach(label => {
-        if (connected.has(label.dataset.issueId)) {
-          label.classList.add('focus-highlighted');
-        }
-      });
-      // Highlight arrows between connected issues
-      document.querySelectorAll('.dependency-arrow').forEach(arrow => {
-        if (connected.has(arrow.dataset.from) && connected.has(arrow.dataset.to)) {
-          arrow.classList.add('focus-highlighted');
-        }
-      });
-
-      announce(\`Focus: \${connected.size} issue\${connected.size !== 1 ? 's' : ''} in dependency chain\`);
-    }
-
-    function clearFocus() {
-      focusedIssueId = null;
-      ganttContainer.classList.remove('focus-mode');
-      document.querySelectorAll('.focus-highlighted').forEach(el => el.classList.remove('focus-highlighted'));
-    }
-
-    // Multi-select state
-    const selectedIssues = new Set();
-    let lastClickedIssueId = null;
-    const selectionCountEl = document.getElementById('selectionCount');
-    const allIssueBars = Array.from(document.querySelectorAll('.issue-bar'));
-
-    function updateSelectionUI() {
-      // Update visual selection on bars
-      allIssueBars.forEach(bar => {
-        bar.classList.toggle('selected', selectedIssues.has(bar.dataset.issueId));
-      });
-      // Update selection count
-      if (selectedIssues.size > 0) {
-        selectionCountEl.textContent = \`\${selectedIssues.size} selected\`;
-        selectionCountEl.classList.remove('hidden');
-        ganttContainer.classList.add('multi-select-mode');
-      } else {
-        selectionCountEl.classList.add('hidden');
-        ganttContainer.classList.remove('multi-select-mode');
-      }
-    }
-
-    function clearSelection() {
-      selectedIssues.clear();
-      lastClickedIssueId = null;
-      updateSelectionUI();
-    }
-
-    function toggleSelection(issueId) {
-      if (selectedIssues.has(issueId)) {
-        selectedIssues.delete(issueId);
-      } else {
-        selectedIssues.add(issueId);
-      }
-      lastClickedIssueId = issueId;
-      updateSelectionUI();
-    }
-
-    function selectRange(fromId, toId) {
-      const fromIndex = allIssueBars.findIndex(b => b.dataset.issueId === fromId);
-      const toIndex = allIssueBars.findIndex(b => b.dataset.issueId === toId);
-      if (fromIndex === -1 || toIndex === -1) return;
-      const start = Math.min(fromIndex, toIndex);
-      const end = Math.max(fromIndex, toIndex);
-      for (let i = start; i <= end; i++) {
-        selectedIssues.add(allIssueBars[i].dataset.issueId);
-      }
-      updateSelectionUI();
-    }
-
-    function selectAll() {
-      allIssueBars.forEach(bar => selectedIssues.add(bar.dataset.issueId));
-      updateSelectionUI();
-      announce(\`Selected all \${selectedIssues.size} issues\`);
-    }
-
-    // Handle Ctrl+click and Shift+click on bars for selection
-    allIssueBars.forEach(bar => {
-      bar.addEventListener('mousedown', (e) => {
-        // Only handle Ctrl or Shift clicks for selection
-        if (!e.ctrlKey && !e.metaKey && !e.shiftKey) return;
-
-        // Don't interfere with drag handles
-        if (e.target.classList.contains('drag-handle') ||
-            e.target.classList.contains('link-handle')) return;
-
-        e.preventDefault();
-        e.stopPropagation();
-
-        const issueId = bar.dataset.issueId;
-        if (e.shiftKey && lastClickedIssueId) {
-          // Shift+click: range selection
-          selectRange(lastClickedIssueId, issueId);
-        } else {
-          // Ctrl/Cmd+click: toggle selection
-          toggleSelection(issueId);
-        }
-      });
-    });
-
-    // Ctrl+A to select all, Escape to clear
-    addDocListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
-        e.preventDefault();
-        selectAll();
-      }
-      if (e.key === 'Escape' && selectedIssues.size > 0) {
-        e.stopImmediatePropagation();
-        clearSelection();
-        announce('Selection cleared');
-      }
-    });
-
-    // Refresh button handler
-    document.getElementById('refreshBtn')?.addEventListener('click', () => {
-      document.getElementById('loadingOverlay')?.classList.add('visible');
-      vscode.postMessage({ command: 'refresh' });
-    });
-
-    // Show delete confirmation picker
-    function showDeletePicker(x, y, relationId, fromId, toId) {
-      document.querySelector('.relation-picker')?.remove();
-
-      const picker = document.createElement('div');
-      picker.className = 'relation-picker';
-
-      // Clamp position to viewport bounds
-      const pickerWidth = 150;
-      const pickerHeight = 100;
-      const clampedX = Math.min(x, window.innerWidth - pickerWidth - 10);
-      const clampedY = Math.min(y, window.innerHeight - pickerHeight - 10);
-      picker.style.left = Math.max(10, clampedX) + 'px';
-      picker.style.top = Math.max(10, clampedY) + 'px';
-
-      const label = document.createElement('div');
-      label.style.padding = '6px 12px';
-      label.style.fontSize = '11px';
-      label.style.opacity = '0.7';
-      label.textContent = \`#\${fromId} → #\${toId}\`;
-      picker.appendChild(label);
-
-      const deleteBtn = document.createElement('button');
-      deleteBtn.textContent = '🗑️ Delete relation';
-      deleteBtn.addEventListener('click', () => {
-        saveState();
-        vscode.postMessage({ command: 'deleteRelation', relationId });
-        picker.remove();
-      });
-      picker.appendChild(deleteBtn);
-
-      const cancelBtn = document.createElement('button');
-      cancelBtn.textContent = 'Cancel';
-      cancelBtn.addEventListener('click', () => picker.remove());
-      picker.appendChild(cancelBtn);
-
-      document.body.appendChild(picker);
-      closeOnOutsideClick(picker);
-    }
-
-    // Build lookup maps for O(1) hover highlight (instead of repeated querySelectorAll)
-    // Deferred to avoid blocking initial render
-    const issueBarsByIssueId = new Map();
-    const issueLabelsByIssueId = new Map();
-    const arrowsByIssueId = new Map(); // arrows connected to an issue
-    const projectLabelsByKey = new Map();
-    const aggregateBarsByKey = new Map();
-    let mapsReady = false;
-
-    function buildLookupMaps() {
-      document.querySelectorAll('.issue-bar').forEach(bar => {
-        const id = bar.dataset.issueId;
-        if (id) {
-          if (!issueBarsByIssueId.has(id)) issueBarsByIssueId.set(id, []);
-          issueBarsByIssueId.get(id).push(bar);
-        }
-      });
-      document.querySelectorAll('.issue-label').forEach(label => {
-        const id = label.dataset.issueId;
-        if (id) {
-          if (!issueLabelsByIssueId.has(id)) issueLabelsByIssueId.set(id, []);
-          issueLabelsByIssueId.get(id).push(label);
-        }
-      });
-      document.querySelectorAll('.dependency-arrow').forEach(arrow => {
-        const fromId = arrow.dataset.from;
-        const toId = arrow.dataset.to;
-        if (fromId) {
-          if (!arrowsByIssueId.has(fromId)) arrowsByIssueId.set(fromId, []);
-          arrowsByIssueId.get(fromId).push(arrow);
-        }
-        if (toId) {
-          if (!arrowsByIssueId.has(toId)) arrowsByIssueId.set(toId, []);
-          arrowsByIssueId.get(toId).push(arrow);
-        }
-      });
-      document.querySelectorAll('.project-label').forEach(label => {
-        const key = label.dataset.collapseKey;
-        if (key) {
-          if (!projectLabelsByKey.has(key)) projectLabelsByKey.set(key, []);
-          projectLabelsByKey.get(key).push(label);
-        }
-      });
-      document.querySelectorAll('.aggregate-bars').forEach(bars => {
-        const key = bars.dataset.collapseKey;
-        if (key) {
-          if (!aggregateBarsByKey.has(key)) aggregateBarsByKey.set(key, []);
-          aggregateBarsByKey.get(key).push(bars);
-        }
-      });
-      mapsReady = true;
-    }
-
-    // Defer map building to after initial render
-    if (typeof requestIdleCallback !== 'undefined') {
-      requestIdleCallback(() => buildLookupMaps(), { timeout: 100 });
-    } else {
-      setTimeout(buildLookupMaps, 0);
-    }
-
-    // Track currently highlighted elements for fast clear
-    let highlightedElements = [];
-
-    function clearHoverHighlight() {
-      document.body.classList.remove('hover-focus', 'dependency-hover');
-      highlightedElements.forEach(el => el.classList.remove('hover-highlighted', 'hover-source'));
-      highlightedElements = [];
-    }
-
-    function highlightIssue(issueId) {
-      document.body.classList.add('hover-focus');
-      // Use cached lookups if ready, otherwise fall back to DOM query
-      const bars = mapsReady ? (issueBarsByIssueId.get(issueId) || [])
-        : document.querySelectorAll('.issue-bar[data-issue-id="' + issueId + '"]');
-      const labels = mapsReady ? (issueLabelsByIssueId.get(issueId) || [])
-        : document.querySelectorAll('.issue-label[data-issue-id="' + issueId + '"]');
-      const arrows = mapsReady ? (arrowsByIssueId.get(issueId) || [])
-        : document.querySelectorAll('.dependency-arrow[data-from="' + issueId + '"], .dependency-arrow[data-to="' + issueId + '"]');
-      bars.forEach(el => { el.classList.add('hover-highlighted'); highlightedElements.push(el); });
-      labels.forEach(el => { el.classList.add('hover-highlighted'); highlightedElements.push(el); });
-      arrows.forEach(el => { el.classList.add('hover-highlighted'); highlightedElements.push(el); });
-    }
-
-    function highlightProject(collapseKey) {
-      document.body.classList.add('hover-focus');
-      const labels = mapsReady ? (projectLabelsByKey.get(collapseKey) || [])
-        : document.querySelectorAll('.project-label[data-collapse-key="' + collapseKey + '"]');
-      const bars = mapsReady ? (aggregateBarsByKey.get(collapseKey) || [])
-        : document.querySelectorAll('.aggregate-bars[data-collapse-key="' + collapseKey + '"]');
-      labels.forEach(el => { el.classList.add('hover-highlighted'); highlightedElements.push(el); });
-      bars.forEach(el => { el.classList.add('hover-highlighted'); highlightedElements.push(el); });
-    }
-
-    // Use event delegation for hover events (single listener instead of N listeners)
-    const timelineSvg = document.querySelector('.gantt-timeline svg');
-    const labelsSvg = document.querySelector('.gantt-labels svg');
-
-    if (timelineSvg) {
-      timelineSvg.addEventListener('mouseenter', (e) => {
-        const bar = e.target.closest('.issue-bar');
-        const aggBar = e.target.closest('.aggregate-bars');
-        const arrow = e.target.closest('.dependency-arrow');
-        if (bar) {
-          const issueId = bar.dataset.issueId;
-          if (issueId) highlightIssue(issueId);
-        } else if (aggBar) {
-          const key = aggBar.dataset.collapseKey;
-          if (key) highlightProject(key);
-        } else if (arrow) {
-          const fromId = arrow.dataset.from;
-          const toId = arrow.dataset.to;
-          document.body.classList.add('dependency-hover');
-          arrow.classList.add('hover-source');
-          highlightedElements.push(arrow);
-          if (fromId) highlightIssue(fromId);
-          if (toId) highlightIssue(toId);
-        }
-      }, true); // capture phase for delegation
-
-      timelineSvg.addEventListener('mouseleave', (e) => {
-        const bar = e.target.closest('.issue-bar');
-        const aggBar = e.target.closest('.aggregate-bars');
-        const arrow = e.target.closest('.dependency-arrow');
-        if (bar || aggBar || arrow) {
-          clearHoverHighlight();
-        }
-      }, true);
-    }
-
-    if (labelsSvg) {
-      labelsSvg.addEventListener('mouseenter', (e) => {
-        const label = e.target.closest('.issue-label');
-        const projectLabel = e.target.closest('.project-label');
-        if (label) {
-          const issueId = label.dataset.issueId;
-          if (issueId) highlightIssue(issueId);
-        } else if (projectLabel) {
-          const key = projectLabel.dataset.collapseKey;
-          if (key) highlightProject(key);
-        }
-      }, true);
-
-      labelsSvg.addEventListener('mouseleave', (e) => {
-        const label = e.target.closest('.issue-label');
-        const projectLabel = e.target.closest('.project-label');
-        if (label || projectLabel) {
-          clearHoverHighlight();
-        }
-      }, true);
-    }
-
-    // Dependency arrow right-click delete (delegated)
-    if (timelineSvg) {
-      timelineSvg.addEventListener('contextmenu', (e) => {
-        const arrow = e.target.closest('.dependency-arrow');
-        if (!arrow) return;
-        e.preventDefault();
-        const relationId = parseInt(arrow.dataset.relationId);
-        const fromId = arrow.dataset.from;
-        const toId = arrow.dataset.to;
-        showDeletePicker(e.clientX, e.clientY, relationId, fromId, toId);
-      });
-
-      // Dependency arrow click to select/highlight
-      let selectedArrow = null;
-      timelineSvg.addEventListener('click', (e) => {
-        const arrow = e.target.closest('.dependency-arrow');
-
-        // Clear previous selection
-        if (selectedArrow) {
-          selectedArrow.classList.remove('selected');
-          document.body.classList.remove('arrow-selection-mode');
-          document.querySelectorAll('.arrow-connected').forEach(el => el.classList.remove('arrow-connected'));
-          selectedArrow = null;
-        }
-
-        if (!arrow) return;
-
-        // Select clicked arrow
-        e.stopPropagation();
-        selectedArrow = arrow;
-        arrow.classList.add('selected');
-        document.body.classList.add('arrow-selection-mode');
-
-        // Highlight connected bars and labels
-        const fromId = arrow.dataset.from;
-        const toId = arrow.dataset.to;
-        document.querySelectorAll(\`.issue-bar[data-issue-id="\${fromId}"], .issue-bar[data-issue-id="\${toId}"]\`)
-          .forEach(bar => bar.classList.add('arrow-connected'));
-        document.querySelectorAll(\`.issue-label[data-issue-id="\${fromId}"], .issue-label[data-issue-id="\${toId}"]\`)
-          .forEach(label => label.classList.add('arrow-connected'));
-
-        announce(\`Selected relation from #\${fromId} to #\${toId}\`);
-      });
-
-      // Helper to clear all arrow selections (single or multi-select)
-      function clearArrowSelection() {
-        document.querySelectorAll('.dependency-arrow.selected').forEach(a => a.classList.remove('selected'));
-        document.body.classList.remove('arrow-selection-mode');
-        document.querySelectorAll('.arrow-connected').forEach(el => el.classList.remove('arrow-connected'));
-        selectedArrow = null;
-      }
-
-      // Click elsewhere to deselect arrows (cleanup previous handlers)
-      if (window._ganttArrowClickHandler) {
-        document.removeEventListener('click', window._ganttArrowClickHandler);
-      }
-      window._ganttArrowClickHandler = (e) => {
-        const hasSelection = selectedArrow || document.querySelector('.dependency-arrow.selected');
-        if (hasSelection && !e.target.closest('.dependency-arrow') && !e.target.closest('.blocks-badge-group') && !e.target.closest('.blocker-badge')) {
-          clearArrowSelection();
-        }
-      };
-      document.addEventListener('click', window._ganttArrowClickHandler);
-
-      // Escape to deselect arrows (cleanup previous handler)
-      if (window._ganttArrowKeyHandler) {
-        document.removeEventListener('keydown', window._ganttArrowKeyHandler);
-      }
-      window._ganttArrowKeyHandler = (e) => {
-        const hasSelection = selectedArrow || document.querySelector('.dependency-arrow.selected');
-        if (e.key === 'Escape' && hasSelection) {
-          e.stopImmediatePropagation();
-          clearArrowSelection();
-        }
-      };
-      document.addEventListener('keydown', window._ganttArrowKeyHandler);
-    }
-
-    // Show context menu for issue (similar to Issues pane context menu)
-    function showIssueContextMenu(x, y, issueId) {
-      document.querySelector('.relation-picker')?.remove();
-
-      // Check if this is a bulk operation (multiple selected and clicked is part of selection)
-      const isBulkMode = selectedIssues.size > 1 && selectedIssues.has(issueId);
-      const targetIds = isBulkMode ? Array.from(selectedIssues).map(id => parseInt(id)) : [parseInt(issueId)];
-
-      const picker = document.createElement('div');
-      picker.className = 'relation-picker';
-
-      const pickerWidth = 160;
-      const pickerHeight = 180;
-      const clampedX = Math.min(x, window.innerWidth - pickerWidth - 10);
-      const clampedY = Math.min(y, window.innerHeight - pickerHeight - 10);
-      picker.style.left = Math.max(10, clampedX) + 'px';
-      picker.style.top = Math.max(10, clampedY) + 'px';
-
-      const label = document.createElement('div');
-      label.style.padding = '6px 12px';
-      label.style.fontSize = '11px';
-      label.style.opacity = '0.7';
-      label.textContent = isBulkMode ? targetIds.length + ' issues selected' : '#' + issueId;
-      picker.appendChild(label);
-
-      const options = isBulkMode ? [
-        { label: 'Set % Done...', command: 'bulkSetDoneRatio', bulk: true },
-        { label: 'Clear Selection', command: 'clearSelection', local: true },
-      ] : [
-        { label: 'Update Issue...', command: 'openIssue' },
-        { label: 'Open in Browser', command: 'openInBrowser' },
-        { label: 'Show in Issues', command: 'showInIssues' },
-        { label: 'Log Time', command: 'logTime' },
-        { label: 'Set % Done', command: 'setDoneRatio' },
-        { label: 'Toggle Auto-update %', command: 'toggleAutoUpdate' },
-        { label: 'Toggle Ad-hoc Budget', command: 'toggleAdHoc' },
-        { label: 'Toggle Precedence', command: 'togglePrecedence' },
-        { label: 'Set Internal Estimate', command: 'setInternalEstimate' },
-        { label: 'Copy Link', command: 'copyLink', local: true },
-        { label: 'Copy URL', command: 'copyUrl' },
-      ];
-
-      options.forEach(opt => {
-        const btn = document.createElement('button');
-        btn.textContent = opt.label;
-        btn.addEventListener('click', async () => {
-          if (opt.command === 'copyLink') {
-            // Copy with HTML format for Teams/rich text support
-            const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
-            const subject = bar?.dataset?.subject || 'Issue #' + issueId;
-            const url = redmineBaseUrl + '/issues/' + issueId;
-            const html = '<a href="' + url + '">#' + issueId + ' ' + subject + '</a>';
-            const plain = url;
-            try {
-              await navigator.clipboard.write([
-                new ClipboardItem({
-                  'text/plain': new Blob([plain], { type: 'text/plain' }),
-                  'text/html': new Blob([html], { type: 'text/html' })
-                })
-              ]);
-              vscode.postMessage({ command: 'showStatus', message: 'Copied #' + issueId + ' link' });
-            } catch (e) {
-              // Fallback to plain text
-              await navigator.clipboard.writeText(plain);
-              vscode.postMessage({ command: 'showStatus', message: 'Copied #' + issueId + ' URL' });
-            }
-          } else if (opt.local) {
-            clearSelection();
-          } else if (opt.bulk) {
-            vscode.postMessage({ command: opt.command, issueIds: targetIds });
-          } else {
-            vscode.postMessage({ command: opt.command, issueId: parseInt(issueId) });
-          }
-          picker.remove();
-        });
-        picker.appendChild(btn);
-      });
-
-      document.body.appendChild(picker);
-      closeOnOutsideClick(picker);
-    }
-
-    // Issue bar/label and project label context menus are handled by VS Code native webview context menu
-    // via data-vscode-context attribute (see webview/context in package.json)
-
-    // Convert x position to date string (YYYY-MM-DD)
-    function xToDate(x) {
-      const ms = minDateMs + (x / timelineWidth) * (maxDateMs - minDateMs);
-      const d = new Date(ms);
-      return d.toISOString().slice(0, 10);
-    }
-
-    // Convert end x position to due date (bar endX is at due_date + 1, so subtract 1 day)
-    function xToDueDate(x) {
-      const ms = minDateMs + (x / timelineWidth) * (maxDateMs - minDateMs) - 86400000;
-      const d = new Date(ms);
-      return d.toISOString().slice(0, 10);
-    }
-
-    // Drag date tooltip helpers
-    const dragTooltip = document.getElementById('dragDateTooltip');
-    let lastTooltipDate = null;
-
-    function formatDateShort(dateStr) {
-      const d = new Date(dateStr + 'T00:00:00');
-      const month = d.toLocaleDateString('en-US', { month: 'short' });
-      const day = d.getDate();
-      const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
-      return month + ' ' + day + ' (' + weekday + ')';
-    }
-
-    function formatDateRange(startStr, endStr) {
-      const sd = new Date(startStr + 'T00:00:00'), ed = new Date(endStr + 'T00:00:00');
-      const sm = sd.toLocaleDateString('en-US', { month: 'short' });
-      const em = ed.toLocaleDateString('en-US', { month: 'short' });
-      return sm === em ? sm + ' ' + sd.getDate() + '-' + ed.getDate()
-                       : sm + ' ' + sd.getDate() + '-' + em + ' ' + ed.getDate();
-    }
-
-    function showDragTooltip(text) {
-      dragTooltip.textContent = text;
-      dragTooltip.style.display = 'block';
-      lastTooltipDate = text;
-    }
-
-    function updateDragTooltip(text) {
-      if (text === lastTooltipDate) return;
-      dragTooltip.textContent = text;
-      lastTooltipDate = text;
-    }
-
-    function positionDragTooltip(clientX, clientY) {
-      // Position above cursor, flip below if near top
-      let top = clientY - 28;
-      let flipped = false;
-      if (top < 40) {
-        top = clientY + 20;
-        flipped = true;
-      }
-      dragTooltip.style.left = clientX + 'px';
-      dragTooltip.style.top = top + 'px';
-      dragTooltip.classList.toggle('flipped', flipped);
-    }
-
-    function hideDragTooltip() {
-      dragTooltip.style.display = 'none';
-      lastTooltipDate = null;
-    }
-
-    // Arrow path calculation for drag updates
-    const arrowSize = 6;
-    function calcArrowPath(x1, y1, x2, y2, isScheduling) {
-      const goingRight = x2 > x1;
-      const horizontalDist = Math.abs(x2 - x1);
-      const nearlyVertical = horizontalDist < 30;
-      const sameRow = Math.abs(y1 - y2) < 5;
-
-      let path;
-      if (sameRow && goingRight) {
-        path = 'M ' + x1 + ' ' + y1 + ' H ' + (x2 - arrowSize);
-      } else if (!sameRow && nearlyVertical) {
-        const jogX = 20;
-        const midY = (y1 + y2) / 2;
-        path = 'M ' + x1 + ' ' + y1 + ' H ' + (x1 + jogX) + ' V ' + midY + ' H ' + (x2 - jogX) + ' V ' + y2 + ' H ' + (x2 - arrowSize);
-      } else if (goingRight) {
-        const midX = (x1 + x2) / 2;
-        path = 'M ' + x1 + ' ' + y1 + ' H ' + midX + ' V ' + y2 + ' H ' + (x2 - arrowSize);
-      } else if (sameRow) {
-        const gap = 12;
-        const routeY = y1 - barHeight;
-        path = 'M ' + x1 + ' ' + y1 + ' V ' + routeY + ' H ' + (x2 - gap) + ' V ' + y2 + ' H ' + (x2 - arrowSize);
-      } else {
-        const gap = 12;
-        const midY = (y1 + y2) / 2;
-        path = 'M ' + x1 + ' ' + y1 + ' V ' + midY + ' H ' + (x2 - gap) + ' V ' + y2 + ' H ' + (x2 - arrowSize);
-      }
-      const arrowHead = 'M ' + x2 + ' ' + y2 + ' l -' + arrowSize + ' -' + (arrowSize * 0.6) + ' l 0 ' + (arrowSize * 1.2) + ' Z';
-      return { path, arrowHead };
-    }
-
-    function getConnectedArrows(issueId) {
-      const arrows = [];
-      const selector = '.dependency-arrow[data-from="' + issueId + '"], .dependency-arrow[data-to="' + issueId + '"]';
-      document.querySelectorAll(selector).forEach(arrow => {
-        const fromId = arrow.getAttribute('data-from');
-        const toId = arrow.getAttribute('data-to');
-        const classList = arrow.getAttribute('class') || '';
-        const relMatch = classList.match(/rel-(\\w+)/);
-        const relType = relMatch ? relMatch[1] : 'relates';
-        const isScheduling = ['blocks', 'precedes', 'finish_to_start', 'start_to_start', 'finish_to_finish', 'start_to_finish'].includes(relType);
-        // Get source/target bar positions
-        const fromBar = document.querySelector('.issue-bar[data-issue-id="' + fromId + '"]');
-        const toBar = document.querySelector('.issue-bar[data-issue-id="' + toId + '"]');
-        if (!fromBar || !toBar) return;
-        arrows.push({
-          element: arrow,
-          fromId, toId, isScheduling,
-          fromBar, toBar,
-          linePath: arrow.querySelector('.arrow-line'),
-          hitPath: arrow.querySelector('.arrow-hit-area'),
-          headPath: arrow.querySelector('.arrow-head')
-        });
-      });
-      return arrows;
-    }
-
-    function updateArrowPositions(arrows, draggedIssueId, newStartX, newEndX) {
-      arrows.forEach(a => {
-        // Get current positions (may be dragged or original)
-        const fromStartX = a.fromId == draggedIssueId ? newStartX : parseFloat(a.fromBar.dataset.startX);
-        const fromEndX = a.fromId == draggedIssueId ? newEndX : parseFloat(a.fromBar.dataset.endX);
-        const fromY = parseFloat(a.fromBar.dataset.centerY);
-        const toStartX = a.toId == draggedIssueId ? newStartX : parseFloat(a.toBar.dataset.startX);
-        const toEndX = a.toId == draggedIssueId ? newEndX : parseFloat(a.toBar.dataset.endX);
-        const toY = parseFloat(a.toBar.dataset.centerY);
-
-        let x1, y1, x2, y2;
-        if (a.isScheduling) {
-          x1 = fromEndX + 2; y1 = fromY;
-          x2 = toStartX - 2; y2 = toY;
-        } else {
-          x1 = (fromStartX + fromEndX) / 2; y1 = fromY;
-          x2 = (toStartX + toEndX) / 2; y2 = toY;
-        }
-
-        const { path, arrowHead } = calcArrowPath(x1, y1, x2, y2, a.isScheduling);
-        if (a.linePath) a.linePath.setAttribute('d', path);
-        if (a.hitPath) a.hitPath.setAttribute('d', path);
-        if (a.headPath) a.headPath.setAttribute('d', arrowHead);
-      });
-    }
-
-    // Drag confirmation modal
-    const dragConfirmOverlay = document.getElementById('dragConfirmOverlay');
-    const dragConfirmMessage = document.getElementById('dragConfirmMessage');
-    const dragConfirmOk = document.getElementById('dragConfirmOk');
-    const dragConfirmCancel = document.getElementById('dragConfirmCancel');
-    let pendingDragConfirm = null;
-
-    // Scroll protection flag (declared here, initialized below)
-    let allowScrollChange = false;
-
-    function showDragConfirmModal(message, onConfirm, onCancel) {
-      if (!dragConfirmOverlay || !dragConfirmMessage) return;
-      dragConfirmMessage.textContent = message;
-      pendingDragConfirm = { onConfirm, onCancel };
-      allowScrollChange = true; // Keep scroll at new position while modal is visible
-      dragConfirmOverlay.style.display = 'flex';
-      if (dragConfirmOk) dragConfirmOk.focus();
-    }
-
-    function hideDragConfirmModal() {
-      if (dragConfirmOverlay) dragConfirmOverlay.style.display = 'none';
-      pendingDragConfirm = null;
-    }
-
-    function restoreScrollPosition() {
-      if (ganttScroll && dragScrollSnapshot) {
-        ganttScroll.scrollLeft = dragScrollSnapshot.left;
-        ganttScroll.scrollTop = dragScrollSnapshot.top;
-      }
-      dragScrollSnapshot = null;
-    }
-
-    dragConfirmOk?.addEventListener('click', () => {
-      if (pendingDragConfirm?.onConfirm) pendingDragConfirm.onConfirm();
-      dragScrollSnapshot = null; // Clear snapshot on confirm (change accepted)
-      hideDragConfirmModal();
-    });
-
-    dragConfirmCancel?.addEventListener('click', () => {
-      if (pendingDragConfirm?.onCancel) pendingDragConfirm.onCancel();
-      restoreScrollPosition();
-      hideDragConfirmModal();
-    });
-
-    // Close on Escape or overlay click
-    dragConfirmOverlay?.addEventListener('click', (e) => {
-      if (e.target === dragConfirmOverlay) {
-        if (pendingDragConfirm?.onCancel) pendingDragConfirm.onCancel();
-        restoreScrollPosition();
-        hideDragConfirmModal();
-      }
-    });
-
-    // Keyboard handling for modal
-    document.addEventListener('keydown', (e) => {
-      if (!pendingDragConfirm) return;
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        if (pendingDragConfirm.onCancel) pendingDragConfirm.onCancel();
-        restoreScrollPosition();
-        hideDragConfirmModal();
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        if (pendingDragConfirm.onConfirm) pendingDragConfirm.onConfirm();
-        dragScrollSnapshot = null; // Clear snapshot on confirm (change accepted)
-        hideDragConfirmModal();
-      }
-    });
-
-
-    // Drag state
-    let dragState = null;
-    let dragScrollSnapshot = null; // Scroll position at drag start, for restoration (modal cancel)
-    let justEndedDrag = false; // Flag to skip click handler after drag ends
-
-    // Handle drag start on handles
-    document.querySelectorAll('.drag-handle').forEach(handle => {
-      handle.addEventListener('mousedown', (e) => {
-        e.preventDefault(); // Prevent focus/scroll anchoring
-        e.stopPropagation();
-        // Save scroll position at drag start for later restoration
-        dragScrollSnapshot = { left: ganttScroll?.scrollLeft, top: ganttScroll?.scrollTop };
-        const bar = handle.closest('.issue-bar');
-        const isLeft = handle.classList.contains('drag-left');
-        const issueId = parseInt(bar.dataset.issueId);
-        const startX = parseFloat(bar.dataset.startX);
-        const endX = parseFloat(bar.dataset.endX);
-        const oldStartDate = bar.dataset.startDate || null;
-        const oldDueDate = bar.dataset.dueDate || null;
-        // Use bar-outline (always exists) instead of bar-main (may not exist for intensity bars)
-        const barOutline = bar.querySelector('.bar-outline');
-        const barMain = bar.querySelector('.bar-main'); // May be null for intensity bars
-        const leftHandle = bar.querySelector('.drag-left');
-        const rightHandle = bar.querySelector('.drag-right');
-
-        bar.classList.add('dragging');
-        const barLabels = bar.querySelector('.bar-labels');
-        const labelsOnLeft = barLabels?.classList.contains('labels-left');
-        const connectedArrows = getConnectedArrows(issueId);
-        const linkHandle = bar.querySelector('.link-handle');
-        dragState = {
-          issueId,
-          isLeft,
-          isMove: false,
-          initialMouseX: e.clientX,
-          startX,
-          endX,
-          oldStartDate,
-          oldDueDate,
-          barOutline,
-          barMain,
-          leftHandle,
-          rightHandle,
-          bar,
-          barLabels,
-          labelsOnLeft,
-          connectedArrows,
-          linkHandle
-        };
-
-        // Show drag date tooltip
-        const edgeX = isLeft ? startX : endX;
-        const currentDate = isLeft ? oldStartDate : oldDueDate;
-        if (currentDate) {
-          showDragTooltip((isLeft ? 'Start: ' : 'Due: ') + formatDateShort(currentDate));
-          positionDragTooltip(e.clientX, e.clientY);
-        }
-      });
-    });
-
-    // Handle drag start on bar body (move entire bar or bulk move)
-    document.querySelectorAll('.bar-outline').forEach(outline => {
-      outline.addEventListener('mousedown', (e) => {
-        // Skip if clicking on drag handles (they're on top)
-        if (e.target.classList.contains('drag-handle')) return;
-        // Skip if Ctrl/Shift held (selection mode)
-        if (e.ctrlKey || e.metaKey || e.shiftKey) return;
-        e.preventDefault(); // Prevent focus/scroll anchoring
-        e.stopPropagation();
-        // Save scroll position at drag start for later restoration
-        dragScrollSnapshot = { left: ganttScroll?.scrollLeft, top: ganttScroll?.scrollTop };
-        const bar = outline.closest('.issue-bar');
-        if (!bar) return;
-        const issueId = bar.dataset.issueId;
-
-        // Check if this bar is part of a selection for bulk drag
-        const isBulkDrag = selectedIssues.size > 1 && selectedIssues.has(issueId);
-        const barsToMove = isBulkDrag
-          ? allIssueBars.filter(b => selectedIssues.has(b.dataset.issueId))
-          : [bar];
-
-        // Collect data for all bars to move
-        const bulkBars = barsToMove.map(b => ({
-          issueId: b.dataset.issueId,
-          startX: parseFloat(b.dataset.startX),
-          endX: parseFloat(b.dataset.endX),
-          oldStartDate: b.dataset.startDate || null,
-          oldDueDate: b.dataset.dueDate || null,
-          barOutline: b.querySelector('.bar-outline'),
-          barMain: b.querySelector('.bar-main'),
-          leftHandle: b.querySelector('.drag-left'),
-          rightHandle: b.querySelector('.drag-right'),
-          bar: b,
-          barLabels: b.querySelector('.bar-labels'),
-          labelsOnLeft: b.querySelector('.bar-labels')?.classList.contains('labels-left'),
-          connectedArrows: getConnectedArrows(b.dataset.issueId),
-          linkHandle: b.querySelector('.link-handle')
-        }));
-
-        bulkBars.forEach(b => b.bar.classList.add('dragging'));
-
-        const singleBarLabels = bar.querySelector('.bar-labels');
-        const singleLabelsOnLeft = singleBarLabels?.classList.contains('labels-left');
-        const connectedArrows = getConnectedArrows(issueId);
-        const singleLinkHandle = bar.querySelector('.link-handle');
-        dragState = {
-          issueId: parseInt(issueId),
-          isLeft: false,
-          isMove: true,
-          isBulkDrag,
-          bulkBars,
-          initialMouseX: e.clientX,
-          startX: parseFloat(bar.dataset.startX),
-          endX: parseFloat(bar.dataset.endX),
-          oldStartDate: bar.dataset.startDate || null,
-          oldDueDate: bar.dataset.dueDate || null,
-          barOutline: outline,
-          barMain: bar.querySelector('.bar-main'),
-          leftHandle: bar.querySelector('.drag-left'),
-          rightHandle: bar.querySelector('.drag-right'),
-          bar,
-          barLabels: singleBarLabels,
-          labelsOnLeft: singleLabelsOnLeft,
-          connectedArrows,
-          linkHandle: singleLinkHandle
-        };
-
-        // Show drag date tooltip for single bar move (not bulk)
-        if (!isBulkDrag && bar.dataset.startDate && bar.dataset.dueDate) {
-          showDragTooltip(formatDateRange(bar.dataset.startDate, bar.dataset.dueDate));
-          positionDragTooltip(e.clientX, e.clientY);
-        }
-      });
-    });
-
-    // Linking drag state
-    let linkingState = null;
-    let tempArrow = null;
-    let currentTarget = null;
-
-    function cancelLinking() {
-      if (!linkingState) return;
-      linkingState.fromBar.classList.remove('linking-source');
-      document.querySelectorAll('.link-target').forEach(el => el.classList.remove('link-target'));
-      if (tempArrow) { tempArrow.remove(); tempArrow = null; }
-      linkingState = null;
-      currentTarget = null;
-      document.body.classList.remove('cursor-crosshair');
-    }
-
-    function showRelationPicker(x, y, fromId, toId) {
-      // Remove existing picker
-      document.querySelector('.relation-picker')?.remove();
-
-      const picker = document.createElement('div');
-      picker.className = 'relation-picker';
-
-      // Clamp position to viewport bounds (picker is ~180px wide, ~200px tall)
-      const pickerWidth = 180;
-      const pickerHeight = 200;
-      const clampedX = Math.min(x, window.innerWidth - pickerWidth - 10);
-      const clampedY = Math.min(y, window.innerHeight - pickerHeight - 10);
-      picker.style.left = Math.max(10, clampedX) + 'px';
-      picker.style.top = Math.max(10, clampedY) + 'px';
-
-      const baseTypes = [
-        { value: 'blocks', label: '🚫 Blocks', cssClass: 'rel-line-blocks',
-          tooltip: 'Target cannot be closed until this issue is closed' },
-        { value: 'precedes', label: '➡️ Precedes', cssClass: 'rel-line-scheduling',
-          tooltip: 'This issue must complete before target can start' },
-        { value: 'relates', label: '🔗 Relates to', cssClass: 'rel-line-informational',
-          tooltip: 'Simple link between issues (no constraints)' },
-        { value: 'duplicates', label: '📋 Duplicates', cssClass: 'rel-line-informational',
-          tooltip: 'Closing target will automatically close this issue' },
-        { value: 'copied_to', label: '📄 Copied to', cssClass: 'rel-line-informational',
-          tooltip: 'This issue was copied to create the target issue' }
-      ];
-      const extendedTypes = [
-        { value: 'finish_to_start', label: '⏩ Finish→Start', cssClass: 'rel-line-scheduling',
-          tooltip: 'Target starts after this issue finishes (FS)' },
-        { value: 'start_to_start', label: '▶️ Start→Start', cssClass: 'rel-line-scheduling',
-          tooltip: 'Target starts when this issue starts (SS)' },
-        { value: 'finish_to_finish', label: '⏹️ Finish→Finish', cssClass: 'rel-line-scheduling',
-          tooltip: 'Target finishes when this issue finishes (FF)' },
-        { value: 'start_to_finish', label: '⏪ Start→Finish', cssClass: 'rel-line-scheduling',
-          tooltip: 'Target finishes when this issue starts (SF)' }
-      ];
-      const types = extendedRelationTypes ? [...baseTypes, ...extendedTypes] : baseTypes;
-
-      types.forEach(t => {
-        const btn = document.createElement('button');
-        const swatch = document.createElement('span');
-        swatch.className = 'color-swatch ' + t.cssClass;
-        btn.appendChild(swatch);
-        btn.appendChild(document.createTextNode(t.label));
-        btn.title = t.tooltip;
-        btn.addEventListener('click', () => {
-          saveState();
-          vscode.postMessage({
-            command: 'createRelation',
-            issueId: fromId,
-            targetIssueId: toId,
-            relationType: t.value
-          });
-          picker.remove();
-        });
-        picker.appendChild(btn);
-      });
-
-      document.body.appendChild(picker);
-      closeOnOutsideClick(picker);
-    }
-
-    // Announce to screen readers
-    function announce(message) {
-      const liveRegion = document.getElementById('liveRegion');
-      if (liveRegion) {
-        liveRegion.textContent = message;
-      }
-    }
-
-    // Handle click on bar - scroll to issue start date and highlight
-    // Double-click enters focus mode (highlights dependency chain)
-    const interactiveSelector = '.drag-handle, .link-handle, .bar-outline, ' +
-      '.blocks-badge-group, .blocker-badge, .progress-badge-group, .flex-badge-group';
-    document.querySelectorAll('.issue-bar').forEach(bar => {
-      bar.addEventListener('click', (e) => {
-        // Ignore clicks on interactive elements (handles, badges, outline)
-        if (e.target.closest(interactiveSelector)) return;
-        if (dragState || linkingState || justEndedDrag) return;
-        // Clear focus mode on single click
-        if (focusedIssueId) {
-          clearFocus();
-        }
-        scrollToAndHighlight(bar.dataset.issueId);
-      });
-      bar.addEventListener('dblclick', (e) => {
-        if (dragState || linkingState || justEndedDrag) return;
-        e.preventDefault();
-        focusOnDependencyChain(bar.dataset.issueId);
-      });
-    });
-
-    // Helper to highlight multiple arrows and their connected issues
-    function highlightArrows(arrows, issueId) {
-      // Clear any previous arrow selection
-      document.querySelectorAll('.dependency-arrow.selected').forEach(a => a.classList.remove('selected'));
-      document.querySelectorAll('.arrow-connected').forEach(el => el.classList.remove('arrow-connected'));
-
-      if (arrows.length === 0) return;
-
-      // Add selection mode and select all matching arrows
-      document.body.classList.add('arrow-selection-mode');
-      const connectedIds = new Set();
-      arrows.forEach(arrow => {
-        arrow.classList.add('selected');
-        connectedIds.add(arrow.dataset.from);
-        connectedIds.add(arrow.dataset.to);
-      });
-
-      // Highlight connected bars and labels
-      connectedIds.forEach(id => {
-        document.querySelectorAll(\`.issue-bar[data-issue-id="\${id}"], .issue-label[data-issue-id="\${id}"]\`)
-          .forEach(el => el.classList.add('arrow-connected'));
-      });
-
-      announce(\`Highlighted \${arrows.length} dependency arrow(s) for #\${issueId}\`);
-    }
-
-    // Blocks badge click - highlight arrows FROM this issue (issues it blocks)
-    document.querySelectorAll('.blocks-badge-group').forEach(badge => {
-      // Prevent focus on mousedown (before click fires)
-      badge.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      });
-      badge.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const issueBar = badge.closest('.issue-bar');
-        if (!issueBar) return;
-        const issueId = issueBar.dataset.issueId;
-        const arrows = Array.from(document.querySelectorAll(\`.dependency-arrow[data-from="\${issueId}"]\`));
-        highlightArrows(arrows, issueId);
-      });
-    });
-
-    // Blocker badge click - highlight arrows TO this issue (no scroll, like blocks-badge)
-    document.querySelectorAll('.blocker-badge').forEach(badge => {
-      // Prevent focus on mousedown (before click fires)
-      badge.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      });
-      badge.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const issueBar = badge.closest('.issue-bar');
-        if (!issueBar) return;
-        const issueId = issueBar.dataset.issueId;
-        const arrows = Array.from(document.querySelectorAll(\`.dependency-arrow[data-to="\${issueId}"]\`));
-        highlightArrows(arrows, issueId);
-      });
-    });
-
-    // Keyboard navigation for issue bars
-    const issueBars = Array.from(document.querySelectorAll('.issue-bar'));
-    const PAGE_JUMP = 10;
-    issueBars.forEach((bar, index) => {
-      bar.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          scrollToAndHighlight(bar.dataset.issueId);
-        } else if (e.key === 'ArrowDown' && index < issueBars.length - 1) {
-          e.preventDefault();
-          issueBars[index + 1].focus();
-          announce(\`Issue \${issueBars[index + 1].getAttribute('aria-label')}\`);
-        } else if (e.key === 'ArrowUp' && index > 0) {
-          e.preventDefault();
-          issueBars[index - 1].focus();
-          announce(\`Issue \${issueBars[index - 1].getAttribute('aria-label')}\`);
-        } else if (e.key === 'Home') {
-          e.preventDefault();
-          issueBars[0].focus();
-          announce(\`First issue: \${issueBars[0].getAttribute('aria-label')}\`);
-        } else if (e.key === 'End') {
-          e.preventDefault();
-          issueBars[issueBars.length - 1].focus();
-          announce(\`Last issue: \${issueBars[issueBars.length - 1].getAttribute('aria-label')}\`);
-        } else if (e.key === 'PageDown') {
-          e.preventDefault();
-          const nextIdx = Math.min(index + PAGE_JUMP, issueBars.length - 1);
-          issueBars[nextIdx].focus();
-          announce(\`Issue \${issueBars[nextIdx].getAttribute('aria-label')}\`);
-        } else if (e.key === 'PageUp') {
-          e.preventDefault();
-          const prevIdx = Math.max(index - PAGE_JUMP, 0);
-          issueBars[prevIdx].focus();
-          announce(\`Issue \${issueBars[prevIdx].getAttribute('aria-label')}\`);
-        } else if (e.key === 'Tab' && e.shiftKey) {
-          // Jump back to corresponding label
-          const issueId = bar.dataset.issueId;
-          const label = document.querySelector(\`.issue-label[data-issue-id="\${issueId}"]\`);
-          if (label) {
-            e.preventDefault();
-            label.focus();
-            announce(\`Label for issue #\${issueId}\`);
-          }
-        }
-      });
-    });
-
-    // Handle link handle mousedown to start linking
-    document.querySelectorAll('.link-handle').forEach(handle => {
-      handle.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        const bar = handle.closest('.issue-bar');
-        const issueId = parseInt(bar.dataset.issueId);
-        const cx = parseFloat(handle.dataset.cx);
-        const cy = parseFloat(handle.dataset.cy);
-
-        bar.classList.add('linking-source');
-        document.body.classList.add('cursor-crosshair');
-
-        // Create temp arrow in SVG with arrowhead marker
-        const svg = document.querySelector('#ganttTimeline svg');
-
-        // Add arrowhead marker if not exists
-        if (!document.getElementById('temp-arrow-head')) {
-          const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-          defs.innerHTML = \`
-            <marker id="temp-arrow-head" markerWidth="10" markerHeight="7"
-                    refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth">
-              <polygon points="0 0, 10 3.5, 0 7" fill="var(--vscode-focusBorder)"/>
-            </marker>\`;
-          svg.insertBefore(defs, svg.firstChild);
-        }
-
-        tempArrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        tempArrow.classList.add('temp-link-arrow');
-        tempArrow.setAttribute('stroke', 'var(--vscode-focusBorder)');
-        tempArrow.setAttribute('stroke-width', '2');
-        tempArrow.setAttribute('fill', 'none');
-        tempArrow.setAttribute('marker-end', 'url(#temp-arrow-head)');
-        svg.appendChild(tempArrow);
-
-        linkingState = { fromId: issueId, fromBar: bar, startX: cx, startY: cy };
-      });
-    });
-
-    // Escape to cancel linking mode, close pickers, and clear focus
-    addDocListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        const picker = document.querySelector('.relation-picker');
-        if (picker) {
-          e.stopImmediatePropagation();
-          picker.remove();
-          return;
-        }
-        if (linkingState) {
-          e.stopImmediatePropagation();
-          cancelLinking();
-          return;
-        }
-        if (focusedIssueId) {
-          e.stopImmediatePropagation();
-          clearFocus();
-          announce('Focus cleared');
-        }
-      }
-    });
-
-    // Collapse toggle click (before issue-label handler to stop propagation)
-    document.querySelectorAll('.collapse-toggle').forEach(el => {
-      el.addEventListener('click', (e) => {
-        e.stopPropagation();
-        // Get collapse key from parent label element
-        const label = el.closest('[data-collapse-key]');
-        const collapseKey = label?.dataset.collapseKey;
-        if (collapseKey) {
-          // Instant client-side toggle (all rows are in DOM)
-          toggleCollapseClientSide(collapseKey);
-        }
-      });
-    });
-
-    // Expand/collapse all menu items
-    document.getElementById('menuExpand')?.addEventListener('click', () => {
-      // Use pre-computed list of ALL expandable keys (not just visible DOM elements)
-      const ganttScroll = document.getElementById('ganttScroll');
-      const allKeys = ganttScroll?.dataset.allExpandableKeys;
-      const keys = allKeys ? JSON.parse(allKeys) : [];
-      vscode.postMessage({ command: 'expandAll', keys });
-    });
-    document.getElementById('menuCollapse')?.addEventListener('click', () => {
-      vscode.postMessage({ command: 'collapseAll' });
-    });
-
-    // Labels click and keyboard navigation
-    const allLabels = Array.from(document.querySelectorAll('.project-label, .issue-label, .time-group-label'));
-    let activeLabel = null;
-    const savedSelectedKey = ${JSON.stringify(this._selectedCollapseKey)};
-
-    // Check if label is visible (not hidden by collapse)
-    function isLabelVisible(label) {
-      return !label.classList.contains('gantt-row-hidden') && label.getAttribute('visibility') !== 'hidden';
-    }
-
-    // Find next visible label from index (direction: 1=down, -1=up)
-    function findVisibleLabel(fromIndex, direction) {
-      let i = fromIndex + direction;
-      while (i >= 0 && i < allLabels.length) {
-        if (isLabelVisible(allLabels[i])) return { label: allLabels[i], index: i };
-        i += direction;
-      }
-      return null;
-    }
-
-    // Scroll label into view (vertical only, for keyboard navigation)
-    function scrollLabelIntoView(label) {
-      const scrollContainer = document.getElementById('ganttScroll');
-      const headerRow = document.querySelector('.gantt-header-row');
-      if (!scrollContainer || !label) return;
-
-      const headerHeight = headerRow?.getBoundingClientRect().height || 60;
-      const labelRow = label.closest('.gantt-row');
-      if (!labelRow) return;
-
-      const rowTop = labelRow.getBoundingClientRect().top;
-      const rowHeight = labelRow.getBoundingClientRect().height;
-      const containerRect = scrollContainer.getBoundingClientRect();
-      const visibleTop = containerRect.top + headerHeight;
-      const visibleBottom = containerRect.bottom;
-
-      // Only scroll if label is outside visible area
-      if (rowTop < visibleTop) {
-        // Label is above visible area - scroll up
-        scrollContainer.scrollBy({ top: rowTop - visibleTop - 4, behavior: 'smooth' });
-      } else if (rowTop + rowHeight > visibleBottom) {
-        // Label is below visible area - scroll down
-        scrollContainer.scrollBy({ top: (rowTop + rowHeight) - visibleBottom + 4, behavior: 'smooth' });
-      }
-    }
-
-    function setActiveLabel(label, skipNotify = false, scrollIntoView = false, skipFocus = false) {
-      if (activeLabel) activeLabel.classList.remove('active');
-      activeLabel = label;
-      if (label) {
-        label.classList.add('active');
-        if (!skipFocus) label.focus();
-        if (scrollIntoView) scrollLabelIntoView(label);
-        // Persist selection to extension for re-render preservation
-        if (!skipNotify) {
-          vscode.postMessage({ command: 'setSelectedKey', collapseKey: label.dataset.collapseKey });
-        }
-      }
-    }
-
-    // Restore focus to active label when webview regains focus
-    window.addEventListener('focus', () => {
-      if (activeLabel && isLabelVisible(activeLabel)) {
-        activeLabel.focus();
-      }
-    });
-
-    // Escape to deselect active label
-    addDocListener('keydown', (e) => {
-      if (e.key === 'Escape' && activeLabel) {
-        activeLabel.classList.remove('active');
-        activeLabel.blur();
-        activeLabel = null;
-        vscode.postMessage({ command: 'setSelectedKey', collapseKey: null });
-      }
-    });
-
-    // Row index for O(1) lookups during collapse
-    const rowIndex = new Map(); // collapseKey → { originalY, elements: [] }
-    const ancestorCache = new Map(); // collapseKey → [parentKey, grandparentKey, ...]
-
-    function buildRowIndex() {
-      rowIndex.clear();
-      const elements = document.querySelectorAll('[data-collapse-key][data-original-y]');
-      elements.forEach(el => {
-        const key = el.dataset.collapseKey;
-        const originalY = parseFloat(el.dataset.originalY);
-        if (!rowIndex.has(key)) {
-          rowIndex.set(key, { originalY, elements: [] });
-        }
-        rowIndex.get(key).elements.push(el);
-      });
-    }
-
-    function buildAncestorCache() {
-      ancestorCache.clear();
-      const elements = document.querySelectorAll('[data-collapse-key][data-parent-key]');
-      elements.forEach(el => {
-        const key = el.dataset.collapseKey;
-        if (ancestorCache.has(key)) return; // Already built for this key
-        const ancestors = [];
-        let parentKey = el.dataset.parentKey;
-        while (parentKey) {
-          ancestors.push(parentKey);
-          const parentEl = document.querySelector('[data-collapse-key="' + parentKey + '"]');
-          parentKey = parentEl?.dataset.parentKey || null;
-        }
-        ancestorCache.set(key, ancestors);
-      });
-    }
-
-    // Build indexes on load
-    buildRowIndex();
-    buildAncestorCache();
-
-    // Helper to toggle SVG element visibility
-    function setSvgVisibility(el, hidden) {
-      if (hidden) {
-        el.setAttribute('visibility', 'hidden');
-        el.classList.add('gantt-row-hidden');
-      } else {
-        el.removeAttribute('visibility');
-        el.classList.remove('gantt-row-hidden');
-      }
-    }
-
-    // Find all descendants of a collapse key
-    function findDescendants(parentKey) {
-      const result = [];
-      ancestorCache.forEach((ancestors, key) => {
-        if (ancestors.includes(parentKey)) result.push(key);
-      });
-      return result;
-    }
-
-    // Find descendants that should be VISIBLE when expanding parentKey
-    // Only includes descendants whose entire ancestor chain (up to parentKey) is expanded
-    function findVisibleDescendants(parentKey) {
-      const result = [];
-      ancestorCache.forEach((ancestors, key) => {
-        const idx = ancestors.indexOf(parentKey);
-        if (idx === -1) return; // Not a descendant of parentKey
-
-        // Check all ancestors between this node and parentKey
-        // ancestors[0] is immediate parent, ancestors[idx] is parentKey
-        // All ancestors from 0 to idx-1 must be expanded for this node to be visible
-        let allAncestorsExpanded = true;
-        for (let i = 0; i < idx; i++) {
-          const ancestorKey = ancestors[i];
-          const ancestorLabel = document.querySelector('[data-collapse-key="' + ancestorKey + '"].project-label, [data-collapse-key="' + ancestorKey + '"].issue-label, [data-collapse-key="' + ancestorKey + '"].time-group-label');
-          if (!ancestorLabel || ancestorLabel.dataset.expanded !== 'true') {
-            allAncestorsExpanded = false;
-            break;
-          }
-        }
-        if (allAncestorsExpanded) {
-          result.push(key);
-        }
-      });
-      return result;
-    }
-
-    // Client-side collapse/expand toggle for instant response
-    // All rows are rendered in DOM (hidden rows have visibility:hidden)
-    // This enables instant toggle without VS Code re-render roundtrip
-    function toggleCollapseClientSide(collapseKey, action) {
-      // Find the parent label element (must be a label with hasChildren)
-      const parentLabel = document.querySelector('[data-collapse-key="' + collapseKey + '"].project-label, [data-collapse-key="' + collapseKey + '"].time-group-label, [data-collapse-key="' + collapseKey + '"].issue-label');
-      if (!parentLabel || parentLabel.dataset.hasChildren !== 'true') {
-        return;
-      }
-
-      const wasExpanded = parentLabel.dataset.expanded === 'true';
-      const shouldExpand = action === 'expand' ? true : action === 'collapse' ? false : !wasExpanded;
-      if (shouldExpand === wasExpanded) {
-        return;
-      }
-
-      // Update chevron state FIRST (before findVisibleDescendants checks it)
-      parentLabel.dataset.expanded = shouldExpand ? 'true' : 'false';
-      const chevron = parentLabel.querySelector('.collapse-toggle');
-      if (chevron) chevron.classList.toggle('expanded', shouldExpand);
-
-      // For EXPAND: only show descendants whose ancestor chain is expanded
-      // For COLLAPSE: hide ALL descendants
-      const allDescendants = findDescendants(collapseKey);
-      const visibleDescendants = shouldExpand ? findVisibleDescendants(collapseKey) : [];
-
-      // DEBUG: Log nested expanded states
-      if (shouldExpand) {
-        const nestedExpanded = [];
-        document.querySelectorAll('.project-label[data-expanded="true"], .issue-label[data-expanded="true"], .time-group-label[data-expanded="true"]').forEach(lbl => {
-          nestedExpanded.push(lbl.dataset.collapseKey);
-        });
-        console.log('[TOGGLE DEBUG] expanding:', collapseKey, 'allDesc:', allDescendants.length, 'visibleDesc:', visibleDescendants.length, 'nestedExpanded:', nestedExpanded);
-        console.log('[TOGGLE DEBUG] visibleDescendants:', visibleDescendants);
-      }
-
-      if (allDescendants.length === 0) {
-        // No descendants, just sync state
-        vscode.postMessage({ command: 'collapseStateSync', collapseKey, isExpanded: shouldExpand });
-        return;
-      }
-
-      const descendantSet = new Set(allDescendants);
-      const visibleSet = new Set(visibleDescendants);
-      const parentEntry = rowIndex.get(collapseKey);
-      const parentRowY = parentEntry?.originalY ?? 0; // Row coordinate system
-
-      // Calculate delta from stripe contributions for CURRENTLY VISIBLE descendants only
-      // When collapsing: only count rows that are currently visible (not already hidden by nested collapse)
-      // When expanding: only count rows that will become visible (respecting nested expanded states)
-      // Also find the parent's stripe Y position (different coordinate system than rows)
-      const countedKeys = new Set();
-      let actualDelta = 0;
-      let parentStripeY = 0;
-      // For collapse: calculate visible descendants (excluding already-hidden nested items)
-      const currentlyVisibleDescendants = shouldExpand ? visibleDescendants : findVisibleDescendants(collapseKey);
-      const deltaDescendants = currentlyVisibleDescendants;
-      const deltaSet = new Set(deltaDescendants);
-      document.querySelectorAll('.zebra-stripe').forEach(stripe => {
-        const contributions = JSON.parse(stripe.dataset.rowContributions || '{}');
-        // Find parent's stripe Y (stripe containing the collapseKey)
-        if (collapseKey in contributions && parentStripeY === 0) {
-          parentStripeY = parseFloat(stripe.dataset.originalY || '0');
-        }
-        for (const [key, contribution] of Object.entries(contributions)) {
-          if (deltaSet.has(key) && !countedKeys.has(key)) {
-            actualDelta += parseFloat(contribution);
-            countedKeys.add(key);
-          }
-        }
-      });
-
-      // Fallback: if no contributions found, use re-render
-      const barHeight = ${barHeight};
-      if (actualDelta === 0 && deltaDescendants.length > 0) {
-        vscode.postMessage({ command: 'collapseStateSync', collapseKey, isExpanded: shouldExpand });
-        vscode.postMessage({ command: 'requestRerender' });
-        return;
-      }
-
-      const delta = shouldExpand ? actualDelta : -actualDelta;
-
-      // Get parent's CURRENT Y position (from transform, not originalY)
-      let parentCurrentY = parentRowY;
-      if (parentEntry && parentEntry.elements.length > 0) {
-        const parentTransform = parentEntry.elements[0].getAttribute('transform') || '';
-        const parentYMatch = parentTransform.match(/translate\\([^,]+,\\s*([-\\d.]+)/);
-        if (parentYMatch) {
-          parentCurrentY = parseFloat(parentYMatch[1]);
-        }
-      }
-
-      // Toggle visibility of descendants and position them correctly
-      let nextY = parentCurrentY + barHeight; // First child goes right after parent
-      if (shouldExpand) {
-        // EXPAND: only show visibleDescendants, position them sequentially
-        visibleDescendants.forEach(key => {
-          const entry = rowIndex.get(key);
-          if (entry) {
-            entry.elements.forEach(el => {
-              const transform = el.getAttribute('transform') || '';
-              const xMatch = transform.match(/translate\\(([-\\d.]+)/);
-              const x = xMatch ? xMatch[1] : '0';
-              el.setAttribute('transform', 'translate(' + x + ', ' + nextY + ')');
-              setSvgVisibility(el, false); // Show
-            });
-            nextY += barHeight;
-          }
-        });
-      } else {
-        // COLLAPSE: hide ALL descendants
-        allDescendants.forEach(key => {
-          const entry = rowIndex.get(key);
-          if (entry) {
-            entry.elements.forEach(el => {
-              setSvgVisibility(el, true); // Hide
-            });
-          }
-        });
-      }
-
-      // Shift rows BELOW the parent (not descendants, not above)
-      rowIndex.forEach(({ originalY, elements }, key) => {
-        // Only shift rows that are below the parent and not any descendant
-        if (originalY > parentRowY && !descendantSet.has(key)) {
-          elements.forEach(el => {
-            const transform = el.getAttribute('transform') || '';
-            // Extract current X (for timeline bars)
-            const xMatch = transform.match(/translate\\(([-\\d.]+)/);
-            const x = xMatch ? xMatch[1] : '0';
-            // Extract current Y
-            const yMatch = transform.match(/translate\\([^,]+,\\s*([-\\d.]+)/);
-            const currentY = yMatch ? parseFloat(yMatch[1]) : originalY;
-            const newY = currentY + delta;
-            el.setAttribute('transform', 'translate(' + x + ', ' + newY + ')');
-          });
-        }
-      });
-
-      // Update SVG heights
-      const labelColumn = document.querySelector('.gantt-labels svg');
-      if (labelColumn) {
-        const currentHeight = parseFloat(labelColumn.getAttribute('height') || '0');
-        const newHeight = currentHeight + delta;
-        labelColumn.setAttribute('height', String(newHeight));
-        // Don't set viewBox on labels SVG - it causes scaling issues on column resize
-      }
-
-      // Update other column heights
-      const columnSelectors = [
-        '.gantt-col-status svg',
-        '.gantt-col-id svg',
-        '.gantt-col-start svg',
-        '.gantt-col-due svg',
-        '.gantt-col-assignee svg'
-      ];
-      columnSelectors.forEach(selector => {
-        const colSvg = document.querySelector(selector);
-        if (!colSvg) return;
-        const currentHeight = parseFloat(colSvg.getAttribute('height') || '0');
-        const newHeight = currentHeight + delta;
-        colSvg.setAttribute('height', String(newHeight));
-      });
-
-      // Update timeline height
-      const timelineSvg = document.querySelector('.gantt-timeline svg');
-      if (timelineSvg) {
-        const currentHeight = parseFloat(timelineSvg.getAttribute('height') || '0');
-        const newHeight = currentHeight + delta;
-        timelineSvg.setAttribute('height', newHeight);
-      }
-
-      // Build set of collapsed parents for visibility checks
-      const collapsedKeys = new Set();
-      document.querySelectorAll('.project-label[data-has-children="true"], .time-group-label[data-has-children="true"], .issue-label[data-has-children="true"]').forEach(lbl => {
-        if (lbl.dataset.expanded === 'false') {
-          collapsedKeys.add(lbl.dataset.collapseKey);
-        }
-      });
-
-      // Handle zebra stripes: hide stripes covering descendants, shift stripes below
-      // First pass: calculate actions for each unique stripe (by originalY)
-      const stripeActions = new Map(); // originalY -> { action, newHeight?, newY? }
-      const allStripes = document.querySelectorAll('.zebra-stripe');
-      allStripes.forEach((stripe) => {
-        const originalY = parseFloat(stripe.dataset.originalY || '0');
-        if (stripeActions.has(originalY)) return; // Skip duplicates
-
-        const contributions = JSON.parse(stripe.dataset.rowContributions || '{}');
-        const contributingKeys = Object.keys(contributions);
-
-        // Check what this stripe covers
-        const coversOnlyDescendants = contributingKeys.length > 0 &&
-          contributingKeys.every(key => descendantSet.has(key));
-        const coversAnyDescendant = contributingKeys.some(key => descendantSet.has(key));
-        const isBelowParent = originalY > parentStripeY;
-
-        if (coversOnlyDescendants) {
-          stripeActions.set(originalY, { action: 'toggle-visibility', hide: !shouldExpand });
-        } else if (coversAnyDescendant) {
-          if (!shouldExpand) {
-            let newHeight = 0;
-            for (const [key, contribution] of Object.entries(contributions)) {
-              if (!descendantSet.has(key)) {
-                newHeight += parseFloat(contribution);
-              }
-            }
-            stripeActions.set(originalY, { action: 'shrink', newHeight });
-          } else {
-            // EXPANDING: calculate correct height based on visible descendants (not originalHeight)
-            // Include parent (not in descendantSet) + visible descendants
-            let newHeight = 0;
-            for (const [key, contribution] of Object.entries(contributions)) {
-              if (!descendantSet.has(key) || visibleSet.has(key)) {
-                newHeight += parseFloat(contribution);
-              }
-            }
-            stripeActions.set(originalY, { action: 'expand', newHeight });
-          }
-        } else if (isBelowParent) {
-          const currentY = parseFloat(stripe.getAttribute('y') || String(originalY));
-          stripeActions.set(originalY, { action: 'shift', newY: currentY + delta });
-        }
-      });
-
-      // Second pass: apply actions to ALL stripes (including duplicates across SVGs)
-      allStripes.forEach((stripe) => {
-        const originalY = parseFloat(stripe.dataset.originalY || '0');
-        const action = stripeActions.get(originalY);
-        if (!action) return;
-
-        switch (action.action) {
-          case 'toggle-visibility':
-            setSvgVisibility(stripe, action.hide);
-            break;
-          case 'shrink':
-            stripe.setAttribute('height', String(action.newHeight));
-            break;
-          case 'expand':
-            stripe.setAttribute('height', String(action.newHeight));
-            break;
-          case 'shift':
-            stripe.setAttribute('y', String(action.newY));
-            break;
-        }
-      });
-
-      // Re-alternate visible stripes by Y position
-      // Group stripes by Y to handle multiple columns having stripes at same Y
-      const visibleStripes = Array.from(document.querySelectorAll('.zebra-stripe'))
-        .filter(s => s.getAttribute('visibility') !== 'hidden');
-
-      const stripesByY = new Map();
-      visibleStripes.forEach(stripe => {
-        const y = parseFloat(stripe.getAttribute('y') || '0');
-        if (!stripesByY.has(y)) stripesByY.set(y, []);
-        stripesByY.get(y).push(stripe);
-      });
-
-      // Sort unique Y positions and assign same opacity to all stripes at each Y
-      const sortedYs = Array.from(stripesByY.keys()).sort((a, b) => a - b);
-      sortedYs.forEach((y, idx) => {
-        const opacity = idx % 2 === 0 ? '0.03' : '0.06';
-        stripesByY.get(y).forEach(stripe => stripe.setAttribute('opacity', opacity));
-      });
-
-      // Handle indent guide lines
-      document.querySelectorAll('.indent-guide-line').forEach(line => {
-        const forParent = line.dataset.forParent;
-        const ancestors = ancestorCache.get(forParent) || [];
-        const shouldHide = collapsedKeys.has(forParent) || ancestors.some(a => collapsedKeys.has(a));
-        setSvgVisibility(line, shouldHide);
-
-        // Shift indent guides for parents below the collapsed row
-        if (!shouldHide) {
-          const parentOfGuide = rowIndex.get(forParent);
-          if (parentOfGuide && parentOfGuide.originalY > parentRowY) {
-            // This guide's parent is below collapsed row - shift it
-            const y1 = parseFloat(line.getAttribute('y1') || '0');
-            const y2 = parseFloat(line.getAttribute('y2') || '0');
-            line.setAttribute('y1', y1 + delta);
-            line.setAttribute('y2', y2 + delta);
-          }
-        }
-      });
-
-      // Toggle dependency arrows
-      document.querySelectorAll('.dependency-arrow').forEach(arrow => {
-        const fromId = arrow.dataset.from;
-        const toId = arrow.dataset.to;
-        const fromBar = document.querySelector('.issue-bar[data-issue-id="' + fromId + '"]');
-        const toBar = document.querySelector('.issue-bar[data-issue-id="' + toId + '"]');
-        const fromHidden = fromBar?.classList.contains('gantt-row-hidden');
-        const toHidden = toBar?.classList.contains('gantt-row-hidden');
-        setSvgVisibility(arrow, fromHidden || toHidden);
-      });
-
-      // Sync state to extension for persistence (no re-render)
-      vscode.postMessage({ command: 'collapseStateSync', collapseKey, isExpanded: shouldExpand });
-    }
-
-    // Restore selection from previous render
-    if (savedSelectedKey) {
-      const savedLabel = allLabels.find(el => el.dataset.collapseKey === savedSelectedKey);
-      if (savedLabel) {
-        setActiveLabel(savedLabel, true);
-      }
-    }
-
-    allLabels.forEach((el, index) => {
-      el.addEventListener('click', (e) => {
-        // Chevron has its own handler with stopPropagation - won't reach here
-        if (e.target.closest?.('.collapse-toggle') || e.target.closest?.('.chevron-hit-area')) {
-          return;
-        }
-
-        const issueId = el.dataset.issueId;
-        const isProject = el.classList.contains('project-label');
-        const isTimeGroup = el.classList.contains('time-group-label');
-        const collapseKey = el.dataset.collapseKey;
-
-        // Project/time-group labels: toggle collapse on click (if has children)
-        if ((isProject || isTimeGroup) && collapseKey) {
-          setActiveLabel(el);
-          if (el.dataset.hasChildren === 'true') {
-            // Instant client-side toggle (all rows are in DOM)
-            toggleCollapseClientSide(collapseKey);
-          }
-          return;
-        }
-
-        // Issue labels
-        const clickedOnText = e.target.classList?.contains('issue-text') || e.target.closest('.issue-text');
-        if (issueId && clickedOnText) {
-          // Clicking on text opens quick-pick
-          setActiveLabel(el, false, false, true); // skipFocus=true
-          vscode.postMessage({ command: 'openIssue', issueId: parseInt(issueId, 10) });
-        } else if (el.dataset.hasChildren === 'true' && collapseKey) {
-          // Parent issue: clicking elsewhere toggles collapse
-          setActiveLabel(el);
-          // Instant client-side toggle (all rows are in DOM)
-          toggleCollapseClientSide(collapseKey);
-        } else {
-          // Regular issue: clicking elsewhere just selects
-          setActiveLabel(el);
-        }
-      });
-
-      el.addEventListener('keydown', (e) => {
-        const collapseKey = el.dataset.collapseKey;
-        const issueId = el.dataset.issueId ? parseInt(el.dataset.issueId, 10) : NaN;
-
-        switch (e.key) {
-          case 'Enter':
-          case ' ':
-            e.preventDefault();
-            if (!isNaN(issueId)) {
-              vscode.postMessage({ command: 'openIssue', issueId });
-            }
-            break;
-          case 'ArrowUp': {
-            e.preventDefault();
-            const prev = findVisibleLabel(index, -1);
-            if (prev) setActiveLabel(prev.label, false, true);
-            break;
-          }
-          case 'ArrowDown': {
-            e.preventDefault();
-            const next = findVisibleLabel(index, 1);
-            if (next) setActiveLabel(next.label, false, true);
-            break;
-          }
-          case 'ArrowLeft':
-            e.preventDefault();
-            // VS Code behavior: if expanded, collapse; if collapsed, go to parent
-            if (el.dataset.hasChildren === 'true' && el.dataset.expanded === 'true') {
-              // Instant client-side collapse (all rows are in DOM)
-              toggleCollapseClientSide(collapseKey, 'collapse');
-            } else if (el.dataset.parentKey) {
-              // Navigate to parent
-              const parent = allLabels.find(l => l.dataset.collapseKey === el.dataset.parentKey);
-              if (parent) setActiveLabel(parent, false, true);
-            }
-            break;
-          case 'ArrowRight':
-            e.preventDefault();
-            // VS Code behavior: if collapsed, expand; if expanded, go to first child
-            if (el.dataset.hasChildren === 'true' && el.dataset.expanded === 'false') {
-              // Instant client-side expand (all rows are in DOM)
-              toggleCollapseClientSide(collapseKey, 'expand');
-            } else if (el.dataset.hasChildren === 'true' && el.dataset.expanded === 'true') {
-              // Navigate to first visible child
-              const firstChild = allLabels.find(l => l.dataset.parentKey === collapseKey && isLabelVisible(l));
-              if (firstChild) setActiveLabel(firstChild, false, true);
-            }
-            break;
-          case 'Home': {
-            e.preventDefault();
-            const first = findVisibleLabel(-1, 1);
-            if (first) setActiveLabel(first.label, false, true);
-            break;
-          }
-          case 'End': {
-            e.preventDefault();
-            const last = findVisibleLabel(allLabels.length, -1);
-            if (last) setActiveLabel(last.label, false, true);
-            break;
-          }
-          case 'PageDown': {
-            e.preventDefault();
-            // Skip ~10 visible labels
-            let target = index, count = 0;
-            while (count < 10 && target < allLabels.length - 1) {
-              const next = findVisibleLabel(target, 1);
-              if (!next) break;
-              target = next.index;
-              count++;
-            }
-            if (count > 0) setActiveLabel(allLabels[target], false, true);
-            break;
-          }
-          case 'PageUp': {
-            e.preventDefault();
-            // Skip ~10 visible labels
-            let target = index, count = 0;
-            while (count < 10 && target > 0) {
-              const prev = findVisibleLabel(target, -1);
-              if (!prev) break;
-              target = prev.index;
-              count++;
-            }
-            if (count > 0) setActiveLabel(allLabels[target], false, true);
-            break;
-          }
-          case 'Tab':
-            // Jump to corresponding bar in timeline
-            if (!e.shiftKey && !isNaN(issueId)) {
-              const bar = document.querySelector(\`.issue-bar[data-issue-id="\${issueId}"]\`);
-              if (bar) {
-                e.preventDefault();
-                bar.focus();
-                announce(\`Timeline bar for issue #\${issueId}\`);
-              }
-            }
-            break;
-        }
-      });
-    });
-
-    // Handle drag move (resizing, moving, and linking)
-    // Use requestAnimationFrame to throttle updates for smooth 60fps
-    let dragRafPending = false;
-    let lastMouseEvent = null;
-
-    addDocListener('mousemove', (e) => {
-      // Early exit if no drag in progress
-      if (!dragState && !linkingState) return;
-
-      // Store latest event and schedule RAF if not pending
-      lastMouseEvent = e;
-      if (dragRafPending) return;
-      dragRafPending = true;
-
-      requestAnimationFrame(() => {
-        dragRafPending = false;
-        const evt = lastMouseEvent;
-        if (!evt) return;
-
-        // Handle resize/move drag
-        if (dragState) {
-          const delta = evt.clientX - dragState.initialMouseX;
-
-        if (dragState.isMove && dragState.isBulkDrag && dragState.bulkBars) {
-          // Bulk move: update all selected bars
-          const snappedDelta = snapToDay(delta) - snapToDay(0); // Snap the delta itself
-          dragState.bulkBars.forEach(b => {
-            const barWidth = b.endX - b.startX;
-            const newStartX = Math.max(0, Math.min(b.startX + snappedDelta, timelineWidth - barWidth));
-            const newEndX = newStartX + barWidth;
-            const width = newEndX - newStartX;
-            b.barOutline.setAttribute('x', newStartX);
-            b.barOutline.setAttribute('width', width);
-            if (b.barMain) {
-              b.barMain.setAttribute('x', newStartX);
-              b.barMain.setAttribute('width', width);
-            }
-            b.leftHandle.setAttribute('x', newStartX);
-            b.rightHandle.setAttribute('x', newEndX - 8);
-            b.newStartX = newStartX;
-            b.newEndX = newEndX;
-            // Update badge position
-            if (b.barLabels) {
-              const labelDelta = b.labelsOnLeft ? (newStartX - b.startX) : (newEndX - b.endX);
-              b.barLabels.setAttribute('transform', 'translate(' + labelDelta + ', 0)');
-            }
-            // Update connected arrows
-            if (b.connectedArrows) {
-              updateArrowPositions(b.connectedArrows, b.issueId, newStartX, newEndX);
-            }
-            // Update link handle position
-            if (b.linkHandle) {
-              b.linkHandle.querySelectorAll('circle').forEach(c => c.setAttribute('cx', String(newEndX + 8)));
-            }
-          });
-          dragState.snappedDelta = snappedDelta;
-        } else {
-          // Single bar drag
-          let newStartX = dragState.startX;
-          let newEndX = dragState.endX;
-          const barWidth = dragState.endX - dragState.startX;
-
-          if (dragState.isMove) {
-            // Move entire bar: shift both start and end by same delta
-            newStartX = snapToDay(Math.max(0, Math.min(dragState.startX + delta, timelineWidth - barWidth)));
-            newEndX = newStartX + barWidth;
-          } else if (dragState.isLeft) {
-            newStartX = snapToDay(Math.max(0, Math.min(dragState.startX + delta, dragState.endX - dayWidth)));
-          } else {
-            newEndX = snapToDay(Math.max(dragState.startX + dayWidth, Math.min(dragState.endX + delta, timelineWidth)));
-          }
-
-          const width = newEndX - newStartX;
-          dragState.barOutline.setAttribute('x', newStartX);
-          dragState.barOutline.setAttribute('width', width);
-          if (dragState.barMain) {
-            dragState.barMain.setAttribute('x', newStartX);
-            dragState.barMain.setAttribute('width', width);
-          }
-          dragState.leftHandle.setAttribute('x', newStartX);
-          dragState.rightHandle.setAttribute('x', newEndX - 8);
-          dragState.newStartX = newStartX;
-          dragState.newEndX = newEndX;
-
-          // Update badge position
-          if (dragState.barLabels) {
-            const labelDelta = dragState.labelsOnLeft ? (newStartX - dragState.startX) : (newEndX - dragState.endX);
-            dragState.barLabels.setAttribute('transform', 'translate(' + labelDelta + ', 0)');
-          }
-
-          // Update connected arrows
-          if (dragState.connectedArrows) {
-            updateArrowPositions(dragState.connectedArrows, dragState.issueId, newStartX, newEndX);
-          }
-
-          // Update link handle position
-          if (dragState.linkHandle) {
-            dragState.linkHandle.querySelectorAll('circle').forEach(c => c.setAttribute('cx', String(newEndX + 8)));
-          }
-
-          // Update drag date tooltip
-          if (dragState.isMove && !dragState.isBulkDrag) {
-            const newStartDate = xToDate(newStartX);
-            const newDueDate = xToDueDate(newEndX);
-            const changed = newStartDate !== dragState.oldStartDate;
-            const text = changed
-              ? formatDateRange(dragState.oldStartDate, dragState.oldDueDate) + ' → ' + formatDateRange(newStartDate, newDueDate)
-              : formatDateRange(newStartDate, newDueDate);
-            updateDragTooltip(text);
-            positionDragTooltip(evt.clientX, evt.clientY);
-          } else if (!dragState.isMove) {
-            const edgeX = dragState.isLeft ? newStartX : newEndX;
-            const newDate = dragState.isLeft ? xToDate(edgeX) : xToDueDate(edgeX);
-            updateDragTooltip((dragState.isLeft ? 'Start: ' : 'Due: ') + formatDateShort(newDate));
-            positionDragTooltip(evt.clientX, evt.clientY);
-          }
-        }
-      }
-
-        // Handle linking drag
-        if (linkingState && tempArrow) {
-          // Use SVG rect directly - getBoundingClientRect accounts for scroll
-          const svg = document.querySelector('#ganttTimeline svg');
-          const rect = svg.getBoundingClientRect();
-          const endX = evt.clientX - rect.left;
-          const endY = evt.clientY - rect.top;
-
-          // Draw dashed line from start to cursor
-          const path = \`M \${linkingState.startX} \${linkingState.startY} L \${endX} \${endY}\`;
-          tempArrow.setAttribute('d', path);
-
-          // Find target bar under cursor
-          const targetBar = document.elementFromPoint(evt.clientX, evt.clientY)?.closest('.issue-bar');
-          if (currentTarget && currentTarget !== targetBar) {
-            currentTarget.classList.remove('link-target');
-          }
-          if (targetBar && targetBar !== linkingState.fromBar) {
-            targetBar.classList.add('link-target');
-            currentTarget = targetBar;
-          } else {
-            currentTarget = null;
-          }
-        }
-      }); // end RAF
-    }); // end mousemove
-
-    // Restore bar to original position (used by cancel)
-    function restoreBarPosition(state) {
-      if (!state) return;
-      const { bar, barOutline, barMain, leftHandle, rightHandle, barLabels, startX, endX, connectedArrows, issueId, linkHandle } = state;
-      const width = endX - startX;
-      if (barOutline) {
-        barOutline.setAttribute('x', String(startX));
-        barOutline.setAttribute('width', String(width));
-      }
-      if (barMain) {
-        barMain.setAttribute('x', String(startX));
-        barMain.setAttribute('width', String(width));
-      }
-      if (leftHandle) leftHandle.setAttribute('x', String(startX));
-      if (rightHandle) rightHandle.setAttribute('x', String(endX - 8));
-      if (barLabels) barLabels.removeAttribute('transform');
-      if (connectedArrows && connectedArrows.length > 0) {
-        updateArrowPositions(connectedArrows, issueId, startX, endX);
-      }
-      if (linkHandle) {
-        linkHandle.querySelectorAll('circle').forEach(c => c.setAttribute('cx', String(endX + 8)));
-      }
-      if (bar) bar.classList.remove('dragging');
-    }
-
-    // Handle drag end (resizing, moving, and linking)
-    addDocListener('mouseup', (e) => {
-      // Handle resize/move drag end
-      if (dragState) {
-        const { issueId, isLeft, isMove, isBulkDrag, bulkBars, newStartX, newEndX, bar, startX, endX, oldStartDate, oldDueDate, barOutline, barMain, leftHandle, rightHandle, barLabels, connectedArrows } = dragState;
-        const savedState = { ...dragState }; // Save for restoration
-
-        // Handle bulk drag end
-        if (isBulkDrag && bulkBars && isMove) {
-          // Remove dragging class from all bars
-          bulkBars.forEach(b => b.bar.classList.remove('dragging'));
-
-          // Collect all date changes
-          const changes = [];
-          bulkBars.forEach(b => {
-            if (b.newStartX !== undefined && b.newStartX !== b.startX) {
-              const newStart = xToDate(b.newStartX);
-              const newDue = xToDueDate(b.newEndX);
-              if (newStart !== b.oldStartDate || newDue !== b.oldDueDate) {
-                changes.push({
-                  issueId: parseInt(b.issueId),
-                  oldStartDate: b.oldStartDate,
-                  oldDueDate: b.oldDueDate,
-                  newStartDate: newStart,
-                  newDueDate: newDue,
-                  barData: b
-                });
-              }
-            }
-          });
-
-          if (changes.length > 0) {
-            hideDragTooltip();
-            const message = 'Move ' + changes.length + ' issue(s) to new dates?';
-            showDragConfirmModal(message,
-              () => {
-                // Confirm: commit changes
-                undoStack.push({ type: 'bulk', changes: changes.map(c => ({ issueId: c.issueId, oldStartDate: c.oldStartDate, oldDueDate: c.oldDueDate, newStartDate: c.newStartDate, newDueDate: c.newDueDate })) });
-                redoStack.length = 0;
-                updateUndoRedoButtons();
-                saveState();
-                changes.forEach(c => {
-                  vscode.postMessage({ command: 'updateDates', issueId: c.issueId, startDate: c.newStartDate, dueDate: c.newDueDate });
-                });
-              },
-              () => {
-                // Cancel: restore all bars
-                bulkBars.forEach(b => restoreBarPosition(b));
-              }
-            );
-          } else {
-            // No changes - restore all bars
-            hideDragTooltip();
-            bulkBars.forEach(b => restoreBarPosition(b));
-          }
-          dragState = null;
-          justEndedDrag = true;
-          requestAnimationFrame(() => justEndedDrag = false);
-          return;
-        }
-
-        // Single bar drag end
-        bar.classList.remove('dragging');
-        hideDragTooltip();
-
-        if (newStartX !== undefined || newEndX !== undefined) {
-          let calcStartDate = null;
-          let calcDueDate = null;
-
-          if (isMove) {
-            // Move: update both dates if position changed
-            if (newStartX !== startX) {
-              calcStartDate = xToDate(newStartX);
-              calcDueDate = xToDueDate(newEndX);
-            }
-          } else if (isLeft) {
-            calcStartDate = newStartX !== startX ? xToDate(newStartX) : null;
-          } else {
-            calcDueDate = newEndX !== endX ? xToDueDate(newEndX) : null;
-          }
-
-          const newStartDate = calcStartDate && calcStartDate !== oldStartDate ? calcStartDate : null;
-          const newDueDate = calcDueDate && calcDueDate !== oldDueDate ? calcDueDate : null;
-
-          if (newStartDate || newDueDate) {
-            // Build confirmation message
-            let message = 'Issue #' + issueId + ': ';
-            if (newStartDate && newDueDate) {
-              message += formatDateRange(oldStartDate, oldDueDate) + ' → ' + formatDateRange(newStartDate, newDueDate);
-            } else if (newStartDate) {
-              message += 'Start: ' + formatDateShort(oldStartDate) + ' → ' + formatDateShort(newStartDate);
-            } else {
-              message += 'Due: ' + formatDateShort(oldDueDate) + ' → ' + formatDateShort(newDueDate);
-            }
-
-            showDragConfirmModal(message,
-              () => {
-                // Confirm: commit change
-                undoStack.push({
-                  issueId,
-                  oldStartDate: newStartDate ? oldStartDate : null,
-                  oldDueDate: newDueDate ? oldDueDate : null,
-                  newStartDate,
-                  newDueDate
-                });
-                redoStack.length = 0;
-                updateUndoRedoButtons();
-                saveState();
-                vscode.postMessage({ command: 'updateDates', issueId, startDate: newStartDate, dueDate: newDueDate });
-              },
-              () => {
-                // Cancel: restore bar
-                restoreBarPosition(savedState);
-              }
-            );
-          } else {
-            // No date change - restore bar to original position
-            restoreBarPosition(savedState);
-          }
-        } else {
-          // No drag movement detected - restore bar
-          restoreBarPosition(savedState);
-        }
-        dragState = null;
-        justEndedDrag = true;
-        requestAnimationFrame(() => justEndedDrag = false);
-      }
-
-      // Handle linking drag end
-      if (linkingState) {
-        const fromId = linkingState.fromId;
-        if (currentTarget) {
-          const toId = parseInt(currentTarget.dataset.issueId);
-          // Prevent self-referential relations
-          if (fromId !== toId) {
-            showRelationPicker(e.clientX, e.clientY, fromId, toId);
-          }
-        }
-        cancelLinking();
-      }
-
-      // Restore scroll position if no modal shown (no-change cases)
-      if (!pendingDragConfirm) {
-        restoreScrollPosition();
-      }
-    });
-
-    // Undo menu item
-    menuUndo?.addEventListener('click', () => {
-      if (menuUndo.hasAttribute('disabled')) return;
-      if (undoStack.length === 0) return;
-      const action = undoStack.pop();
-      redoStack.push(action);
-      updateUndoRedoButtons();
-      saveState();
-
-      if (action.type === 'relation') {
-        // Undo relation action
-        if (action.operation === 'create') {
-          // Undo create = delete the relation
-          vscode.postMessage({
-            command: 'undoRelation',
-            operation: 'delete',
-            relationId: action.relationId,
-            datesBefore: action.datesBefore
-          });
-        } else {
-          // Undo delete = recreate the relation
-          vscode.postMessage({
-            command: 'undoRelation',
-            operation: 'create',
-            issueId: action.issueId,
-            targetIssueId: action.targetIssueId,
-            relationType: action.relationType
-          });
-        }
-      } else if (action.type === 'bulk') {
-        // Undo bulk date changes - revert all to old dates
-        action.changes.forEach(c => {
-          vscode.postMessage({
-            command: 'updateDates',
-            issueId: c.issueId,
-            startDate: c.oldStartDate,
-            dueDate: c.oldDueDate
-          });
-        });
-      } else {
-        // Date change action
-        vscode.postMessage({
-          command: 'updateDates',
-          issueId: action.issueId,
-          startDate: action.oldStartDate,
-          dueDate: action.oldDueDate
-        });
-      }
-    });
-
-    // Redo menu item
-    menuRedo?.addEventListener('click', () => {
-      if (menuRedo.hasAttribute('disabled')) return;
-      if (redoStack.length === 0) return;
-      const action = redoStack.pop();
-      undoStack.push(action);
-      updateUndoRedoButtons();
-      saveState();
-
-      if (action.type === 'relation') {
-        // Redo relation action
-        if (action.operation === 'create') {
-          // Redo create = recreate the relation
-          vscode.postMessage({
-            command: 'redoRelation',
-            operation: 'create',
-            issueId: action.issueId,
-            targetIssueId: action.targetIssueId,
-            relationType: action.relationType
-          });
-        } else {
-          // Redo delete = delete the relation again
-          vscode.postMessage({
-            command: 'redoRelation',
-            operation: 'delete',
-            relationId: action.relationId
-          });
-        }
-      } else if (action.type === 'bulk') {
-        // Redo bulk date changes - apply all new dates
-        action.changes.forEach(c => {
-          vscode.postMessage({
-            command: 'updateDates',
-            issueId: c.issueId,
-            startDate: c.newStartDate,
-            dueDate: c.newDueDate
-          });
-        });
-      } else {
-        // Date change action
-        vscode.postMessage({
-          command: 'updateDates',
-          issueId: action.issueId,
-          startDate: action.newStartDate,
-          dueDate: action.newDueDate
-        });
-      }
-    });
-
-    // Keyboard shortcuts
-    addDocListener('keydown', (e) => {
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      const modKey = isMac ? e.metaKey : e.ctrlKey;
-      // Skip if user is typing in an input/select
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
-
-      if (modKey && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        menuUndo?.click();
-      } else if (modKey && e.key === 'z' && e.shiftKey) {
-        e.preventDefault();
-        menuRedo?.click();
-      } else if (modKey && e.key === 'y') {
-        e.preventDefault();
-        menuRedo?.click();
-      }
-      // Zoom shortcuts (1-5)
-      else if (e.key >= '1' && e.key <= '5') {
-        const zoomSelect = document.getElementById('zoomSelect');
-        const levels = ['day', 'week', 'month', 'quarter', 'year'];
-        zoomSelect.value = levels[parseInt(e.key) - 1];
-        zoomSelect.dispatchEvent(new Event('change'));
-      }
-      // Toggle shortcuts (trigger menu items)
-      else if (e.key.toLowerCase() === 'h') { document.getElementById('menuHeatmap')?.click(); }
-      else if (e.key.toLowerCase() === 'y') { document.getElementById('menuCapacity')?.click(); }
-      else if (e.key.toLowerCase() === 'i') { document.getElementById('menuIntensity')?.click(); }
-      else if (e.key.toLowerCase() === 'd') { document.getElementById('menuDeps')?.click(); }
-      else if (e.key.toLowerCase() === 'v') {
-        // Toggle view focus between Project and Person
-        const viewSelect = document.getElementById('viewFocusSelect');
-        viewSelect.value = viewSelect.value === 'project' ? 'person' : 'project';
-        viewSelect.dispatchEvent(new Event('change'));
-      }
-      // Action shortcuts
-      else if (e.key.toLowerCase() === 'r') { document.getElementById('refreshBtn')?.click(); }
-      else if (e.key.toLowerCase() === 't') { scrollToToday(); }
-      else if (e.key.toLowerCase() === 'e') { document.getElementById('menuExpand')?.click(); }
-      else if (e.key.toLowerCase() === 'c' && !modKey) { document.getElementById('menuCollapse')?.click(); }
-      // Health filter shortcut (F cycles through health filters, skip if Ctrl/Cmd held)
-      else if (e.key.toLowerCase() === 'f' && !modKey) {
-        e.preventDefault();
-        document.getElementById('menuFilterHealth')?.click();
-      }
-      // Jump to next blocked issue (B)
-      else if (e.key.toLowerCase() === 'b') {
-        e.preventDefault();
-        const blockedBars = Array.from(document.querySelectorAll('.issue-bar[data-issue-id]'))
-          .filter(bar => bar.querySelector('.blocker-badge'));
-        if (blockedBars.length === 0) {
-          announce('No blocked issues');
-          return;
-        }
-        const focusedBar = document.activeElement?.closest('.issue-bar');
-        const currentIdx = focusedBar ? blockedBars.indexOf(focusedBar) : -1;
-        const nextIdx = (currentIdx + 1) % blockedBars.length;
-        const nextBar = blockedBars[nextIdx];
-        scrollToAndHighlight(nextBar.dataset.issueId);
-        nextBar.focus();
-        announce('Blocked issue ' + (nextIdx + 1) + ' of ' + blockedBars.length);
-      }
-      // Arrow key date nudging for focused issue bars
-      else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        const focusedBar = document.activeElement?.closest('.issue-bar:not(.parent-bar)');
-        if (!focusedBar) return;
-        e.preventDefault();
-        const issueId = parseInt(focusedBar.dataset.issueId);
-        const startDate = focusedBar.dataset.startDate;
-        const dueDate = focusedBar.dataset.dueDate;
-        if (!startDate && !dueDate) return;
-
-        const delta = e.key === 'ArrowRight' ? 1 : -1;
-        const addDays = (dateStr, days) => {
-          const d = new Date(dateStr + 'T00:00:00');
-          d.setDate(d.getDate() + days);
-          return d.toISOString().slice(0, 10);
-        };
-
-        let newStart = null, newDue = null;
-        if (e.shiftKey && dueDate) {
-          // Shift+Arrow: resize end date only
-          newDue = addDays(dueDate, delta);
-        } else if (e.altKey && startDate) {
-          // Alt+Arrow: resize start date only
-          newStart = addDays(startDate, delta);
-        } else {
-          // Plain Arrow: move entire bar
-          if (startDate) newStart = addDays(startDate, delta);
-          if (dueDate) newDue = addDays(dueDate, delta);
-        }
-
-        if (newStart || newDue) {
-          saveState();
-          undoStack.push({
-            issueId,
-            oldStartDate: newStart ? startDate : null,
-            oldDueDate: newDue ? dueDate : null,
-            newStartDate: newStart,
-            newDueDate: newDue
-          });
-          redoStack.length = 0;
-          updateUndoRedoButtons();
-          vscode.postMessage({ command: 'updateDates', issueId, startDate: newStart, dueDate: newDue });
-        }
-      }
-      // Quick search (/)
-      else if (e.key === '/' && !modKey) {
-        e.preventDefault();
-        showQuickSearch();
-      }
-      // Keyboard shortcuts help (?)
-      else if (e.key === '?' || (e.shiftKey && e.key === '/')) {
-        e.preventDefault();
-        toggleKeyboardHelp();
-      }
-    });
-
-    // Quick search overlay
-    let quickSearchEl = null;
-    function showQuickSearch() {
-      if (quickSearchEl) { quickSearchEl.remove(); }
-      quickSearchEl = document.createElement('div');
-      quickSearchEl.className = 'quick-search';
-      quickSearchEl.innerHTML = \`
-        <input type="text" placeholder="Search issues..." autofocus />
-      \`;
-      document.body.appendChild(quickSearchEl);
-      const input = quickSearchEl.querySelector('input');
-      input.focus();
-
-      const labels = Array.from(document.querySelectorAll('.issue-label'));
-      input.addEventListener('input', () => {
-        const query = input.value.toLowerCase();
-        labels.forEach(label => {
-          const text = label.getAttribute('aria-label')?.toLowerCase() || '';
-          const match = query && text.includes(query);
-          label.classList.toggle('search-match', match);
-        });
-      });
-
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-          closeQuickSearch();
-        } else if (e.key === 'Enter') {
-          const match = document.querySelector('.issue-label.search-match');
-          if (match) {
-            closeQuickSearch();
-            match.focus();
-            scrollToAndHighlight(match.dataset.issueId);
-          }
-        }
-      });
-
-      input.addEventListener('blur', () => setTimeout(closeQuickSearch, 150));
-    }
-
-    function closeQuickSearch() {
-      if (quickSearchEl) {
-        quickSearchEl.remove();
-        quickSearchEl = null;
-        document.querySelectorAll('.search-match').forEach(el => el.classList.remove('search-match'));
-      }
-    }
-
-    // Keyboard help overlay
-    let keyboardHelpEl = null;
-    function toggleKeyboardHelp() {
-      if (keyboardHelpEl) {
-        keyboardHelpEl.remove();
-        keyboardHelpEl = null;
-        return;
-      }
-      keyboardHelpEl = document.createElement('div');
-      keyboardHelpEl.className = 'keyboard-help';
-      keyboardHelpEl.innerHTML = \`
-        <div class="keyboard-help-content">
-          <h3>Keyboard Shortcuts</h3>
-          <div class="shortcut-grid">
-            <div class="shortcut-section">
-              <h4>Navigation</h4>
-              <div><kbd>↑</kbd><kbd>↓</kbd> Move between issues</div>
-              <div><kbd>Home</kbd><kbd>End</kbd> First/last issue</div>
-              <div><kbd>PgUp</kbd><kbd>PgDn</kbd> Jump 10 rows</div>
-              <div><kbd>Tab</kbd> Label → Bar</div>
-              <div><kbd>Shift+Tab</kbd> Bar → Label</div>
-            </div>
-            <div class="shortcut-section">
-              <h4>Date Editing</h4>
-              <div><kbd>←</kbd><kbd>→</kbd> Move bar ±1 day</div>
-              <div><kbd>Shift+←/→</kbd> Resize end</div>
-              <div><kbd>Alt+←/→</kbd> Resize start</div>
-              <div><kbd>Ctrl+Z</kbd> Undo</div>
-              <div><kbd>Ctrl+Y</kbd> Redo</div>
-            </div>
-            <div class="shortcut-section">
-              <h4>View</h4>
-              <div><kbd>1-5</kbd> Zoom levels</div>
-              <div><kbd>H</kbd> Heatmap</div>
-              <div><kbd>D</kbd> Dependencies</div>
-              <div><kbd>C</kbd> Critical path</div>
-              <div><kbd>T</kbd> Today</div>
-            </div>
-            <div class="shortcut-section">
-              <h4>Health & Other</h4>
-              <div><kbd>F</kbd> Cycle health filter</div>
-              <div><kbd>B</kbd> Next blocked issue</div>
-              <div><kbd>/</kbd> Quick search</div>
-              <div><kbd>S</kbd> Cycle sort</div>
-              <div><kbd>R</kbd> Refresh</div>
-              <div><kbd>Esc</kbd> Clear/cancel</div>
-            </div>
-          </div>
-          <p class="keyboard-help-close">Press <kbd>?</kbd> or <kbd>Esc</kbd> to close</p>
-        </div>
-      \`;
-      document.body.appendChild(keyboardHelpEl);
-      keyboardHelpEl.addEventListener('click', (e) => {
-        if (e.target === keyboardHelpEl) toggleKeyboardHelp();
-      });
-    }
-
-    // Close help on Escape
-    addDocListener('keydown', (e) => {
-      if (e.key === 'Escape' && keyboardHelpEl) {
-        e.stopImmediatePropagation();
-        toggleKeyboardHelp();
-      }
-    });
-
-    // Scroll to today marker (centered in visible timeline area)
-    const todayX = ${Math.round(todayX)};
-    const todayInRange = ${todayInRange};
-    function scrollToToday() {
-      if (!todayInRange) {
-        vscode.postMessage({ command: 'todayOutOfRange' });
-        return;
-      }
-      if (ganttScroll) {
-        const stickyLeft = document.querySelector('.gantt-body .gantt-sticky-left');
-        const stickyWidth = stickyLeft?.offsetWidth ?? 0;
-        const visibleTimelineWidth = ganttScroll.clientWidth - stickyWidth;
-        ganttScroll.scrollLeft = Math.max(0, todayX - visibleTimelineWidth / 2);
-      }
-    }
-
-    // Scroll to and highlight an issue (for click/keyboard navigation)
-    function scrollToAndHighlight(issueId) {
-      if (!issueId) return;
-      allowScrollChange = true; // Intentional scroll
-      const label = document.querySelector('.issue-label[data-issue-id="' + issueId + '"]');
-      const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
-      if (label) {
-        label.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        label.classList.add('highlighted');
-        setTimeout(() => label.classList.remove('highlighted'), 1500);
-      }
-      if (bar && ganttScroll) {
-        const barRect = bar.getBoundingClientRect();
-        const scrollRect = ganttScroll.getBoundingClientRect();
-        const scrollLeft = ganttScroll.scrollLeft + barRect.left - scrollRect.left - 100;
-        ganttScroll.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' });
-        bar.classList.add('highlighted');
-        setTimeout(() => bar.classList.remove('highlighted'), 1500);
-      }
-    }
-
-    // Restore scroll position or scroll to today on initial load
-    // Defer to next frame to avoid blocking initial paint and batch layout reads
-    requestAnimationFrame(() => {
-      if (savedCenterDateMs !== null && ganttScroll) {
-        // Date-based restore: works correctly when date range changes
-        // Clamp to current date range if saved date is outside
-        const clampedDateMs = Math.max(minDateMs, Math.min(maxDateMs, savedCenterDateMs));
-        // Always scroll to clamped date (nearest edge if out of range)
-        scrollToCenterDate(clampedDateMs);
-        if (savedScrollTop !== null) {
-          ganttScroll.scrollTop = savedScrollTop;
-        }
-        savedCenterDateMs = null;
-        savedScrollTop = null;
-      } else if (savedScrollLeft !== null && ganttScroll) {
-        // Legacy pixel position (deprecated, kept for backward compat)
-        ganttScroll.scrollLeft = savedScrollLeft;
-        if (savedScrollTop !== null) {
-          ganttScroll.scrollTop = savedScrollTop;
-        }
-        savedScrollLeft = null;
-        savedScrollTop = null;
-      } else {
-        scrollToToday();
-      }
-      // Initialize minimap viewport (batched with scroll restoration)
-      updateMinimapViewport();
-      // Allow scroll state saving after restoration completes
-      restoringScroll = false;
-    });
-
-    // Today button handler
-    document.getElementById('todayBtn')?.addEventListener('click', scrollToToday);
-
-    // Column resize handling
-    const resizeHandle = document.getElementById('resizeHandle');
-    const resizeHandleHeader = document.getElementById('resizeHandleHeader');
-    let isResizing = false;
-    let resizeStartX = 0;
-    let resizeStartWidth = 0;
-    let activeResizeHandle = null;
-
-    function startResize(e, handle) {
-      isResizing = true;
-      activeResizeHandle = handle;
-      resizeStartX = e.clientX;
-      resizeStartWidth = labelsColumn.offsetWidth;
-      handle.classList.add('dragging');
-      document.body.classList.add('cursor-col-resize', 'user-select-none');
-      e.preventDefault();
-    }
-
-    resizeHandle?.addEventListener('mousedown', (e) => startResize(e, resizeHandle));
-    resizeHandleHeader?.addEventListener('mousedown', (e) => startResize(e, resizeHandleHeader));
-
-    // RAF throttle for smooth column resize
-    let resizeRafPending = false;
-    let lastResizeEvent = null;
-    addDocListener('mousemove', (e) => {
-      if (!isResizing) return;
-      lastResizeEvent = e;
-      if (resizeRafPending) return;
-      resizeRafPending = true;
-      requestAnimationFrame(() => {
-        resizeRafPending = false;
-        if (!lastResizeEvent) return;
-        const delta = lastResizeEvent.clientX - resizeStartX;
-        const newWidth = Math.min(600, Math.max(120, resizeStartWidth + delta));
-        // Resize both header and body labels columns + inner SVG
-        if (ganttLeftHeader) ganttLeftHeader.style.width = newWidth + 'px';
-        if (labelsColumn) {
-          labelsColumn.style.width = newWidth + 'px';
-          const labelsSvg = labelsColumn.querySelector('svg');
-          if (labelsSvg) labelsSvg.setAttribute('width', String(newWidth));
-        }
-        // Update capacity ribbon label width (label + resize handle + extra columns)
-        const capacityLabel = document.querySelector('.capacity-ribbon-label');
-        if (capacityLabel) {
-          capacityLabel.style.width = (newWidth + ${resizeHandleWidth + extraColumnsWidth}) + 'px';
-        }
-        updateMinimapPosition();
-      });
-    });
-
-    addDocListener('mouseup', () => {
-      if (isResizing) {
-        isResizing = false;
-        activeResizeHandle?.classList.remove('dragging');
-        activeResizeHandle = null;
-        document.body.classList.remove('cursor-col-resize', 'user-select-none');
-        saveState(); // Persist new column width
-      }
-    });
-
-    // Auto-hide loading overlay after content renders
-    requestAnimationFrame(() => {
-      document.getElementById('loadingOverlay')?.classList.remove('visible');
-    });
-  </script>
-</body>
-</html>`;
+    return { html, state: renderState };
   }
 
-  private _getEmptyHtml(): string {
-    const nonce = getNonce();
+  private _getEmptyPayload(): GanttRenderPayload {
     const message = "No issues with dates to display. Add start_date or due_date to your issues.";
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}';">
-  <title>Redmine Gantt</title>
-  <style nonce="${nonce}">
-    body {
-      padding: 20px;
-      background: var(--vscode-editor-background);
-      color: var(--vscode-foreground);
-    }
-  </style>
-</head>
-<body>
-  <h2>Timeline</h2>
-  <p>${message}</p>
-</body>
-</html>`;
+    const html = `
+  <div class="gantt-empty">
+    <h2>Timeline</h2>
+    <p>${message}</p>
+  </div>
+`;
+    return { html, state: this._getFallbackState() };
   }
 
   /** Status colors using VS Code theme variables with opacity for 60-30-10 UX rule */

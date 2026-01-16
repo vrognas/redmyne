@@ -306,7 +306,7 @@ export function activate(context: vscode.ExtensionContext): void {
   vscode.window.registerWebviewPanelSerializer("redmineGantt", {
     async deserializeWebviewPanel(panel: vscode.WebviewPanel) {
       // Restore panel with loading skeleton
-      const ganttPanel = GanttPanel.restore(panel, projectsTree.server);
+      const ganttPanel = GanttPanel.restore(panel, context.extensionUri, projectsTree.server);
       // Fetch and populate data
       const issues = await projectsTree.fetchIssuesIfNeeded();
       if (issues.length > 0) {

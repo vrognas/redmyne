@@ -3,6 +3,7 @@ import { GanttViewMode } from "../redmine/models/common";
 export type GanttZoomLevel = "day" | "week" | "month" | "quarter" | "year";
 
 export type GanttWebviewMessage =
+  | { command: "webviewReady" }
   | { command: "openIssue"; issueId: number }
   | { command: "updateDates"; issueId: number; startDate: string | null; dueDate: string | null }
   | { command: "setZoom"; zoomLevel: GanttZoomLevel }
