@@ -538,7 +538,7 @@ fi
 
 **Solution**: Instance-level cache with revision-counter invalidation
 - Use `_dataRevision` counter (incremented on any data mutation)
-- Cache key: `${revision}-${viewFocus}-${assignee}-${minDate}-${maxDate}-${schedule}`
+- Cache key: `${revision}-${viewFocus}-${assignee}-${filter}-${minDate}-${maxDate}-${schedule}`
 - Don't use `issues.length` alone (edits don't change length but do change data)
 - Call `_bumpRevision()` at every mutation point: updateIssues, date changes, relations, etc.
 
@@ -565,6 +565,7 @@ fi
 1. **Always-render for instant toggle**: Pre-render both states, toggle via CSS
 2. **Container class > per-element toggle**: O(1) class on parent vs O(N) iteration
 3. **Revision counters > length-based keys**: Data content changes without length changes
+3b. **Cache keys must include ALL filter state**: Filters change visible data without mutations
 4. **Diff for incremental updates**: Track what changed, update only that
 5. **Parse once, cache forever**: Static DOM data should be parsed and cached
 6. **Gate perf logging**: Use config flag (default: off) not hardcoded booleans
