@@ -264,7 +264,7 @@ export function setupCollapse(ctx) {
     let parentCurrentY = parentRowY;
     if (parentEntry && parentEntry.elements.length > 0) {
       const parentTransform = parentEntry.elements[0].getAttribute('transform') || '';
-      const parentYMatch = parentTransform.match(/translate\\([^,]+,\\s*([-\\d.]+)/);
+      const parentYMatch = parentTransform.match(/translate\([^,]+,\s*([-\d.]+)/);
       if (parentYMatch) {
         parentCurrentY = parseFloat(parentYMatch[1]);
       }
@@ -279,7 +279,7 @@ export function setupCollapse(ctx) {
         if (entry) {
           entry.elements.forEach(el => {
             const transform = el.getAttribute('transform') || '';
-            const xMatch = transform.match(/translate\\(([-\\d.]+)/);
+            const xMatch = transform.match(/translate\(([-\d.]+)/);
             const x = xMatch ? xMatch[1] : '0';
             el.setAttribute('transform', 'translate(' + x + ', ' + nextY + ')');
             setSvgVisibility(el, false); // Show
@@ -306,10 +306,10 @@ export function setupCollapse(ctx) {
         elements.forEach(el => {
           const transform = el.getAttribute('transform') || '';
           // Extract current X (for timeline bars)
-          const xMatch = transform.match(/translate\\(([-\\d.]+)/);
+          const xMatch = transform.match(/translate\(([-\d.]+)/);
           const x = xMatch ? xMatch[1] : '0';
           // Extract current Y
-          const yMatch = transform.match(/translate\\([^,]+,\\s*([-\\d.]+)/);
+          const yMatch = transform.match(/translate\([^,]+,\s*([-\d.]+)/);
           const currentY = yMatch ? parseFloat(yMatch[1]) : originalY;
           const newY = currentY + delta;
           el.setAttribute('transform', 'translate(' + x + ', ' + newY + ')');
