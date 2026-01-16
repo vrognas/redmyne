@@ -8,7 +8,7 @@
 
 import type * as vscode from "vscode";
 
-export const STORAGE_KEY = "redmine.internalEstimates";
+export const STORAGE_KEY = "redmyne.internalEstimates";
 
 export interface InternalEstimate {
   hoursRemaining: number;

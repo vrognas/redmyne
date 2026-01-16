@@ -57,8 +57,8 @@ function isIssue(item: TreeItem): item is Issue {
 }
 
 
-const FILTER_KEY = "redmine.issueFilter";
-const SORT_KEY = "redmine.issueSort";
+const FILTER_KEY = "redmyne.issueFilter";
+const SORT_KEY = "redmyne.issueSort";
 
 export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   server?: RedmineServer;
@@ -96,7 +96,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
     // Listen for config changes
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration((e) => {
-        if (e.affectsConfiguration("redmine.workingHours")) {
+        if (e.affectsConfiguration("redmyne.workingHours")) {
           clearFlexibilityCache();
           this.flexibilityCache.clear();
           this.refresh();
@@ -123,7 +123,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
       issue,
       flexibility,
       this.server,
-      "redmine.openActionsForIssue",
+      "redmyne.openActionsForIssue",
       showAssignee
     );
 

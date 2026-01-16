@@ -23,7 +23,7 @@ describe("RedmineSecretManager", () => {
     await manager.setApiKey("test-key-123");
 
     expect(context.secrets.store).toHaveBeenCalledWith(
-      "redmine:global:apiKey:v2",
+      "redmyne:global:apiKey:v2",
       "test-key-123"
     );
   });
@@ -33,12 +33,12 @@ describe("RedmineSecretManager", () => {
 
     const key = await manager.getApiKey();
     expect(key).toBe("test-key-123");
-    expect(context.secrets.get).toHaveBeenCalledWith("redmine:global:apiKey:v2");
+    expect(context.secrets.get).toHaveBeenCalledWith("redmyne:global:apiKey:v2");
   });
 
   it("should delete API key", async () => {
     await manager.deleteApiKey();
 
-    expect(context.secrets.delete).toHaveBeenCalledWith("redmine:global:apiKey:v2");
+    expect(context.secrets.delete).toHaveBeenCalledWith("redmyne:global:apiKey:v2");
   });
 });

@@ -328,7 +328,7 @@ export function buildFlexibilityCache(
  * Supports both new weeklySchedule format and deprecated hoursPerDay/workingDays
  */
 export function getWeeklySchedule(): WeeklySchedule {
-  const config = vscode.workspace.getConfiguration("redmine.workingHours");
+  const config = vscode.workspace.getConfiguration("redmyne.workingHours");
 
   // Try new format first
   const schedule = config.get<WeeklySchedule>("weeklySchedule");

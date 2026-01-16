@@ -17,7 +17,7 @@ export function registerCreateTestIssuesCommand(
   deps: CreateTestIssuesDeps
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand("redmine.createTestIssues", async () => {
+    vscode.commands.registerCommand("redmyne.createTestIssues", async () => {
       const server = deps.getServer();
       if (!server) {
         vscode.window.showErrorMessage("Redmine not configured. Run 'Redmine: Configure' first.");

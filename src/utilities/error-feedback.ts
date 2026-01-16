@@ -45,8 +45,8 @@ export interface ErrorAction {
  * @example
  * ```ts
  * showActionableError("Redmine not configured", [
- *   { title: "Configure", command: "redmine.configure" },
- *   { title: "View Docs", command: "redmine.openDocs" },
+ *   { title: "Configure", command: "redmyne.configure" },
+ *   { title: "View Docs", command: "redmyne.openDocs" },
  * ]);
  * ```
  */

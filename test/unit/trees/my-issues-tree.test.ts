@@ -66,7 +66,7 @@ describe("MyIssuesTree", () => {
 
     const treeItem = tree.getTreeItem(issue);
 
-    expect(treeItem.command?.command).toBe("redmine.openActionsForIssue");
+    expect(treeItem.command?.command).toBe("redmyne.openActionsForIssue");
     expect(treeItem.command?.arguments?.[2]).toBe("7392");
   });
 });

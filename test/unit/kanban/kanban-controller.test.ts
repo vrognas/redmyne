@@ -42,7 +42,7 @@ describe("KanbanController", () => {
 
       expect(controller.getTasks()).toHaveLength(1);
       expect(mockState.update).toHaveBeenCalledWith(
-        "redmine.kanban",
+        "redmyne.kanban",
         expect.any(Array)
       );
     });

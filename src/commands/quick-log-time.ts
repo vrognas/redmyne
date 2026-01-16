@@ -124,7 +124,7 @@ export async function quickLogTime(
     }
 
     // 8. Refresh time entries tree
-    vscode.commands.executeCommand("redmine.refreshTimeEntries");
+    vscode.commands.executeCommand("redmyne.refreshTimeEntries");
 
     // 9. Update cache
     await context.globalState.update("lastTimeLog", {

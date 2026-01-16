@@ -40,7 +40,7 @@ export function registerTimeEntryCommands(
 ): void {
   // Open time entry's issue in browser
   context.subscriptions.push(
-    vscode.commands.registerCommand("redmine.openTimeEntryInBrowser", async (...args: unknown[]) => {
+    vscode.commands.registerCommand("redmyne.openTimeEntryInBrowser", async (...args: unknown[]) => {
       let issueId: number | undefined;
 
       // Handle command URI (tooltip link passes [issueId] as first arg)
@@ -71,7 +71,7 @@ export function registerTimeEntryCommands(
       }
 
       // Get URL from config
-      const config = vscode.workspace.getConfiguration("redmine");
+      const config = vscode.workspace.getConfiguration("redmyne");
       const url = config.get<string>("url");
       if (!url) {
         vscode.window.showErrorMessage("Redmine URL not configured");
@@ -84,7 +84,7 @@ export function registerTimeEntryCommands(
 
   // Edit time entry
   context.subscriptions.push(
-    vscode.commands.registerCommand("redmine.editTimeEntry", async (node: TimeEntryNode) => {
+    vscode.commands.registerCommand("redmyne.editTimeEntry", async (node: TimeEntryNode) => {
       const entry = node?._entry;
       if (!entry?.id) {
         vscode.window.showErrorMessage("No time entry selected");
@@ -183,7 +183,7 @@ export function registerTimeEntryCommands(
 
   // Delete time entry
   context.subscriptions.push(
-    vscode.commands.registerCommand("redmine.deleteTimeEntry", async (node: TimeEntryNode) => {
+    vscode.commands.registerCommand("redmyne.deleteTimeEntry", async (node: TimeEntryNode) => {
       const entry = node?._entry;
       if (!entry?.id) {
         vscode.window.showErrorMessage("No time entry selected");
@@ -219,14 +219,14 @@ export function registerTimeEntryCommands(
 
   // Add time entry for a specific date (context menu on day-group)
   context.subscriptions.push(
-    vscode.commands.registerCommand("redmine.addTimeEntryForDate", async (node: DayGroupNode) => {
+    vscode.commands.registerCommand("redmyne.addTimeEntryForDate", async (node: DayGroupNode) => {
       const server = deps.getServer();
       if (!server) {
         vscode.window.showErrorMessage("No Redmine server configured");
         return;
       }
 
-      const config = vscode.workspace.getConfiguration("redmine");
+      const config = vscode.workspace.getConfiguration("redmyne");
       const url = config.get<string>("url") || "";
 
       await quickLogTime(

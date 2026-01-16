@@ -17,7 +17,7 @@ export function registerInternalEstimateCommands(
   context.subscriptions.push(
     // Set internal estimate for an issue
     vscode.commands.registerCommand(
-      "redmine.setInternalEstimate",
+      "redmyne.setInternalEstimate",
       async (issue: { id: number; subject: string; estimated_hours?: number | null } | undefined) => {
         if (!issue?.id) {
           vscode.window.showErrorMessage("Could not determine issue ID");
@@ -52,13 +52,13 @@ export function registerInternalEstimateCommands(
         );
 
         // Refresh Gantt if open
-        vscode.commands.executeCommand("redmine.refreshGanttData");
+        vscode.commands.executeCommand("redmyne.refreshGanttData");
       }
     ),
 
     // Clear internal estimate
     vscode.commands.registerCommand(
-      "redmine.clearInternalEstimate",
+      "redmyne.clearInternalEstimate",
       async (issue: { id: number; subject: string } | undefined) => {
         if (!issue?.id) {
           vscode.window.showErrorMessage("Could not determine issue ID");
@@ -80,7 +80,7 @@ export function registerInternalEstimateCommands(
         );
 
         // Refresh Gantt if open
-        vscode.commands.executeCommand("redmine.refreshGanttData");
+        vscode.commands.executeCommand("redmyne.refreshGanttData");
       }
     )
   );

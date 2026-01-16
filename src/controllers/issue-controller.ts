@@ -73,7 +73,7 @@ export class IssueController {
       );
 
       // Refresh time entries tree
-      vscode.commands.executeCommand("redmine.refreshTimeEntries");
+      vscode.commands.executeCommand("redmyne.refreshTimeEntries");
 
       // Status bar confirmation (matches QuickLogTime UX)
       showStatusBarMessage(
@@ -129,7 +129,7 @@ export class IssueController {
         2000
       );
       this.onIssueUpdated?.();
-      vscode.commands.executeCommand("redmine.refreshAfterIssueUpdate");
+      vscode.commands.executeCommand("redmyne.refreshAfterIssueUpdate");
     } catch (error) {
       vscode.window.showErrorMessage(errorToString(error));
     }
@@ -272,7 +272,7 @@ export class IssueController {
       }
       // Trigger refresh (even on partial success - issue was modified)
       this.onIssueUpdated?.();
-      vscode.commands.executeCommand("redmine.refreshAfterIssueUpdate");
+      vscode.commands.executeCommand("redmyne.refreshAfterIssueUpdate");
     } catch (error) {
       vscode.window.showErrorMessage(
         `Error while applying quick update: ${error}`

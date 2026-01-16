@@ -17,8 +17,8 @@ export function registerConfigureCommand(
   deps: ConfigureCommandDeps
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand("redmine.configure", async () => {
-      const config = vscode.workspace.getConfiguration("redmine");
+    vscode.commands.registerCommand("redmyne.configure", async () => {
+      const config = vscode.workspace.getConfiguration("redmyne");
       const existingUrl = config.get<string>("url");
       const existingApiKey = await deps.secretManager.getApiKey();
 

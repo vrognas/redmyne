@@ -5,7 +5,7 @@ import { setupKeyboard } from './gantt-keyboard.js';
 
 const vscode = acquireVsCodeApi();
 
-// Performance instrumentation (controlled by redmine.gantt.perfDebug setting)
+// Performance instrumentation (controlled by redmyne.gantt.perfDebug setting)
 let PERF_DEBUG = false; // Updated from state.perfDebug on render
 function perfMark(name) {
   if (PERF_DEBUG && typeof performance !== 'undefined') {

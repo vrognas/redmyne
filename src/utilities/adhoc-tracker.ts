@@ -7,7 +7,7 @@ import * as vscode from "vscode";
  */
 class AdHocTracker {
   private context: vscode.ExtensionContext | null = null;
-  private readonly STORAGE_KEY = "redmine.adHocIssues";
+  private readonly STORAGE_KEY = "redmyne.adHocIssues";
 
   initialize(context: vscode.ExtensionContext): void {
     this.context = context;

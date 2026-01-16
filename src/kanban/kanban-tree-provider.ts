@@ -11,9 +11,9 @@ import { formatHoursAsHHMM } from "../utilities/time-input";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
 
 // Filter/sort persistence keys
-const FILTER_KEY = "redmine.kanban.filterPriority";
-const SORT_FIELD_KEY = "redmine.kanban.sortField";
-const SORT_DIR_KEY = "redmine.kanban.sortDirection";
+const FILTER_KEY = "redmyne.kanban.filterPriority";
+const SORT_FIELD_KEY = "redmyne.kanban.sortField";
+const SORT_DIR_KEY = "redmyne.kanban.sortDirection";
 
 export type KanbanFilterPriority = TaskPriority | "all";
 export type KanbanSortField = "priority" | "issueId";
@@ -168,7 +168,7 @@ export class KanbanTreeProvider
       item.iconPath = new vscode.ThemeIcon("coffee", new vscode.ThemeColor("charts.blue"));
       item.contextValue = "break-status";
       item.command = {
-        command: "redmine.kanban.skipBreak",
+        command: "redmyne.kanban.skipBreak",
         title: "Skip Break",
       };
       const md = new vscode.MarkdownString();
@@ -313,19 +313,19 @@ export class KanbanTreeProvider
     // Command on click: toggle timer for doing tasks, start timer for todo
     if (task.timerPhase === "working") {
       item.command = {
-        command: "redmine.kanban.pauseTimer",
+        command: "redmyne.kanban.pauseTimer",
         title: "Pause Timer",
         arguments: [task.id],
       };
     } else if (task.timerPhase === "paused") {
       item.command = {
-        command: "redmine.kanban.resumeTimer",
+        command: "redmyne.kanban.resumeTimer",
         title: "Resume Timer",
         arguments: [task.id],
       };
     } else if (status !== "done") {
       item.command = {
-        command: "redmine.kanban.startTimer",
+        command: "redmyne.kanban.startTimer",
         title: "Start Timer",
         arguments: [task.id],
       };

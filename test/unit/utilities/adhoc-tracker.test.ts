@@ -55,7 +55,7 @@ describe("AdHocTracker", () => {
     it("persists to storage", () => {
       tracker.tag(1234);
       expect(mockContext.globalState.update).toHaveBeenCalledWith(
-        "redmine.adHocIssues",
+        "redmyne.adHocIssues",
         [1234]
       );
     });
@@ -79,7 +79,7 @@ describe("AdHocTracker", () => {
       tracker.tag(1234);
       tracker.untag(1234);
       expect(mockContext.globalState.update).toHaveBeenLastCalledWith(
-        "redmine.adHocIssues",
+        "redmyne.adHocIssues",
         []
       );
     });

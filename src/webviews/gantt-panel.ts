@@ -33,10 +33,10 @@ import { escapeAttr, escapeHtml } from "./gantt-html-escape";
 import { CreatableRelationType, GanttIssue, GanttRow, nodeToGanttRow } from "./gantt-model";
 import { deriveAssigneeState, filterIssuesForView } from "./gantt-view-filter";
 
-// Performance instrumentation (gated behind redmine.gantt.perfDebug config)
+// Performance instrumentation (gated behind redmyne.gantt.perfDebug config)
 const perfTimers: Map<string, number> = new Map();
 function isPerfDebugEnabled(): boolean {
-  return vscode.workspace.getConfiguration("redmine.gantt").get<boolean>("perfDebug", false);
+  return vscode.workspace.getConfiguration("redmyne.gantt").get<boolean>("perfDebug", false);
 }
 function perfStart(name: string): void {
   if (isPerfDebugEnabled()) {
@@ -351,14 +351,14 @@ function getHeatmapColor(utilization: number): string {
  * Gantt timeline webview panel
  * Shows issues as horizontal bars on a timeline
  */
-const VIEW_MODE_KEY = "redmine.gantt.viewMode";
-const VIEW_FOCUS_KEY = "redmine.gantt.viewFocus";
-const SELECTED_PROJECT_KEY = "redmine.gantt.selectedProject";
-const SELECTED_ASSIGNEE_KEY = "redmine.gantt.selectedAssignee";
-const FILTER_ASSIGNEE_KEY = "redmine.gantt.filterAssignee";
-const FILTER_STATUS_KEY = "redmine.gantt.filterStatus";
-const FILTER_HEALTH_KEY = "redmine.gantt.filterHealth";
-const LOOKBACK_YEARS_KEY = "redmine.gantt.lookbackYears";
+const VIEW_MODE_KEY = "redmyne.gantt.viewMode";
+const VIEW_FOCUS_KEY = "redmyne.gantt.viewFocus";
+const SELECTED_PROJECT_KEY = "redmyne.gantt.selectedProject";
+const SELECTED_ASSIGNEE_KEY = "redmyne.gantt.selectedAssignee";
+const FILTER_ASSIGNEE_KEY = "redmyne.gantt.filterAssignee";
+const FILTER_STATUS_KEY = "redmyne.gantt.filterStatus";
+const FILTER_HEALTH_KEY = "redmyne.gantt.filterHealth";
+const LOOKBACK_YEARS_KEY = "redmyne.gantt.lookbackYears";
 
 export class GanttPanel {
   public static currentPanel: GanttPanel | undefined;
@@ -744,10 +744,10 @@ export class GanttPanel {
     const resizeHandleWidth = 10;
     const extraColumnsWidth = idColumnWidth + startDateColumnWidth + statusColumnWidth + dueDateColumnWidth + assigneeColumnWidth;
     const stickyLeftWidth = labelWidth + resizeHandleWidth + extraColumnsWidth;
-    const ganttConfig = vscode.workspace.getConfiguration("redmine.gantt");
+    const ganttConfig = vscode.workspace.getConfiguration("redmyne.gantt");
     const extendedRelationTypes = ganttConfig.get<boolean>("extendedRelationTypes", false);
     const perfDebug = ganttConfig.get<boolean>("perfDebug", false);
-    const redmineBaseUrl = vscode.workspace.getConfiguration("redmine").get<string>("url") || "";
+    const redmineBaseUrl = vscode.workspace.getConfiguration("redmyne").get<string>("url") || "";
 
     const baseState: GanttRenderState = {
       timelineWidth: 600,
@@ -1200,7 +1200,7 @@ export class GanttPanel {
         if (message.issueId && this._server) {
           // Open issue actions (refresh is handled by individual actions if needed)
           vscode.commands.executeCommand(
-            "redmine.openActionsForIssue",
+            "redmyne.openActionsForIssue",
             false,
             { server: this._server },
             String(message.issueId)
@@ -1303,7 +1303,7 @@ export class GanttPanel {
         this._isRefreshing = true;
         resetDownstreamCountCache();
         // Clear cache and refetch data (including new relations)
-        vscode.commands.executeCommand("redmine.refreshIssues");
+        vscode.commands.executeCommand("redmyne.refreshIssues");
         break;
       case "toggleCollapse":
         if (message.collapseKey) {
@@ -1363,40 +1363,40 @@ export class GanttPanel {
         break;
       case "openInBrowser":
         if (message.issueId) {
-          vscode.commands.executeCommand("redmine.openIssueInBrowser", { id: message.issueId });
+          vscode.commands.executeCommand("redmyne.openIssueInBrowser", { id: message.issueId });
         }
         break;
       case "openProjectInBrowser":
         if (message.projectId) {
           const project = this._projects.find(p => p.id === message.projectId);
           if (project) {
-            vscode.commands.executeCommand("redmine.openProjectInBrowser", { project: { identifier: project.identifier } });
+            vscode.commands.executeCommand("redmyne.openProjectInBrowser", { project: { identifier: project.identifier } });
           }
         }
         break;
       case "showInIssues":
         if (message.issueId) {
-          vscode.commands.executeCommand("redmine.revealIssueInTree", message.issueId);
+          vscode.commands.executeCommand("redmyne.revealIssueInTree", message.issueId);
         }
         break;
       case "logTime":
         if (message.issueId) {
-          vscode.commands.executeCommand("redmine.quickLogTime", { id: message.issueId });
+          vscode.commands.executeCommand("redmyne.quickLogTime", { id: message.issueId });
         }
         break;
       case "setDoneRatio":
         if (message.issueId) {
-          vscode.commands.executeCommand("redmine.setDoneRatio", { id: message.issueId });
+          vscode.commands.executeCommand("redmyne.setDoneRatio", { id: message.issueId });
         }
         break;
       case "bulkSetDoneRatio":
         if (message.issueIds && message.issueIds.length > 0) {
-          vscode.commands.executeCommand("redmine.bulkSetDoneRatio", message.issueIds);
+          vscode.commands.executeCommand("redmyne.bulkSetDoneRatio", message.issueIds);
         }
         break;
       case "copyUrl":
         if (message.issueId) {
-          vscode.commands.executeCommand("redmine.copyIssueUrl", { id: message.issueId });
+          vscode.commands.executeCommand("redmyne.copyIssueUrl", { id: message.issueId });
         }
         break;
       case "showStatus":
@@ -1409,12 +1409,12 @@ export class GanttPanel {
         break;
       case "setInternalEstimate":
         if (message.issueId) {
-          vscode.commands.executeCommand("redmine.setInternalEstimate", { id: message.issueId });
+          vscode.commands.executeCommand("redmyne.setInternalEstimate", { id: message.issueId });
         }
         break;
       case "toggleAutoUpdate":
         if (message.issueId) {
-          vscode.commands.executeCommand("redmine.toggleAutoUpdateDoneRatio", { id: message.issueId });
+          vscode.commands.executeCommand("redmyne.toggleAutoUpdateDoneRatio", { id: message.issueId });
         }
         break;
       case "toggleAdHoc":
@@ -1426,7 +1426,7 @@ export class GanttPanel {
           );
           // Refresh Gantt to update contribution data
           this._isRefreshing = true;
-          vscode.commands.executeCommand("redmine.refreshIssues");
+          vscode.commands.executeCommand("redmyne.refreshIssues");
         }
         break;
       case "togglePrecedence":
@@ -1440,7 +1440,7 @@ export class GanttPanel {
             );
             // Refresh to update intensity calculations
             this._isRefreshing = true;
-            vscode.commands.executeCommand("redmine.refreshIssues");
+            vscode.commands.executeCommand("redmyne.refreshIssues");
           });
         }
         break;
@@ -1728,7 +1728,7 @@ export class GanttPanel {
   private _getRenderPayload(): GanttRenderPayload {
     perfStart("_getRenderPayload");
     // Read gantt config settings
-    const ganttConfig = vscode.workspace.getConfiguration("redmine.gantt");
+    const ganttConfig = vscode.workspace.getConfiguration("redmyne.gantt");
     this._extendedRelationTypes = ganttConfig.get<boolean>("extendedRelationTypes", false);
     const visibleTypes = ganttConfig.get<string[]>("visibleRelationTypes", ["blocks", "precedes"]);
     this._visibleRelationTypes = new Set(visibleTypes);
@@ -3722,7 +3722,7 @@ export class GanttPanel {
   </div>
 `;
 
-    const redmineBaseUrl = vscode.workspace.getConfiguration("redmine").get<string>("url") || "";
+    const redmineBaseUrl = vscode.workspace.getConfiguration("redmyne").get<string>("url") || "";
     const renderState: GanttRenderState = {
       timelineWidth,
       minDateMs: minDate.getTime(),

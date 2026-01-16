@@ -13,8 +13,8 @@ describe("error-feedback", () => {
       mockShowErrorMessage.mockResolvedValue(undefined);
 
       const actions: ErrorAction[] = [
-        { title: "Configure", command: "redmine.configure" },
-        { title: "Retry", command: "redmine.refresh" },
+        { title: "Configure", command: "redmyne.configure" },
+        { title: "Retry", command: "redmyne.refresh" },
       ];
 
       await showActionableError("Connection failed", actions);
@@ -34,12 +34,12 @@ describe("error-feedback", () => {
       mockExecuteCommand.mockResolvedValue(undefined);
 
       const actions: ErrorAction[] = [
-        { title: "Configure", command: "redmine.configure" },
+        { title: "Configure", command: "redmyne.configure" },
       ];
 
       await showActionableError("Not configured", actions);
 
-      expect(mockExecuteCommand).toHaveBeenCalledWith("redmine.configure");
+      expect(mockExecuteCommand).toHaveBeenCalledWith("redmyne.configure");
     });
 
     it("passes command arguments when provided", async () => {
@@ -50,12 +50,12 @@ describe("error-feedback", () => {
       mockExecuteCommand.mockResolvedValue(undefined);
 
       const actions: ErrorAction[] = [
-        { title: "View Issue", command: "redmine.openIssue", args: [123] },
+        { title: "View Issue", command: "redmyne.openIssue", args: [123] },
       ];
 
       await showActionableError("Issue error", actions);
 
-      expect(mockExecuteCommand).toHaveBeenCalledWith("redmine.openIssue", 123);
+      expect(mockExecuteCommand).toHaveBeenCalledWith("redmyne.openIssue", 123);
     });
 
     it("does nothing when no action selected", async () => {
@@ -65,7 +65,7 @@ describe("error-feedback", () => {
       mockShowErrorMessage.mockResolvedValue(undefined);
 
       const actions: ErrorAction[] = [
-        { title: "Retry", command: "redmine.refresh" },
+        { title: "Retry", command: "redmyne.refresh" },
       ];
 
       await showActionableError("Error", actions);

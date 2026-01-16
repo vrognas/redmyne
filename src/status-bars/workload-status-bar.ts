@@ -27,7 +27,7 @@ export class WorkloadStatusBar implements vscode.Disposable {
   }
 
   private initialize(): void {
-    const config = vscode.workspace.getConfiguration("redmine.statusBar");
+    const config = vscode.workspace.getConfiguration("redmyne.statusBar");
     const showWorkload = config.get<boolean>("showWorkload", false);
 
     if (!showWorkload) {
@@ -40,7 +40,7 @@ export class WorkloadStatusBar implements vscode.Disposable {
         vscode.StatusBarAlignment.Left,
         50
       );
-      this.statusBar.command = "redmine.listOpenIssuesAssignedToMe";
+      this.statusBar.command = "redmyne.listOpenIssuesAssignedToMe";
     }
   }
 
@@ -63,7 +63,7 @@ export class WorkloadStatusBar implements vscode.Disposable {
       return;
     }
 
-    const scheduleConfig = vscode.workspace.getConfiguration("redmine.workingHours");
+    const scheduleConfig = vscode.workspace.getConfiguration("redmyne.workingHours");
     const defaultSchedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
 
     const currentMonthKey = getMonthKey(new Date());

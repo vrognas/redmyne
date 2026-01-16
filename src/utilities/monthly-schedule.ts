@@ -10,7 +10,7 @@ import * as vscode from "vscode";
 import { WeeklySchedule, getDayName } from "./flexibility-calculator";
 
 /** Storage key for monthly schedule overrides */
-export const MONTHLY_SCHEDULES_KEY = "redmine.monthlySchedules";
+export const MONTHLY_SCHEDULES_KEY = "redmyne.monthlySchedules";
 
 /** Month key format: "YYYY-MM" */
 export type MonthKey = string;

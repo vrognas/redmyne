@@ -204,7 +204,7 @@ describe("KanbanController Timer", () => {
       const now = new Date();
       const thirtySecondsAgo = new Date(now.getTime() - 30000);
 
-      mockState.update("redmine.kanban", [
+      mockState.update("redmyne.kanban", [
         {
           id: "test-id",
           title: "Recovering task",
@@ -239,7 +239,7 @@ describe("KanbanController Timer", () => {
       const now = new Date();
       const sixtySecondsAgo = new Date(now.getTime() - 60000);
 
-      mockState.update("redmine.kanban", [
+      mockState.update("redmyne.kanban", [
         {
           id: "completed-id",
           title: "Completed task",
@@ -271,7 +271,7 @@ describe("KanbanController Timer", () => {
 
     it("clears timer if timerSecondsLeft was exactly 0", async () => {
       // Edge case: timer completed but extension restarted before user responded
-      mockState.update("redmine.kanban", [
+      mockState.update("redmyne.kanban", [
         {
           id: "zero-id",
           title: "Zero seconds task",

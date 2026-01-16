@@ -32,9 +32,9 @@ export function registerMonthlyScheduleCommands(
   deps: MonthlyScheduleCommandDeps
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand("redmine.workingHours.editMonth", async () => {
+    vscode.commands.registerCommand("redmyne.workingHours.editMonth", async () => {
       // Get default schedule from config
-      const config = vscode.workspace.getConfiguration("redmine.workingHours");
+      const config = vscode.workspace.getConfiguration("redmyne.workingHours");
       const defaultSchedule = config.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
       const overrides = deps.getOverrides();
 

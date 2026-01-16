@@ -62,7 +62,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     // Refresh when working hours config changes
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration((e) => {
-        if (e.affectsConfiguration("redmine.workingHours")) {
+        if (e.affectsConfiguration("redmyne.workingHours")) {
           clearFlexibilityCache();
                     this._onDidChangeTreeData.fire(undefined);
         }
@@ -621,7 +621,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
           `**Date:** ${entry.spent_on}\n\n` +
           `**Comments:** ${entry.comments || "(none)"}\n\n` +
           `---\n\n` +
-          `[Open Issue in Browser](command:redmine.openTimeEntryInBrowser?${commandArgs})`
+          `[Open Issue in Browser](command:redmyne.openTimeEntryInBrowser?${commandArgs})`
       );
       tooltip.isTrusted = true;
       tooltip.supportHtml = false;
@@ -662,7 +662,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     treeItem.contextValue = node.contextValue;
     if (node.type === "load-earlier") {
       treeItem.command = {
-        command: "redmine.loadEarlierTimeEntries",
+        command: "redmyne.loadEarlierTimeEntries",
         title: "Load Earlier Time Entries",
       };
     }

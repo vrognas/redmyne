@@ -7,7 +7,7 @@ import {
   sortTasksByPriority,
 } from "./kanban-state";
 
-const STORAGE_KEY = "redmine.kanban";
+const STORAGE_KEY = "redmyne.kanban";
 
 /**
  * Interface for globalState-like storage

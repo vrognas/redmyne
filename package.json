@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "3.25.1",
+  "version": "4.0.0",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -25,691 +25,691 @@
   "contributes": {
     "commands": [
       {
-        "command": "redmine.configure",
+        "command": "redmyne.configure",
         "title": "Configure Redmine Server",
         "icon": "$(settings-gear)"
       },
       {
-        "command": "redmine.setApiKey",
+        "command": "redmyne.setApiKey",
         "title": "Redmine: Set API Key"
       },
       {
-        "command": "redmine.listOpenIssuesAssignedToMe",
+        "command": "redmyne.listOpenIssuesAssignedToMe",
         "title": "Redmine: List open issues assigned to me"
       },
       {
-        "command": "redmine.openActionsForIssue",
+        "command": "redmyne.openActionsForIssue",
         "title": "Redmine: Actions for issue"
       },
       {
-        "command": "redmine.newIssue",
+        "command": "redmyne.newIssue",
         "title": "Redmine: Create new issue"
       },
       {
-        "command": "redmine.openActionsForIssueUnderCursor",
+        "command": "redmyne.openActionsForIssueUnderCursor",
         "title": "Redmine: Actions for issue under cursor"
       },
       {
-        "command": "redmine.quickLogTime",
+        "command": "redmyne.quickLogTime",
         "title": "Log Time"
       },
       {
-        "command": "redmine.refreshIssues",
+        "command": "redmyne.refreshIssues",
         "title": "Refresh",
         "icon": "$(refresh)"
       },
       {
-        "command": "redmine.filterMyOpen",
+        "command": "redmyne.filterMyOpen",
         "title": "My Open Issues"
       },
       {
-        "command": "redmine.filterAllOpen",
+        "command": "redmyne.filterAllOpen",
         "title": "All Open Issues"
       },
       {
-        "command": "redmine.filterMyClosed",
+        "command": "redmyne.filterMyClosed",
         "title": "My Closed Issues"
       },
       {
-        "command": "redmine.filterAll",
+        "command": "redmyne.filterAll",
         "title": "All Issues"
       },
       {
-        "command": "redmine.timeFilterMy",
+        "command": "redmyne.timeFilterMy",
         "title": "My Time Entries"
       },
       {
-        "command": "redmine.timeFilterAll",
+        "command": "redmyne.timeFilterAll",
         "title": "All Time Entries"
       },
       {
-        "command": "redmine.issueSortId",
+        "command": "redmyne.issueSortId",
         "title": "Sort by #ID"
       },
       {
-        "command": "redmine.issueSortSubject",
+        "command": "redmyne.issueSortSubject",
         "title": "Sort by Subject"
       },
       {
-        "command": "redmine.issueSortAssignee",
+        "command": "redmyne.issueSortAssignee",
         "title": "Sort by Assignee"
       },
       {
-        "command": "redmine.timeSortId",
+        "command": "redmyne.timeSortId",
         "title": "Sort by #ID"
       },
       {
-        "command": "redmine.timeSortSubject",
+        "command": "redmyne.timeSortSubject",
         "title": "Sort by Subject"
       },
       {
-        "command": "redmine.timeSortComment",
+        "command": "redmyne.timeSortComment",
         "title": "Sort by Comment"
       },
       {
-        "command": "redmine.timeSortUser",
+        "command": "redmyne.timeSortUser",
         "title": "Sort by User"
       },
       {
-        "command": "redmine.toggleTreeView",
+        "command": "redmyne.toggleTreeView",
         "title": "Tree View",
         "icon": "$(list-tree)"
       },
       {
-        "command": "redmine.toggleListView",
+        "command": "redmyne.toggleListView",
         "title": "List View",
         "icon": "$(list-flat)"
       },
       {
-        "command": "redmine.showApiOutput",
+        "command": "redmyne.showApiOutput",
         "title": "Redmine: Show API Output"
       },
       {
-        "command": "redmine.clearApiOutput",
+        "command": "redmyne.clearApiOutput",
         "title": "Redmine: Clear API Output"
       },
       {
-        "command": "redmine.toggleApiLogging",
+        "command": "redmyne.toggleApiLogging",
         "title": "Redmine: Toggle API Logging"
       },
       {
-        "command": "redmine.workingHours.editMonth",
+        "command": "redmyne.workingHours.editMonth",
         "title": "Redmine: Edit Monthly Working Hours"
       },
       {
-        "command": "redmine.refreshTimeEntries",
+        "command": "redmyne.refreshTimeEntries",
         "title": "Refresh",
         "icon": "$(refresh)"
       },
       {
-        "command": "redmine.loadEarlierTimeEntries",
+        "command": "redmyne.loadEarlierTimeEntries",
         "title": "Load Earlier Time Entries"
       },
       {
-        "command": "redmine.openTimeEntryInBrowser",
+        "command": "redmyne.openTimeEntryInBrowser",
         "title": "Open in Browser"
       },
       {
-        "command": "redmine.editTimeEntry",
+        "command": "redmyne.editTimeEntry",
         "title": "Edit Time Entry..."
       },
       {
-        "command": "redmine.deleteTimeEntry",
+        "command": "redmyne.deleteTimeEntry",
         "title": "Delete Time Entry"
       },
       {
-        "command": "redmine.addTimeEntryForDate",
+        "command": "redmyne.addTimeEntryForDate",
         "title": "Add Time Entry..."
       },
       {
-        "command": "redmine.openIssueInBrowser",
+        "command": "redmyne.openIssueInBrowser",
         "title": "Open in Browser",
         "icon": "$(link-external)"
       },
       {
-        "command": "redmine.openIssueInGantt",
+        "command": "redmyne.openIssueInGantt",
         "title": "Show in Gantt",
         "icon": "$(graph)"
       },
       {
-        "command": "redmine.setInternalEstimate",
+        "command": "redmyne.setInternalEstimate",
         "title": "Set Internal Estimate",
         "shortTitle": "Set...",
         "icon": "$(clock)"
       },
       {
-        "command": "redmine.clearInternalEstimate",
+        "command": "redmyne.clearInternalEstimate",
         "title": "Clear Internal Estimate",
         "shortTitle": "Clear",
         "icon": "$(trash)"
       },
       {
-        "command": "redmine.setDoneRatio",
+        "command": "redmyne.setDoneRatio",
         "title": "Set % Done",
         "icon": "$(checklist)"
       },
       {
-        "command": "redmine.setStatus",
+        "command": "redmyne.setStatus",
         "title": "Set Status",
         "icon": "$(symbol-event)"
       },
       {
-        "command": "redmine.setDoneRatio0",
+        "command": "redmyne.setDoneRatio0",
         "title": "0%"
       },
       {
-        "command": "redmine.setDoneRatio10",
+        "command": "redmyne.setDoneRatio10",
         "title": "10%"
       },
       {
-        "command": "redmine.setDoneRatio20",
+        "command": "redmyne.setDoneRatio20",
         "title": "20%"
       },
       {
-        "command": "redmine.setDoneRatio30",
+        "command": "redmyne.setDoneRatio30",
         "title": "30%"
       },
       {
-        "command": "redmine.setDoneRatio40",
+        "command": "redmyne.setDoneRatio40",
         "title": "40%"
       },
       {
-        "command": "redmine.setDoneRatio50",
+        "command": "redmyne.setDoneRatio50",
         "title": "50%"
       },
       {
-        "command": "redmine.setDoneRatio60",
+        "command": "redmyne.setDoneRatio60",
         "title": "60%"
       },
       {
-        "command": "redmine.setDoneRatio70",
+        "command": "redmyne.setDoneRatio70",
         "title": "70%"
       },
       {
-        "command": "redmine.setDoneRatio80",
+        "command": "redmyne.setDoneRatio80",
         "title": "80%"
       },
       {
-        "command": "redmine.setDoneRatio90",
+        "command": "redmyne.setDoneRatio90",
         "title": "90%"
       },
       {
-        "command": "redmine.setDoneRatio100",
+        "command": "redmyne.setDoneRatio100",
         "title": "100%"
       },
       {
-        "command": "redmine.setDoneRatioCustom",
+        "command": "redmyne.setDoneRatioCustom",
         "title": "Custom..."
       },
       {
-        "command": "redmine.setIssuePriority",
+        "command": "redmyne.setIssuePriority",
         "title": "Set Priority",
         "icon": "$(arrow-both)"
       },
       {
-        "command": "redmine.autoUpdateOn",
+        "command": "redmyne.autoUpdateOn",
         "title": "On"
       },
       {
-        "command": "redmine.autoUpdateOff",
+        "command": "redmyne.autoUpdateOff",
         "title": "Off"
       },
       {
-        "command": "redmine.adHocOn",
+        "command": "redmyne.adHocOn",
         "title": "On"
       },
       {
-        "command": "redmine.adHocOff",
+        "command": "redmyne.adHocOff",
         "title": "Off"
       },
       {
-        "command": "redmine.precedenceOn",
+        "command": "redmyne.precedenceOn",
         "title": "On"
       },
       {
-        "command": "redmine.precedenceOff",
+        "command": "redmyne.precedenceOff",
         "title": "Off"
       },
       {
-        "command": "redmine.copyIssueUrl",
+        "command": "redmyne.copyIssueUrl",
         "title": "Copy URL",
         "icon": "$(copy)"
       },
       {
-        "command": "redmine.copyIssueId",
+        "command": "redmyne.copyIssueId",
         "title": "Copy Issue ID",
         "icon": "$(copy)"
       },
       {
-        "command": "redmine.copyProjectId",
+        "command": "redmyne.copyProjectId",
         "title": "Copy Project ID",
         "icon": "$(copy)"
       },
       {
-        "command": "redmine.copyProjectUrl",
+        "command": "redmyne.copyProjectUrl",
         "title": "Copy Project URL",
         "icon": "$(copy)"
       },
       {
-        "command": "redmine.showGantt",
+        "command": "redmyne.showGantt",
         "title": "Show Gantt",
         "icon": "$(calendar)"
       },
       {
-        "command": "redmine.openProjectInBrowser",
+        "command": "redmyne.openProjectInBrowser",
         "title": "Open in Browser",
         "icon": "$(link-external)"
       },
       {
-        "command": "redmine.showProjectInGantt",
+        "command": "redmyne.showProjectInGantt",
         "title": "Show in Gantt",
         "icon": "$(graph)"
       },
       {
-        "command": "redmine.createTestIssues",
+        "command": "redmyne.createTestIssues",
         "title": "Redmine: Create Test Issues"
       },
       {
-        "command": "redmine.quickCreateIssue",
+        "command": "redmyne.quickCreateIssue",
         "title": "Redmine: Quick Create Issue (Ctrl+Y N)",
         "icon": "$(add)"
       },
       {
-        "command": "redmine.updateIssue",
+        "command": "redmyne.updateIssue",
         "title": "Update Issue...",
         "icon": "$(edit)"
       },
       {
-        "command": "redmine.quickCreateSubIssue",
+        "command": "redmyne.quickCreateSubIssue",
         "title": "Create Sub-Issue",
         "icon": "$(add)"
       },
       {
-        "command": "redmine.quickCreateVersion",
+        "command": "redmyne.quickCreateVersion",
         "title": "Create Version/Milestone",
         "icon": "$(milestone)"
       },
       {
-        "command": "redmine.addIssueToKanban",
+        "command": "redmyne.addIssueToKanban",
         "title": "Add to Kanban",
         "icon": "$(checklist)"
       },
       {
-        "command": "redmine.kanban.add",
+        "command": "redmyne.kanban.add",
         "title": "Add Kanban Task",
         "icon": "$(add)"
       },
       {
-        "command": "redmine.kanban.edit",
+        "command": "redmyne.kanban.edit",
         "title": "Edit Task",
         "icon": "$(edit)"
       },
       {
-        "command": "redmine.kanban.delete",
+        "command": "redmyne.kanban.delete",
         "title": "Delete Task",
         "icon": "$(trash)"
       },
       {
-        "command": "redmine.kanban.markDone",
+        "command": "redmyne.kanban.markDone",
         "title": "Mark Done",
         "icon": "$(check)"
       },
       {
-        "command": "redmine.kanban.reopen",
+        "command": "redmyne.kanban.reopen",
         "title": "Reopen Task",
         "icon": "$(refresh)"
       },
       {
-        "command": "redmine.kanban.setPriority",
+        "command": "redmyne.kanban.setPriority",
         "title": "Set Priority",
         "icon": "$(arrow-both)"
       },
       {
-        "command": "redmine.kanban.openInBrowser",
+        "command": "redmyne.kanban.openInBrowser",
         "title": "Open Linked Issue in Browser",
         "icon": "$(link-external)"
       },
       {
-        "command": "redmine.kanban.clearDone",
+        "command": "redmyne.kanban.clearDone",
         "title": "Clear Done Tasks",
         "icon": "$(trash)"
       },
       {
-        "command": "redmine.kanban.refreshParentProjects",
+        "command": "redmyne.kanban.refreshParentProjects",
         "title": "Refresh",
         "icon": "$(refresh)"
       },
       {
-        "command": "redmine.kanban.copySubject",
+        "command": "redmyne.kanban.copySubject",
         "title": "Copy Task Subject",
         "icon": "$(copy)"
       },
       {
-        "command": "redmine.kanban.startTimer",
+        "command": "redmyne.kanban.startTimer",
         "title": "Start Timer",
         "icon": "$(play)"
       },
       {
-        "command": "redmine.kanban.pauseTimer",
+        "command": "redmyne.kanban.pauseTimer",
         "title": "Pause Timer",
         "icon": "$(debug-pause)"
       },
       {
-        "command": "redmine.kanban.resumeTimer",
+        "command": "redmyne.kanban.resumeTimer",
         "title": "Resume Timer",
         "icon": "$(play)"
       },
       {
-        "command": "redmine.kanban.stopTimer",
+        "command": "redmyne.kanban.stopTimer",
         "title": "Stop Timer",
         "icon": "$(debug-stop)"
       },
       {
-        "command": "redmine.kanban.moveToTodo",
+        "command": "redmyne.kanban.moveToTodo",
         "title": "Move to To Do",
         "icon": "$(arrow-left)"
       },
       {
-        "command": "redmine.kanban.toggleTimer",
+        "command": "redmyne.kanban.toggleTimer",
         "title": "Toggle Timer"
       },
       {
-        "command": "redmine.kanban.skipBreak",
+        "command": "redmyne.kanban.skipBreak",
         "title": "Skip Break",
         "icon": "$(debug-step-over)"
       },
       {
-        "command": "redmine.kanban.logEarly",
+        "command": "redmyne.kanban.logEarly",
         "title": "Log Early",
         "icon": "$(history)"
       },
       {
-        "command": "redmine.kanban.logAndContinue",
+        "command": "redmyne.kanban.logAndContinue",
         "title": "Log & Continue",
         "icon": "$(debug-restart)"
       },
       {
-        "command": "redmine.kanban.deferTime",
+        "command": "redmyne.kanban.deferTime",
         "title": "Defer Time",
         "icon": "$(arrow-right)"
       },
       {
-        "command": "redmine.kanban.moveUp",
+        "command": "redmyne.kanban.moveUp",
         "title": "Move Up",
         "icon": "$(arrow-up)"
       },
       {
-        "command": "redmine.kanban.moveDown",
+        "command": "redmyne.kanban.moveDown",
         "title": "Move Down",
         "icon": "$(arrow-down)"
       },
       {
-        "command": "redmine.kanban.revealTimeEntry",
+        "command": "redmyne.kanban.revealTimeEntry",
         "title": "Reveal Time Entry",
         "icon": "$(eye)"
       },
       {
-        "command": "redmine.kanban.configureTimer",
+        "command": "redmyne.kanban.configureTimer",
         "title": "Timer Settings",
         "icon": "$(gear)"
       },
       {
-        "command": "redmine.kanban.filterAll",
+        "command": "redmyne.kanban.filterAll",
         "title": "All Priorities"
       },
       {
-        "command": "redmine.kanban.filterHigh",
+        "command": "redmyne.kanban.filterHigh",
         "title": "High Priority"
       },
       {
-        "command": "redmine.kanban.filterMedium",
+        "command": "redmyne.kanban.filterMedium",
         "title": "Medium Priority"
       },
       {
-        "command": "redmine.kanban.filterLow",
+        "command": "redmyne.kanban.filterLow",
         "title": "Low Priority"
       },
       {
-        "command": "redmine.kanban.sortPriority",
+        "command": "redmyne.kanban.sortPriority",
         "title": "Sort by Priority"
       },
       {
-        "command": "redmine.kanban.sortIssueId",
+        "command": "redmyne.kanban.sortIssueId",
         "title": "Sort by Issue ID"
       },
       {
-        "command": "redmine.toggleAutoUpdateDoneRatio",
+        "command": "redmyne.toggleAutoUpdateDoneRatio",
         "title": "Toggle Auto-update % Done",
         "icon": "$(sync)"
       },
       {
-        "command": "redmine.toggleAdHoc",
+        "command": "redmyne.toggleAdHoc",
         "title": "Toggle Ad-hoc Budget",
         "icon": "$(package)"
       },
       {
-        "command": "redmine.togglePrecedence",
+        "command": "redmyne.togglePrecedence",
         "title": "Toggle Precedence Priority",
         "icon": "$(arrow-up)"
       },
       {
-        "command": "redmine.gantt.updateIssue",
+        "command": "redmyne.gantt.updateIssue",
         "title": "Update Issue..."
       },
       {
-        "command": "redmine.gantt.openInBrowser",
+        "command": "redmyne.gantt.openInBrowser",
         "title": "Open in Browser"
       },
       {
-        "command": "redmine.gantt.showInIssues",
+        "command": "redmyne.gantt.showInIssues",
         "title": "Show in Sidebar"
       },
       {
-        "command": "redmine.gantt.createSubIssue",
+        "command": "redmyne.gantt.createSubIssue",
         "title": "Create Sub-Issue"
       },
       {
-        "command": "redmine.gantt.createIssue",
+        "command": "redmyne.gantt.createIssue",
         "title": "Create Issue"
       },
       {
-        "command": "redmine.gantt.createVersion",
+        "command": "redmyne.gantt.createVersion",
         "title": "Create Version"
       },
       {
-        "command": "redmine.gantt.addToKanban",
+        "command": "redmyne.gantt.addToKanban",
         "title": "Add to Kanban"
       },
       {
-        "command": "redmine.gantt.logTime",
+        "command": "redmyne.gantt.logTime",
         "title": "Log Time"
       },
       {
-        "command": "redmine.gantt.setDoneRatio",
+        "command": "redmyne.gantt.setDoneRatio",
         "title": "Set % Done"
       },
       {
-        "command": "redmine.gantt.setDoneRatio0",
+        "command": "redmyne.gantt.setDoneRatio0",
         "title": "0%"
       },
       {
-        "command": "redmine.gantt.setDoneRatio10",
+        "command": "redmyne.gantt.setDoneRatio10",
         "title": "10%"
       },
       {
-        "command": "redmine.gantt.setDoneRatio20",
+        "command": "redmyne.gantt.setDoneRatio20",
         "title": "20%"
       },
       {
-        "command": "redmine.gantt.setDoneRatio30",
+        "command": "redmyne.gantt.setDoneRatio30",
         "title": "30%"
       },
       {
-        "command": "redmine.gantt.setDoneRatio40",
+        "command": "redmyne.gantt.setDoneRatio40",
         "title": "40%"
       },
       {
-        "command": "redmine.gantt.setDoneRatio50",
+        "command": "redmyne.gantt.setDoneRatio50",
         "title": "50%"
       },
       {
-        "command": "redmine.gantt.setDoneRatio60",
+        "command": "redmyne.gantt.setDoneRatio60",
         "title": "60%"
       },
       {
-        "command": "redmine.gantt.setDoneRatio70",
+        "command": "redmyne.gantt.setDoneRatio70",
         "title": "70%"
       },
       {
-        "command": "redmine.gantt.setDoneRatio80",
+        "command": "redmyne.gantt.setDoneRatio80",
         "title": "80%"
       },
       {
-        "command": "redmine.gantt.setDoneRatio90",
+        "command": "redmyne.gantt.setDoneRatio90",
         "title": "90%"
       },
       {
-        "command": "redmine.gantt.setDoneRatio100",
+        "command": "redmyne.gantt.setDoneRatio100",
         "title": "100%"
       },
       {
-        "command": "redmine.gantt.setDoneRatioCustom",
+        "command": "redmyne.gantt.setDoneRatioCustom",
         "title": "Custom..."
       },
       {
-        "command": "redmine.gantt.setStatus",
+        "command": "redmyne.gantt.setStatus",
         "title": "Set Status"
       },
       {
-        "command": "redmine.gantt.setIssuePriority",
+        "command": "redmyne.gantt.setIssuePriority",
         "title": "Set Priority"
       },
       {
-        "command": "redmine.gantt.autoUpdateOn",
+        "command": "redmyne.gantt.autoUpdateOn",
         "title": "On"
       },
       {
-        "command": "redmine.gantt.autoUpdateOff",
+        "command": "redmyne.gantt.autoUpdateOff",
         "title": "Off"
       },
       {
-        "command": "redmine.gantt.adHocOn",
+        "command": "redmyne.gantt.adHocOn",
         "title": "On"
       },
       {
-        "command": "redmine.gantt.adHocOff",
+        "command": "redmyne.gantt.adHocOff",
         "title": "Off"
       },
       {
-        "command": "redmine.gantt.precedenceOn",
+        "command": "redmyne.gantt.precedenceOn",
         "title": "On"
       },
       {
-        "command": "redmine.gantt.precedenceOff",
+        "command": "redmyne.gantt.precedenceOff",
         "title": "Off"
       },
       {
-        "command": "redmine.gantt.setInternalEstimate",
+        "command": "redmyne.gantt.setInternalEstimate",
         "title": "Set..."
       },
       {
-        "command": "redmine.gantt.clearInternalEstimate",
+        "command": "redmyne.gantt.clearInternalEstimate",
         "title": "Clear"
       },
       {
-        "command": "redmine.gantt.copyUrl",
+        "command": "redmyne.gantt.copyUrl",
         "title": "Copy URL"
       },
       {
-        "command": "redmine.gantt.copyIssueId",
+        "command": "redmyne.gantt.copyIssueId",
         "title": "Copy Issue ID"
       },
       {
-        "command": "redmine.gantt.copyProjectId",
+        "command": "redmyne.gantt.copyProjectId",
         "title": "Copy Project ID"
       },
       {
-        "command": "redmine.gantt.copyProjectUrl",
+        "command": "redmyne.gantt.copyProjectUrl",
         "title": "Copy Project URL"
       },
       {
-        "command": "redmine.gantt.openProjectInBrowser",
+        "command": "redmyne.gantt.openProjectInBrowser",
         "title": "Open in Browser"
       },
       {
-        "command": "redmine.gantt.showProjectInGantt",
+        "command": "redmyne.gantt.showProjectInGantt",
         "title": "Show Project in Gantt"
       },
       {
-        "command": "redmine.gantt.showProjectInIssues",
+        "command": "redmyne.gantt.showProjectInIssues",
         "title": "Show in Sidebar"
       },
       {
-        "command": "redmine.contributeToIssue",
+        "command": "redmyne.contributeToIssue",
         "title": "Contribute to Issue...",
         "icon": "$(arrow-right)"
       },
       {
-        "command": "redmine.removeContribution",
+        "command": "redmyne.removeContribution",
         "title": "Remove Contribution",
         "icon": "$(close)"
       }
     ],
     "keybindings": [
       {
-        "command": "redmine.quickLogTime",
+        "command": "redmyne.quickLogTime",
         "key": "ctrl+y ctrl+y",
         "mac": "cmd+y cmd+y",
         "when": "!terminalFocus && !inDebugMode && !inQuickOpen"
       },
       {
-        "command": "redmine.quickCreateIssue",
+        "command": "redmyne.quickCreateIssue",
         "key": "ctrl+y ctrl+n",
         "mac": "cmd+y cmd+n",
         "when": "!terminalFocus && !inDebugMode && !inQuickOpen"
       },
       {
-        "command": "redmine.kanban.toggleTimer",
+        "command": "redmyne.kanban.toggleTimer",
         "key": "ctrl+y ctrl+t",
         "mac": "cmd+y cmd+t",
         "when": "!terminalFocus && !inDebugMode && !inQuickOpen"
       }
     ],
     "views": {
-      "redmine-explorer": [
+      "redmyne-explorer": [
         {
-          "id": "redmine-explorer-kanban",
+          "id": "redmyne-explorer-kanban",
           "name": "Kanban",
-          "when": "redmine:configured"
+          "when": "redmyne:configured"
         },
         {
-          "id": "redmine-explorer-projects",
+          "id": "redmyne-explorer-projects",
           "name": "Issues"
         },
         {
-          "id": "redmine-explorer-my-time-entries",
+          "id": "redmyne-explorer-my-time-entries",
           "name": "Time Entries",
-          "when": "redmine:configured"
+          "when": "redmyne:configured"
         }
       ]
     },
     "viewsWelcome": [
       {
-        "view": "redmine-explorer-kanban",
-        "contents": "No kanban tasks yet.\n[Add Task](command:redmine.kanban.add)\n\n---\n\n**Tips:**\n- Right-click tasks for actions\n- Drag tasks between columns\n- Link tasks to Redmine issues",
-        "when": "redmine:configured"
+        "view": "redmyne-explorer-kanban",
+        "contents": "No kanban tasks yet.\n[Add Task](command:redmyne.kanban.add)\n\n---\n\n**Tips:**\n- Right-click tasks for actions\n- Drag tasks between columns\n- Link tasks to Redmine issues",
+        "when": "redmyne:configured"
       },
       {
-        "view": "redmine-explorer-projects",
-        "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmine.configure)\nSet up your Redmine server URL and API key to get started.",
-        "when": "!redmine:configured"
+        "view": "redmyne-explorer-projects",
+        "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmyne.configure)\nSet up your Redmine server URL and API key to get started.",
+        "when": "!redmyne:configured"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
           "title": "Redmine",
-          "id": "redmine-explorer",
+          "id": "redmyne-explorer",
           "name": "Redmine",
           "icon": "logo.svg"
         }
@@ -717,1025 +717,1025 @@
     },
     "submenus": [
       {
-        "id": "redmine.issueFilterMenu",
+        "id": "redmyne.issueFilterMenu",
         "label": "Filter",
         "icon": "$(filter)"
       },
       {
-        "id": "redmine.issueSortMenu",
+        "id": "redmyne.issueSortMenu",
         "label": "Sort",
         "icon": "$(arrow-swap)"
       },
       {
-        "id": "redmine.timeFilterMenu",
+        "id": "redmyne.timeFilterMenu",
         "label": "Filter",
         "icon": "$(filter)"
       },
       {
-        "id": "redmine.timeSortMenu",
+        "id": "redmyne.timeSortMenu",
         "label": "Sort",
         "icon": "$(arrow-swap)"
       },
       {
-        "id": "redmine.kanbanFilterMenu",
+        "id": "redmyne.kanbanFilterMenu",
         "label": "Filter",
         "icon": "$(filter)"
       },
       {
-        "id": "redmine.kanbanSortMenu",
+        "id": "redmyne.kanbanSortMenu",
         "label": "Sort",
         "icon": "$(arrow-swap)"
       },
       {
-        "id": "redmine.gantt.doneRatioMenu",
+        "id": "redmyne.gantt.doneRatioMenu",
         "label": "% Done"
       },
       {
-        "id": "redmine.gantt.autoUpdateMenu",
+        "id": "redmyne.gantt.autoUpdateMenu",
         "label": "Auto-update %"
       },
       {
-        "id": "redmine.gantt.adHocMenu",
+        "id": "redmyne.gantt.adHocMenu",
         "label": "Ad-hoc Budget"
       },
       {
-        "id": "redmine.gantt.precedenceMenu",
+        "id": "redmyne.gantt.precedenceMenu",
         "label": "Precedence"
       },
       {
-        "id": "redmine.gantt.internalEstimateMenu",
+        "id": "redmyne.gantt.internalEstimateMenu",
         "label": "Internal Estimate"
       },
       {
-        "id": "redmine.doneRatioMenu",
+        "id": "redmyne.doneRatioMenu",
         "label": "% Done"
       },
       {
-        "id": "redmine.autoUpdateMenu",
+        "id": "redmyne.autoUpdateMenu",
         "label": "Auto-update %"
       },
       {
-        "id": "redmine.adHocMenu",
+        "id": "redmyne.adHocMenu",
         "label": "Ad-hoc Budget"
       },
       {
-        "id": "redmine.precedenceMenu",
+        "id": "redmyne.precedenceMenu",
         "label": "Precedence"
       },
       {
-        "id": "redmine.internalEstimateMenu",
+        "id": "redmyne.internalEstimateMenu",
         "label": "Internal Estimate"
       }
     ],
     "menus": {
-      "redmine.issueFilterMenu": [
+      "redmyne.issueFilterMenu": [
         {
-          "command": "redmine.filterMyOpen",
+          "command": "redmyne.filterMyOpen",
           "group": "1_filters@1"
         },
         {
-          "command": "redmine.filterAllOpen",
+          "command": "redmyne.filterAllOpen",
           "group": "1_filters@2"
         },
         {
-          "command": "redmine.filterMyClosed",
+          "command": "redmyne.filterMyClosed",
           "group": "1_filters@3"
         },
         {
-          "command": "redmine.filterAll",
+          "command": "redmyne.filterAll",
           "group": "1_filters@4"
         }
       ],
-      "redmine.timeFilterMenu": [
+      "redmyne.timeFilterMenu": [
         {
-          "command": "redmine.timeFilterMy",
+          "command": "redmyne.timeFilterMy",
           "group": "1_filters@1"
         },
         {
-          "command": "redmine.timeFilterAll",
+          "command": "redmyne.timeFilterAll",
           "group": "1_filters@2"
         }
       ],
-      "redmine.issueSortMenu": [
+      "redmyne.issueSortMenu": [
         {
-          "command": "redmine.issueSortId",
+          "command": "redmyne.issueSortId",
           "group": "1_sort@1"
         },
         {
-          "command": "redmine.issueSortSubject",
+          "command": "redmyne.issueSortSubject",
           "group": "1_sort@2"
         },
         {
-          "command": "redmine.issueSortAssignee",
+          "command": "redmyne.issueSortAssignee",
           "group": "1_sort@3"
         }
       ],
-      "redmine.timeSortMenu": [
+      "redmyne.timeSortMenu": [
         {
-          "command": "redmine.timeSortId",
+          "command": "redmyne.timeSortId",
           "group": "1_sort@1"
         },
         {
-          "command": "redmine.timeSortSubject",
+          "command": "redmyne.timeSortSubject",
           "group": "1_sort@2"
         },
         {
-          "command": "redmine.timeSortComment",
+          "command": "redmyne.timeSortComment",
           "group": "1_sort@3"
         },
         {
-          "command": "redmine.timeSortUser",
+          "command": "redmyne.timeSortUser",
           "group": "1_sort@4"
         }
       ],
-      "redmine.kanbanFilterMenu": [
+      "redmyne.kanbanFilterMenu": [
         {
-          "command": "redmine.kanban.filterAll",
+          "command": "redmyne.kanban.filterAll",
           "group": "1_filters@1"
         },
         {
-          "command": "redmine.kanban.filterHigh",
+          "command": "redmyne.kanban.filterHigh",
           "group": "1_filters@2"
         },
         {
-          "command": "redmine.kanban.filterMedium",
+          "command": "redmyne.kanban.filterMedium",
           "group": "1_filters@3"
         },
         {
-          "command": "redmine.kanban.filterLow",
+          "command": "redmyne.kanban.filterLow",
           "group": "1_filters@4"
         }
       ],
-      "redmine.kanbanSortMenu": [
+      "redmyne.kanbanSortMenu": [
         {
-          "command": "redmine.kanban.sortPriority",
+          "command": "redmyne.kanban.sortPriority",
           "group": "1_sort@1"
         },
         {
-          "command": "redmine.kanban.sortIssueId",
+          "command": "redmyne.kanban.sortIssueId",
           "group": "1_sort@2"
         }
       ],
       "commandPalette": [
         {
-          "command": "redmine.refreshIssues",
+          "command": "redmyne.refreshIssues",
           "when": "false"
         },
         {
-          "command": "redmine.filterMyOpen",
+          "command": "redmyne.filterMyOpen",
           "when": "false"
         },
         {
-          "command": "redmine.filterAllOpen",
+          "command": "redmyne.filterAllOpen",
           "when": "false"
         },
         {
-          "command": "redmine.filterMyClosed",
+          "command": "redmyne.filterMyClosed",
           "when": "false"
         },
         {
-          "command": "redmine.filterAll",
+          "command": "redmyne.filterAll",
           "when": "false"
         },
         {
-          "command": "redmine.timeFilterMy",
+          "command": "redmyne.timeFilterMy",
           "when": "false"
         },
         {
-          "command": "redmine.timeFilterAll",
+          "command": "redmyne.timeFilterAll",
           "when": "false"
         },
         {
-          "command": "redmine.issueSortId",
+          "command": "redmyne.issueSortId",
           "when": "false"
         },
         {
-          "command": "redmine.issueSortSubject",
+          "command": "redmyne.issueSortSubject",
           "when": "false"
         },
         {
-          "command": "redmine.issueSortAssignee",
+          "command": "redmyne.issueSortAssignee",
           "when": "false"
         },
         {
-          "command": "redmine.timeSortId",
+          "command": "redmyne.timeSortId",
           "when": "false"
         },
         {
-          "command": "redmine.timeSortSubject",
+          "command": "redmyne.timeSortSubject",
           "when": "false"
         },
         {
-          "command": "redmine.timeSortComment",
+          "command": "redmyne.timeSortComment",
           "when": "false"
         },
         {
-          "command": "redmine.timeSortUser",
+          "command": "redmyne.timeSortUser",
           "when": "false"
         },
         {
-          "command": "redmine.toggleTreeView",
+          "command": "redmyne.toggleTreeView",
           "when": "false"
         },
         {
-          "command": "redmine.toggleListView",
+          "command": "redmyne.toggleListView",
           "when": "false"
         },
         {
-          "command": "redmine.refreshTimeEntries",
+          "command": "redmyne.refreshTimeEntries",
           "when": "false"
         },
         {
-          "command": "redmine.loadEarlierTimeEntries",
+          "command": "redmyne.loadEarlierTimeEntries",
           "when": "false"
         },
         {
-          "command": "redmine.openTimeEntryInBrowser",
+          "command": "redmyne.openTimeEntryInBrowser",
           "when": "false"
         },
         {
-          "command": "redmine.editTimeEntry",
+          "command": "redmyne.editTimeEntry",
           "when": "false"
         },
         {
-          "command": "redmine.deleteTimeEntry",
+          "command": "redmyne.deleteTimeEntry",
           "when": "false"
         },
         {
-          "command": "redmine.addTimeEntryForDate",
+          "command": "redmyne.addTimeEntryForDate",
           "when": "false"
         },
         {
-          "command": "redmine.openIssueInBrowser",
+          "command": "redmyne.openIssueInBrowser",
           "when": "false"
         },
         {
-          "command": "redmine.openIssueInGantt",
+          "command": "redmyne.openIssueInGantt",
           "when": "false"
         },
         {
-          "command": "redmine.setInternalEstimate",
+          "command": "redmyne.setInternalEstimate",
           "when": "false"
         },
         {
-          "command": "redmine.clearInternalEstimate",
+          "command": "redmyne.clearInternalEstimate",
           "when": "false"
         },
         {
-          "command": "redmine.setDoneRatio",
+          "command": "redmyne.setDoneRatio",
           "when": "false"
         },
         {
-          "command": "redmine.copyIssueUrl",
+          "command": "redmyne.copyIssueUrl",
           "when": "false"
         },
         {
-          "command": "redmine.quickCreateSubIssue",
+          "command": "redmyne.quickCreateSubIssue",
           "when": "false"
         },
         {
-          "command": "redmine.addIssueToKanban",
+          "command": "redmyne.addIssueToKanban",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.add",
+          "command": "redmyne.kanban.add",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.edit",
+          "command": "redmyne.kanban.edit",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.delete",
+          "command": "redmyne.kanban.delete",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.markDone",
+          "command": "redmyne.kanban.markDone",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.reopen",
+          "command": "redmyne.kanban.reopen",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.setPriority",
+          "command": "redmyne.kanban.setPriority",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.openInBrowser",
+          "command": "redmyne.kanban.openInBrowser",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.clearDone",
+          "command": "redmyne.kanban.clearDone",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.refreshParentProjects",
+          "command": "redmyne.kanban.refreshParentProjects",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.copySubject",
+          "command": "redmyne.kanban.copySubject",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.startTimer",
+          "command": "redmyne.kanban.startTimer",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.pauseTimer",
+          "command": "redmyne.kanban.pauseTimer",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.resumeTimer",
+          "command": "redmyne.kanban.resumeTimer",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.stopTimer",
+          "command": "redmyne.kanban.stopTimer",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.moveToTodo",
+          "command": "redmyne.kanban.moveToTodo",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.skipBreak",
+          "command": "redmyne.kanban.skipBreak",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.logEarly",
+          "command": "redmyne.kanban.logEarly",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.logAndContinue",
+          "command": "redmyne.kanban.logAndContinue",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.deferTime",
+          "command": "redmyne.kanban.deferTime",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.moveUp",
+          "command": "redmyne.kanban.moveUp",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.moveDown",
+          "command": "redmyne.kanban.moveDown",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.revealTimeEntry",
+          "command": "redmyne.kanban.revealTimeEntry",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.configureTimer",
+          "command": "redmyne.kanban.configureTimer",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.filterAll",
+          "command": "redmyne.kanban.filterAll",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.filterHigh",
+          "command": "redmyne.kanban.filterHigh",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.filterMedium",
+          "command": "redmyne.kanban.filterMedium",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.filterLow",
+          "command": "redmyne.kanban.filterLow",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.sortPriority",
+          "command": "redmyne.kanban.sortPriority",
           "when": "false"
         },
         {
-          "command": "redmine.kanban.sortIssueId",
+          "command": "redmyne.kanban.sortIssueId",
           "when": "false"
         },
         {
-          "command": "redmine.toggleAutoUpdateDoneRatio",
+          "command": "redmyne.toggleAutoUpdateDoneRatio",
           "when": "false"
         },
         {
-          "command": "redmine.toggleAdHoc",
+          "command": "redmyne.toggleAdHoc",
           "when": "false"
         },
         {
-          "command": "redmine.contributeToIssue",
+          "command": "redmyne.contributeToIssue",
           "when": "false"
         },
         {
-          "command": "redmine.removeContribution",
+          "command": "redmyne.removeContribution",
           "when": "false"
         },
         {
-          "command": "redmine.gantt.createSubIssue",
+          "command": "redmyne.gantt.createSubIssue",
           "when": "false"
         },
         {
-          "command": "redmine.gantt.createIssue",
+          "command": "redmyne.gantt.createIssue",
           "when": "false"
         },
         {
-          "command": "redmine.gantt.createVersion",
+          "command": "redmyne.gantt.createVersion",
           "when": "false"
         },
         {
-          "command": "redmine.gantt.updateIssue",
+          "command": "redmyne.gantt.updateIssue",
           "when": "false"
         },
         {
-          "command": "redmine.gantt.openInBrowser",
+          "command": "redmyne.gantt.openInBrowser",
           "when": "false"
         },
         {
-          "command": "redmine.gantt.showInIssues",
+          "command": "redmyne.gantt.showInIssues",
           "when": "false"
         },
         {
-          "command": "redmine.gantt.addToKanban",
+          "command": "redmyne.gantt.addToKanban",
           "when": "false"
         },
         {
-          "command": "redmine.gantt.logTime",
+          "command": "redmyne.gantt.logTime",
           "when": "false"
         },
         {
-          "command": "redmine.gantt.setDoneRatio",
+          "command": "redmyne.gantt.setDoneRatio",
           "when": "false"
         },
         {
-          "command": "redmine.gantt.setStatus",
+          "command": "redmyne.gantt.setStatus",
           "when": "false"
         },
         {
-          "command": "redmine.gantt.setIssuePriority",
+          "command": "redmyne.gantt.setIssuePriority",
           "when": "false"
         },
         {
-          "command": "redmine.gantt.copyUrl",
+          "command": "redmyne.gantt.copyUrl",
           "when": "false"
         },
         {
-          "command": "redmine.gantt.copyIssueId",
+          "command": "redmyne.gantt.copyIssueId",
           "when": "false"
         },
         {
-          "command": "redmine.gantt.copyProjectId",
+          "command": "redmyne.gantt.copyProjectId",
           "when": "false"
         },
         {
-          "command": "redmine.gantt.copyProjectUrl",
+          "command": "redmyne.gantt.copyProjectUrl",
           "when": "false"
         },
         {
-          "command": "redmine.gantt.openProjectInBrowser",
+          "command": "redmyne.gantt.openProjectInBrowser",
           "when": "false"
         },
         {
-          "command": "redmine.gantt.showProjectInGantt",
+          "command": "redmyne.gantt.showProjectInGantt",
           "when": "false"
         },
         {
-          "command": "redmine.gantt.showProjectInIssues",
+          "command": "redmyne.gantt.showProjectInIssues",
           "when": "false"
         }
       ],
       "view/title": [
         {
-          "command": "redmine.kanban.refreshParentProjects",
-          "when": "view == 'redmine-explorer-kanban' && redmine:configured",
+          "command": "redmyne.kanban.refreshParentProjects",
+          "when": "view == 'redmyne-explorer-kanban' && redmyne:configured",
           "group": "navigation@1"
         },
         {
-          "submenu": "redmine.kanbanFilterMenu",
-          "when": "view == 'redmine-explorer-kanban' && redmine:configured",
+          "submenu": "redmyne.kanbanFilterMenu",
+          "when": "view == 'redmyne-explorer-kanban' && redmyne:configured",
           "group": "navigation@2"
         },
         {
-          "submenu": "redmine.kanbanSortMenu",
-          "when": "view == 'redmine-explorer-kanban' && redmine:configured",
+          "submenu": "redmyne.kanbanSortMenu",
+          "when": "view == 'redmyne-explorer-kanban' && redmyne:configured",
           "group": "navigation@3"
         },
         {
-          "command": "redmine.refreshIssues",
-          "when": "view == 'redmine-explorer-projects'",
+          "command": "redmyne.refreshIssues",
+          "when": "view == 'redmyne-explorer-projects'",
           "group": "navigation@1"
         },
         {
-          "submenu": "redmine.issueFilterMenu",
-          "when": "view == 'redmine-explorer-projects' && redmine:configured",
+          "submenu": "redmyne.issueFilterMenu",
+          "when": "view == 'redmyne-explorer-projects' && redmyne:configured",
           "group": "navigation@2"
         },
         {
-          "submenu": "redmine.issueSortMenu",
-          "when": "view == 'redmine-explorer-projects' && redmine:configured",
+          "submenu": "redmyne.issueSortMenu",
+          "when": "view == 'redmyne-explorer-projects' && redmyne:configured",
           "group": "navigation@3"
         },
         {
-          "command": "redmine.toggleTreeView",
-          "when": "view == 'redmine-explorer-projects' && redmine:treeViewStyle",
+          "command": "redmyne.toggleTreeView",
+          "when": "view == 'redmyne-explorer-projects' && redmyne:treeViewStyle",
           "group": "navigation@4"
         },
         {
-          "command": "redmine.toggleListView",
-          "when": "view == 'redmine-explorer-projects' && !redmine:treeViewStyle",
+          "command": "redmyne.toggleListView",
+          "when": "view == 'redmyne-explorer-projects' && !redmyne:treeViewStyle",
           "group": "navigation@4"
         },
         {
-          "command": "redmine.showGantt",
-          "when": "view == 'redmine-explorer-projects' && redmine:configured",
+          "command": "redmyne.showGantt",
+          "when": "view == 'redmyne-explorer-projects' && redmyne:configured",
           "group": "navigation@5"
         },
         {
-          "command": "redmine.configure",
-          "when": "view == 'redmine-explorer-projects'",
+          "command": "redmyne.configure",
+          "when": "view == 'redmyne-explorer-projects'",
           "group": "navigation@6"
         },
         {
-          "command": "redmine.refreshTimeEntries",
-          "when": "view == 'redmine-explorer-my-time-entries'",
+          "command": "redmyne.refreshTimeEntries",
+          "when": "view == 'redmyne-explorer-my-time-entries'",
           "group": "navigation@1"
         },
         {
-          "submenu": "redmine.timeFilterMenu",
-          "when": "view == 'redmine-explorer-my-time-entries' && redmine:configured",
+          "submenu": "redmyne.timeFilterMenu",
+          "when": "view == 'redmyne-explorer-my-time-entries' && redmyne:configured",
           "group": "navigation@2"
         },
         {
-          "submenu": "redmine.timeSortMenu",
-          "when": "view == 'redmine-explorer-my-time-entries' && redmine:configured",
+          "submenu": "redmyne.timeSortMenu",
+          "when": "view == 'redmyne-explorer-my-time-entries' && redmyne:configured",
           "group": "navigation@3"
         }
       ],
       "view/item/context": [
         {
-          "command": "redmine.editTimeEntry",
-          "when": "view == 'redmine-explorer-my-time-entries' && viewItem =~ /^time-entry/",
+          "command": "redmyne.editTimeEntry",
+          "when": "view == 'redmyne-explorer-my-time-entries' && viewItem =~ /^time-entry/",
           "group": "1_edit@1"
         },
         {
-          "command": "redmine.deleteTimeEntry",
-          "when": "view == 'redmine-explorer-my-time-entries' && viewItem =~ /^time-entry/",
+          "command": "redmyne.deleteTimeEntry",
+          "when": "view == 'redmyne-explorer-my-time-entries' && viewItem =~ /^time-entry/",
           "group": "1_edit@2"
         },
         {
-          "command": "redmine.openTimeEntryInBrowser",
-          "when": "view == 'redmine-explorer-my-time-entries' && viewItem =~ /^time-entry/",
+          "command": "redmyne.openTimeEntryInBrowser",
+          "when": "view == 'redmyne-explorer-my-time-entries' && viewItem =~ /^time-entry/",
           "group": "2_navigation@1"
         },
         {
-          "command": "redmine.contributeToIssue",
-          "when": "view == 'redmine-explorer-my-time-entries' && viewItem == 'time-entry-adhoc'",
+          "command": "redmyne.contributeToIssue",
+          "when": "view == 'redmyne-explorer-my-time-entries' && viewItem == 'time-entry-adhoc'",
           "group": "3_adhoc@1"
         },
         {
-          "command": "redmine.removeContribution",
-          "when": "view == 'redmine-explorer-my-time-entries' && viewItem == 'time-entry-adhoc-linked'",
+          "command": "redmyne.removeContribution",
+          "when": "view == 'redmyne-explorer-my-time-entries' && viewItem == 'time-entry-adhoc-linked'",
           "group": "3_adhoc@2"
         },
         {
-          "command": "redmine.addTimeEntryForDate",
-          "when": "view == 'redmine-explorer-my-time-entries' && viewItem == 'day-group'",
+          "command": "redmyne.addTimeEntryForDate",
+          "when": "view == 'redmyne-explorer-my-time-entries' && viewItem == 'day-group'",
           "group": "1_edit@1"
         },
         {
-          "command": "redmine.openIssueInBrowser",
-          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "command": "redmyne.openIssueInBrowser",
+          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
           "group": "1_navigation@1"
         },
         {
-          "command": "redmine.openIssueInGantt",
-          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "command": "redmyne.openIssueInGantt",
+          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
           "group": "1_navigation@2"
         },
         {
-          "command": "redmine.updateIssue",
-          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "command": "redmyne.updateIssue",
+          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
           "group": "2_actions@1"
         },
         {
-          "command": "redmine.quickCreateSubIssue",
-          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/ && viewItem !~ /-child/ && view != 'redmine-explorer-kanban' && view != 'redmine-explorer-my-time-entries'",
+          "command": "redmyne.quickCreateSubIssue",
+          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/ && viewItem !~ /-child/ && view != 'redmyne-explorer-kanban' && view != 'redmyne-explorer-my-time-entries'",
           "group": "2_actions@2"
         },
         {
-          "submenu": "redmine.doneRatioMenu",
-          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "submenu": "redmyne.doneRatioMenu",
+          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
           "group": "3_properties@1"
         },
         {
-          "command": "redmine.setStatus",
-          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "command": "redmyne.setStatus",
+          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
           "group": "3_properties@2"
         },
         {
-          "command": "redmine.setIssuePriority",
-          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "command": "redmyne.setIssuePriority",
+          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
           "group": "3_properties@3"
         },
         {
-          "command": "redmine.quickLogTime",
-          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue-active/",
+          "command": "redmyne.quickLogTime",
+          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue-active/",
           "group": "4_time@1"
         },
         {
-          "submenu": "redmine.autoUpdateMenu",
-          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "submenu": "redmyne.autoUpdateMenu",
+          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
           "group": "5_settings@1"
         },
         {
-          "submenu": "redmine.adHocMenu",
-          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "submenu": "redmyne.adHocMenu",
+          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
           "group": "5_settings@2"
         },
         {
-          "submenu": "redmine.precedenceMenu",
-          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "submenu": "redmyne.precedenceMenu",
+          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
           "group": "5_settings@3"
         },
         {
-          "submenu": "redmine.internalEstimateMenu",
-          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "submenu": "redmyne.internalEstimateMenu",
+          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
           "group": "5_settings@4"
         },
         {
-          "command": "redmine.addIssueToKanban",
-          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "command": "redmyne.addIssueToKanban",
+          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
           "group": "6_integrations@1"
         },
         {
-          "command": "redmine.copyIssueUrl",
-          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "command": "redmyne.copyIssueUrl",
+          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
           "group": "9_clipboard@1"
         },
         {
-          "command": "redmine.copyIssueId",
-          "when": "(view == 'redmine-explorer-projects' || view == 'redmine-explorer-my-issues') && viewItem =~ /^issue/",
+          "command": "redmyne.copyIssueId",
+          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
           "group": "9_clipboard@2"
         },
         {
-          "command": "redmine.openProjectInBrowser",
-          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^project/",
+          "command": "redmyne.openProjectInBrowser",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^project/",
           "group": "1_navigation@1"
         },
         {
-          "command": "redmine.showProjectInGantt",
-          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^project/",
+          "command": "redmyne.showProjectInGantt",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^project/",
           "group": "1_navigation@2"
         },
         {
-          "command": "redmine.quickCreateIssue",
-          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^project/",
+          "command": "redmyne.quickCreateIssue",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^project/",
           "group": "2_actions@1"
         },
         {
-          "command": "redmine.quickCreateVersion",
-          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^project/",
+          "command": "redmyne.quickCreateVersion",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^project/",
           "group": "2_actions@2"
         },
         {
-          "command": "redmine.copyProjectUrl",
-          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^project/",
+          "command": "redmyne.copyProjectUrl",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^project/",
           "group": "9_clipboard@1"
         },
         {
-          "command": "redmine.copyProjectId",
-          "when": "view == 'redmine-explorer-projects' && viewItem =~ /^project/",
+          "command": "redmyne.copyProjectId",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^project/",
           "group": "9_clipboard@2"
         },
         {
-          "command": "redmine.kanban.startTimer",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|doing|doing-initialized)$/ && viewItem != 'task-doing-working' && viewItem != 'task-doing-paused'",
+          "command": "redmyne.kanban.startTimer",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-(todo|doing|doing-initialized)$/ && viewItem != 'task-doing-working' && viewItem != 'task-doing-paused'",
           "group": "timer@1"
         },
         {
-          "command": "redmine.kanban.startTimer",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|doing-initialized)$/",
+          "command": "redmyne.kanban.startTimer",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-(todo|doing-initialized)$/",
           "group": "inline"
         },
         {
-          "command": "redmine.kanban.pauseTimer",
-          "when": "view == 'redmine-explorer-kanban' && viewItem == 'task-doing-working'",
+          "command": "redmyne.kanban.pauseTimer",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem == 'task-doing-working'",
           "group": "timer@1"
         },
         {
-          "command": "redmine.kanban.pauseTimer",
-          "when": "view == 'redmine-explorer-kanban' && viewItem == 'task-doing-working'",
+          "command": "redmyne.kanban.pauseTimer",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem == 'task-doing-working'",
           "group": "inline"
         },
         {
-          "command": "redmine.kanban.resumeTimer",
-          "when": "view == 'redmine-explorer-kanban' && viewItem == 'task-doing-paused'",
+          "command": "redmyne.kanban.resumeTimer",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem == 'task-doing-paused'",
           "group": "timer@1"
         },
         {
-          "command": "redmine.kanban.resumeTimer",
-          "when": "view == 'redmine-explorer-kanban' && viewItem == 'task-doing-paused'",
+          "command": "redmyne.kanban.resumeTimer",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem == 'task-doing-paused'",
           "group": "inline"
         },
         {
-          "command": "redmine.kanban.stopTimer",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-doing-(working|paused)$/",
+          "command": "redmyne.kanban.stopTimer",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-doing-(working|paused)$/",
           "group": "timer@2"
         },
         {
-          "command": "redmine.kanban.logEarly",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-doing-(working|paused)$/",
+          "command": "redmyne.kanban.logEarly",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-doing-(working|paused)$/",
           "group": "timer@3"
         },
         {
-          "command": "redmine.kanban.logAndContinue",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-doing-(working|paused)$/",
+          "command": "redmyne.kanban.logAndContinue",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-doing-(working|paused)$/",
           "group": "timer@4"
         },
         {
-          "command": "redmine.kanban.deferTime",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-doing-(working|paused)$/",
+          "command": "redmyne.kanban.deferTime",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-doing-(working|paused)$/",
           "group": "timer@5"
         },
         {
-          "command": "redmine.kanban.moveToTodo",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-doing/",
+          "command": "redmyne.kanban.moveToTodo",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-doing/",
           "group": "timer@6"
         },
         {
-          "command": "redmine.kanban.markDone",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|doing)/",
+          "command": "redmyne.kanban.markDone",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-(todo|doing)/",
           "group": "kanban@2"
         },
         {
-          "command": "redmine.kanban.markDone",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|doing)/",
+          "command": "redmyne.kanban.markDone",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-(todo|doing)/",
           "group": "inline"
         },
         {
-          "command": "redmine.kanban.reopen",
-          "when": "view == 'redmine-explorer-kanban' && viewItem == 'task-done'",
+          "command": "redmyne.kanban.reopen",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem == 'task-done'",
           "group": "kanban@2"
         },
         {
-          "command": "redmine.kanban.setPriority",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-(todo|doing)/",
+          "command": "redmyne.kanban.setPriority",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-(todo|doing)/",
           "group": "kanban@3"
         },
         {
-          "command": "redmine.kanban.moveUp",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-/",
+          "command": "redmyne.kanban.moveUp",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-/",
           "group": "kanban@4"
         },
         {
-          "command": "redmine.kanban.moveDown",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-/",
+          "command": "redmyne.kanban.moveDown",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-/",
           "group": "kanban@5"
         },
         {
-          "command": "redmine.kanban.revealTimeEntry",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-/",
+          "command": "redmyne.kanban.revealTimeEntry",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-/",
           "group": "kanban@6"
         },
         {
-          "command": "redmine.kanban.edit",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-/",
+          "command": "redmyne.kanban.edit",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-/",
           "group": "edit@1"
         },
         {
-          "command": "redmine.kanban.delete",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-/",
+          "command": "redmyne.kanban.delete",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-/",
           "group": "edit@2"
         },
         {
-          "command": "redmine.kanban.openInBrowser",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-/",
+          "command": "redmyne.kanban.openInBrowser",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-/",
           "group": "navigation@1"
         },
         {
-          "command": "redmine.kanban.copySubject",
-          "when": "view == 'redmine-explorer-kanban' && viewItem =~ /^task-/",
+          "command": "redmyne.kanban.copySubject",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-/",
           "group": "9_clipboard@1"
         },
         {
-          "command": "redmine.kanban.clearDone",
-          "when": "view == 'redmine-explorer-kanban' && viewItem == 'status-header-done'",
+          "command": "redmyne.kanban.clearDone",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem == 'status-header-done'",
           "group": "inline"
         },
         {
-          "command": "redmine.kanban.add",
-          "when": "view == 'redmine-explorer-kanban' && viewItem == 'status-header-todo'",
+          "command": "redmyne.kanban.add",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem == 'status-header-todo'",
           "group": "inline"
         },
         {
-          "command": "redmine.kanban.configureTimer",
-          "when": "view == 'redmine-explorer-kanban' && viewItem == 'status-header-doing'",
+          "command": "redmyne.kanban.configureTimer",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem == 'status-header-doing'",
           "group": "inline"
         }
       ],
-      "redmine.gantt.doneRatioMenu": [
+      "redmyne.gantt.doneRatioMenu": [
         {
-          "command": "redmine.gantt.setDoneRatio0",
+          "command": "redmyne.gantt.setDoneRatio0",
           "group": "1_percentages@1"
         },
         {
-          "command": "redmine.gantt.setDoneRatio10",
+          "command": "redmyne.gantt.setDoneRatio10",
           "group": "1_percentages@2"
         },
         {
-          "command": "redmine.gantt.setDoneRatio20",
+          "command": "redmyne.gantt.setDoneRatio20",
           "group": "1_percentages@3"
         },
         {
-          "command": "redmine.gantt.setDoneRatio30",
+          "command": "redmyne.gantt.setDoneRatio30",
           "group": "1_percentages@4"
         },
         {
-          "command": "redmine.gantt.setDoneRatio40",
+          "command": "redmyne.gantt.setDoneRatio40",
           "group": "1_percentages@5"
         },
         {
-          "command": "redmine.gantt.setDoneRatio50",
+          "command": "redmyne.gantt.setDoneRatio50",
           "group": "1_percentages@6"
         },
         {
-          "command": "redmine.gantt.setDoneRatio60",
+          "command": "redmyne.gantt.setDoneRatio60",
           "group": "1_percentages@7"
         },
         {
-          "command": "redmine.gantt.setDoneRatio70",
+          "command": "redmyne.gantt.setDoneRatio70",
           "group": "1_percentages@8"
         },
         {
-          "command": "redmine.gantt.setDoneRatio80",
+          "command": "redmyne.gantt.setDoneRatio80",
           "group": "1_percentages@9"
         },
         {
-          "command": "redmine.gantt.setDoneRatio90",
+          "command": "redmyne.gantt.setDoneRatio90",
           "group": "1_percentages@10"
         },
         {
-          "command": "redmine.gantt.setDoneRatio100",
+          "command": "redmyne.gantt.setDoneRatio100",
           "group": "1_percentages@11"
         },
         {
-          "command": "redmine.gantt.setDoneRatioCustom",
+          "command": "redmyne.gantt.setDoneRatioCustom",
           "group": "2_custom@1"
         }
       ],
-      "redmine.gantt.autoUpdateMenu": [
-        { "command": "redmine.gantt.autoUpdateOn", "group": "1_toggle@1" },
-        { "command": "redmine.gantt.autoUpdateOff", "group": "1_toggle@2" }
+      "redmyne.gantt.autoUpdateMenu": [
+        { "command": "redmyne.gantt.autoUpdateOn", "group": "1_toggle@1" },
+        { "command": "redmyne.gantt.autoUpdateOff", "group": "1_toggle@2" }
       ],
-      "redmine.gantt.adHocMenu": [
-        { "command": "redmine.gantt.adHocOn", "group": "1_toggle@1" },
-        { "command": "redmine.gantt.adHocOff", "group": "1_toggle@2" }
+      "redmyne.gantt.adHocMenu": [
+        { "command": "redmyne.gantt.adHocOn", "group": "1_toggle@1" },
+        { "command": "redmyne.gantt.adHocOff", "group": "1_toggle@2" }
       ],
-      "redmine.gantt.precedenceMenu": [
-        { "command": "redmine.gantt.precedenceOn", "group": "1_toggle@1" },
-        { "command": "redmine.gantt.precedenceOff", "group": "1_toggle@2" }
+      "redmyne.gantt.precedenceMenu": [
+        { "command": "redmyne.gantt.precedenceOn", "group": "1_toggle@1" },
+        { "command": "redmyne.gantt.precedenceOff", "group": "1_toggle@2" }
       ],
-      "redmine.gantt.internalEstimateMenu": [
-        { "command": "redmine.gantt.setInternalEstimate", "group": "1_estimate@1" },
-        { "command": "redmine.gantt.clearInternalEstimate", "group": "1_estimate@2" }
+      "redmyne.gantt.internalEstimateMenu": [
+        { "command": "redmyne.gantt.setInternalEstimate", "group": "1_estimate@1" },
+        { "command": "redmyne.gantt.clearInternalEstimate", "group": "1_estimate@2" }
       ],
-      "redmine.doneRatioMenu": [
-        { "command": "redmine.setDoneRatio0", "group": "1_percentages@1" },
-        { "command": "redmine.setDoneRatio10", "group": "1_percentages@2" },
-        { "command": "redmine.setDoneRatio20", "group": "1_percentages@3" },
-        { "command": "redmine.setDoneRatio30", "group": "1_percentages@4" },
-        { "command": "redmine.setDoneRatio40", "group": "1_percentages@5" },
-        { "command": "redmine.setDoneRatio50", "group": "1_percentages@6" },
-        { "command": "redmine.setDoneRatio60", "group": "1_percentages@7" },
-        { "command": "redmine.setDoneRatio70", "group": "1_percentages@8" },
-        { "command": "redmine.setDoneRatio80", "group": "1_percentages@9" },
-        { "command": "redmine.setDoneRatio90", "group": "1_percentages@10" },
-        { "command": "redmine.setDoneRatio100", "group": "1_percentages@11" },
-        { "command": "redmine.setDoneRatioCustom", "group": "2_custom@1" }
+      "redmyne.doneRatioMenu": [
+        { "command": "redmyne.setDoneRatio0", "group": "1_percentages@1" },
+        { "command": "redmyne.setDoneRatio10", "group": "1_percentages@2" },
+        { "command": "redmyne.setDoneRatio20", "group": "1_percentages@3" },
+        { "command": "redmyne.setDoneRatio30", "group": "1_percentages@4" },
+        { "command": "redmyne.setDoneRatio40", "group": "1_percentages@5" },
+        { "command": "redmyne.setDoneRatio50", "group": "1_percentages@6" },
+        { "command": "redmyne.setDoneRatio60", "group": "1_percentages@7" },
+        { "command": "redmyne.setDoneRatio70", "group": "1_percentages@8" },
+        { "command": "redmyne.setDoneRatio80", "group": "1_percentages@9" },
+        { "command": "redmyne.setDoneRatio90", "group": "1_percentages@10" },
+        { "command": "redmyne.setDoneRatio100", "group": "1_percentages@11" },
+        { "command": "redmyne.setDoneRatioCustom", "group": "2_custom@1" }
       ],
-      "redmine.autoUpdateMenu": [
-        { "command": "redmine.autoUpdateOn", "group": "1_toggle@1" },
-        { "command": "redmine.autoUpdateOff", "group": "1_toggle@2" }
+      "redmyne.autoUpdateMenu": [
+        { "command": "redmyne.autoUpdateOn", "group": "1_toggle@1" },
+        { "command": "redmyne.autoUpdateOff", "group": "1_toggle@2" }
       ],
-      "redmine.adHocMenu": [
-        { "command": "redmine.adHocOn", "group": "1_toggle@1" },
-        { "command": "redmine.adHocOff", "group": "1_toggle@2" }
+      "redmyne.adHocMenu": [
+        { "command": "redmyne.adHocOn", "group": "1_toggle@1" },
+        { "command": "redmyne.adHocOff", "group": "1_toggle@2" }
       ],
-      "redmine.precedenceMenu": [
-        { "command": "redmine.precedenceOn", "group": "1_toggle@1" },
-        { "command": "redmine.precedenceOff", "group": "1_toggle@2" }
+      "redmyne.precedenceMenu": [
+        { "command": "redmyne.precedenceOn", "group": "1_toggle@1" },
+        { "command": "redmyne.precedenceOff", "group": "1_toggle@2" }
       ],
-      "redmine.internalEstimateMenu": [
-        { "command": "redmine.setInternalEstimate", "group": "1_estimate@1" },
-        { "command": "redmine.clearInternalEstimate", "group": "1_estimate@2" }
+      "redmyne.internalEstimateMenu": [
+        { "command": "redmyne.setInternalEstimate", "group": "1_estimate@1" },
+        { "command": "redmyne.clearInternalEstimate", "group": "1_estimate@2" }
       ],
       "webview/context": [
         {
-          "command": "redmine.gantt.openInBrowser",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "command": "redmyne.gantt.openInBrowser",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar'",
           "group": "1_navigation@1"
         },
         {
-          "command": "redmine.gantt.showInIssues",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "command": "redmyne.gantt.showInIssues",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar'",
           "group": "1_navigation@2"
         },
         {
-          "command": "redmine.gantt.updateIssue",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "command": "redmyne.gantt.updateIssue",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar'",
           "group": "2_actions@1"
         },
         {
-          "command": "redmine.gantt.createSubIssue",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar' && !hasParent",
+          "command": "redmyne.gantt.createSubIssue",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar' && !hasParent",
           "group": "2_actions@2"
         },
         {
-          "submenu": "redmine.gantt.doneRatioMenu",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "submenu": "redmyne.gantt.doneRatioMenu",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar'",
           "group": "3_properties@1"
         },
         {
-          "command": "redmine.gantt.setStatus",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "command": "redmyne.gantt.setStatus",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar'",
           "group": "3_properties@2"
         },
         {
-          "command": "redmine.gantt.setIssuePriority",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "command": "redmyne.gantt.setIssuePriority",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar'",
           "group": "3_properties@3"
         },
         {
-          "command": "redmine.gantt.logTime",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "command": "redmyne.gantt.logTime",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar'",
           "group": "4_time@1"
         },
         {
-          "submenu": "redmine.gantt.autoUpdateMenu",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "submenu": "redmyne.gantt.autoUpdateMenu",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar'",
           "group": "5_settings@1"
         },
         {
-          "submenu": "redmine.gantt.adHocMenu",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "submenu": "redmyne.gantt.adHocMenu",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar'",
           "group": "5_settings@2"
         },
         {
-          "submenu": "redmine.gantt.precedenceMenu",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "submenu": "redmyne.gantt.precedenceMenu",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar'",
           "group": "5_settings@3"
         },
         {
-          "submenu": "redmine.gantt.internalEstimateMenu",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "submenu": "redmyne.gantt.internalEstimateMenu",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar'",
           "group": "5_settings@4"
         },
         {
-          "command": "redmine.gantt.addToKanban",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "command": "redmyne.gantt.addToKanban",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar'",
           "group": "6_integrations@1"
         },
         {
-          "command": "redmine.gantt.copyUrl",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "command": "redmyne.gantt.copyUrl",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar'",
           "group": "9_clipboard@1"
         },
         {
-          "command": "redmine.gantt.copyIssueId",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueBar'",
+          "command": "redmyne.gantt.copyIssueId",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar'",
           "group": "9_clipboard@2"
         },
         {
-          "command": "redmine.gantt.copyIssueId",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'issueIdColumn'",
+          "command": "redmyne.gantt.copyIssueId",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueIdColumn'",
           "group": "1_clipboard@1"
         },
         {
-          "command": "redmine.gantt.openProjectInBrowser",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'projectLabel'",
+          "command": "redmyne.gantt.openProjectInBrowser",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'projectLabel'",
           "group": "1_navigation@1"
         },
         {
-          "command": "redmine.gantt.showProjectInIssues",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'projectLabel'",
+          "command": "redmyne.gantt.showProjectInIssues",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'projectLabel'",
           "group": "1_navigation@2"
         },
         {
-          "command": "redmine.gantt.createIssue",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'projectLabel'",
+          "command": "redmyne.gantt.createIssue",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'projectLabel'",
           "group": "2_actions@1"
         },
         {
-          "command": "redmine.gantt.createVersion",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'projectLabel'",
+          "command": "redmyne.gantt.createVersion",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'projectLabel'",
           "group": "2_actions@2"
         },
         {
-          "command": "redmine.gantt.copyProjectUrl",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'projectLabel'",
+          "command": "redmyne.gantt.copyProjectUrl",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'projectLabel'",
           "group": "9_clipboard@1"
         },
         {
-          "command": "redmine.gantt.copyProjectId",
-          "when": "webviewId == 'redmineGantt' && webviewSection == 'projectLabel'",
+          "command": "redmyne.gantt.copyProjectId",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'projectLabel'",
           "group": "9_clipboard@2"
         }
       ]
@@ -1743,7 +1743,7 @@
     "configuration": {
       "title": "Redmine Integration",
       "properties": {
-        "redmine.url": {
+        "redmyne.url": {
           "type": "string",
           "markdownDescription": "**Redmine server URL (HTTPS required)**\n\n🔒 HTTP connections are not allowed for security.\n\n**Storage:**\n- URL: User settings (`settings.json`)\n- API Key: Encrypted secrets (Windows Credential Manager / macOS Keychain / Linux libsecret)\n- Both are global (single Redmine server)",
           "examples": [
@@ -1752,52 +1752,52 @@
           ],
           "scope": "application"
         },
-        "redmine.apiKey": {
+        "redmyne.apiKey": {
           "type": "string",
           "description": "DEPRECATED: Use 'Redmine: Set API Key' command instead",
           "deprecationMessage": "API keys now stored in VS Code secrets. Run 'Redmine: Set API Key'",
           "scope": "machine"
         },
-        "redmine.identifier": {
+        "redmyne.identifier": {
           "type": "string",
           "description": "Project identifier in Redmine",
           "default": "",
           "scope": "machine"
         },
-        "redmine.additionalHeaders": {
+        "redmyne.additionalHeaders": {
           "type": "object",
           "description": "Additional headers",
           "default": {},
           "scope": "machine"
         },
-        "redmine.logging.enabled": {
+        "redmyne.logging.enabled": {
           "type": "boolean",
           "description": "Enable API request/response logging to output channel",
           "default": true,
           "scope": "machine"
         },
-        "redmine.autoUpdateDoneRatio": {
+        "redmyne.autoUpdateDoneRatio": {
           "type": "boolean",
           "description": "Auto-update % Done based on spent/estimated hours when logging time. Caps at 99% (100% must be manual). Skips if over budget.",
           "default": true,
           "scope": "application"
         },
-        "redmine.showCalculatedPriority": {
+        "redmyne.showCalculatedPriority": {
           "type": "boolean",
           "description": "Show calculated priority score in Gantt tooltips (based on due date urgency, downstream dependencies, external blocks)",
           "default": false,
           "scope": "application"
         },
-        "redmine.workingHours.hoursPerDay": {
+        "redmyne.workingHours.hoursPerDay": {
           "type": "number",
           "default": 8,
           "minimum": 1,
           "maximum": 16,
           "scope": "application",
-          "markdownDescription": "**DEPRECATED:** Use `#redmine.workingHours.weeklySchedule#` instead.\n\nDaily working hours for time entry calculations.",
-          "deprecationMessage": "Use redmine.workingHours.weeklySchedule to set hours per day of week"
+          "markdownDescription": "**DEPRECATED:** Use `#redmyne.workingHours.weeklySchedule#` instead.\n\nDaily working hours for time entry calculations.",
+          "deprecationMessage": "Use redmyne.workingHours.weeklySchedule to set hours per day of week"
         },
-        "redmine.workingHours.workingDays": {
+        "redmyne.workingHours.workingDays": {
           "type": "array",
           "items": {
             "type": "string",
@@ -1822,10 +1822,10 @@
           "maxItems": 7,
           "uniqueItems": true,
           "scope": "application",
-          "markdownDescription": "**DEPRECATED:** Use `#redmine.workingHours.weeklySchedule#` instead.\n\nWorking days for time entry calculations.",
-          "deprecationMessage": "Use redmine.workingHours.weeklySchedule to set hours per day of week"
+          "markdownDescription": "**DEPRECATED:** Use `#redmyne.workingHours.weeklySchedule#` instead.\n\nWorking days for time entry calculations.",
+          "deprecationMessage": "Use redmyne.workingHours.weeklySchedule to set hours per day of week"
         },
-        "redmine.workingHours.weeklySchedule": {
+        "redmyne.workingHours.weeklySchedule": {
           "type": "object",
           "default": {
             "Mon": 8,
@@ -1877,19 +1877,19 @@
           "scope": "application",
           "markdownDescription": "**Weekly working hours schedule**\n\nSet working hours for each day of the week (0-24h). Use 0 for non-working days.\n\n**Example schedules:**\n- Standard 5-day week: Mon-Fri = 8h, Sat-Sun = 0h\n- 4-day week: Mon-Thu = 10h, Fri-Sun = 0h\n- Part-time Friday: Mon-Thu = 8h, Fri = 4h, Sat-Sun = 0h\n\nUsed to calculate utilization percentages in time entry view."
         },
-        "redmine.statusBar.showWorkload": {
+        "redmyne.statusBar.showWorkload": {
           "type": "boolean",
           "default": false,
           "scope": "application",
           "markdownDescription": "**Show workload overview in status bar**\n\nDisplays remaining work and capacity buffer.\n\n**Note:** Opt-in to reduce noise. Enable if you need capacity planning at a glance.\n\n**Format:** `25h left, +8h buffer`"
         },
-        "redmine.gantt.extendedRelationTypes": {
+        "redmyne.gantt.extendedRelationTypes": {
           "type": "boolean",
           "default": false,
           "scope": "application",
           "markdownDescription": "**Enable extended scheduling relation types**\n\nAdds support for Gantt plugin dependency types:\n- Finish-to-Start (FS)\n- Start-to-Start (SS)\n- Finish-to-Finish (FF)\n- Start-to-Finish (SF)\n\nDisable if your server doesn't have a Gantt plugin."
         },
-        "redmine.gantt.visibleRelationTypes": {
+        "redmyne.gantt.visibleRelationTypes": {
           "type": "array",
           "items": {
             "type": "string",
@@ -1909,13 +1909,13 @@
           "scope": "application",
           "markdownDescription": "**Relation types to show as dependency arrows**\n\n- `blocks` / `precedes` — Scheduling relations (default)\n- `relates` — General association\n- `duplicates` — Duplicate tracking\n- `copied_to` — Copy history\n\nOnly scheduling types affect project planning."
         },
-        "redmine.gantt.perfDebug": {
+        "redmyne.gantt.perfDebug": {
           "type": "boolean",
           "default": false,
           "scope": "application",
           "markdownDescription": "**Enable performance logging**\n\nLogs timing data to console for debugging performance issues.\n\n**Note:** For development only."
         },
-        "redmine.maxConcurrentRequests": {
+        "redmyne.maxConcurrentRequests": {
           "type": "number",
           "default": 2,
           "minimum": 1,
@@ -1927,52 +1927,52 @@
     },
     "walkthroughs": [
       {
-        "id": "redmine.getStarted",
+        "id": "redmyne.getStarted",
         "title": "Get Started with Redmyne",
         "description": "Log time without leaving your IDE",
         "steps": [
           {
-            "id": "redmine.configure",
+            "id": "redmyne.configure",
             "title": "Connect to Redmine",
-            "description": "One-time setup. Enter URL and API key.\n\n[Configure](command:redmine.configure)",
+            "description": "One-time setup. Enter URL and API key.\n\n[Configure](command:redmyne.configure)",
             "media": {
               "markdown": "media/walkthrough/configure.md"
             },
             "completionEvents": [
-              "onSettingChanged:redmine.url"
+              "onSettingChanged:redmyne.url"
             ]
           },
           {
-            "id": "redmine.logTime",
+            "id": "redmyne.logTime",
             "title": "Log Your First Entry",
-            "description": "Try it: **Ctrl+Y Ctrl+Y** → pick issue → enter hours → done.\n\n[Log Time Now](command:redmine.quickLogTime)",
+            "description": "Try it: **Ctrl+Y Ctrl+Y** → pick issue → enter hours → done.\n\n[Log Time Now](command:redmyne.quickLogTime)",
             "media": {
               "markdown": "media/walkthrough/log-time.md"
             },
             "completionEvents": [
-              "onCommand:redmine.quickLogTime"
+              "onCommand:redmyne.quickLogTime"
             ]
           },
           {
-            "id": "redmine.viewIssues",
+            "id": "redmyne.viewIssues",
             "title": "Browse Your Issues",
-            "description": "See what's assigned to you. Color = schedule risk.\n\n[Open Sidebar](command:workbench.view.extension.redmine-explorer)",
+            "description": "See what's assigned to you. Color = schedule risk.\n\n[Open Sidebar](command:workbench.view.extension.redmyne-explorer)",
             "media": {
               "markdown": "media/walkthrough/view-issues.md"
             },
             "completionEvents": [
-              "onView:redmine-explorer-projects"
+              "onView:redmyne-explorer-projects"
             ]
           },
           {
-            "id": "redmine.goDeeper",
+            "id": "redmyne.goDeeper",
             "title": "Go Deeper",
-            "description": "Gantt chart, Kanban board — when you're ready.\n\n[Open Gantt](command:redmine.showGantt)",
+            "description": "Gantt chart, Kanban board — when you're ready.\n\n[Open Gantt](command:redmyne.showGantt)",
             "media": {
               "markdown": "media/walkthrough/timeline.md"
             },
             "completionEvents": [
-              "onCommand:redmine.showGantt"
+              "onCommand:redmyne.showGantt"
             ]
           }
         ]

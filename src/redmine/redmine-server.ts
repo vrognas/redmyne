@@ -669,7 +669,7 @@ export class RedmineServer {
     try {
       // Check if auto-update is enabled globally
       const config = await import("vscode").then(vscode =>
-        vscode.workspace.getConfiguration("redmine")
+        vscode.workspace.getConfiguration("redmyne")
       );
       if (!config.get<boolean>("autoUpdateDoneRatio", true)) return;
 

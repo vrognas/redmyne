@@ -6,7 +6,7 @@ import * as vscode from "vscode";
  */
 class AutoUpdateTracker {
   private context: vscode.ExtensionContext | null = null;
-  private readonly STORAGE_KEY = "redmine.autoUpdateEnabledIssues";
+  private readonly STORAGE_KEY = "redmyne.autoUpdateEnabledIssues";
 
   initialize(context: vscode.ExtensionContext): void {
     this.context = context;

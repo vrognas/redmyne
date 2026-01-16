@@ -2,6 +2,22 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.0.0]
+
+### BREAKING CHANGES
+
+- **Namespace renamed**: All extension identifiers changed from `redmine.*` to `redmyne.*`
+  - Settings: `redmine.url` → `redmyne.url`, `redmine.workingHours.*` → `redmyne.workingHours.*`, etc.
+  - Commands: `redmine.configure` → `redmyne.configure`, etc.
+  - Views: `redmine-explorer-*` → `redmyne-explorer-*`
+  - Context keys: `redmine:configured` → `redmyne:configured`
+- **Automatic migration**: API key and all preferences auto-migrate on first v4.0.0 startup
+
+### Changed
+
+- Distinguishes extension "Redmyne" from server software "Redmine"
+- Class names (RedmineServer, etc.) unchanged (they interface with Redmine server)
+
 ## [3.25.1]
 
 ### Changed
@@ -11,7 +27,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Selection optimization** - O(1) bar lookup for single-item selection updates
 - **Collapse caching** - stripe contributions parsed once, cached for reuse
 - **Intensity toggle O(1)** - uses container class instead of iterating all bars
-- **Perf logging config** - `redmine.gantt.perfDebug` setting gates timing logs in both extension and webview
+- **Perf logging config** - `redmyne.gantt.perfDebug` setting gates timing logs in both extension and webview
 
 ## [3.25.0]
 
@@ -78,7 +94,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Time entry contribution commands** - right-click time entries on ad-hoc issues to set/remove contribution target
 - **Gantt toggle ad-hoc** - right-click context menu to tag/untag issues as ad-hoc budget
 - **Gantt left column scroll** - horizontal scroll for issue/project names, hover shows full name
-- **Configurable concurrent requests** - `redmine.maxConcurrentRequests` setting (1-20, default 2)
+- **Configurable concurrent requests** - `redmyne.maxConcurrentRequests` setting (1-20, default 2)
 
 ### Changed
 
@@ -393,7 +409,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 - **Workload Overview status bar item** - remaining work and capacity buffer
 - Rich tooltip with top 3 urgent issues
-- Opt-in via `redmine.statusBar.showWorkload` setting
+- Opt-in via `redmyne.statusBar.showWorkload` setting
 
 ### Changed
 
@@ -447,7 +463,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 ### Added
 
 - Output channel for API call logging
-- `redmine.logging.enabled` config
+- `redmyne.logging.enabled` config
 - Commands: showApiOutput, clearApiOutput, toggleApiLogging
 - LoggingRedmineServer: decorator pattern
 - Sensitive data redaction
@@ -516,7 +532,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 ### Added
 
-- `redmine.setApiKey` command
+- `redmyne.setApiKey` command
 - Comprehensive test suite (60% coverage)
 
 ### Removed

@@ -28,7 +28,7 @@ export function registerGanttCommands(
 ): void {
   context.subscriptions.push(
     // Gantt timeline command
-    vscode.commands.registerCommand("redmine.showGantt", async () => {
+    vscode.commands.registerCommand("redmyne.showGantt", async () => {
       // Ensure issues are fetched
       const issues = await deps.fetchIssuesIfNeeded();
 
@@ -40,7 +40,7 @@ export function registerGanttCommands(
       }
 
       // Get working hours schedule for intensity calculation
-      const scheduleConfig = vscode.workspace.getConfiguration("redmine.workingHours");
+      const scheduleConfig = vscode.workspace.getConfiguration("redmyne.workingHours");
       const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
 
       const panel = GanttPanel.createOrShow(context.extensionUri, deps.getServer());
@@ -49,7 +49,7 @@ export function registerGanttCommands(
     }),
 
     // Refresh Gantt data without resetting view state
-    vscode.commands.registerCommand("redmine.refreshGanttData", async () => {
+    vscode.commands.registerCommand("redmyne.refreshGanttData", async () => {
       const panel = GanttPanel.currentPanel;
       if (!panel) return;
 
@@ -58,14 +58,14 @@ export function registerGanttCommands(
 
       if (issues.length === 0) return;
 
-      const scheduleConfig = vscode.workspace.getConfiguration("redmine.workingHours");
+      const scheduleConfig = vscode.workspace.getConfiguration("redmyne.workingHours");
       const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
 
       panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule, deps.getFilter(), deps.getDependencyIssues(), deps.getServer());
     }),
 
     // Open specific issue in Gantt (context menu)
-    vscode.commands.registerCommand("redmine.openIssueInGantt", async (issue: { id: number; project?: { id: number } } | undefined) => {
+    vscode.commands.registerCommand("redmyne.openIssueInGantt", async (issue: { id: number; project?: { id: number } } | undefined) => {
       if (!issue?.id) {
         vscode.window.showErrorMessage("Could not determine issue ID");
         return;
@@ -80,7 +80,7 @@ export function registerGanttCommands(
         return;
       }
 
-      const scheduleConfig = vscode.workspace.getConfiguration("redmine.workingHours");
+      const scheduleConfig = vscode.workspace.getConfiguration("redmyne.workingHours");
       const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
 
       const panel = GanttPanel.createOrShow(context.extensionUri, deps.getServer());

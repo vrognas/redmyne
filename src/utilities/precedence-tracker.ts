@@ -5,7 +5,7 @@
 
 import * as vscode from "vscode";
 
-const STORAGE_KEY = "redmine.precedenceIssues";
+const STORAGE_KEY = "redmyne.precedenceIssues";
 
 /**
  * Get all issue IDs tagged with precedence priority

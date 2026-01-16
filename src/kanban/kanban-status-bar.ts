@@ -16,7 +16,7 @@ export class KanbanStatusBar {
       vscode.StatusBarAlignment.Left,
       49
     );
-    this.statusBarItem.command = "redmine.kanban.toggleTimer";
+    this.statusBarItem.command = "redmyne.kanban.toggleTimer";
 
     // Subscribe to state changes
     this.disposables.push(
@@ -60,20 +60,20 @@ export class KanbanStatusBar {
       const timeStr = this.formatSecondsAsMmSs(breakSecondsLeft);
       this.statusBarItem.text = `$(coffee) ${timeStr} break`;
       this.statusBarItem.tooltip = this.buildBreakTooltip(doneCount, tasks.length, totalLoggedHours);
-      this.statusBarItem.command = "redmine.kanban.skipBreak";
+      this.statusBarItem.command = "redmyne.kanban.skipBreak";
     } else if (activeTask) {
       // Show active timer
       const timeStr = this.formatSecondsAsMmSs(activeTask.timerSecondsLeft ?? 0);
       const deferredStr = deferredMinutes > 0 ? ` +${deferredMinutes}m` : "";
       this.statusBarItem.text = `$(pulse) ${timeStr} #${activeTask.linkedIssueId}${deferredStr}`;
       this.statusBarItem.tooltip = this.buildWorkingTooltip(activeTask, doneCount, tasks.length, totalLoggedHours);
-      this.statusBarItem.command = "redmine.kanban.toggleTimer";
+      this.statusBarItem.command = "redmyne.kanban.toggleTimer";
     } else if (pausedTask) {
       // Show paused timer
       const timeStr = this.formatSecondsAsMmSs(pausedTask.timerSecondsLeft ?? 0);
       this.statusBarItem.text = `$(debug-pause) ${timeStr} #${pausedTask.linkedIssueId}`;
       this.statusBarItem.tooltip = this.buildPausedTooltip(pausedTask, doneCount, tasks.length, totalLoggedHours);
-      this.statusBarItem.command = "redmine.kanban.toggleTimer";
+      this.statusBarItem.command = "redmyne.kanban.toggleTimer";
     } else if (doingCount > 0) {
       // Show "ready to start" with first doing task
       const doingTask = tasks.find((t) => getTaskStatus(t) === "doing");
@@ -81,19 +81,19 @@ export class KanbanStatusBar {
       this.statusBarItem.tooltip = this.buildIdleTooltip(doingTask, doneCount, tasks.length, totalLoggedHours);
       this.statusBarItem.command = doingTask ? {
         title: "Start Timer",
-        command: "redmine.kanban.startTimer",
+        command: "redmyne.kanban.startTimer",
         arguments: [doingTask.id],
       } : undefined;
     } else if (tasks.length > 0) {
       // All done or only todo tasks
       this.statusBarItem.text = `$(check) ${doneCount}/${tasks.length} done`;
       this.statusBarItem.tooltip = this.buildDoneTooltip(doneCount, tasks.length, totalLoggedHours);
-      this.statusBarItem.command = "redmine.kanban.add";
+      this.statusBarItem.command = "redmyne.kanban.add";
     } else {
       // No tasks
       this.statusBarItem.text = "$(plus) Add task";
       this.statusBarItem.tooltip = "Click to add a Kanban task";
-      this.statusBarItem.command = "redmine.kanban.add";
+      this.statusBarItem.command = "redmyne.kanban.add";
     }
   }
 

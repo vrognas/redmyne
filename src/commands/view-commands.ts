@@ -28,37 +28,37 @@ export function registerViewCommands(
   });
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("redmine.refreshIssues", debouncedRefresh),
+    vscode.commands.registerCommand("redmyne.refreshIssues", debouncedRefresh),
 
-    vscode.commands.registerCommand("redmine.toggleTreeView", () => {
+    vscode.commands.registerCommand("redmyne.toggleTreeView", () => {
       vscode.commands.executeCommand(
         "setContext",
-        "redmine:treeViewStyle",
+        "redmyne:treeViewStyle",
         ProjectsViewStyle.LIST
       );
       deps.projectsTree.setViewStyle(ProjectsViewStyle.LIST);
     }),
 
-    vscode.commands.registerCommand("redmine.toggleListView", () => {
+    vscode.commands.registerCommand("redmyne.toggleListView", () => {
       vscode.commands.executeCommand(
         "setContext",
-        "redmine:treeViewStyle",
+        "redmyne:treeViewStyle",
         ProjectsViewStyle.TREE
       );
       deps.projectsTree.setViewStyle(ProjectsViewStyle.TREE);
     }),
 
-    vscode.commands.registerCommand("redmine.showApiOutput", () => {
+    vscode.commands.registerCommand("redmyne.showApiOutput", () => {
       deps.outputChannel.show();
     }),
 
-    vscode.commands.registerCommand("redmine.clearApiOutput", () => {
+    vscode.commands.registerCommand("redmyne.clearApiOutput", () => {
       deps.outputChannel.clear();
       showStatusBarMessage("$(check) API output cleared", 2000);
     }),
 
-    vscode.commands.registerCommand("redmine.toggleApiLogging", async () => {
-      const config = vscode.workspace.getConfiguration("redmine");
+    vscode.commands.registerCommand("redmyne.toggleApiLogging", async () => {
+      const config = vscode.workspace.getConfiguration("redmyne");
       const currentValue = config.get<boolean>("logging.enabled") || false;
       await config.update(
         "logging.enabled",
@@ -73,70 +73,70 @@ export function registerViewCommands(
     }),
 
     // Issue filter commands
-    vscode.commands.registerCommand("redmine.filterMyOpen", () => {
+    vscode.commands.registerCommand("redmyne.filterMyOpen", () => {
       deps.projectsTree.setFilter({ assignee: "me", status: "open" });
       showStatusBarMessage("$(account) My Open Issues", 2000);
     }),
 
-    vscode.commands.registerCommand("redmine.filterAllOpen", () => {
+    vscode.commands.registerCommand("redmyne.filterAllOpen", () => {
       deps.projectsTree.setFilter({ assignee: "any", status: "open" });
       showStatusBarMessage("$(eye) All Open Issues", 2000);
     }),
 
-    vscode.commands.registerCommand("redmine.filterMyClosed", () => {
+    vscode.commands.registerCommand("redmyne.filterMyClosed", () => {
       deps.projectsTree.setFilter({ assignee: "me", status: "closed" });
       showStatusBarMessage("$(archive) My Closed Issues", 2000);
     }),
 
-    vscode.commands.registerCommand("redmine.filterAll", () => {
+    vscode.commands.registerCommand("redmyne.filterAll", () => {
       deps.projectsTree.setFilter({ assignee: "any", status: "any" });
       showStatusBarMessage("$(list-flat) All Issues", 2000);
     }),
 
     // Time entries filter commands
-    vscode.commands.registerCommand("redmine.timeFilterMy", () => {
+    vscode.commands.registerCommand("redmyne.timeFilterMy", () => {
       deps.timeEntriesTree.setShowAllUsers(false);
       showStatusBarMessage("$(account) My Time Entries", 2000);
     }),
 
-    vscode.commands.registerCommand("redmine.timeFilterAll", () => {
+    vscode.commands.registerCommand("redmyne.timeFilterAll", () => {
       deps.timeEntriesTree.setShowAllUsers(true);
       showStatusBarMessage("$(eye) All Time Entries", 2000);
     }),
 
     // Issue sort commands
-    vscode.commands.registerCommand("redmine.issueSortId", () => {
+    vscode.commands.registerCommand("redmyne.issueSortId", () => {
       deps.projectsTree.setSort("id");
       showStatusBarMessage("$(arrow-swap) Sort by #ID", 2000);
     }),
 
-    vscode.commands.registerCommand("redmine.issueSortSubject", () => {
+    vscode.commands.registerCommand("redmyne.issueSortSubject", () => {
       deps.projectsTree.setSort("subject");
       showStatusBarMessage("$(arrow-swap) Sort by Subject", 2000);
     }),
 
-    vscode.commands.registerCommand("redmine.issueSortAssignee", () => {
+    vscode.commands.registerCommand("redmyne.issueSortAssignee", () => {
       deps.projectsTree.setSort("assignee");
       showStatusBarMessage("$(arrow-swap) Sort by Assignee", 2000);
     }),
 
     // Time entries sort commands
-    vscode.commands.registerCommand("redmine.timeSortId", () => {
+    vscode.commands.registerCommand("redmyne.timeSortId", () => {
       deps.timeEntriesTree.setSort("id");
       showStatusBarMessage("$(arrow-swap) Sort by #ID", 2000);
     }),
 
-    vscode.commands.registerCommand("redmine.timeSortSubject", () => {
+    vscode.commands.registerCommand("redmyne.timeSortSubject", () => {
       deps.timeEntriesTree.setSort("subject");
       showStatusBarMessage("$(arrow-swap) Sort by Subject", 2000);
     }),
 
-    vscode.commands.registerCommand("redmine.timeSortComment", () => {
+    vscode.commands.registerCommand("redmyne.timeSortComment", () => {
       deps.timeEntriesTree.setSort("comment");
       showStatusBarMessage("$(arrow-swap) Sort by Comment", 2000);
     }),
 
-    vscode.commands.registerCommand("redmine.timeSortUser", () => {
+    vscode.commands.registerCommand("redmyne.timeSortUser", () => {
       deps.timeEntriesTree.setSort("user");
       showStatusBarMessage("$(arrow-swap) Sort by User", 2000);
     })

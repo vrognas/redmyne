@@ -82,7 +82,7 @@ describe("Integration: Kanban Task Lifecycle", () => {
   });
 
   it("corrupted storage recovery: filters invalid tasks on restore", async () => {
-    mockStorage.set("redmine.kanban", [
+    mockStorage.set("redmyne.kanban", [
       { id: "valid", title: "Valid", linkedIssueId: 1, linkedIssueSubject: "I", linkedProjectId: 1, linkedProjectName: "P", loggedHours: 0, priority: "medium", createdAt: "2025-01-01", updatedAt: "2025-01-01" },
       { id: "missing-fields" },
       null,

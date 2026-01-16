@@ -1,3 +1,28 @@
+# v4.0.0 Migration Guide
+
+## What Changed
+
+**Breaking**: All extension identifiers renamed from `redmine.*` to `redmyne.*`:
+
+- Settings: `redmine.url` → `redmyne.url`, etc.
+- Commands: `redmine.configure` → `redmyne.configure`, etc.
+- Views: `redmine-explorer-*` → `redmyne-explorer-*`
+- Context keys: `redmine:configured` → `redmyne:configured`
+
+## Automatic Migration
+
+Extension auto-migrates on first v4.0.0 startup:
+
+- API key moved to new secret key
+- All globalState keys migrated
+- No user action required
+
+## Manual Steps (if needed)
+
+If settings.json has explicit `redmine.*` keys, rename to `redmyne.*`.
+
+---
+
 # v3.0.0 Migration Guide
 
 ## Prerequisites

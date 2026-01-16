@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 
-const GLOBAL_API_KEY = "redmine:global:apiKey:v2";
+const GLOBAL_API_KEY = "redmyne:global:apiKey:v2";
 
 export class RedmineSecretManager {
   constructor(private context: vscode.ExtensionContext) {}

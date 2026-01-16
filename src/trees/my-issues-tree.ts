@@ -52,7 +52,7 @@ export class MyIssuesTree extends BaseTreeProvider<TreeItem> {
     // Listen for config changes
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration((e) => {
-        if (e.affectsConfiguration("redmine.workingHours")) {
+        if (e.affectsConfiguration("redmyne.workingHours")) {
           clearFlexibilityCache();
           this.flexibilityCache.clear();
           this._onDidChangeTreeData.fire(undefined);
@@ -78,7 +78,7 @@ export class MyIssuesTree extends BaseTreeProvider<TreeItem> {
       issue,
       flexibility,
       this.server,
-      "redmine.openActionsForIssue"
+      "redmyne.openActionsForIssue"
     );
 
     // Make expandable if has children

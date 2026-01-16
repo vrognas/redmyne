@@ -37,10 +37,10 @@ describe("createIssueTreeItem", () => {
     const treeItem = createIssueTreeItem(
       mockIssue,
       server,
-      "redmine.openActionsForIssue"
+      "redmyne.openActionsForIssue"
     );
 
-    expect(treeItem.command?.command).toBe("redmine.openActionsForIssue");
+    expect(treeItem.command?.command).toBe("redmyne.openActionsForIssue");
     expect(treeItem.command?.arguments).toEqual([false, { server }, "7392"]);
     expect(treeItem.command?.title).toBe("Open actions for issue #7392");
   });

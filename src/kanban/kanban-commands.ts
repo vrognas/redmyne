@@ -25,11 +25,11 @@ export function registerKanbanCommands(
 
   // Add Task
   disposables.push(
-    vscode.commands.registerCommand("redmine.kanban.add", async () => {
+    vscode.commands.registerCommand("redmyne.kanban.add", async () => {
       const server = getServer();
       if (!server) {
         showActionableError("Redmine not configured", [
-          { title: "Configure", command: "redmine.configure" },
+          { title: "Configure", command: "redmyne.configure" },
         ]);
         return;
       }
@@ -56,7 +56,7 @@ export function registerKanbanCommands(
   // Edit Task
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.kanban.edit",
+      "redmyne.kanban.edit",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
 
@@ -71,7 +71,7 @@ export function registerKanbanCommands(
   // Delete Task
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.kanban.delete",
+      "redmyne.kanban.delete",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
 
@@ -90,7 +90,7 @@ export function registerKanbanCommands(
   // Mark Done
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.kanban.markDone",
+      "redmyne.kanban.markDone",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
         await controller.markDone(item.task.id);
@@ -101,7 +101,7 @@ export function registerKanbanCommands(
   // Reopen
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.kanban.reopen",
+      "redmyne.kanban.reopen",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
         await controller.reopen(item.task.id);
@@ -112,7 +112,7 @@ export function registerKanbanCommands(
   // Set Priority
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.kanban.setPriority",
+      "redmyne.kanban.setPriority",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
 
@@ -134,14 +134,14 @@ export function registerKanbanCommands(
   // Open Linked Issue in Browser
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.kanban.openInBrowser",
+      "redmyne.kanban.openInBrowser",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
 
         const server = getServer();
         if (!server) {
           showActionableError("Redmine not configured", [
-          { title: "Configure", command: "redmine.configure" },
+          { title: "Configure", command: "redmyne.configure" },
         ]);
           return;
         }
@@ -154,7 +154,7 @@ export function registerKanbanCommands(
 
   // Clear Done
   disposables.push(
-    vscode.commands.registerCommand("redmine.kanban.clearDone", async () => {
+    vscode.commands.registerCommand("redmyne.kanban.clearDone", async () => {
       const doneTasks = controller.getTasks().filter((t) => getTaskStatus(t) === "done");
       if (doneTasks.length === 0) {
         vscode.window.showInformationMessage("No done tasks to clear");
@@ -174,11 +174,11 @@ export function registerKanbanCommands(
 
   // Refresh Parent Projects (migrate existing tasks)
   disposables.push(
-    vscode.commands.registerCommand("redmine.kanban.refreshParentProjects", async () => {
+    vscode.commands.registerCommand("redmyne.kanban.refreshParentProjects", async () => {
       const server = getServer();
       if (!server) {
         showActionableError("Redmine not configured", [
-          { title: "Configure", command: "redmine.configure" },
+          { title: "Configure", command: "redmyne.configure" },
         ]);
         return;
       }
@@ -224,7 +224,7 @@ export function registerKanbanCommands(
   // Copy Task Subject
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.kanban.copySubject",
+      "redmyne.kanban.copySubject",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
         await vscode.env.clipboard.writeText(item.task.title);
@@ -236,7 +236,7 @@ export function registerKanbanCommands(
   // Add issue from My Issues tree to Kanban
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.addIssueToKanban",
+      "redmyne.addIssueToKanban",
       async (issue: { id: number; subject: string; project?: { id: number; name: string } }) => {
         if (!issue?.id) {
           vscode.window.showErrorMessage("No issue selected");
@@ -286,7 +286,7 @@ export function registerKanbanCommands(
   // Start Timer
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.kanban.startTimer",
+      "redmyne.kanban.startTimer",
       async (taskId: string | TaskTreeItem) => {
         const id = typeof taskId === "string" ? taskId : taskId?.task?.id;
         if (!id) return;
@@ -303,7 +303,7 @@ export function registerKanbanCommands(
         const server = getServer();
         if (!server) {
           showActionableError("Redmine not configured", [
-            { title: "Configure", command: "redmine.configure" },
+            { title: "Configure", command: "redmyne.configure" },
           ]);
           return;
         }
@@ -325,7 +325,7 @@ export function registerKanbanCommands(
   // Pause Timer
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.kanban.pauseTimer",
+      "redmyne.kanban.pauseTimer",
       async (taskId: string | TaskTreeItem) => {
         const id = typeof taskId === "string" ? taskId : taskId?.task?.id;
         if (!id) return;
@@ -338,7 +338,7 @@ export function registerKanbanCommands(
   // Resume Timer
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.kanban.resumeTimer",
+      "redmyne.kanban.resumeTimer",
       async (taskId: string | TaskTreeItem) => {
         const id = typeof taskId === "string" ? taskId : taskId?.task?.id;
         if (!id) return;
@@ -351,7 +351,7 @@ export function registerKanbanCommands(
   // Stop Timer
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.kanban.stopTimer",
+      "redmyne.kanban.stopTimer",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
         await controller.stopTimer(item.task.id);
@@ -362,7 +362,7 @@ export function registerKanbanCommands(
   // Move to To Do (clears timer and hours)
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.kanban.moveToTodo",
+      "redmyne.kanban.moveToTodo",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
         await controller.moveToTodo(item.task.id);
@@ -372,7 +372,7 @@ export function registerKanbanCommands(
 
   // Toggle Timer (keyboard shortcut)
   disposables.push(
-    vscode.commands.registerCommand("redmine.kanban.toggleTimer", async () => {
+    vscode.commands.registerCommand("redmyne.kanban.toggleTimer", async () => {
       const active = controller.getActiveTask();
       if (active) {
         await controller.pauseTimer(active.id);
@@ -392,7 +392,7 @@ export function registerKanbanCommands(
 
   // Skip Break
   disposables.push(
-    vscode.commands.registerCommand("redmine.kanban.skipBreak", async () => {
+    vscode.commands.registerCommand("redmyne.kanban.skipBreak", async () => {
       if (!controller.isOnBreak()) {
         vscode.window.showInformationMessage("No break in progress");
         return;
@@ -404,7 +404,7 @@ export function registerKanbanCommands(
   // Log Early (proportional time)
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.kanban.logEarly",
+      "redmyne.kanban.logEarly",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
 
@@ -417,7 +417,7 @@ export function registerKanbanCommands(
         const server = getServer();
         if (!server) {
           showActionableError("Redmine not configured", [
-            { title: "Configure", command: "redmine.configure" },
+            { title: "Configure", command: "redmyne.configure" },
           ]);
           return;
         }
@@ -460,7 +460,7 @@ export function registerKanbanCommands(
   // Defer Time (stop timer, carry time to next task)
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.kanban.deferTime",
+      "redmyne.kanban.deferTime",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
 
@@ -497,7 +497,7 @@ export function registerKanbanCommands(
   // Log and Continue (log full duration, reset timer)
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.kanban.logAndContinue",
+      "redmyne.kanban.logAndContinue",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
 
@@ -510,7 +510,7 @@ export function registerKanbanCommands(
         const server = getServer();
         if (!server) {
           showActionableError("Redmine not configured", [
-            { title: "Configure", command: "redmine.configure" },
+            { title: "Configure", command: "redmyne.configure" },
           ]);
           return;
         }
@@ -540,7 +540,7 @@ export function registerKanbanCommands(
   // Move Up
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.kanban.moveUp",
+      "redmyne.kanban.moveUp",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
         await controller.moveUp(item.task.id);
@@ -551,7 +551,7 @@ export function registerKanbanCommands(
   // Move Down
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.kanban.moveDown",
+      "redmyne.kanban.moveDown",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
         await controller.moveDown(item.task.id);
@@ -562,13 +562,13 @@ export function registerKanbanCommands(
   // Reveal Time Entry (focus My Time Entries view)
   disposables.push(
     vscode.commands.registerCommand(
-      "redmine.kanban.revealTimeEntry",
+      "redmyne.kanban.revealTimeEntry",
       async (item: TaskTreeItem) => {
         if (!item?.task) return;
 
         // Focus the time entries view and refresh
-        await vscode.commands.executeCommand("redmine-explorer-my-time-entries.focus");
-        await vscode.commands.executeCommand("redmine.refreshTimeEntries");
+        await vscode.commands.executeCommand("redmyne-explorer-my-time-entries.focus");
+        await vscode.commands.executeCommand("redmyne.refreshTimeEntries");
 
         vscode.window.showInformationMessage(
           `Look for entries on #${item.task.linkedIssueId}`
@@ -579,11 +579,11 @@ export function registerKanbanCommands(
 
   // Configure Timer Settings
   disposables.push(
-    vscode.commands.registerCommand("redmine.kanban.configureTimer", async () => {
-      const currentUnit = context.globalState.get<number>("redmine.timer.unitDuration", 60);
-      const currentWork = context.globalState.get<number>("redmine.timer.workDuration", 45);
+    vscode.commands.registerCommand("redmyne.kanban.configureTimer", async () => {
+      const currentUnit = context.globalState.get<number>("redmyne.timer.unitDuration", 60);
+      const currentWork = context.globalState.get<number>("redmyne.timer.workDuration", 45);
       const currentBreak = currentUnit - currentWork;
-      const currentSound = context.globalState.get<boolean>("redmine.timer.soundEnabled", true);
+      const currentSound = context.globalState.get<boolean>("redmyne.timer.soundEnabled", true);
 
       const choice = await vscode.window.showQuickPick(
         [
@@ -614,7 +614,7 @@ export function registerKanbanCommands(
       if (!choice) return;
 
       if (choice.setting === "sound") {
-        await context.globalState.update("redmine.timer.soundEnabled", !currentSound);
+        await context.globalState.update("redmyne.timer.soundEnabled", !currentSound);
         showStatusBarMessage(`$(check) Sound ${!currentSound ? "enabled" : "disabled"}`, 2000);
         return;
       }
@@ -633,7 +633,7 @@ export function registerKanbanCommands(
         if (!input) return;
         const newBreak = parseInt(input, 10);
         const newWork = currentUnit - newBreak;
-        await context.globalState.update("redmine.timer.workDuration", newWork);
+        await context.globalState.update("redmyne.timer.workDuration", newWork);
         showStatusBarMessage(`$(check) Break set to ${newBreak}min (work: ${newWork}min)`, 2000);
         return;
       }
@@ -658,14 +658,14 @@ export function registerKanbanCommands(
 
       const value = parseInt(input, 10);
       if (choice.setting === "unitDuration") {
-        await context.globalState.update("redmine.timer.unitDuration", value);
+        await context.globalState.update("redmyne.timer.unitDuration", value);
         // Adjust work duration if needed
         if (currentWork > value) {
-          await context.globalState.update("redmine.timer.workDuration", value);
+          await context.globalState.update("redmyne.timer.workDuration", value);
         }
         showStatusBarMessage(`$(check) Unit duration set to ${value}min`, 2000);
       } else {
-        await context.globalState.update("redmine.timer.workDuration", value);
+        await context.globalState.update("redmyne.timer.workDuration", value);
         showStatusBarMessage(`$(check) Work duration set to ${value}min`, 2000);
       }
     })
@@ -675,25 +675,25 @@ export function registerKanbanCommands(
   if (treeProvider) {
     // Filter commands
     disposables.push(
-      vscode.commands.registerCommand("redmine.kanban.filterAll", () => {
+      vscode.commands.registerCommand("redmyne.kanban.filterAll", () => {
         treeProvider.setFilter("all");
         showStatusBarMessage("$(check) Showing all priorities", 2000);
       })
     );
     disposables.push(
-      vscode.commands.registerCommand("redmine.kanban.filterHigh", () => {
+      vscode.commands.registerCommand("redmyne.kanban.filterHigh", () => {
         treeProvider.setFilter("high");
         showStatusBarMessage("$(check) Showing high priority", 2000);
       })
     );
     disposables.push(
-      vscode.commands.registerCommand("redmine.kanban.filterMedium", () => {
+      vscode.commands.registerCommand("redmyne.kanban.filterMedium", () => {
         treeProvider.setFilter("medium");
         showStatusBarMessage("$(check) Showing medium priority", 2000);
       })
     );
     disposables.push(
-      vscode.commands.registerCommand("redmine.kanban.filterLow", () => {
+      vscode.commands.registerCommand("redmyne.kanban.filterLow", () => {
         treeProvider.setFilter("low");
         showStatusBarMessage("$(check) Showing low priority", 2000);
       })
@@ -701,7 +701,7 @@ export function registerKanbanCommands(
 
     // Sort commands
     disposables.push(
-      vscode.commands.registerCommand("redmine.kanban.sortPriority", () => {
+      vscode.commands.registerCommand("redmyne.kanban.sortPriority", () => {
         treeProvider.setSort("priority");
         const { direction } = treeProvider.getSort();
         const arrow = direction === "asc" ? "↑" : "↓";
@@ -709,7 +709,7 @@ export function registerKanbanCommands(
       })
     );
     disposables.push(
-      vscode.commands.registerCommand("redmine.kanban.sortIssueId", () => {
+      vscode.commands.registerCommand("redmyne.kanban.sortIssueId", () => {
         treeProvider.setSort("issueId");
         const { direction } = treeProvider.getSort();
         const arrow = direction === "asc" ? "↑" : "↓";
