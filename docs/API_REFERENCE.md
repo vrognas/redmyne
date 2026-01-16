@@ -294,7 +294,7 @@ vscode.commands.registerCommand(
 ): Disposable
 ```
 
-**Registered Commands**: `setApiKey`, `listOpenIssuesAssignedToMe`, `openActionsForIssue`, `openActionsForIssueUnderCursor`, `newIssue`, `changeDefaultServer`, `refreshIssues`, `toggleTreeView`, `toggleListView` (`src/extension.ts`)
+**Registered Commands**: `setApiKey`, `listOpenIssuesAssignedToMe`, `openActionsForIssue`, `openActionsForIssueUnderCursor`, `newIssue`, `refreshIssues`, `toggleTreeView`, `toggleListView` (`src/extension.ts`)
 
 **`vscode.commands.executeCommand()`**
 

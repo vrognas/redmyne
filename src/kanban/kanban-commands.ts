@@ -6,6 +6,7 @@ import { RedmineServer } from "../redmine/redmine-server";
 import { pickActivityForProject } from "../utilities/issue-picker";
 import { showActionableError } from "../utilities/error-feedback";
 import { showStatusBarMessage } from "../utilities/status-bar";
+import { KanbanTreeProvider } from "./kanban-tree-provider";
 
 interface TaskTreeItem {
   task?: KanbanTask;
@@ -17,7 +18,8 @@ interface TaskTreeItem {
 export function registerKanbanCommands(
   context: vscode.ExtensionContext,
   controller: KanbanController,
-  getServer: () => RedmineServer | undefined
+  getServer: () => RedmineServer | undefined,
+  treeProvider?: KanbanTreeProvider
 ): vscode.Disposable[] {
   const disposables: vscode.Disposable[] = [];
 
@@ -668,6 +670,53 @@ export function registerKanbanCommands(
       }
     })
   );
+
+  // Filter/sort commands (only if tree provider is available)
+  if (treeProvider) {
+    // Filter commands
+    disposables.push(
+      vscode.commands.registerCommand("redmine.kanban.filterAll", () => {
+        treeProvider.setFilter("all");
+        showStatusBarMessage("$(check) Showing all priorities", 2000);
+      })
+    );
+    disposables.push(
+      vscode.commands.registerCommand("redmine.kanban.filterHigh", () => {
+        treeProvider.setFilter("high");
+        showStatusBarMessage("$(check) Showing high priority", 2000);
+      })
+    );
+    disposables.push(
+      vscode.commands.registerCommand("redmine.kanban.filterMedium", () => {
+        treeProvider.setFilter("medium");
+        showStatusBarMessage("$(check) Showing medium priority", 2000);
+      })
+    );
+    disposables.push(
+      vscode.commands.registerCommand("redmine.kanban.filterLow", () => {
+        treeProvider.setFilter("low");
+        showStatusBarMessage("$(check) Showing low priority", 2000);
+      })
+    );
+
+    // Sort commands
+    disposables.push(
+      vscode.commands.registerCommand("redmine.kanban.sortPriority", () => {
+        treeProvider.setSort("priority");
+        const { direction } = treeProvider.getSort();
+        const arrow = direction === "asc" ? "↑" : "↓";
+        showStatusBarMessage(`$(check) Sort by priority ${arrow}`, 2000);
+      })
+    );
+    disposables.push(
+      vscode.commands.registerCommand("redmine.kanban.sortIssueId", () => {
+        treeProvider.setSort("issueId");
+        const { direction } = treeProvider.getSort();
+        const arrow = direction === "asc" ? "↑" : "↓";
+        showStatusBarMessage(`$(check) Sort by issue ID ${arrow}`, 2000);
+      })
+    );
+  }
 
   return disposables;
 }

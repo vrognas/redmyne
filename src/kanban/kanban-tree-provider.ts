@@ -2,12 +2,22 @@ import * as vscode from "vscode";
 import { KanbanController } from "./kanban-controller";
 import {
   KanbanTask,
+  TaskPriority,
   TaskStatus,
   getTaskStatus,
   sortTasksByPriority,
 } from "./kanban-state";
 import { formatHoursAsHHMM } from "../utilities/time-input";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
+
+// Filter/sort persistence keys
+const FILTER_KEY = "redmine.kanban.filterPriority";
+const SORT_FIELD_KEY = "redmine.kanban.sortField";
+const SORT_DIR_KEY = "redmine.kanban.sortDirection";
+
+export type KanbanFilterPriority = TaskPriority | "all";
+export type KanbanSortField = "priority" | "issueId";
+export type SortDirection = "asc" | "desc";
 
 type TaskTreeItemType = "status-header" | "client-folder" | "project-folder" | "task" | "break-status";
 
@@ -38,9 +48,57 @@ export class KanbanTreeProvider
   readonly dropMimeTypes = [MIME_TYPE];
   readonly dragMimeTypes = [MIME_TYPE];
 
-  constructor(private controller: KanbanController) {
+  // Filter/sort state
+  private filterPriority: KanbanFilterPriority = "all";
+  private sortField: KanbanSortField = "priority";
+  private sortDirection: SortDirection = "desc";
+  private globalState?: vscode.Memento;
+
+  constructor(private controller: KanbanController, globalState?: vscode.Memento) {
     super();
+    this.globalState = globalState;
     this.disposables.push(controller.onTasksChange(() => this.refresh()));
+
+    // Restore filter/sort from globalState
+    if (globalState) {
+      this.filterPriority = globalState.get<KanbanFilterPriority>(FILTER_KEY, "all");
+      this.sortField = globalState.get<KanbanSortField>(SORT_FIELD_KEY, "priority");
+      this.sortDirection = globalState.get<SortDirection>(SORT_DIR_KEY, "desc");
+    }
+  }
+
+  /**
+   * Set filter by priority. Persists to globalState.
+   */
+  setFilter(priority: KanbanFilterPriority): void {
+    this.filterPriority = priority;
+    this.globalState?.update(FILTER_KEY, priority);
+    this.refresh();
+  }
+
+  /**
+   * Set sort field. Toggles direction if same field. Persists to globalState.
+   */
+  setSort(field: KanbanSortField): void {
+    if (this.sortField === field) {
+      this.sortDirection = this.sortDirection === "asc" ? "desc" : "asc";
+    } else {
+      this.sortField = field;
+      this.sortDirection = "desc";
+    }
+    this.globalState?.update(SORT_FIELD_KEY, this.sortField);
+    this.globalState?.update(SORT_DIR_KEY, this.sortDirection);
+    this.refresh();
+  }
+
+  /** Get current filter for UI display */
+  getFilter(): KanbanFilterPriority {
+    return this.filterPriority;
+  }
+
+  /** Get current sort for UI display */
+  getSort(): { field: KanbanSortField; direction: SortDirection } {
+    return { field: this.sortField, direction: this.sortDirection };
   }
 
   // --- TreeDragAndDropController methods ---
@@ -289,7 +347,7 @@ export class KanbanTreeProvider
 
       // Doing board: flat list (no folders)
       if (element.status === "doing") {
-        return sortTasksByPriority(tasks).map((task) => ({
+        return this.sortTasks(tasks).map((task) => ({
           type: "task" as const,
           task,
         }));
@@ -308,7 +366,7 @@ export class KanbanTreeProvider
     // Children of a project folder
     if (element?.type === "project-folder" && element.status && element.projectId) {
       const tasks = this.getTasksForStatusAndProject(element.status, element.projectId, element.clientId);
-      return sortTasksByPriority(tasks).map((task) => ({
+      return this.sortTasks(tasks).map((task) => ({
         type: "task" as const,
         task,
       }));
@@ -467,7 +525,29 @@ export class KanbanTreeProvider
 
   private getTasksForStatus(status: TaskStatus): KanbanTask[] {
     const tasks = this.controller.getTasks();
-    return tasks.filter((t) => getTaskStatus(t) === status);
+    let filtered = tasks.filter((t) => getTaskStatus(t) === status);
+
+    // Apply priority filter
+    if (this.filterPriority !== "all") {
+      filtered = filtered.filter((t) => t.priority === this.filterPriority);
+    }
+
+    return filtered;
+  }
+
+  /**
+   * Sort tasks based on current sort settings.
+   */
+  private sortTasks(tasks: KanbanTask[]): KanbanTask[] {
+    if (this.sortField === "priority") {
+      // Use existing priority sort, then apply direction
+      const sorted = sortTasksByPriority(tasks);
+      return this.sortDirection === "asc" ? sorted.reverse() : sorted;
+    }
+
+    // Sort by issue ID
+    const sorted = [...tasks].sort((a, b) => a.linkedIssueId - b.linkedIssueId);
+    return this.sortDirection === "asc" ? sorted : sorted.reverse();
   }
 
   private getStatusLabel(status: TaskStatus): string {

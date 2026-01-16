@@ -239,7 +239,7 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
-  const kanbanTreeProvider = new KanbanTreeProvider(kanbanController);
+  const kanbanTreeProvider = new KanbanTreeProvider(kanbanController, context.globalState);
   cleanupResources.kanbanTreeProvider = kanbanTreeProvider;
 
   cleanupResources.kanbanTreeView = vscode.window.createTreeView("redmine-explorer-kanban", {
@@ -265,7 +265,8 @@ export function activate(context: vscode.ExtensionContext): void {
     ...registerKanbanCommands(
       context,
       kanbanController,
-      () => projectsTree.server
+      () => projectsTree.server,
+      kanbanTreeProvider
     )
   );
 
@@ -629,14 +630,6 @@ export function activate(context: vscode.ExtensionContext): void {
       vscode.commands.executeCommand("redmine.refreshGantt");
     }
   });
-  registerCommand("changeDefaultServer", (conf) => {
-    projectsTree.setServer(conf.server);
-    myTimeEntriesTree.setServer(conf.server);
-
-    projectsTree.refresh();
-    myTimeEntriesTree.refresh();
-  });
-
   registerCommand("refreshTimeEntries", () => {
     myTimeEntriesTree.refresh();
   });

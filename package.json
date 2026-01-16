@@ -26,7 +26,7 @@
     "commands": [
       {
         "command": "redmine.configure",
-        "title": "Redmine: Configure",
+        "title": "Configure Redmine Server",
         "icon": "$(settings-gear)"
       },
       {
@@ -52,10 +52,6 @@
       {
         "command": "redmine.quickLogTime",
         "title": "Log Time"
-      },
-      {
-        "command": "redmine.changeDefaultServer",
-        "title": "Redmine: Change server"
       },
       {
         "command": "redmine.refreshIssues",
@@ -458,6 +454,30 @@
         "icon": "$(gear)"
       },
       {
+        "command": "redmine.kanban.filterAll",
+        "title": "All Priorities"
+      },
+      {
+        "command": "redmine.kanban.filterHigh",
+        "title": "High Priority"
+      },
+      {
+        "command": "redmine.kanban.filterMedium",
+        "title": "Medium Priority"
+      },
+      {
+        "command": "redmine.kanban.filterLow",
+        "title": "Low Priority"
+      },
+      {
+        "command": "redmine.kanban.sortPriority",
+        "title": "Sort by Priority"
+      },
+      {
+        "command": "redmine.kanban.sortIssueId",
+        "title": "Sort by Issue ID"
+      },
+      {
         "command": "redmine.toggleAutoUpdateDoneRatio",
         "title": "Toggle Auto-update % Done",
         "icon": "$(sync)"
@@ -717,6 +737,16 @@
         "icon": "$(arrow-swap)"
       },
       {
+        "id": "redmine.kanbanFilterMenu",
+        "label": "Filter",
+        "icon": "$(filter)"
+      },
+      {
+        "id": "redmine.kanbanSortMenu",
+        "label": "Sort",
+        "icon": "$(arrow-swap)"
+      },
+      {
         "id": "redmine.gantt.doneRatioMenu",
         "label": "% Done"
       },
@@ -818,11 +848,35 @@
           "group": "1_sort@4"
         }
       ],
-      "commandPalette": [
+      "redmine.kanbanFilterMenu": [
         {
-          "command": "redmine.changeDefaultServer",
-          "when": "false"
+          "command": "redmine.kanban.filterAll",
+          "group": "1_filters@1"
         },
+        {
+          "command": "redmine.kanban.filterHigh",
+          "group": "1_filters@2"
+        },
+        {
+          "command": "redmine.kanban.filterMedium",
+          "group": "1_filters@3"
+        },
+        {
+          "command": "redmine.kanban.filterLow",
+          "group": "1_filters@4"
+        }
+      ],
+      "redmine.kanbanSortMenu": [
+        {
+          "command": "redmine.kanban.sortPriority",
+          "group": "1_sort@1"
+        },
+        {
+          "command": "redmine.kanban.sortIssueId",
+          "group": "1_sort@2"
+        }
+      ],
+      "commandPalette": [
         {
           "command": "redmine.refreshIssues",
           "when": "false"
@@ -1036,6 +1090,30 @@
           "when": "false"
         },
         {
+          "command": "redmine.kanban.filterAll",
+          "when": "false"
+        },
+        {
+          "command": "redmine.kanban.filterHigh",
+          "when": "false"
+        },
+        {
+          "command": "redmine.kanban.filterMedium",
+          "when": "false"
+        },
+        {
+          "command": "redmine.kanban.filterLow",
+          "when": "false"
+        },
+        {
+          "command": "redmine.kanban.sortPriority",
+          "when": "false"
+        },
+        {
+          "command": "redmine.kanban.sortIssueId",
+          "when": "false"
+        },
+        {
           "command": "redmine.toggleAutoUpdateDoneRatio",
           "when": "false"
         },
@@ -1128,61 +1206,67 @@
         {
           "command": "redmine.kanban.refreshParentProjects",
           "when": "view == 'redmine-explorer-kanban' && redmine:configured",
-          "group": "navigation@4"
+          "group": "navigation@1"
         },
         {
-          "command": "redmine.configure",
-          "when": "view == 'redmine-explorer-projects'",
-          "group": "navigation"
+          "submenu": "redmine.kanbanFilterMenu",
+          "when": "view == 'redmine-explorer-kanban' && redmine:configured",
+          "group": "navigation@2"
         },
         {
-          "command": "redmine.changeDefaultServer",
-          "when": "view == 'redmine-explorer-projects' && !hasSingleConfig"
-        },
-        {
-          "command": "redmine.toggleTreeView",
-          "when": "view == 'redmine-explorer-projects' && redmine:treeViewStyle",
-          "group": "navigation"
-        },
-        {
-          "command": "redmine.toggleListView",
-          "when": "view == 'redmine-explorer-projects' && !redmine:treeViewStyle",
-          "group": "navigation"
+          "submenu": "redmine.kanbanSortMenu",
+          "when": "view == 'redmine-explorer-kanban' && redmine:configured",
+          "group": "navigation@3"
         },
         {
           "command": "redmine.refreshIssues",
           "when": "view == 'redmine-explorer-projects'",
-          "group": "navigation"
+          "group": "navigation@1"
         },
         {
           "submenu": "redmine.issueFilterMenu",
           "when": "view == 'redmine-explorer-projects' && redmine:configured",
-          "group": "navigation"
+          "group": "navigation@2"
         },
         {
           "submenu": "redmine.issueSortMenu",
           "when": "view == 'redmine-explorer-projects' && redmine:configured",
-          "group": "navigation"
+          "group": "navigation@3"
+        },
+        {
+          "command": "redmine.toggleTreeView",
+          "when": "view == 'redmine-explorer-projects' && redmine:treeViewStyle",
+          "group": "navigation@4"
+        },
+        {
+          "command": "redmine.toggleListView",
+          "when": "view == 'redmine-explorer-projects' && !redmine:treeViewStyle",
+          "group": "navigation@4"
         },
         {
           "command": "redmine.showGantt",
           "when": "view == 'redmine-explorer-projects' && redmine:configured",
-          "group": "navigation@1"
+          "group": "navigation@5"
+        },
+        {
+          "command": "redmine.configure",
+          "when": "view == 'redmine-explorer-projects'",
+          "group": "navigation@6"
         },
         {
           "command": "redmine.refreshTimeEntries",
           "when": "view == 'redmine-explorer-my-time-entries'",
-          "group": "navigation"
+          "group": "navigation@1"
         },
         {
           "submenu": "redmine.timeFilterMenu",
           "when": "view == 'redmine-explorer-my-time-entries' && redmine:configured",
-          "group": "navigation"
+          "group": "navigation@2"
         },
         {
           "submenu": "redmine.timeSortMenu",
           "when": "view == 'redmine-explorer-my-time-entries' && redmine:configured",
-          "group": "navigation"
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
