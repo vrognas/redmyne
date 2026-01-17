@@ -1366,16 +1366,29 @@ export class RedmineServer {
 
   /**
    * Returns promise, that resolves to list of open issues for project
+   * @param limit - Max issues to return (default: all). Use for search previews.
    */
   async getOpenIssuesForProject(
     project_id: number | string,
-    include_subproject = true
+    include_subproject = true,
+    limit?: number,
+    openOnly = true
   ): Promise<{ issues: Issue[] }> {
-    const endpoint = include_subproject
-      ? `/issues.json?status_id=open&project_id=${project_id}`
-      : `/issues.json?status_id=open&project_id=${project_id}&subproject_id=!*`;
+    const statusFilter = openOnly ? "status_id=open" : "status_id=*";
+    const baseEndpoint = include_subproject
+      ? `/issues.json?${statusFilter}&project_id=${project_id}`
+      : `/issues.json?${statusFilter}&project_id=${project_id}&subproject_id=!*`;
 
-    const issues = await this.paginate<Issue>(endpoint, "issues");
+    if (limit !== undefined) {
+      // Direct fetch with limit (no pagination needed)
+      const response = await this.doRequest<{ issues: Issue[] }>(
+        `${baseEndpoint}&limit=${limit}`,
+        "GET"
+      );
+      return { issues: response?.issues || [] };
+    }
+
+    const issues = await this.paginate<Issue>(baseEndpoint, "issues");
     return { issues };
   }
 

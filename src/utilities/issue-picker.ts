@@ -1,10 +1,289 @@
 import * as vscode from "vscode";
+import Fuse, { IFuseOptions } from "fuse.js";
 import { RedmineServer } from "../redmine/redmine-server";
 import { Issue } from "../redmine/models/issue";
 import { TimeEntryActivity } from "../redmine/models/common";
+import { RedmineProject } from "../redmine/redmine-project";
 import { debounce } from "./debounce";
 
 const SEARCH_DEBOUNCE_MS = 300;
+const PROJECT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+// Project path cache (module-level, shared across picker invocations)
+interface ProjectPathCache {
+  map: Map<number, string>;
+  timestamp: number;
+  serverAddress: string;
+}
+let projectPathCache: ProjectPathCache | null = null;
+
+/**
+ * Get or build project path map with caching
+ */
+async function getProjectPathMap(server: RedmineServer): Promise<Map<number, string>> {
+  const now = Date.now();
+  const serverAddress = server.options.address;
+
+  // Return cached if valid and same server
+  if (
+    projectPathCache &&
+    projectPathCache.serverAddress === serverAddress &&
+    now - projectPathCache.timestamp < PROJECT_CACHE_TTL_MS
+  ) {
+    return projectPathCache.map;
+  }
+
+  // Fetch fresh data
+  try {
+    const projects = await server.getProjects();
+    const map = buildProjectPathMap(projects);
+    projectPathCache = { map, timestamp: now, serverAddress };
+    return map;
+  } catch {
+    // Return empty map on error (fallback to direct project name)
+    return projectPathCache?.map ?? new Map();
+  }
+}
+
+/**
+ * Search result from searchIssuesWithFuzzy
+ */
+interface IssueSearchResult {
+  results: Issue[];
+  exactMatch: Issue | null;
+  exactMatchError: string | null; // "no access" | "not found" | null
+}
+
+/**
+ * Search issues across multiple sources with fuzzy matching
+ * - Searches server by each query token (for multi-word queries)
+ * - Searches projects by name and fetches their issues
+ * - Applies fuzzy matching to rank all candidates
+ */
+async function searchIssuesWithFuzzy(
+  server: RedmineServer,
+  query: string,
+  localIssues: Issue[],
+  projectPathMap: Map<number, string>
+): Promise<IssueSearchResult> {
+  const cleanQuery = query.replace(/^#/, "");
+  const possibleId = parseInt(cleanQuery, 10);
+  const isNumericQuery = !isNaN(possibleId) && cleanQuery === String(possibleId);
+  const queryTokens = query.trim().split(/\s+/).filter(t => t.length >= 2);
+
+  // Find projects matching any token (for project-name search)
+  const matchingProjectIds: number[] = [];
+  for (const token of queryTokens) {
+    const lowerToken = token.toLowerCase();
+    for (const [projectId, path] of projectPathMap.entries()) {
+      if (path.toLowerCase().includes(lowerToken) && !matchingProjectIds.includes(projectId)) {
+        matchingProjectIds.push(projectId);
+      }
+    }
+  }
+
+  // Parallel fetch: exact ID + token searches + project issues
+  let exactMatch: Issue | null = null;
+  let exactMatchError: string | null = null;
+  const serverResults: Issue[] = [];
+
+  await Promise.all([
+    // Exact ID lookup
+    (async () => {
+      if (isNumericQuery) {
+        try {
+          const result = await server.getIssueById(possibleId);
+          exactMatch = result.issue;
+        } catch (error: unknown) {
+          if (error instanceof Error) {
+            exactMatchError = error.message.includes("403") ? "no access" :
+                             error.message.includes("404") ? "not found" : null;
+          }
+        }
+      }
+    })(),
+    // Search each token separately for multi-word queries
+    ...(queryTokens.length > 1
+      ? queryTokens.map(async (token) => {
+          const results = await server.searchIssues(token, 10);
+          serverResults.push(...results);
+        })
+      : [(async () => {
+          const results = await server.searchIssues(query, 10);
+          serverResults.push(...results);
+        })()]),
+    // Fetch issues from projects matching search tokens (include closed issues)
+    ...matchingProjectIds.slice(0, 5).map(async (projectId) => {
+      try {
+        const result = await server.getOpenIssuesForProject(projectId, true, 10, false);
+        serverResults.push(...result.issues);
+      } catch { /* ignore - project may not be accessible */ }
+    }),
+  ]);
+
+  // Collect all unique candidates
+  const seenIds = new Set<number>();
+  const candidateIssues: Issue[] = [];
+
+  if (exactMatch) {
+    candidateIssues.push(exactMatch);
+    seenIds.add(exactMatch.id);
+  }
+  for (const issue of localIssues) {
+    if (!seenIds.has(issue.id)) {
+      candidateIssues.push(issue);
+      seenIds.add(issue.id);
+    }
+  }
+  for (const issue of serverResults) {
+    if (!seenIds.has(issue.id)) {
+      candidateIssues.push(issue);
+      seenIds.add(issue.id);
+    }
+  }
+
+  // Apply fuzzy search for ranking (assigned issues ranked higher)
+  const assignedIds = new Set(localIssues.map(i => i.id));
+  const results = fuzzyFilterIssues(candidateIssues, query, projectPathMap, assignedIds);
+
+  return { results, exactMatch, exactMatchError };
+}
+
+// Fuzzy search configuration
+interface SearchableIssue {
+  id: string;
+  subject: string;
+  project: string;
+  original: Issue;
+}
+
+const FUSE_OPTIONS: IFuseOptions<SearchableIssue> = {
+  keys: [
+    { name: "subject", weight: 2 },
+    { name: "project", weight: 1.5 },
+    { name: "id", weight: 1 },
+  ],
+  threshold: 0.4,
+  ignoreLocation: true,
+  includeScore: true,
+  useExtendedSearch: true,  // Enable space-separated AND queries
+};
+
+/**
+ * Build map of projectId → full ancestor path (e.g., "Nuvalent > Subproject")
+ */
+function buildProjectPathMap(projects: RedmineProject[]): Map<number, string> {
+  const projectMap = new Map<number, RedmineProject>();
+  for (const p of projects) {
+    projectMap.set(p.id, p);
+  }
+
+  const pathCache = new Map<number, string>();
+
+  function getPath(projectId: number): string {
+    if (pathCache.has(projectId)) return pathCache.get(projectId)!;
+
+    const project = projectMap.get(projectId);
+    if (!project) return "";
+
+    let path = project.name;
+    if (project.parent?.id) {
+      const parentPath = getPath(project.parent.id);
+      if (parentPath) path = `${parentPath} ${project.name}`;
+    }
+    pathCache.set(projectId, path);
+    return path;
+  }
+
+  for (const p of projects) {
+    getPath(p.id);
+  }
+  return pathCache;
+}
+
+// Score penalties for ranking (lower score = higher rank)
+const NON_ASSIGNED_PENALTY = 0.3;  // Non-assigned below assigned
+const CLOSED_PENALTY = 0.5;        // Closed below open
+
+/**
+ * Fuzzy search issues by query (searches id, subject, project path)
+ * For multi-word queries, all terms must match (AND logic)
+ * Ranking: assigned+open > assigned+closed > unassigned+open > unassigned+closed
+ */
+function fuzzyFilterIssues(
+  issues: Issue[],
+  query: string,
+  projectPathMap?: Map<number, string>,
+  assignedIds?: Set<number>
+): Issue[] {
+  const tokens = query.trim().split(/\s+/).filter(t => t);
+  if (tokens.length === 0) return issues;
+
+  const searchable: SearchableIssue[] = issues.map((i) => ({
+    id: String(i.id),
+    subject: i.subject,
+    project: projectPathMap?.get(i.project?.id ?? 0) ?? i.project?.name ?? "",
+    original: i,
+  }));
+
+  const fuse = new Fuse(searchable, FUSE_OPTIONS);
+
+  // Helper to apply ranking boosts
+  const applyBoosts = (score: number, issue: Issue): number => {
+    let adjusted = score;
+    if (assignedIds && !assignedIds.has(issue.id)) {
+      adjusted += NON_ASSIGNED_PENALTY;
+    }
+    if (issue.status?.is_closed) {
+      adjusted += CLOSED_PENALTY;
+    }
+    return adjusted;
+  };
+
+  if (tokens.length === 1) {
+    const results = fuse.search(tokens[0]);
+    // Sort with ranking boosts
+    return results
+      .map(r => ({ score: applyBoosts(r.score ?? 0, r.item.original), item: r.item }))
+      .sort((a, b) => a.score - b.score)
+      .map(r => r.item.original);
+  }
+
+  // Multi-token: search once per token, intersect results
+  const tokenResultMaps = tokens.map(token => {
+    const results = fuse.search(token);
+    return new Map(results.map(r => [r.item.id, { score: r.score ?? 1, item: r.item }]));
+  });
+
+  // Find items present in ALL token results, sum scores
+  const firstMap = tokenResultMaps[0];
+  const intersection: Array<{ totalScore: number; item: SearchableIssue }> = [];
+
+  for (const [id, { score, item }] of firstMap) {
+    let totalScore = score;
+    let inAll = true;
+
+    for (let i = 1; i < tokenResultMaps.length; i++) {
+      const match = tokenResultMaps[i].get(id);
+      if (!match) {
+        inAll = false;
+        break;
+      }
+      totalScore += match.score;
+    }
+
+    if (inAll) {
+      // Apply ranking boosts to total score
+      totalScore = applyBoosts(totalScore, item.original);
+      intersection.push({ totalScore, item });
+    }
+  }
+
+  // Sort by combined score (lower is better)
+  intersection.sort((a, b) => a.totalScore - b.totalScore);
+
+  return intersection.map((i) => i.item.original);
+}
 
 interface IssueQuickPickItem extends vscode.QuickPickItem {
   issue?: Issue;
@@ -64,17 +343,18 @@ export async function pickIssueWithSearch(
     return undefined;
   }
 
-  // Filter out issues from projects without time_tracking enabled
+  // Fetch project path map (cached) + check time_tracking in parallel
   const projectIds = [...new Set(issues.map(i => i.project?.id).filter(Boolean))] as number[];
   const timeTrackingByProject = new Map<number, boolean>();
 
-  // Check time_tracking for all projects in parallel
-  await Promise.all(
-    projectIds.map(async (projectId) => {
+  const [projectPathMap] = await Promise.all([
+    getProjectPathMap(server),
+    // Check time_tracking for all projects
+    ...projectIds.map(async (projectId) => {
       const enabled = await server.isTimeTrackingEnabled(projectId);
       timeTrackingByProject.set(projectId, enabled);
-    })
-  );
+    }),
+  ]);
 
   // Build issue list: trackable issues first, then non-trackable (disabled)
   const trackableIssues = issues.filter(
@@ -89,14 +369,14 @@ export async function pickIssueWithSearch(
     // Trackable issues (selectable)
     ...trackableIssues.map((issue) => ({
       label: `#${issue.id} ${issue.subject}`,
-      description: issue.project?.name,
+      description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
       issue,
       disabled: false,
     })),
     // Non-trackable issues (disabled, greyed out)
     ...nonTrackableIssues.map((issue) => ({
       label: `$(circle-slash) #${issue.id} ${issue.subject}`,
-      description: `${issue.project?.name ?? "Unknown"} (no time tracking)`,
+      description: `${projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name ?? "Unknown"} (no time tracking)`,
       issue,
       disabled: true,
     })),
@@ -154,70 +434,19 @@ export async function pickIssueWithSearch(
       quickPick.busy = true;
 
       try {
-        const lowerQuery = query.toLowerCase();
         const cleanQuery = query.replace(/^#/, "");
         const possibleId = parseInt(cleanQuery, 10);
         const isNumericQuery = !isNaN(possibleId) && cleanQuery === String(possibleId);
 
-        // 1. Search local assigned issues
-        const localMatches = issues.filter((issue) =>
-          String(issue.id).includes(cleanQuery) ||
-          issue.subject.toLowerCase().includes(lowerQuery) ||
-          issue.project?.name?.toLowerCase().includes(lowerQuery)
+        // Use shared search helper
+        const { results: allResults, exactMatchError } = await searchIssuesWithFuzzy(
+          server,
+          query,
+          issues,
+          projectPathMap
         );
 
-        // 2. Parallel: exact ID fetch + server text search
-        type SearchResult = {
-          exactMatch: Issue | null;
-          exactMatchError: string | null;
-          serverResults: Issue[];
-        };
-
-        const searchResult: SearchResult = { exactMatch: null, exactMatchError: null, serverResults: [] };
-
-        await Promise.all([
-          (async () => {
-            if (isNumericQuery) {
-              try {
-                const result = await server.getIssueById(possibleId);
-                searchResult.exactMatch = result.issue;
-              } catch (error: unknown) {
-                if (error instanceof Error) {
-                  searchResult.exactMatchError = error.message.includes("403") ? "no access" :
-                                   error.message.includes("404") ? "not found" : null;
-                }
-              }
-            }
-          })(),
-          (async () => {
-            searchResult.serverResults = await server.searchIssues(query, 10);
-          })(),
-        ]);
-
-        const { exactMatch, exactMatchError, serverResults } = searchResult;
-
-        // 3. Merge results
-        const seenIds = new Set<number>();
-        const allResults: Issue[] = [];
-
-        if (exactMatch) {
-          allResults.push(exactMatch);
-          seenIds.add(exactMatch.id);
-        }
-        for (const issue of localMatches) {
-          if (!seenIds.has(issue.id)) {
-            allResults.push(issue);
-            seenIds.add(issue.id);
-          }
-        }
-        for (const issue of serverResults) {
-          if (!seenIds.has(issue.id)) {
-            allResults.push(issue);
-            seenIds.add(issue.id);
-          }
-        }
-
-        // 4. Check time tracking for new projects
+        // Check time tracking for new projects
         const newProjectIds = [...new Set(
           allResults
             .map(i => i.project?.id)
@@ -244,14 +473,7 @@ export async function pickIssueWithSearch(
           return projectId !== null && projectId !== undefined && timeTrackingByProject.get(projectId) === true;
         });
 
-        // Sort: assigned issues first
-        trackableResults.sort((a, b) => {
-          const aAssigned = assignedIds.has(a.id);
-          const bAssigned = assignedIds.has(b.id);
-          if (aAssigned && !bAssigned) return -1;
-          if (!aAssigned && bAssigned) return 1;
-          return b.id - a.id;
-        });
+        // Note: Results are already sorted by fuzzy relevance - don't override
 
         // 6. Check if results are still relevant
         if (thisSearchVersion !== searchVersion || resolved) return;
@@ -264,6 +486,7 @@ export async function pickIssueWithSearch(
           resultItems.push({
             label: `$(error) #${possibleId} ${exactMatchError}`,
             disabled: true,
+            alwaysShow: true,
           });
         }
 
@@ -271,6 +494,7 @@ export async function pickIssueWithSearch(
           resultItems.push({
             label: `$(info) No results for "${query}"`,
             disabled: true,
+            alwaysShow: true,
           });
         }
 
@@ -278,18 +502,25 @@ export async function pickIssueWithSearch(
           const isAssigned = assignedIds.has(issue.id);
           const icon = isAssigned ? "$(account)" : "$(search)";
           const assignedTag = isAssigned ? " (assigned)" : "";
+          // Use full project path for description (enables fuzzy match on parent projects)
+          const projectPath = projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name ?? "";
           resultItems.push({
             label: `${icon} #${issue.id} ${issue.subject}`,
-            description: `${issue.project?.name ?? ""}${assignedTag}`,
+            description: `${projectPath}${assignedTag}`,
             detail: issue.status?.name,
             issue,
+            alwaysShow: true,  // Bypass VSCode's built-in filter
           });
         }
+
+        // Filter baseItems to exclude issues already in search results
+        const resultIds = new Set(limitedResults.map(i => i.id));
+        const filteredBaseItems = baseItems.filter(item => !item.issue || !resultIds.has(item.issue.id));
 
         quickPick.items = [
           ...resultItems,
           { label: "", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem,
-          ...baseItems,
+          ...filteredBaseItems,
         ];
       } catch {
         if (thisSearchVersion === searchVersion && !resolved) {
@@ -418,18 +649,18 @@ export async function pickIssue(
     return undefined;
   }
 
-  // Check time_tracking for all projects (unless skipped)
+  // Fetch project path map (cached) + check time_tracking in parallel
   const timeTrackingByProject = new Map<number, boolean>();
+  const projectIds = [...new Set(issues.map(i => i.project?.id).filter(Boolean))] as number[];
 
-  if (!skipTimeTrackingCheck) {
-    const projectIds = [...new Set(issues.map(i => i.project?.id).filter(Boolean))] as number[];
-    await Promise.all(
-      projectIds.map(async (projectId) => {
-        const enabled = await server.isTimeTrackingEnabled(projectId);
-        timeTrackingByProject.set(projectId, enabled);
-      })
-    );
-  }
+  const [projectPathMap] = await Promise.all([
+    getProjectPathMap(server),
+    // Check time_tracking for all projects (unless skipped)
+    ...(skipTimeTrackingCheck ? [] : projectIds.map(async (projectId) => {
+      const enabled = await server.isTimeTrackingEnabled(projectId);
+      timeTrackingByProject.set(projectId, enabled);
+    })),
+  ]);
 
   // Build base items
   let baseItems: IssueQuickPickItem[];
@@ -438,7 +669,7 @@ export async function pickIssue(
     // All issues selectable
     baseItems = issues.map((issue) => ({
       label: `#${issue.id} ${issue.subject}`,
-      description: issue.project?.name,
+      description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
       issue,
       disabled: false,
     }));
@@ -454,13 +685,13 @@ export async function pickIssue(
     baseItems = [
       ...trackableIssues.map((issue) => ({
         label: `#${issue.id} ${issue.subject}`,
-        description: issue.project?.name,
+        description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
         issue,
         disabled: false,
       })),
       ...nonTrackableIssues.map((issue) => ({
         label: `$(circle-slash) #${issue.id} ${issue.subject}`,
-        description: `${issue.project?.name ?? "Unknown"} (no time tracking)`,
+        description: `${projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name ?? "Unknown"} (no time tracking)`,
         issue,
         disabled: true,
       })),
@@ -497,55 +728,13 @@ export async function pickIssue(
       quickPick.busy = true;
 
       try {
-        const lowerQuery = query.toLowerCase();
-        const cleanQuery = query.replace(/^#/, "");
-        const possibleId = parseInt(cleanQuery, 10);
-        const isNumericQuery = !isNaN(possibleId) && cleanQuery === String(possibleId);
-
-        // Search local + server in parallel
-        const localMatches = issues.filter((issue) =>
-          String(issue.id).includes(cleanQuery) ||
-          issue.subject.toLowerCase().includes(lowerQuery) ||
-          issue.project?.name?.toLowerCase().includes(lowerQuery)
+        // Use shared search helper
+        const { results: allResults } = await searchIssuesWithFuzzy(
+          server,
+          query,
+          issues,
+          projectPathMap
         );
-
-        type SearchResult = { exactMatch: Issue | null; serverResults: Issue[] };
-        const searchResult: SearchResult = { exactMatch: null, serverResults: [] };
-
-        await Promise.all([
-          (async () => {
-            if (isNumericQuery) {
-              try {
-                const result = await server.getIssueById(possibleId);
-                searchResult.exactMatch = result.issue;
-              } catch { /* ignore */ }
-            }
-          })(),
-          (async () => {
-            searchResult.serverResults = await server.searchIssues(query, 10);
-          })(),
-        ]);
-
-        // Merge results
-        const seenIds = new Set<number>();
-        const allResults: Issue[] = [];
-
-        if (searchResult.exactMatch) {
-          allResults.push(searchResult.exactMatch);
-          seenIds.add(searchResult.exactMatch.id);
-        }
-        for (const issue of localMatches) {
-          if (!seenIds.has(issue.id)) {
-            allResults.push(issue);
-            seenIds.add(issue.id);
-          }
-        }
-        for (const issue of searchResult.serverResults) {
-          if (!seenIds.has(issue.id)) {
-            allResults.push(issue);
-            seenIds.add(issue.id);
-          }
-        }
 
         if (thisSearchVersion !== searchVersion || resolved) return;
 
@@ -571,26 +760,30 @@ export async function pickIssue(
         const limitedResults = allResults.slice(0, 15);
 
         const resultItems: IssueQuickPickItem[] = limitedResults.length === 0
-          ? [{ label: `$(info) No results for "${query}"`, disabled: true }]
+          ? [{ label: `$(info) No results for "${query}"`, disabled: true, alwaysShow: true }]
           : limitedResults.map((issue) => {
               const isAssigned = assignedIds.has(issue.id);
               const projectId = issue.project?.id;
               const hasTimeTracking = skipTimeTrackingCheck || (projectId ? timeTrackingByProject.get(projectId) : false);
+              // Use full project path for description (enables fuzzy match on parent projects)
+              const projectPath = projectPathMap.get(projectId ?? 0) ?? issue.project?.name ?? "";
               if (!hasTimeTracking) {
                 return {
                   label: `$(circle-slash) #${issue.id} ${issue.subject}`,
-                  description: `${issue.project?.name ?? "Unknown"} (no time tracking)`,
+                  description: `${projectPath} (no time tracking)`,
                   detail: issue.status?.name,
                   issue,
                   disabled: true,
+                  alwaysShow: true,
                 };
               }
               const icon = isAssigned ? "$(account)" : "$(search)";
               return {
                 label: `${icon} #${issue.id} ${issue.subject}`,
-                description: `${issue.project?.name ?? ""}${isAssigned ? " (assigned)" : ""}`,
+                description: `${projectPath}${isAssigned ? " (assigned)" : ""}`,
                 detail: issue.status?.name,
                 issue,
+                alwaysShow: true,  // Bypass VSCode's built-in filter
               };
             });
 

@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -1582,50 +1582,134 @@
         }
       ],
       "redmyne.gantt.autoUpdateMenu": [
-        { "command": "redmyne.gantt.autoUpdateOn", "group": "1_toggle@1" },
-        { "command": "redmyne.gantt.autoUpdateOff", "group": "1_toggle@2" }
+        {
+          "command": "redmyne.gantt.autoUpdateOn",
+          "group": "1_toggle@1"
+        },
+        {
+          "command": "redmyne.gantt.autoUpdateOff",
+          "group": "1_toggle@2"
+        }
       ],
       "redmyne.gantt.adHocMenu": [
-        { "command": "redmyne.gantt.adHocOn", "group": "1_toggle@1" },
-        { "command": "redmyne.gantt.adHocOff", "group": "1_toggle@2" }
+        {
+          "command": "redmyne.gantt.adHocOn",
+          "group": "1_toggle@1"
+        },
+        {
+          "command": "redmyne.gantt.adHocOff",
+          "group": "1_toggle@2"
+        }
       ],
       "redmyne.gantt.precedenceMenu": [
-        { "command": "redmyne.gantt.precedenceOn", "group": "1_toggle@1" },
-        { "command": "redmyne.gantt.precedenceOff", "group": "1_toggle@2" }
+        {
+          "command": "redmyne.gantt.precedenceOn",
+          "group": "1_toggle@1"
+        },
+        {
+          "command": "redmyne.gantt.precedenceOff",
+          "group": "1_toggle@2"
+        }
       ],
       "redmyne.gantt.internalEstimateMenu": [
-        { "command": "redmyne.gantt.setInternalEstimate", "group": "1_estimate@1" },
-        { "command": "redmyne.gantt.clearInternalEstimate", "group": "1_estimate@2" }
+        {
+          "command": "redmyne.gantt.setInternalEstimate",
+          "group": "1_estimate@1"
+        },
+        {
+          "command": "redmyne.gantt.clearInternalEstimate",
+          "group": "1_estimate@2"
+        }
       ],
       "redmyne.doneRatioMenu": [
-        { "command": "redmyne.setDoneRatio0", "group": "1_percentages@1" },
-        { "command": "redmyne.setDoneRatio10", "group": "1_percentages@2" },
-        { "command": "redmyne.setDoneRatio20", "group": "1_percentages@3" },
-        { "command": "redmyne.setDoneRatio30", "group": "1_percentages@4" },
-        { "command": "redmyne.setDoneRatio40", "group": "1_percentages@5" },
-        { "command": "redmyne.setDoneRatio50", "group": "1_percentages@6" },
-        { "command": "redmyne.setDoneRatio60", "group": "1_percentages@7" },
-        { "command": "redmyne.setDoneRatio70", "group": "1_percentages@8" },
-        { "command": "redmyne.setDoneRatio80", "group": "1_percentages@9" },
-        { "command": "redmyne.setDoneRatio90", "group": "1_percentages@10" },
-        { "command": "redmyne.setDoneRatio100", "group": "1_percentages@11" },
-        { "command": "redmyne.setDoneRatioCustom", "group": "2_custom@1" }
+        {
+          "command": "redmyne.setDoneRatio0",
+          "group": "1_percentages@1"
+        },
+        {
+          "command": "redmyne.setDoneRatio10",
+          "group": "1_percentages@2"
+        },
+        {
+          "command": "redmyne.setDoneRatio20",
+          "group": "1_percentages@3"
+        },
+        {
+          "command": "redmyne.setDoneRatio30",
+          "group": "1_percentages@4"
+        },
+        {
+          "command": "redmyne.setDoneRatio40",
+          "group": "1_percentages@5"
+        },
+        {
+          "command": "redmyne.setDoneRatio50",
+          "group": "1_percentages@6"
+        },
+        {
+          "command": "redmyne.setDoneRatio60",
+          "group": "1_percentages@7"
+        },
+        {
+          "command": "redmyne.setDoneRatio70",
+          "group": "1_percentages@8"
+        },
+        {
+          "command": "redmyne.setDoneRatio80",
+          "group": "1_percentages@9"
+        },
+        {
+          "command": "redmyne.setDoneRatio90",
+          "group": "1_percentages@10"
+        },
+        {
+          "command": "redmyne.setDoneRatio100",
+          "group": "1_percentages@11"
+        },
+        {
+          "command": "redmyne.setDoneRatioCustom",
+          "group": "2_custom@1"
+        }
       ],
       "redmyne.autoUpdateMenu": [
-        { "command": "redmyne.autoUpdateOn", "group": "1_toggle@1" },
-        { "command": "redmyne.autoUpdateOff", "group": "1_toggle@2" }
+        {
+          "command": "redmyne.autoUpdateOn",
+          "group": "1_toggle@1"
+        },
+        {
+          "command": "redmyne.autoUpdateOff",
+          "group": "1_toggle@2"
+        }
       ],
       "redmyne.adHocMenu": [
-        { "command": "redmyne.adHocOn", "group": "1_toggle@1" },
-        { "command": "redmyne.adHocOff", "group": "1_toggle@2" }
+        {
+          "command": "redmyne.adHocOn",
+          "group": "1_toggle@1"
+        },
+        {
+          "command": "redmyne.adHocOff",
+          "group": "1_toggle@2"
+        }
       ],
       "redmyne.precedenceMenu": [
-        { "command": "redmyne.precedenceOn", "group": "1_toggle@1" },
-        { "command": "redmyne.precedenceOff", "group": "1_toggle@2" }
+        {
+          "command": "redmyne.precedenceOn",
+          "group": "1_toggle@1"
+        },
+        {
+          "command": "redmyne.precedenceOff",
+          "group": "1_toggle@2"
+        }
       ],
       "redmyne.internalEstimateMenu": [
-        { "command": "redmyne.setInternalEstimate", "group": "1_estimate@1" },
-        { "command": "redmyne.clearInternalEstimate", "group": "1_estimate@2" }
+        {
+          "command": "redmyne.setInternalEstimate",
+          "group": "1_estimate@1"
+        },
+        {
+          "command": "redmyne.clearInternalEstimate",
+          "group": "1_estimate@2"
+        }
       ],
       "webview/context": [
         {
@@ -2011,6 +2095,7 @@
     "vitest": "^4.0.13"
   },
   "dependencies": {
-    "date-fns": "^4.1.0"
+    "date-fns": "^4.1.0",
+    "fuse.js": "^7.1.0"
   }
 }

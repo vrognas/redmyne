@@ -2,6 +2,12 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.1.0]
+
+### Added
+
+- **Fuzzy issue search** - multi-term queries like "nuvalent non" now match issues across subject + project name (uses fuse.js)
+
 ## [4.0.0]
 
 ### BREAKING CHANGES
