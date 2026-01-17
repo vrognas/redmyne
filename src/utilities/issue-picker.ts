@@ -209,16 +209,6 @@ const NON_ASSIGNED_PENALTY = 1.0;  // Non-assigned below assigned
 const CLOSED_PENALTY = 0.5;        // Closed below open
 const RECENT_BOOST = -0.3;         // Recent issues get priority
 
-// Status weights: lower = higher priority
-// In progress > New > Resolved > Feedback > other > Closed
-const STATUS_WEIGHTS: Record<string, number> = {
-  "In Progress": 0,
-  "New": 0.05,
-  "Resolved": 0.1,
-  "Feedback": 0.15,
-};
-const DEFAULT_STATUS_WEIGHT = 0.2;
-
 // Fuse index cache (module-level)
 interface FuseCache {
   fuse: Fuse<SearchableIssue>;
@@ -342,12 +332,9 @@ function fuzzyFilterIssues(
       adjusted += NON_ASSIGNED_PENALTY;
     }
 
-    // Status-based weighting
-    const statusName = issue.status?.name ?? "";
+    // Closed penalty
     if (issue.status?.is_closed) {
       adjusted += CLOSED_PENALTY;
-    } else {
-      adjusted += STATUS_WEIGHTS[statusName] ?? DEFAULT_STATUS_WEIGHT;
     }
 
     return adjusted;
@@ -479,8 +466,8 @@ export async function pickIssueWithSearch(
     (issue) => !issue.project?.id || !timeTrackingByProject.get(issue.project.id)
   );
 
-  // Sort trackable issues: recent first, then by status
-  const sortByRecencyAndStatus = (a: Issue, b: Issue): number => {
+  // Sort trackable issues: recent first
+  const sortByRecency = (a: Issue, b: Issue): number => {
     const recentIssueIdsList = getRecentIssueIds();
     const aRecent = recentIssueIdsList.indexOf(a.id);
     const bRecent = recentIssueIdsList.indexOf(b.id);
@@ -489,13 +476,10 @@ export async function pickIssueWithSearch(
     // Only one recent
     if (aRecent !== -1) return -1;
     if (bRecent !== -1) return 1;
-    // Neither recent: sort by status weight
-    const aWeight = STATUS_WEIGHTS[a.status?.name ?? ""] ?? DEFAULT_STATUS_WEIGHT;
-    const bWeight = STATUS_WEIGHTS[b.status?.name ?? ""] ?? DEFAULT_STATUS_WEIGHT;
-    return aWeight - bWeight;
+    return 0;
   };
 
-  trackableIssues.sort(sortByRecencyAndStatus);
+  trackableIssues.sort(sortByRecency);
 
   // Build base items from assigned issues with visual grouping
   const recentTrackable = trackableIssues.filter(i => recentIds.has(i.id));
@@ -833,17 +817,15 @@ export async function pickIssue(
   // Get recent issue IDs for boosting
   const recentIds = new Set(getRecentIssueIds());
 
-  // Sort issues: recent first, then by status
-  const sortByRecencyAndStatus = (a: Issue, b: Issue): number => {
+  // Sort issues: recent first
+  const sortByRecency = (a: Issue, b: Issue): number => {
     const recentIssueIdsList = getRecentIssueIds();
     const aRecent = recentIssueIdsList.indexOf(a.id);
     const bRecent = recentIssueIdsList.indexOf(b.id);
     if (aRecent !== -1 && bRecent !== -1) return aRecent - bRecent;
     if (aRecent !== -1) return -1;
     if (bRecent !== -1) return 1;
-    const aWeight = STATUS_WEIGHTS[a.status?.name ?? ""] ?? DEFAULT_STATUS_WEIGHT;
-    const bWeight = STATUS_WEIGHTS[b.status?.name ?? ""] ?? DEFAULT_STATUS_WEIGHT;
-    return aWeight - bWeight;
+    return 0;
   };
 
   // Build base items with visual grouping
@@ -851,7 +833,7 @@ export async function pickIssue(
 
   if (skipTimeTrackingCheck) {
     // All issues selectable - sort by recency
-    issues.sort(sortByRecencyAndStatus);
+    issues.sort(sortByRecency);
     const recentIssues = issues.filter(i => recentIds.has(i.id));
     const otherIssues = issues.filter(i => !recentIds.has(i.id));
 
@@ -886,7 +868,7 @@ export async function pickIssue(
       (issue) => !issue.project?.id || !timeTrackingByProject.get(issue.project.id)
     );
 
-    trackableIssues.sort(sortByRecencyAndStatus);
+    trackableIssues.sort(sortByRecency);
 
     const recentTrackable = trackableIssues.filter(i => recentIds.has(i.id));
     const otherTrackable = trackableIssues.filter(i => !recentIds.has(i.id));
