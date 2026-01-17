@@ -1803,7 +1803,8 @@ export class GanttPanel {
           sortedIssues,
           this._flexibilityCache,
           this._selectedAssignee ?? "",
-          this._projects
+          this._projects,
+          this._sortBy !== null // preserve order when user has applied a sort
         );
       } else {
         // Project view: selected project and all subprojects

@@ -94,13 +94,48 @@ describe("filterIssuesForView", () => {
       selectedAssignee: null,
       currentUserName: null,
       uniqueAssignees: [],
-      selectedProjectId: null,
+      selectedProjectId: 1, // Explicitly select root project
       currentFilter: { assignee: "me", status: "any" },
       currentUserId: 10,
     });
 
     expect(result.selectedProjectId).toBe(1);
     expect(result.filteredIssues.map((issue) => issue.id).sort()).toEqual([1, 2]);
+  });
+
+  it("preserves null selectedProjectId for All Projects view", () => {
+    const proj1 = new RedmineProject({
+      id: 1,
+      name: "Project 1",
+      description: "",
+      identifier: "p1",
+    });
+    const proj2 = new RedmineProject({
+      id: 2,
+      name: "Project 2",
+      description: "",
+      identifier: "p2",
+    });
+    const issues = [
+      createIssue({ id: 1, project: { id: 1, name: "Project 1" } }),
+      createIssue({ id: 2, project: { id: 2, name: "Project 2" } }),
+    ];
+
+    const result = filterIssuesForView({
+      issues,
+      projects: [proj1, proj2],
+      viewFocus: "project",
+      selectedAssignee: null,
+      currentUserName: null,
+      uniqueAssignees: [],
+      selectedProjectId: null, // All Projects
+      currentFilter: { assignee: "any", status: "any" },
+      currentUserId: null,
+    });
+
+    // null should be preserved (All Projects) and all issues returned
+    expect(result.selectedProjectId).toBeNull();
+    expect(result.filteredIssues.map((i) => i.id).sort()).toEqual([1, 2]);
   });
 
   it("falls back to first project when selectedProjectId does not exist", () => {

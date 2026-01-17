@@ -618,7 +618,8 @@ export function buildResourceHierarchy(
   issues: Issue[],
   flexibilityCache: Map<number, FlexibilityScore | null>,
   assigneeName: string,
-  projects: RedmineProject[] = []
+  projects: RedmineProject[] = [],
+  preserveOrder = false
 ): HierarchyNode[] {
   // Filter by assignee
   const assigneeIssues = issues.filter(
@@ -678,7 +679,7 @@ export function buildResourceHierarchy(
     const projectKey = `project-${projectId}`;
 
     // Use buildIssueTree to preserve parent/child relationships
-    const children = buildIssueTree(projectIssues, flexibilityCache, projectKey, 1, false);
+    const children = buildIssueTree(projectIssues, flexibilityCache, projectKey, 1, preserveOrder);
 
     // Collect date ranges for aggregate bar
     const childDateRanges: Array<{ startDate: string | null; dueDate: string | null; issueId: number }> = [];
