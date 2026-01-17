@@ -2,8 +2,10 @@ import { describe, it, expect } from "vitest";
 import {
   createIssueTreeItem,
   createEnhancedIssueTreeItem,
+  createProjectTooltip,
 } from "../../../src/utilities/tree-item-factory";
 import { Issue } from "../../../src/redmine/models/issue";
+import { RedmineProject } from "../../../src/redmine/redmine-project";
 import { FlexibilityScore } from "../../../src/utilities/flexibility-calculator";
 
 describe("createIssueTreeItem", () => {
@@ -11,7 +13,7 @@ describe("createIssueTreeItem", () => {
     id: 7392,
     subject: "Test Issue 1234",
     tracker: { id: 1, name: "Tasks" },
-    status: { id: 1, name: "Not Yet Started" },
+    status: { id: 1, name: "Not Yet Started", is_closed: false },
     author: { id: 1, name: "Viktor Rognås" },
     project: { id: 1, name: "Test Project" },
     priority: { id: 1, name: "Normal" },
@@ -57,7 +59,7 @@ describe("createEnhancedIssueTreeItem", () => {
     id: 7392,
     subject: "Test Issue",
     tracker: { id: 1, name: "Tasks" },
-    status: { id: 1, name: "In Progress" },
+    status: { id: 1, name: "In Progress", is_closed: false },
     author: { id: 1, name: "Author" },
     project: { id: 1, name: "Test Project" },
     priority: { id: 1, name: "Normal" },
@@ -111,7 +113,7 @@ describe("createEnhancedIssueTreeItem", () => {
     expect(treeItem.description).not.toContain("At Risk");
   });
 
-  it("uses icon to convey status (not description text)", () => {
+  it("uses minimal circle icon for open issues", () => {
     const treeItem = createEnhancedIssueTreeItem(
       mockIssue,
       mockFlexibility,
@@ -119,49 +121,44 @@ describe("createEnhancedIssueTreeItem", () => {
       "test.command"
     );
 
-    // Icon should be defined and colored for status
+    // Minimal icons: open issues get neutral dot
     expect(treeItem.iconPath).toBeDefined();
     const iconPath = treeItem.iconPath as { id: string; color?: { id: string } };
-    expect(iconPath.id).toBe("git-pull-request-draft"); // on-track icon
+    expect(iconPath.id).toBe("circle-filled");
+    expect(iconPath.color?.id).toBe("list.deemphasizedForeground");
   });
 
-  it("uses error icon for overbooked status", () => {
-    const overbooked: FlexibilityScore = {
-      ...mockFlexibility,
-      remaining: -30,
-      status: "overbooked",
+  it("uses grayed pass icon for closed issues", () => {
+    const closedIssue: Issue = {
+      ...mockIssue,
+      status: { id: 5, name: "Closed", is_closed: true },
     };
 
     const treeItem = createEnhancedIssueTreeItem(
-      mockIssue,
-      overbooked,
-      undefined,
-      "test.command"
-    );
-
-    const iconPath = treeItem.iconPath as { id: string; color?: { id: string } };
-    expect(iconPath.id).toBe("error");
-    // Description should NOT contain status text
-    expect(treeItem.description).not.toContain("Overbooked");
-  });
-
-  it("uses pass icon for completed status", () => {
-    const completed: FlexibilityScore = {
-      ...mockFlexibility,
-      status: "completed",
-    };
-
-    const treeItem = createEnhancedIssueTreeItem(
-      mockIssue,
-      completed,
+      closedIssue,
+      mockFlexibility,
       undefined,
       "test.command"
     );
 
     const iconPath = treeItem.iconPath as { id: string; color?: { id: string } };
     expect(iconPath.id).toBe("pass");
+    expect(iconPath.color?.id).toBe("list.deemphasizedForeground");
+  });
+
+  it("description does not contain status text", () => {
+    const treeItem = createEnhancedIssueTreeItem(
+      mockIssue,
+      mockFlexibility,
+      undefined,
+      "test.command"
+    );
+
     // Description should NOT contain status text
+    expect(treeItem.description).not.toContain("On Track");
+    expect(treeItem.description).not.toContain("Overbooked");
     expect(treeItem.description).not.toContain("Done");
+    expect(treeItem.description).not.toContain("At Risk");
   });
 
   it("falls back to hours display when no flexibility", () => {
@@ -212,7 +209,7 @@ describe("createEnhancedIssueTreeItem", () => {
     expect(tooltipValue).toContain("Non-billable");
   });
 
-  it("uses status color for icon regardless of billability", () => {
+  it("uses same minimal icon regardless of tracker", () => {
     const billableIssue: Issue = {
       ...mockIssue,
       tracker: { id: 1, name: "Task" },
@@ -225,9 +222,10 @@ describe("createEnhancedIssueTreeItem", () => {
       "test.command"
     );
 
-    // iconPath should use status color
-    const iconPath = treeItem.iconPath as { color?: { id: string } };
-    expect(iconPath?.color?.id).toBe("testing.iconPassed");
+    // Minimal icons: all open issues use same neutral icon
+    const iconPath = treeItem.iconPath as { id: string; color?: { id: string } };
+    expect(iconPath.id).toBe("circle-filled");
+    expect(iconPath?.color?.id).toBe("list.deemphasizedForeground");
   });
 
   it("shows blocked info in tooltip not description", () => {
@@ -289,5 +287,107 @@ describe("createEnhancedIssueTreeItem", () => {
     expect(tooltipValue).toContain("#100");
     expect(tooltipValue).toContain("Blocks");
     expect(tooltipValue).toContain("#200");
+  });
+});
+
+describe("createProjectTooltip", () => {
+  it("includes project ID and name in bold", () => {
+    const project = new RedmineProject({
+      id: 1,
+      name: "Test Project",
+      description: "",
+      identifier: "test-project",
+    });
+
+    const tooltip = createProjectTooltip(project, undefined);
+    expect(tooltip.value).toContain("**#1 Test Project**");
+  });
+
+  it("includes description when present", () => {
+    const project = new RedmineProject({
+      id: 1,
+      name: "Test Project",
+      description: "Project description here",
+      identifier: "test-project",
+    });
+
+    const tooltip = createProjectTooltip(project, undefined);
+    expect(tooltip.value).toContain("Project description here");
+  });
+
+  it("includes non-empty custom fields", () => {
+    const project = new RedmineProject({
+      id: 1,
+      name: "Test Project",
+      description: "",
+      identifier: "test-project",
+      custom_fields: [
+        { id: 1, name: "Drug", value: "Aspirin" },
+        { id: 2, name: "Indication", value: "Pain relief" },
+      ],
+    });
+
+    const tooltip = createProjectTooltip(project, undefined);
+    expect(tooltip.value).toContain("**Drug:** Aspirin");
+    expect(tooltip.value).toContain("**Indication:** Pain relief");
+  });
+
+  it("excludes empty custom fields", () => {
+    const project = new RedmineProject({
+      id: 1,
+      name: "Test Project",
+      description: "",
+      identifier: "test-project",
+      custom_fields: [
+        { id: 1, name: "Drug", value: "Aspirin" },
+        { id: 2, name: "Empty", value: "" },
+        { id: 3, name: "Null", value: null },
+      ],
+    });
+
+    const tooltip = createProjectTooltip(project, undefined);
+    expect(tooltip.value).toContain("**Drug:** Aspirin");
+    expect(tooltip.value).not.toContain("**Empty:**");
+    expect(tooltip.value).not.toContain("**Null:**");
+  });
+
+  it("handles array custom field values", () => {
+    const project = new RedmineProject({
+      id: 1,
+      name: "Test Project",
+      description: "",
+      identifier: "test-project",
+      custom_fields: [
+        { id: 1, name: "Roles", multiple: true, value: ["Lead", "Analyst"] },
+      ],
+    });
+
+    const tooltip = createProjectTooltip(project, undefined);
+    expect(tooltip.value).toContain("**Roles:** Lead, Analyst");
+  });
+
+  it("includes browser link with project identifier", () => {
+    const project = new RedmineProject({
+      id: 1,
+      name: "Test Project",
+      description: "",
+      identifier: "test-project",
+    });
+
+    const server = { options: { address: "https://redmine.example.com" } };
+    const tooltip = createProjectTooltip(project, server as never);
+    expect(tooltip.value).toContain("[Open in Browser](https://redmine.example.com/projects/test-project)");
+  });
+
+  it("works without custom fields", () => {
+    const project = new RedmineProject({
+      id: 42,
+      name: "Test Project",
+      description: "",
+      identifier: "test-project",
+    });
+
+    const tooltip = createProjectTooltip(project, undefined);
+    expect(tooltip.value).toContain("**#42 Test Project**");
   });
 });

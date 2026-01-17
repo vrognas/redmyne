@@ -1,4 +1,5 @@
 import { Issue } from "../redmine/models/issue";
+import { CustomField } from "../redmine/models/common";
 import { FlexibilityScore } from "../utilities/flexibility-calculator";
 import { adHocTracker } from "../utilities/adhoc-tracker";
 import { ProjectHealth } from "../utilities/project-health";
@@ -97,6 +98,8 @@ export interface GanttRow {
   description?: string;
   /** Project identifier (for project rows) */
   identifier?: string;
+  /** Custom fields (for project rows) */
+  customFields?: CustomField[];
 }
 
 /**
@@ -201,6 +204,7 @@ export function nodeToGanttRow(
       health: node.health,
       description: node.description,
       identifier: node.identifier,
+      customFields: node.customFields,
     };
   }
 

@@ -311,7 +311,7 @@
       },
       {
         "command": "redmyne.quickCreateIssue",
-        "title": "Redmine: Quick Create Issue (Ctrl+Y N)",
+        "title": "Create Issue",
         "icon": "$(add)"
       },
       {
@@ -1317,7 +1317,7 @@
         },
         {
           "command": "redmyne.quickCreateSubIssue",
-          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/ && viewItem !~ /-child/ && view != 'redmyne-explorer-kanban' && view != 'redmyne-explorer-my-time-entries'",
+          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/ && viewItem =~ /-root$/ && view != 'redmyne-explorer-kanban' && view != 'redmyne-explorer-my-time-entries'",
           "group": "2_actions@2"
         },
         {

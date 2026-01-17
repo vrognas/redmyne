@@ -32,7 +32,12 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(node esbuild.cjs:*)",
       "Bash(npm run lint)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(curl:*)",
+      "Bash(npm run test:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git stash:*)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []

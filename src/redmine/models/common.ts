@@ -20,6 +20,16 @@ export interface TimeEntryActivity extends NamedEntity {
 }
 
 /**
+ * Custom field from Redmine API
+ */
+export interface CustomField {
+  id: number;
+  name: string;
+  multiple?: boolean;
+  value: unknown; // API can return string, string[], number, boolean, null
+}
+
+/**
  * Filter options for issue queries
  * Designed for common use cases - keeps UI simple
  */

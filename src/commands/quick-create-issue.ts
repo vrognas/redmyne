@@ -217,6 +217,10 @@ export async function quickCreateSubIssue(
       props.server.getPriorities(),
     ]);
     const parent = parentResponse.issue;
+    if (parent.parent?.id) {
+      vscode.window.showWarningMessage("Create Sub-Issue is only available for issues without a parent.");
+      return undefined;
+    }
     const prefix = `Sub-Issue of #${parent.id}`;
 
     // State machine for wizard

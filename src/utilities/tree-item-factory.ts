@@ -1,8 +1,10 @@
 import * as vscode from "vscode";
 import { Issue, IssueRelation } from "../redmine/models/issue";
 import { RedmineServer } from "../redmine/redmine-server";
+import { RedmineProject } from "../redmine/redmine-project";
 import { FlexibilityScore } from "./flexibility-calculator";
 import { formatHoursAsHHMM } from "./time-input";
+import { formatCustomFieldValue } from "./custom-field-formatter";
 
 /**
  * Creates a VS Code TreeItem for displaying a Redmine issue
@@ -34,13 +36,13 @@ export function createIssueTreeItem(
 }
 
 /**
- * Status display text and icons for flexibility scores
+ * Status display text for flexibility scores (used in tooltips)
  */
-const STATUS_CONFIG = {
-  completed: { icon: "pass", color: "testing.iconPassed", text: "Done" },
-  "on-track": { icon: "git-pull-request-draft", color: "testing.iconPassed", text: "On Track" },
-  "at-risk": { icon: "warning", color: "list.warningForeground", text: "At Risk" },
-  overbooked: { icon: "error", color: "list.errorForeground", text: "Overbooked" },
+const STATUS_TEXT = {
+  completed: "Done",
+  "on-track": "On Track",
+  "at-risk": "At Risk",
+  overbooked: "Overbooked",
 } as const;
 
 /**
@@ -75,40 +77,29 @@ export function createEnhancedIssueTreeItem(
   const spentHours = issue.spent_hours ?? 0;
   const estHours = issue.estimated_hours ?? 0;
   const hasDescription = !!issue.description?.trim();
+  const isClosed = issue.status?.is_closed === true;
+  const parentSuffix = issue.parent ? "-child" : "-root";
 
-  if (flexibility) {
-    const config = STATUS_CONFIG[flexibility.status];
-
-    // Reduced density: just hours and days, no status text or prefixes
-    // Status is conveyed via icon color, blocked/billable in tooltip
-    const baseDesc = `${formatHoursAsHHMM(spentHours)}/${formatHoursAsHHMM(estHours)} • ${flexibility.daysRemaining}d`;
-    const descIndicator = hasDescription ? " ⋯" : "";
-    treeItem.description = assignee ? `${baseDesc} • ${assignee}${descIndicator}` : `${baseDesc}${descIndicator}`;
-
-    // Icon color conveys status (no text needed)
-    const iconColor = new vscode.ThemeColor(config.color);
-    treeItem.iconPath = new vscode.ThemeIcon(config.icon, iconColor);
-
-    // Rich tooltip with full details including blocked/billable info
-    treeItem.tooltip = createFlexibilityTooltip(issue, flexibility, server);
-
-    // Context value for menus - append -child suffix if issue has parent
-    const childSuffix = issue.parent ? "-child" : "";
-    treeItem.contextValue =
-      flexibility.status === "completed" ? `issue-completed${childSuffix}` : `issue-active${childSuffix}`;
+  // Minimal icons: closed = grayed checkmark, open = neutral dot
+  if (isClosed) {
+    treeItem.iconPath = new vscode.ThemeIcon("pass", new vscode.ThemeColor("list.deemphasizedForeground"));
+    treeItem.contextValue = `issue-completed${parentSuffix}`;
   } else {
-    // No flexibility data - show hours only, neutral icon
-    const baseDesc = `${formatHoursAsHHMM(spentHours)}/${formatHoursAsHHMM(estHours)}`;
-    const descIndicator = hasDescription ? " ⋯" : "";
-    treeItem.description = assignee ? `${baseDesc} • ${assignee}${descIndicator}` : `${baseDesc}${descIndicator}`;
-    treeItem.iconPath = new vscode.ThemeIcon("circle-outline", new vscode.ThemeColor("list.deemphasizedForeground"));
-    // Append -child suffix if issue has parent
-    const childSuffix = issue.parent ? "-child" : "";
-    treeItem.contextValue = `issue${childSuffix}`;
-
-    // Basic tooltip without flexibility
-    treeItem.tooltip = createBasicTooltip(issue, server);
+    treeItem.iconPath = new vscode.ThemeIcon("circle-filled", new vscode.ThemeColor("list.deemphasizedForeground"));
+    treeItem.contextValue = `issue-active${parentSuffix}`;
   }
+
+  // Build description
+  const baseDesc = flexibility
+    ? `${formatHoursAsHHMM(spentHours)}/${formatHoursAsHHMM(estHours)} • ${flexibility.daysRemaining}d`
+    : `${formatHoursAsHHMM(spentHours)}/${formatHoursAsHHMM(estHours)}`;
+  const descIndicator = hasDescription ? " ⋯" : "";
+  treeItem.description = assignee ? `${baseDesc} • ${assignee}${descIndicator}` : `${baseDesc}${descIndicator}`;
+
+  // Tooltip: rich if flexibility data available, basic otherwise
+  treeItem.tooltip = flexibility
+    ? createFlexibilityTooltip(issue, flexibility, server)
+    : createBasicTooltip(issue, server);
 
   treeItem.command = {
     command: commandName,
@@ -127,7 +118,7 @@ function createFlexibilityTooltip(
   flexibility: FlexibilityScore,
   server: RedmineServer | undefined
 ): vscode.MarkdownString {
-  const config = STATUS_CONFIG[flexibility.status];
+  const statusText = STATUS_TEXT[flexibility.status];
   const spentHours = issue.spent_hours ?? 0;
   const estHours = issue.estimated_hours ?? 0;
   const progress = estHours > 0 ? Math.round((spentHours / estHours) * 100) : 0;
@@ -136,7 +127,10 @@ function createFlexibilityTooltip(
   md.isTrusted = true;
   md.supportHtml = true;
 
-  md.appendMarkdown(`**#${issue.id}: ${issue.subject.trim()}**\n\n`);
+  const subject = issue.subject?.trim();
+  const subjectText = subject ? subject : "Unknown";
+
+  md.appendMarkdown(`**#${issue.id}: ${subjectText}**\n\n`);
   md.appendMarkdown(`**Tracker:** ${issue.tracker?.name?.trim() ?? "Unknown"}\n\n`);
   md.appendMarkdown(`**Priority:** ${issue.priority?.name?.trim() ?? "Unknown"}\n\n`);
   md.appendMarkdown(`**Progress:** ${formatHoursAsHHMM(spentHours)} / ${formatHoursAsHHMM(estHours)} (${progress}%)\n\n`);
@@ -149,7 +143,7 @@ function createFlexibilityTooltip(
     );
   }
 
-  md.appendMarkdown(`**Status:** ${config.text}\n\n`);
+  md.appendMarkdown(`**Status:** ${statusText}\n\n`);
 
   // Add description if present
   if (issue.description?.trim()) {
@@ -186,7 +180,10 @@ function createBasicTooltip(
   md.isTrusted = true;
   md.supportHtml = true;
 
-  md.appendMarkdown(`**#${issue.id}: ${issue.subject.trim()}**\n\n`);
+  const subject = issue.subject?.trim();
+  const subjectText = subject ? subject : "Unknown";
+
+  md.appendMarkdown(`**#${issue.id}: ${subjectText}**\n\n`);
   md.appendMarkdown(`**Tracker:** ${issue.tracker?.name?.trim() ?? "Unknown"}\n\n`);
   md.appendMarkdown(`**Priority:** ${issue.priority?.name?.trim() ?? "Unknown"}\n\n`);
   md.appendMarkdown(`**Status:** ${issue.status?.name?.trim() ?? "Unknown"}\n\n`);
@@ -270,4 +267,41 @@ function formatRelations(relations: IssueRelation[]): string {
   }
 
   return lines.join("");
+}
+
+/**
+ * Creates tooltip for project tree items
+ */
+export function createProjectTooltip(
+  project: RedmineProject,
+  server: RedmineServer | undefined
+): vscode.MarkdownString {
+  const md = new vscode.MarkdownString();
+  md.isTrusted = true;
+  md.supportHtml = true;
+
+  md.appendMarkdown("**");
+  md.appendText(`#${project.id} ${project.name}`);
+  md.appendMarkdown("**\n\n");
+
+  if (project.description?.trim()) {
+    md.appendMarkdown(`${project.description.trim()}\n\n---\n\n`);
+  }
+
+  // Non-empty custom fields only
+  for (const cf of project.customFields) {
+    const val = formatCustomFieldValue(cf.value);
+    if (val) {
+      md.appendMarkdown("**");
+      md.appendText(`${cf.name}:`);
+      md.appendMarkdown("** ");
+      md.appendText(val);
+      md.appendMarkdown("\n\n");
+    }
+  }
+
+  if (server) {
+    md.appendMarkdown(`[Open in Browser](${server.options.address}/projects/${project.identifier})`);
+  }
+  return md;
 }

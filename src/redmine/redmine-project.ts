@@ -1,5 +1,5 @@
 import { QuickPickItem } from "vscode";
-import { NamedEntity } from "./models/common";
+import { NamedEntity, CustomField } from "./models/common";
 
 export interface RedmineProjectOptions {
   /**
@@ -12,6 +12,7 @@ export interface RedmineProjectOptions {
   description: string;
   identifier: string;
   parent?: NamedEntity;
+  custom_fields?: CustomField[];
 }
 
 export interface ProjectQuickPickItem extends QuickPickItem {
@@ -40,6 +41,10 @@ export class RedmineProject {
 
   get description() {
     return this.options.description || "";
+  }
+
+  get customFields(): CustomField[] {
+    return this.options.custom_fields ?? [];
   }
 
   toQuickPickItem(): ProjectQuickPickItem {

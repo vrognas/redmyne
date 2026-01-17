@@ -1,5 +1,6 @@
 import { Issue } from "../redmine/models/issue";
 import { RedmineProject } from "../redmine/redmine-project";
+import { CustomField } from "../redmine/models/common";
 import { FlexibilityScore } from "./flexibility-calculator";
 import { sortIssuesByRisk } from "./issue-sorting";
 import { groupBy } from "./collection-utils";
@@ -43,6 +44,8 @@ export interface HierarchyNode {
   description?: string;
   /** Project identifier (for project nodes) */
   identifier?: string;
+  /** Custom fields (for project nodes) */
+  customFields?: CustomField[];
 }
 
 export interface HierarchyOptions {
@@ -181,6 +184,7 @@ export function buildProjectHierarchy(
       parentKey,
       description: project.description,
       identifier: project.identifier,
+      customFields: project.customFields,
     };
 
     // Collect child date ranges for aggregate bar rendering
@@ -613,7 +617,8 @@ export function buildMyWorkHierarchy(
 export function buildResourceHierarchy(
   issues: Issue[],
   flexibilityCache: Map<number, FlexibilityScore | null>,
-  assigneeName: string
+  assigneeName: string,
+  projects: RedmineProject[] = []
 ): HierarchyNode[] {
   // Filter by assignee
   const assigneeIssues = issues.filter(
@@ -621,13 +626,28 @@ export function buildResourceHierarchy(
   );
   if (assigneeIssues.length === 0) return [];
 
+  const projectMap = new Map<number, RedmineProject>(
+    projects.map((project) => [project.id, project])
+  );
+
+  // Drop issues from projects that are not in the current project list.
+  const visibleIssues = projectMap.size > 0
+    ? assigneeIssues.filter((issue) => {
+        const projectId = issue.project?.id;
+        return projectId !== undefined && projectMap.has(projectId);
+      })
+    : assigneeIssues;
+
+  if (visibleIssues.length === 0) return [];
+
   // Group by project
   const byProject = new Map<number, { name: string; issues: Issue[] }>();
-  for (const issue of assigneeIssues) {
+  for (const issue of visibleIssues) {
     const projectId = issue.project?.id ?? 0;
     const projectName = issue.project?.name ?? "Unknown";
     if (!byProject.has(projectId)) {
-      byProject.set(projectId, { name: projectName, issues: [] });
+      const resolvedName = projectMap.get(projectId)?.name ?? projectName;
+      byProject.set(projectId, { name: resolvedName, issues: [] });
     }
     byProject.get(projectId)!.issues.push(issue);
   }
@@ -666,15 +686,20 @@ export function buildResourceHierarchy(
       childDateRanges.push(...collectChildDateRanges(child));
     }
 
+    const project = projectMap.get(projectId);
+
     return {
       type: "project" as const,
       id: projectId,
-      label: name,
+      label: project?.name ?? name,
       depth: 0,
       children,
       collapseKey: projectKey,
       parentKey: null,
       childDateRanges,
+      description: project?.description,
+      identifier: project?.identifier,
+      customFields: project?.customFields,
     };
   });
 }
@@ -747,3 +772,6 @@ export function flattenHierarchyAll(
   traverse(nodes, true);
   return result;
 }
+
+
+

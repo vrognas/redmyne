@@ -155,6 +155,13 @@ export class MarkdownString {
     this.value += value;
     return this;
   }
+
+  appendText(value: string): this {
+    // In real VS Code, this escapes markdown characters
+    // For testing, we just append the text as-is
+    this.value += value;
+    return this;
+  }
 }
 
 export class ThemeColor {

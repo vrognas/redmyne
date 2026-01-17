@@ -102,4 +102,40 @@ describe("filterIssuesForView", () => {
     expect(result.selectedProjectId).toBe(1);
     expect(result.filteredIssues.map((issue) => issue.id).sort()).toEqual([1, 2]);
   });
+
+  it("falls back to first project when selectedProjectId does not exist", () => {
+    const proj1 = new RedmineProject({
+      id: 10,
+      name: "Project 10",
+      description: "",
+      identifier: "p10",
+    });
+    const proj2 = new RedmineProject({
+      id: 20,
+      name: "Project 20",
+      description: "",
+      identifier: "p20",
+    });
+    const issues = [
+      createIssue({ id: 1, project: { id: 10, name: "Project 10" } }),
+      createIssue({ id: 2, project: { id: 20, name: "Project 20" } }),
+    ];
+
+    const result = filterIssuesForView({
+      issues,
+      projects: [proj1, proj2],
+      viewFocus: "project",
+      selectedAssignee: null,
+      currentUserName: null,
+      uniqueAssignees: [],
+      // Invalid project ID that doesn't exist
+      selectedProjectId: 999,
+      currentFilter: { assignee: "any", status: "any" },
+      currentUserId: null,
+    });
+
+    // Should fall back to first project (ID 10)
+    expect(result.selectedProjectId).toBe(10);
+    expect(result.filteredIssues.map((i) => i.id)).toEqual([1]);
+  });
 });

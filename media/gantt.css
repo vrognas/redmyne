@@ -303,7 +303,7 @@
     /* Help tooltip (special styling) */
     .help-dropdown { position: relative; }
     .help-tooltip {
-      display: none;
+      display: block;
       position: absolute;
       right: 0;
       top: 100%;
@@ -315,8 +315,16 @@
       box-shadow: 0 0 8px 2px var(--vscode-widget-shadow);
       z-index: 1000;
       white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.08s ease-out;
     }
-    .help-dropdown:hover .help-tooltip { display: block; }
+    .help-dropdown:hover .help-tooltip {
+      opacity: 1;
+      visibility: visible;
+      transition-delay: 300ms;
+    }
     .help-section { display: flex; flex-direction: column; gap: 3px; font-size: 11px; }
     .help-section + .help-section { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--vscode-panel-border); }
     .help-title { font-weight: 600; margin-bottom: 2px; color: var(--vscode-foreground); }
@@ -495,6 +503,8 @@
     .gantt-timeline { flex-shrink: 0; }
     svg { display: block; }
     .issue-bar:hover .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 2; }
+    .aggregate-bar { cursor: pointer; }
+    .aggregate-bar:hover { stroke: var(--vscode-focusBorder); stroke-width: 2; opacity: 0.8; }
     .issue-label:hover { opacity: 1; }
     .issue-bar.bar-past { filter: saturate(0.4) opacity(0.7); }
     .issue-bar.bar-past:hover { filter: saturate(0.6) opacity(0.85); }
@@ -506,7 +516,7 @@
     .issue-bar.bar-critical:not(.bar-overdue) .bar-outline { stroke: var(--vscode-charts-orange) !important; stroke-width: 2; animation: critical-pulse 2s ease-in-out infinite; }
     @keyframes critical-pulse { 0%, 100% { stroke-width: 2; } 50% { stroke-width: 3; } }
     /* External dependency bars (dimmed, dashed, no drag handles) */
-    .issue-bar.bar-external { opacity: 0.5; pointer-events: none; }
+    .issue-bar.bar-external { opacity: 0.5; pointer-events: auto; }
     .issue-bar.bar-external .bar-outline { stroke-dasharray: 4, 2; stroke: var(--vscode-descriptionForeground); }
     .issue-bar.bar-external .bar-main { opacity: 0.4; }
     .issue-bar.bar-external .drag-handle,
@@ -520,9 +530,9 @@
     .selection-count { margin-left: 8px; font-size: 11px; color: var(--vscode-descriptionForeground); }
     .issue-bar.parent-bar { opacity: 0.7; }
     .issue-bar.parent-bar:hover { opacity: 1; }
-    .past-overlay { pointer-events: none; }
-    .progress-unfilled, .progress-divider { pointer-events: none; }
-    .bar-labels { pointer-events: none; }
+    .past-overlay { pointer-events: auto; }
+    .progress-unfilled, .progress-divider { pointer-events: auto; }
+    .bar-labels { pointer-events: auto; }
     .bar-labels .blocks-badge-group,
     .bar-labels .blocker-badge,
     .bar-labels .flex-badge-group,
@@ -532,7 +542,7 @@
     .status-badge-bg { pointer-events: all; }
     .status-badge { pointer-events: all; font-weight: 500; }
     .flex-badge-bg, .flex-badge { pointer-events: all; }
-    .bar-assignee { pointer-events: none; opacity: 0.85; }
+    .bar-assignee { pointer-events: auto; opacity: 0.85; }
     .bar-assignee.current-user { fill: var(--vscode-charts-blue) !important; font-weight: 600; opacity: 1; }
     .issue-bar .drag-handle:hover { fill: var(--vscode-focusBorder); opacity: 0.5; }
     .issue-bar:hover .drag-handle { fill: var(--vscode-list-hoverBackground); opacity: 0.3; }
@@ -546,7 +556,7 @@
     .issue-bar.highlighted .bar-outline { stroke: var(--vscode-focusBorder); stroke-width: 3; }
     .issue-label.highlighted { animation: highlight-pulse 0.5s ease-in-out 4; }
     .issue-bar.highlighted { animation: highlight-pulse 0.5s ease-in-out 4; }
-    .temp-link-arrow { pointer-events: none; }
+    .temp-link-arrow { pointer-events: auto; }
     .dependency-arrow .arrow-line { transition: stroke-width 0.15s, filter 0.15s; }
     .dependency-arrow .arrow-head { transition: filter 0.15s; }
     .dependency-arrow:hover .arrow-line { stroke-width: 3 !important; }
@@ -583,9 +593,19 @@
     .relation-picker button { display: block; width: 100%; padding: 4px 12px; border: none; background: transparent; color: var(--vscode-menu-foreground); text-align: left; cursor: pointer; font-size: 13px; }
     .relation-picker button:hover, .relation-picker button:focus { background: var(--vscode-menu-selectionBackground); color: var(--vscode-menu-selectionForeground); }
     /* Drag date tooltip */
-    .drag-date-tooltip { position: fixed; pointer-events: none; z-index: 1000; background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-editorWidget-border); border-radius: 3px; box-shadow: 0 2px 4px var(--vscode-widget-shadow); padding: 3px 6px; font-size: 11px; font-family: var(--vscode-font-family); color: var(--vscode-editorWidget-foreground); white-space: nowrap; transform: translateX(-50%); }
+    .drag-date-tooltip { position: fixed; pointer-events: auto; z-index: 1000; background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-editorWidget-border); border-radius: 3px; box-shadow: 0 2px 4px var(--vscode-widget-shadow); padding: 3px 6px; font-size: 11px; font-family: var(--vscode-font-family); color: var(--vscode-editorWidget-foreground); white-space: nowrap; transform: translateX(-50%); }
     .drag-date-tooltip::after { content: ''; position: absolute; left: 50%; transform: translateX(-50%); bottom: -5px; border: 5px solid transparent; border-top-color: var(--vscode-editorWidget-border); }
     .drag-date-tooltip.flipped::after { bottom: auto; top: -5px; border-top-color: transparent; border-bottom-color: var(--vscode-editorWidget-border); }
+    /* Gantt custom tooltip */
+    .gantt-tooltip { position: fixed; pointer-events: auto; z-index: 1000; max-width: 360px; padding: 6px 8px; border-radius: 4px; background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background)); border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-editorWidget-border)); color: var(--vscode-editorHoverWidget-foreground, var(--vscode-editorWidget-foreground)); box-shadow: 0 2px 8px var(--vscode-widget-shadow); font-family: var(--vscode-font-family); font-size: calc(var(--vscode-font-size) - 1px); line-height: 1.4; opacity: 0; visibility: hidden; transition: opacity 0.08s ease-out; }
+    .gantt-tooltip.visible { opacity: 1; visibility: visible; }
+    .gantt-tooltip-line { white-space: pre-wrap; word-break: break-word; }
+    .gantt-tooltip-key { font-weight: 600; }
+    .gantt-tooltip-title { font-weight: 600; }
+    .gantt-tooltip-divider { border-top: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-editorWidget-border)); margin: 4px 0; }
+    .gantt-tooltip-spacer { height: 4px; }
+    .gantt-tooltip a { color: var(--vscode-textLink-foreground); text-decoration: none; }
+    .gantt-tooltip a:hover { text-decoration: underline; }
     /* Drag confirmation modal */
     .drag-confirm-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 1001; display: none; align-items: center; justify-content: center; }
     .drag-confirm-modal { background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-editorWidget-border); border-radius: 6px; box-shadow: 0 4px 16px var(--vscode-widget-shadow); padding: 16px; min-width: 280px; max-width: 400px; }
@@ -609,6 +629,11 @@
     }
     .issue-label:hover text, .project-label:hover text, .time-group-label:hover text {
       fill: var(--vscode-list-hoverForeground) !important;
+    }
+    .issue-label text,
+    .project-label text,
+    .time-group-label text {
+      pointer-events: auto;
     }
     .issue-label:focus, .project-label:focus, .time-group-label:focus {
       outline: none;
@@ -739,7 +764,7 @@
       text-align: center;
     }
     .weekend-bg { fill: var(--vscode-editor-inactiveSelectionBackground); opacity: 0.3; }
-    .zebra-stripe { fill: var(--vscode-foreground); pointer-events: none; }
+    .zebra-stripe { fill: var(--vscode-foreground); pointer-events: auto; }
     .day-grid { stroke: var(--vscode-editorRuler-foreground); stroke-width: 1; opacity: 0.25; }
     .date-marker { stroke: var(--vscode-editorRuler-foreground); stroke-dasharray: 2,2; }
     .today-marker { stroke: var(--today-color); stroke-width: 2; stroke-dasharray: 4 2; }
@@ -867,7 +892,7 @@
       stroke-width: 3;
     }
     .milestone-label {
-      pointer-events: none;
+      pointer-events: auto;
       font-family: var(--vscode-font-family);
     }
     /* Focus mode: highlight dependency chain */
@@ -884,3 +909,7 @@
     /* Blocks badge styling */
     .blocks-badge-group { cursor: pointer; }
     .blocks-badge-group:hover .blocks-badge-bg { opacity: 0.35 !important; }
+
+
+
+

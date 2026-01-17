@@ -68,10 +68,14 @@ export function filterIssuesForView(options: {
     };
   }
 
-  const effectiveProjectId = options.selectedProjectId ?? options.projects[0]?.id ?? null;
-  const nextSelectedProjectId = effectiveProjectId && effectiveProjectId !== options.selectedProjectId
-    ? effectiveProjectId
-    : options.selectedProjectId;
+  // null = "All Projects" - don't force a specific project
+  // Only validate if a specific project is selected
+  const effectiveProjectId = options.selectedProjectId === null
+    ? null
+    : options.projects.some(p => p.id === options.selectedProjectId)
+      ? options.selectedProjectId
+      : (options.projects[0]?.id ?? null);
+  const nextSelectedProjectId = effectiveProjectId;
 
   let filteredIssues = options.issues;
   if (effectiveProjectId !== null) {

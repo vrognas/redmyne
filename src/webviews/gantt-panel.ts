@@ -26,7 +26,8 @@ import { getPrecedenceIssues, hasPrecedence, togglePrecedence } from "../utiliti
 import { autoUpdateTracker } from "../utilities/auto-update-tracker";
 import { CollapseStateManager } from "../utilities/collapse-state";
 import { debounce, DebouncedFunction } from "../utilities/debounce";
-import { IssueFilter, DEFAULT_ISSUE_FILTER, GanttViewMode } from "../redmine/models/common";
+import { IssueFilter, DEFAULT_ISSUE_FILTER, GanttViewMode, CustomField } from "../redmine/models/common";
+import { formatCustomFieldValue } from "../utilities/custom-field-formatter";
 import { parseLocalDate, getLocalToday, formatLocalDate } from "../utilities/date-utils";
 import { GanttWebviewMessage, parseLookbackYears } from "./gantt-webview-messages";
 import { escapeAttr, escapeHtml } from "./gantt-html-escape";
@@ -475,7 +476,7 @@ export class GanttPanel {
     }
 
     const panel = vscode.window.createWebviewPanel(
-      "redmineGantt",
+      "redmyneGantt",
       "Redmine Gantt",
       column,
       {
@@ -504,8 +505,10 @@ export class GanttPanel {
     const labelWidth = 250;
     const headerHeight = 40;
     const barHeight = 22; // VS Code native tree row height
-    const barGap = 10;
+    const barGap = 0;
+    const indentSize = 8;
     const rowCount = 10;
+    const timelineWidth = 600;
     const idColumnWidth = 50;
     const startDateColumnWidth = 58;
     const statusColumnWidth = 50; // Colored dot + header text
@@ -519,7 +522,7 @@ export class GanttPanel {
     const skeletonRows = Array.from({ length: rowCount }, (_, i) => {
       const y = i * (barHeight + barGap);
       const isProject = i % 3 === 0;
-      const indent = isProject ? 0 : 16;
+      const indent = isProject ? 0 : indentSize;
       // Vary bar positions and widths for visual interest
       const barStart = 50 + (i * 37) % 200;
       const barWidth = 80 + (i * 53) % 150;
@@ -574,16 +577,17 @@ export class GanttPanel {
       </g>
     `).join("");
 
+    // Zebra stripes for alternating row backgrounds
     const zebraStripes = skeletonRows
       .filter((_, i) => i % 2 === 1)
-      .map(r => `<rect x="0" y="${r.y}" width="100%" height="${barHeight + barGap}" fill="var(--vscode-list-hoverBackground)" opacity="0.15"/>`)
+      .map(r => `<rect x="0" y="${r.y}" width="100%" height="${barHeight}" fill="var(--vscode-list-hoverBackground)" opacity="0.15"/>`)
       .join("");
 
-    const bodyHeight = rowCount * (barHeight + barGap);
+    const bodyHeight = Math.max(rowCount * barHeight + barGap, 600);
 
     const html = `
   <div class="gantt-header">
-    <div class="gantt-title"></div>
+    <div class="gantt-title"><span class="loading-text">Loading issues...</span></div>
     <div class="gantt-actions" role="toolbar" aria-label="Gantt chart controls">
       <!-- Zoom -->
       <select class="toolbar-select" disabled title="Zoom level"><option>Month</option></select>
@@ -605,61 +609,69 @@ export class GanttPanel {
     </div>
   </div>
   <div class="gantt-container">
-    <div class="gantt-header-row">
-      <div class="gantt-col-status"><div class="gantt-col-header">Status</div></div>
-      <div class="gantt-col-id"><div class="gantt-col-header">#ID</div></div>
-      <div class="gantt-left-header"><div class="gantt-col-header">Task</div></div>
-      <div class="gantt-resize-handle-header"></div>
-      <div class="gantt-col-start"><div class="gantt-col-header">Start</div></div>
-      <div class="gantt-col-due"><div class="gantt-col-header">Due</div></div>
-      <div class="gantt-col-assignee"><div class="gantt-col-header">Who</div></div>
-      <div class="gantt-timeline-header">
-        <span class="loading-text">Loading issues...</span>
-      </div>
-    </div>
-    <div class="gantt-body-scroll">
-      <div class="gantt-col-status">
-        <svg width="${statusColumnWidth}" height="${bodyHeight}">
-          ${zebraStripes}
-          ${statusSvg}
-        </svg>
-      </div>
-      <div class="gantt-col-id">
-        <svg width="${idColumnWidth}" height="${bodyHeight}">
-          ${zebraStripes}
-          ${idSvg}
-        </svg>
-      </div>
-      <div class="gantt-labels">
-        <svg width="${labelWidth}" height="${bodyHeight}">
-          ${zebraStripes}
-          ${labelsSvg}
-        </svg>
-      </div>
-      <div class="gantt-resize-handle"></div>
-      <div class="gantt-col-start">
-        <svg width="${startDateColumnWidth}" height="${bodyHeight}">
-          ${zebraStripes}
-          ${startSvg}
-        </svg>
-      </div>
-      <div class="gantt-col-due">
-        <svg width="${dueDateColumnWidth}" height="${bodyHeight}">
-          ${zebraStripes}
-          ${dueSvg}
-        </svg>
-      </div>
-      <div class="gantt-col-assignee">
-        <svg width="${assigneeColumnWidth}" height="${bodyHeight}">
-          ${zebraStripes}
-          ${assigneeSvg}
-        </svg>
-      </div>
-      <div class="gantt-timeline">
-        <svg width="100%" height="${bodyHeight}">
-          ${zebraStripes}
-          ${barsSvg}
-        </svg>
+    <div class="gantt-scroll-wrapper">
+      <div class="gantt-scroll" id="ganttScroll">
+        <div class="gantt-header-row">
+          <div class="gantt-sticky-left gantt-corner">
+            <div class="gantt-col-status"><div class="gantt-col-header">Status</div></div>
+            <div class="gantt-col-id"><div class="gantt-col-header">#ID</div></div>
+            <div class="gantt-left-header" id="ganttLeftHeader"><div class="gantt-col-header">Task</div></div>
+            <div class="gantt-resize-handle-header" id="resizeHandleHeader"></div>
+            <div class="gantt-col-start"><div class="gantt-col-header">Start</div></div>
+            <div class="gantt-col-due"><div class="gantt-col-header">Due</div></div>
+            <div class="gantt-col-assignee"><div class="gantt-col-header">Who</div></div>
+          </div>
+          <div class="gantt-timeline-header">
+            <svg width="${timelineWidth}" height="${headerHeight}"></svg>
+          </div>
+        </div>
+        <div class="gantt-body">
+          <div class="gantt-sticky-left">
+            <div class="gantt-col-status">
+              <svg width="${statusColumnWidth}" height="${bodyHeight}">
+                ${zebraStripes}
+                ${statusSvg}
+              </svg>
+            </div>
+            <div class="gantt-col-id">
+              <svg width="${idColumnWidth}" height="${bodyHeight}">
+                ${zebraStripes}
+                ${idSvg}
+              </svg>
+            </div>
+            <div class="gantt-labels" id="ganttLabels">
+              <svg width="${labelWidth * 2}" height="${bodyHeight}">
+                ${zebraStripes}
+                ${labelsSvg}
+              </svg>
+            </div>
+            <div class="gantt-resize-handle" id="resizeHandle"></div>
+            <div class="gantt-col-start">
+              <svg width="${startDateColumnWidth}" height="${bodyHeight}">
+                ${zebraStripes}
+                ${startSvg}
+              </svg>
+            </div>
+            <div class="gantt-col-due">
+              <svg width="${dueDateColumnWidth}" height="${bodyHeight}">
+                ${zebraStripes}
+                ${dueSvg}
+              </svg>
+            </div>
+            <div class="gantt-col-assignee">
+              <svg width="${assigneeColumnWidth}" height="${bodyHeight}">
+                ${zebraStripes}
+                ${assigneeSvg}
+              </svg>
+            </div>
+          </div>
+          <div class="gantt-timeline" id="ganttTimeline">
+            <svg width="${timelineWidth + 50}" height="${bodyHeight}">
+              ${zebraStripes}
+              ${barsSvg}
+            </svg>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -670,6 +682,7 @@ export class GanttPanel {
       labelWidth,
       headerHeight,
       barHeight,
+      timelineWidth,
       idColumnWidth,
       startDateColumnWidth,
       statusColumnWidth,
@@ -1786,19 +1799,41 @@ export class GanttPanel {
 
       if (this._viewFocus === "person") {
         // Person view: group by project, flat issues
-        this._cachedHierarchy = buildResourceHierarchy(sortedIssues, this._flexibilityCache, this._selectedAssignee ?? "");
+        this._cachedHierarchy = buildResourceHierarchy(
+          sortedIssues,
+          this._flexibilityCache,
+          this._selectedAssignee ?? "",
+          this._projects
+        );
       } else {
         // Project view: selected project and all subprojects
         // _selectedProjectId was already updated to effective value in filtering logic above
-        const projectsForHierarchy = this._projects.filter(p => {
-          // Include selected project and all its descendants
-          let current: typeof p | undefined = p;
-          while (current) {
-            if (current.id === this._selectedProjectId) return true;
-            current = this._projects.find(pp => pp.id === current?.parent?.id);
+        const projectMap = new Map(this._projects.map((project) => [project.id, project]));
+        let projectsForHierarchy: RedmineProject[] = [];
+
+        if (this._selectedProjectId === null) {
+          const relevantProjectIds = new Set<number>();
+          for (const issue of sortedIssues) {
+            let currentId = issue.project?.id;
+            while (currentId != null) {
+              if (relevantProjectIds.has(currentId)) break;
+              relevantProjectIds.add(currentId);
+              currentId = projectMap.get(currentId)?.parent?.id;
+            }
           }
-          return false;
-        });
+          projectsForHierarchy = this._projects.filter((project) => relevantProjectIds.has(project.id));
+        } else {
+          projectsForHierarchy = this._projects.filter((project) => {
+            // Include selected project and all its descendants
+            let current: RedmineProject | undefined = project;
+            while (current) {
+              if (current.id === this._selectedProjectId) return true;
+              current = current.parent?.id ? projectMap.get(current.parent.id) : undefined;
+            }
+            return false;
+          });
+        }
+
         this._cachedHierarchy = buildProjectHierarchy(sortedIssues, this._flexibilityCache, projectsForHierarchy, true, blockedIds);
       }
     }
@@ -2262,17 +2297,14 @@ export class GanttPanel {
           const countsX = progressBarX + progressBarWidth + 30;
           const countsText = countsStr ? `<text x="${countsX}" y="${barHeight / 2 + 4}" fill="var(--vscode-descriptionForeground)" font-size="10">${countsStr}</text>` : "";
 
-          // Tooltip: project ID + description + health stats
-          const baseTooltip = health
-            ? this.formatHealthTooltip(health, row.description)
-            : row.description || "";
-          const tooltip = `#${row.id} ${row.label}\n${baseTooltip}`.trim();
+          // Tooltip: project details aligned with tree view
+          const tooltip = this.buildProjectTooltip(row);
 
           // De-emphasized project headers: regular weight, muted color
           // Projects are containers, not content - issues should be primary focus
           return `
-            <g class="project-label gantt-row cursor-pointer${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${originalY}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}' transform="translate(0, ${y})"${hiddenAttr} tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
-              <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent" pointer-events="all"><title>${escapeAttr(tooltip)}</title></rect>
+            <g class="project-label gantt-row cursor-pointer${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${originalY}" data-tooltip="${escapeAttr(tooltip)}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}' transform="translate(0, ${y})"${hiddenAttr} tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
+              <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent" pointer-events="all"/>
               ${chevron}
               <text x="${labelX}" y="${barHeight / 2 + 5}" fill="var(--vscode-descriptionForeground)" font-size="13" pointer-events="none">
                 ${healthDot}${escapeHtml(row.label)}
@@ -2288,8 +2320,8 @@ export class GanttPanel {
           const timeGroupClass = `time-group-${row.timeGroup}`;
           const countBadge = row.childCount ? ` (${row.childCount})` : "";
           return `
-            <g class="time-group-label gantt-row ${timeGroupClass}${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-time-group="${row.timeGroup}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr} tabindex="0" role="button" aria-label="Toggle ${escapeHtml(row.label)}">
-              <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent" pointer-events="all"><title>${escapeHtml(row.label)}</title></rect>
+            <g class="time-group-label gantt-row ${timeGroupClass}${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-time-group="${row.timeGroup}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${originalY}" data-tooltip="${escapeAttr(row.label)}" transform="translate(0, ${y})"${hiddenAttr} tabindex="0" role="button" aria-label="Toggle ${escapeHtml(row.label)}">
+              <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent" pointer-events="all"/>
               ${chevron}
               <text x="${10 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="13" font-weight="bold" pointer-events="none">
                 ${row.icon || ""} ${escapeHtml(row.label)}${countBadge}
@@ -2395,8 +2427,8 @@ export class GanttPanel {
         const taskOpacity = issue.isClosed ? "0.5" : "1";
 
         return `
-          <g class="issue-label gantt-row cursor-pointer${hiddenClass}" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${originalY}" data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}' transform="translate(0, ${y})"${hiddenAttr} tabindex="0" role="button" aria-label="Open issue #${issue.id}">
-            <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent" pointer-events="all"><title>${escapeAttr(tooltip)}</title></rect>
+          <g class="issue-label gantt-row cursor-pointer${hiddenClass}" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${originalY}" data-tooltip="${escapeAttr(tooltip)}" data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}' transform="translate(0, ${y})"${hiddenAttr} tabindex="0" role="button" aria-label="Open issue #${issue.id}">
+            <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent" pointer-events="all"/>
             ${chevron}
             <text class="issue-text" x="${10 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="${issue.isExternal ? "var(--vscode-descriptionForeground)" : "var(--vscode-foreground)"}" font-size="13" opacity="${taskOpacity}">
               ${externalBadge}${projectBadge}${escapedSubject}
@@ -2538,6 +2570,9 @@ export class GanttPanel {
             return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
           }
 
+          const tooltip = this.buildProjectTooltip(row);
+          const tooltipAttr = escapeAttr(tooltip);
+
           // Render aggregate bars for each child issue date range
           const aggregateBars = row.childDateRanges
             .filter(range => range.startDate || range.dueDate)
@@ -2554,11 +2589,11 @@ export class GanttPanel {
               const width = Math.max(4, endX - startX);
 
               return `<rect class="aggregate-bar" x="${startX}" y="${barY}" width="${width}" height="${barContentHeight}"
-                            fill="var(--vscode-descriptionForeground)" opacity="0.5" rx="2" ry="2"/>`;
+                            fill="var(--vscode-descriptionForeground)" opacity="0.5" rx="2" ry="2"><title>${tooltipAttr}</title></rect>`;
             })
             .join("");
 
-          return `<g class="aggregate-bars gantt-row${hiddenClass}" data-project-id="${row.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}' transform="translate(0, ${y})"${hiddenAttr}>${aggregateBars}</g>`;
+          return `<g class="aggregate-bars gantt-row${hiddenClass}" data-project-id="${row.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" data-tooltip="${escapeAttr(tooltip)}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}' transform="translate(0, ${y})"${hiddenAttr}><title>${escapeAttr(tooltip)}</title>${aggregateBars}</g>`;
         }
 
         // Time group headers: render aggregate bars for child issues
@@ -3710,6 +3745,9 @@ export class GanttPanel {
     </div>
   </div>
   <div id="dragDateTooltip" class="drag-date-tooltip" style="display: none;"></div>
+  <div id="ganttTooltip" class="gantt-tooltip" role="tooltip" aria-hidden="true">
+    <div class="gantt-tooltip-content"></div>
+  </div>
   <div id="dragConfirmOverlay" class="drag-confirm-overlay">
     <div class="drag-confirm-modal">
       <h3>Confirm date change</h3>
@@ -3807,13 +3845,13 @@ export class GanttPanel {
   ): string {
     switch (status) {
       case "overbooked":
-        return "⚠️ Overbooked: Not enough time to complete before due date";
+        return "Overbooked: Not enough time to complete before due date";
       case "at-risk":
-        return "⏰ At Risk: Tight schedule with little buffer";
+        return "At Risk: Tight schedule with little buffer";
       case "on-track":
-        return "✅ On Track: Sufficient time remaining";
+        return "On Track: Sufficient time remaining";
       case "completed":
-        return "🎉 Completed: Issue is done";
+        return "Completed: Issue is done";
       default:
         return "";
     }
@@ -4082,22 +4120,63 @@ export class GanttPanel {
     }
   }
 
+  private normalizeTooltipText(value: string): string {
+    return value.replace(/\*\*/g, "").replace(/__/g, "").trim();
+  }
+
+  /**
+   * Format project tooltip custom fields for display.
+   */
+  private getProjectCustomFieldLines(customFields?: CustomField[]): string[] {
+    const lines: string[] = [];
+
+    if (!customFields) {
+      return lines;
+    }
+
+    for (const cf of customFields) {
+      const label = this.normalizeTooltipText(cf.name ?? "");
+      const val = this.normalizeTooltipText(formatCustomFieldValue(cf.value));
+      if (label && val) {
+        lines.push(`cf:${label}: ${val}`);
+      }
+    }
+
+    return lines;
+  }
+
+  private buildProjectTooltip(row: GanttRow): string {
+    const customFieldLines = this.getProjectCustomFieldLines(row.customFields);
+    const baseDetails = this.formatProjectTooltip(row.description, customFieldLines);
+
+    let tooltip = `#${row.id} ${row.label}\n\n`;
+
+    if (baseDetails) {
+      tooltip += `${baseDetails}\n\n`;
+    }
+
+    if (row.health) {
+      if (customFieldLines.length > 0) {
+        tooltip += "---\n\n";
+      }
+      tooltip += `${this.formatHealthTooltip(row.health)}\n\n`;
+    }
+
+    if (this._server && row.identifier) {
+      tooltip += `Open in Browser: ${this._server.options.address}/projects/${row.identifier}`;
+    }
+
+    return tooltip.trim();
+  }
+
   /**
    * Format health data as tooltip text
    */
-  private formatHealthTooltip(health: ProjectHealth, description?: string): string {
+  private formatHealthTooltip(health: ProjectHealth): string {
     const lines: string[] = [];
 
-    // Description first - this is the primary value
-    if (description && description.trim()) {
-      lines.push(description.trim());
-      lines.push("");
-    }
-
-    // Health summary
     lines.push(`${health.progress}% · ${health.counts.closed}/${health.counts.closed + health.counts.open} done`);
 
-    // Attention items (compact)
     const alerts: string[] = [];
     if (health.counts.overdue > 0) alerts.push(`🔴 ${health.counts.overdue} overdue`);
     if (health.counts.blocked > 0) alerts.push(`⚠ ${health.counts.blocked} blocked`);
@@ -4106,9 +4185,35 @@ export class GanttPanel {
       lines.push(alerts.join(" · "));
     }
 
-    // Hours (if tracked)
     if (health.hours.estimated > 0) {
       lines.push(`${health.hours.spent}h / ${health.hours.estimated}h`);
+    }
+
+    return lines.join("\n");
+  }
+
+  /**
+   * Format project tooltip without health data (description + custom fields)
+   */
+  private formatProjectTooltip(description?: string, customFieldLines?: string[]): string {
+    const lines: string[] = [];
+
+    if (description?.trim()) {
+      lines.push(this.normalizeTooltipText(description));
+      lines.push("");
+      lines.push("---");
+      lines.push("");
+    }
+
+    if (customFieldLines) {
+      for (const line of customFieldLines) {
+        lines.push(line);
+        lines.push("");
+      }
+    }
+
+    while (lines.length > 0 && lines[lines.length - 1] === "") {
+      lines.pop();
     }
 
     return lines.join("\n");
@@ -4148,3 +4253,9 @@ export class GanttPanel {
 function getNonce(): string {
   return crypto.randomBytes(16).toString("base64");
 }
+
+
+
+
+
+

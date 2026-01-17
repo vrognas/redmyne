@@ -48,6 +48,293 @@ function applyCssVars(state) {
   root.style.setProperty('--gantt-sticky-left-width', `${state.stickyLeftWidth}px`);
 }
 
+function setupTooltips({ addDocListener, addWinListener }) {
+  const root = document.getElementById('ganttRoot');
+  const tooltip = document.getElementById('ganttTooltip');
+  const tooltipContent = tooltip?.querySelector('.gantt-tooltip-content');
+  if (!root || !tooltip || !tooltipContent) return;
+
+  const normalizeTooltipText = (value) => {
+    if (!value) return '';
+    return String(value).replace(/\r\n/g, '\n').trimEnd();
+  };
+
+  function convertSvgTitles() {
+    root.querySelectorAll('svg title').forEach((title) => {
+      const parent = title.parentElement;
+      const text = normalizeTooltipText(title.textContent);
+      if (parent && text) {
+        parent.dataset.tooltip = text;
+      }
+      title.remove();
+    });
+  }
+
+  function convertTitleAttributes() {
+    root.querySelectorAll('[title]').forEach((el) => {
+      if (el.tagName.toLowerCase() === 'title') return;
+      const text = normalizeTooltipText(el.getAttribute('title'));
+      el.removeAttribute('title');
+      if (text) {
+        el.dataset.tooltip = text;
+      }
+    });
+  }
+
+  function prepareTooltips() {
+    convertSvgTitles();
+    convertTitleAttributes();
+  }
+
+  function findHeaderIndex(lines) {
+    const headerIndex = lines.findIndex((line) => line.trim().startsWith('#'));
+    if (headerIndex >= 0) return headerIndex;
+    return lines.findIndex((line) => line.trim());
+  }
+
+  function buildTooltipContent(text) {
+    tooltipContent.textContent = '';
+    const normalized = normalizeTooltipText(text);
+    if (!normalized) return;
+    const lines = normalized.split('\n');
+    const headerIndex = findHeaderIndex(lines);
+    let lastWasSpacer = false;
+
+    lines.forEach((line, index) => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        if (!lastWasSpacer) {
+          const spacer = document.createElement('div');
+          spacer.className = 'gantt-tooltip-spacer';
+          tooltipContent.appendChild(spacer);
+          lastWasSpacer = true;
+        }
+        return;
+      }
+
+      if (trimmed === '---') {
+        const divider = document.createElement('div');
+        divider.className = 'gantt-tooltip-divider';
+        tooltipContent.appendChild(divider);
+        lastWasSpacer = false;
+        return;
+      }
+
+      const customMatch = trimmed.match(/^cf:([^:]+):(.*)$/);
+      if (customMatch) {
+        const key = customMatch[1].trim();
+        const value = customMatch[2].trim();
+        const lineEl = document.createElement('div');
+        lineEl.className = 'gantt-tooltip-line';
+        const keyEl = document.createElement('span');
+        keyEl.className = 'gantt-tooltip-key';
+        keyEl.textContent = `${key}: `;
+        lineEl.appendChild(keyEl);
+        if (value) {
+          lineEl.appendChild(document.createTextNode(value));
+        }
+        tooltipContent.appendChild(lineEl);
+        lastWasSpacer = false;
+        return;
+      }
+
+      const lineEl = document.createElement('div');
+      lineEl.className = 'gantt-tooltip-line';
+      if (index === headerIndex) {
+        lineEl.classList.add('gantt-tooltip-title');
+      }
+
+      const openMatch = trimmed.match(/^Open in Browser:\s*(\S+)/);
+      if (openMatch && /^https?:\/\//i.test(openMatch[1])) {
+        lineEl.appendChild(document.createTextNode('Open in Browser: '));
+        const link = document.createElement('a');
+        link.href = openMatch[1];
+        link.textContent = openMatch[1];
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        lineEl.appendChild(link);
+      } else {
+        lineEl.textContent = line;
+      }
+
+      tooltipContent.appendChild(lineEl);
+      lastWasSpacer = false;
+    });
+
+    const lastChild = tooltipContent.lastElementChild;
+    if (lastChild && lastChild.classList.contains('gantt-tooltip-spacer')) {
+      lastChild.remove();
+    }
+  }
+
+  let activeTarget = null;
+  let hideTimer = null;
+  let showTimer = null;
+  let lastPointer = { x: 0, y: 0 };
+
+  function updatePointer(event) {
+    lastPointer = { x: event.clientX, y: event.clientY };
+  }
+
+  function cancelHide() {
+    if (!hideTimer) return;
+    clearTimeout(hideTimer);
+    hideTimer = null;
+  }
+
+  function cancelShow() {
+    if (!showTimer) return;
+    clearTimeout(showTimer);
+    showTimer = null;
+  }
+
+  function isInTooltip(node) {
+    return node && (node === tooltip || tooltip.contains(node));
+  }
+
+  function isInActiveTarget(node) {
+    return node && activeTarget && (node === activeTarget || activeTarget.contains(node));
+  }
+
+  function isPointerOverTooltipOrTarget() {
+    if (!lastPointer) return false;
+    const hovered = document.elementFromPoint(lastPointer.x, lastPointer.y);
+    return isInTooltip(hovered) || isInActiveTarget(hovered);
+  }
+
+  const showDelay = 300;
+
+  function scheduleShow(target) {
+    cancelShow();
+    showTimer = setTimeout(() => {
+      showTimer = null;
+      if (!activeTarget || activeTarget !== target) return;
+      if (!isPointerOverTooltipOrTarget()) return;
+      showTooltip(target, lastPointer.x, lastPointer.y);
+    }, showDelay);
+  }
+
+  function scheduleHide() {
+    cancelHide();
+    hideTimer = setTimeout(() => {
+      if (!activeTarget) return;
+      if (isPointerOverTooltipOrTarget()) return;
+      hideTooltip();
+    }, 300);
+  }
+
+  function positionTooltip(x, y) {
+    const padding = 8;
+    const offset = 8;
+    const rect = tooltip.getBoundingClientRect();
+    let left = x + offset;
+    let top = y + offset;
+
+    if (left + rect.width > window.innerWidth - padding) {
+      left = x - rect.width - offset;
+    }
+    if (top + rect.height > window.innerHeight - padding) {
+      top = y - rect.height - offset;
+    }
+
+    left = Math.max(padding, Math.min(left, window.innerWidth - rect.width - padding));
+    top = Math.max(padding, Math.min(top, window.innerHeight - rect.height - padding));
+
+    tooltip.style.left = `${Math.round(left)}px`;
+    tooltip.style.top = `${Math.round(top)}px`;
+  }
+
+  function showTooltip(target, x, y) {
+    const text = target.dataset.tooltip;
+    if (!text) return;
+    buildTooltipContent(text);
+    tooltip.classList.add('visible');
+    tooltip.setAttribute('aria-hidden', 'false');
+    positionTooltip(x, y);
+  }
+
+  function hideTooltip(keepTarget = false) {
+    cancelShow();
+    cancelHide();
+    tooltip.classList.remove('visible');
+    tooltip.setAttribute('aria-hidden', 'true');
+    if (!keepTarget) {
+      activeTarget = null;
+    }
+  }
+
+  function resolveTooltipTarget(node) {
+    if (!node || node === tooltip || tooltip.contains(node)) return null;
+    const target = node.closest?.('[data-tooltip], [title]');
+    if (!target || !root.contains(target)) return null;
+    if (target.hasAttribute('title')) {
+      const title = normalizeTooltipText(target.getAttribute('title'));
+      target.removeAttribute('title');
+      if (title) {
+        target.dataset.tooltip = title;
+      }
+    }
+    if (!target.dataset.tooltip) return null;
+    return target;
+  }
+
+  prepareTooltips();
+
+  addDocListener('pointerover', (event) => {
+    updatePointer(event);
+    if (isInTooltip(event.target)) {
+      cancelHide();
+      cancelShow();
+      return;
+    }
+    const target = resolveTooltipTarget(event.target);
+    if (!target) {
+      cancelShow();
+      return;
+    }
+    cancelHide();
+    if (activeTarget !== target) {
+      activeTarget = target;
+      if (tooltip.classList.contains('visible')) {
+        hideTooltip(true);
+      }
+      scheduleShow(target);
+    } else if (!tooltip.classList.contains('visible')) {
+      scheduleShow(target);
+    }
+  }, true);
+
+  addDocListener('pointermove', (event) => {
+    if (!activeTarget) return;
+    updatePointer(event);
+    if (hideTimer && isPointerOverTooltipOrTarget()) {
+      cancelHide();
+    }
+  }, true);
+
+  addDocListener('pointerout', (event) => {
+    if (!activeTarget) return;
+    updatePointer(event);
+    cancelShow();
+    if (!isInActiveTarget(event.target) && !isInTooltip(event.target)) return;
+    const related = event.relatedTarget;
+    if (isInTooltip(related) || isInActiveTarget(related)) return;
+    scheduleHide();
+  }, true);
+
+  addDocListener('scroll', () => {
+    if (activeTarget) hideTooltip();
+  }, true);
+
+  addDocListener('keydown', () => {
+    if (activeTarget) hideTooltip();
+  }, true);
+
+  addWinListener('blur', () => {
+    if (activeTarget) hideTooltip();
+  });
+}
+
 function render(payload) {
   if (!payload) return;
   // Update perf debug flag from config (passed via state)
@@ -1090,6 +1377,11 @@ function initializeGantt(state) {
       scrollToToday
     });
 
+    setupTooltips({
+      addDocListener,
+      addWinListener,
+      ganttScroll
+    });
     // Restore scroll position or scroll to today on initial load
     // Defer to next frame to avoid blocking initial paint and batch layout reads
     requestAnimationFrame(() => {
@@ -1191,3 +1483,12 @@ function initializeGantt(state) {
     perfMark('initializeGantt-end');
     perfMeasure('initializeGantt', 'initializeGantt-start', 'initializeGantt-end');
 }
+
+
+
+
+
+
+
+
+

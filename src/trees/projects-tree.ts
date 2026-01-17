@@ -3,7 +3,7 @@ import { RedmineServer } from "../redmine/redmine-server";
 import { RedmineProject } from "../redmine/redmine-project";
 import { Issue } from "../redmine/models/issue";
 import { IssueFilter, DEFAULT_ISSUE_FILTER, IssueSortField, SortConfig } from "../redmine/models/common";
-import { createEnhancedIssueTreeItem } from "../utilities/tree-item-factory";
+import { createEnhancedIssueTreeItem, createProjectTooltip } from "../utilities/tree-item-factory";
 import { sortIssuesByRisk, sortIssuesByField } from "../utilities/issue-sorting";
 import {
   clearFlexibilityCache,
@@ -187,6 +187,9 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
       treeItem.contextValue = "project-empty";
     }
 
+    // Set tooltip with project details and custom fields
+    treeItem.tooltip = createProjectTooltip(project, this.server);
+
     return treeItem;
   }
 
@@ -358,7 +361,10 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
     // Apply tree view filtering if needed
     let filtered = nodes;
     if (this.viewStyle === ProjectsViewStyle.TREE) {
-      filtered = nodes.filter((n) => !n.project.parent);
+      const projectIdSet = new Set((this.projects ?? []).map((project) => project.id));
+      filtered = nodes.filter(
+        (n) => !n.project.parent || !projectIdSet.has(n.project.parent.id)
+      );
     }
 
     return filtered.sort((a, b) =>
@@ -514,3 +520,4 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
     return null;
   }
 }
+

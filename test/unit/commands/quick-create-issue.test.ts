@@ -322,6 +322,26 @@ describe("quickCreateSubIssue", () => {
     });
   });
 
+  it("blocks sub-issue creation when issue already has a parent", async () => {
+    mockServer.getIssueById.mockResolvedValueOnce({
+      issue: {
+        id: 123,
+        subject: "Child Issue",
+        project: { id: 1, name: "Project Alpha" },
+        tracker: { id: 2, name: "Tasks" },
+        parent: { id: 99 },
+      },
+    });
+
+    const warningSpy = vi.spyOn(vscode.window, "showWarningMessage").mockResolvedValue(undefined);
+
+    const result = await quickCreateSubIssue(props, 123);
+
+    expect(result).toBeUndefined();
+    expect(warningSpy).toHaveBeenCalled();
+    expect(mockServer.createIssue).not.toHaveBeenCalled();
+  });
+
   it("shows parent issue info in subject prompt", async () => {
     vi.spyOn(vscode.window, "showQuickPick")
       .mockResolvedValueOnce({ label: "Normal", data: { label: "Normal", id: 2 } } as unknown as vscode.QuickPickItem);

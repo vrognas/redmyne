@@ -2,6 +2,18 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Project tooltips** - hover projects in tree view and Gantt to see custom fields
+
+### Fixed
+
+- **Create Sub-Issue menu** - only appears for root issues without a parent
+- **Gantt loading UI** - moved loading text to header
+- **Gantt "All Projects"** - project selector now allows viewing all projects in by-project view
+
 ## [4.1.0]
 
 ### Added

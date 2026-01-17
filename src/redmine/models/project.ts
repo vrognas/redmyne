@@ -1,4 +1,4 @@
-import { NamedEntity } from "./common";
+import { NamedEntity, CustomField } from "./common";
 
 export interface Project {
   id: number;
@@ -6,4 +6,5 @@ export interface Project {
   description: string;
   identifier: string;
   parent?: NamedEntity;
+  custom_fields?: CustomField[];
 }
