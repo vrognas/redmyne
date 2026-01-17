@@ -7,6 +7,7 @@ Quick reference of key patterns. Details in sections below.
 **TypeScript**: Strict mode catches bugs, delete unused code (don't prefix `_`)
 **Performance**: Lazy load, cache rarely-changing data, progress for >200ms ops
 **State machines**: Find by state not index, deep clone persisted data, validate on restore
+**QuickPick**: Set `sortByLabel = false` to preserve custom sort order
 
 ---
 

@@ -45,6 +45,7 @@ import { toggleAdHoc, contributeToIssue, removeContribution } from "./commands/a
 import { togglePrecedence, setPrecedence, clearPrecedence } from "./utilities/precedence-tracker";
 import { debounce, DebouncedFunction } from "./utilities/debounce";
 import { runMigration } from "./utilities/migration";
+import { initRecentIssues } from "./utilities/recent-issues";
 
 // Constants
 const CONFIG_DEBOUNCE_MS = 300;
@@ -73,6 +74,9 @@ let cleanupResources: {
 export function activate(context: vscode.ExtensionContext): void {
   // Run migration from redmine.* to redmyne.* namespace (one-time on upgrade)
   runMigration(context);
+
+  // Initialize recent issues tracker
+  initRecentIssues(context);
 
   // Initialize auto-update tracker
   autoUpdateTracker.initialize(context);

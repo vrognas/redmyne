@@ -1,12 +1,13 @@
 import * as vscode from "vscode";
-import Fuse, { IFuseOptions } from "fuse.js";
+import Fuse, { IFuseOptions, FuseResult } from "fuse.js";
 import { RedmineServer } from "../redmine/redmine-server";
 import { Issue } from "../redmine/models/issue";
 import { TimeEntryActivity } from "../redmine/models/common";
 import { RedmineProject } from "../redmine/redmine-project";
 import { debounce } from "./debounce";
+import { recordRecentIssue, getRecentIssueIds } from "./recent-issues";
 
-const SEARCH_DEBOUNCE_MS = 300;
+const SEARCH_DEBOUNCE_MS = 150;
 const PROJECT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 // Project path cache (module-level, shared across picker invocations)
@@ -64,7 +65,8 @@ async function searchIssuesWithFuzzy(
   server: RedmineServer,
   query: string,
   localIssues: Issue[],
-  projectPathMap: Map<number, string>
+  projectPathMap: Map<number, string>,
+  recentIds?: Set<number>
 ): Promise<IssueSearchResult> {
   const cleanQuery = query.replace(/^#/, "");
   const possibleId = parseInt(cleanQuery, 10);
@@ -144,7 +146,7 @@ async function searchIssuesWithFuzzy(
 
   // Apply fuzzy search for ranking (assigned issues ranked higher)
   const assignedIds = new Set(localIssues.map(i => i.id));
-  const results = fuzzyFilterIssues(candidateIssues, query, projectPathMap, assignedIds);
+  const results = fuzzyFilterIssues(candidateIssues, query, projectPathMap, assignedIds, recentIds);
 
   return { results, exactMatch, exactMatchError };
 }
@@ -205,21 +207,79 @@ function buildProjectPathMap(projects: RedmineProject[]): Map<number, string> {
 // Fuse.js scores are 0.0-0.4, penalties create clear tier separation
 const NON_ASSIGNED_PENALTY = 1.0;  // Non-assigned below assigned
 const CLOSED_PENALTY = 0.5;        // Closed below open
+const RECENT_BOOST = -0.3;         // Recent issues get priority
+
+// Status weights: lower = higher priority
+// In progress > New > Resolved > Feedback > other > Closed
+const STATUS_WEIGHTS: Record<string, number> = {
+  "In Progress": 0,
+  "New": 0.05,
+  "Resolved": 0.1,
+  "Feedback": 0.15,
+};
+const DEFAULT_STATUS_WEIGHT = 0.2;
+
+// Fuse index cache (module-level)
+interface FuseCache {
+  fuse: Fuse<SearchableIssue>;
+  issueIds: Set<number>;
+  timestamp: number;
+}
+let fuseCache: FuseCache | null = null;
+const FUSE_CACHE_TTL_MS = 60 * 1000; // 1 minute
+
+// Search operators regex
+const OPERATOR_REGEX = /\b(project|status):("[^"]+"|[^\s]+)/gi;
 
 /**
- * Fuzzy search issues by query (searches id, subject, project path)
- * For multi-word queries, all terms must match (AND logic)
- * Ranking: assigned+open > assigned+closed > unassigned+open > unassigned+closed
+ * Parse search operators from query (project:xxx, status:xxx)
+ * Returns the remaining query and extracted filters
  */
-function fuzzyFilterIssues(
-  issues: Issue[],
-  query: string,
-  projectPathMap?: Map<number, string>,
-  assignedIds?: Set<number>
-): Issue[] {
-  const tokens = query.trim().split(/\s+/).filter(t => t);
-  if (tokens.length === 0) return issues;
+function parseSearchOperators(query: string): {
+  textQuery: string;
+  projectFilter?: string;
+  statusFilter?: string;
+} {
+  let textQuery = query;
+  let projectFilter: string | undefined;
+  let statusFilter: string | undefined;
 
+  const matches = query.matchAll(OPERATOR_REGEX);
+  for (const match of matches) {
+    const [fullMatch, operator, value] = match;
+    const cleanValue = value.replace(/^"|"$/g, "").toLowerCase();
+    if (operator.toLowerCase() === "project") {
+      projectFilter = cleanValue;
+    } else if (operator.toLowerCase() === "status") {
+      statusFilter = cleanValue;
+    }
+    textQuery = textQuery.replace(fullMatch, "");
+  }
+
+  return { textQuery: textQuery.trim(), projectFilter, statusFilter };
+}
+
+/**
+ * Get or create Fuse index with caching
+ */
+function getOrCreateFuse(
+  issues: Issue[],
+  projectPathMap?: Map<number, string>
+): Fuse<SearchableIssue> {
+  const now = Date.now();
+  const currentIds = new Set(issues.map(i => i.id));
+
+  // Check cache validity
+  if (
+    fuseCache &&
+    now - fuseCache.timestamp < FUSE_CACHE_TTL_MS &&
+    currentIds.size === fuseCache.issueIds.size &&
+    [...currentIds].every(id => fuseCache!.issueIds.has(id))
+  ) {
+    return fuseCache.fuse;
+  }
+
+  // Build new index
   const searchable: SearchableIssue[] = issues.map((i) => ({
     id: String(i.id),
     subject: i.subject,
@@ -228,23 +288,78 @@ function fuzzyFilterIssues(
   }));
 
   const fuse = new Fuse(searchable, FUSE_OPTIONS);
+  fuseCache = { fuse, issueIds: currentIds, timestamp: now };
+  return fuse;
+}
+
+/**
+ * Fuzzy search issues by query (searches id, subject, project path)
+ * For multi-word queries, all terms must match (AND logic)
+ * Ranking: recent > assigned+open > assigned+closed > unassigned+open > unassigned+closed
+ * Supports operators: project:xxx, status:xxx
+ */
+function fuzzyFilterIssues(
+  issues: Issue[],
+  query: string,
+  projectPathMap?: Map<number, string>,
+  assignedIds?: Set<number>,
+  recentIds?: Set<number>
+): Issue[] {
+  // Parse search operators
+  const { textQuery, projectFilter, statusFilter } = parseSearchOperators(query);
+
+  // Pre-filter by operators
+  let filtered = issues;
+  if (projectFilter) {
+    filtered = filtered.filter(i => {
+      const projectPath = projectPathMap?.get(i.project?.id ?? 0) ?? i.project?.name ?? "";
+      return projectPath.toLowerCase().includes(projectFilter);
+    });
+  }
+  if (statusFilter) {
+    filtered = filtered.filter(i =>
+      i.status?.name?.toLowerCase().includes(statusFilter)
+    );
+  }
+
+  const tokens = textQuery.split(/\s+/).filter(t => t);
+  if (tokens.length === 0) return filtered;
+
+  // Get cached Fuse index (rebuild if issues changed)
+  const fuse = getOrCreateFuse(filtered, projectPathMap);
 
   // Helper to apply ranking boosts
   const applyBoosts = (score: number, issue: Issue): number => {
     let adjusted = score;
+
+    // Recent boost
+    if (recentIds?.has(issue.id)) {
+      adjusted += RECENT_BOOST;
+    }
+
+    // Assignment penalty
     if (!assignedIds?.has(issue.id)) {
       adjusted += NON_ASSIGNED_PENALTY;
     }
+
+    // Status-based weighting
+    const statusName = issue.status?.name ?? "";
     if (issue.status?.is_closed) {
       adjusted += CLOSED_PENALTY;
+    } else {
+      adjusted += STATUS_WEIGHTS[statusName] ?? DEFAULT_STATUS_WEIGHT;
     }
+
     return adjusted;
   };
 
   if (tokens.length === 1) {
     const results = fuse.search(tokens[0]);
-    // Sort with ranking boosts
-    const scored = results.map(r => ({ score: applyBoosts(r.score ?? 0, r.item.original), item: r.item }));
+    const scored = results.map(r => ({
+      score: applyBoosts(r.score ?? 0, r.item.original),
+      item: r.item,
+      matches: r.matches,
+    }));
     scored.sort((a, b) => a.score - b.score);
     return scored.map(r => r.item.original);
   }
@@ -252,7 +367,7 @@ function fuzzyFilterIssues(
   // Multi-token: search once per token, intersect results
   const tokenResultMaps = tokens.map(token => {
     const results = fuse.search(token);
-    return new Map(results.map(r => [r.item.id, { score: r.score ?? 1, item: r.item }]));
+    return new Map(results.map(r => [r.item.id, { score: r.score ?? 1, item: r.item, matches: r.matches }]));
   });
 
   // Find items present in ALL token results, sum scores
@@ -273,15 +388,12 @@ function fuzzyFilterIssues(
     }
 
     if (inAll) {
-      // Apply ranking boosts to total score
       totalScore = applyBoosts(totalScore, item.original);
       intersection.push({ totalScore, item });
     }
   }
 
-  // Sort by combined score (lower is better)
   intersection.sort((a, b) => a.totalScore - b.totalScore);
-
   return intersection.map((i) => i.item.original);
 }
 
@@ -356,6 +468,9 @@ export async function pickIssueWithSearch(
     }),
   ]);
 
+  // Get recent issue IDs for boosting
+  const recentIds = new Set(getRecentIssueIds());
+
   // Build issue list: trackable issues first, then non-trackable (disabled)
   const trackableIssues = issues.filter(
     (issue) => issue.project?.id && timeTrackingByProject.get(issue.project.id)
@@ -364,23 +479,68 @@ export async function pickIssueWithSearch(
     (issue) => !issue.project?.id || !timeTrackingByProject.get(issue.project.id)
   );
 
-  // Build base items from assigned issues
-  const baseItems: IssueQuickPickItem[] = [
-    // Trackable issues (selectable)
-    ...trackableIssues.map((issue) => ({
-      label: `#${issue.id} ${issue.subject}`,
-      description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
-      issue,
-      disabled: false,
-    })),
-    // Non-trackable issues (disabled, greyed out)
-    ...nonTrackableIssues.map((issue) => ({
-      label: `$(circle-slash) #${issue.id} ${issue.subject}`,
-      description: `${projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name ?? "Unknown"} (no time tracking)`,
-      issue,
-      disabled: true,
-    })),
-  ];
+  // Sort trackable issues: recent first, then by status
+  const sortByRecencyAndStatus = (a: Issue, b: Issue): number => {
+    const recentIssueIdsList = getRecentIssueIds();
+    const aRecent = recentIssueIdsList.indexOf(a.id);
+    const bRecent = recentIssueIdsList.indexOf(b.id);
+    // Both recent: sort by recency
+    if (aRecent !== -1 && bRecent !== -1) return aRecent - bRecent;
+    // Only one recent
+    if (aRecent !== -1) return -1;
+    if (bRecent !== -1) return 1;
+    // Neither recent: sort by status weight
+    const aWeight = STATUS_WEIGHTS[a.status?.name ?? ""] ?? DEFAULT_STATUS_WEIGHT;
+    const bWeight = STATUS_WEIGHTS[b.status?.name ?? ""] ?? DEFAULT_STATUS_WEIGHT;
+    return aWeight - bWeight;
+  };
+
+  trackableIssues.sort(sortByRecencyAndStatus);
+
+  // Build base items from assigned issues with visual grouping
+  const recentTrackable = trackableIssues.filter(i => recentIds.has(i.id));
+  const otherTrackable = trackableIssues.filter(i => !recentIds.has(i.id));
+
+  const baseItems: IssueQuickPickItem[] = [];
+
+  // Recent issues section
+  if (recentTrackable.length > 0) {
+    baseItems.push({ label: "Recent", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
+    for (const issue of recentTrackable) {
+      baseItems.push({
+        label: `$(history) #${issue.id} ${issue.subject}`,
+        description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
+        issue,
+        disabled: false,
+      });
+    }
+  }
+
+  // Other assigned issues
+  if (otherTrackable.length > 0) {
+    baseItems.push({ label: "Assigned", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
+    for (const issue of otherTrackable) {
+      baseItems.push({
+        label: `#${issue.id} ${issue.subject}`,
+        description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
+        issue,
+        disabled: false,
+      });
+    }
+  }
+
+  // Non-trackable issues (disabled, greyed out)
+  if (nonTrackableIssues.length > 0) {
+    baseItems.push({ label: "No Time Tracking", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
+    for (const issue of nonTrackableIssues) {
+      baseItems.push({
+        label: `$(circle-slash) #${issue.id} ${issue.subject}`,
+        description: `${projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name ?? "Unknown"}`,
+        issue,
+        disabled: true,
+      });
+    }
+  }
 
   // Add skip option if allowed
   if (allowSkip) {
@@ -421,6 +581,12 @@ export async function pickIssueWithSearch(
 
       if (selected.issue) {
         resolved = true;
+        // Record selection for recent issues
+        recordRecentIssue(
+          selected.issue.id,
+          selected.issue.subject,
+          selected.issue.project?.name ?? ""
+        );
         quickPick.dispose();
         resolve(selected.issue);
         return true;
@@ -444,7 +610,8 @@ export async function pickIssueWithSearch(
           server,
           query,
           issues,
-          projectPathMap
+          projectPathMap,
+          recentIds
         );
 
         // Check time tracking for new projects
@@ -663,19 +830,55 @@ export async function pickIssue(
     })),
   ]);
 
-  // Build base items
-  let baseItems: IssueQuickPickItem[];
+  // Get recent issue IDs for boosting
+  const recentIds = new Set(getRecentIssueIds());
+
+  // Sort issues: recent first, then by status
+  const sortByRecencyAndStatus = (a: Issue, b: Issue): number => {
+    const recentIssueIdsList = getRecentIssueIds();
+    const aRecent = recentIssueIdsList.indexOf(a.id);
+    const bRecent = recentIssueIdsList.indexOf(b.id);
+    if (aRecent !== -1 && bRecent !== -1) return aRecent - bRecent;
+    if (aRecent !== -1) return -1;
+    if (bRecent !== -1) return 1;
+    const aWeight = STATUS_WEIGHTS[a.status?.name ?? ""] ?? DEFAULT_STATUS_WEIGHT;
+    const bWeight = STATUS_WEIGHTS[b.status?.name ?? ""] ?? DEFAULT_STATUS_WEIGHT;
+    return aWeight - bWeight;
+  };
+
+  // Build base items with visual grouping
+  const baseItems: IssueQuickPickItem[] = [];
 
   if (skipTimeTrackingCheck) {
-    // All issues selectable
-    baseItems = issues.map((issue) => ({
-      label: `#${issue.id} ${issue.subject}`,
-      description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
-      issue,
-      disabled: false,
-    }));
+    // All issues selectable - sort by recency
+    issues.sort(sortByRecencyAndStatus);
+    const recentIssues = issues.filter(i => recentIds.has(i.id));
+    const otherIssues = issues.filter(i => !recentIds.has(i.id));
+
+    if (recentIssues.length > 0) {
+      baseItems.push({ label: "Recent", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
+      for (const issue of recentIssues) {
+        baseItems.push({
+          label: `$(history) #${issue.id} ${issue.subject}`,
+          description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
+          issue,
+          disabled: false,
+        });
+      }
+    }
+    if (otherIssues.length > 0) {
+      baseItems.push({ label: "All Issues", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
+      for (const issue of otherIssues) {
+        baseItems.push({
+          label: `#${issue.id} ${issue.subject}`,
+          description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
+          issue,
+          disabled: false,
+        });
+      }
+    }
   } else {
-    // Split by time tracking: trackable first, then non-trackable (disabled)
+    // Split by time tracking
     const trackableIssues = issues.filter(
       (issue) => issue.project?.id && timeTrackingByProject.get(issue.project.id)
     );
@@ -683,20 +886,44 @@ export async function pickIssue(
       (issue) => !issue.project?.id || !timeTrackingByProject.get(issue.project.id)
     );
 
-    baseItems = [
-      ...trackableIssues.map((issue) => ({
-        label: `#${issue.id} ${issue.subject}`,
-        description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
-        issue,
-        disabled: false,
-      })),
-      ...nonTrackableIssues.map((issue) => ({
-        label: `$(circle-slash) #${issue.id} ${issue.subject}`,
-        description: `${projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name ?? "Unknown"} (no time tracking)`,
-        issue,
-        disabled: true,
-      })),
-    ];
+    trackableIssues.sort(sortByRecencyAndStatus);
+
+    const recentTrackable = trackableIssues.filter(i => recentIds.has(i.id));
+    const otherTrackable = trackableIssues.filter(i => !recentIds.has(i.id));
+
+    if (recentTrackable.length > 0) {
+      baseItems.push({ label: "Recent", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
+      for (const issue of recentTrackable) {
+        baseItems.push({
+          label: `$(history) #${issue.id} ${issue.subject}`,
+          description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
+          issue,
+          disabled: false,
+        });
+      }
+    }
+    if (otherTrackable.length > 0) {
+      baseItems.push({ label: "Assigned", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
+      for (const issue of otherTrackable) {
+        baseItems.push({
+          label: `#${issue.id} ${issue.subject}`,
+          description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
+          issue,
+          disabled: false,
+        });
+      }
+    }
+    if (nonTrackableIssues.length > 0) {
+      baseItems.push({ label: "No Time Tracking", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
+      for (const issue of nonTrackableIssues) {
+        baseItems.push({
+          label: `$(circle-slash) #${issue.id} ${issue.subject}`,
+          description: `${projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name ?? "Unknown"}`,
+          issue,
+          disabled: true,
+        });
+      }
+    }
   }
 
   // Use createQuickPick for inline search
@@ -716,6 +943,12 @@ export async function pickIssue(
       if (selected.disabled) return false;
       if (selected.issue) {
         resolved = true;
+        // Record selection for recent issues
+        recordRecentIssue(
+          selected.issue.id,
+          selected.issue.subject,
+          selected.issue.project?.name ?? ""
+        );
         quickPick.dispose();
         resolve(selected.issue);
         return true;
@@ -735,7 +968,8 @@ export async function pickIssue(
           server,
           query,
           issues,
-          projectPathMap
+          projectPathMap,
+          recentIds
         );
 
         if (thisSearchVersion !== searchVersion || resolved) return;

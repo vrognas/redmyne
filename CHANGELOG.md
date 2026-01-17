@@ -7,6 +7,15 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 ### Added
 
 - **Fuzzy issue search** - multi-term queries like "nuvalent non" now match issues across subject + project name (uses fuse.js)
+- **Search operators** - `project:xxx` and `status:xxx` filters in issue picker
+- **Recent issues** - previously selected issues shown first with $(history) icon
+- **Visual grouping** - issue picker grouped by Recent/Assigned/No Time Tracking sections
+- **Status-based ranking** - "In Progress" issues ranked above "New", "Resolved", etc.
+
+### Changed
+
+- **Faster debounce** - search debounce reduced from 300ms to 150ms
+- **Fuse index caching** - search index cached for 1 minute, faster subsequent searches
 
 ## [4.0.0]
 
