@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import Fuse, { IFuseOptions, FuseResult } from "fuse.js";
+import Fuse, { IFuseOptions } from "fuse.js";
 import { RedmineServer } from "../redmine/redmine-server";
 import { Issue } from "../redmine/models/issue";
 import { TimeEntryActivity } from "../redmine/models/common";
