@@ -202,7 +202,8 @@ function buildProjectPathMap(projects: RedmineProject[]): Map<number, string> {
 }
 
 // Score penalties for ranking (lower score = higher rank)
-const NON_ASSIGNED_PENALTY = 0.3;  // Non-assigned below assigned
+// Fuse.js scores are 0.0-0.4, penalties create clear tier separation
+const NON_ASSIGNED_PENALTY = 1.0;  // Non-assigned below assigned
 const CLOSED_PENALTY = 0.5;        // Closed below open
 
 /**
@@ -231,7 +232,7 @@ function fuzzyFilterIssues(
   // Helper to apply ranking boosts
   const applyBoosts = (score: number, issue: Issue): number => {
     let adjusted = score;
-    if (assignedIds && !assignedIds.has(issue.id)) {
+    if (!assignedIds?.has(issue.id)) {
       adjusted += NON_ASSIGNED_PENALTY;
     }
     if (issue.status?.is_closed) {
@@ -243,10 +244,9 @@ function fuzzyFilterIssues(
   if (tokens.length === 1) {
     const results = fuse.search(tokens[0]);
     // Sort with ranking boosts
-    return results
-      .map(r => ({ score: applyBoosts(r.score ?? 0, r.item.original), item: r.item }))
-      .sort((a, b) => a.score - b.score)
-      .map(r => r.item.original);
+    const scored = results.map(r => ({ score: applyBoosts(r.score ?? 0, r.item.original), item: r.item }));
+    scored.sort((a, b) => a.score - b.score);
+    return scored.map(r => r.item.original);
   }
 
   // Multi-token: search once per token, intersect results
@@ -395,6 +395,7 @@ export async function pickIssueWithSearch(
     const quickPick = vscode.window.createQuickPick<IssueQuickPickItem>();
     quickPick.title = title;
     quickPick.placeholder = "Type to search, or select from list";
+    quickPick.sortByLabel = false;  // Preserve our custom sort order
     quickPick.items = baseItems;
     quickPick.matchOnDescription = true;
 
@@ -703,6 +704,7 @@ export async function pickIssue(
     const quickPick = vscode.window.createQuickPick<IssueQuickPickItem>();
     quickPick.title = title;
     quickPick.placeholder = "Type to search, or select from list";
+    quickPick.sortByLabel = false;  // Preserve our custom sort order
     quickPick.items = baseItems;
     quickPick.matchOnDescription = true;
 
