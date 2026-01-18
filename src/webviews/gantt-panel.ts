@@ -477,7 +477,7 @@ export class GanttPanel {
 
     const panel = vscode.window.createWebviewPanel(
       "redmyneGantt",
-      "Redmine Gantt",
+      "Redmyne Gantt",
       column,
       {
         enableScripts: true,
@@ -713,7 +713,7 @@ export class GanttPanel {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="${csp}">
-  <title>Redmine Gantt</title>
+  <title>Redmyne Gantt</title>
   <link rel="stylesheet" href="${cssUri}">
 </head>
 <body>

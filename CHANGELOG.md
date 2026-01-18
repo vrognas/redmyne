@@ -2,6 +2,12 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.3.0]
+
+### Changed
+
+- **User-facing terminology** - command palette, error messages, and panel titles now say "Redmyne" instead of "Redmine" to distinguish the extension from the server software
+
 ## [4.2.0]
 
 ### Added

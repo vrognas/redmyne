@@ -41,7 +41,7 @@ export function registerConfigureCommand(
             { label: "$(settings-gear) Reconfigure Both", value: "both" },
           ],
           {
-            title: "Redmine Configuration",
+            title: "Redmyne Configuration",
             placeHolder: "What would you like to update?",
           }
         );
@@ -66,7 +66,7 @@ export function registerConfigureCommand(
             { label: "$(link) Change URL", value: "change" },
           ],
           {
-            title: "Redmine Configuration",
+            title: "Redmyne Configuration",
             placeHolder: "Your Redmine URL is configured. Do you want to change it?",
           }
         );
@@ -126,14 +126,14 @@ export function registerConfigureCommand(
       }
 
       await deps.updateConfiguredContext();
-      showStatusBarMessage("$(check) Redmine configured", 3000);
+      showStatusBarMessage("$(check) Redmyne configured", 3000);
     })
   );
 }
 
 async function promptForUrl(currentUrl?: string): Promise<string | undefined> {
   const prompt = currentUrl
-    ? "Update your Redmine server URL (changing URL will require new API key)"
+    ? "Update your server URL (changing URL will require new API key)"
     : "Step 1/2: Enter your Redmine server URL (HTTPS required)";
 
   return await vscode.window.showInputBox({

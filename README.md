@@ -6,7 +6,7 @@
 
 ```
 1. Install extension
-2. Ctrl+Shift+P → "Redmine: Set API Key"
+2. Ctrl+Shift+P → "Redmyne: Set API Key"
 3. Enter URL + API key
 ```
 
@@ -157,7 +157,7 @@ Stage tasks before timing them.
 | `redmine.identifier` | Default project identifier | `""` |
 | `redmine.additionalHeaders` | Custom HTTP headers for auth proxies | `{}` |
 
-API keys stored via `Redmine: Set API Key` command (encrypted keychain).
+API keys stored via `Redmyne: Set API Key` command (encrypted keychain).
 
 ### Working Hours
 
@@ -222,14 +222,14 @@ Stay in your IDE. Stay in flow.
 
 | Command | Description |
 |---------|-------------|
-| `Redmine: Set API Key` | Configure server URL and API key |
-| `Redmine: Quick Log Time` | Log time with keyboard (Ctrl+Y Ctrl+Y) |
-| `Redmine: Quick Create Issue` | Create issue wizard (Ctrl+Y Ctrl+N) |
-| `Redmine: Plan Day` | Set up timer work units (Ctrl+Y Ctrl+T) |
-| `Redmine: Show Gantt` | Open Gantt chart |
-| `Redmine: Edit Monthly Working Hours` | Configure FTE per month |
-| `Redmine: Show API Output` | View API request/response log |
-| `Redmine: Toggle API Logging` | Enable/disable request logging |
+| `Redmyne: Set API Key` | Configure server URL and API key |
+| `Redmyne: Quick Log Time` | Log time with keyboard (Ctrl+Y Ctrl+Y) |
+| `Redmyne: Quick Create Issue` | Create issue wizard (Ctrl+Y Ctrl+N) |
+| `Redmyne: Plan Day` | Set up timer work units (Ctrl+Y Ctrl+T) |
+| `Redmyne: Show Gantt` | Open Gantt chart |
+| `Redmyne: Edit Monthly Working Hours` | Configure FTE per month |
+| `Redmyne: Show API Output` | View API request/response log |
+| `Redmyne: Toggle API Logging` | Enable/disable request logging |
 
 </details>
 

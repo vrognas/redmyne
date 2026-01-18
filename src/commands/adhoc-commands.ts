@@ -42,7 +42,7 @@ export async function contributeToIssue(
   }
 
   if (!server) {
-    vscode.window.showErrorMessage("Not connected to Redmine");
+    vscode.window.showErrorMessage("Not connected to Redmyne");
     return;
   }
 
@@ -135,7 +135,7 @@ export async function removeContribution(
   }
 
   if (!server) {
-    vscode.window.showErrorMessage("Not connected to Redmine");
+    vscode.window.showErrorMessage("Not connected to Redmyne");
     return;
   }
 

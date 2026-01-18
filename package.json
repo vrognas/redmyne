@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "4.2.0",
+  "version": "4.3.0",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -31,23 +31,23 @@
       },
       {
         "command": "redmyne.setApiKey",
-        "title": "Redmine: Set API Key"
+        "title": "Redmyne: Set API Key"
       },
       {
         "command": "redmyne.listOpenIssuesAssignedToMe",
-        "title": "Redmine: List open issues assigned to me"
+        "title": "Redmyne: List open issues assigned to me"
       },
       {
         "command": "redmyne.openActionsForIssue",
-        "title": "Redmine: Actions for issue"
+        "title": "Redmyne: Actions for issue"
       },
       {
         "command": "redmyne.newIssue",
-        "title": "Redmine: Create new issue"
+        "title": "Redmyne: Create new issue"
       },
       {
         "command": "redmyne.openActionsForIssueUnderCursor",
-        "title": "Redmine: Actions for issue under cursor"
+        "title": "Redmyne: Actions for issue under cursor"
       },
       {
         "command": "redmyne.quickLogTime",
@@ -122,19 +122,19 @@
       },
       {
         "command": "redmyne.showApiOutput",
-        "title": "Redmine: Show API Output"
+        "title": "Redmyne: Show API Output"
       },
       {
         "command": "redmyne.clearApiOutput",
-        "title": "Redmine: Clear API Output"
+        "title": "Redmyne: Clear API Output"
       },
       {
         "command": "redmyne.toggleApiLogging",
-        "title": "Redmine: Toggle API Logging"
+        "title": "Redmyne: Toggle API Logging"
       },
       {
         "command": "redmyne.workingHours.editMonth",
-        "title": "Redmine: Edit Monthly Working Hours"
+        "title": "Redmyne: Edit Monthly Working Hours"
       },
       {
         "command": "redmyne.refreshTimeEntries",
@@ -307,7 +307,7 @@
       },
       {
         "command": "redmyne.createTestIssues",
-        "title": "Redmine: Create Test Issues"
+        "title": "Redmyne: Create Test Issues"
       },
       {
         "command": "redmyne.quickCreateIssue",
@@ -701,16 +701,16 @@
       },
       {
         "view": "redmyne-explorer-projects",
-        "contents": "No Redmine configuration found.\n[Configure Redmine](command:redmyne.configure)\nSet up your Redmine server URL and API key to get started.",
+        "contents": "No Redmine server configured.\n[Configure Redmine Server](command:redmyne.configure)\nSet up your Redmine server URL and API key to get started.",
         "when": "!redmyne:configured"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
-          "title": "Redmine",
+          "title": "Redmyne",
           "id": "redmyne-explorer",
-          "name": "Redmine",
+          "name": "Redmyne",
           "icon": "logo.svg"
         }
       ]
@@ -1825,7 +1825,7 @@
       ]
     },
     "configuration": {
-      "title": "Redmine Integration",
+      "title": "Redmyne Settings",
       "properties": {
         "redmyne.url": {
           "type": "string",
@@ -1838,8 +1838,8 @@
         },
         "redmyne.apiKey": {
           "type": "string",
-          "description": "DEPRECATED: Use 'Redmine: Set API Key' command instead",
-          "deprecationMessage": "API keys now stored in VS Code secrets. Run 'Redmine: Set API Key'",
+          "description": "DEPRECATED: Use 'Redmyne: Set API Key' command instead",
+          "deprecationMessage": "API keys now stored in VS Code secrets. Run 'Redmyne: Set API Key'",
           "scope": "machine"
         },
         "redmyne.identifier": {

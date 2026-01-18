@@ -405,7 +405,7 @@ export function activate(context: vscode.ExtensionContext): void {
         // Status bar updates via projectsTree event listener
       } catch (error) {
         vscode.window.showErrorMessage(
-          `Failed to initialize Redmine server: ${error}`
+          `Failed to initialize server: ${error}`
         );
       }
     } else {
@@ -489,7 +489,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
     if (!url) {
       vscode.window.showErrorMessage(
-        'No Redmine URL configured. Run "Redmine: Configure"'
+        'No Redmine URL configured. Run "Configure Redmine Server"'
       );
       return Promise.resolve({ props: undefined, args: [] });
     }
@@ -499,7 +499,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
     if (!apiKey) {
       vscode.window.showErrorMessage(
-        'No API key configured. Run "Redmine: Configure"'
+        'No API key configured. Run "Configure Redmine Server"'
       );
       return Promise.resolve({ props: undefined, args: [] });
     }

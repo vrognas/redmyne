@@ -28,7 +28,7 @@ export function registerKanbanCommands(
     vscode.commands.registerCommand("redmyne.kanban.add", async () => {
       const server = getServer();
       if (!server) {
-        showActionableError("Redmine not configured", [
+        showActionableError("Redmyne not configured", [
           { title: "Configure", command: "redmyne.configure" },
         ]);
         return;
@@ -140,7 +140,7 @@ export function registerKanbanCommands(
 
         const server = getServer();
         if (!server) {
-          showActionableError("Redmine not configured", [
+          showActionableError("Redmyne not configured", [
           { title: "Configure", command: "redmyne.configure" },
         ]);
           return;
@@ -177,7 +177,7 @@ export function registerKanbanCommands(
     vscode.commands.registerCommand("redmyne.kanban.refreshParentProjects", async () => {
       const server = getServer();
       if (!server) {
-        showActionableError("Redmine not configured", [
+        showActionableError("Redmyne not configured", [
           { title: "Configure", command: "redmyne.configure" },
         ]);
         return;
@@ -302,7 +302,7 @@ export function registerKanbanCommands(
 
         const server = getServer();
         if (!server) {
-          showActionableError("Redmine not configured", [
+          showActionableError("Redmyne not configured", [
             { title: "Configure", command: "redmyne.configure" },
           ]);
           return;
@@ -416,7 +416,7 @@ export function registerKanbanCommands(
 
         const server = getServer();
         if (!server) {
-          showActionableError("Redmine not configured", [
+          showActionableError("Redmyne not configured", [
             { title: "Configure", command: "redmyne.configure" },
           ]);
           return;
@@ -509,7 +509,7 @@ export function registerKanbanCommands(
 
         const server = getServer();
         if (!server) {
-          showActionableError("Redmine not configured", [
+          showActionableError("Redmyne not configured", [
             { title: "Configure", command: "redmyne.configure" },
           ]);
           return;
