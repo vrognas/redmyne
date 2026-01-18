@@ -36,6 +36,7 @@ export interface TimeEntryNode {
   _entry?: TimeEntry;
   _dateRange?: { start: string; end: string }; // For filling empty working days
   _date?: string; // ISO date for day-group nodes (YYYY-MM-DD)
+  _weekStart?: string; // ISO date for week start (YYYY-MM-DD) for copy/paste
   _monthYear?: { year: number; month: number }; // For lazy-loaded month nodes
   _isDraft?: boolean; // True for draft time entries
 }
@@ -414,8 +415,10 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
           tooltip: "Shows working days from Monday up to today",
           collapsibleState: this.getCollapsibleState("group-week", true),
           type: "week-group",
+          contextValue: "week-group",
           _cachedEntries: weekWithDrafts,
           _dateRange: { start: weekStart, end: today },
+          _weekStart: weekStart,
         },
       ];
 
@@ -623,8 +626,10 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         tooltip: `${weekRange.start} to ${cappedEnd}`,
         collapsibleState: this.getCollapsibleState(nodeId, true),
         type: "week-subgroup" as const,
+        contextValue: "week-group",
         _cachedEntries: weekEntries,
         _dateRange: { start: weekRange.start, end: cappedEnd },
+        _weekStart: weekRange.start,
       };
     });
   }

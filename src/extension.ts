@@ -28,6 +28,7 @@ import { KanbanTreeProvider } from "./kanban/kanban-tree-provider";
 import { registerKanbanCommands } from "./kanban/kanban-commands";
 import { getTaskStatus } from "./kanban/kanban-state";
 import { registerTimeEntryCommands } from "./commands/time-entry-commands";
+import { updateClipboardContext } from "./utilities/time-entry-clipboard";
 import { registerMonthlyScheduleCommands } from "./commands/monthly-schedule-commands";
 import { registerGanttCommands } from "./commands/gantt-commands";
 import { registerInternalEstimateCommands } from "./commands/internal-estimate-commands";
@@ -94,6 +95,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Initialize ad-hoc budget tracker
   adHocTracker.initialize(context);
+
+  // Initialize time entry clipboard context (for copy/paste)
+  updateClipboardContext();
 
   // Initialize draft mode manager
   const draftModeManager = new DraftModeManager({
@@ -318,6 +322,7 @@ export function activate(context: vscode.ExtensionContext): void {
       // Also refresh Gantt if open (time entries affect contribution data)
       vscode.commands.executeCommand("redmyne.refreshGanttData");
     },
+    getMonthlySchedules: () => cleanupResources.monthlySchedules ?? {},
   });
 
   // Register monthly schedule commands

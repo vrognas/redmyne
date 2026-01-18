@@ -10,6 +10,16 @@ import { showStatusBarMessage } from "../utilities/status-bar";
 import { validateDateInput } from "../utilities/date-picker";
 import { quickLogTime } from "./quick-log-time";
 import { pickIssue } from "../utilities/issue-picker";
+import {
+  setClipboard,
+  getClipboard,
+  ClipboardEntry,
+  calculatePasteTargetDates,
+  getEntriesForTargetDate,
+} from "../utilities/time-entry-clipboard";
+import { parseLocalDate } from "../utilities/date-utils";
+import { DEFAULT_WEEKLY_SCHEDULE, WeeklySchedule } from "../utilities/flexibility-calculator";
+import { MonthlyScheduleOverrides } from "../utilities/monthly-schedule";
 
 /** Time entry node from tree view */
 interface TimeEntryNode {
@@ -27,11 +37,37 @@ interface TimeEntryNode {
 /** Day group node from tree view */
 interface DayGroupNode {
   _date?: string; // YYYY-MM-DD
+  _cachedEntries?: Array<{
+    id?: number;
+    issue_id?: number;
+    issue?: { id: number };
+    activity_id?: number;
+    activity?: { id: number };
+    hours: string;
+    comments: string;
+    spent_on?: string;
+  }>;
+}
+
+/** Week group node from tree view */
+interface WeekGroupNode {
+  _weekStart?: string; // YYYY-MM-DD (Monday)
+  _cachedEntries?: Array<{
+    id?: number;
+    issue_id?: number;
+    issue?: { id: number };
+    activity_id?: number;
+    activity?: { id: number };
+    hours: string;
+    comments: string;
+    spent_on?: string;
+  }>;
 }
 
 export interface TimeEntryCommandDeps {
   getServer: () => RedmineServer | undefined;
   refreshTree: () => void;
+  getMonthlySchedules?: () => MonthlyScheduleOverrides;
 }
 
 export function registerTimeEntryCommands(
@@ -236,5 +272,261 @@ export function registerTimeEntryCommands(
       );
       deps.refreshTree();
     })
+  );
+
+  // Copy single time entry
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmyne.copyTimeEntry", (node: TimeEntryNode) => {
+      const entry = node?._entry;
+      if (!entry) {
+        vscode.window.showErrorMessage("No time entry selected");
+        return;
+      }
+
+      const clipEntry: ClipboardEntry = {
+        issue_id: entry.issue_id ?? entry.issue?.id ?? 0,
+        activity_id: entry.activity?.id ?? 0,
+        hours: entry.hours,
+        comments: entry.comments || "",
+      };
+
+      setClipboard({
+        kind: "entry",
+        entries: [clipEntry],
+        sourceDate: entry.spent_on,
+      });
+
+      showStatusBarMessage("$(copy) Copied", 2000);
+    })
+  );
+
+  // Copy all entries from a day
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmyne.copyDayTimeEntries", (node: DayGroupNode) => {
+      const entries = node?._cachedEntries;
+      if (!entries || entries.length === 0) {
+        // Allow copying empty day (results in empty paste)
+        setClipboard({
+          kind: "day",
+          entries: [],
+          sourceDate: node?._date,
+        });
+        showStatusBarMessage("$(copy) Day copied (empty)", 2000);
+        return;
+      }
+
+      // Filter out drafts (negative IDs)
+      const clipEntries: ClipboardEntry[] = entries
+        .filter((e) => (e.id ?? 0) >= 0)
+        .map((e) => ({
+          issue_id: e.issue_id ?? e.issue?.id ?? 0,
+          activity_id: e.activity_id ?? e.activity?.id ?? 0,
+          hours: e.hours,
+          comments: e.comments || "",
+        }));
+
+      setClipboard({
+        kind: "day",
+        entries: clipEntries,
+        sourceDate: node._date,
+      });
+
+      const count = clipEntries.length;
+      showStatusBarMessage(`$(copy) ${count} ${count === 1 ? "entry" : "entries"} copied`, 2000);
+    })
+  );
+
+  // Copy all entries from a week
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmyne.copyWeekTimeEntries", (node: WeekGroupNode) => {
+      const entries = node?._cachedEntries;
+      const weekStart = node?._weekStart;
+      if (!weekStart) {
+        vscode.window.showErrorMessage("Could not determine week start");
+        return;
+      }
+
+      // Group entries by day-of-week (0=Mon)
+      const weekMap = new Map<number, ClipboardEntry[]>();
+      const allEntries: ClipboardEntry[] = [];
+
+      if (entries && entries.length > 0) {
+        const monday = parseLocalDate(weekStart);
+
+        for (const e of entries) {
+          // Filter out drafts
+          if ((e.id ?? 0) < 0) continue;
+
+          const clipEntry: ClipboardEntry = {
+            issue_id: e.issue_id ?? e.issue?.id ?? 0,
+            activity_id: e.activity_id ?? e.activity?.id ?? 0,
+            hours: e.hours,
+            comments: e.comments || "",
+          };
+          allEntries.push(clipEntry);
+
+          // Calculate day offset from Monday
+          if (e.spent_on) {
+            const entryDate = parseLocalDate(e.spent_on);
+            const dayOffset = Math.floor(
+              (entryDate.getTime() - monday.getTime()) / (1000 * 60 * 60 * 24)
+            );
+            if (dayOffset >= 0 && dayOffset < 7) {
+              if (!weekMap.has(dayOffset)) {
+                weekMap.set(dayOffset, []);
+              }
+              weekMap.get(dayOffset)!.push(clipEntry);
+            }
+          }
+        }
+      }
+
+      setClipboard({
+        kind: "week",
+        entries: allEntries,
+        weekMap,
+        sourceWeekStart: weekStart,
+      });
+
+      const count = allEntries.length;
+      showStatusBarMessage(
+        count === 0
+          ? "$(copy) Week copied (empty)"
+          : `$(copy) ${count} ${count === 1 ? "entry" : "entries"} copied`,
+        2000
+      );
+    })
+  );
+
+  // Paste time entries
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "redmyne.pasteTimeEntries",
+      async (node: DayGroupNode | WeekGroupNode) => {
+        const clipboard = getClipboard();
+        if (!clipboard || clipboard.entries.length === 0) {
+          vscode.window.showInformationMessage("Clipboard is empty");
+          return;
+        }
+
+        const server = deps.getServer();
+        if (!server) {
+          vscode.window.showErrorMessage("No Redmine server configured");
+          return;
+        }
+
+        // Determine target type and date
+        const isDayTarget = "_date" in node && !!node._date;
+        const isWeekTarget = "_weekStart" in node && !!node._weekStart;
+
+        if (!isDayTarget && !isWeekTarget) {
+          vscode.window.showErrorMessage("Invalid paste target");
+          return;
+        }
+
+        const targetKind = isDayTarget ? "day" : "week";
+        const targetDate = isDayTarget ? (node as DayGroupNode)._date : undefined;
+        const targetWeekStart = isWeekTarget ? (node as WeekGroupNode)._weekStart : undefined;
+
+        // Get schedule config
+        const config = vscode.workspace.getConfiguration("redmyne.workingHours");
+        const schedule = config.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
+        const overrides = deps.getMonthlySchedules?.() ?? {};
+
+        // Calculate target dates
+        const targetDates = calculatePasteTargetDates(
+          clipboard,
+          targetKind,
+          targetDate,
+          targetWeekStart,
+          schedule,
+          overrides
+        );
+
+        if (targetDates === null) {
+          vscode.window.showErrorMessage("Cannot paste week to a single day");
+          return;
+        }
+
+        if (targetDates.length === 0) {
+          vscode.window.showInformationMessage("No working days in target range");
+          return;
+        }
+
+        // Calculate total entries to create
+        let totalEntries = 0;
+        if (clipboard.kind === "week" && targetKind === "week" && clipboard.weekMap) {
+          // Week→Week: entries per mapped day
+          for (const date of targetDates) {
+            const dayEntries = getEntriesForTargetDate(clipboard, date, targetWeekStart!);
+            totalEntries += dayEntries.length;
+          }
+        } else {
+          // Entry/Day→Day or Entry/Day→Week: all entries for each target date
+          totalEntries = clipboard.entries.length * targetDates.length;
+        }
+
+        if (totalEntries === 0) {
+          vscode.window.showInformationMessage("No entries to paste");
+          return;
+        }
+
+        // Confirmation
+        const confirm = await vscode.window.showInformationMessage(
+          `Create ${totalEntries} time ${totalEntries === 1 ? "entry" : "entries"}?`,
+          { modal: true },
+          "Create"
+        );
+        if (confirm !== "Create") return;
+
+        // Execute paste with progress
+        await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: "Creating time entries..." },
+          async (progress) => {
+            let created = 0;
+            const errors: string[] = [];
+
+            for (const date of targetDates) {
+              // Get entries for this date
+              const entriesToCreate =
+                clipboard.kind === "week" && targetKind === "week"
+                  ? getEntriesForTargetDate(clipboard, date, targetWeekStart!)
+                  : clipboard.entries;
+
+              for (const entry of entriesToCreate) {
+                try {
+                  await server.addTimeEntry(
+                    entry.issue_id,
+                    entry.activity_id,
+                    entry.hours,
+                    entry.comments,
+                    date
+                  );
+                  created++;
+                  progress.report({
+                    increment: (1 / totalEntries) * 100,
+                    message: `${created}/${totalEntries}`,
+                  });
+                } catch (error) {
+                  errors.push(`${date}: ${error}`);
+                }
+              }
+            }
+
+            if (errors.length > 0) {
+              vscode.window.showWarningMessage(
+                `Created ${created}/${totalEntries} entries. ${errors.length} failed.`
+              );
+            } else {
+              showStatusBarMessage(`$(check) Created ${created} entries`, 2000);
+            }
+          }
+        );
+
+        deps.refreshTree();
+        // Refresh Gantt if open
+        vscode.commands.executeCommand("redmyne.refreshGanttData");
+      }
+    )
   );
 }

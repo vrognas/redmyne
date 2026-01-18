@@ -2,6 +2,18 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Copy/Paste Time Entries** - copy and paste time entries, days, or weeks
+  - Copy single entry: right-click time entry → Copy
+  - Copy day: right-click day group → Copy Day
+  - Copy week: right-click week group → Copy Week
+  - Paste to day or week targets with smart date mapping
+  - Week→week preserves day-of-week (Mon→Mon, Tue→Tue)
+  - Respects working days from `weeklySchedule` and monthly overrides
+
 ## [4.4.0]
 
 ### Added

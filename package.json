@@ -167,6 +167,22 @@
         "title": "Add Time Entry..."
       },
       {
+        "command": "redmyne.copyTimeEntry",
+        "title": "Copy"
+      },
+      {
+        "command": "redmyne.copyDayTimeEntries",
+        "title": "Copy Day"
+      },
+      {
+        "command": "redmyne.copyWeekTimeEntries",
+        "title": "Copy Week"
+      },
+      {
+        "command": "redmyne.pasteTimeEntries",
+        "title": "Paste"
+      },
+      {
         "command": "redmyne.openIssueInBrowser",
         "title": "Open in Browser",
         "icon": "$(link-external)"
@@ -1001,6 +1017,22 @@
           "when": "false"
         },
         {
+          "command": "redmyne.copyTimeEntry",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.copyDayTimeEntries",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.copyWeekTimeEntries",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.pasteTimeEntries",
+          "when": "false"
+        },
+        {
           "command": "redmyne.openIssueInBrowser",
           "when": "false"
         },
@@ -1350,6 +1382,31 @@
           "command": "redmyne.addTimeEntryForDate",
           "when": "view == 'redmyne-explorer-my-time-entries' && viewItem == 'day-group'",
           "group": "1_edit@1"
+        },
+        {
+          "command": "redmyne.copyTimeEntry",
+          "when": "view == 'redmyne-explorer-my-time-entries' && viewItem =~ /^time-entry/ && viewItem != 'time-entry-draft'",
+          "group": "1_edit@3"
+        },
+        {
+          "command": "redmyne.copyDayTimeEntries",
+          "when": "view == 'redmyne-explorer-my-time-entries' && viewItem == 'day-group'",
+          "group": "1_edit@2"
+        },
+        {
+          "command": "redmyne.copyWeekTimeEntries",
+          "when": "view == 'redmyne-explorer-my-time-entries' && viewItem == 'week-group'",
+          "group": "1_edit@1"
+        },
+        {
+          "command": "redmyne.pasteTimeEntries",
+          "when": "view == 'redmyne-explorer-my-time-entries' && viewItem == 'day-group' && redmyne:timeEntryClipboardType =~ /^(entry|day)$/",
+          "group": "1_edit@3"
+        },
+        {
+          "command": "redmyne.pasteTimeEntries",
+          "when": "view == 'redmyne-explorer-my-time-entries' && viewItem == 'week-group' && redmyne:timeEntryClipboardType",
+          "group": "1_edit@2"
         },
         {
           "command": "redmyne.openIssueInBrowser",
