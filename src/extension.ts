@@ -425,8 +425,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
         // Load draft queue with server identity check (async, non-blocking)
         hashString(config.get<string>("url")! + apiKey!).then((serverIdentity) => {
-          draftQueue.load(serverIdentity).catch((err) => {
-            console.error("Failed to load draft queue:", err);
+          draftQueue.load(serverIdentity).catch(() => {
+            // Silent fail - draft queue loading is non-critical
           });
         });
 
