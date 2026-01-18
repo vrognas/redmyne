@@ -1,4 +1,4 @@
-import { formatCustomFieldValue } from "../../../src/utilities/custom-field-formatter";
+import { formatCustomFieldValue, isCustomFieldMeaningful } from "../../../src/utilities/custom-field-formatter";
 
 describe("formatCustomFieldValue", () => {
   it("returns empty string for null", () => {
@@ -56,5 +56,50 @@ describe("formatCustomFieldValue", () => {
 
   it("returns empty for empty array", () => {
     expect(formatCustomFieldValue([])).toBe("");
+  });
+});
+
+describe("isCustomFieldMeaningful", () => {
+  it("returns false for null", () => {
+    expect(isCustomFieldMeaningful(null)).toBe(false);
+  });
+
+  it("returns false for empty string", () => {
+    expect(isCustomFieldMeaningful("")).toBe(false);
+  });
+
+  it("returns false for '0'", () => {
+    expect(isCustomFieldMeaningful("0")).toBe(false);
+  });
+
+  it("returns false for 0 (number)", () => {
+    expect(isCustomFieldMeaningful(0)).toBe(false);
+  });
+
+  it("returns false for '0.0'", () => {
+    expect(isCustomFieldMeaningful("0.0")).toBe(false);
+  });
+
+  it("returns false for '0.00'", () => {
+    expect(isCustomFieldMeaningful("0.00")).toBe(false);
+  });
+
+  it("returns true for non-zero numbers", () => {
+    expect(isCustomFieldMeaningful(42)).toBe(true);
+    expect(isCustomFieldMeaningful("123")).toBe(true);
+    expect(isCustomFieldMeaningful("3920")).toBe(true);
+  });
+
+  it("returns true for non-empty strings", () => {
+    expect(isCustomFieldMeaningful("hello")).toBe(true);
+    expect(isCustomFieldMeaningful("Pharmacometrics")).toBe(true);
+  });
+
+  it("returns true for arrays with values", () => {
+    expect(isCustomFieldMeaningful(["a", "b"])).toBe(true);
+  });
+
+  it("returns false for empty arrays", () => {
+    expect(isCustomFieldMeaningful([])).toBe(false);
   });
 });

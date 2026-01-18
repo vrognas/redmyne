@@ -4,7 +4,7 @@ import { RedmineServer } from "../redmine/redmine-server";
 import { RedmineProject } from "../redmine/redmine-project";
 import { FlexibilityScore } from "./flexibility-calculator";
 import { formatHoursAsHHMM } from "./time-input";
-import { formatCustomFieldValue } from "./custom-field-formatter";
+import { formatCustomFieldValue, isCustomFieldMeaningful } from "./custom-field-formatter";
 
 /**
  * Creates a VS Code TreeItem for displaying a Redmine issue
@@ -112,6 +112,7 @@ export function createEnhancedIssueTreeItem(
 
 /**
  * Creates rich tooltip with flexibility details
+ * Compact layout: metadata on one line, clear sections
  */
 function createFlexibilityTooltip(
   issue: Issue,
@@ -127,54 +128,53 @@ function createFlexibilityTooltip(
   md.isTrusted = true;
   md.supportHtml = true;
 
-  const subject = issue.subject?.trim();
-  const subjectText = subject ? subject : "Unknown";
+  const subject = issue.subject?.trim() || "Unknown";
+  const tracker = issue.tracker?.name?.trim() ?? "Unknown";
+  const priority = issue.priority?.name?.trim() ?? "Unknown";
 
-  md.appendMarkdown(`**#${issue.id}: ${subjectText}**\n\n`);
-  md.appendMarkdown(`**Tracker:** ${issue.tracker?.name?.trim() ?? "Unknown"}\n\n`);
-  md.appendMarkdown(`**Priority:** ${issue.priority?.name?.trim() ?? "Unknown"}\n\n`);
-  md.appendMarkdown(`**Progress:** ${formatHoursAsHHMM(spentHours)} / ${formatHoursAsHHMM(estHours)} (${progress}%)\n\n`);
+  // Header
+  md.appendMarkdown(`**#${issue.id}: ${subject}**\n\n`);
 
+  // Compact metadata line
+  md.appendMarkdown(`${tracker} · ${priority} · ${statusText}\n\n`);
+
+  // Progress line
+  const progressLine = [`${formatHoursAsHHMM(spentHours)}/${formatHoursAsHHMM(estHours)} (${progress}%)`];
   if (flexibility.status !== "completed") {
-    md.appendMarkdown(`**Days Remaining:** ${flexibility.daysRemaining}\n\n`);
-    md.appendMarkdown(`**Hours Remaining:** ${formatHoursAsHHMM(flexibility.hoursRemaining)}\n\n`);
-    md.appendMarkdown(
-      `**Flexibility:** ${flexibility.remaining >= 0 ? "+" : ""}${flexibility.remaining}%\n\n`
-    );
+    progressLine.push(`${flexibility.daysRemaining}d left`);
   }
+  if (issue.due_date) {
+    progressLine.push(`due ${issue.due_date}`);
+  }
+  md.appendMarkdown(`${progressLine.join(" · ")}\n\n`);
 
-  md.appendMarkdown(`**Status:** ${statusText}\n\n`);
-
-  // Add description if present
+  // Description section
   if (issue.description?.trim()) {
     md.appendMarkdown(`---\n\n${issue.description.trim()}\n\n`);
   }
 
-  // Add relations if present
+  // Relations section
   if (issue.relations && issue.relations.length > 0) {
     const relationsText = formatRelations(issue.relations);
     if (relationsText) {
+      if (!issue.description?.trim()) md.appendMarkdown("---\n\n");
       md.appendMarkdown(relationsText);
     }
   }
 
-  // Add custom fields if present
-  if (issue.custom_fields && issue.custom_fields.length > 0) {
-    for (const cf of issue.custom_fields) {
+  // Custom fields section (only meaningful values)
+  const meaningfulFields = issue.custom_fields?.filter(cf => isCustomFieldMeaningful(cf.value)) ?? [];
+  if (meaningfulFields.length > 0) {
+    md.appendMarkdown("---\n\n");
+    for (const cf of meaningfulFields) {
       const val = formatCustomFieldValue(cf.value);
-      if (val) {
-        md.appendMarkdown("**");
-        md.appendText(`${cf.name}:`);
-        md.appendMarkdown("** ");
-        md.appendText(val);
-        md.appendMarkdown("\n\n");
-      }
+      md.appendMarkdown(`**${cf.name}:** ${val}\n\n`);
     }
   }
 
+  // Browser link
   if (server) {
-    const baseUrl = server.options.address;
-    md.appendMarkdown(`[Open in Browser](${baseUrl}/issues/${issue.id})`);
+    md.appendMarkdown(`[Open in Browser](${server.options.address}/issues/${issue.id})`);
   }
 
   return md;
@@ -182,6 +182,7 @@ function createFlexibilityTooltip(
 
 /**
  * Creates basic tooltip for issues without flexibility data
+ * Compact layout: metadata on one line, clear sections
  */
 function createBasicTooltip(
   issue: Issue,
@@ -194,52 +195,56 @@ function createBasicTooltip(
   md.isTrusted = true;
   md.supportHtml = true;
 
-  const subject = issue.subject?.trim();
-  const subjectText = subject ? subject : "Unknown";
+  const subject = issue.subject?.trim() || "Unknown";
+  const tracker = issue.tracker?.name?.trim() ?? "Unknown";
+  const priority = issue.priority?.name?.trim() ?? "Unknown";
+  const status = issue.status?.name?.trim() ?? "Unknown";
 
-  md.appendMarkdown(`**#${issue.id}: ${subjectText}**\n\n`);
-  md.appendMarkdown(`**Tracker:** ${issue.tracker?.name?.trim() ?? "Unknown"}\n\n`);
-  md.appendMarkdown(`**Priority:** ${issue.priority?.name?.trim() ?? "Unknown"}\n\n`);
-  md.appendMarkdown(`**Status:** ${issue.status?.name?.trim() ?? "Unknown"}\n\n`);
+  // Header
+  md.appendMarkdown(`**#${issue.id}: ${subject}**\n\n`);
 
-  if (issue.due_date) {
-    md.appendMarkdown(`**Due Date:** ${issue.due_date}\n\n`);
-  }
+  // Compact metadata line
+  md.appendMarkdown(`${tracker} · ${priority} · ${status}\n\n`);
 
+  // Details line (hours and due date if present)
+  const details: string[] = [];
   if (estHours > 0 || spentHours > 0) {
-    md.appendMarkdown(`**Hours:** ${formatHoursAsHHMM(spentHours)} / ${formatHoursAsHHMM(estHours)}\n\n`);
+    details.push(`${formatHoursAsHHMM(spentHours)}/${formatHoursAsHHMM(estHours)}`);
+  }
+  if (issue.due_date) {
+    details.push(`due ${issue.due_date}`);
+  }
+  if (details.length > 0) {
+    md.appendMarkdown(`${details.join(" · ")}\n\n`);
   }
 
-  // Add description if present
+  // Description section
   if (issue.description?.trim()) {
     md.appendMarkdown(`---\n\n${issue.description.trim()}\n\n`);
   }
 
-  // Add relations if present
+  // Relations section
   if (issue.relations && issue.relations.length > 0) {
     const relationsText = formatRelations(issue.relations);
     if (relationsText) {
+      if (!issue.description?.trim()) md.appendMarkdown("---\n\n");
       md.appendMarkdown(relationsText);
     }
   }
 
-  // Add custom fields if present
-  if (issue.custom_fields && issue.custom_fields.length > 0) {
-    for (const cf of issue.custom_fields) {
+  // Custom fields section (only meaningful values)
+  const meaningfulFields = issue.custom_fields?.filter(cf => isCustomFieldMeaningful(cf.value)) ?? [];
+  if (meaningfulFields.length > 0) {
+    md.appendMarkdown("---\n\n");
+    for (const cf of meaningfulFields) {
       const val = formatCustomFieldValue(cf.value);
-      if (val) {
-        md.appendMarkdown("**");
-        md.appendText(`${cf.name}:`);
-        md.appendMarkdown("** ");
-        md.appendText(val);
-        md.appendMarkdown("\n\n");
-      }
+      md.appendMarkdown(`**${cf.name}:** ${val}\n\n`);
     }
   }
 
+  // Browser link
   if (server) {
-    const baseUrl = server.options.address;
-    md.appendMarkdown(`[Open in Browser](${baseUrl}/issues/${issue.id})`);
+    md.appendMarkdown(`[Open in Browser](${server.options.address}/issues/${issue.id})`);
   }
 
   return md;
