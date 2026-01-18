@@ -113,11 +113,11 @@ jobs:
           SIZE_BYTES=$(stat -c %s "$VSIX_FILE")
           SIZE_KB=$((SIZE_BYTES / 1024))
           echo "📦 VSIX size: ${SIZE_KB}KB"
-          if [ $SIZE_KB -gt 175 ]; then
-            echo "❌ VSIX size (${SIZE_KB}KB) exceeds 175KB threshold"
+          if [ $SIZE_KB -gt 150 ]; then
+            echo "❌ VSIX size (${SIZE_KB}KB) exceeds 150KB threshold"
             exit 1
           fi
-          echo "✅ Size check passed: ${SIZE_KB}KB / 175KB"
+          echo "✅ Size check passed: ${SIZE_KB}KB / 150KB"
 
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v6
