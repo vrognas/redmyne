@@ -1275,19 +1275,9 @@
           "group": "navigation@3"
         },
         {
-          "command": "redmyne.toggleTreeView",
-          "when": "view == 'redmyne-explorer-projects' && redmyne:treeViewStyle",
-          "group": "navigation@4"
-        },
-        {
-          "command": "redmyne.toggleListView",
-          "when": "view == 'redmyne-explorer-projects' && !redmyne:treeViewStyle",
-          "group": "navigation@4"
-        },
-        {
           "command": "redmyne.showGantt",
           "when": "view == 'redmyne-explorer-projects' && redmyne:configured",
-          "group": "navigation@5"
+          "group": "navigation@4"
         },
         {
           "command": "redmyne.configure",
