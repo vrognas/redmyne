@@ -175,7 +175,7 @@ describe("createEnhancedIssueTreeItem", () => {
     expect(treeItem.label).toBe("#7392 Test Issue");
   });
 
-  it("includes tracker name in compact metadata line", () => {
+  it("includes tracker name in tooltip", () => {
     const treeItem = createEnhancedIssueTreeItem(
       mockIssue,
       mockFlexibility,
@@ -183,9 +183,8 @@ describe("createEnhancedIssueTreeItem", () => {
       "test.command"
     );
 
-    // tooltip has compact metadata line: "Tracker · Priority · Status"
     const tooltipValue = (treeItem.tooltip as { value: string })?.value;
-    expect(tooltipValue).toContain("Tasks · Normal"); // tracker · priority
+    expect(tooltipValue).toContain("**Tracker:** Tasks");
   });
 
   it("does not show billable prefix in description (moved to tooltip)", () => {
@@ -309,7 +308,7 @@ describe("createEnhancedIssueTreeItem", () => {
     expect(tooltipValue).toContain("**Department:** Engineering");
   });
 
-  it("excludes empty and zero custom fields from tooltip", () => {
+  it("excludes empty custom fields but keeps zeros", () => {
     const issueWithEmptyFields: Issue = {
       ...mockIssue,
       custom_fields: [
@@ -332,8 +331,9 @@ describe("createEnhancedIssueTreeItem", () => {
     expect(tooltipValue).toContain("**Client:** Acme Corp");
     expect(tooltipValue).not.toContain("**Empty:**");
     expect(tooltipValue).not.toContain("**Null:**");
-    expect(tooltipValue).not.toContain("**Zero:**");
-    expect(tooltipValue).not.toContain("**ZeroFloat:**");
+    // Zero values ARE included (Yes/No fields use 0/1)
+    expect(tooltipValue).toContain("**Zero:** 0");
+    expect(tooltipValue).toContain("**ZeroFloat:** 0");
   });
 
   it("handles array custom field values in tooltip", () => {

@@ -4,7 +4,7 @@ import { RedmineServer } from "../redmine/redmine-server";
 import { RedmineProject } from "../redmine/redmine-project";
 import { FlexibilityScore } from "./flexibility-calculator";
 import { formatHoursAsHHMM } from "./time-input";
-import { formatCustomFieldValue, isCustomFieldMeaningful } from "./custom-field-formatter";
+import { formatCustomFieldValue } from "./custom-field-formatter";
 
 /**
  * Creates a VS Code TreeItem for displaying a Redmine issue
@@ -112,7 +112,7 @@ export function createEnhancedIssueTreeItem(
 
 /**
  * Creates rich tooltip with flexibility details
- * Compact layout: metadata on one line, clear sections
+ * Uses tight line breaks within sections, separators between groups
  */
 function createFlexibilityTooltip(
   issue: Issue,
@@ -129,24 +129,22 @@ function createFlexibilityTooltip(
   md.supportHtml = true;
 
   const subject = issue.subject?.trim() || "Unknown";
-  const tracker = issue.tracker?.name?.trim() ?? "Unknown";
-  const priority = issue.priority?.name?.trim() ?? "Unknown";
 
-  // Header
+  // Title
   md.appendMarkdown(`**#${issue.id}: ${subject}**\n\n`);
 
-  // Compact metadata line
-  md.appendMarkdown(`${tracker} · ${priority} · ${statusText}\n\n`);
-
-  // Progress line
-  const progressLine = [`${formatHoursAsHHMM(spentHours)}/${formatHoursAsHHMM(estHours)} (${progress}%)`];
-  if (flexibility.status !== "completed") {
-    progressLine.push(`${flexibility.daysRemaining}d left`);
-  }
+  // Core metadata (tight spacing with soft breaks)
+  md.appendMarkdown(`**Tracker:** ${issue.tracker?.name?.trim() ?? "Unknown"}  \n`);
+  md.appendMarkdown(`**Priority:** ${issue.priority?.name?.trim() ?? "Unknown"}  \n`);
+  md.appendMarkdown(`**Status:** ${statusText}  \n`);
   if (issue.due_date) {
-    progressLine.push(`due ${issue.due_date}`);
+    md.appendMarkdown(`**Due:** ${issue.due_date}  \n`);
   }
-  md.appendMarkdown(`${progressLine.join(" · ")}\n\n`);
+  md.appendMarkdown(`**Progress:** ${formatHoursAsHHMM(spentHours)} / ${formatHoursAsHHMM(estHours)} (${progress}%)`);
+  if (flexibility.status !== "completed") {
+    md.appendMarkdown(`  \n**Remaining:** ${flexibility.daysRemaining}d · ${formatHoursAsHHMM(flexibility.hoursRemaining)}h`);
+  }
+  md.appendMarkdown("\n\n");
 
   // Description section
   if (issue.description?.trim()) {
@@ -155,21 +153,22 @@ function createFlexibilityTooltip(
 
   // Relations section
   if (issue.relations && issue.relations.length > 0) {
-    const relationsText = formatRelations(issue.relations);
+    const relationsText = formatRelationsCompact(issue.relations);
     if (relationsText) {
-      if (!issue.description?.trim()) md.appendMarkdown("---\n\n");
-      md.appendMarkdown(relationsText);
+      md.appendMarkdown(`---\n\n${relationsText}\n\n`);
     }
   }
 
-  // Custom fields section (only meaningful values)
-  const meaningfulFields = issue.custom_fields?.filter(cf => isCustomFieldMeaningful(cf.value)) ?? [];
-  if (meaningfulFields.length > 0) {
+  // Custom fields section
+  if (issue.custom_fields && issue.custom_fields.length > 0) {
     md.appendMarkdown("---\n\n");
-    for (const cf of meaningfulFields) {
+    for (const cf of issue.custom_fields) {
       const val = formatCustomFieldValue(cf.value);
-      md.appendMarkdown(`**${cf.name}:** ${val}\n\n`);
+      if (val !== "") {
+        md.appendMarkdown(`**${cf.name}:** ${val}  \n`);
+      }
     }
+    md.appendMarkdown("\n");
   }
 
   // Browser link
@@ -182,7 +181,7 @@ function createFlexibilityTooltip(
 
 /**
  * Creates basic tooltip for issues without flexibility data
- * Compact layout: metadata on one line, clear sections
+ * Uses tight line breaks within sections, separators between groups
  */
 function createBasicTooltip(
   issue: Issue,
@@ -196,27 +195,21 @@ function createBasicTooltip(
   md.supportHtml = true;
 
   const subject = issue.subject?.trim() || "Unknown";
-  const tracker = issue.tracker?.name?.trim() ?? "Unknown";
-  const priority = issue.priority?.name?.trim() ?? "Unknown";
-  const status = issue.status?.name?.trim() ?? "Unknown";
 
-  // Header
+  // Title
   md.appendMarkdown(`**#${issue.id}: ${subject}**\n\n`);
 
-  // Compact metadata line
-  md.appendMarkdown(`${tracker} · ${priority} · ${status}\n\n`);
-
-  // Details line (hours and due date if present)
-  const details: string[] = [];
-  if (estHours > 0 || spentHours > 0) {
-    details.push(`${formatHoursAsHHMM(spentHours)}/${formatHoursAsHHMM(estHours)}`);
-  }
+  // Core metadata (tight spacing with soft breaks)
+  md.appendMarkdown(`**Tracker:** ${issue.tracker?.name?.trim() ?? "Unknown"}  \n`);
+  md.appendMarkdown(`**Priority:** ${issue.priority?.name?.trim() ?? "Unknown"}  \n`);
+  md.appendMarkdown(`**Status:** ${issue.status?.name?.trim() ?? "Unknown"}  \n`);
   if (issue.due_date) {
-    details.push(`due ${issue.due_date}`);
+    md.appendMarkdown(`**Due:** ${issue.due_date}  \n`);
   }
-  if (details.length > 0) {
-    md.appendMarkdown(`${details.join(" · ")}\n\n`);
+  if (estHours > 0 || spentHours > 0) {
+    md.appendMarkdown(`**Hours:** ${formatHoursAsHHMM(spentHours)} / ${formatHoursAsHHMM(estHours)}`);
   }
+  md.appendMarkdown("\n\n");
 
   // Description section
   if (issue.description?.trim()) {
@@ -225,21 +218,22 @@ function createBasicTooltip(
 
   // Relations section
   if (issue.relations && issue.relations.length > 0) {
-    const relationsText = formatRelations(issue.relations);
+    const relationsText = formatRelationsCompact(issue.relations);
     if (relationsText) {
-      if (!issue.description?.trim()) md.appendMarkdown("---\n\n");
-      md.appendMarkdown(relationsText);
+      md.appendMarkdown(`---\n\n${relationsText}\n\n`);
     }
   }
 
-  // Custom fields section (only meaningful values)
-  const meaningfulFields = issue.custom_fields?.filter(cf => isCustomFieldMeaningful(cf.value)) ?? [];
-  if (meaningfulFields.length > 0) {
+  // Custom fields section
+  if (issue.custom_fields && issue.custom_fields.length > 0) {
     md.appendMarkdown("---\n\n");
-    for (const cf of meaningfulFields) {
+    for (const cf of issue.custom_fields) {
       const val = formatCustomFieldValue(cf.value);
-      md.appendMarkdown(`**${cf.name}:** ${val}\n\n`);
+      if (val !== "") {
+        md.appendMarkdown(`**${cf.name}:** ${val}  \n`);
+      }
     }
+    md.appendMarkdown("\n");
   }
 
   // Browser link
@@ -300,6 +294,49 @@ function formatRelations(relations: IssueRelation[]): string {
   }
 
   return lines.join("");
+}
+
+/**
+ * Format relations with tight spacing (soft breaks)
+ */
+function formatRelationsCompact(relations: IssueRelation[]): string {
+  const groups: Record<string, number[]> = {};
+
+  for (const rel of relations) {
+    if (!groups[rel.relation_type]) {
+      groups[rel.relation_type] = [];
+    }
+    groups[rel.relation_type].push(rel.issue_to_id);
+  }
+
+  const lines: string[] = [];
+
+  const typeLabels: Record<string, string> = {
+    blocked: "Blocked by",
+    blocks: "Blocks",
+    precedes: "Precedes",
+    follows: "Follows",
+    relates: "Related to",
+    duplicates: "Duplicates",
+    duplicated: "Duplicated by",
+    copied_to: "Copied to",
+    copied_from: "Copied from",
+  };
+
+  const order = [
+    "blocked", "blocks", "precedes", "follows", "relates",
+    "duplicates", "duplicated", "copied_to", "copied_from",
+  ];
+
+  for (const type of order) {
+    if (groups[type] && groups[type].length > 0) {
+      const label = typeLabels[type] || type;
+      const ids = groups[type].map((id) => `#${id}`).join(", ");
+      lines.push(`**${label}:** ${ids}`);
+    }
+  }
+
+  return lines.join("  \n"); // Soft breaks between relations
 }
 
 /**
