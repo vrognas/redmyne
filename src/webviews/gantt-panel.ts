@@ -75,7 +75,6 @@ interface GanttRenderState {
   minDateMs: number;
   maxDateMs: number;
   totalDays: number;
-  extendedRelationTypes: boolean;
   redmineBaseUrl: string;
   minimapBarsData: GanttMinimapBar[];
   minimapHeight: number;
@@ -386,7 +385,6 @@ export class GanttPanel {
   private _showDependencies: boolean = true;
   private _showIntensity: boolean = false;
   private _scrollPosition: { left: number; top: number } = { left: 0, top: 0 };
-  private _extendedRelationTypes: boolean = false;
   private _visibleRelationTypes: Set<string> = new Set(["blocks", "precedes"]);
   private _closedStatusIds: Set<number> = new Set();
   private _debouncedCollapseUpdate: DebouncedFunction<() => void>;
@@ -758,16 +756,14 @@ export class GanttPanel {
     const extraColumnsWidth = idColumnWidth + startDateColumnWidth + statusColumnWidth + dueDateColumnWidth + assigneeColumnWidth;
     const stickyLeftWidth = labelWidth + resizeHandleWidth + extraColumnsWidth;
     const ganttConfig = vscode.workspace.getConfiguration("redmyne.gantt");
-    const extendedRelationTypes = ganttConfig.get<boolean>("extendedRelationTypes", false);
     const perfDebug = ganttConfig.get<boolean>("perfDebug", false);
-    const redmineBaseUrl = vscode.workspace.getConfiguration("redmyne").get<string>("url") || "";
+    const redmineBaseUrl = vscode.workspace.getConfiguration("redmyne").get<string>("serverUrl") || "";
 
     const baseState: GanttRenderState = {
       timelineWidth: 600,
       minDateMs: now,
       maxDateMs: now + 86400000,
       totalDays: 1,
-      extendedRelationTypes,
       redmineBaseUrl,
       minimapBarsData: [],
       minimapHeight: 30,
@@ -1742,7 +1738,6 @@ export class GanttPanel {
     perfStart("_getRenderPayload");
     // Read gantt config settings
     const ganttConfig = vscode.workspace.getConfiguration("redmyne.gantt");
-    this._extendedRelationTypes = ganttConfig.get<boolean>("extendedRelationTypes", false);
     const visibleTypes = ganttConfig.get<string[]>("visibleRelationTypes", ["blocks", "precedes"]);
     this._visibleRelationTypes = new Set(visibleTypes);
 
@@ -3761,13 +3756,12 @@ export class GanttPanel {
   </div>
 `;
 
-    const redmineBaseUrl = vscode.workspace.getConfiguration("redmyne").get<string>("url") || "";
+    const redmineBaseUrl = vscode.workspace.getConfiguration("redmyne").get<string>("serverUrl") || "";
     const renderState: GanttRenderState = {
       timelineWidth,
       minDateMs: minDate.getTime(),
       maxDateMs: maxDate.getTime(),
       totalDays,
-      extendedRelationTypes: this._extendedRelationTypes,
       redmineBaseUrl,
       minimapBarsData: minimapBars,
       minimapHeight,

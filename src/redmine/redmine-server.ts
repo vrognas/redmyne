@@ -654,7 +654,7 @@ export class RedmineServer {
     this.invalidateIssueCache(issueId);
 
     // Auto-update %done based on spent/estimated hours
-    await this.autoUpdateDoneRatio(issueId);
+    await this.autoUpdateDonePercent(issueId);
 
     return result;
   }
@@ -665,13 +665,13 @@ export class RedmineServer {
    * skip if already 100%, skip if over budget (spent > estimated),
    * skip if issue not opted-in
    */
-  private async autoUpdateDoneRatio(issueId: number): Promise<void> {
+  private async autoUpdateDonePercent(issueId: number): Promise<void> {
     try {
       // Check if auto-update is enabled globally
       const config = await import("vscode").then(vscode =>
         vscode.workspace.getConfiguration("redmyne")
       );
-      if (!config.get<boolean>("autoUpdateDoneRatio", true)) return;
+      if (!config.get<boolean>("autoUpdateDonePercent", false)) return;
 
       // Check if this specific issue is opted-in
       const { autoUpdateTracker } = await import("../utilities/auto-update-tracker");

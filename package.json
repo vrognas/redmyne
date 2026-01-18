@@ -752,7 +752,7 @@
       },
       {
         "view": "redmyne-explorer-projects",
-        "contents": "No Redmine server configured.\n[Configure Redmine Server](command:redmyne.configure)\nSet up your Redmine server URL and API key to get started.",
+        "contents": "[Configure Redmine Server](command:redmyne.configure)",
         "when": "!redmyne:configured"
       }
     ],
@@ -1933,45 +1933,29 @@
       ]
     },
     "configuration": {
-      "title": "Redmyne Settings",
+      "title": "Redmyne",
       "properties": {
-        "redmyne.url": {
+        "redmyne.serverUrl": {
           "type": "string",
-          "markdownDescription": "**Redmine server URL (HTTPS required)**\n\n🔒 HTTP connections are not allowed for security.\n\n**Storage:**\n- URL: User settings (`settings.json`)\n- API Key: Encrypted secrets (Windows Credential Manager / macOS Keychain / Linux libsecret)\n- Both are global (single Redmine server)",
+          "order": 1,
+          "pattern": "^https://",
+          "description": "HTTPS required",
           "examples": [
             "https://example.com",
             "https://example.com:8443/redmine"
           ],
           "scope": "application"
         },
-        "redmyne.apiKey": {
-          "type": "string",
-          "description": "DEPRECATED: Use 'Redmyne: Set API Key' command instead",
-          "deprecationMessage": "API keys now stored in VS Code secrets. Run 'Redmyne: Set API Key'",
-          "scope": "machine"
-        },
-        "redmyne.identifier": {
-          "type": "string",
-          "description": "Project identifier in Redmine",
-          "default": "",
-          "scope": "machine"
-        },
-        "redmyne.additionalHeaders": {
-          "type": "object",
-          "description": "Additional headers",
-          "default": {},
-          "scope": "machine"
-        },
         "redmyne.logging.enabled": {
           "type": "boolean",
-          "description": "Enable API request/response logging to output channel",
+          "description": "Log API requests/responses to output channel",
           "default": true,
           "scope": "machine"
         },
-        "redmyne.autoUpdateDoneRatio": {
+        "redmyne.autoUpdateDonePercent": {
           "type": "boolean",
           "description": "Auto-update % Done based on spent/estimated hours when logging time. Caps at 99% (100% must be manual). Skips if over budget.",
-          "default": true,
+          "default": false,
           "scope": "application"
         },
         "redmyne.showCalculatedPriority": {
@@ -1979,43 +1963,6 @@
           "description": "Show calculated priority score in Gantt tooltips (based on due date urgency, downstream dependencies, external blocks)",
           "default": false,
           "scope": "application"
-        },
-        "redmyne.workingHours.hoursPerDay": {
-          "type": "number",
-          "default": 8,
-          "minimum": 1,
-          "maximum": 16,
-          "scope": "application",
-          "markdownDescription": "**DEPRECATED:** Use `#redmyne.workingHours.weeklySchedule#` instead.\n\nDaily working hours for time entry calculations.",
-          "deprecationMessage": "Use redmyne.workingHours.weeklySchedule to set hours per day of week"
-        },
-        "redmyne.workingHours.workingDays": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "enum": [
-              "Mon",
-              "Tue",
-              "Wed",
-              "Thu",
-              "Fri",
-              "Sat",
-              "Sun"
-            ]
-          },
-          "default": [
-            "Mon",
-            "Tue",
-            "Wed",
-            "Thu",
-            "Fri"
-          ],
-          "minItems": 1,
-          "maxItems": 7,
-          "uniqueItems": true,
-          "scope": "application",
-          "markdownDescription": "**DEPRECATED:** Use `#redmyne.workingHours.weeklySchedule#` instead.\n\nWorking days for time entry calculations.",
-          "deprecationMessage": "Use redmyne.workingHours.weeklySchedule to set hours per day of week"
         },
         "redmyne.workingHours.weeklySchedule": {
           "type": "object",
@@ -2075,12 +2022,6 @@
           "scope": "application",
           "markdownDescription": "**Show workload overview in status bar**\n\nDisplays remaining work and capacity buffer.\n\n**Note:** Opt-in to reduce noise. Enable if you need capacity planning at a glance.\n\n**Format:** `25h left, +8h buffer`"
         },
-        "redmyne.gantt.extendedRelationTypes": {
-          "type": "boolean",
-          "default": false,
-          "scope": "application",
-          "markdownDescription": "**Enable extended scheduling relation types**\n\nAdds support for Gantt plugin dependency types:\n- Finish-to-Start (FS)\n- Start-to-Start (SS)\n- Finish-to-Finish (FF)\n- Start-to-Finish (SF)\n\nDisable if your server doesn't have a Gantt plugin."
-        },
         "redmyne.gantt.visibleRelationTypes": {
           "type": "array",
           "items": {
@@ -2090,7 +2031,11 @@
               "precedes",
               "relates",
               "duplicates",
-              "copied_to"
+              "copied_to",
+              "finish_to_start",
+              "start_to_start",
+              "finish_to_finish",
+              "start_to_finish"
             ]
           },
           "default": [
@@ -2099,7 +2044,7 @@
           ],
           "uniqueItems": true,
           "scope": "application",
-          "markdownDescription": "**Relation types to show as dependency arrows**\n\n- `blocks` / `precedes` — Scheduling relations (default)\n- `relates` — General association\n- `duplicates` — Duplicate tracking\n- `copied_to` — Copy history\n\nOnly scheduling types affect project planning."
+          "markdownDescription": "**Relation types to show as dependency arrows**\n\n**Standard:**\n- `blocks` / `precedes` — Scheduling relations (default)\n- `relates` — General association\n- `duplicates` / `copied_to` — Tracking\n\n**Gantt plugin (if installed):**\n- `finish_to_start` (FS), `start_to_start` (SS)\n- `finish_to_finish` (FF), `start_to_finish` (SF)"
         },
         "redmyne.gantt.perfDebug": {
           "type": "boolean",
@@ -2131,7 +2076,7 @@
               "markdown": "media/walkthrough/configure.md"
             },
             "completionEvents": [
-              "onSettingChanged:redmyne.url"
+              "onSettingChanged:redmyne.serverUrl"
             ]
           },
           {

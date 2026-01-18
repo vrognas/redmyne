@@ -19,7 +19,7 @@ export function registerConfigureCommand(
   context.subscriptions.push(
     vscode.commands.registerCommand("redmyne.configure", async () => {
       const config = vscode.workspace.getConfiguration("redmyne");
-      const existingUrl = config.get<string>("url");
+      const existingUrl = config.get<string>("serverUrl");
       const existingApiKey = await deps.secretManager.getApiKey();
 
       let url = existingUrl;
@@ -51,7 +51,7 @@ export function registerConfigureCommand(
         if (choice.value === "url" || choice.value === "both") {
           url = await promptForUrl(existingUrl);
           if (!url) return;
-          await config.update("url", url, vscode.ConfigurationTarget.Global);
+          await config.update("serverUrl", url, vscode.ConfigurationTarget.Global);
         }
 
         shouldUpdateApiKey = choice.value === "apiKey" || choice.value === "both";
@@ -76,7 +76,7 @@ export function registerConfigureCommand(
         if (choice.value === "change") {
           url = await promptForUrl(existingUrl);
           if (!url) return;
-          await config.update("url", url, vscode.ConfigurationTarget.Global);
+          await config.update("serverUrl", url, vscode.ConfigurationTarget.Global);
         }
 
         shouldUpdateApiKey = true;
@@ -88,8 +88,7 @@ export function registerConfigureCommand(
             detail:
               "An API key exists but no Redmine URL is configured. API keys are specific to a Redmine server.\n\nWould you like to reconfigure from scratch?",
           },
-          "Reconfigure",
-          "Cancel"
+          "Reconfigure"
         );
 
         if (action !== "Reconfigure") return;
@@ -98,7 +97,7 @@ export function registerConfigureCommand(
 
         url = await promptForUrl();
         if (!url) return;
-        await config.update("url", url, vscode.ConfigurationTarget.Global);
+        await config.update("serverUrl", url, vscode.ConfigurationTarget.Global);
         shouldUpdateApiKey = true;
       } else {
         const proceed = await vscode.window.showInformationMessage(
@@ -108,15 +107,14 @@ export function registerConfigureCommand(
             detail:
               "How your credentials are stored:\n\n• URL: User settings (settings.json)\n• API Key: Encrypted secrets storage\n  - Windows: Credential Manager\n  - macOS: Keychain\n  - Linux: libsecret\n\nAPI keys are machine-local and never synced to the cloud.",
           },
-          "Continue",
-          "Cancel"
+          "Continue"
         );
 
         if (proceed !== "Continue") return;
 
         url = await promptForUrl();
         if (!url) return;
-        await config.update("url", url, vscode.ConfigurationTarget.Global);
+        await config.update("serverUrl", url, vscode.ConfigurationTarget.Global);
         shouldUpdateApiKey = true;
       }
 

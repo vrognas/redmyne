@@ -27,8 +27,7 @@ export function registerCreateTestIssuesCommand(
       const confirm = await vscode.window.showWarningMessage(
         "Create test issues for integration testing?",
         { modal: true, detail: "This will create 10 test issues in the Operations project." },
-        "Create Issues",
-        "Cancel"
+        "Create Issues"
       );
       if (confirm !== "Create Issues") return;
 

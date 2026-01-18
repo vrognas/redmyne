@@ -16,8 +16,8 @@ export default async ({ server, config }: ActionProperties) => {
       });
   };
 
-  if (config.identifier) {
-    return open(config.identifier);
+  if (config.defaultProject) {
+    return open(config.defaultProject);
   }
 
   const promise = server.getProjects();

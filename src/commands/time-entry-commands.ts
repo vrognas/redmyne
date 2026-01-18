@@ -108,7 +108,7 @@ export function registerTimeEntryCommands(
 
       // Get URL from config
       const config = vscode.workspace.getConfiguration("redmyne");
-      const url = config.get<string>("url");
+      const url = config.get<string>("serverUrl");
       if (!url) {
         vscode.window.showErrorMessage("Redmine URL not configured");
         return;
@@ -263,10 +263,10 @@ export function registerTimeEntryCommands(
       }
 
       const config = vscode.workspace.getConfiguration("redmyne");
-      const url = config.get<string>("url") || "";
+      const url = config.get<string>("serverUrl") || "";
 
       await quickLogTime(
-        { server, config: { ...config, url, apiKey: "" } },
+        { server, config: { ...config, serverUrl: url } },
         context,
         node?._date
       );

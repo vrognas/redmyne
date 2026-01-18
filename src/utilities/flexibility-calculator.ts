@@ -323,34 +323,14 @@ export function buildFlexibilityCache(
   }
 }
 
+const DEFAULT_SCHEDULE: WeeklySchedule = {
+  Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0, Sun: 0,
+};
+
 /**
  * Get the weekly schedule from configuration
- * Supports both new weeklySchedule format and deprecated hoursPerDay/workingDays
  */
 export function getWeeklySchedule(): WeeklySchedule {
   const config = vscode.workspace.getConfiguration("redmyne.workingHours");
-
-  // Try new format first
-  const schedule = config.get<WeeklySchedule>("weeklySchedule");
-  if (schedule) {
-    return schedule;
-  }
-
-  // Fallback to deprecated format (backward compatibility)
-  const hoursPerDay = config.get<number>("hoursPerDay", 8);
-  const workingDays = config.get<string[]>("workingDays", [
-    "Mon", "Tue", "Wed", "Thu", "Fri",
-  ]);
-
-  const result: WeeklySchedule = {
-    Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0,
-  };
-
-  workingDays.forEach((day) => {
-    if (day in result) {
-      result[day as keyof WeeklySchedule] = hoursPerDay;
-    }
-  });
-
-  return result;
+  return config.get<WeeklySchedule>("weeklySchedule", DEFAULT_SCHEDULE);
 }

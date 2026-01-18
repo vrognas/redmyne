@@ -398,7 +398,7 @@ export function activate(context: vscode.ExtensionContext): void {
   // Check if configured and update context
   const updateConfiguredContext = async () => {
     const config = vscode.workspace.getConfiguration("redmyne");
-    const hasUrl = !!config.get<string>("url");
+    const hasUrl = !!config.get<string>("serverUrl");
     const apiKey = await secretManager.getApiKey();
     const isConfigured = hasUrl && !!apiKey;
 
@@ -413,7 +413,7 @@ export function activate(context: vscode.ExtensionContext): void {
     if (isConfigured) {
       try {
         const innerServer = createServer({
-          address: config.get<string>("url")!,
+          address: config.get<string>("serverUrl")!,
           key: apiKey!,
           additionalHeaders: config.get("additionalHeaders"),
         });
@@ -424,7 +424,7 @@ export function activate(context: vscode.ExtensionContext): void {
         const server = draftModeServer;
 
         // Load draft queue with server identity check (async, non-blocking)
-        hashString(config.get<string>("url")! + apiKey!).then((serverIdentity) => {
+        hashString(config.get<string>("serverUrl")! + apiKey!).then((serverIdentity) => {
           draftQueue.load(serverIdentity).catch(() => {
             // Silent fail - draft queue loading is non-critical
           });
@@ -534,7 +534,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }
 
     const config = vscode.workspace.getConfiguration("redmyne");
-    const url = config.get<string>("url");
+    const url = config.get<string>("serverUrl");
 
     if (!url) {
       vscode.window.showErrorMessage(
@@ -586,8 +586,7 @@ export function activate(context: vscode.ExtensionContext): void {
         server,
         config: {
           ...config,
-          url,
-          apiKey: "", // Deprecated, not used
+          serverUrl: url,
         },
       },
       args: [],
@@ -708,7 +707,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.window.showErrorMessage('Could not determine issue ID');
         return;
       }
-      const url = vscode.workspace.getConfiguration("redmyne").get<string>("url");
+      const url = vscode.workspace.getConfiguration("redmyne").get<string>("serverUrl");
       if (!url) {
         vscode.window.showErrorMessage('No Redmine URL configured');
         return;
@@ -724,7 +723,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.window.showErrorMessage('Could not determine issue ID');
         return;
       }
-      const url = vscode.workspace.getConfiguration("redmyne").get<string>("url");
+      const url = vscode.workspace.getConfiguration("redmyne").get<string>("serverUrl");
       if (!url) {
         vscode.window.showErrorMessage('No Redmine URL configured');
         return;
@@ -766,7 +765,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.window.showErrorMessage('Could not determine project identifier');
         return;
       }
-      const url = vscode.workspace.getConfiguration("redmyne").get<string>("url");
+      const url = vscode.workspace.getConfiguration("redmyne").get<string>("serverUrl");
       if (!url) {
         vscode.window.showErrorMessage('No Redmine URL configured');
         return;
@@ -1032,7 +1031,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.window.showErrorMessage("Could not determine project identifier");
         return;
       }
-      const url = vscode.workspace.getConfiguration("redmyne").get<string>("url");
+      const url = vscode.workspace.getConfiguration("redmyne").get<string>("serverUrl");
       if (!url) {
         vscode.window.showErrorMessage("No Redmine URL configured");
         return;
@@ -1363,7 +1362,7 @@ export function activate(context: vscode.ExtensionContext): void {
       "redmyne.gantt.copyProjectUrl",
       (ctx: { projectId: number; projectIdentifier: string }) => {
         if (ctx?.projectIdentifier) {
-          const url = vscode.workspace.getConfiguration("redmyne").get<string>("url");
+          const url = vscode.workspace.getConfiguration("redmyne").get<string>("serverUrl");
           if (url) {
             const projectUrl = `${url}/projects/${ctx.projectIdentifier}`;
             vscode.env.clipboard.writeText(projectUrl);

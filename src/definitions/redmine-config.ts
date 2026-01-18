@@ -6,15 +6,11 @@ export interface RedmineConfig extends WorkspaceConfiguration {
    * @example https://example.com
    * @example https://example.com:8443/redmine
    */
-  url: string;
+  serverUrl: string;
   /**
-   * API Key (deprecated - use Secrets API via "Redmine: Set API Key" command)
+   * Default project identifier for "New Issue" command (hidden setting)
    */
-  apiKey: string;
-  /**
-   * Project identifier in Redmine
-   */
-  identifier?: string;
+  defaultProject?: string;
   /**
    * Additional headers
    */
