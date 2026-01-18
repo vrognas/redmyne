@@ -245,58 +245,6 @@ function createBasicTooltip(
 }
 
 /**
- * Format relations for tooltip display
- * Priority order: blocked, blocks, precedes/follows, others
- */
-function formatRelations(relations: IssueRelation[]): string {
-  const groups: Record<string, number[]> = {};
-
-  for (const rel of relations) {
-    if (!groups[rel.relation_type]) {
-      groups[rel.relation_type] = [];
-    }
-    groups[rel.relation_type].push(rel.issue_to_id);
-  }
-
-  const lines: string[] = [];
-
-  // Priority order for display
-  const typeLabels: Record<string, string> = {
-    blocked: "Blocked by",
-    blocks: "Blocks",
-    precedes: "Precedes",
-    follows: "Follows",
-    relates: "Related to",
-    duplicates: "Duplicates",
-    duplicated: "Duplicated by",
-    copied_to: "Copied to",
-    copied_from: "Copied from",
-  };
-
-  const order = [
-    "blocked",
-    "blocks",
-    "precedes",
-    "follows",
-    "relates",
-    "duplicates",
-    "duplicated",
-    "copied_to",
-    "copied_from",
-  ];
-
-  for (const type of order) {
-    if (groups[type] && groups[type].length > 0) {
-      const label = typeLabels[type] || type;
-      const ids = groups[type].map((id) => `#${id}`).join(", ");
-      lines.push(`**${label}:** ${ids}\n\n`);
-    }
-  }
-
-  return lines.join("");
-}
-
-/**
  * Format relations with tight spacing (soft breaks)
  */
 function formatRelationsCompact(relations: IssueRelation[]): string {
