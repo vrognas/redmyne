@@ -4,6 +4,8 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 ## [Unreleased]
 
+## [4.6.0]
+
 ### Added
 
 - **Copy/Paste Time Entries** - copy and paste time entries, days, or weeks
