@@ -57,10 +57,7 @@ export function registerDraftModeCommands(
         }
       }
 
-      const newState = await manager.toggle();
-      vscode.window.showInformationMessage(
-        `Draft mode ${newState ? "enabled" : "disabled"}`
-      );
+      await manager.toggle();
     }
   );
 

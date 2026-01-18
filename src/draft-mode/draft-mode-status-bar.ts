@@ -25,10 +25,10 @@ export class DraftModeStatusBar implements vscode.Disposable {
     this.statusBar.name = "Redmyne Draft Mode";
     this.statusBar.text = "$(edit) Draft Mode";
     this.statusBar.backgroundColor = new vscode.ThemeColor(
-      "statusBarItem.prominentBackground"
+      "statusBarItem.warningBackground"
     );
     this.statusBar.color = new vscode.ThemeColor(
-      "statusBarItem.prominentForeground"
+      "statusBarItem.warningForeground"
     );
 
     this.disposables.push(
