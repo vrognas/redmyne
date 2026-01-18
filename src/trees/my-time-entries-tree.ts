@@ -177,15 +177,6 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     return drafts;
   }
 
-  /**
-   * Get draft entries for a specific date
-   */
-  private getDraftEntriesForDate(dateStr: string): TimeEntry[] {
-    return this.getDraftTimeEntries()
-      .filter(d => d.entry.spent_on === dateStr)
-      .map(d => d.entry);
-  }
-
   override refresh(): void {
     // Clear all caches
     this.issueCache.clear();

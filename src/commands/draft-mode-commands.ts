@@ -17,7 +17,7 @@ export interface DraftModeCommandDeps {
 }
 
 export function registerDraftModeCommands(
-  context: vscode.ExtensionContext,
+  _context: vscode.ExtensionContext,
   deps: DraftModeCommandDeps
 ): vscode.Disposable[] {
   const { queue, manager, refreshTrees, showReviewPanel } = deps;

@@ -403,7 +403,9 @@ export class DraftModeServer {
     return {
       time_entry: {
         id: tempId,
-        hours: parseFloat(hours),
+        issue_id: issueId,
+        activity_id: activityId,
+        hours,
         comments: message,
         spent_on: spentOn ?? new Date().toISOString().split("T")[0],
         activity: { id: activityId, name: "" },

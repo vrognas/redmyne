@@ -76,7 +76,7 @@ export function generateDraftId(): string {
 }
 
 /** Generate a temp ID for create operations */
-export function generateTempId(type: "issue" | "version" | "relation"): string {
+export function generateTempId(type: "issue" | "version" | "relation" | "timeentry"): string {
   return `draft-${type}-${crypto.randomUUID()}`;
 }
 

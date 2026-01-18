@@ -430,8 +430,8 @@ export function activate(context: vscode.ExtensionContext): void {
           });
         });
 
-        projectsTree.setServer(server);
-        myTimeEntriesTree.setServer(server);
+        projectsTree.setServer(server as unknown as RedmineServer);
+        myTimeEntriesTree.setServer(server as unknown as RedmineServer);
         projectsTree.refresh();
         myTimeEntriesTree.refresh();
 
