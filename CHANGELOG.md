@@ -4,6 +4,13 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 ## [Unreleased]
 
+## [4.7.0]
+
+### Improved
+
+- **Log Time context menu** - right-click issue → Log Time now auto-selects that issue
+- **Internal Estimate submenu** - renamed items to "Set" and "Clear"
+
 ## [4.6.0]
 
 ### Added
