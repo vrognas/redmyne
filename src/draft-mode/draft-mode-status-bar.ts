@@ -1,6 +1,6 @@
 /**
  * Draft Mode Status Bar
- * Shows spinning indicator when draft mode is active
+ * Shows when draft mode is active using theme-aware prominent styling
  */
 
 import * as vscode from "vscode";
@@ -23,9 +23,12 @@ export class DraftModeStatusBar implements vscode.Disposable {
     );
     this.statusBar.command = "redmyne.reviewDrafts";
     this.statusBar.name = "Redmyne Draft Mode";
-    this.statusBar.text = "$(sync~spin) Draft Mode";
+    this.statusBar.text = "$(edit) Draft Mode";
     this.statusBar.backgroundColor = new vscode.ThemeColor(
-      "statusBarItem.warningBackground"
+      "statusBarItem.prominentBackground"
+    );
+    this.statusBar.color = new vscode.ThemeColor(
+      "statusBarItem.prominentForeground"
     );
 
     this.disposables.push(
