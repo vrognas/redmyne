@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import type { ActionProperties } from "./action-properties";
 import { parseTimeInput, validateTimeInput, formatHoursAsHHMM } from "../utilities/time-input";
 import { showStatusBarMessage } from "../utilities/status-bar";
-import { pickIssueWithSearch } from "../utilities/issue-picker";
+import { pickIssueWithSearch, pickActivityForProject } from "../utilities/issue-picker";
 import { pickDate } from "../utilities/date-picker";
 import { errorToString } from "../utilities/error-feedback";
 
@@ -21,13 +21,14 @@ function isRecent(date: Date): boolean {
 export async function quickLogTime(
   props: ActionProperties,
   context: vscode.ExtensionContext,
-  presetDate?: string // Optional pre-selected date (YYYY-MM-DD)
+  presetDate?: string, // Optional pre-selected date (YYYY-MM-DD)
+  presetIssueId?: number // Optional pre-selected issue ID (from context menu)
 ): Promise<void> {
   try {
     // 1. Get recent log from cache
     const recent = context.globalState.get<RecentTimeLog>("lastTimeLog");
 
-    // 2. Prompt: recent issue or pick new?
+    // 2. Determine issue selection
     let selection: {
       issueId: number;
       activityId: number;
@@ -35,7 +36,28 @@ export async function quickLogTime(
       issueSubject: string;
     };
 
-    if (recent && isRecent(recent.lastLogged)) {
+    // If issue pre-selected (from context menu), fetch it and pick activity only
+    if (presetIssueId) {
+      const issueResult = await props.server.getIssueById(presetIssueId);
+      const issue = issueResult.issue;
+      if (!issue.project?.id) {
+        vscode.window.showErrorMessage("Issue has no associated project");
+        return;
+      }
+      const activity = await pickActivityForProject(
+        props.server,
+        issue.project.id,
+        "Log Time",
+        `#${issue.id}`
+      );
+      if (!activity) return;
+      selection = {
+        issueId: issue.id,
+        issueSubject: issue.subject,
+        activityId: activity.activityId,
+        activityName: activity.activityName,
+      };
+    } else if (recent && isRecent(recent.lastLogged)) {
       const choice = await vscode.window.showQuickPick(
         [
           {

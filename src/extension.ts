@@ -519,14 +519,21 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   const parseConfiguration = async (
-    withPick = true,
+    withPick: unknown = true,
     props?: ActionProperties,
     ...args: unknown[]
   ): Promise<{
     props?: ActionProperties;
     args: unknown[];
   }> => {
-    if (!withPick) {
+    // When invoked from context menu, tree element is passed as first arg
+    // Preserve it in args if it's an object (not a boolean)
+    let contextArgs: unknown[] = [];
+    if (typeof withPick === "object" && withPick !== null) {
+      contextArgs = [withPick, props, ...args];
+    }
+
+    if (withPick === false) {
       return Promise.resolve({
         props,
         args,
@@ -589,7 +596,7 @@ export function activate(context: vscode.ExtensionContext): void {
           serverUrl: url,
         },
       },
-      args: [],
+      args: contextArgs,
     };
   };
 
@@ -626,7 +633,22 @@ export function activate(context: vscode.ExtensionContext): void {
     openActionsForIssueUnderCursor
   );
   registerCommand("newIssue", newIssue);
-  registerCommand("quickLogTime", (props) => quickLogTime(props, context));
+  registerCommand("quickLogTime", (props, ...args) => {
+    // Extract issue ID from tree node (Issue) or Gantt context ({ id: number })
+    let issueId: number | undefined;
+    const arg = args[0];
+    if (arg && typeof arg === "object") {
+      // Issue object from tree view (has id + subject)
+      if ("subject" in arg && typeof (arg as { id: number }).id === "number") {
+        issueId = (arg as { id: number }).id;
+      }
+      // Gantt context { id: number }
+      else if ("id" in arg && typeof (arg as { id: number }).id === "number") {
+        issueId = (arg as { id: number }).id;
+      }
+    }
+    return quickLogTime(props, context, undefined, issueId);
+  });
   // addTimeEntryForDate moved to time-entry-commands.ts
   registerCommand("quickCreateIssue", async (props, ...args) => {
     // Extract project ID from tree node if invoked from context menu

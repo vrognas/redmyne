@@ -194,14 +194,12 @@
       },
       {
         "command": "redmyne.setInternalEstimate",
-        "title": "Set Internal Estimate",
-        "shortTitle": "Set...",
+        "title": "Set",
         "icon": "$(clock)"
       },
       {
         "command": "redmyne.clearInternalEstimate",
-        "title": "Clear Internal Estimate",
-        "shortTitle": "Clear",
+        "title": "Clear",
         "icon": "$(trash)"
       },
       {
