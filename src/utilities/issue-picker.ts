@@ -127,9 +127,11 @@ async function searchIssuesWithFuzzy(
   const seenIds = new Set<number>();
   const candidateIssues: Issue[] = [];
 
-  if (exactMatch) {
-    candidateIssues.push(exactMatch);
-    seenIds.add(exactMatch.id);
+  if (exactMatch !== null) {
+    // Type assertion needed: TS can't track mutations inside Promise.all closures
+    const matchedIssue = exactMatch as Issue;
+    candidateIssues.push(matchedIssue);
+    seenIds.add(matchedIssue.id);
   }
   for (const issue of localIssues) {
     if (!seenIds.has(issue.id)) {
@@ -539,7 +541,7 @@ export async function pickIssueWithSearch(
     const quickPick = vscode.window.createQuickPick<IssueQuickPickItem>();
     quickPick.title = title;
     quickPick.placeholder = "Type to search, or select from list";
-    quickPick.sortByLabel = false;  // Preserve our custom sort order
+    (quickPick as unknown as { sortByLabel: boolean }).sortByLabel = false;  // Preserve our custom sort order
     quickPick.items = baseItems;
     quickPick.matchOnDescription = true;
 
@@ -913,7 +915,7 @@ export async function pickIssue(
     const quickPick = vscode.window.createQuickPick<IssueQuickPickItem>();
     quickPick.title = title;
     quickPick.placeholder = "Type to search, or select from list";
-    quickPick.sortByLabel = false;  // Preserve our custom sort order
+    (quickPick as unknown as { sortByLabel: boolean }).sortByLabel = false;  // Preserve our custom sort order
     quickPick.items = baseItems;
     quickPick.matchOnDescription = true;
 

@@ -3,7 +3,7 @@
  * Handles various value types returned by Redmine API.
  */
 export function formatCustomFieldValue(value: unknown): string {
-  if (value == null) return "";
+  if (value === null || value === undefined) return "";
   if (Array.isArray(value)) {
     return value
       .filter(v => typeof v === "string" || typeof v === "number" || typeof v === "boolean")

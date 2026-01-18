@@ -1815,8 +1815,8 @@ export class GanttPanel {
         if (this._selectedProjectId === null) {
           const relevantProjectIds = new Set<number>();
           for (const issue of sortedIssues) {
-            let currentId = issue.project?.id;
-            while (currentId != null) {
+            let currentId: number | undefined = issue.project?.id;
+            while (currentId !== undefined) {
               if (relevantProjectIds.has(currentId)) break;
               relevantProjectIds.add(currentId);
               currentId = projectMap.get(currentId)?.parent?.id;

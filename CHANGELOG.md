@@ -2,7 +2,7 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
-## [Unreleased]
+## [4.2.0]
 
 ### Added
 
@@ -13,6 +13,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Create Sub-Issue menu** - only appears for root issues without a parent
 - **Gantt loading UI** - moved loading text to header
 - **Gantt "All Projects"** - project selector now allows viewing all projects in by-project view
+- **Gantt sorting in by-person view** - column sorting now works correctly
 
 ## [4.1.0]
 
