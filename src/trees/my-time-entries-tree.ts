@@ -351,8 +351,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       // Add "Load Earlier..." node
       nodes.push({
         id: "load-earlier",
-        label: "Load Earlier...",
-        description: `(${MyTimeEntriesTreeDataProvider.LOAD_BATCH_SIZE} more months)`,
+        label: "Load another 3 months",
         iconPath: new vscode.ThemeIcon("history"),
         collapsibleState: vscode.TreeItemCollapsibleState.None,
         type: "load-earlier",

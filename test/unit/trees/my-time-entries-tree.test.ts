@@ -138,7 +138,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     expect(secondResult[1].label).toContain("This Week");
     // Month nodes show month names like "January 2026"
     expect(secondResult[2].type).toBe("month-group");
-    expect(secondResult[5].label).toBe("Load Earlier...");
+    expect(secondResult[5].label).toBe("Load another 3 months");
   });
 
   it("caches entries at parent level (no double-fetch)", async () => {
