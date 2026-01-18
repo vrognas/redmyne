@@ -349,7 +349,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         this.isLoading = true;
         this.loadTodayAndThisWeek();
         return [{
-          label: "Loading time entries...",
+          label: "Loading...",
           iconPath: new vscode.ThemeIcon("loading~spin"),
           collapsibleState: vscode.TreeItemCollapsibleState.None,
           type: "loading",
@@ -359,7 +359,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       // Still loading
       if (this.isLoading) {
         return [{
-          label: "Loading time entries...",
+          label: "Loading...",
           iconPath: new vscode.ThemeIcon("loading~spin"),
           collapsibleState: vscode.TreeItemCollapsibleState.None,
           type: "loading",
