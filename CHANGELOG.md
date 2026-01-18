@@ -14,6 +14,18 @@ All notable changes to the "Redmyne" extension will be documented in this file.
   - Week→week preserves day-of-week (Mon→Mon, Tue→Tue)
   - Respects working days from `weeklySchedule` and monthly overrides
 
+## [4.5.0]
+
+### Changed
+
+- **Settings UX overhaul**
+  - Renamed: `url` → `serverUrl`, `autoUpdateDoneRatio` → `autoUpdateDonePercent`
+  - Hidden from UI (power-user): `defaultProject`, `additionalHeaders`
+  - Removed deprecated: `apiKey`, `hoursPerDay`, `workingDays`
+  - Merged `extendedRelationTypes` into `visibleRelationTypes` (auto-detects server types)
+  - Simplified welcome message to single "Configure" button
+  - Fixed duplicate Cancel buttons in modal dialogs
+
 ## [4.4.0]
 
 ### Added
