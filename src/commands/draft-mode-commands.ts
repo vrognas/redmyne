@@ -39,12 +39,12 @@ export function registerDraftModeCommands(
     async () => {
       if (manager.isEnabled && queue.count > 0) {
         // Prompt user to apply or discard pending drafts
+        // Note: modal dialogs automatically have a Cancel option (X button / Escape)
         const action = await vscode.window.showWarningMessage(
           `You have ${queue.count} pending draft${queue.count === 1 ? "" : "s"}. What do you want to do?`,
           { modal: true },
           "Apply All",
-          "Discard All",
-          "Cancel"
+          "Discard All"
         );
 
         if (action === "Apply All") {
@@ -52,7 +52,7 @@ export function registerDraftModeCommands(
         } else if (action === "Discard All") {
           await vscode.commands.executeCommand("redmyne.discardDrafts");
         } else {
-          // Cancel - keep draft mode on
+          // Cancel (closed dialog) - keep draft mode on
           return;
         }
       }
