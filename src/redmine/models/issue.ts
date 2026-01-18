@@ -1,4 +1,4 @@
-import { NamedEntity, IssueStatus } from "./common";
+import { NamedEntity, IssueStatus, CustomField } from "./common";
 import { VersionRef } from "./version";
 
 /**
@@ -93,4 +93,6 @@ export interface Issue {
   journals?: Journal[];
   /** Target version/milestone for this issue */
   fixed_version?: VersionRef;
+  /** Custom fields (from API - requires custom fields to be enabled) */
+  custom_fields?: CustomField[];
 }

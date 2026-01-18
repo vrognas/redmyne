@@ -158,6 +158,20 @@ function createFlexibilityTooltip(
     }
   }
 
+  // Add custom fields if present
+  if (issue.custom_fields && issue.custom_fields.length > 0) {
+    for (const cf of issue.custom_fields) {
+      const val = formatCustomFieldValue(cf.value);
+      if (val) {
+        md.appendMarkdown("**");
+        md.appendText(`${cf.name}:`);
+        md.appendMarkdown("** ");
+        md.appendText(val);
+        md.appendMarkdown("\n\n");
+      }
+    }
+  }
+
   if (server) {
     const baseUrl = server.options.address;
     md.appendMarkdown(`[Open in Browser](${baseUrl}/issues/${issue.id})`);
@@ -206,6 +220,20 @@ function createBasicTooltip(
     const relationsText = formatRelations(issue.relations);
     if (relationsText) {
       md.appendMarkdown(relationsText);
+    }
+  }
+
+  // Add custom fields if present
+  if (issue.custom_fields && issue.custom_fields.length > 0) {
+    for (const cf of issue.custom_fields) {
+      const val = formatCustomFieldValue(cf.value);
+      if (val) {
+        md.appendMarkdown("**");
+        md.appendText(`${cf.name}:`);
+        md.appendMarkdown("** ");
+        md.appendText(val);
+        md.appendMarkdown("\n\n");
+      }
     }
   }
 

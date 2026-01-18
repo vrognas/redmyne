@@ -288,6 +288,88 @@ describe("createEnhancedIssueTreeItem", () => {
     expect(tooltipValue).toContain("Blocks");
     expect(tooltipValue).toContain("#200");
   });
+
+  it("includes non-empty custom fields in tooltip", () => {
+    const issueWithCustomFields: Issue = {
+      ...mockIssue,
+      custom_fields: [
+        { id: 1, name: "Client", value: "Acme Corp" },
+        { id: 2, name: "Department", value: "Engineering" },
+      ],
+    };
+
+    const treeItem = createEnhancedIssueTreeItem(
+      issueWithCustomFields,
+      mockFlexibility,
+      undefined,
+      "test.command"
+    );
+
+    const tooltipValue = (treeItem.tooltip as { value: string })?.value;
+    expect(tooltipValue).toContain("**Client:** Acme Corp");
+    expect(tooltipValue).toContain("**Department:** Engineering");
+  });
+
+  it("excludes empty custom fields from tooltip", () => {
+    const issueWithEmptyFields: Issue = {
+      ...mockIssue,
+      custom_fields: [
+        { id: 1, name: "Client", value: "Acme Corp" },
+        { id: 2, name: "Empty", value: "" },
+        { id: 3, name: "Null", value: null },
+      ],
+    };
+
+    const treeItem = createEnhancedIssueTreeItem(
+      issueWithEmptyFields,
+      mockFlexibility,
+      undefined,
+      "test.command"
+    );
+
+    const tooltipValue = (treeItem.tooltip as { value: string })?.value;
+    expect(tooltipValue).toContain("**Client:** Acme Corp");
+    expect(tooltipValue).not.toContain("**Empty:**");
+    expect(tooltipValue).not.toContain("**Null:**");
+  });
+
+  it("handles array custom field values in tooltip", () => {
+    const issueWithArrayField: Issue = {
+      ...mockIssue,
+      custom_fields: [
+        { id: 1, name: "Tags", multiple: true, value: ["urgent", "frontend"] },
+      ],
+    };
+
+    const treeItem = createEnhancedIssueTreeItem(
+      issueWithArrayField,
+      mockFlexibility,
+      undefined,
+      "test.command"
+    );
+
+    const tooltipValue = (treeItem.tooltip as { value: string })?.value;
+    expect(tooltipValue).toContain("**Tags:** urgent, frontend");
+  });
+
+  it("includes custom fields in basic tooltip (no flexibility)", () => {
+    const issueWithCustomFields: Issue = {
+      ...mockIssue,
+      custom_fields: [
+        { id: 1, name: "Priority Level", value: "High" },
+      ],
+    };
+
+    const treeItem = createEnhancedIssueTreeItem(
+      issueWithCustomFields,
+      null,
+      undefined,
+      "test.command"
+    );
+
+    const tooltipValue = (treeItem.tooltip as { value: string })?.value;
+    expect(tooltipValue).toContain("**Priority Level:** High");
+  });
 });
 
 describe("createProjectTooltip", () => {
