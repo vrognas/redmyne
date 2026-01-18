@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "4.3.0",
+  "version": "4.4.0",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -653,6 +653,31 @@
         "command": "redmyne.removeContribution",
         "title": "Remove Contribution",
         "icon": "$(close)"
+      },
+      {
+        "command": "redmyne.toggleDraftMode",
+        "title": "Redmyne: Toggle Draft Mode",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "redmyne.reviewDrafts",
+        "title": "Redmyne: Review Drafts",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "redmyne.applyDrafts",
+        "title": "Redmyne: Apply All Drafts",
+        "icon": "$(check-all)"
+      },
+      {
+        "command": "redmyne.discardDrafts",
+        "title": "Redmyne: Discard All Drafts",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "redmyne.removeDraft",
+        "title": "Remove Draft",
+        "icon": "$(close)"
       }
     ],
     "keybindings": [
@@ -1200,6 +1225,22 @@
         {
           "command": "redmyne.gantt.showProjectInIssues",
           "when": "false"
+        },
+        {
+          "command": "redmyne.reviewDrafts",
+          "when": "redmyne:draftMode && redmyne:hasDrafts"
+        },
+        {
+          "command": "redmyne.applyDrafts",
+          "when": "redmyne:draftMode && redmyne:hasDrafts"
+        },
+        {
+          "command": "redmyne.discardDrafts",
+          "when": "redmyne:draftMode && redmyne:hasDrafts"
+        },
+        {
+          "command": "redmyne.removeDraft",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -1252,6 +1293,11 @@
           "command": "redmyne.configure",
           "when": "view == 'redmyne-explorer-projects'",
           "group": "navigation@6"
+        },
+        {
+          "command": "redmyne.toggleDraftMode",
+          "when": "view == 'redmyne-explorer-projects' && redmyne:configured",
+          "group": "navigation@7"
         },
         {
           "command": "redmyne.refreshTimeEntries",

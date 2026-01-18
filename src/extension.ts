@@ -46,6 +46,13 @@ import { togglePrecedence, setPrecedence, clearPrecedence } from "./utilities/pr
 import { debounce, DebouncedFunction } from "./utilities/debounce";
 import { runMigration } from "./utilities/migration";
 import { initRecentIssues } from "./utilities/recent-issues";
+import { DraftQueue } from "./draft-mode/draft-queue";
+import { DraftModeManager } from "./draft-mode/draft-mode-manager";
+import { DraftModeServer } from "./draft-mode/draft-mode-server";
+import { DraftModeStatusBar } from "./draft-mode/draft-mode-status-bar";
+import { registerDraftModeCommands } from "./commands/draft-mode-commands";
+import { hashString } from "./draft-mode/draft-operation";
+import { DraftReviewPanel } from "./draft-mode/draft-review-panel";
 
 // Constants
 const CONFIG_DEBOUNCE_MS = 300;
@@ -69,6 +76,10 @@ let cleanupResources: {
   };
   userFte?: number;
   monthlySchedules?: MonthlyScheduleOverrides;
+  draftQueue?: DraftQueue;
+  draftModeManager?: DraftModeManager;
+  draftModeStatusBar?: DraftModeStatusBar;
+  draftModeServer?: DraftModeServer;
 } = {};
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -83,6 +94,26 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Initialize ad-hoc budget tracker
   adHocTracker.initialize(context);
+
+  // Initialize draft mode manager
+  const draftModeManager = new DraftModeManager({
+    globalState: context.globalState,
+    setContext: (key, value) => vscode.commands.executeCommand("setContext", key, value),
+  });
+  cleanupResources.draftModeManager = draftModeManager;
+  draftModeManager.initialize();
+
+  // Initialize draft queue with file system persistence
+  const draftQueue = new DraftQueue({
+    storagePath: vscode.Uri.joinPath(context.globalStorageUri, "drafts.json"),
+    fs: vscode.workspace.fs,
+  });
+  cleanupResources.draftQueue = draftQueue;
+
+  // Create draft mode status bar
+  const draftModeStatusBar = new DraftModeStatusBar(draftQueue, draftModeManager);
+  cleanupResources.draftModeStatusBar = draftModeStatusBar;
+  context.subscriptions.push(draftModeStatusBar);
 
   const bucket = {
     servers: [] as RedmineServer[],
@@ -375,10 +406,22 @@ export function activate(context: vscode.ExtensionContext): void {
     // If configured, initialize server for trees
     if (isConfigured) {
       try {
-        const server = createServer({
+        const innerServer = createServer({
           address: config.get<string>("url")!,
           key: apiKey!,
           additionalHeaders: config.get("additionalHeaders"),
+        });
+
+        // Wrap with draft mode server
+        const draftModeServer = new DraftModeServer(innerServer, draftQueue, draftModeManager);
+        cleanupResources.draftModeServer = draftModeServer;
+        const server = draftModeServer;
+
+        // Load draft queue with server identity check (async, non-blocking)
+        hashString(config.get<string>("url")! + apiKey!).then((serverIdentity) => {
+          draftQueue.load(serverIdentity).catch((err) => {
+            console.error("Failed to load draft queue:", err);
+          });
         });
 
         projectsTree.setServer(server);
@@ -1569,6 +1612,23 @@ export function activate(context: vscode.ExtensionContext): void {
     updateConfiguredContext,
   });
 
+  // Register draft mode commands
+  context.subscriptions.push(
+    ...registerDraftModeCommands(context, {
+      queue: draftQueue,
+      manager: draftModeManager,
+      getServer: () => cleanupResources.draftModeServer,
+      refreshTrees: () => {
+        projectsTree.refresh();
+        myTimeEntriesTree.refresh();
+        vscode.commands.executeCommand("redmyne.refreshGanttData");
+      },
+      showReviewPanel: () => {
+        DraftReviewPanel.createOrShow(context.extensionUri, draftQueue, draftModeManager);
+      },
+    })
+  );
+
   // Register create test issues command
   registerCreateTestIssuesCommand(context, {
     getServer: () => projectsTree.server,
@@ -1613,6 +1673,11 @@ export function deactivate(): void {
 
   // Dispose shared status bar utility
   disposeStatusBar();
+
+  // Dispose draft mode resources
+  if (cleanupResources.draftModeStatusBar) {
+    cleanupResources.draftModeStatusBar.dispose();
+  }
 
   // Dispose and clear bucket servers
   if (cleanupResources.bucket) {

@@ -2,7 +2,7 @@
 
 VS Code/Positron extension for Redmine workload management. TypeScript 5.9+, zero runtime deps.
 
-**v3.19.0** | VS Code ≥1.105.0 | Node ≥20
+**v4.4.0** | VS Code ≥1.105.0 | Node ≥20
 
 ## Core Pattern
 
@@ -26,6 +26,7 @@ src/
 │   └── gantt-panel.ts    # SVG timeline, dependencies, heatmap
 ├── timer/                # Pomodoro-style work units
 ├── kanban/               # Personal task management
+├── draft-mode/           # Offline write queueing
 ├── status-bars/          # Workload status bar
 ├── shared/               # Base classes (BaseTreeProvider)
 └── utilities/            # Helpers (secrets, flexibility calc, etc.)
@@ -60,6 +61,13 @@ src/
 - Local task management (todo/in-progress/done)
 - Links to Redmine issues, priority levels
 
+### Draft Mode (`src/draft-mode/`)
+- Intercepts write operations when enabled
+- DraftModeServer wraps RedmineServer, queues writes
+- DraftQueue persists to globalStorageUri file
+- Server identity check prevents misapplying drafts
+- Conflict resolution: latest wins per resource key
+
 ## Data Flow
 
 ```
@@ -79,6 +87,7 @@ Commands execute actions → API calls → refresh trees
 | API Key | VS Code Secrets API (encrypted) |
 | Collapse state, filters | globalState (memento) |
 | Timer/Kanban state | globalState |
+| Draft queue | globalStorageUri (file) |
 | Config | VS Code settings |
 
 ## Build & Test

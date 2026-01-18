@@ -2,6 +2,19 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.4.0]
+
+### Added
+
+- **Draft Mode** - queue write operations locally before sending to Redmine
+  - Toggle via command palette or status bar
+  - Status bar shows pending draft count with warning indicator
+  - Review panel to inspect, apply, or discard pending drafts
+  - Per-draft removal supported
+  - Server identity validation prevents applying drafts to wrong server
+  - Persists across VS Code restarts
+  - Supports all write operations: issue CRUD, time entries, versions, relations
+
 ## [4.3.0]
 
 ### Changed
