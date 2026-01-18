@@ -413,7 +413,7 @@ export class DraftReviewPanel implements vscode.Disposable {
       <div class="keyboard-hint">
         <kbd>↑</kbd><kbd>↓</kbd> Navigate
         <kbd>Enter</kbd> Apply
-        <kbd>Delete</kbd> Remove
+        <kbd>Backspace</kbd> Remove
       </div>
     `}
   </div>
@@ -463,7 +463,7 @@ export class DraftReviewPanel implements vscode.Disposable {
         const row = rows[selectedIndex];
         const id = row?.dataset.id;
         if (id) vscode.postMessage({ command: 'applyDraft', id });
-      } else if (e.key === 'Delete' && selectedIndex >= 0) {
+      } else if (e.key === 'Backspace' && selectedIndex >= 0) {
         e.preventDefault();
         const row = rows[selectedIndex];
         const id = row?.dataset.id;
@@ -551,7 +551,7 @@ export class DraftReviewPanel implements vscode.Disposable {
         '<div class="keyboard-hint">' +
           '<kbd>↑</kbd><kbd>↓</kbd> Navigate ' +
           '<kbd>Enter</kbd> Apply ' +
-          '<kbd>Delete</kbd> Remove' +
+          '<kbd>Backspace</kbd> Remove' +
         '</div>';
 
       // Restore selection if still valid
