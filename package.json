@@ -142,6 +142,11 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "redmyne.openTimeEntriesSettings",
+        "title": "Weekly Schedule Settings",
+        "icon": "$(gear)"
+      },
+      {
         "command": "redmyne.loadEarlierTimeEntries",
         "title": "Load Earlier Time Entries"
       },
@@ -678,6 +683,11 @@
         "command": "redmyne.removeDraft",
         "title": "Remove Draft",
         "icon": "$(close)"
+      },
+      {
+        "command": "redmyne.applySingleDraft",
+        "title": "Apply Single Draft",
+        "icon": "$(check)"
       }
     ],
     "keybindings": [
@@ -1303,6 +1313,11 @@
           "submenu": "redmyne.timeSortMenu",
           "when": "view == 'redmyne-explorer-my-time-entries' && redmyne:configured",
           "group": "navigation@3"
+        },
+        {
+          "command": "redmyne.openTimeEntriesSettings",
+          "when": "view == 'redmyne-explorer-my-time-entries'",
+          "group": "navigation@4"
         }
       ],
       "view/item/context": [
@@ -1995,7 +2010,7 @@
           },
           "additionalProperties": false,
           "scope": "application",
-          "markdownDescription": "**Weekly working hours schedule**\n\nSet working hours for each day of the week (0-24h). Use 0 for non-working days.\n\n**Example schedules:**\n- Standard 5-day week: Mon-Fri = 8h, Sat-Sun = 0h\n- 4-day week: Mon-Thu = 10h, Fri-Sun = 0h\n- Part-time Friday: Mon-Thu = 8h, Fri = 4h, Sat-Sun = 0h\n\nUsed to calculate utilization percentages in time entry view."
+          "markdownDescription": "Working hours per day (0-24). Set 0 for non-working days. Used for utilization calculations."
         },
         "redmyne.statusBar.showWorkload": {
           "type": "boolean",

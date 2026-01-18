@@ -139,6 +139,13 @@ export function registerViewCommands(
     vscode.commands.registerCommand("redmyne.timeSortUser", () => {
       deps.timeEntriesTree.setSort("user");
       showStatusBarMessage("$(arrow-swap) Sort by User", 2000);
+    }),
+
+    vscode.commands.registerCommand("redmyne.openTimeEntriesSettings", () => {
+      vscode.commands.executeCommand(
+        "workbench.action.openSettings",
+        "redmyne.workingHours.weeklySchedule"
+      );
     })
   );
 }

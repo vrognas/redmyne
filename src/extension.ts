@@ -1625,7 +1625,7 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.executeCommand("redmyne.refreshGanttData");
       },
       showReviewPanel: () => {
-        DraftReviewPanel.createOrShow(context.extensionUri, draftQueue, draftModeManager);
+        DraftReviewPanel.createOrShow(draftQueue);
       },
     })
   );

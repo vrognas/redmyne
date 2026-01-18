@@ -10,10 +10,20 @@ All notable changes to the "Redmyne" extension will be documented in this file.
   - Toggle via command palette or status bar
   - Status bar shows pending draft count with warning indicator
   - Review panel to inspect, apply, or discard pending drafts
-  - Per-draft removal supported
+  - Per-draft removal and per-draft apply supported
   - Server identity validation prevents applying drafts to wrong server
   - Persists across VS Code restarts
   - Supports all write operations: issue CRUD, time entries, versions, relations
+
+### Improved
+
+- **Draft Review Panel UX**
+  - Incremental DOM updates via postMessage (no full page refresh)
+  - Loading/processing states with visual feedback
+  - Confirmation dialog for Discard All
+  - Per-row apply button to apply individual drafts
+  - Sticky header for better navigation on long lists
+  - Keyboard navigation: Arrow keys, Enter (apply), Delete (remove)
 
 ## [4.3.0]
 

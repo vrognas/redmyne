@@ -683,3 +683,51 @@ fi
 1. **"Today" should be local**: Users expect UI to show their local date, not UTC
 2. **Issue dates are dateless**: YYYY-MM-DD strings have no timezone - treat as local midnight
 3. **Don't flip-flop**: Previous fix (a1959b0) was correct; reverting to UTC (8e0ce55) broke it
+
+## Webview Panel UX (2026-01-18)
+
+### Incremental DOM Updates
+
+**Problem**: Full HTML regeneration on every state change causes scroll position loss and flickering
+
+**Solution**: Use postMessage for incremental updates
+- Initial render sets full HTML once
+- State changes send delta updates via `panel.webview.postMessage()`
+- Webview JS handles DOM updates without full re-render
+- Track `lastOperationIds` to detect add/remove changes
+
+### Loading States
+
+**Problem**: Async operations with no visual feedback feel broken
+
+**Solution**: Bidirectional loading messages
+- Extension sends `{ command: "setLoading", loading: true, action: "applyAll" }` before async work
+- Extension sends `{ command: "setLoading", loading: false }` in finally block
+- Webview toggles `.loading` class on buttons
+- Per-row loading via `setRowLoading` message
+
+### Event Delegation
+
+**Problem**: Re-attaching event listeners on every render is wasteful
+
+**Solution**: Delegate events to container
+- Single `document.addEventListener('click', ...)` handler
+- Use `e.target.closest('button')` to find clicked element
+- Check `target.id` or `target.classList` to route action
+
+### Keyboard Navigation in Webviews
+
+**Pattern**: Arrow keys + Enter/Delete for table navigation
+- Track `selectedIndex` state in webview JS
+- Listen for `keydown` events: ArrowUp/Down navigate, Enter applies, Delete removes
+- Add `tabindex="0"` to rows for focusability
+- Add `.selected` class and call `row.focus()` for visual feedback
+- Restore selection after re-render if still valid
+
+### Lessons
+
+1. **postMessage > full HTML**: Incremental updates preserve scroll/selection state
+2. **Loading states are mandatory**: Any async operation needs visual feedback
+3. **Event delegation scales**: Single handler beats N listeners on N elements
+4. **Keyboard nav = tabindex + focus**: Make rows focusable for accessibility
+5. **Confirm destructive actions**: Modal dialogs for "Discard All" type operations

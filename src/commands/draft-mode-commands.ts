@@ -172,12 +172,41 @@ export function registerDraftModeCommands(
     }
   );
 
+  const applySingleDraft = vscode.commands.registerCommand(
+    "redmyne.applySingleDraft",
+    async (draftId: string) => {
+      const server = deps.getServer();
+      if (!server) {
+        vscode.window.showErrorMessage("No Redmine server configured");
+        return;
+      }
+
+      const operations = queue.getAll();
+      const op = operations.find(o => o.id === draftId);
+      if (!op) {
+        vscode.window.showErrorMessage("Draft not found");
+        return;
+      }
+
+      try {
+        await executeOperation(server, op);
+        await queue.remove(op.id);
+        refreshTrees();
+        vscode.window.showInformationMessage(`Applied: ${op.description}`);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to apply: ${op.description}\n${msg}`);
+      }
+    }
+  );
+
   return [
     toggleDraftMode,
     reviewDrafts,
     applyDrafts,
     discardDrafts,
     removeDraft,
+    applySingleDraft,
     managerSub,
     queueSub,
   ];
