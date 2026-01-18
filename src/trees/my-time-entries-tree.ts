@@ -20,6 +20,8 @@ import {
   formatLocalDate,
 } from "../utilities/date-utils";
 import { SortConfig, TimeEntrySortField } from "../redmine/models/common";
+import type { DraftQueue } from "../draft-mode/draft-queue";
+import type { DraftOperation } from "../draft-mode/draft-operation";
 
 export interface TimeEntryNode {
   id?: string; // Stable ID for preserving expansion state
@@ -35,6 +37,25 @@ export interface TimeEntryNode {
   _dateRange?: { start: string; end: string }; // For filling empty working days
   _date?: string; // ISO date for day-group nodes (YYYY-MM-DD)
   _monthYear?: { year: number; month: number }; // For lazy-loaded month nodes
+  _isDraft?: boolean; // True for draft time entries
+}
+
+/** Convert draft operation to TimeEntry-like object for display */
+function draftOperationToTimeEntry(op: DraftOperation): TimeEntry | null {
+  if (op.type !== "createTimeEntry") return null;
+  const data = op.http.data?.time_entry as Record<string, unknown> | undefined;
+  if (!data) return null;
+
+  return {
+    id: op.resourceId ?? -Date.now(), // Use negative ID for drafts
+    issue_id: data.issue_id as number,
+    issue: { id: data.issue_id as number },
+    activity_id: data.activity_id as number,
+    activity: { id: data.activity_id as number, name: "" },
+    hours: String(data.hours),
+    comments: (data.comments as string) ?? "",
+    spent_on: (data.spent_on as string) ?? formatLocalDate(new Date()),
+  };
 }
 
 export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNode> {
@@ -48,6 +69,8 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   private monthlySchedules: MonthlyScheduleOverrides = {};
   private showAllUsers = false; // false = my entries only, true = all users
   private entrySort: SortConfig<TimeEntrySortField> | null = null;
+  private draftQueue?: DraftQueue;
+  private draftQueueDisposable?: { dispose: () => void };
 
   // Lazy loading state for month nodes
   private visibleMonths: { year: number; month: number }[] = [];
@@ -119,6 +142,47 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     this.todayEntries = undefined;
     this.weekEntries = undefined;
     this.initializeVisibleMonths();
+  }
+
+  /**
+   * Set draft queue to show draft time entries
+   */
+  setDraftQueue(queue: DraftQueue | undefined): void {
+    // Dispose previous subscription
+    this.draftQueueDisposable?.dispose();
+    this.draftQueue = queue;
+
+    if (queue) {
+      // Refresh tree when draft queue changes
+      this.draftQueueDisposable = queue.onDidChange(() => {
+        this._onDidChangeTreeData.fire(undefined);
+      });
+    }
+  }
+
+  /**
+   * Get draft time entries from queue
+   */
+  private getDraftTimeEntries(): { entry: TimeEntry; draftId: string }[] {
+    if (!this.draftQueue) return [];
+
+    const drafts: { entry: TimeEntry; draftId: string }[] = [];
+    for (const op of this.draftQueue.getAll()) {
+      const entry = draftOperationToTimeEntry(op);
+      if (entry) {
+        drafts.push({ entry, draftId: op.id });
+      }
+    }
+    return drafts;
+  }
+
+  /**
+   * Get draft entries for a specific date
+   */
+  private getDraftEntriesForDate(dateStr: string): TimeEntry[] {
+    return this.getDraftTimeEntries()
+      .filter(d => d.entry.spent_on === dateStr)
+      .map(d => d.entry);
   }
 
   override refresh(): void {
@@ -310,8 +374,20 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const weekNum = getISOWeekNumber(now);
       const defaultSchedule = getWeeklySchedule();
 
-      const todayTotal = calculateTotal(this.todayEntries || []);
-      const weekTotal = calculateTotal(this.weekEntries || []);
+      // Merge draft time entries into server entries
+      const draftEntries = this.getDraftTimeEntries().map(d => d.entry);
+      const todayDrafts = draftEntries.filter(e => e.spent_on === today);
+      const weekDrafts = draftEntries.filter(e => {
+        const date = e.spent_on || "";
+        return date >= weekStart && date <= today;
+      });
+
+      // Combine server entries with drafts (drafts first for visibility)
+      const todayWithDrafts = [...todayDrafts, ...(this.todayEntries || [])];
+      const weekWithDrafts = [...weekDrafts, ...(this.weekEntries || [])];
+
+      const todayTotal = calculateTotal(todayWithDrafts);
+      const weekTotal = calculateTotal(weekWithDrafts);
       const todayAvailable = getHoursForDateMonthly(new Date(), this.monthlySchedules, defaultSchedule);
       const weekAvailable = countAvailableHoursMonthly(
         new Date(weekStart),
@@ -328,7 +404,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
           collapsibleState: this.getCollapsibleState("group-today", true),
           type: "group",
           contextValue: "day-group",
-          _cachedEntries: this.todayEntries,
+          _cachedEntries: todayWithDrafts,
           _date: today,
         },
         {
@@ -338,7 +414,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
           tooltip: "Shows working days from Monday up to today",
           collapsibleState: this.getCollapsibleState("group-week", true),
           type: "week-group",
-          _cachedEntries: this.weekEntries,
+          _cachedEntries: weekWithDrafts,
           _dateRange: { start: weekStart, end: today },
         },
       ];
@@ -396,9 +472,20 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         }];
       }
 
-      const entries = this.loadedMonthEntries.get(monthKey) || [];
+      const serverEntries = this.loadedMonthEntries.get(monthKey) || [];
+
+      // Merge draft entries for this month
+      const { start, end } = this.getMonthDateRange(element._monthYear);
+      const draftEntries = this.getDraftTimeEntries()
+        .map(d => d.entry)
+        .filter(e => {
+          const date = e.spent_on || "";
+          return date >= start && date <= end;
+        });
+
+      const entries = [...draftEntries, ...serverEntries];
       const weekGroups = this.groupEntriesByWeek(entries, element.id || "month");
-      if (weekGroups.length === 0) {
+      if (weekGroups.length === 0 && draftEntries.length === 0) {
         return [{
           label: "No time entries",
           collapsibleState: vscode.TreeItemCollapsibleState.None,
@@ -607,10 +694,15 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const projectName = cached?.project || "";
       const clientName = cached?.projectId ? projectClientMap.get(cached.projectId) || "" : "";
 
+      // Check if this is a draft entry (negative ID)
+      const isDraft = (entry.id ?? 0) < 0;
+
       // Encode command arguments as JSON array for VS Code command URI
       const commandArgs = encodeURIComponent(JSON.stringify([issueId]));
       const userLine = this.showAllUsers && entry.user?.name ? `**User:** ${entry.user.name}\n\n` : "";
+      const draftLine = isDraft ? `**⚠️ DRAFT** - Not yet saved to server\n\n` : "";
       const tooltip = new vscode.MarkdownString(
+        draftLine +
         `**Issue:** #${issueId} ${issueSubject}\n\n` +
           userLine +
           (clientName ? `**Client:** ${clientName}\n\n` : "") +
@@ -619,8 +711,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
           `**Activity:** ${entry.activity?.name || "Unknown"}\n\n` +
           `**Date:** ${entry.spent_on}\n\n` +
           `**Comments:** ${entry.comments || "(none)"}\n\n` +
-          `---\n\n` +
-          `[Open Issue in Browser](command:redmyne.openTimeEntryInBrowser?${commandArgs})`
+          (isDraft ? "" : `---\n\n[Open Issue in Browser](command:redmyne.openTimeEntryInBrowser?${commandArgs})`)
       );
       tooltip.isTrusted = true;
       tooltip.supportHtml = false;
@@ -630,24 +721,32 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const activity = entry.activity?.name ? `[${entry.activity.name}]` : "";
       const comment = entry.comments ? ` ${entry.comments}` : "";
       const userName = this.showAllUsers && entry.user?.name ? `• ${entry.user.name}` : "";
-      const descParts = [hours, activity, issueSubject, userName].filter(Boolean);
+      const draftSuffix = isDraft ? "(draft)" : "";
+      const descParts = [hours, activity, issueSubject, userName, draftSuffix].filter(Boolean);
 
       // Determine contextValue for ad-hoc contributions
-      let contextValue = "time-entry";
-      if (adHocTracker.isAdHoc(issueId)) {
+      let contextValue = isDraft ? "time-entry-draft" : "time-entry";
+      if (!isDraft && adHocTracker.isAdHoc(issueId)) {
         const targetId = parseTargetIssueId(entry.comments);
         contextValue = targetId ? "time-entry-adhoc-linked" : "time-entry-adhoc";
       }
+
+      // Draft entries get a distinct icon with theme-aware color
+      const iconPath = isDraft
+        ? new vscode.ThemeIcon("edit", new vscode.ThemeColor("editorWarning.foreground"))
+        : undefined;
 
       return {
         id: `${idPrefix}-entry-${entry.id}`,
         label: `#${issueId}${comment}`,
         description: descParts.join(" "),
         tooltip,
+        iconPath,
         collapsibleState: vscode.TreeItemCollapsibleState.None,
         type: "entry" as const,
         contextValue,
         _entry: entry,
+        _isDraft: isDraft,
       };
     });
   }

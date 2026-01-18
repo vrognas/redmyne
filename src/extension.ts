@@ -187,6 +187,7 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   myTimeEntriesTree.setTreeView(cleanupResources.myTimeEntriesTreeView as vscode.TreeView<import("./trees/my-time-entries-tree").TimeEntryNode>);
   myTimeEntriesTree.setMonthlySchedules(cleanupResources.monthlySchedules ?? {});
+  myTimeEntriesTree.setDraftQueue(draftQueue);
 
   // Initialize timer controller with settings from globalState
   const unitDuration = context.globalState.get<number>("redmyne.timer.unitDuration", 60);
