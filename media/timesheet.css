@@ -217,6 +217,7 @@ body {
 .flatpickr-calendar {
   background: var(--vscode-editorWidget-background, var(--vscode-dropdown-background)) !important;
   border: 1px solid var(--vscode-editorWidget-border, var(--vscode-dropdown-border)) !important;
+  border-radius: 4px !important;
   box-shadow: 0 4px 16px var(--vscode-widget-shadow) !important;
   font-family: var(--vscode-font-family) !important;
   font-size: calc(var(--vscode-font-size, 13px) - 1px) !important;
