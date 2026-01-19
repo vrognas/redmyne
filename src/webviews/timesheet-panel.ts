@@ -1237,7 +1237,7 @@ export class TimeSheetPanel {
     <header class="timesheet-header">
       <div class="header-left">
         <h1>Time Sheet</h1>
-        <select id="groupBySelect" class="toolbar-select" title="Group by">
+        <select id="groupBySelect" class="toolbar-select" data-tooltip="Group by">
           <option value="none">No grouping</option>
           <option value="client">By Client</option>
           <option value="project">By Project</option>
@@ -1245,18 +1245,18 @@ export class TimeSheetPanel {
           <option value="activity">By Activity</option>
         </select>
         <div class="toolbar-separator"></div>
-        <button id="undoBtn" class="toolbar-btn" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
-        <button id="redoBtn" class="toolbar-btn" disabled title="Redo (Ctrl+Shift+Z)">↪ Redo</button>
+        <button id="undoBtn" class="toolbar-btn" disabled data-tooltip="Undo (Ctrl+Z)">↩ Undo</button>
+        <button id="redoBtn" class="toolbar-btn" disabled data-tooltip="Redo (Ctrl+Shift+Z)">↪ Redo</button>
         <div class="toolbar-separator"></div>
-        <button id="copyWeekBtn" class="toolbar-btn" title="Copy week (Ctrl+C)">📋 Copy</button>
-        <button id="pasteWeekBtn" class="toolbar-btn" title="Paste week (Ctrl+V)">📥 Paste</button>
+        <button id="copyWeekBtn" class="toolbar-btn" data-tooltip="Copy week (Ctrl+C)">📋 Copy</button>
+        <button id="pasteWeekBtn" class="toolbar-btn" data-tooltip="Paste week (Ctrl+V)">📥 Paste</button>
       </div>
       <div class="week-nav">
-        <button id="prevWeek" class="nav-btn" title="Previous week">‹</button>
-        <span id="weekLabel" class="week-label-picker" title="Click to pick a week">Loading...</span>
+        <button id="prevWeek" class="nav-btn" data-tooltip="Previous week">‹</button>
+        <span id="weekLabel" class="week-label-picker" data-tooltip="Click to pick a week">Loading...</span>
         <input type="text" id="weekPickerInput" class="week-picker-input" readonly>
-        <button id="nextWeek" class="nav-btn" title="Next week">›</button>
-        <button id="todayBtn" class="nav-btn today-btn" title="Go to current week">Today</button>
+        <button id="nextWeek" class="nav-btn" data-tooltip="Next week">›</button>
+        <button id="todayBtn" class="nav-btn today-btn" data-tooltip="Go to current week">Today</button>
       </div>
     </header>
 
