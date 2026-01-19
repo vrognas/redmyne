@@ -303,7 +303,7 @@
       const label = row.parentProjectId === OTHERS_PARENT_ID
         ? "Others"
         : `#${row.parentProjectId} ${row.parentProjectName || ""}`;
-      parentSelect.title = label;
+      parentSelect.dataset.tooltip = label;
       // Context menu data (only for real projects, not "Others")
       if (row.parentProjectId !== OTHERS_PARENT_ID) {
         const parentProject = state.parentProjects.find(p => p.id === row.parentProjectId);
@@ -360,7 +360,7 @@
 
     // Set tooltip for selected project
     if (row.projectId !== null) {
-      projectSelect.title = `#${row.projectId} ${row.projectName || ""}`;
+      projectSelect.dataset.tooltip = `#${row.projectId} ${row.projectName || ""}`;
       const childProject = state.projects.find(p => p.id === row.projectId);
       projectSelect.dataset.vscodeContext = JSON.stringify({
         webviewSection: "tsProject",
@@ -440,7 +440,7 @@
     const searchBtn = document.createElement("button");
     searchBtn.className = "search-btn";
     searchBtn.textContent = "🔍";
-    searchBtn.title = "Search all issues";
+    searchBtn.dataset.tooltip = "Search all issues";
     searchBtn.addEventListener("click", () => {
       vscode.postMessage({ type: "pickIssue", rowId: row.id });
     });
@@ -471,7 +471,7 @@
 
     // Set tooltip for selected activity
     if (row.activityId !== null && row.activityName) {
-      activitySelect.title = row.activityName;
+      activitySelect.dataset.tooltip = row.activityName;
     }
 
     activitySelect.addEventListener("change", () => {
@@ -525,7 +525,7 @@
       input.type = "text";
       input.className = "day-input" + (cell.isDirty ? " dirty" : "") + (cell.hours === 0 ? " zero" : "");
       input.value = formatHours(cell.hours);
-      input.title = state.week ? state.week.dayDates[i] : "";
+      input.dataset.tooltip = state.week ? state.week.dayDates[i] : "";
       input.dataset.oldValue = cell.hours; // Store for undo
       input.addEventListener("focus", (e) => {
         e.target.dataset.oldValue = parseHours(e.target.value); // Capture before edit
@@ -577,7 +577,7 @@
     const deleteBtn = document.createElement("button");
     deleteBtn.className = "action-btn delete-btn";
     deleteBtn.textContent = "🗑️";
-    deleteBtn.title = "Delete";
+    deleteBtn.dataset.tooltip = "Delete";
     deleteBtn.addEventListener("click", () => {
       vscode.postMessage({ type: "deleteRow", rowId: row.id });
     });
@@ -586,7 +586,7 @@
     const copyBtn = document.createElement("button");
     copyBtn.className = "action-btn copy-btn";
     copyBtn.textContent = "📋";
-    copyBtn.title = "Copy";
+    copyBtn.dataset.tooltip = "Duplicate";
     copyBtn.addEventListener("click", () => {
       vscode.postMessage({ type: "duplicateRow", rowId: row.id });
     });
@@ -803,10 +803,10 @@
         const percent = Math.min((hours / target) * 100, 100);
         progressFill.style.width = `${percent}%`;
         progressFill.classList.remove("met", "over");
-        if (hours >= target) {
-          progressFill.classList.add("met");
-        } else if (hours > target) {
+        if (hours > target) {
           progressFill.classList.add("over");
+        } else if (hours >= target) {
+          progressFill.classList.add("met");
         }
       } else if (progressFill) {
         progressFill.style.width = "0%";
@@ -1209,8 +1209,8 @@
     }
     tooltipTarget = null;
     pendingTooltipIssueId = null;
-    issueTooltip.classList.remove("visible");
-    issueTooltip.setAttribute("aria-hidden", "true");
+    issueTooltip?.classList.remove("visible");
+    issueTooltip?.setAttribute("aria-hidden", "true");
   }
 
   // Event delegation for tooltip on task cells
@@ -1265,6 +1265,85 @@
   // Hide tooltip on scroll
   document.querySelector(".timesheet-grid-container")?.addEventListener("scroll", () => {
     hideIssueTooltip();
+  });
+
+  // ========== Generic Tooltip (for data-tooltip attributes) ==========
+  const genericTooltip = document.getElementById("genericTooltip");
+  let genericTooltipTarget = null;
+  let genericTooltipTimer = null;
+
+  function showGenericTooltip(target, x, y) {
+    if (!genericTooltip) return;
+    const text = target.dataset.tooltip;
+    if (!text) return;
+
+    genericTooltip.textContent = text;
+
+    // Position tooltip
+    const padding = 8;
+    const offset = 10;
+    genericTooltip.style.left = "0";
+    genericTooltip.style.top = "0";
+    genericTooltip.classList.add("visible");
+
+    const rect = genericTooltip.getBoundingClientRect();
+    let left = x + offset;
+    let top = y + offset;
+
+    if (left + rect.width > window.innerWidth - padding) {
+      left = x - rect.width - offset;
+    }
+    if (top + rect.height > window.innerHeight - padding) {
+      top = y - rect.height - offset;
+    }
+
+    left = Math.max(padding, Math.min(left, window.innerWidth - rect.width - padding));
+    top = Math.max(padding, Math.min(top, window.innerHeight - rect.height - padding));
+
+    genericTooltip.style.left = `${Math.round(left)}px`;
+    genericTooltip.style.top = `${Math.round(top)}px`;
+  }
+
+  function hideGenericTooltip() {
+    if (genericTooltipTimer) {
+      clearTimeout(genericTooltipTimer);
+      genericTooltipTimer = null;
+    }
+    genericTooltipTarget = null;
+    genericTooltip?.classList.remove("visible");
+  }
+
+  // Event delegation for generic tooltips
+  document.addEventListener("pointerover", (e) => {
+    const target = e.target.closest("[data-tooltip]");
+    // Skip if this is an issue tooltip target (handled separately)
+    if (!target || target.dataset.issueId) return;
+    if (genericTooltipTarget === target) return;
+
+    hideGenericTooltip();
+    genericTooltipTarget = target;
+
+    genericTooltipTimer = setTimeout(() => {
+      genericTooltipTimer = null;
+      if (genericTooltipTarget === target) {
+        showGenericTooltip(target, e.clientX, e.clientY);
+      }
+    }, 400);
+  }, true);
+
+  document.addEventListener("pointerout", (e) => {
+    const target = e.target.closest("[data-tooltip]");
+    if (!target || target !== genericTooltipTarget) return;
+
+    const relatedTarget = e.relatedTarget;
+    if (relatedTarget && target.contains(relatedTarget)) return;
+
+    hideGenericTooltip();
+  }, true);
+
+  // Hide generic tooltip on scroll
+  document.querySelector(".timesheet-grid-container")?.addEventListener("scroll", () => {
+    hideGenericTooltip();
   });
 
   // Notify extension that webview is ready

@@ -1014,3 +1014,29 @@ body.draft-mode-disabled .action-btn {
 .issue-tooltip a:hover {
   text-decoration: underline;
 }
+
+/* ========== Generic Tooltip (for simple text tooltips) ========== */
+.generic-tooltip {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1000;
+  max-width: 300px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
+  border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-editorWidget-border));
+  color: var(--vscode-editorHoverWidget-foreground, var(--vscode-editorWidget-foreground));
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+  font-family: var(--vscode-font-family);
+  font-size: calc(var(--vscode-font-size) - 1px);
+  line-height: 1.4;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.08s ease-out;
+}
+
+.generic-tooltip.visible {
+  opacity: 1;
+  visibility: visible;
+}

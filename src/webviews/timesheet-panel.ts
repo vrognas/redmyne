@@ -617,7 +617,7 @@ export class TimeSheetPanel {
               method: "DELETE",
               path: `/time_entries/${cell.entryId}.json`,
             },
-            resourceKey: `timeentry:${cell.entryId}`,
+            resourceKey: `ts:timeentry:${cell.entryId}`,
           });
         }
       }
@@ -1181,7 +1181,7 @@ export class TimeSheetPanel {
                 },
               },
             },
-            resourceKey: `timeentry:${tempId}`,
+            resourceKey: `ts:timeentry:${tempId}`,
           });
           created++;
         }
@@ -1316,6 +1316,8 @@ export class TimeSheetPanel {
   <div id="issueTooltip" class="issue-tooltip" role="tooltip" aria-hidden="true">
     <div class="issue-tooltip-content"></div>
   </div>
+
+  <div id="genericTooltip" class="generic-tooltip" role="tooltip" aria-hidden="true"></div>
 
   <script nonce="${nonce}" src="${flatpickrJsUri}"></script>
   <script nonce="${nonce}" src="${weekSelectJsUri}"></script>
