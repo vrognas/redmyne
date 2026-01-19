@@ -603,9 +603,11 @@
   function getGroupLabel(row) {
     switch (state.groupBy) {
       case "client":
-        return row.parentProjectName || "(No client)";
+        // parentProjectId -1 = "Others" synthetic group
+        if (row.parentProjectId === OTHERS_PARENT_ID) return row.parentProjectName || "Others";
+        return row.parentProjectId ? `#${row.parentProjectId} ${row.parentProjectName || ""}` : "(No client)";
       case "project":
-        return row.projectName ? `#${row.projectId} ${row.projectName}` : "(No project)";
+        return row.projectId ? `#${row.projectId} ${row.projectName || ""}` : "(No project)";
       case "issue":
         return row.issueId ? `#${row.issueId} ${row.issueSubject || ""}` : "(No task)";
       case "activity":

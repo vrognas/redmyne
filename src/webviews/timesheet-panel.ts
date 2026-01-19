@@ -344,6 +344,17 @@ export class TimeSheetPanel {
       // Load activities and issues for all projects in parallel
       await Promise.all([...projectIds].map((pid) => this._loadProjectData(pid)));
 
+      // Update issueSubject for all rows from cached issues
+      for (const row of this._rows) {
+        if (row.issueId && row.projectId) {
+          const issues = this._issuesByProject.get(row.projectId);
+          const issue = issues?.find((i) => i.id === row.issueId);
+          if (issue) {
+            row.issueSubject = issue.subject;
+          }
+        }
+      }
+
       // Calculate totals
       const totals = this._calculateTotals();
 
