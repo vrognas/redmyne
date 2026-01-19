@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "4.7.0",
+  "version": "4.8.0",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -313,6 +313,11 @@
         "command": "redmyne.showGantt",
         "title": "Show Gantt",
         "icon": "$(calendar)"
+      },
+      {
+        "command": "redmyne.showTimeSheet",
+        "title": "Time Sheet",
+        "icon": "$(table)"
       },
       {
         "command": "redmyne.openProjectInBrowser",
@@ -1348,6 +1353,11 @@
           "command": "redmyne.openTimeEntriesSettings",
           "when": "view == 'redmyne-explorer-my-time-entries'",
           "group": "navigation@4"
+        },
+        {
+          "command": "redmyne.showTimeSheet",
+          "when": "view == 'redmyne-explorer-my-time-entries' && redmyne:configured",
+          "group": "navigation@5"
         }
       ],
       "view/item/context": [

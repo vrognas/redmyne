@@ -31,6 +31,7 @@ import { registerTimeEntryCommands } from "./commands/time-entry-commands";
 import { updateClipboardContext } from "./utilities/time-entry-clipboard";
 import { registerMonthlyScheduleCommands } from "./commands/monthly-schedule-commands";
 import { registerGanttCommands } from "./commands/gantt-commands";
+import { registerTimeSheetCommands } from "./commands/timesheet-commands";
 import { registerInternalEstimateCommands } from "./commands/internal-estimate-commands";
 import { setInternalEstimate } from "./utilities/internal-estimates";
 import { parseTimeInput } from "./utilities/time-input";
@@ -343,6 +344,13 @@ export function activate(context: vscode.ExtensionContext): void {
     clearProjects: () => projectsTree.clearProjects(),
     getFilter: () => projectsTree.getFilter(),
     setFilter: (filter) => projectsTree.setFilter(filter),
+  });
+
+  // Register timesheet commands
+  registerTimeSheetCommands(context, {
+    getServer: () => projectsTree.server,
+    getDraftQueue: () => draftQueue,
+    getDraftModeManager: () => draftModeManager,
   });
 
   // Register internal estimate commands

@@ -4,6 +4,20 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 ## [Unreleased]
 
+## [4.8.0]
+
+### Added
+
+- **Time Sheet webview** - week-by-week time entry editing
+  - Open via table icon in Time Entries pane header
+  - Auto-enables Draft Mode for batch operations
+  - Navigate weeks (prev/next/today)
+  - Add, delete, duplicate rows
+  - Searchable issue picker per row
+  - Activity dropdown per row
+  - Daily hours input with dirty tracking
+  - Daily/weekly totals with target indicators
+
 ## [4.7.0]
 
 ### Improved
