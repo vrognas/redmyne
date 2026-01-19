@@ -1089,6 +1089,8 @@
   let pendingTooltipY = 0;
 
   function showIssueTooltip(target, x, y) {
+    if (!issueTooltip || !tooltipContent) return;
+
     const issueId = parseInt(target.dataset.issueId, 10);
     if (!issueId) return;
 
@@ -1240,6 +1242,13 @@
   document.addEventListener("pointerout", (e) => {
     const target = e.target.closest("[data-issue-id]");
     if (!target || target !== tooltipTarget) return;
+
+    // Check if we're moving to another element within the same tooltip target
+    const relatedTarget = e.relatedTarget;
+    if (relatedTarget && target.contains(relatedTarget)) {
+      // Still within the same element, don't hide
+      return;
+    }
 
     // Cancel pending show
     if (tooltipShowTimer) {
