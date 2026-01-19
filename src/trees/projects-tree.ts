@@ -396,6 +396,14 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   }
 
   /**
+   * Get project node by ID for reveal operations.
+   * Returns the internal ProjectNode which is what the tree actually contains.
+   */
+  getProjectNodeById(projectId: number): TreeItem | undefined {
+    return this.projectNodes.find((n) => n.project.id === projectId);
+  }
+
+  /**
    * Get flexibility cache for Gantt display
    */
   getFlexibilityCache(): Map<number, FlexibilityScore | null> {

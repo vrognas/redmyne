@@ -6,6 +6,7 @@
 import * as vscode from "vscode";
 import { RedmineServer } from "../redmine/redmine-server";
 import { TimeEntry } from "../redmine/models/time-entry";
+import { Issue } from "../redmine/models/issue";
 import { DraftQueue } from "../draft-mode/draft-queue";
 import { DraftModeManager } from "../draft-mode/draft-mode-manager";
 import { generateTempId } from "../draft-mode/draft-operation";
@@ -14,6 +15,11 @@ import { parseLocalDate, getLocalToday } from "../utilities/date-utils";
 import { pickIssue } from "../utilities/issue-picker";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import {
+  setClipboard,
+  getClipboard,
+  ClipboardEntry,
+} from "../utilities/time-entry-clipboard";
+import {
   TimeSheetRow,
   DayCell,
   WeekInfo,
@@ -21,9 +27,14 @@ import {
   ProjectOption,
   IssueOption,
   ActivityOption,
+  IssueDetails,
   ExtensionToWebviewMessage,
   WebviewToExtensionMessage,
   buildWeekInfo,
+  OTHERS_PARENT_ID,
+  SortColumn,
+  SortDirection,
+  GroupBy,
 } from "./timesheet-webview-messages";
 import { startOfISOWeek } from "date-fns";
 
@@ -31,31 +42,37 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export class TimeSheetPanel {
   public static currentPanel: TimeSheetPanel | undefined;
-  private static _globalState: vscode.Memento | undefined;
 
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
+  private readonly _context: vscode.ExtensionContext;
   private _server: RedmineServer | undefined;
   private _draftQueue: DraftQueue | undefined;
   private _draftModeManager: DraftModeManager | undefined;
+  private _getCachedIssues: (() => Issue[]) | undefined;
 
   private _rows: TimeSheetRow[] = [];
   private _currentWeek: WeekInfo;
-  private _projects: ProjectOption[] = [];
-  private _issuesByProject: Map<number | null, IssueOption[]> = new Map();
+  private _projects: ProjectOption[] = []; // All projects flat
+  private _parentProjects: ProjectOption[] = []; // Parents + "Others"
+  private _childrenByParent: Map<number, ProjectOption[]> = new Map(); // parentId -> children
+  private _issuesByProject: Map<number, IssueOption[]> = new Map();
   private _activitiesByProject: Map<number, ActivityOption[]> = new Map();
+  private _issueDetailsCache: Map<number, IssueDetails> = new Map();
   private _disposables: vscode.Disposable[] = [];
   private _schedule: WeeklySchedule = DEFAULT_WEEKLY_SCHEDULE;
-
-  public static initialize(globalState: vscode.Memento): void {
-    TimeSheetPanel._globalState = globalState;
-  }
+  private _sortColumn: SortColumn = null;
+  private _sortDirection: SortDirection = "asc";
+  private _groupBy: GroupBy = "none";
+  private _collapsedGroups: Set<string> = new Set();
 
   public static createOrShow(
     extensionUri: vscode.Uri,
+    context: vscode.ExtensionContext,
     server: RedmineServer | undefined,
     draftQueue: DraftQueue | undefined,
-    draftModeManager: DraftModeManager | undefined
+    draftModeManager: DraftModeManager | undefined,
+    getCachedIssues?: () => Issue[]
   ): TimeSheetPanel {
     const column = vscode.window.activeTextEditor?.viewColumn;
 
@@ -71,6 +88,7 @@ export class TimeSheetPanel {
       TimeSheetPanel.currentPanel._server = server;
       TimeSheetPanel.currentPanel._draftQueue = draftQueue;
       TimeSheetPanel.currentPanel._draftModeManager = draftModeManager;
+      TimeSheetPanel.currentPanel._getCachedIssues = getCachedIssues;
       return TimeSheetPanel.currentPanel;
     }
 
@@ -89,9 +107,11 @@ export class TimeSheetPanel {
     TimeSheetPanel.currentPanel = new TimeSheetPanel(
       panel,
       extensionUri,
+      context,
       server,
       draftQueue,
-      draftModeManager
+      draftModeManager,
+      getCachedIssues
     );
     return TimeSheetPanel.currentPanel;
   }
@@ -99,24 +119,29 @@ export class TimeSheetPanel {
   public static restore(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
+    context: vscode.ExtensionContext,
     server: RedmineServer | undefined
   ): TimeSheetPanel {
-    TimeSheetPanel.currentPanel = new TimeSheetPanel(panel, extensionUri, server);
+    TimeSheetPanel.currentPanel = new TimeSheetPanel(panel, extensionUri, context, server);
     return TimeSheetPanel.currentPanel;
   }
 
   private constructor(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
+    context: vscode.ExtensionContext,
     server: RedmineServer | undefined,
     draftQueue?: DraftQueue,
-    draftModeManager?: DraftModeManager
+    draftModeManager?: DraftModeManager,
+    getCachedIssues?: () => Issue[]
   ) {
     this._panel = panel;
     this._extensionUri = extensionUri;
+    this._context = context;
     this._server = server;
     this._draftQueue = draftQueue;
     this._draftModeManager = draftModeManager;
+    this._getCachedIssues = getCachedIssues;
 
     // Initialize to current week
     const today = getLocalToday();
@@ -126,6 +151,15 @@ export class TimeSheetPanel {
     // Load schedule from config
     const scheduleConfig = vscode.workspace.getConfiguration("redmyne.workingHours");
     this._schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
+
+    // Load persisted sort state
+    this._sortColumn = this._context.globalState.get<SortColumn>("redmyne.timesheet.sortColumn", null);
+    this._sortDirection = this._context.globalState.get<SortDirection>("redmyne.timesheet.sortDirection", "asc");
+
+    // Load persisted grouping state
+    this._groupBy = this._context.globalState.get<GroupBy>("redmyne.timesheet.groupBy", "none");
+    const collapsed = this._context.globalState.get<string[]>("redmyne.timesheet.collapsedGroups", []);
+    this._collapsedGroups = new Set(collapsed);
 
     // Set HTML content
     this._panel.webview.html = this._getHtml();
@@ -151,6 +185,18 @@ export class TimeSheetPanel {
       null,
       this._disposables
     );
+
+    // Listen for draft mode changes
+    if (this._draftModeManager) {
+      this._disposables.push(
+        this._draftModeManager.onDidChangeEnabled(() => {
+          this._postMessage({
+            type: "draftModeChanged",
+            isDraftMode: this._draftModeManager?.isEnabled ?? false,
+          });
+        })
+      );
+    }
   }
 
   private _dispose(): void {
@@ -192,8 +238,12 @@ export class TimeSheetPanel {
         await this._updateRowField(message.rowId, message.field, message.value);
         break;
 
+      case "requestChildProjects":
+        this._sendChildProjects(message.parentId);
+        break;
+
       case "requestIssues":
-        await this._loadIssuesForProject(message.projectId, message.query);
+        await this._loadIssuesForProject(message.projectId);
         break;
 
       case "requestActivities":
@@ -206,6 +256,47 @@ export class TimeSheetPanel {
 
       case "pickIssue":
         await this._pickIssueForRow(message.rowId);
+        break;
+
+      case "sortChanged":
+        this._sortColumn = message.sortColumn;
+        this._sortDirection = message.sortDirection;
+        // Persist to globalState
+        void this._context.globalState.update("redmyne.timesheet.sortColumn", this._sortColumn);
+        void this._context.globalState.update("redmyne.timesheet.sortDirection", this._sortDirection);
+        break;
+
+      case "setGroupBy":
+        this._groupBy = message.groupBy;
+        void this._context.globalState.update("redmyne.timesheet.groupBy", this._groupBy);
+        break;
+
+      case "toggleGroup":
+        if (this._collapsedGroups.has(message.groupKey)) {
+          this._collapsedGroups.delete(message.groupKey);
+        } else {
+          this._collapsedGroups.add(message.groupKey);
+        }
+        void this._context.globalState.update(
+          "redmyne.timesheet.collapsedGroups",
+          [...this._collapsedGroups]
+        );
+        break;
+
+      case "copyWeek":
+        this._copyWeek();
+        break;
+
+      case "pasteWeek":
+        await this._pasteWeek();
+        break;
+
+      case "enableDraftMode":
+        await this._enableDraftMode();
+        break;
+
+      case "requestIssueDetails":
+        await this._loadIssueDetails(message.issueId);
         break;
     }
   }
@@ -237,9 +328,21 @@ export class TimeSheetPanel {
       // Convert entries to rows (each entry = separate row)
       this._rows = this._entriesToRows(entries, week);
 
-      // Load activities for all projects in the rows
-      const projectIds = new Set(this._rows.map((r) => r.projectId).filter((id): id is number => id !== null));
-      await Promise.all([...projectIds].map((pid) => this._loadActivitiesForProject(pid)));
+      // Auto-add empty row if no entries exist
+      if (this._rows.length === 0) {
+        this._rows.push(this._createEmptyRow());
+      }
+
+      // Collect unique parent and project IDs from rows
+      const parentIds = new Set(
+        this._rows.map((r) => r.parentProjectId).filter((id): id is number => id !== null)
+      );
+      const projectIds = new Set(
+        this._rows.map((r) => r.projectId).filter((id): id is number => id !== null)
+      );
+
+      // Load activities and issues for all projects in parallel
+      await Promise.all([...projectIds].map((pid) => this._loadProjectData(pid)));
 
       // Calculate totals
       const totals = this._calculateTotals();
@@ -251,8 +354,21 @@ export class TimeSheetPanel {
         week: this._currentWeek,
         totals,
         projects: this._projects,
+        parentProjects: this._parentProjects,
         isDraftMode: this._draftModeManager?.isEnabled ?? false,
+        sortColumn: this._sortColumn,
+        sortDirection: this._sortDirection,
+        groupBy: this._groupBy,
+        collapsedGroups: [...this._collapsedGroups],
       });
+
+      // Pre-send child projects for all parents in existing rows
+      for (const parentId of parentIds) {
+        this._sendChildProjects(parentId);
+      }
+
+      // Load issue details for tooltips (fire and forget)
+      this._loadAllIssueDetails();
     } catch (error) {
       this._postMessage({ type: "showError", message: `Failed to load: ${error}` });
     } finally {
@@ -265,54 +381,122 @@ export class TimeSheetPanel {
 
     try {
       const projects = await this._server.getProjects();
+
+      // Build flat list with parentId
       this._projects = projects.map((p) => ({
         id: p.id,
         name: p.name,
-        path: p.name, // Could build full path with parent
+        identifier: p.identifier,
+        path: p.name,
+        parentId: p.parent?.id ?? null,
       }));
+
+      // Build hierarchy: separate parents and children
+      const parentsWithChildren = new Set<number>();
+      const orphans: ProjectOption[] = [];
+      this._childrenByParent.clear();
+
+      for (const p of this._projects) {
+        if (p.parentId !== null) {
+          // This is a child - add to its parent's children list
+          parentsWithChildren.add(p.parentId);
+          const children = this._childrenByParent.get(p.parentId) ?? [];
+          children.push(p);
+          this._childrenByParent.set(p.parentId, children);
+        }
+      }
+
+      // Identify parents (projects that have children) and orphans (no parent, no children)
+      const parents: ProjectOption[] = [];
+      for (const p of this._projects) {
+        if (parentsWithChildren.has(p.id)) {
+          // This project has children - it's a parent
+          parents.push(p);
+        } else if (p.parentId === null) {
+          // No parent and no children - orphan (goes to "Others")
+          orphans.push(p);
+        }
+      }
+
+      // Build parent projects list (for Client dropdown)
+      this._parentProjects = [...parents];
+
+      // Add synthetic "Others" if there are orphan projects
+      if (orphans.length > 0) {
+        const othersParent: ProjectOption = {
+          id: OTHERS_PARENT_ID,
+          name: "Others",
+          identifier: "",
+          path: "Others",
+          parentId: null,
+        };
+        this._parentProjects.push(othersParent);
+        this._childrenByParent.set(OTHERS_PARENT_ID, orphans);
+      }
+
+      // Sort parents alphabetically
+      this._parentProjects.sort((a, b) => a.name.localeCompare(b.name));
     } catch {
       // Silent fail - projects will be empty
     }
   }
 
+  private _sendChildProjects(parentId: number): void {
+    const children = this._childrenByParent.get(parentId) ?? [];
+    this._postMessage({
+      type: "updateChildProjects",
+      projects: children,
+      forParentId: parentId,
+    });
+  }
+
   private _entriesToRows(entries: TimeEntry[], week: WeekInfo): TimeSheetRow[] {
-    // Group entries by issue+activity (each unique combo is a row)
-    const rowMap = new Map<string, TimeSheetRow>();
+    // One row per time entry (no grouping)
+    const rows: TimeSheetRow[] = [];
 
     for (const entry of entries) {
-      const key = `${entry.issue?.id ?? "none"}-${entry.activity?.id ?? 0}`;
-
       // Find day index (0=Mon, 6=Sun)
-      const entryDate = entry.spent_on;
+      const entryDate = entry.spent_on ?? "";
       const dayIndex = week.dayDates.indexOf(entryDate);
       if (dayIndex === -1) continue;
 
-      let row = rowMap.get(key);
-      if (!row) {
-        row = this._createEmptyRow();
-        row.id = `existing-${entry.id}`;
-        row.projectId = entry.project?.id ?? null;
-        row.projectName = entry.project?.name ?? null;
-        row.issueId = entry.issue?.id ?? null;
-        row.issueSubject = entry.issue?.name ?? null;
-        row.activityId = entry.activity?.id ?? null;
-        row.activityName = entry.activity?.name ?? null;
-        row.isNew = false;
-        rowMap.set(key, row);
+      const row = this._createEmptyRow();
+      row.id = `existing-${entry.id}`;
+      row.projectId = entry.project?.id ?? null;
+      row.projectName = entry.project?.name ?? null;
+
+      // Derive parentProjectId from project's parent
+      const projectOpt = this._projects.find((p) => p.id === row.projectId);
+      if (projectOpt?.parentId !== null && projectOpt?.parentId !== undefined) {
+        // Has a parent - use it
+        row.parentProjectId = projectOpt.parentId;
+        row.parentProjectName = this._parentProjects.find((p) => p.id === projectOpt.parentId)?.name ?? null;
+      } else if (row.projectId !== null) {
+        // Orphan project or parent project - put in "Others"
+        row.parentProjectId = OTHERS_PARENT_ID;
+        row.parentProjectName = "Others";
       }
 
-      // Add hours to the day cell
+      row.issueId = entry.issue?.id ?? null;
+      row.issueSubject = entry.issue?.subject ?? null;
+      row.activityId = entry.activity?.id ?? null;
+      row.activityName = entry.activity?.name ?? null;
+      row.comments = entry.comments ?? null;
+      row.isNew = false;
+
+      // Set hours for this entry's day
+      const entryHours = typeof entry.hours === "string" ? parseFloat(entry.hours) : entry.hours;
       row.days[dayIndex] = {
-        hours: (row.days[dayIndex]?.hours ?? 0) + entry.hours,
-        entryId: entry.id,
+        hours: entryHours,
+        originalHours: entryHours,
+        entryId: entry.id ?? null,
         isDirty: false,
       };
-    }
 
-    // Calculate week totals
-    const rows = Array.from(rowMap.values());
-    for (const row of rows) {
-      row.weekTotal = Object.values(row.days).reduce((sum, cell) => sum + cell.hours, 0);
+      // Calculate week total (just this entry's hours)
+      row.weekTotal = entryHours;
+
+      rows.push(row);
     }
 
     return rows;
@@ -321,16 +505,19 @@ export class TimeSheetPanel {
   private _createEmptyRow(): TimeSheetRow {
     const days: Record<number, DayCell> = {};
     for (let i = 0; i < 7; i++) {
-      days[i] = { hours: 0, entryId: null, isDirty: false };
+      days[i] = { hours: 0, originalHours: 0, entryId: null, isDirty: false };
     }
     return {
       id: generateTempId("timeentry"),
+      parentProjectId: null,
+      parentProjectName: null,
       projectId: null,
       projectName: null,
       issueId: null,
       issueSubject: null,
       activityId: null,
       activityName: null,
+      comments: null,
       days,
       isNew: true,
       weekTotal: 0,
@@ -390,7 +577,12 @@ export class TimeSheetPanel {
       week: this._currentWeek,
       totals,
       projects: this._projects,
+      parentProjects: this._parentProjects,
       isDraftMode: this._draftModeManager?.isEnabled ?? false,
+      sortColumn: this._sortColumn,
+      sortDirection: this._sortDirection,
+      groupBy: this._groupBy,
+      collapsedGroups: [...this._collapsedGroups],
     });
   }
 
@@ -404,7 +596,7 @@ export class TimeSheetPanel {
     if (!row.isNew && this._draftQueue && this._draftModeManager?.isEnabled) {
       for (const cell of Object.values(row.days)) {
         if (cell.entryId) {
-          this._draftQueue.enqueue({
+          this._draftQueue.add({
             id: crypto.randomUUID(),
             type: "deleteTimeEntry",
             timestamp: Date.now(),
@@ -428,7 +620,12 @@ export class TimeSheetPanel {
       week: this._currentWeek,
       totals,
       projects: this._projects,
+      parentProjects: this._parentProjects,
       isDraftMode: this._draftModeManager?.isEnabled ?? false,
+      sortColumn: this._sortColumn,
+      sortDirection: this._sortDirection,
+      groupBy: this._groupBy,
+      collapsedGroups: [...this._collapsedGroups],
     });
   }
 
@@ -437,18 +634,23 @@ export class TimeSheetPanel {
     if (!row) return;
 
     const newRow = this._createEmptyRow();
+    newRow.parentProjectId = row.parentProjectId;
+    newRow.parentProjectName = row.parentProjectName;
     newRow.projectId = row.projectId;
     newRow.projectName = row.projectName;
     newRow.issueId = row.issueId;
     newRow.issueSubject = row.issueSubject;
     newRow.activityId = row.activityId;
     newRow.activityName = row.activityName;
+    newRow.comments = row.comments;
     // Copy hours but mark as dirty (new entries)
     for (let i = 0; i < 7; i++) {
+      const hours = row.days[i]?.hours ?? 0;
       newRow.days[i] = {
-        hours: row.days[i]?.hours ?? 0,
+        hours,
+        originalHours: 0, // New row has no server entry
         entryId: null,
-        isDirty: true,
+        isDirty: hours !== 0,
       };
     }
     newRow.weekTotal = row.weekTotal;
@@ -461,7 +663,12 @@ export class TimeSheetPanel {
       week: this._currentWeek,
       totals,
       projects: this._projects,
+      parentProjects: this._parentProjects,
       isDraftMode: this._draftModeManager?.isEnabled ?? false,
+      sortColumn: this._sortColumn,
+      sortDirection: this._sortDirection,
+      groupBy: this._groupBy,
+      collapsedGroups: [...this._collapsedGroups],
     });
   }
 
@@ -469,10 +676,13 @@ export class TimeSheetPanel {
     const row = this._rows.find((r) => r.id === rowId);
     if (!row) return;
 
+    const existingCell = row.days[dayIndex];
+    const originalHours = existingCell?.originalHours ?? 0;
     row.days[dayIndex] = {
       hours,
-      entryId: row.days[dayIndex]?.entryId ?? null,
-      isDirty: true,
+      originalHours,
+      entryId: existingCell?.entryId ?? null,
+      isDirty: hours !== originalHours,
     };
     row.weekTotal = Object.values(row.days).reduce((sum, cell) => sum + cell.hours, 0);
 
@@ -482,15 +692,35 @@ export class TimeSheetPanel {
 
   private async _updateRowField(
     rowId: string,
-    field: "project" | "issue" | "activity",
-    value: number | null
+    field: "parentProject" | "project" | "issue" | "activity" | "comments",
+    value: number | string | null
   ): Promise<void> {
     const row = this._rows.find((r) => r.id === rowId);
     if (!row) return;
 
-    if (field === "project") {
-      row.projectId = value;
-      row.projectName = this._projects.find((p) => p.id === value)?.name ?? null;
+    if (field === "parentProject") {
+      const numValue = value as number | null;
+      row.parentProjectId = numValue;
+      row.parentProjectName = this._parentProjects.find((p) => p.id === numValue)?.name ?? null;
+      // Reset project/issue/activity when parent changes
+      row.projectId = null;
+      row.projectName = null;
+      row.issueId = null;
+      row.issueSubject = null;
+      row.activityId = null;
+      row.activityName = null;
+      // Mark all cells as dirty
+      for (const cell of Object.values(row.days)) {
+        cell.isDirty = true;
+      }
+      // Send child projects for this parent
+      if (numValue !== null) {
+        this._sendChildProjects(numValue);
+      }
+    } else if (field === "project") {
+      const numValue = value as number | null;
+      row.projectId = numValue;
+      row.projectName = this._projects.find((p) => p.id === numValue)?.name ?? null;
       // Reset issue and activity when project changes
       row.issueId = null;
       row.issueSubject = null;
@@ -500,21 +730,27 @@ export class TimeSheetPanel {
       for (const cell of Object.values(row.days)) {
         cell.isDirty = true;
       }
-      // Load activities for new project
-      if (value) {
-        await this._loadActivitiesForProject(value);
+      // Load activities and issues for new project in parallel
+      if (numValue) {
+        void this._loadProjectData(numValue);
       }
     } else if (field === "issue") {
-      row.issueId = value;
-      const issues = this._issuesByProject.get(row.projectId) ?? [];
-      row.issueSubject = issues.find((i) => i.id === value)?.subject ?? null;
+      const numValue = value as number | null;
+      row.issueId = numValue;
+      const issues = this._issuesByProject.get(row.projectId ?? 0) ?? [];
+      row.issueSubject = issues.find((i) => i.id === numValue)?.subject ?? null;
       for (const cell of Object.values(row.days)) {
         cell.isDirty = true;
       }
     } else if (field === "activity") {
-      row.activityId = value;
+      row.activityId = value as number | null;
       const activities = this._activitiesByProject.get(row.projectId ?? 0) ?? [];
       row.activityName = activities.find((a) => a.id === value)?.name ?? null;
+      for (const cell of Object.values(row.days)) {
+        cell.isDirty = true;
+      }
+    } else if (field === "comments") {
+      row.comments = value as string | null;
       for (const cell of Object.values(row.days)) {
         cell.isDirty = true;
       }
@@ -524,29 +760,40 @@ export class TimeSheetPanel {
     this._postMessage({ type: "updateRow", row, totals });
   }
 
-  private async _loadIssuesForProject(
-    projectId: number | null,
-    _query?: string
-  ): Promise<void> {
+  private async _loadIssuesForProject(projectId: number, forceRefresh = false): Promise<void> {
     if (!this._server) return;
 
-    try {
-      let issues: IssueOption[];
-      if (projectId) {
-        const result = await this._server.getOpenIssuesForProject(projectId, true, 50, false);
-        issues = result.issues.map((i) => ({
+    // Return cached data immediately if available
+    if (!forceRefresh && this._issuesByProject.has(projectId)) {
+      const cached = this._issuesByProject.get(projectId)!;
+      this._postMessage({ type: "updateIssues", issues: cached, forProjectId: projectId });
+      return;
+    }
+
+    // Try to use cached issues from sidebar (already loaded)
+    if (!forceRefresh && this._getCachedIssues) {
+      const cachedIssues = this._getCachedIssues();
+      const matchingIssues = cachedIssues.filter((i) => i.project?.id === projectId);
+      if (matchingIssues.length > 0) {
+        const issues: IssueOption[] = matchingIssues.map((i) => ({
           id: i.id,
           subject: i.subject,
           projectId: i.project?.id ?? projectId,
         }));
-      } else {
-        const result = await this._server.getIssuesAssignedToMe();
-        issues = result.issues.map((i) => ({
-          id: i.id,
-          subject: i.subject,
-          projectId: i.project?.id ?? 0,
-        }));
+        this._issuesByProject.set(projectId, issues);
+        this._postMessage({ type: "updateIssues", issues, forProjectId: projectId });
+        return;
       }
+    }
+
+    try {
+      // Pass false for includeSubprojects - user selected specific child project
+      const result = await this._server.getOpenIssuesForProject(projectId, false, 50, false);
+      const issues: IssueOption[] = result.issues.map((i) => ({
+        id: i.id,
+        subject: i.subject,
+        projectId: i.project?.id ?? projectId,
+      }));
       this._issuesByProject.set(projectId, issues);
       this._postMessage({ type: "updateIssues", issues, forProjectId: projectId });
     } catch {
@@ -554,8 +801,15 @@ export class TimeSheetPanel {
     }
   }
 
-  private async _loadActivitiesForProject(projectId: number): Promise<void> {
+  private async _loadActivitiesForProject(projectId: number, forceRefresh = false): Promise<void> {
     if (!this._server) return;
+
+    // Return cached data immediately if available
+    if (!forceRefresh && this._activitiesByProject.has(projectId)) {
+      const cached = this._activitiesByProject.get(projectId)!;
+      this._postMessage({ type: "updateActivities", activities: cached, forProjectId: projectId });
+      return;
+    }
 
     try {
       const activities = await this._server.getProjectTimeEntryActivities(projectId);
@@ -568,6 +822,65 @@ export class TimeSheetPanel {
       this._postMessage({ type: "updateActivities", activities: activityOptions, forProjectId: projectId });
     } catch {
       // Silent fail
+    }
+  }
+
+  /** Load issues and activities for a project in parallel */
+  private async _loadProjectData(projectId: number): Promise<void> {
+    await Promise.all([
+      this._loadIssuesForProject(projectId),
+      this._loadActivitiesForProject(projectId),
+    ]);
+  }
+
+  /** Fetch and send issue details for tooltip display */
+  private async _loadIssueDetails(issueId: number): Promise<void> {
+    if (!this._server) return;
+
+    // Return cached if available
+    if (this._issueDetailsCache.has(issueId)) {
+      const cached = this._issueDetailsCache.get(issueId)!;
+      this._postMessage({ type: "updateIssueDetails", issueId, details: cached });
+      return;
+    }
+
+    try {
+      const { issue } = await this._server.getIssueById(issueId);
+      const details: IssueDetails = {
+        id: issue.id,
+        subject: issue.subject,
+        status: issue.status?.name ?? "Unknown",
+        priority: issue.priority?.name ?? "Unknown",
+        tracker: issue.tracker?.name ?? "Unknown",
+        assignedTo: issue.assigned_to?.name ?? null,
+        doneRatio: issue.done_ratio ?? 0,
+        estimatedHours: issue.estimated_hours ?? null,
+        spentHours: issue.spent_hours ?? null,
+        startDate: issue.start_date ?? null,
+        dueDate: issue.due_date ?? null,
+        customFields: (issue.custom_fields ?? []).map((cf) => ({
+          name: cf.name,
+          value: Array.isArray(cf.value) ? cf.value.join(", ") : String(cf.value ?? ""),
+        })).filter((cf) => cf.value !== ""),
+      };
+      this._issueDetailsCache.set(issueId, details);
+      this._postMessage({ type: "updateIssueDetails", issueId, details });
+    } catch {
+      // Silent fail - tooltip just won't show
+    }
+  }
+
+  /** Load issue details for all rows with issues */
+  private async _loadAllIssueDetails(): Promise<void> {
+    const issueIds = new Set<number>();
+    for (const row of this._rows) {
+      if (row.issueId !== null) {
+        issueIds.add(row.issueId);
+      }
+    }
+    // Load in parallel but don't await all (fire and forget)
+    for (const issueId of issueIds) {
+      this._loadIssueDetails(issueId);
     }
   }
 
@@ -587,14 +900,31 @@ export class TimeSheetPanel {
     row.projectId = issue.project?.id ?? null;
     row.projectName = issue.project?.name ?? null;
 
+    // Derive parentProjectId from project's parent
+    const projectOpt = this._projects.find((p) => p.id === row.projectId);
+    if (projectOpt?.parentId !== null && projectOpt?.parentId !== undefined) {
+      // Has a parent - use it
+      row.parentProjectId = projectOpt.parentId;
+      row.parentProjectName = this._parentProjects.find((p) => p.id === projectOpt.parentId)?.name ?? null;
+    } else if (row.projectId !== null) {
+      // Orphan project - put in "Others"
+      row.parentProjectId = OTHERS_PARENT_ID;
+      row.parentProjectName = "Others";
+    }
+
     // Mark cells as dirty
     for (const cell of Object.values(row.days)) {
       cell.isDirty = true;
     }
 
-    // Load activities for the issue's project
+    // Load children for parent (so dropdown syncs)
+    if (row.parentProjectId !== null) {
+      this._sendChildProjects(row.parentProjectId);
+    }
+
+    // Load issues and activities for the issue's project in parallel
     if (row.projectId) {
-      await this._loadActivitiesForProject(row.projectId);
+      await this._loadProjectData(row.projectId);
     }
 
     const totals = this._calculateTotals();
@@ -623,7 +953,7 @@ export class TimeSheetPanel {
           if (cell.entryId) {
             // Update existing entry
             if (cell.hours > 0) {
-              this._draftQueue.enqueue({
+              this._draftQueue.add({
                 id: crypto.randomUUID(),
                 type: "updateTimeEntry",
                 timestamp: Date.now(),
@@ -637,6 +967,7 @@ export class TimeSheetPanel {
                     time_entry: {
                       hours: cell.hours,
                       activity_id: row.activityId,
+                      comments: row.comments ?? "",
                     },
                   },
                 },
@@ -644,7 +975,7 @@ export class TimeSheetPanel {
               });
             } else {
               // Delete if hours = 0
-              this._draftQueue.enqueue({
+              this._draftQueue.add({
                 id: crypto.randomUUID(),
                 type: "deleteTimeEntry",
                 timestamp: Date.now(),
@@ -660,7 +991,7 @@ export class TimeSheetPanel {
           } else if (cell.hours > 0) {
             // Create new entry
             const tempId = generateTempId("timeentry");
-            this._draftQueue.enqueue({
+            this._draftQueue.add({
               id: crypto.randomUUID(),
               type: "createTimeEntry",
               timestamp: Date.now(),
@@ -676,6 +1007,7 @@ export class TimeSheetPanel {
                     hours: cell.hours,
                     activity_id: row.activityId,
                     spent_on: date,
+                    comments: row.comments ?? "",
                   },
                 },
               },
@@ -688,23 +1020,128 @@ export class TimeSheetPanel {
         }
       }
 
-      showStatusBarMessage("$(check) Changes queued in draft mode", 2000);
+      // Apply all queued operations immediately to Redmine
+      await vscode.commands.executeCommand("redmyne.applyDrafts");
 
-      // Re-render to show clean state
-      const totals = this._calculateTotals();
-      this._postMessage({
-        type: "render",
-        rows: this._rows,
-        week: this._currentWeek,
-        totals,
-        projects: this._projects,
-        isDraftMode: true,
-      });
+      showStatusBarMessage("$(check) Changes saved to Redmine", 2000);
+
+      // Reload week to get fresh data from server
+      await this._loadWeek(this._currentWeek);
     } catch (error) {
       this._postMessage({ type: "showError", message: `Failed to save: ${error}` });
     } finally {
       this._postMessage({ type: "setLoading", loading: false });
     }
+  }
+
+  private _copyWeek(): void {
+    // Build weekMap: day offset (0=Mon) -> entries for that day
+    const weekMap = new Map<number, ClipboardEntry[]>();
+    const allEntries: ClipboardEntry[] = [];
+
+    for (const row of this._rows) {
+      // Skip rows without required fields
+      if (!row.issueId || !row.activityId) continue;
+
+      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+        const cell = row.days[dayIndex];
+        if (!cell || cell.hours <= 0) continue;
+
+        const entry: ClipboardEntry = {
+          issue_id: row.issueId,
+          activity_id: row.activityId,
+          hours: String(cell.hours),
+          comments: row.comments || "",
+        };
+
+        allEntries.push(entry);
+
+        if (!weekMap.has(dayIndex)) {
+          weekMap.set(dayIndex, []);
+        }
+        weekMap.get(dayIndex)!.push(entry);
+      }
+    }
+
+    if (allEntries.length === 0) {
+      showStatusBarMessage("$(warning) No entries to copy", 2000);
+      return;
+    }
+
+    setClipboard({
+      kind: "week",
+      entries: allEntries,
+      weekMap,
+      sourceWeekStart: this._currentWeek.startDate,
+    });
+
+    showStatusBarMessage(`$(copy) Copied ${allEntries.length} entries`, 2000);
+  }
+
+  private async _pasteWeek(): Promise<void> {
+    const clipboard = getClipboard();
+    if (!clipboard || clipboard.kind !== "week" || !clipboard.weekMap) {
+      showStatusBarMessage("$(warning) No week data to paste", 2000);
+      return;
+    }
+
+    if (!this._draftQueue || !this._draftModeManager?.isEnabled) {
+      showStatusBarMessage("$(warning) Draft mode required", 2000);
+      return;
+    }
+
+    this._postMessage({ type: "setLoading", loading: true });
+
+    try {
+      let created = 0;
+
+      // Paste entries for each day in the weekMap
+      for (const [dayOffset, entries] of clipboard.weekMap) {
+        const targetDate = this._currentWeek.dayDates[dayOffset];
+        if (!targetDate) continue;
+
+        for (const entry of entries) {
+          const tempId = generateTempId("timeentry");
+          this._draftQueue.add({
+            id: crypto.randomUUID(),
+            type: "createTimeEntry",
+            timestamp: Date.now(),
+            issueId: entry.issue_id,
+            tempId,
+            description: `Log ${entry.hours}h to #${entry.issue_id} on ${targetDate}`,
+            http: {
+              method: "POST",
+              path: "/time_entries.json",
+              data: {
+                time_entry: {
+                  issue_id: entry.issue_id,
+                  hours: parseFloat(entry.hours),
+                  activity_id: entry.activity_id,
+                  spent_on: targetDate,
+                  comments: entry.comments,
+                },
+              },
+            },
+            resourceKey: `timeentry:${tempId}`,
+          });
+          created++;
+        }
+      }
+
+      showStatusBarMessage(`$(check) Pasted ${created} entries to draft`, 2000);
+
+      // Reload week to show new entries
+      await this._loadWeek(this._currentWeek);
+    } catch (error) {
+      this._postMessage({ type: "showError", message: `Failed to paste: ${error}` });
+    } finally {
+      this._postMessage({ type: "setLoading", loading: false });
+    }
+  }
+
+  private async _enableDraftMode(): Promise<void> {
+    // Execute the toggle draft mode command
+    await vscode.commands.executeCommand("redmyne.toggleDraftMode");
   }
 
   private _getHtml(): string {
@@ -729,7 +1166,22 @@ export class TimeSheetPanel {
 <body>
   <div class="timesheet-container">
     <header class="timesheet-header">
-      <h1>Time Sheet</h1>
+      <div class="header-left">
+        <h1>Time Sheet</h1>
+        <select id="groupBySelect" class="toolbar-select" title="Group by">
+          <option value="none">No grouping</option>
+          <option value="client">By Client</option>
+          <option value="project">By Project</option>
+          <option value="issue">By Task</option>
+          <option value="activity">By Activity</option>
+        </select>
+        <div class="toolbar-separator"></div>
+        <button id="undoBtn" class="toolbar-btn" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
+        <button id="redoBtn" class="toolbar-btn" disabled title="Redo (Ctrl+Shift+Z)">↪ Redo</button>
+        <div class="toolbar-separator"></div>
+        <button id="copyWeekBtn" class="toolbar-btn" title="Copy week (Ctrl+C)">📋 Copy</button>
+        <button id="pasteWeekBtn" class="toolbar-btn" title="Paste week (Ctrl+V)">📥 Paste</button>
+      </div>
       <div class="week-nav">
         <button id="prevWeek" class="nav-btn" title="Previous week">‹</button>
         <span id="weekLabel">Loading...</span>
@@ -738,43 +1190,61 @@ export class TimeSheetPanel {
       </div>
     </header>
 
+    <div id="draftModeWarning" class="draft-mode-warning">
+      <span class="warning-icon">⚠️</span>
+      <span class="warning-text">Draft Mode is disabled. Enable Draft Mode to edit time entries.</span>
+      <button id="enableDraftModeBtn" class="enable-draft-btn">Enable Draft Mode</button>
+    </div>
+
     <div class="timesheet-grid-container">
       <table class="timesheet-grid" id="grid">
         <thead>
           <tr>
-            <th class="col-task">Task</th>
-            <th class="col-activity">Activity</th>
+            <th class="col-parent sortable" data-sort="client">Client</th>
+            <th class="col-project sortable" data-sort="project">Project</th>
+            <th class="col-task sortable" data-sort="task">Task</th>
+            <th class="col-activity sortable" data-sort="activity">Activity</th>
+            <th class="col-comments sortable" data-sort="comments">Comment</th>
             ${WEEKDAYS.map((d, i) => `<th class="col-day" data-day="${i}">${d}</th>`).join("")}
-            <th class="col-total">Total</th>
+            <th class="col-total sortable" data-sort="total">Total</th>
             <th class="col-actions">Actions</th>
           </tr>
         </thead>
         <tbody id="gridBody">
           <tr class="loading-row">
-            <td colspan="11">Loading...</td>
+            <td colspan="14">Loading...</td>
           </tr>
         </tbody>
         <tfoot>
           <tr id="totalsRow">
+            <td class="col-parent"></td>
+            <td class="col-project"></td>
             <td class="col-task"></td>
-            <td class="col-activity">Daily Total</td>
-            ${WEEKDAYS.map((_, i) => `<td class="col-day total-cell" data-day="${i}">0</td>`).join("")}
+            <td class="col-activity"></td>
+            <td class="col-comments"></td>
+            ${WEEKDAYS.map((_, i) => `<td class="col-day total-cell" data-day="${i}"><div class="total-content"><span class="total-value">0</span><div class="progress-bar"><div class="progress-fill"></div></div></div></td>`).join("")}
             <td class="col-total total-cell" id="weekTotal">0</td>
-            <td class="col-actions">
-              <button id="addRowBtn" class="action-btn add-btn" title="Add row">+</button>
-            </td>
+            <td class="col-actions"></td>
           </tr>
         </tfoot>
       </table>
+      <div id="addRowContainer" class="add-row-container">
+        <button id="addEntryBtn" class="add-entry-btn">+ Add Time Entry...</button>
+      </div>
     </div>
 
     <footer class="timesheet-footer">
-      <button id="saveBtn" class="save-btn">Save to Draft</button>
+      <div class="footer-spacer"></div>
+      <button id="saveBtn" class="save-btn">Save to Redmine Server</button>
     </footer>
   </div>
 
   <div id="loadingOverlay" class="loading-overlay hidden">
     <div class="spinner"></div>
+  </div>
+
+  <div id="issueTooltip" class="issue-tooltip" role="tooltip" aria-hidden="true">
+    <div class="issue-tooltip-content"></div>
   </div>
 
   <script nonce="${nonce}" src="${jsUri}"></script>

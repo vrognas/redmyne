@@ -3,9 +3,13 @@
  * Defines communication protocol between extension and webview
  */
 
+// Sentinel value for orphan projects (no parent)
+export const OTHERS_PARENT_ID = -1;
+
 // Day cell data
 export interface DayCell {
   hours: number;
+  originalHours: number; // Value when loaded from server (for dirty detection)
   entryId: number | null;
   isDirty: boolean;
 }
@@ -13,12 +17,15 @@ export interface DayCell {
 // Row data model
 export interface TimeSheetRow {
   id: string; // Entry ID or temp UUID
+  parentProjectId: number | null; // Client/parent project (-1 = "Others" group)
+  parentProjectName: string | null;
   projectId: number | null;
   projectName: string | null;
   issueId: number | null;
   issueSubject: string | null;
   activityId: number | null;
   activityName: string | null;
+  comments: string | null;
   days: Record<number, DayCell>; // 0=Mon...6=Sun
   isNew: boolean;
   weekTotal: number;
@@ -28,7 +35,9 @@ export interface TimeSheetRow {
 export interface ProjectOption {
   id: number;
   name: string;
+  identifier: string;
   path: string;
+  parentId: number | null; // null = root project
 }
 
 // Issue option
@@ -43,6 +52,22 @@ export interface ActivityOption {
   id: number;
   name: string;
   isDefault: boolean;
+}
+
+// Issue details for tooltip display
+export interface IssueDetails {
+  id: number;
+  subject: string;
+  status: string;
+  priority: string;
+  tracker: string;
+  assignedTo: string | null;
+  doneRatio: number;
+  estimatedHours: number | null;
+  spentHours: number | null;
+  startDate: string | null;
+  dueDate: string | null;
+  customFields: { name: string; value: string }[];
 }
 
 // Week info
@@ -64,13 +89,25 @@ export interface DailyTotals {
 
 // --- Extension -> Webview Messages ---
 
+// Sort state
+export type SortColumn = "client" | "project" | "task" | "activity" | "comments" | "total" | null;
+export type SortDirection = "asc" | "desc";
+
+// Grouping state
+export type GroupBy = "none" | "client" | "project" | "issue" | "activity";
+
 export interface RenderMessage {
   type: "render";
   rows: TimeSheetRow[];
   week: WeekInfo;
   totals: DailyTotals;
-  projects: ProjectOption[];
+  projects: ProjectOption[]; // All projects flat
+  parentProjects: ProjectOption[]; // Parents only (includes synthetic "Others")
   isDraftMode: boolean;
+  sortColumn: SortColumn;
+  sortDirection: SortDirection;
+  groupBy: GroupBy;
+  collapsedGroups: string[]; // Group keys that are collapsed
 }
 
 export interface UpdateRowMessage {
@@ -79,10 +116,16 @@ export interface UpdateRowMessage {
   totals: DailyTotals;
 }
 
+export interface UpdateChildProjectsMessage {
+  type: "updateChildProjects";
+  projects: ProjectOption[];
+  forParentId: number; // -1 = "Others" group (never null)
+}
+
 export interface UpdateIssuesMessage {
   type: "updateIssues";
   issues: IssueOption[];
-  forProjectId: number | null;
+  forProjectId: number; // required, not nullable
 }
 
 export interface UpdateActivitiesMessage {
@@ -106,14 +149,28 @@ export interface ShowErrorMessage {
   message: string;
 }
 
+export interface DraftModeChangedMessage {
+  type: "draftModeChanged";
+  isDraftMode: boolean;
+}
+
+export interface UpdateIssueDetailsMessage {
+  type: "updateIssueDetails";
+  issueId: number;
+  details: IssueDetails;
+}
+
 export type ExtensionToWebviewMessage =
   | RenderMessage
   | UpdateRowMessage
+  | UpdateChildProjectsMessage
   | UpdateIssuesMessage
   | UpdateActivitiesMessage
   | SetLoadingMessage
   | WeekChangedMessage
-  | ShowErrorMessage;
+  | ShowErrorMessage
+  | DraftModeChangedMessage
+  | UpdateIssueDetailsMessage;
 
 // --- Webview -> Extension Messages ---
 
@@ -151,14 +208,18 @@ export interface UpdateCellMessage {
 export interface UpdateRowFieldMessage {
   type: "updateRowField";
   rowId: string;
-  field: "project" | "issue" | "activity";
-  value: number | null;
+  field: "parentProject" | "project" | "issue" | "activity" | "comments";
+  value: number | string | null;
+}
+
+export interface RequestChildProjectsMessage {
+  type: "requestChildProjects";
+  parentId: number; // -1 = "Others"
 }
 
 export interface RequestIssuesMessage {
   type: "requestIssues";
-  projectId: number | null;
-  query?: string;
+  projectId: number;
 }
 
 export interface RequestActivitiesMessage {
@@ -175,6 +236,39 @@ export interface PickIssueMessage {
   rowId: string;
 }
 
+export interface SortChangedMessage {
+  type: "sortChanged";
+  sortColumn: SortColumn;
+  sortDirection: SortDirection;
+}
+
+export interface SetGroupByMessage {
+  type: "setGroupBy";
+  groupBy: GroupBy;
+}
+
+export interface ToggleGroupMessage {
+  type: "toggleGroup";
+  groupKey: string;
+}
+
+export interface CopyWeekMessage {
+  type: "copyWeek";
+}
+
+export interface PasteWeekMessage {
+  type: "pasteWeek";
+}
+
+export interface EnableDraftModeMessage {
+  type: "enableDraftMode";
+}
+
+export interface RequestIssueDetailsMessage {
+  type: "requestIssueDetails";
+  issueId: number;
+}
+
 export type WebviewToExtensionMessage =
   | WebviewReadyMessage
   | NavigateWeekMessage
@@ -183,10 +277,18 @@ export type WebviewToExtensionMessage =
   | DuplicateRowMessage
   | UpdateCellMessage
   | UpdateRowFieldMessage
+  | RequestChildProjectsMessage
   | RequestIssuesMessage
   | RequestActivitiesMessage
   | SaveAllMessage
-  | PickIssueMessage;
+  | PickIssueMessage
+  | SortChangedMessage
+  | SetGroupByMessage
+  | ToggleGroupMessage
+  | CopyWeekMessage
+  | PasteWeekMessage
+  | EnableDraftModeMessage
+  | RequestIssueDetailsMessage;
 
 // Combined type for message handling
 export type TimeSheetMessage = ExtensionToWebviewMessage | WebviewToExtensionMessage;

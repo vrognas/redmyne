@@ -351,6 +351,7 @@ export function activate(context: vscode.ExtensionContext): void {
     getServer: () => projectsTree.server,
     getDraftQueue: () => draftQueue,
     getDraftModeManager: () => draftModeManager,
+    getCachedIssues: () => projectsTree.getAssignedIssues(),
   });
 
   // Register internal estimate commands
@@ -1100,14 +1101,13 @@ export function activate(context: vscode.ExtensionContext): void {
   // Reveal project in tree (from Gantt context menu)
   context.subscriptions.push(
     vscode.commands.registerCommand("redmyne.revealProjectInTree", async (projectId: number) => {
-      if (!projectId) return;
-      // Find the project in the tree data
-      const projects = projectsTree.getProjects();
-      const project = projects.find((p) => p.id === projectId);
-      if (project && cleanupResources.projectsTreeView) {
+      if (!projectId || projectId < 0) return; // Skip invalid IDs like -1 (Others)
+      // Find the project node (not raw project) for reveal to work
+      const projectNode = projectsTree.getProjectNodeById(projectId);
+      if (projectNode && cleanupResources.projectsTreeView) {
         // Focus the Issues view first, then reveal
         await vscode.commands.executeCommand("redmyne-explorer-projects.focus");
-        await cleanupResources.projectsTreeView.reveal(project, { select: true, focus: true, expand: true });
+        await cleanupResources.projectsTreeView.reveal(projectNode, { select: true, focus: true, expand: true });
       }
     })
   );
@@ -1430,6 +1430,35 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand(
       "redmyne.gantt.showProjectInIssues",
+      (ctx: { projectId: number }) => {
+        if (ctx?.projectId) {
+          vscode.commands.executeCommand("redmyne.revealProjectInTree", ctx.projectId);
+        }
+      }
+    ),
+    // Timesheet context menu commands
+    vscode.commands.registerCommand("redmyne.timesheet.openIssueInBrowser", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmyne.openIssueInBrowser", { id: ctx.issueId });
+      }
+    }),
+    vscode.commands.registerCommand("redmyne.timesheet.showIssueInSidebar", (ctx: { issueId: number }) => {
+      if (ctx?.issueId) {
+        vscode.commands.executeCommand("redmyne.revealIssueInTree", ctx.issueId);
+      }
+    }),
+    vscode.commands.registerCommand(
+      "redmyne.timesheet.openProjectInBrowser",
+      (ctx: { projectId: number; projectIdentifier: string }) => {
+        if (ctx?.projectIdentifier) {
+          vscode.commands.executeCommand("redmyne.openProjectInBrowser", {
+            project: { identifier: ctx.projectIdentifier },
+          });
+        }
+      }
+    ),
+    vscode.commands.registerCommand(
+      "redmyne.timesheet.showProjectInSidebar",
       (ctx: { projectId: number }) => {
         if (ctx?.projectId) {
           vscode.commands.executeCommand("redmyne.revealProjectInTree", ctx.projectId);
