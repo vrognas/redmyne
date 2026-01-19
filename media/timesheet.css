@@ -959,9 +959,10 @@ body.draft-mode-disabled .action-btn {
   cursor: not-allowed;
 }
 
-/* ========== Issue Tooltip ========== */
+/* ========== Issue Tooltip (matches Gantt tooltip styling) ========== */
 .issue-tooltip {
   position: fixed;
+  pointer-events: auto;
   z-index: 1000;
   max-width: 360px;
   padding: 6px 8px;
@@ -971,9 +972,8 @@ body.draft-mode-disabled .action-btn {
   color: var(--vscode-editorHoverWidget-foreground, var(--vscode-editorWidget-foreground));
   box-shadow: 0 2px 8px var(--vscode-widget-shadow);
   font-family: var(--vscode-font-family);
-  font-size: calc(var(--vscode-font-size, 13px) - 1px);
+  font-size: calc(var(--vscode-font-size) - 1px);
   line-height: 1.4;
-  pointer-events: none;
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.08s ease-out;
@@ -1004,4 +1004,13 @@ body.draft-mode-disabled .action-btn {
 
 .issue-tooltip-spacer {
   height: 4px;
+}
+
+.issue-tooltip a {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+}
+
+.issue-tooltip a:hover {
+  text-decoration: underline;
 }
