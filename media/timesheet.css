@@ -423,9 +423,9 @@ td.col-total,
 .day-input {
   width: 100%;
   padding: 6px 4px;
-  border: none;
+  border: 1px solid color-mix(in srgb, var(--vscode-input-border, var(--vscode-panel-border)) 40%, transparent);
   border-radius: 4px;
-  background: transparent;
+  background: color-mix(in srgb, var(--vscode-input-background) 30%, transparent);
   color: var(--vscode-disabledForeground);
   text-align: right;
   padding-right: 12px;
@@ -433,17 +433,19 @@ td.col-total,
   font-size: 12px;
   font-weight: 400;
   font-variant-numeric: tabular-nums;
-  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .day-input:hover {
-  background: var(--ts-hover-bg);
+  background: color-mix(in srgb, var(--vscode-input-background) 60%, transparent);
+  border-color: color-mix(in srgb, var(--vscode-input-border, var(--vscode-panel-border)) 70%, transparent);
 }
 
 .day-input:focus {
   outline: none;
-  /* No background change on focus - only show outline */
-  box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+  background: var(--vscode-input-background);
+  border-color: var(--vscode-focusBorder);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--vscode-focusBorder) 30%, transparent);
 }
 
 /* Cell with value - just change text style, no background */
@@ -541,28 +543,29 @@ td.col-total,
   border-color: color-mix(in srgb, var(--vscode-panel-border) 50%, transparent);
 }
 
-/* ========== Ghost-Style Comments Input ========== */
+/* ========== Comments Input - Visually Editable ========== */
 .comments-input {
   width: 100%;
   padding: 6px 10px;
-  border: 1px solid transparent;
+  border: 1px solid color-mix(in srgb, var(--vscode-input-border, var(--vscode-panel-border)) 40%, transparent);
   border-radius: 4px;
-  background: transparent;
+  background: color-mix(in srgb, var(--vscode-input-background) 30%, transparent);
   color: var(--vscode-foreground);
   font-family: var(--ts-font-sans);
   font-size: 11px;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .comments-input:hover {
-  background: var(--ts-hover-bg);
-  border-color: color-mix(in srgb, var(--vscode-panel-border) 50%, transparent);
+  background: color-mix(in srgb, var(--vscode-input-background) 60%, transparent);
+  border-color: color-mix(in srgb, var(--vscode-input-border, var(--vscode-panel-border)) 70%, transparent);
 }
 
 .comments-input:focus {
   outline: none;
-  background: color-mix(in srgb, var(--vscode-focusBorder) 10%, transparent);
+  background: var(--vscode-input-background);
   border-color: var(--vscode-focusBorder);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--vscode-focusBorder) 30%, transparent);
 }
 
 .comments-input::placeholder {
