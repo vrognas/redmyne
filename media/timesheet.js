@@ -96,6 +96,22 @@
           skipUndo: true,
         });
         break;
+      case "duplicateRow":
+        if (isUndo) {
+          // Undo: delete the duplicated row
+          vscode.postMessage({
+            type: "deleteRow",
+            rowId: action.newRowId,
+            skipUndo: true,
+          });
+        } else {
+          // Redo: re-duplicate from source (will create new row with new ID)
+          vscode.postMessage({
+            type: "duplicateRow",
+            rowId: action.sourceRowId,
+          });
+        }
+        break;
     }
   }
 
@@ -1011,6 +1027,14 @@
           showIssueTooltip(tooltipTarget, pendingTooltipX, pendingTooltipY);
           pendingTooltipIssueId = null;
         }
+        break;
+      case "rowDuplicated":
+        // Push undo action for the duplicated row
+        pushUndo({
+          type: "duplicateRow",
+          sourceRowId: message.sourceRowId,
+          newRowId: message.newRowId,
+        });
         break;
     }
   });

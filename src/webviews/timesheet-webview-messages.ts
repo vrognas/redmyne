@@ -161,6 +161,12 @@ export interface UpdateIssueDetailsMessage {
   details: IssueDetails;
 }
 
+export interface RowDuplicatedMessage {
+  type: "rowDuplicated";
+  sourceRowId: string;
+  newRowId: string;
+}
+
 export type ExtensionToWebviewMessage =
   | RenderMessage
   | UpdateRowMessage
@@ -171,7 +177,8 @@ export type ExtensionToWebviewMessage =
   | WeekChangedMessage
   | ShowErrorMessage
   | DraftModeChangedMessage
-  | UpdateIssueDetailsMessage;
+  | UpdateIssueDetailsMessage
+  | RowDuplicatedMessage;
 
 // --- Webview -> Extension Messages ---
 

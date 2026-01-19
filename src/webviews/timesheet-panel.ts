@@ -688,6 +688,13 @@ export class TimeSheetPanel {
       sortDirection: this._sortDirection,
       groupBy: this._groupBy,
       collapsedGroups: [...this._collapsedGroups],
+      aggregateRows: this._aggregateRows,
+    });
+    // Send rowDuplicated for undo/redo support
+    this._postMessage({
+      type: "rowDuplicated",
+      sourceRowId: rowId,
+      newRowId: newRow.id,
     });
   }
 
