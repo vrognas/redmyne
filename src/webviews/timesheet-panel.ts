@@ -223,8 +223,13 @@ export class TimeSheetPanel {
     this._postMessage({ type: "setLoading", loading: true });
 
     try {
-      // Fetch time entries for the week
-      const entries = await this._server.getMyTimeEntries(week.startDate, week.endDate);
+      // Fetch time entries for the week (current user only)
+      const result = await this._server.getTimeEntries({
+        from: week.startDate,
+        to: week.endDate,
+        allUsers: false,
+      });
+      const entries = result.time_entries;
 
       // Load projects
       await this._loadProjects();
