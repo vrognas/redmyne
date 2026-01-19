@@ -185,6 +185,115 @@ body {
   font-family: var(--ts-font-sans);
 }
 
+/* Week picker label - clickable */
+.week-label-picker {
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 3px;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.week-label-picker:hover {
+  background: var(--ts-hover-bg);
+  color: var(--vscode-foreground);
+}
+
+.week-label-picker::after {
+  content: " ▼";
+  font-size: 8px;
+  opacity: 0.5;
+}
+
+/* Hidden input for flatpickr */
+.week-picker-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Flatpickr dark theme overrides for VS Code */
+.flatpickr-calendar {
+  background: var(--vscode-editorWidget-background, var(--vscode-dropdown-background)) !important;
+  border: 1px solid var(--vscode-editorWidget-border, var(--vscode-dropdown-border)) !important;
+  box-shadow: 0 4px 16px var(--vscode-widget-shadow) !important;
+  font-family: var(--vscode-font-family) !important;
+  font-size: calc(var(--vscode-font-size, 13px) - 1px) !important;
+}
+
+.flatpickr-months {
+  background: var(--vscode-editorWidget-background, var(--vscode-dropdown-background)) !important;
+}
+
+.flatpickr-month {
+  color: var(--vscode-foreground) !important;
+  fill: var(--vscode-foreground) !important;
+}
+
+.flatpickr-current-month {
+  color: var(--vscode-foreground) !important;
+}
+
+.flatpickr-monthDropdown-months {
+  background: var(--vscode-dropdown-background) !important;
+  color: var(--vscode-dropdown-foreground) !important;
+}
+
+.flatpickr-weekdays {
+  background: var(--vscode-editorWidget-background, var(--vscode-dropdown-background)) !important;
+}
+
+.flatpickr-weekday {
+  color: var(--vscode-descriptionForeground) !important;
+}
+
+.flatpickr-days {
+  background: var(--vscode-editorWidget-background, var(--vscode-dropdown-background)) !important;
+  border: none !important;
+}
+
+.flatpickr-day {
+  color: var(--vscode-foreground) !important;
+  border-radius: 3px !important;
+}
+
+.flatpickr-day:hover {
+  background: var(--vscode-list-hoverBackground) !important;
+  border-color: var(--vscode-list-hoverBackground) !important;
+}
+
+.flatpickr-day.selected,
+.flatpickr-day.selected:hover {
+  background: var(--vscode-button-background) !important;
+  border-color: var(--vscode-button-background) !important;
+  color: var(--vscode-button-foreground) !important;
+}
+
+.flatpickr-day.today {
+  border-color: var(--vscode-focusBorder) !important;
+}
+
+.flatpickr-day.prevMonthDay,
+.flatpickr-day.nextMonthDay {
+  color: var(--vscode-disabledForeground) !important;
+}
+
+/* Week select plugin styles */
+.flatpickr-day.week.selected {
+  background: var(--vscode-button-background) !important;
+  border-color: var(--vscode-button-background) !important;
+  color: var(--vscode-button-foreground) !important;
+}
+
+.flatpickr-weekwrapper .flatpickr-weeks {
+  background: var(--vscode-editorWidget-background) !important;
+}
+
+.flatpickr-weekwrapper span.flatpickr-day {
+  color: var(--vscode-descriptionForeground) !important;
+}
+
 /* ========== Grid Container ========== */
 .timesheet-grid-container {
   flex: 1;

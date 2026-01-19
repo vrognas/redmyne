@@ -7,11 +7,13 @@ import { TimeSheetPanel } from "../webviews/timesheet-panel";
 import { RedmineServer } from "../redmine/redmine-server";
 import { DraftQueue } from "../draft-mode/draft-queue";
 import { DraftModeManager } from "../draft-mode/draft-mode-manager";
+import { Issue } from "../redmine/models/issue";
 
 export interface TimeSheetCommandsDeps {
   getServer: () => RedmineServer | undefined;
   getDraftQueue: () => DraftQueue | undefined;
   getDraftModeManager: () => DraftModeManager | undefined;
+  getCachedIssues: () => Issue[];
 }
 
 export function registerTimeSheetCommands(
@@ -20,17 +22,16 @@ export function registerTimeSheetCommands(
 ): vscode.Disposable[] {
   const disposables: vscode.Disposable[] = [];
 
-  // Initialize TimeSheetPanel with globalState
-  TimeSheetPanel.initialize(context.globalState);
-
   // Register show command
   disposables.push(
     vscode.commands.registerCommand("redmyne.showTimeSheet", () => {
       TimeSheetPanel.createOrShow(
         context.extensionUri,
+        context,
         deps.getServer(),
         deps.getDraftQueue(),
-        deps.getDraftModeManager()
+        deps.getDraftModeManager(),
+        deps.getCachedIssues
       );
     })
   );
@@ -38,7 +39,7 @@ export function registerTimeSheetCommands(
   // Register webview panel serializer for restore on reload
   vscode.window.registerWebviewPanelSerializer("redmyneTimeSheet", {
     async deserializeWebviewPanel(panel: vscode.WebviewPanel) {
-      TimeSheetPanel.restore(panel, context.extensionUri, deps.getServer());
+      TimeSheetPanel.restore(panel, context.extensionUri, context, deps.getServer());
     },
   });
 

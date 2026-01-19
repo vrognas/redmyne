@@ -110,6 +110,48 @@
   const addEntryBtn = document.getElementById("addEntryBtn");
   const undoBtn = document.getElementById("undoBtn");
   const redoBtn = document.getElementById("redoBtn");
+  const weekPickerInput = document.getElementById("weekPickerInput");
+
+  // Initialize flatpickr week picker
+  let weekPicker = null;
+  if (typeof flatpickr !== "undefined" && weekPickerInput) {
+    weekPicker = flatpickr(weekPickerInput, {
+      weekNumbers: true,
+      locale: { firstDayOfWeek: 1 }, // Monday
+      plugins: typeof weekSelectPlugin !== "undefined" ? [new weekSelectPlugin({})] : [],
+      onChange: function(selectedDates) {
+        if (selectedDates.length > 0) {
+          const selectedDate = selectedDates[0];
+          // Format as YYYY-MM-DD for navigation
+          const year = selectedDate.getFullYear();
+          const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+          const day = String(selectedDate.getDate()).padStart(2, "0");
+          const dateStr = `${year}-${month}-${day}`;
+          vscode.postMessage({ type: "navigateWeek", direction: "date", targetDate: dateStr });
+        }
+      },
+      onOpen: function() {
+        // Position calendar near the week label
+        const rect = weekLabel.getBoundingClientRect();
+        const calendar = this.calendarContainer;
+        if (calendar) {
+          calendar.style.top = `${rect.bottom + 4}px`;
+          calendar.style.left = `${rect.left}px`;
+        }
+      }
+    });
+
+    // Open picker when clicking week label
+    weekLabel?.addEventListener("click", () => {
+      if (weekPicker) {
+        // Set current week's Monday as the default date
+        if (state.week?.startDate) {
+          weekPicker.setDate(state.week.startDate, false);
+        }
+        weekPicker.open();
+      }
+    });
+  }
 
   // Update draft mode UI state
   function updateDraftModeUI() {

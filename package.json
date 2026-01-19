@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "4.8.0",
+  "version": "4.9.0",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -707,6 +707,22 @@
         "command": "redmyne.applySingleDraft",
         "title": "Apply Single Draft",
         "icon": "$(check)"
+      },
+      {
+        "command": "redmyne.timesheet.openIssueInBrowser",
+        "title": "Open in Browser"
+      },
+      {
+        "command": "redmyne.timesheet.showIssueInSidebar",
+        "title": "Show in Sidebar"
+      },
+      {
+        "command": "redmyne.timesheet.openProjectInBrowser",
+        "title": "Open in Browser"
+      },
+      {
+        "command": "redmyne.timesheet.showProjectInSidebar",
+        "title": "Show in Sidebar"
       }
     ],
     "keybindings": [
@@ -1286,6 +1302,22 @@
         {
           "command": "redmyne.removeDraft",
           "when": "false"
+        },
+        {
+          "command": "redmyne.timesheet.openIssueInBrowser",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.timesheet.showIssueInSidebar",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.timesheet.openProjectInBrowser",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.timesheet.showProjectInSidebar",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -1350,13 +1382,13 @@
           "group": "navigation@3"
         },
         {
-          "command": "redmyne.openTimeEntriesSettings",
-          "when": "view == 'redmyne-explorer-my-time-entries'",
+          "command": "redmyne.showTimeSheet",
+          "when": "view == 'redmyne-explorer-my-time-entries' && redmyne:configured",
           "group": "navigation@4"
         },
         {
-          "command": "redmyne.showTimeSheet",
-          "when": "view == 'redmyne-explorer-my-time-entries' && redmyne:configured",
+          "command": "redmyne.openTimeEntriesSettings",
+          "when": "view == 'redmyne-explorer-my-time-entries'",
           "group": "navigation@5"
         }
       ],
@@ -1937,6 +1969,36 @@
           "command": "redmyne.gantt.copyProjectId",
           "when": "webviewId == 'redmyneGantt' && webviewSection == 'projectLabel'",
           "group": "9_clipboard@2"
+        },
+        {
+          "command": "redmyne.timesheet.openIssueInBrowser",
+          "when": "webviewId == 'redmyneTimeSheet' && webviewSection == 'tsTask'",
+          "group": "1_navigation@1"
+        },
+        {
+          "command": "redmyne.timesheet.showIssueInSidebar",
+          "when": "webviewId == 'redmyneTimeSheet' && webviewSection == 'tsTask'",
+          "group": "1_navigation@2"
+        },
+        {
+          "command": "redmyne.timesheet.openProjectInBrowser",
+          "when": "webviewId == 'redmyneTimeSheet' && webviewSection == 'tsClient'",
+          "group": "1_navigation@1"
+        },
+        {
+          "command": "redmyne.timesheet.showProjectInSidebar",
+          "when": "webviewId == 'redmyneTimeSheet' && webviewSection == 'tsClient'",
+          "group": "1_navigation@2"
+        },
+        {
+          "command": "redmyne.timesheet.openProjectInBrowser",
+          "when": "webviewId == 'redmyneTimeSheet' && webviewSection == 'tsProject'",
+          "group": "1_navigation@1"
+        },
+        {
+          "command": "redmyne.timesheet.showProjectInSidebar",
+          "when": "webviewId == 'redmyneTimeSheet' && webviewSection == 'tsProject'",
+          "group": "1_navigation@2"
         }
       ]
     },
@@ -2157,6 +2219,7 @@
   },
   "dependencies": {
     "date-fns": "^4.1.0",
+    "flatpickr": "^4.6.13",
     "fuse.js": "^7.1.0"
   }
 }

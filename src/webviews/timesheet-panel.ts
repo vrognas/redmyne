@@ -678,16 +678,112 @@ export class TimeSheetPanel {
 
     const existingCell = row.days[dayIndex];
     const originalHours = existingCell?.originalHours ?? 0;
+    const entryId = existingCell?.entryId ?? null;
+    const isDirty = hours !== originalHours;
+
     row.days[dayIndex] = {
       hours,
       originalHours,
-      entryId: existingCell?.entryId ?? null,
-      isDirty: hours !== originalHours,
+      entryId,
+      isDirty,
     };
     row.weekTotal = Object.values(row.days).reduce((sum, cell) => sum + cell.hours, 0);
 
+    // Queue operation to draft queue if draft mode enabled
+    this._queueCellOperation(row, dayIndex, hours, entryId, isDirty);
+
     const totals = this._calculateTotals();
     this._postMessage({ type: "updateRow", row, totals });
+  }
+
+  /** Queue a cell change to the draft queue */
+  private _queueCellOperation(
+    row: TimeSheetRow,
+    dayIndex: number,
+    hours: number,
+    entryId: number | null,
+    isDirty: boolean
+  ): void {
+    if (!this._draftQueue || !this._draftModeManager?.isEnabled) return;
+    if (!row.issueId || !row.activityId) return;
+
+    const date = this._currentWeek.dayDates[dayIndex];
+    // Use consistent resourceKey with ts: prefix for timesheet operations
+    const resourceKey = entryId
+      ? `ts:timeentry:${entryId}`
+      : `ts:timeentry:${row.id}:${dayIndex}`;
+
+    // If not dirty (restored to original), remove any pending operation
+    if (!isDirty) {
+      this._draftQueue.removeByKey(resourceKey);
+      return;
+    }
+
+    if (entryId) {
+      // Existing entry
+      if (hours > 0) {
+        // Update
+        this._draftQueue.add({
+          id: crypto.randomUUID(),
+          type: "updateTimeEntry",
+          timestamp: Date.now(),
+          resourceId: entryId,
+          issueId: row.issueId,
+          description: `Update #${row.issueId} on ${date}: ${hours}h`,
+          http: {
+            method: "PUT",
+            path: `/time_entries/${entryId}.json`,
+            data: {
+              time_entry: {
+                hours,
+                activity_id: row.activityId,
+                comments: row.comments ?? "",
+              },
+            },
+          },
+          resourceKey,
+        });
+      } else {
+        // Delete (hours = 0)
+        this._draftQueue.add({
+          id: crypto.randomUUID(),
+          type: "deleteTimeEntry",
+          timestamp: Date.now(),
+          resourceId: entryId,
+          description: `Delete time entry on ${date}`,
+          http: {
+            method: "DELETE",
+            path: `/time_entries/${entryId}.json`,
+          },
+          resourceKey,
+        });
+      }
+    } else if (hours > 0) {
+      // New entry (no entryId, hours > 0)
+      this._draftQueue.add({
+        id: crypto.randomUUID(),
+        type: "createTimeEntry",
+        timestamp: Date.now(),
+        issueId: row.issueId,
+        tempId: `${row.id}:${dayIndex}`,
+        description: `Log ${hours}h to #${row.issueId} on ${date}`,
+        http: {
+          method: "POST",
+          path: "/time_entries.json",
+          data: {
+            time_entry: {
+              issue_id: row.issueId,
+              hours,
+              activity_id: row.activityId,
+              spent_on: date,
+              comments: row.comments ?? "",
+            },
+          },
+        },
+        resourceKey,
+      });
+    }
+    // If no entryId and hours = 0, nothing to queue (or remove pending create)
   }
 
   private async _updateRowField(
@@ -937,93 +1033,45 @@ export class TimeSheetPanel {
       return;
     }
 
+    // Get only timesheet operations (ts: prefix)
+    const operations = this._draftQueue.getByKeyPrefix("ts:");
+    if (operations.length === 0) {
+      showStatusBarMessage("$(info) No changes to save", 2000);
+      return;
+    }
+
     this._postMessage({ type: "setLoading", loading: true });
 
     try {
-      // Collect all dirty cells and enqueue operations
-      for (const row of this._rows) {
-        if (!row.issueId || !row.activityId) continue;
+      let successCount = 0;
+      let errorCount = 0;
 
-        for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-          const cell = row.days[dayIndex];
-          if (!cell.isDirty) continue;
-
-          const date = this._currentWeek.dayDates[dayIndex];
-
-          if (cell.entryId) {
-            // Update existing entry
-            if (cell.hours > 0) {
-              this._draftQueue.add({
-                id: crypto.randomUUID(),
-                type: "updateTimeEntry",
-                timestamp: Date.now(),
-                resourceId: cell.entryId,
-                issueId: row.issueId,
-                description: `Update time entry #${cell.entryId} to ${cell.hours}h`,
-                http: {
-                  method: "PUT",
-                  path: `/time_entries/${cell.entryId}.json`,
-                  data: {
-                    time_entry: {
-                      hours: cell.hours,
-                      activity_id: row.activityId,
-                      comments: row.comments ?? "",
-                    },
-                  },
-                },
-                resourceKey: `timeentry:${cell.entryId}`,
-              });
-            } else {
-              // Delete if hours = 0
-              this._draftQueue.add({
-                id: crypto.randomUUID(),
-                type: "deleteTimeEntry",
-                timestamp: Date.now(),
-                resourceId: cell.entryId,
-                description: `Delete time entry #${cell.entryId}`,
-                http: {
-                  method: "DELETE",
-                  path: `/time_entries/${cell.entryId}.json`,
-                },
-                resourceKey: `timeentry:${cell.entryId}`,
-              });
-            }
-          } else if (cell.hours > 0) {
-            // Create new entry
-            const tempId = generateTempId("timeentry");
-            this._draftQueue.add({
-              id: crypto.randomUUID(),
-              type: "createTimeEntry",
-              timestamp: Date.now(),
-              issueId: row.issueId,
-              tempId,
-              description: `Log ${cell.hours}h to #${row.issueId} on ${date}`,
-              http: {
-                method: "POST",
-                path: "/time_entries.json",
-                data: {
-                  time_entry: {
-                    issue_id: row.issueId,
-                    hours: cell.hours,
-                    activity_id: row.activityId,
-                    spent_on: date,
-                    comments: row.comments ?? "",
-                  },
-                },
-              },
-              resourceKey: `timeentry:${tempId}`,
-            });
+      // Apply operations directly using the server
+      for (const op of operations) {
+        try {
+          const { method, path, data } = op.http;
+          if (method === "POST" && data) {
+            await this._server.post(path, data);
+          } else if (method === "PUT" && data) {
+            await this._server.put(path, data);
+          } else if (method === "DELETE") {
+            await this._server.delete(path);
           }
-
-          // Mark cell as clean
-          cell.isDirty = false;
+          // Remove from queue after successful apply
+          await this._draftQueue.remove(op.id);
+          successCount++;
+        } catch (error) {
+          errorCount++;
+          const msg = error instanceof Error ? error.message : String(error);
+          vscode.window.showErrorMessage(`Failed: ${op.description} - ${msg}`);
         }
       }
 
-      // Apply all queued operations immediately to Redmine
-      await vscode.commands.executeCommand("redmyne.applyDrafts");
-
-      showStatusBarMessage("$(check) Changes saved to Redmine", 2000);
+      if (errorCount === 0) {
+        showStatusBarMessage(`$(check) Saved ${successCount} entries`, 2000);
+      } else {
+        showStatusBarMessage(`$(warning) ${successCount} saved, ${errorCount} failed`, 3000);
+      }
 
       // Reload week to get fresh data from server
       await this._loadWeek(this._currentWeek);
@@ -1152,6 +1200,15 @@ export class TimeSheetPanel {
     const jsUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this._extensionUri, "media", "timesheet.js")
     );
+    const flatpickrCssUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, "media", "flatpickr.min.css")
+    );
+    const flatpickrJsUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, "media", "flatpickr.min.js")
+    );
+    const weekSelectJsUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, "media", "flatpickr-weekSelect.js")
+    );
     const nonce = this._getNonce();
 
     return `<!DOCTYPE html>
@@ -1160,6 +1217,7 @@ export class TimeSheetPanel {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
+  <link href="${flatpickrCssUri}" rel="stylesheet">
   <link href="${cssUri}" rel="stylesheet">
   <title>Time Sheet</title>
 </head>
@@ -1184,7 +1242,8 @@ export class TimeSheetPanel {
       </div>
       <div class="week-nav">
         <button id="prevWeek" class="nav-btn" title="Previous week">‹</button>
-        <span id="weekLabel">Loading...</span>
+        <span id="weekLabel" class="week-label-picker" title="Click to pick a week">Loading...</span>
+        <input type="text" id="weekPickerInput" class="week-picker-input" readonly>
         <button id="nextWeek" class="nav-btn" title="Next week">›</button>
         <button id="todayBtn" class="nav-btn today-btn" title="Go to current week">Today</button>
       </div>
@@ -1247,6 +1306,8 @@ export class TimeSheetPanel {
     <div class="issue-tooltip-content"></div>
   </div>
 
+  <script nonce="${nonce}" src="${flatpickrJsUri}"></script>
+  <script nonce="${nonce}" src="${weekSelectJsUri}"></script>
   <script nonce="${nonce}" src="${jsUri}"></script>
 </body>
 </html>`;

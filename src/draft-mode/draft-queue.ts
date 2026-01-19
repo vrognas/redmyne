@@ -80,6 +80,16 @@ export class DraftQueue {
     }
   }
 
+  async removeByKey(resourceKey: string): Promise<void> {
+    const initialLength = this.operations.length;
+    this.operations = this.operations.filter(op => op.resourceKey !== resourceKey);
+
+    if (this.operations.length !== initialLength) {
+      await this.persist();
+      this.emitChange();
+    }
+  }
+
   async clear(): Promise<void> {
     this.operations = [];
     await this.persist();
@@ -92,6 +102,10 @@ export class DraftQueue {
 
   getByIssueId(issueId: number): DraftOperation[] {
     return this.operations.filter(op => op.issueId === issueId);
+  }
+
+  getByKeyPrefix(prefix: string): DraftOperation[] {
+    return this.operations.filter(op => op.resourceKey.startsWith(prefix));
   }
 
   get count(): number {

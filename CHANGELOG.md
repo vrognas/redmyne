@@ -4,6 +4,60 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Time Sheet sorting** - click column headers to sort rows
+  - Sortable columns: Client, Project, Task, Activity, Comments, Total
+  - Click once for ascending, again for descending, third click clears
+  - Sort indicator (▲/▼) shows current sort state
+
+- **Time Sheet comments column** - prominent Comments field per row
+  - Wider column for better visibility (comment-centric design)
+  - Persists with time entries on save
+  - Supports sorting
+
+- **Time Sheet #ID in dropdowns** - Client and Project dropdowns show project IDs
+  - Format: `#123 ProjectName` for easier identification
+  - "Others" group shows no ID prefix
+
+- **Time Sheet undo/redo** - revert hour changes with keyboard shortcuts
+  - `Ctrl+Z` / `Cmd+Z` to undo
+  - `Ctrl+Shift+Z` / `Cmd+Shift+Z` to redo
+  - `Ctrl+Y` also works for redo on Windows/Linux
+  - `Escape` restores original value while editing
+
+### Improved
+
+- **Time Sheet premium aesthetic** - refined visual design
+  - Rounded hover highlight on hour cells
+  - Only dirty (changed) cells show draft background
+  - Focus outline without background change
+  - Theme-aware dropdown colors with native chevron
+  - Low-opacity grid lines for cleaner table appearance
+  - Monospaced font for time values, sans-serif for labels
+  - Today column glow effect with focus border color
+  - Row hover highlighting across all cells
+  - Progress bars in Daily Total row showing actual/target hours
+  - Icon-based action buttons (🗑️ Delete, 📋 Copy)
+  - "Add Time Entry..." link-style button in footer
+  - All colors theme-aware (adapts to VS Code theme)
+  - Custom scrollbar styling matching VSCode aesthetic
+
+- **Time Sheet performance** - faster dropdown loading
+  - Uses cached issues from sidebar (avoids redundant API calls)
+  - Parallel loading of issues and activities for selected project
+
+## [4.9.0]
+
+### Added
+
+- **Time Sheet cascading dropdowns** - Client → Project → Task → Activity
+  - Select Client (parent project) first to enable Project dropdown
+  - Select Project to enable Task (issue) dropdown
+  - "Others" group for orphan projects without parent
+  - Search button bypasses cascade, auto-fills all fields
+  - Existing rows pre-populate all dropdowns on load
+
 ## [4.8.0]
 
 ### Added

@@ -724,6 +724,26 @@ fi
 - Add `.selected` class and call `row.focus()` for visual feedback
 - Restore selection after re-render if still valid
 
+## Cascading Dropdowns (2026-01-19)
+
+### Project Hierarchy UX
+
+**Pattern**: Client → Project → Task → Activity cascade
+- Disable downstream dropdowns until parent selected
+- Use sentinel value (-1) for synthetic groups like "Others"
+- Never use null for synthetic IDs (null means "not yet selected")
+- Search bypass: allow users to skip cascade via global search
+
+**Lazy Loading Children**
+- Store `childrenByParent: Map<parentId, children[]>` in webview state
+- Extension sends `updateChildProjects` message when parent selected
+- Pre-load children for all parents in existing rows on initial render
+
+**Orphan Project Handling**
+- Group projects without parent under synthetic "Others" client
+- Use consistent sentinel ID (OTHERS_PARENT_ID = -1) everywhere
+- Sort parents alphabetically, put "Others" last
+
 ### Lessons
 
 1. **postMessage > full HTML**: Incremental updates preserve scroll/selection state

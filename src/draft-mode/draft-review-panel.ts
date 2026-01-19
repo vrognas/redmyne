@@ -173,13 +173,9 @@ export class DraftReviewPanel implements vscode.Disposable {
         <td class="issue">${op.issueId ? `#${op.issueId}` : "-"}</td>
         <td class="time">${formatTime(op.timestamp)}</td>
         <td class="actions">
-          <button class="apply-btn" data-id="${escapeHtml(op.id)}" title="Apply this draft">
-            <span class="icon">$(check)</span>
-          </button>
-          <button class="remove-btn" data-id="${escapeHtml(op.id)}" title="Remove">
-            <span class="icon">$(trash)</span>
-          </button>
-          <span class="row-spinner" style="display:none;">$(loading~spin)</span>
+          <button class="apply-btn" data-id="${escapeHtml(op.id)}" title="Apply this draft">✓</button>
+          <button class="remove-btn" data-id="${escapeHtml(op.id)}" title="Remove">🗑️</button>
+          <span class="row-spinner" style="display:none;"></span>
         </td>
       </tr>
     `).join("");
@@ -226,6 +222,12 @@ export class DraftReviewPanel implements vscode.Disposable {
     }
     .spinner {
       display: none;
+      width: 12px;
+      height: 12px;
+      border: 2px solid var(--vscode-button-foreground);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
     }
     .loading .spinner {
       display: inline-block;
@@ -233,6 +235,17 @@ export class DraftReviewPanel implements vscode.Disposable {
     }
     .loading .btn-text {
       opacity: 0.6;
+    }
+    .row-spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--vscode-descriptionForeground);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
     button {
       background: var(--vscode-button-background);
@@ -378,11 +391,11 @@ export class DraftReviewPanel implements vscode.Disposable {
     </div>
     <div class="actions-bar">
       <button id="apply-all" ${operations.length === 0 ? "disabled" : ""}>
-        <span class="spinner">$(loading~spin)</span>
+        <span class="spinner"></span>
         <span class="btn-text">Apply All</span>
       </button>
       <button id="discard-all" class="secondary" ${operations.length === 0 ? "disabled" : ""}>
-        <span class="spinner">$(loading~spin)</span>
+        <span class="spinner"></span>
         <span class="btn-text">Discard All</span>
       </button>
     </div>
@@ -530,13 +543,9 @@ export class DraftReviewPanel implements vscode.Disposable {
           '<td class="issue">' + (op.issueId ? '#' + op.issueId : '-') + '</td>' +
           '<td class="time">' + formatTime(op.timestamp) + '</td>' +
           '<td class="actions">' +
-            '<button class="apply-btn" data-id="' + escapeHtml(op.id) + '" title="Apply this draft">' +
-              '<span class="icon">$(check)</span>' +
-            '</button>' +
-            '<button class="remove-btn" data-id="' + escapeHtml(op.id) + '" title="Remove">' +
-              '<span class="icon">$(trash)</span>' +
-            '</button>' +
-            '<span class="row-spinner" style="display:none;">$(loading~spin)</span>' +
+            '<button class="apply-btn" data-id="' + escapeHtml(op.id) + '" title="Apply this draft">✓</button>' +
+            '<button class="remove-btn" data-id="' + escapeHtml(op.id) + '" title="Remove">🗑️</button>' +
+            '<span class="row-spinner" style="display:none;"></span>' +
           '</td>' +
         '</tr>'
       ).join('');
