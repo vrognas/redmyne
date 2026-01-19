@@ -65,6 +65,7 @@ export class TimeSheetPanel {
   private _sortDirection: SortDirection = "asc";
   private _groupBy: GroupBy = "none";
   private _collapsedGroups: Set<string> = new Set();
+  private _aggregateRows: boolean = false;
 
   public static createOrShow(
     extensionUri: vscode.Uri,
@@ -160,6 +161,7 @@ export class TimeSheetPanel {
     this._groupBy = this._context.globalState.get<GroupBy>("redmyne.timesheet.groupBy", "none");
     const collapsed = this._context.globalState.get<string[]>("redmyne.timesheet.collapsedGroups", []);
     this._collapsedGroups = new Set(collapsed);
+    this._aggregateRows = this._context.globalState.get<boolean>("redmyne.timesheet.aggregateRows", false);
 
     // Set HTML content
     this._panel.webview.html = this._getHtml();
@@ -271,6 +273,11 @@ export class TimeSheetPanel {
         void this._context.globalState.update("redmyne.timesheet.groupBy", this._groupBy);
         break;
 
+      case "setAggregateRows":
+        this._aggregateRows = message.aggregateRows;
+        void this._context.globalState.update("redmyne.timesheet.aggregateRows", this._aggregateRows);
+        break;
+
       case "toggleGroup":
         if (this._collapsedGroups.has(message.groupKey)) {
           this._collapsedGroups.delete(message.groupKey);
@@ -371,6 +378,7 @@ export class TimeSheetPanel {
         sortDirection: this._sortDirection,
         groupBy: this._groupBy,
         collapsedGroups: [...this._collapsedGroups],
+        aggregateRows: this._aggregateRows,
       });
 
       // Pre-send child projects for all parents in existing rows
@@ -1244,6 +1252,10 @@ export class TimeSheetPanel {
           <option value="issue">By Task</option>
           <option value="activity">By Activity</option>
         </select>
+        <label class="toolbar-checkbox" data-tooltip="Merge identical rows (same task+activity+comment)">
+          <input type="checkbox" id="aggregateToggle">
+          <span>Aggregate</span>
+        </label>
         <div class="toolbar-separator"></div>
         <button id="undoBtn" class="toolbar-btn" disabled data-tooltip="Undo (Ctrl+Z)">↩ Undo</button>
         <button id="redoBtn" class="toolbar-btn" disabled data-tooltip="Redo (Ctrl+Shift+Z)">↪ Redo</button>

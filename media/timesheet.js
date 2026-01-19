@@ -28,6 +28,7 @@
     sortDirection: "asc", // 'asc' | 'desc'
     groupBy: "none", // 'none' | 'client' | 'project' | 'issue' | 'activity'
     collapsedGroups: new Set(), // Group keys that are collapsed
+    aggregateRows: false, // Merge identical rows (same issue+activity+comment)
   };
 
   // Push action to undo stack
@@ -283,11 +284,18 @@
     const tr = document.createElement("tr");
     tr.dataset.rowId = row.id;
 
+    // Check if this is an aggregated row (read-only)
+    const isAggregated = row.isAggregated === true;
+    if (isAggregated) {
+      tr.classList.add("aggregated-row");
+    }
+
     // --- Parent (Client) cell ---
     const parentTd = document.createElement("td");
     parentTd.className = "col-parent";
     const parentSelect = document.createElement("select");
     parentSelect.className = "parent-select";
+    parentSelect.disabled = isAggregated;
     parentSelect.innerHTML = '<option value="">Client...</option>';
 
     for (const parent of state.parentProjects) {
@@ -344,7 +352,7 @@
 
     // Disable if no parent selected
     const hasParent = row.parentProjectId !== null;
-    projectSelect.disabled = !hasParent;
+    projectSelect.disabled = isAggregated || !hasParent;
 
     // Populate projects from cache
     if (hasParent) {
@@ -399,9 +407,9 @@
     taskSelect.className = "task-select";
     taskSelect.innerHTML = '<option value="">Task...</option>';
 
-    // Disable if no project selected
+    // Disable if no project selected or aggregated
     const hasProject = row.projectId !== null;
-    taskSelect.disabled = !hasProject;
+    taskSelect.disabled = isAggregated || !hasProject;
 
     // Populate issues from cache
     if (hasProject) {
@@ -457,7 +465,7 @@
     activitySelect.innerHTML = '<option value="">Activity...</option>';
 
     // Disable if no project selected
-    activitySelect.disabled = !hasProject;
+    activitySelect.disabled = isAggregated || !hasProject;
 
     // Populate activities if available
     const activities = state.activitiesByProject.get(row.projectId) || [];
@@ -493,6 +501,7 @@
     commentsInput.type = "text";
     commentsInput.className = "comments-input";
     commentsInput.value = row.comments || "";
+    commentsInput.disabled = isAggregated;
     commentsInput.addEventListener("blur", (e) => {
       const value = e.target.value.trim() || null;
       vscode.postMessage({
@@ -527,6 +536,7 @@
       input.value = formatHours(cell.hours);
       input.dataset.tooltip = state.week ? state.week.dayDates[i] : "";
       input.dataset.oldValue = cell.hours; // Store for undo
+      input.disabled = isAggregated;
       input.addEventListener("focus", (e) => {
         e.target.dataset.oldValue = parseHours(e.target.value); // Capture before edit
         e.target.select();
@@ -577,7 +587,8 @@
     const deleteBtn = document.createElement("button");
     deleteBtn.className = "action-btn delete-btn";
     deleteBtn.textContent = "🗑️";
-    deleteBtn.dataset.tooltip = "Delete";
+    deleteBtn.dataset.tooltip = isAggregated ? "Cannot delete aggregated row" : "Delete";
+    deleteBtn.disabled = isAggregated;
     deleteBtn.addEventListener("click", () => {
       vscode.postMessage({ type: "deleteRow", rowId: row.id });
     });
@@ -586,7 +597,8 @@
     const copyBtn = document.createElement("button");
     copyBtn.className = "action-btn copy-btn";
     copyBtn.textContent = "📋";
-    copyBtn.dataset.tooltip = "Duplicate";
+    copyBtn.dataset.tooltip = isAggregated ? "Cannot duplicate aggregated row" : "Duplicate";
+    copyBtn.disabled = isAggregated;
     copyBtn.addEventListener("click", () => {
       vscode.postMessage({ type: "duplicateRow", rowId: row.id });
     });
@@ -683,11 +695,77 @@
     return tr;
   }
 
+  /**
+   * Aggregate rows with identical (issueId, activityId, comments)
+   * Merges hours per day, returns new array of aggregated rows
+   */
+  function aggregateIdenticalRows(rows) {
+    if (!rows || rows.length === 0) return rows;
+
+    const groups = new Map(); // key -> merged row
+
+    for (const row of rows) {
+      // Build aggregation key: issueId:activityId:comments
+      const key = `${row.issueId ?? "null"}:${row.activityId ?? "null"}:${row.comments ?? ""}`;
+
+      if (!groups.has(key)) {
+        // Create new aggregated row (copy structure)
+        const aggRow = {
+          ...row,
+          id: `agg-${key}`, // Mark as aggregated
+          isAggregated: true, // Flag for read-only
+          sourceRowIds: [row.id], // Track original rows
+          days: {},
+          weekTotal: 0,
+        };
+        // Copy days
+        for (let d = 0; d < 7; d++) {
+          if (row.days[d]) {
+            aggRow.days[d] = {
+              hours: row.days[d].hours,
+              originalHours: row.days[d].originalHours,
+              entryId: null, // Aggregated has no single entry
+              isDirty: false,
+            };
+            aggRow.weekTotal += row.days[d].hours || 0;
+          }
+        }
+        groups.set(key, aggRow);
+      } else {
+        // Merge into existing aggregated row
+        const aggRow = groups.get(key);
+        aggRow.sourceRowIds.push(row.id);
+        for (let d = 0; d < 7; d++) {
+          if (row.days[d]) {
+            if (!aggRow.days[d]) {
+              aggRow.days[d] = {
+                hours: 0,
+                originalHours: 0,
+                entryId: null,
+                isDirty: false,
+              };
+            }
+            aggRow.days[d].hours += row.days[d].hours || 0;
+            aggRow.days[d].originalHours += row.days[d].originalHours || 0;
+            aggRow.weekTotal += row.days[d].hours || 0;
+          }
+        }
+      }
+    }
+
+    return [...groups.values()];
+  }
+
   // Render grid
   function renderGrid() {
     gridBody.innerHTML = "";
 
-    if (state.rows.length === 0) {
+    // Get rows to render (aggregated or original)
+    const rowsToRender = state.aggregateRows
+      ? aggregateIdenticalRows(state.rows)
+      : state.rows;
+
+    if (rowsToRender.length === 0) {
       const tr = document.createElement("tr");
       tr.className = "empty-row";
       const td = document.createElement("td");
@@ -697,7 +775,7 @@
       gridBody.appendChild(tr);
     } else if (state.groupBy === "none") {
       // No grouping - flat list
-      const sortedRows = getSortedRows();
+      const sortedRows = sortRows(rowsToRender);
       for (const row of sortedRows) {
         gridBody.appendChild(renderRow(row));
       }
@@ -706,7 +784,7 @@
       const groups = new Map(); // groupKey -> { label, rows }
 
       // First pass: organize rows into groups
-      for (const row of state.rows) {
+      for (const row of rowsToRender) {
         const groupKey = getGroupKey(row);
         if (!groups.has(groupKey)) {
           groups.set(groupKey, { label: getGroupLabel(row), rows: [] });
@@ -853,8 +931,11 @@
         // Apply persisted grouping state
         state.groupBy = message.groupBy ?? "none";
         state.collapsedGroups = new Set(message.collapsedGroups || []);
-        // Update dropdown
+        state.aggregateRows = message.aggregateRows ?? false;
+        // Update dropdowns and toggles
         if (groupBySelect) groupBySelect.value = state.groupBy;
+        const aggregateToggle = document.getElementById("aggregateToggle");
+        if (aggregateToggle) aggregateToggle.checked = state.aggregateRows;
         weekLabel.textContent = formatWeekLabel(state.week);
         // Update header for weekend
         updateWeekHeaders();
@@ -1020,6 +1101,13 @@
   groupBySelect?.addEventListener("change", (e) => {
     state.groupBy = e.target.value;
     vscode.postMessage({ type: "setGroupBy", groupBy: state.groupBy });
+    renderGrid();
+  });
+
+  // Aggregate toggle
+  document.getElementById("aggregateToggle")?.addEventListener("change", (e) => {
+    state.aggregateRows = e.target.checked;
+    vscode.postMessage({ type: "setAggregateRows", aggregateRows: state.aggregateRows });
     renderGrid();
   });
 

@@ -108,6 +108,7 @@ export interface RenderMessage {
   sortDirection: SortDirection;
   groupBy: GroupBy;
   collapsedGroups: string[]; // Group keys that are collapsed
+  aggregateRows: boolean; // Merge identical rows (same issue+activity+comment)
 }
 
 export interface UpdateRowMessage {
@@ -269,6 +270,11 @@ export interface RequestIssueDetailsMessage {
   issueId: number;
 }
 
+export interface SetAggregateRowsMessage {
+  type: "setAggregateRows";
+  aggregateRows: boolean;
+}
+
 export type WebviewToExtensionMessage =
   | WebviewReadyMessage
   | NavigateWeekMessage
@@ -288,7 +294,8 @@ export type WebviewToExtensionMessage =
   | CopyWeekMessage
   | PasteWeekMessage
   | EnableDraftModeMessage
-  | RequestIssueDetailsMessage;
+  | RequestIssueDetailsMessage
+  | SetAggregateRowsMessage;
 
 // Combined type for message handling
 export type TimeSheetMessage = ExtensionToWebviewMessage | WebviewToExtensionMessage;
