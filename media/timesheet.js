@@ -130,13 +130,27 @@
           vscode.postMessage({ type: "navigateWeek", direction: "date", targetDate: dateStr });
         }
       },
-      onOpen: function() {
+      onOpen: function(selectedDates, dateStr, instance) {
         // Position calendar near the week label
         const rect = weekLabel.getBoundingClientRect();
         const calendar = this.calendarContainer;
         if (calendar) {
           calendar.style.top = `${rect.bottom + 4}px`;
           calendar.style.left = `${rect.left}px`;
+        }
+        // Add Escape key listener when calendar opens
+        instance._escHandler = function(e) {
+          if (e.key === "Escape") {
+            instance.close();
+          }
+        };
+        document.addEventListener("keydown", instance._escHandler);
+      },
+      onClose: function(selectedDates, dateStr, instance) {
+        // Remove Escape key listener when calendar closes
+        if (instance._escHandler) {
+          document.removeEventListener("keydown", instance._escHandler);
+          instance._escHandler = null;
         }
       }
     });
