@@ -636,15 +636,11 @@ export function activate(context: vscode.ExtensionContext): void {
   registerCommand("quickLogTime", (props, ...args) => {
     // Extract issue ID from tree node (Issue) or Gantt context ({ id: number })
     let issueId: number | undefined;
-    const arg = args[0];
+    const arg = args[0] as Record<string, unknown> | undefined;
     if (arg && typeof arg === "object") {
-      // Issue object from tree view (has id + subject)
-      if ("subject" in arg && typeof (arg as { id: number }).id === "number") {
-        issueId = (arg as { id: number }).id;
-      }
-      // Gantt context { id: number }
-      else if ("id" in arg && typeof (arg as { id: number }).id === "number") {
-        issueId = (arg as { id: number }).id;
+      // Issue object from tree view (has id + subject) or Gantt context { id: number }
+      if (typeof arg.id === "number") {
+        issueId = arg.id;
       }
     }
     return quickLogTime(props, context, undefined, issueId);
