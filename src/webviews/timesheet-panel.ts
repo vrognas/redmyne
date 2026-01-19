@@ -237,6 +237,10 @@ export class TimeSheetPanel {
       // Convert entries to rows (each entry = separate row)
       this._rows = this._entriesToRows(entries, week);
 
+      // Load activities for all projects in the rows
+      const projectIds = new Set(this._rows.map((r) => r.projectId).filter((id): id is number => id !== null));
+      await Promise.all([...projectIds].map((pid) => this._loadActivitiesForProject(pid)));
+
       // Calculate totals
       const totals = this._calculateTotals();
 
