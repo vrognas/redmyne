@@ -112,6 +112,22 @@
           });
         }
         break;
+      case "deleteRow":
+        if (isUndo) {
+          // Undo: restore the deleted row
+          vscode.postMessage({
+            type: "restoreRow",
+            row: action.deletedRow,
+          });
+        } else {
+          // Redo: delete the row again
+          vscode.postMessage({
+            type: "deleteRow",
+            rowId: action.deletedRow.id,
+            skipUndo: true,
+          });
+        }
+        break;
     }
   }
 
@@ -1034,6 +1050,13 @@
           type: "duplicateRow",
           sourceRowId: message.sourceRowId,
           newRowId: message.newRowId,
+        });
+        break;
+      case "rowDeleted":
+        // Push undo action for the deleted row
+        pushUndo({
+          type: "deleteRow",
+          deletedRow: message.deletedRow,
         });
         break;
     }

@@ -228,6 +228,10 @@ export class TimeSheetPanel {
         await this._deleteRow(message.rowId);
         break;
 
+      case "restoreRow":
+        this._restoreRow(message.row);
+        break;
+
       case "duplicateRow":
         this._duplicateRow(message.rowId);
         break;
@@ -631,6 +635,9 @@ export class TimeSheetPanel {
       }
     }
 
+    // Store deleted row for undo before removing
+    const deletedRow = { ...row };
+
     this._rows.splice(rowIndex, 1);
     const totals = this._calculateTotals();
     this._postMessage({
@@ -645,6 +652,32 @@ export class TimeSheetPanel {
       sortDirection: this._sortDirection,
       groupBy: this._groupBy,
       collapsedGroups: [...this._collapsedGroups],
+      aggregateRows: this._aggregateRows,
+    });
+    // Send rowDeleted for undo/redo support
+    this._postMessage({
+      type: "rowDeleted",
+      deletedRow,
+    });
+  }
+
+  private _restoreRow(row: TimeSheetRow): void {
+    // Re-add the row to the list
+    this._rows.push(row);
+    const totals = this._calculateTotals();
+    this._postMessage({
+      type: "render",
+      rows: this._rows,
+      week: this._currentWeek,
+      totals,
+      projects: this._projects,
+      parentProjects: this._parentProjects,
+      isDraftMode: this._draftModeManager?.isEnabled ?? false,
+      sortColumn: this._sortColumn,
+      sortDirection: this._sortDirection,
+      groupBy: this._groupBy,
+      collapsedGroups: [...this._collapsedGroups],
+      aggregateRows: this._aggregateRows,
     });
   }
 

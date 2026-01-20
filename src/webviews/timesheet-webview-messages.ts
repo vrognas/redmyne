@@ -167,6 +167,11 @@ export interface RowDuplicatedMessage {
   newRowId: string;
 }
 
+export interface RowDeletedMessage {
+  type: "rowDeleted";
+  deletedRow: TimeSheetRow; // Full row data for undo
+}
+
 export type ExtensionToWebviewMessage =
   | RenderMessage
   | UpdateRowMessage
@@ -178,7 +183,8 @@ export type ExtensionToWebviewMessage =
   | ShowErrorMessage
   | DraftModeChangedMessage
   | UpdateIssueDetailsMessage
-  | RowDuplicatedMessage;
+  | RowDuplicatedMessage
+  | RowDeletedMessage;
 
 // --- Webview -> Extension Messages ---
 
@@ -199,6 +205,11 @@ export interface AddRowMessage {
 export interface DeleteRowMessage {
   type: "deleteRow";
   rowId: string;
+}
+
+export interface RestoreRowMessage {
+  type: "restoreRow";
+  row: TimeSheetRow; // Full row data to restore
 }
 
 export interface DuplicateRowMessage {
@@ -287,6 +298,7 @@ export type WebviewToExtensionMessage =
   | NavigateWeekMessage
   | AddRowMessage
   | DeleteRowMessage
+  | RestoreRowMessage
   | DuplicateRowMessage
   | UpdateCellMessage
   | UpdateRowFieldMessage
