@@ -41,7 +41,7 @@ export interface TimeEntryNode {
   _isDraft?: boolean; // True for draft time entries
 }
 
-/** Convert draft operation to TimeEntry-like object for display */
+/** Convert draft create operation to TimeEntry-like object for display */
 function draftOperationToTimeEntry(op: DraftOperation): TimeEntry | null {
   if (op.type !== "createTimeEntry") return null;
   const data = op.http.data?.time_entry as Record<string, unknown> | undefined;
@@ -57,6 +57,62 @@ function draftOperationToTimeEntry(op: DraftOperation): TimeEntry | null {
     comments: (data.comments as string) ?? "",
     spent_on: (data.spent_on as string) ?? formatLocalDate(new Date()),
   };
+}
+
+/**
+ * Apply all draft operations to server entries:
+ * - Create: add new draft entries
+ * - Update: modify existing entries with draft values
+ * - Delete: remove entries from display
+ */
+function applyDraftsToEntries(
+  serverEntries: TimeEntry[],
+  draftOps: DraftOperation[]
+): TimeEntry[] {
+  // Build maps for quick lookup
+  const deleteIds = new Set<number>();
+  const updateMap = new Map<number, DraftOperation>();
+  const creates: TimeEntry[] = [];
+
+  for (const op of draftOps) {
+    if (op.type === "deleteTimeEntry" && op.resourceId) {
+      deleteIds.add(op.resourceId);
+    } else if (op.type === "updateTimeEntry" && op.resourceId) {
+      updateMap.set(op.resourceId, op);
+    } else if (op.type === "createTimeEntry") {
+      const entry = draftOperationToTimeEntry(op);
+      if (entry) creates.push(entry);
+    }
+  }
+
+  // Process server entries: apply updates, filter deletes
+  const result: TimeEntry[] = [];
+  for (const entry of serverEntries) {
+    if (deleteIds.has(entry.id)) continue; // Skip deleted entries
+
+    const updateOp = updateMap.get(entry.id);
+    if (updateOp) {
+      // Apply draft updates to entry
+      const data = updateOp.http.data?.time_entry as Record<string, unknown> | undefined;
+      if (data) {
+        result.push({
+          ...entry,
+          hours: data.hours !== undefined ? String(data.hours) : entry.hours,
+          comments: data.comments !== undefined ? (data.comments as string) : entry.comments,
+          activity_id: data.activity_id !== undefined ? (data.activity_id as number) : entry.activity_id,
+          // Mark as modified (use negative ID offset for visual indicator)
+          _isDraftModified: true,
+        } as TimeEntry & { _isDraftModified?: boolean });
+      } else {
+        result.push(entry);
+      }
+    } else {
+      result.push(entry);
+    }
+  }
+
+  // Add draft creates (at beginning for visibility)
+  return [...creates, ...result];
 }
 
 export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNode> {
@@ -159,22 +215,6 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         this._onDidChangeTreeData.fire(undefined);
       });
     }
-  }
-
-  /**
-   * Get draft time entries from queue
-   */
-  private getDraftTimeEntries(): { entry: TimeEntry; draftId: string }[] {
-    if (!this.draftQueue) return [];
-
-    const drafts: { entry: TimeEntry; draftId: string }[] = [];
-    for (const op of this.draftQueue.getAll()) {
-      const entry = draftOperationToTimeEntry(op);
-      if (entry) {
-        drafts.push({ entry, draftId: op.id });
-      }
-    }
-    return drafts;
   }
 
   override refresh(): void {
@@ -366,17 +406,25 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const weekNum = getISOWeekNumber(now);
       const defaultSchedule = getWeeklySchedule();
 
-      // Merge draft time entries into server entries
-      const draftEntries = this.getDraftTimeEntries().map(d => d.entry);
-      const todayDrafts = draftEntries.filter(e => e.spent_on === today);
-      const weekDrafts = draftEntries.filter(e => {
-        const date = e.spent_on || "";
-        return date >= weekStart && date <= today;
-      });
-
-      // Combine server entries with drafts (drafts first for visibility)
-      const todayWithDrafts = [...todayDrafts, ...(this.todayEntries || [])];
-      const weekWithDrafts = [...weekDrafts, ...(this.weekEntries || [])];
+      // Apply all draft operations (create/update/delete) to server entries
+      const draftOps = this.draftQueue?.getAll() || [];
+      const todayWithDrafts = applyDraftsToEntries(
+        (this.todayEntries || []).filter(e => e.spent_on === today),
+        draftOps.filter(op => {
+          const data = op.http.data?.time_entry as Record<string, unknown> | undefined;
+          return data?.spent_on === today || (op.resourceId && (this.todayEntries || []).some(e => e.id === op.resourceId));
+        })
+      );
+      const weekWithDrafts = applyDraftsToEntries(
+        this.weekEntries || [],
+        draftOps.filter(op => {
+          const data = op.http.data?.time_entry as Record<string, unknown> | undefined;
+          const spentOn = data?.spent_on as string | undefined;
+          if (spentOn && spentOn >= weekStart && spentOn <= today) return true;
+          // Include ops targeting existing week entries
+          return op.resourceId && (this.weekEntries || []).some(e => e.id === op.resourceId);
+        })
+      );
 
       const todayTotal = calculateTotal(todayWithDrafts);
       const weekTotal = calculateTotal(weekWithDrafts);
@@ -468,18 +516,19 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
 
       const serverEntries = this.loadedMonthEntries.get(monthKey) || [];
 
-      // Merge draft entries for this month
+      // Apply all draft operations (create/update/delete) for this month
       const { start, end } = this.getMonthDateRange(element._monthYear);
-      const draftEntries = this.getDraftTimeEntries()
-        .map(d => d.entry)
-        .filter(e => {
-          const date = e.spent_on || "";
-          return date >= start && date <= end;
-        });
+      const draftOps = (this.draftQueue?.getAll() || []).filter(op => {
+        const data = op.http.data?.time_entry as Record<string, unknown> | undefined;
+        const spentOn = data?.spent_on as string | undefined;
+        if (spentOn && spentOn >= start && spentOn <= end) return true;
+        // Include ops targeting existing month entries
+        return op.resourceId && serverEntries.some(e => e.id === op.resourceId);
+      });
+      const entries = applyDraftsToEntries(serverEntries, draftOps);
 
-      const entries = [...draftEntries, ...serverEntries];
       const weekGroups = this.groupEntriesByWeek(entries, element.id || "month");
-      if (weekGroups.length === 0 && draftEntries.length === 0) {
+      if (weekGroups.length === 0) {
         return [{
           label: "No time entries",
           collapsibleState: vscode.TreeItemCollapsibleState.None,
@@ -690,13 +739,15 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const projectName = cached?.project || "";
       const clientName = cached?.projectId ? projectClientMap.get(cached.projectId) || "" : "";
 
-      // Check if this is a draft entry (negative ID)
+      // Check if this is a draft entry (negative ID) or draft-modified
       const isDraft = (entry.id ?? 0) < 0;
+      const isDraftModified = (entry as TimeEntry & { _isDraftModified?: boolean })._isDraftModified === true;
 
       // Encode command arguments as JSON array for VS Code command URI
       const commandArgs = encodeURIComponent(JSON.stringify([issueId]));
       const userLine = this.showAllUsers && entry.user?.name ? `**User:** ${entry.user.name}\n\n` : "";
-      const draftLine = isDraft ? `**⚠️ DRAFT** - Not yet saved to server\n\n` : "";
+      const draftLine = isDraft ? `**⚠️ DRAFT** - Not yet saved to server\n\n` :
+        isDraftModified ? `**✏️ MODIFIED** - Changes pending save\n\n` : "";
       const tooltip = new vscode.MarkdownString(
         draftLine +
         `**Issue:** #${issueId} ${issueSubject}\n\n` +
@@ -717,20 +768,22 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const activity = entry.activity?.name ? `[${entry.activity.name}]` : "";
       const comment = entry.comments ? ` ${entry.comments}` : "";
       const userName = this.showAllUsers && entry.user?.name ? `• ${entry.user.name}` : "";
-      const draftSuffix = isDraft ? "(draft)" : "";
+      const draftSuffix = isDraft ? "(draft)" : isDraftModified ? "(modified)" : "";
       const descParts = [hours, activity, issueSubject, userName, draftSuffix].filter(Boolean);
 
       // Determine contextValue for ad-hoc contributions
-      let contextValue = isDraft ? "time-entry-draft" : "time-entry";
-      if (!isDraft && adHocTracker.isAdHoc(issueId)) {
+      let contextValue = isDraft ? "time-entry-draft" : isDraftModified ? "time-entry-modified" : "time-entry";
+      if (!isDraft && !isDraftModified && adHocTracker.isAdHoc(issueId)) {
         const targetId = parseTargetIssueId(entry.comments);
         contextValue = targetId ? "time-entry-adhoc-linked" : "time-entry-adhoc";
       }
 
-      // Draft entries get a distinct icon with theme-aware color
+      // Draft/modified entries get a distinct icon with theme-aware color
       const iconPath = isDraft
         ? new vscode.ThemeIcon("edit", new vscode.ThemeColor("editorWarning.foreground"))
-        : undefined;
+        : isDraftModified
+          ? new vscode.ThemeIcon("diff-modified", new vscode.ThemeColor("editorWarning.foreground"))
+          : undefined;
 
       return {
         id: `${idPrefix}-entry-${entry.id}`,
@@ -742,7 +795,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         type: "entry" as const,
         contextValue,
         _entry: entry,
-        _isDraft: isDraft,
+        _isDraft: isDraft || isDraftModified,
       };
     });
   }
