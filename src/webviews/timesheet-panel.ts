@@ -1011,8 +1011,25 @@ export class TimeSheetPanel {
     entryId: number | null,
     isDirty: boolean
   ): void {
-    if (!this._draftQueue || !this._draftModeManager?.isEnabled) return;
-    if (!row.issueId || !row.activityId) return;
+    console.log("[Timesheet] _queueCellOperation called:", {
+      rowId: row.id,
+      dayIndex,
+      hours,
+      entryId,
+      isDirty,
+      issueId: row.issueId,
+      activityId: row.activityId,
+      draftQueue: !!this._draftQueue,
+      draftModeEnabled: this._draftModeManager?.isEnabled,
+    });
+    if (!this._draftQueue || !this._draftModeManager?.isEnabled) {
+      console.log("[Timesheet] Skipping: draftQueue or draftMode not available");
+      return;
+    }
+    if (!row.issueId || !row.activityId) {
+      console.log("[Timesheet] Skipping: missing issueId or activityId");
+      return;
+    }
 
     const date = this._currentWeek.dayDates[dayIndex];
     // Use consistent resourceKey with ts: prefix for timesheet operations
@@ -1067,15 +1084,15 @@ export class TimeSheetPanel {
       }
     } else if (hours > 0) {
       // New entry (no entryId, hours > 0)
-      this._draftQueue.add({
+      const operation = {
         id: crypto.randomUUID(),
-        type: "createTimeEntry",
+        type: "createTimeEntry" as const,
         timestamp: Date.now(),
         issueId: row.issueId,
         tempId: `${row.id}:${dayIndex}`,
         description: `Log ${hours}h to #${row.issueId} on ${date}`,
         http: {
-          method: "POST",
+          method: "POST" as const,
           path: "/time_entries.json",
           data: {
             time_entry: {
@@ -1088,7 +1105,9 @@ export class TimeSheetPanel {
           },
         },
         resourceKey,
-      });
+      };
+      console.log("[Timesheet] Adding createTimeEntry operation:", operation);
+      this._draftQueue.add(operation);
     }
     // If no entryId and hours = 0, nothing to queue (or remove pending create)
   }
@@ -1160,10 +1179,19 @@ export class TimeSheetPanel {
     }
 
     // Queue all dirty cells if row is now complete (has issue + activity)
+    console.log("[Timesheet] _updateRowField: checking if row is complete", {
+      rowId: row.id,
+      issueId: row.issueId,
+      activityId: row.activityId,
+      weekTotal: row.weekTotal,
+      isNew: row.isNew,
+    });
     if (row.issueId && row.activityId) {
+      console.log("[Timesheet] Row is complete, queueing dirty cells");
       for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
         const cell = row.days[dayIndex];
         if (cell && cell.isDirty && cell.hours > 0) {
+          console.log("[Timesheet] Queueing cell:", { dayIndex, hours: cell.hours, isDirty: cell.isDirty });
           this._queueCellOperation(row, dayIndex, cell.hours, cell.entryId, true);
         }
       }
