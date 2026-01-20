@@ -400,6 +400,11 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
 
       const today = formatLocalDate(new Date());
       const weekStart = getWeekStart();
+      // Calculate week end (Sunday) for draft filtering
+      const weekStartDate = new Date(weekStart);
+      const weekEndDate = new Date(weekStartDate);
+      weekEndDate.setDate(weekEndDate.getDate() + 6);
+      const weekEnd = formatLocalDate(weekEndDate);
       const now = new Date();
       const dayName = now.toLocaleDateString("en-US", { weekday: "short" });
       const dayNum = now.getDate();
@@ -420,7 +425,8 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         draftOps.filter(op => {
           const data = op.http.data?.time_entry as Record<string, unknown> | undefined;
           const spentOn = data?.spent_on as string | undefined;
-          if (spentOn && spentOn >= weekStart && spentOn <= today) return true;
+          // Include drafts for any day in the week (Mon-Sun), not just up to today
+          if (spentOn && spentOn >= weekStart && spentOn <= weekEnd) return true;
           // Include ops targeting existing week entries
           return op.resourceId && (this.weekEntries || []).some(e => e.id === op.resourceId);
         })
