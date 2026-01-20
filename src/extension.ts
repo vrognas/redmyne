@@ -84,7 +84,7 @@ let cleanupResources: {
   draftModeServer?: DraftModeServer;
 } = {};
 
-export function activate(context: vscode.ExtensionContext): void {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
   // Run migration from redmine.* to redmyne.* namespace (one-time on upgrade)
   runMigration(context);
 
@@ -106,7 +106,7 @@ export function activate(context: vscode.ExtensionContext): void {
     setContext: (key, value) => vscode.commands.executeCommand("setContext", key, value),
   });
   cleanupResources.draftModeManager = draftModeManager;
-  draftModeManager.initialize();
+  await draftModeManager.initialize();
 
   // Initialize draft queue with file system persistence
   const draftQueue = new DraftQueue({
