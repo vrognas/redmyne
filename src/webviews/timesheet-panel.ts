@@ -1739,7 +1739,7 @@ export class TimeSheetPanel {
   <link href="${cssUri}" rel="stylesheet">
   <title>Time Sheet</title>
 </head>
-<body>
+<body class="${this._draftModeManager?.isEnabled ? "" : "draft-mode-disabled"}">
   <div class="timesheet-container">
     <header class="timesheet-header">
       <div class="header-left">
@@ -1771,7 +1771,7 @@ export class TimeSheetPanel {
       </div>
     </header>
 
-    <div id="draftModeWarning" class="draft-mode-warning">
+    <div id="draftModeWarning" class="draft-mode-warning${this._draftModeManager?.isEnabled ? " hidden" : ""}">
       <span class="warning-icon">⚠️</span>
       <span class="warning-text">Draft Mode is disabled. Enable Draft Mode to edit time entries.</span>
       <button id="enableDraftModeBtn" class="enable-draft-btn">Enable Draft Mode</button>
