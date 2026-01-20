@@ -90,6 +90,11 @@ export class TimeSheetPanel {
       TimeSheetPanel.currentPanel._draftQueue = draftQueue;
       TimeSheetPanel.currentPanel._draftModeManager = draftModeManager;
       TimeSheetPanel.currentPanel._getCachedIssues = getCachedIssues;
+      // Notify webview of current draft mode state
+      TimeSheetPanel.currentPanel._postMessage({
+        type: "draftModeChanged",
+        isDraftMode: draftModeManager?.isEnabled ?? false,
+      });
       return TimeSheetPanel.currentPanel;
     }
 
