@@ -46,10 +46,15 @@ export class TimeSheetPanel {
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
   private readonly _context: vscode.ExtensionContext;
-  private _server: RedmineServer | undefined;
+  private _getServerFn: (() => RedmineServer | undefined) | undefined;
   private _draftQueue: DraftQueue | undefined;
   private _draftModeManager: DraftModeManager | undefined;
   private _getCachedIssues: (() => Issue[]) | undefined;
+
+  /** Get current server (called fresh each time to handle late connection) */
+  private get _server(): RedmineServer | undefined {
+    return this._getServerFn?.();
+  }
 
   private _rows: TimeSheetRow[] = [];
   private _currentWeek: WeekInfo;
@@ -70,7 +75,7 @@ export class TimeSheetPanel {
   public static createOrShow(
     extensionUri: vscode.Uri,
     context: vscode.ExtensionContext,
-    server: RedmineServer | undefined,
+    getServer: () => RedmineServer | undefined,
     draftQueue: DraftQueue | undefined,
     draftModeManager: DraftModeManager | undefined,
     getCachedIssues?: () => Issue[]
@@ -86,7 +91,7 @@ export class TimeSheetPanel {
     // If panel exists, reveal it
     if (TimeSheetPanel.currentPanel) {
       TimeSheetPanel.currentPanel._panel.reveal(column);
-      TimeSheetPanel.currentPanel._server = server;
+      TimeSheetPanel.currentPanel._getServerFn = getServer;
       TimeSheetPanel.currentPanel._draftQueue = draftQueue;
       TimeSheetPanel.currentPanel._draftModeManager = draftModeManager;
       TimeSheetPanel.currentPanel._getCachedIssues = getCachedIssues;
@@ -114,7 +119,7 @@ export class TimeSheetPanel {
       panel,
       extensionUri,
       context,
-      server,
+      getServer,
       draftQueue,
       draftModeManager,
       getCachedIssues
@@ -126,7 +131,7 @@ export class TimeSheetPanel {
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
     context: vscode.ExtensionContext,
-    server: RedmineServer | undefined,
+    getServer: () => RedmineServer | undefined,
     draftQueue?: DraftQueue,
     draftModeManager?: DraftModeManager,
     getCachedIssues?: () => Issue[]
@@ -135,7 +140,7 @@ export class TimeSheetPanel {
       panel,
       extensionUri,
       context,
-      server,
+      getServer,
       draftQueue,
       draftModeManager,
       getCachedIssues
@@ -147,7 +152,7 @@ export class TimeSheetPanel {
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
     context: vscode.ExtensionContext,
-    server: RedmineServer | undefined,
+    getServer: () => RedmineServer | undefined,
     draftQueue?: DraftQueue,
     draftModeManager?: DraftModeManager,
     getCachedIssues?: () => Issue[]
@@ -155,7 +160,7 @@ export class TimeSheetPanel {
     this._panel = panel;
     this._extensionUri = extensionUri;
     this._context = context;
-    this._server = server;
+    this._getServerFn = getServer;
     this._draftQueue = draftQueue;
     this._draftModeManager = draftModeManager;
     this._getCachedIssues = getCachedIssues;

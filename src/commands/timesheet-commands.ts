@@ -28,7 +28,7 @@ export function registerTimeSheetCommands(
       TimeSheetPanel.createOrShow(
         context.extensionUri,
         context,
-        deps.getServer(),
+        deps.getServer,
         deps.getDraftQueue(),
         deps.getDraftModeManager(),
         deps.getCachedIssues
@@ -43,7 +43,7 @@ export function registerTimeSheetCommands(
         panel,
         context.extensionUri,
         context,
-        deps.getServer(),
+        deps.getServer,
         deps.getDraftQueue(),
         deps.getDraftModeManager(),
         deps.getCachedIssues
