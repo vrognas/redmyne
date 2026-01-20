@@ -140,7 +140,6 @@ export class TimeSheetPanel {
 
   /** Refresh the timesheet panel if it's open */
   public static refresh(): void {
-    console.log("[Timesheet] static refresh called, currentPanel:", !!TimeSheetPanel.currentPanel);
     if (TimeSheetPanel.currentPanel) {
       void TimeSheetPanel.currentPanel._loadWeek(TimeSheetPanel.currentPanel._currentWeek);
     }
@@ -280,7 +279,6 @@ export class TimeSheetPanel {
       this._disposables.push(
         this._draftQueue.onDidChange(() => {
           if (!isLocalChange && this._panel.visible) {
-            console.log("[Timesheet] External queue change detected, reloading");
             void this._loadWeek(this._currentWeek);
           }
         })
@@ -874,14 +872,7 @@ export class TimeSheetPanel {
       // Also remove any queued draft operations for this row
       if (this._draftQueue) {
         // tempId format is "rowId:dayIndex", so use rowId as prefix
-        const prefix = `${rowId}:`;
-        console.log("[Timesheet] Removing draft ops with tempId prefix:", prefix);
-        console.log("[Timesheet] Queue count before:", this._draftQueue.count);
-        void this._draftQueue.removeByTempIdPrefix(prefix).then(() => {
-          console.log("[Timesheet] Queue count after:", this._draftQueue?.count);
-        });
-      } else {
-        console.log("[Timesheet] No draft queue available for removal");
+        void this._draftQueue.removeByTempIdPrefix(`${rowId}:`);
       }
     }
 

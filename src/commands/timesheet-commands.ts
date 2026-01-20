@@ -39,7 +39,6 @@ export function registerTimeSheetCommands(
   // Register refresh command (used by draft mode commands)
   disposables.push(
     vscode.commands.registerCommand("redmyne.refreshTimesheet", () => {
-      console.log("[Timesheet] refreshTimesheet command called");
       TimeSheetPanel.refresh();
     })
   );
