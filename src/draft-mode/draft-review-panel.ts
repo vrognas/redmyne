@@ -105,18 +105,12 @@ export class DraftReviewPanel implements vscode.Disposable {
   }
 
   private async handleDiscardAll(): Promise<void> {
-    const confirm = await vscode.window.showWarningMessage(
-      `Discard all ${this.queue.count} pending drafts? This cannot be undone.`,
-      { modal: true },
-      "Discard All"
-    );
-    if (confirm === "Discard All") {
-      this.panel.webview.postMessage({ command: "setLoading", loading: true, action: "discardAll" });
-      try {
-        await vscode.commands.executeCommand("redmyne.discardDrafts");
-      } finally {
-        this.panel.webview.postMessage({ command: "setLoading", loading: false });
-      }
+    // Command already shows confirmation modal
+    this.panel.webview.postMessage({ command: "setLoading", loading: true, action: "discardAll" });
+    try {
+      await vscode.commands.executeCommand("redmyne.discardDrafts");
+    } finally {
+      this.panel.webview.postMessage({ command: "setLoading", loading: false });
     }
   }
 
