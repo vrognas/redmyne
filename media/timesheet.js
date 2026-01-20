@@ -577,6 +577,9 @@
     activityTd.appendChild(activitySelect);
     tr.appendChild(activityTd);
 
+    // Check if row is complete (has all required fields for time entry)
+    const isRowComplete = row.parentProjectId !== null && row.projectId !== null && row.issueId !== null && row.activityId !== null;
+
     // --- Comments cell ---
     const commentsTd = document.createElement("td");
     commentsTd.className = "col-comments";
@@ -584,6 +587,8 @@
     commentsInput.type = "text";
     commentsInput.className = "comments-input";
     commentsInput.value = row.comments || "";
+    commentsInput.placeholder = isRowComplete ? "" : "Select client/project/task/activity first";
+    commentsInput.disabled = !isRowComplete;
     // Aggregated rows can edit comments (will update all source entries)
     commentsInput.addEventListener("blur", (e) => {
       const value = e.target.value.trim() || null;
@@ -645,6 +650,7 @@
       }
       input.value = formatHours(cell.hours);
       input.dataset.tooltip = state.week ? state.week.dayDates[i] : "";
+      input.disabled = !isRowComplete;
       input.dataset.oldValue = cell.hours; // Store for undo
       // Store source entries for aggregated row handling
       if (isAggregated && cell.sourceEntries) {

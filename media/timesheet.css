@@ -569,6 +569,13 @@ td.col-total,
   background: var(--vscode-dropdown-background);
 }
 
+.day-input:disabled,
+.comments-input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: var(--vscode-input-background);
+}
+
 /* Style the dropdown options */
 .parent-select option,
 .project-select option,
