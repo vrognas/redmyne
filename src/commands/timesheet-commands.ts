@@ -29,8 +29,8 @@ export function registerTimeSheetCommands(
         context.extensionUri,
         context,
         deps.getServer,
-        deps.getDraftQueue(),
-        deps.getDraftModeManager(),
+        deps.getDraftQueue,
+        deps.getDraftModeManager,
         deps.getCachedIssues
       );
     })
@@ -44,8 +44,8 @@ export function registerTimeSheetCommands(
         context.extensionUri,
         context,
         deps.getServer,
-        deps.getDraftQueue(),
-        deps.getDraftModeManager(),
+        deps.getDraftQueue,
+        deps.getDraftModeManager,
         deps.getCachedIssues
       );
     },

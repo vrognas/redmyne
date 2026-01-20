@@ -47,13 +47,23 @@ export class TimeSheetPanel {
   private readonly _extensionUri: vscode.Uri;
   private readonly _context: vscode.ExtensionContext;
   private _getServerFn: (() => RedmineServer | undefined) | undefined;
-  private _draftQueue: DraftQueue | undefined;
-  private _draftModeManager: DraftModeManager | undefined;
+  private _getDraftQueueFn: (() => DraftQueue | undefined) | undefined;
+  private _getDraftModeManagerFn: (() => DraftModeManager | undefined) | undefined;
   private _getCachedIssues: (() => Issue[]) | undefined;
 
   /** Get current server (called fresh each time to handle late connection) */
   private get _server(): RedmineServer | undefined {
     return this._getServerFn?.();
+  }
+
+  /** Get current draft queue */
+  private get _draftQueue(): DraftQueue | undefined {
+    return this._getDraftQueueFn?.();
+  }
+
+  /** Get current draft mode manager */
+  private get _draftModeManager(): DraftModeManager | undefined {
+    return this._getDraftModeManagerFn?.();
   }
 
   private _rows: TimeSheetRow[] = [];
@@ -76,13 +86,14 @@ export class TimeSheetPanel {
     extensionUri: vscode.Uri,
     context: vscode.ExtensionContext,
     getServer: () => RedmineServer | undefined,
-    draftQueue: DraftQueue | undefined,
-    draftModeManager: DraftModeManager | undefined,
+    getDraftQueue: () => DraftQueue | undefined,
+    getDraftModeManager: () => DraftModeManager | undefined,
     getCachedIssues?: () => Issue[]
   ): TimeSheetPanel {
     const column = vscode.window.activeTextEditor?.viewColumn;
 
     // Auto-enable draft mode
+    const draftModeManager = getDraftModeManager();
     if (draftModeManager && !draftModeManager.isEnabled) {
       draftModeManager.enable();
       showStatusBarMessage("$(pencil) Draft Mode enabled", 2000);
@@ -92,8 +103,8 @@ export class TimeSheetPanel {
     if (TimeSheetPanel.currentPanel) {
       TimeSheetPanel.currentPanel._panel.reveal(column);
       TimeSheetPanel.currentPanel._getServerFn = getServer;
-      TimeSheetPanel.currentPanel._draftQueue = draftQueue;
-      TimeSheetPanel.currentPanel._draftModeManager = draftModeManager;
+      TimeSheetPanel.currentPanel._getDraftQueueFn = getDraftQueue;
+      TimeSheetPanel.currentPanel._getDraftModeManagerFn = getDraftModeManager;
       TimeSheetPanel.currentPanel._getCachedIssues = getCachedIssues;
       // Notify webview of current draft mode state
       TimeSheetPanel.currentPanel._postMessage({
@@ -120,8 +131,8 @@ export class TimeSheetPanel {
       extensionUri,
       context,
       getServer,
-      draftQueue,
-      draftModeManager,
+      getDraftQueue,
+      getDraftModeManager,
       getCachedIssues
     );
     return TimeSheetPanel.currentPanel;
@@ -132,8 +143,8 @@ export class TimeSheetPanel {
     extensionUri: vscode.Uri,
     context: vscode.ExtensionContext,
     getServer: () => RedmineServer | undefined,
-    draftQueue?: DraftQueue,
-    draftModeManager?: DraftModeManager,
+    getDraftQueue: () => DraftQueue | undefined,
+    getDraftModeManager: () => DraftModeManager | undefined,
     getCachedIssues?: () => Issue[]
   ): TimeSheetPanel {
     TimeSheetPanel.currentPanel = new TimeSheetPanel(
@@ -141,8 +152,8 @@ export class TimeSheetPanel {
       extensionUri,
       context,
       getServer,
-      draftQueue,
-      draftModeManager,
+      getDraftQueue,
+      getDraftModeManager,
       getCachedIssues
     );
     return TimeSheetPanel.currentPanel;
@@ -153,16 +164,16 @@ export class TimeSheetPanel {
     extensionUri: vscode.Uri,
     context: vscode.ExtensionContext,
     getServer: () => RedmineServer | undefined,
-    draftQueue?: DraftQueue,
-    draftModeManager?: DraftModeManager,
+    getDraftQueue: () => DraftQueue | undefined,
+    getDraftModeManager: () => DraftModeManager | undefined,
     getCachedIssues?: () => Issue[]
   ) {
     this._panel = panel;
     this._extensionUri = extensionUri;
     this._context = context;
     this._getServerFn = getServer;
-    this._draftQueue = draftQueue;
-    this._draftModeManager = draftModeManager;
+    this._getDraftQueueFn = getDraftQueue;
+    this._getDraftModeManagerFn = getDraftModeManager;
     this._getCachedIssues = getCachedIssues;
 
     // Initialize to current week
