@@ -1217,7 +1217,8 @@ body.draft-mode-disabled .action-btn {
   border-radius: 3px;
   cursor: pointer;
   opacity: 0.7;
-  z-index: 2;
+  z-index: 10;
+  pointer-events: auto;
 }
 
 .expand-btn:hover {
