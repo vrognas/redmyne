@@ -1257,6 +1257,9 @@ export class TimeSheetPanel {
 
       // Reload week to get fresh data from server
       await this._loadWeek(this._currentWeek);
+
+      // Sync sidebar time entries tree
+      vscode.commands.executeCommand("redmyne.refreshTimeEntries");
     } catch (error) {
       this._postMessage({ type: "showError", message: `Failed to save: ${error}` });
     } finally {
