@@ -139,6 +139,7 @@ export class DraftReviewPanel implements vscode.Disposable {
           description: op.description,
           issueId: op.issueId,
           timestamp: op.timestamp,
+          http: op.http,
         })),
         count: operations.length,
       });
@@ -157,6 +158,7 @@ export class DraftReviewPanel implements vscode.Disposable {
         description: op.description,
         issueId: op.issueId,
         timestamp: op.timestamp,
+        http: op.http,
       })),
       count: operations.length,
     });
@@ -166,10 +168,14 @@ export class DraftReviewPanel implements vscode.Disposable {
   private getHtmlForWebview(operations: DraftOperation[]): string {
     const nonce = getNonce();
 
-    const operationRows = operations.map((op) => `
+    const operationRows = operations.map((op) => {
+      const httpInfo = op.http ? `${op.http.method} ${op.http.path}` : "-";
+      const httpData = op.http?.data ? JSON.stringify(op.http.data, null, 2) : "";
+      return `
       <tr data-id="${escapeHtml(op.id)}" tabindex="0">
         <td class="type">${escapeHtml(op.type)}</td>
         <td class="description">${escapeHtml(op.description)}</td>
+        <td class="api-call" title="${escapeHtml(httpData)}">${escapeHtml(httpInfo)}</td>
         <td class="issue">${op.issueId ? `#${op.issueId}` : "-"}</td>
         <td class="time">${formatTime(op.timestamp)}</td>
         <td class="actions">
@@ -178,7 +184,8 @@ export class DraftReviewPanel implements vscode.Disposable {
           <span class="row-spinner" style="display:none;"></span>
         </td>
       </tr>
-    `).join("");
+    `;
+    }).join("");
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -324,8 +331,15 @@ export class DraftReviewPanel implements vscode.Disposable {
       min-width: 200px;
     }
     .issue {
-      width: 80px;
+      width: 60px;
       font-family: var(--vscode-editor-font-family);
+    }
+    .api-call {
+      width: 180px;
+      font-family: var(--vscode-editor-font-family);
+      font-size: 0.85em;
+      color: var(--vscode-textLink-foreground);
+      cursor: help;
     }
     .time {
       width: 80px;
@@ -413,6 +427,7 @@ export class DraftReviewPanel implements vscode.Disposable {
             <tr>
               <th>Type</th>
               <th>Description</th>
+              <th>API Call</th>
               <th>Issue</th>
               <th>Time</th>
               <th></th>
@@ -440,6 +455,7 @@ export class DraftReviewPanel implements vscode.Disposable {
       description: op.description,
       issueId: op.issueId,
       timestamp: op.timestamp,
+      http: op.http,
     })))};
 
     // Event delegation for buttons
@@ -536,10 +552,13 @@ export class DraftReviewPanel implements vscode.Disposable {
         return;
       }
 
-      const rows = ops.map(op =>
-        '<tr data-id="' + escapeHtml(op.id) + '" tabindex="0">' +
+      const rows = ops.map(op => {
+        const httpInfo = op.http ? op.http.method + ' ' + op.http.path : '-';
+        const httpData = op.http && op.http.data ? JSON.stringify(op.http.data, null, 2) : '';
+        return '<tr data-id="' + escapeHtml(op.id) + '" tabindex="0">' +
           '<td class="type">' + escapeHtml(op.type) + '</td>' +
           '<td class="description">' + escapeHtml(op.description) + '</td>' +
+          '<td class="api-call" title="' + escapeHtml(httpData) + '">' + escapeHtml(httpInfo) + '</td>' +
           '<td class="issue">' + (op.issueId ? '#' + op.issueId : '-') + '</td>' +
           '<td class="time">' + formatTime(op.timestamp) + '</td>' +
           '<td class="actions">' +
@@ -547,13 +566,13 @@ export class DraftReviewPanel implements vscode.Disposable {
             '<button class="remove-btn" data-id="' + escapeHtml(op.id) + '" title="Remove">🗑️</button>' +
             '<span class="row-spinner" style="display:none;"></span>' +
           '</td>' +
-        '</tr>'
-      ).join('');
+        '</tr>';
+      }).join('');
 
       content.innerHTML =
         '<div class="table-container">' +
           '<table>' +
-            '<thead><tr><th>Type</th><th>Description</th><th>Issue</th><th>Time</th><th></th></tr></thead>' +
+            '<thead><tr><th>Type</th><th>Description</th><th>API Call</th><th>Issue</th><th>Time</th><th></th></tr></thead>' +
             '<tbody id="operations-body">' + rows + '</tbody>' +
           '</table>' +
         '</div>' +
