@@ -214,6 +214,9 @@ export class TimeSheetPanel {
         if (this._panel.visible) {
           // Refresh when panel becomes visible
           this._loadWeek(this._currentWeek);
+        } else {
+          // Save new rows when panel loses visibility
+          this._saveIncompleteRows();
         }
       },
       null,
@@ -633,18 +636,17 @@ export class TimeSheetPanel {
     return `redmyne.timesheet.incompleteRows.${weekStart}`;
   }
 
-  /** Save incomplete rows (new rows with hours but missing issue/activity) to globalState */
+  /** Save new rows (not yet saved to Redmine) to globalState */
   private _saveIncompleteRows(): void {
-    const incompleteRows = this._rows.filter(
-      (r) => r.isNew && (!r.issueId || !r.activityId) && r.weekTotal > 0
-    );
-    if (incompleteRows.length > 0) {
+    // Save all new rows - they'll be lost when switching views otherwise
+    const newRows = this._rows.filter((r) => r.isNew);
+    if (newRows.length > 0) {
       void this._context.globalState.update(
         this._getIncompleteRowsKey(this._currentWeek.startDate),
-        incompleteRows
+        newRows
       );
     } else {
-      // Clear if no incomplete rows
+      // Clear if no new rows
       void this._context.globalState.update(
         this._getIncompleteRowsKey(this._currentWeek.startDate),
         undefined
@@ -734,6 +736,8 @@ export class TimeSheetPanel {
   private _addRow(): void {
     const newRow = this._createEmptyRow();
     this._rows.push(newRow);
+    // Save immediately so row persists across view changes
+    this._saveIncompleteRows();
     const totals = this._calculateTotals();
     this._postMessage({
       type: "render",
@@ -988,15 +992,9 @@ export class TimeSheetPanel {
     // Queue operation to draft queue if draft mode enabled
     this._queueCellOperation(row, dayIndex, hours, entryId, isDirty);
 
-    // If row is incomplete (missing issue/activity), save to persistent storage
-    // and show a warning toast
-    if (row.isNew && (!row.issueId || !row.activityId) && hours > 0) {
+    // Save new rows to persistent storage
+    if (row.isNew) {
       this._saveIncompleteRows();
-      this._postMessage({
-        type: "showToast",
-        message: "Select task & activity to save draft",
-        duration: 3000,
-      });
     }
 
     const totals = this._calculateTotals();
@@ -1195,12 +1193,12 @@ export class TimeSheetPanel {
           this._queueCellOperation(row, dayIndex, cell.hours, cell.entryId, true);
         }
       }
-      // Row is now complete - remove from incomplete rows storage
+      // Row is now complete - clear from incomplete storage (will be saved via draft queue)
       if (row.isNew) {
         this._clearCompletedRow(row.id);
       }
-    } else if (row.isNew && row.weekTotal > 0) {
-      // Row is still incomplete but has hours - save to storage
+    } else if (row.isNew) {
+      // Row is still incomplete - save to storage
       this._saveIncompleteRows();
     }
 
