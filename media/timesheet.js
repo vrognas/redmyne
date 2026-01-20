@@ -557,18 +557,34 @@
       dayTd.dataset.day = i;
       if (i === todayIndex) dayTd.classList.add("today");
 
-      const cell = row.days[i] || { hours: 0, isDirty: false };
+      const cell = row.days[i] || { hours: 0, isDirty: false, sourceEntries: [] };
+      const sourceEntryCount = cell.sourceEntries?.length || 0;
 
       // Add has-value class for cells with hours
       if (cell.hours > 0) dayTd.classList.add("has-value");
 
+      // Mark multi-entry aggregated cells with visual indicator
+      if (isAggregated && sourceEntryCount > 1) {
+        dayTd.classList.add("multi-entry");
+        dayTd.dataset.entryCount = sourceEntryCount;
+      }
+
       const input = document.createElement("input");
       input.type = "text";
       input.className = "day-input" + (cell.isDirty ? " dirty" : "") + (cell.hours === 0 ? " zero" : "");
+      // Add dashed border class for aggregated cells (editable but special)
+      if (isAggregated) {
+        input.classList.add("aggregated-cell-input");
+      }
       input.value = formatHours(cell.hours);
       input.dataset.tooltip = state.week ? state.week.dayDates[i] : "";
       input.dataset.oldValue = cell.hours; // Store for undo
-      input.disabled = isAggregated;
+      // Store source entries for aggregated row handling
+      if (isAggregated && cell.sourceEntries) {
+        input.dataset.sourceEntries = JSON.stringify(cell.sourceEntries);
+        input.dataset.isAggregated = "true";
+      }
+      // Aggregated rows are now editable
       input.addEventListener("focus", (e) => {
         e.target.dataset.oldValue = parseHours(e.target.value); // Capture before edit
         e.target.select();
@@ -579,19 +595,24 @@
         e.target.value = formatHours(newHours);
         // Only send message and track undo if value changed
         if (oldHours !== newHours) {
-          pushUndo({
-            type: "cell",
-            rowId: row.id,
-            dayIndex: i,
-            oldValue: oldHours,
-            newValue: newHours,
-          });
-          vscode.postMessage({
-            type: "updateCell",
-            rowId: row.id,
-            dayIndex: i,
-            hours: newHours,
-          });
+          // Check if this is an aggregated row
+          if (e.target.dataset.isAggregated === "true") {
+            handleAggregatedCellBlur(row, i, newHours, oldHours, cell);
+          } else {
+            pushUndo({
+              type: "cell",
+              rowId: row.id,
+              dayIndex: i,
+              oldValue: oldHours,
+              newValue: newHours,
+            });
+            vscode.postMessage({
+              type: "updateCell",
+              rowId: row.id,
+              dayIndex: i,
+              hours: newHours,
+            });
+          }
         }
       });
       input.addEventListener("keydown", (e) => {
@@ -616,12 +637,17 @@
     const actionsTd = document.createElement("td");
     actionsTd.className = "col-actions";
 
+    const sourceCount = isAggregated ? (row.sourceRowIds?.length || 1) : 1;
+
     const deleteBtn = document.createElement("button");
     deleteBtn.className = "action-btn delete-btn";
     deleteBtn.textContent = "🗑️";
-    deleteBtn.dataset.tooltip = isAggregated ? "Cannot delete aggregated row" : "Delete";
-    deleteBtn.disabled = isAggregated;
+    deleteBtn.dataset.tooltip = isAggregated ? `Delete ${sourceCount} entries` : "Delete";
     deleteBtn.addEventListener("click", () => {
+      if (isAggregated && sourceCount > 1) {
+        // Show toast with count for aggregated row deletion
+        showToast(`Deleted ${sourceCount} entries`);
+      }
       vscode.postMessage({ type: "deleteRow", rowId: row.id });
     });
     actionsTd.appendChild(deleteBtn);
@@ -629,9 +655,11 @@
     const copyBtn = document.createElement("button");
     copyBtn.className = "action-btn copy-btn";
     copyBtn.textContent = "📋";
-    copyBtn.dataset.tooltip = isAggregated ? "Cannot duplicate aggregated row" : "Duplicate";
-    copyBtn.disabled = isAggregated;
+    copyBtn.dataset.tooltip = isAggregated ? "Duplicate as single row" : "Duplicate";
     copyBtn.addEventListener("click", () => {
+      if (isAggregated) {
+        showToast("Duplicated as single row");
+      }
       vscode.postMessage({ type: "duplicateRow", rowId: row.id });
     });
     actionsTd.appendChild(copyBtn);
@@ -730,6 +758,7 @@
   /**
    * Aggregate rows with identical (issueId, activityId, comments)
    * Merges hours per day, returns new array of aggregated rows
+   * Tracks source entries per day cell for edit/undo support
    */
   function aggregateIdenticalRows(rows) {
     if (!rows || rows.length === 0) return rows;
@@ -745,19 +774,33 @@
         const aggRow = {
           ...row,
           id: `agg-${key}`, // Mark as aggregated
-          isAggregated: true, // Flag for read-only
+          isAggregated: true, // Flag for special handling
           sourceRowIds: [row.id], // Track original rows
           days: {},
           weekTotal: 0,
         };
-        // Copy days
+        // Copy days with source entry tracking
         for (let d = 0; d < 7; d++) {
           if (row.days[d]) {
+            const sourceEntries = [];
+            // Only add source entry if there's an actual entry (not new row)
+            if (row.days[d].entryId && row.days[d].hours > 0) {
+              sourceEntries.push({
+                rowId: row.id,
+                entryId: row.days[d].entryId,
+                hours: row.days[d].hours,
+                issueId: row.issueId,
+                activityId: row.activityId,
+                comments: row.comments,
+                spentOn: state.week?.dayDates[d] || "",
+              });
+            }
             aggRow.days[d] = {
               hours: row.days[d].hours,
               originalHours: row.days[d].originalHours,
               entryId: null, // Aggregated has no single entry
               isDirty: false,
+              sourceEntries,
             };
             aggRow.weekTotal += row.days[d].hours || 0;
           }
@@ -775,11 +818,24 @@
                 originalHours: 0,
                 entryId: null,
                 isDirty: false,
+                sourceEntries: [],
               };
             }
             aggRow.days[d].hours += row.days[d].hours || 0;
             aggRow.days[d].originalHours += row.days[d].originalHours || 0;
             aggRow.weekTotal += row.days[d].hours || 0;
+            // Add source entry for this day
+            if (row.days[d].entryId && row.days[d].hours > 0) {
+              aggRow.days[d].sourceEntries.push({
+                rowId: row.id,
+                entryId: row.days[d].entryId,
+                hours: row.days[d].hours,
+                issueId: row.issueId,
+                activityId: row.activityId,
+                comments: row.comments,
+                spentOn: state.week?.dayDates[d] || "",
+              });
+            }
           }
         }
       }
@@ -1058,6 +1114,15 @@
           type: "deleteRow",
           deletedRow: message.deletedRow,
         });
+        break;
+
+      case "showToast":
+        showToast(message.message, message.undoAction, message.duration);
+        break;
+
+      case "requestAggregatedCellConfirm":
+        // Extension is asking us to confirm editing multiple entries
+        handleAggregatedCellConfirm(message);
         break;
     }
   });
@@ -1480,6 +1545,138 @@
   document.querySelector(".timesheet-grid-container")?.addEventListener("scroll", () => {
     hideGenericTooltip();
   });
+
+  // ========== Toast Notification System ==========
+  let activeToast = null;
+  let toastTimeout = null;
+
+  function showToast(message, undoAction = null, duration = 5000) {
+    // Remove existing toast if any
+    hideToast();
+
+    const toast = document.createElement("div");
+    toast.className = "toast-notification";
+    toast.innerHTML = `
+      <span class="toast-message">${escapeHtml(message)}</span>
+      ${undoAction ? '<button class="toast-undo-btn">Undo</button>' : ''}
+      <button class="toast-dismiss-btn">×</button>
+    `;
+
+    // Add undo handler
+    if (undoAction) {
+      const undoBtn = toast.querySelector(".toast-undo-btn");
+      undoBtn?.addEventListener("click", () => {
+        vscode.postMessage(undoAction);
+        hideToast();
+      });
+    }
+
+    // Dismiss handler
+    const dismissBtn = toast.querySelector(".toast-dismiss-btn");
+    dismissBtn?.addEventListener("click", () => hideToast());
+
+    document.body.appendChild(toast);
+    activeToast = toast;
+
+    // Trigger enter animation
+    requestAnimationFrame(() => {
+      toast.classList.add("visible");
+    });
+
+    // Auto-dismiss
+    if (duration > 0) {
+      toastTimeout = setTimeout(() => hideToast(), duration);
+    }
+  }
+
+  function hideToast() {
+    if (toastTimeout) {
+      clearTimeout(toastTimeout);
+      toastTimeout = null;
+    }
+    if (activeToast) {
+      activeToast.classList.remove("visible");
+      activeToast.classList.add("hiding");
+      setTimeout(() => {
+        activeToast?.remove();
+        activeToast = null;
+      }, 200);
+    }
+  }
+
+  /**
+   * Handle blur on aggregated cell
+   * Determines the appropriate action based on source entry count
+   */
+  function handleAggregatedCellBlur(row, dayIndex, newHours, oldHours, cell) {
+    const sourceEntries = cell.sourceEntries || [];
+    const sourceCount = sourceEntries.length;
+
+    if (sourceCount === 0) {
+      // Empty aggregated cell → create new entry (no confirm)
+      vscode.postMessage({
+        type: "updateAggregatedCell",
+        aggRowId: row.id,
+        dayIndex,
+        newHours,
+        sourceEntries: [],
+        confirmed: true,
+      });
+      showToast("Created entry");
+    } else if (sourceCount === 1) {
+      // Single source entry → simple update (no confirm)
+      vscode.postMessage({
+        type: "updateAggregatedCell",
+        aggRowId: row.id,
+        dayIndex,
+        newHours,
+        sourceEntries,
+        confirmed: true,
+      });
+      showToast("Updated 1 entry");
+    } else {
+      // Multiple source entries → send to extension (may need confirm)
+      vscode.postMessage({
+        type: "updateAggregatedCell",
+        aggRowId: row.id,
+        dayIndex,
+        newHours,
+        sourceEntries,
+        confirmed: false, // Extension will request confirm via toast
+      });
+    }
+  }
+
+  /**
+   * Handle confirmation request for editing aggregated cell with multiple entries
+   * Uses toast+undo pattern instead of blocking confirm dialog
+   */
+  function handleAggregatedCellConfirm(message) {
+    const { aggRowId, dayIndex, newHours, oldHours, sourceEntryCount, sourceEntries } = message;
+
+    // Apply immediately with toast showing undo option
+    const action = newHours === 0 ? "Deleted" : "Replaced";
+    showToast(
+      `${action} ${sourceEntryCount} entries`,
+      {
+        type: "restoreAggregatedEntries",
+        entries: sourceEntries,
+        aggRowId,
+        dayIndex,
+      },
+      5000
+    );
+
+    // Send confirmed message to extension
+    vscode.postMessage({
+      type: "updateAggregatedCell",
+      aggRowId,
+      dayIndex,
+      newHours,
+      sourceEntries,
+      confirmed: true,
+    });
+  }
 
   // Notify extension that webview is ready
   vscode.postMessage({ type: "webviewReady" });

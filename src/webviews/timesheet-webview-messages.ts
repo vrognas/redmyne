@@ -6,12 +6,24 @@
 // Sentinel value for orphan projects (no parent)
 export const OTHERS_PARENT_ID = -1;
 
+// Source entry for aggregated cells
+export interface SourceEntry {
+  rowId: string;
+  entryId: number;
+  hours: number;
+  issueId: number;
+  activityId: number;
+  comments: string | null;
+  spentOn: string;
+}
+
 // Day cell data
 export interface DayCell {
   hours: number;
   originalHours: number; // Value when loaded from server (for dirty detection)
   entryId: number | null;
   isDirty: boolean;
+  sourceEntries?: SourceEntry[]; // For aggregated cells: all contributing entries
 }
 
 // Row data model
@@ -172,6 +184,28 @@ export interface RowDeletedMessage {
   deletedRow: TimeSheetRow; // Full row data for undo
 }
 
+export interface ShowToastMessage {
+  type: "showToast";
+  message: string;
+  undoAction?: {
+    type: "restoreAggregatedEntries";
+    entries: SourceEntry[];
+    aggRowId: string;
+    dayIndex: number;
+  };
+  duration?: number;
+}
+
+export interface RequestAggregatedCellConfirmMessage {
+  type: "requestAggregatedCellConfirm";
+  aggRowId: string;
+  dayIndex: number;
+  newHours: number;
+  oldHours: number;
+  sourceEntryCount: number;
+  sourceEntries: SourceEntry[];
+}
+
 export type ExtensionToWebviewMessage =
   | RenderMessage
   | UpdateRowMessage
@@ -184,7 +218,9 @@ export type ExtensionToWebviewMessage =
   | DraftModeChangedMessage
   | UpdateIssueDetailsMessage
   | RowDuplicatedMessage
-  | RowDeletedMessage;
+  | RowDeletedMessage
+  | ShowToastMessage
+  | RequestAggregatedCellConfirmMessage;
 
 // --- Webview -> Extension Messages ---
 
@@ -293,6 +329,31 @@ export interface SetAggregateRowsMessage {
   aggregateRows: boolean;
 }
 
+export interface UpdateAggregatedCellMessage {
+  type: "updateAggregatedCell";
+  aggRowId: string;
+  dayIndex: number;
+  newHours: number;
+  sourceEntries: SourceEntry[];
+  confirmed: boolean;
+}
+
+export interface UpdateAggregatedFieldMessage {
+  type: "updateAggregatedField";
+  aggRowId: string;
+  field: "parentProject" | "project" | "issue" | "activity" | "comments";
+  value: number | string | null;
+  sourceRowIds: string[];
+  confirmed: boolean;
+}
+
+export interface RestoreAggregatedEntriesMessage {
+  type: "restoreAggregatedEntries";
+  entries: SourceEntry[];
+  aggRowId: string;
+  dayIndex: number;
+}
+
 export type WebviewToExtensionMessage =
   | WebviewReadyMessage
   | NavigateWeekMessage
@@ -314,7 +375,10 @@ export type WebviewToExtensionMessage =
   | PasteWeekMessage
   | EnableDraftModeMessage
   | RequestIssueDetailsMessage
-  | SetAggregateRowsMessage;
+  | SetAggregateRowsMessage
+  | UpdateAggregatedCellMessage
+  | UpdateAggregatedFieldMessage
+  | RestoreAggregatedEntriesMessage;
 
 // Combined type for message handling
 export type TimeSheetMessage = ExtensionToWebviewMessage | WebviewToExtensionMessage;

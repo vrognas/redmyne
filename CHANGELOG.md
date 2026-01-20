@@ -4,6 +4,21 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 ## [Unreleased]
 
+## [4.10.0]
+
+### Added
+
+- **Editable aggregated rows** - edit hours in aggregated (merged) rows
+  - Empty cell → creates new entry
+  - Single entry → updates that entry
+  - Multiple entries → replaces with single entry (shows toast + undo)
+  - Set to 0h → deletes all source entries
+  - Multi-entry cells show count badge and glowing border
+  - Delete/duplicate enabled for aggregated rows
+  - Toast notifications with undo for destructive actions
+
+## [4.9.0]
+
 ### Added
 
 - **Time Sheet sorting** - click column headers to sort rows
@@ -46,10 +61,6 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Time Sheet performance** - faster dropdown loading
   - Uses cached issues from sidebar (avoids redundant API calls)
   - Parallel loading of issues and activities for selected project
-
-## [4.9.0]
-
-### Added
 
 - **Time Sheet cascading dropdowns** - Client → Project → Task → Activity
   - Select Client (parent project) first to enable Project dropdown

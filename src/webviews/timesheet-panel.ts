@@ -309,6 +309,34 @@ export class TimeSheetPanel {
       case "requestIssueDetails":
         await this._loadIssueDetails(message.issueId);
         break;
+
+      case "updateAggregatedCell":
+        await this._updateAggregatedCell(
+          message.aggRowId,
+          message.dayIndex,
+          message.newHours,
+          message.sourceEntries,
+          message.confirmed
+        );
+        break;
+
+      case "updateAggregatedField":
+        await this._updateAggregatedField(
+          message.aggRowId,
+          message.field,
+          message.value,
+          message.sourceRowIds,
+          message.confirmed
+        );
+        break;
+
+      case "restoreAggregatedEntries":
+        await this._restoreAggregatedEntries(
+          message.entries,
+          message.aggRowId,
+          message.dayIndex
+        );
+        break;
     }
   }
 
@@ -610,6 +638,15 @@ export class TimeSheetPanel {
   }
 
   private async _deleteRow(rowId: string): Promise<void> {
+    // Check if this is an aggregated row (id starts with "agg-")
+    const isAggregated = rowId.startsWith("agg-");
+
+    if (isAggregated) {
+      // For aggregated rows, delete all source rows
+      await this._deleteAggregatedRow(rowId);
+      return;
+    }
+
     const rowIndex = this._rows.findIndex((r) => r.id === rowId);
     if (rowIndex === -1) return;
 
@@ -661,6 +698,51 @@ export class TimeSheetPanel {
     });
   }
 
+  /**
+   * Delete an aggregated row - queues deletion for all source entries
+   */
+  private async _deleteAggregatedRow(aggRowId: string): Promise<void> {
+    if (!this._draftQueue || !this._draftModeManager?.isEnabled) return;
+
+    // Parse key from aggRowId: agg-{issueId}:{activityId}:{comments}
+    const keyMatch = aggRowId.match(/^agg-(.+):(.+):(.*)$/);
+    if (!keyMatch) return;
+
+    const issueId = keyMatch[1] === "null" ? null : parseInt(keyMatch[1], 10);
+    const activityId = keyMatch[2] === "null" ? null : parseInt(keyMatch[2], 10);
+    const comments = keyMatch[3] || null;
+
+    // Find all source rows that match this aggregation key
+    const sourceRows = this._rows.filter(r =>
+      r.issueId === issueId &&
+      r.activityId === activityId &&
+      (r.comments ?? "") === (comments ?? "")
+    );
+
+    // Queue deletions for all entries in source rows
+    for (const row of sourceRows) {
+      for (const cell of Object.values(row.days)) {
+        if (cell.entryId) {
+          this._draftQueue.add({
+            id: crypto.randomUUID(),
+            type: "deleteTimeEntry",
+            timestamp: Date.now(),
+            resourceId: cell.entryId,
+            description: `Delete time entry #${cell.entryId}`,
+            http: {
+              method: "DELETE",
+              path: `/time_entries/${cell.entryId}.json`,
+            },
+            resourceKey: `ts:timeentry:${cell.entryId}`,
+          });
+        }
+      }
+    }
+
+    // Reload to reflect changes
+    await this._loadWeek(this._currentWeek);
+  }
+
   private _restoreRow(row: TimeSheetRow): void {
     // Re-add the row to the list
     this._rows.push(row);
@@ -682,8 +764,44 @@ export class TimeSheetPanel {
   }
 
   private _duplicateRow(rowId: string): void {
-    const row = this._rows.find((r) => r.id === rowId);
-    if (!row) return;
+    // Check if this is an aggregated row
+    const isAggregated = rowId.startsWith("agg-");
+
+    let row: TimeSheetRow | undefined;
+    let totalHoursPerDay: number[] = [0, 0, 0, 0, 0, 0, 0];
+
+    if (isAggregated) {
+      // Parse key from aggRowId: agg-{issueId}:{activityId}:{comments}
+      const keyMatch = rowId.match(/^agg-(.+):(.+):(.*)$/);
+      if (!keyMatch) return;
+
+      const issueId = keyMatch[1] === "null" ? null : parseInt(keyMatch[1], 10);
+      const activityId = keyMatch[2] === "null" ? null : parseInt(keyMatch[2], 10);
+      const comments = keyMatch[3] || null;
+
+      // Find all source rows that match this aggregation key
+      const sourceRows = this._rows.filter(r =>
+        r.issueId === issueId &&
+        r.activityId === activityId &&
+        (r.comments ?? "") === (comments ?? "")
+      );
+
+      if (sourceRows.length === 0) return;
+
+      // Use first source row for metadata, aggregate hours
+      row = sourceRows[0];
+      for (const srcRow of sourceRows) {
+        for (let i = 0; i < 7; i++) {
+          totalHoursPerDay[i] += srcRow.days[i]?.hours ?? 0;
+        }
+      }
+    } else {
+      row = this._rows.find((r) => r.id === rowId);
+      if (!row) return;
+      for (let i = 0; i < 7; i++) {
+        totalHoursPerDay[i] = row.days[i]?.hours ?? 0;
+      }
+    }
 
     const newRow = this._createEmptyRow();
     newRow.parentProjectId = row.parentProjectId;
@@ -697,7 +815,7 @@ export class TimeSheetPanel {
     newRow.comments = row.comments;
     // Copy hours but mark as dirty (new entries)
     for (let i = 0; i < 7; i++) {
-      const hours = row.days[i]?.hours ?? 0;
+      const hours = totalHoursPerDay[i];
       newRow.days[i] = {
         hours,
         originalHours: 0, // New row has no server entry
@@ -705,7 +823,7 @@ export class TimeSheetPanel {
         isDirty: hours !== 0,
       };
     }
-    newRow.weekTotal = row.weekTotal;
+    newRow.weekTotal = totalHoursPerDay.reduce((sum, h) => sum + h, 0);
 
     this._rows.push(newRow);
     const totals = this._calculateTotals();
@@ -1249,6 +1367,231 @@ export class TimeSheetPanel {
   private async _enableDraftMode(): Promise<void> {
     // Execute the toggle draft mode command
     await vscode.commands.executeCommand("redmyne.toggleDraftMode");
+  }
+
+  /**
+   * Handle editing an aggregated cell
+   * Creates/updates/deletes entries based on source entries
+   */
+  private async _updateAggregatedCell(
+    aggRowId: string,
+    dayIndex: number,
+    newHours: number,
+    sourceEntries: Array<{ rowId: string; entryId: number; hours: number; issueId: number; activityId: number; comments: string | null; spentOn: string }>,
+    confirmed: boolean
+  ): Promise<void> {
+    if (!this._draftQueue || !this._draftModeManager?.isEnabled) return;
+
+    const sourceCount = sourceEntries.length;
+
+    // Multiple entries + not confirmed → request confirm via toast
+    if (sourceCount > 1 && !confirmed) {
+      const oldHours = sourceEntries.reduce((sum, e) => sum + e.hours, 0);
+      this._postMessage({
+        type: "requestAggregatedCellConfirm",
+        aggRowId,
+        dayIndex,
+        newHours,
+        oldHours,
+        sourceEntryCount: sourceCount,
+        sourceEntries,
+      });
+      return;
+    }
+
+    const date = this._currentWeek.dayDates[dayIndex];
+
+    // Parse issueId, activityId, comments from aggRowId
+    // Format: agg-{issueId}:{activityId}:{comments}
+    const keyMatch = aggRowId.match(/^agg-(.+):(.+):(.*)$/);
+    if (!keyMatch) return;
+
+    const issueId = keyMatch[1] === "null" ? null : parseInt(keyMatch[1], 10);
+    const activityId = keyMatch[2] === "null" ? null : parseInt(keyMatch[2], 10);
+    const comments = keyMatch[3] || null;
+
+    if (!issueId || !activityId) return;
+
+    if (sourceCount === 0 && newHours > 0) {
+      // Empty cell → create new entry
+      const tempId = `${aggRowId}:${dayIndex}`;
+      this._draftQueue.add({
+        id: crypto.randomUUID(),
+        type: "createTimeEntry",
+        timestamp: Date.now(),
+        issueId,
+        tempId,
+        description: `Log ${newHours}h to #${issueId} on ${date}`,
+        http: {
+          method: "POST",
+          path: "/time_entries.json",
+          data: {
+            time_entry: {
+              issue_id: issueId,
+              hours: newHours,
+              activity_id: activityId,
+              spent_on: date,
+              comments: comments ?? "",
+            },
+          },
+        },
+        resourceKey: `ts:timeentry:${tempId}`,
+      });
+    } else if (sourceCount === 1) {
+      const entry = sourceEntries[0];
+      if (newHours > 0) {
+        // Single entry → update
+        this._draftQueue.add({
+          id: crypto.randomUUID(),
+          type: "updateTimeEntry",
+          timestamp: Date.now(),
+          resourceId: entry.entryId,
+          issueId: entry.issueId,
+          description: `Update #${entry.issueId} on ${date}: ${newHours}h`,
+          http: {
+            method: "PUT",
+            path: `/time_entries/${entry.entryId}.json`,
+            data: {
+              time_entry: {
+                hours: newHours,
+                activity_id: entry.activityId,
+                comments: entry.comments ?? "",
+              },
+            },
+          },
+          resourceKey: `ts:timeentry:${entry.entryId}`,
+        });
+      } else {
+        // Single entry + 0h → delete
+        this._draftQueue.add({
+          id: crypto.randomUUID(),
+          type: "deleteTimeEntry",
+          timestamp: Date.now(),
+          resourceId: entry.entryId,
+          description: `Delete time entry on ${date}`,
+          http: {
+            method: "DELETE",
+            path: `/time_entries/${entry.entryId}.json`,
+          },
+          resourceKey: `ts:timeentry:${entry.entryId}`,
+        });
+      }
+    } else {
+      // Multiple entries → delete all, create one (if hours > 0)
+      for (const entry of sourceEntries) {
+        this._draftQueue.add({
+          id: crypto.randomUUID(),
+          type: "deleteTimeEntry",
+          timestamp: Date.now(),
+          resourceId: entry.entryId,
+          description: `Delete time entry #${entry.entryId}`,
+          http: {
+            method: "DELETE",
+            path: `/time_entries/${entry.entryId}.json`,
+          },
+          resourceKey: `ts:timeentry:${entry.entryId}`,
+        });
+      }
+
+      if (newHours > 0) {
+        const tempId = `${aggRowId}:${dayIndex}:new`;
+        this._draftQueue.add({
+          id: crypto.randomUUID(),
+          type: "createTimeEntry",
+          timestamp: Date.now(),
+          issueId,
+          tempId,
+          description: `Log ${newHours}h to #${issueId} on ${date}`,
+          http: {
+            method: "POST",
+            path: "/time_entries.json",
+            data: {
+              time_entry: {
+                issue_id: issueId,
+                hours: newHours,
+                activity_id: activityId,
+                spent_on: date,
+                comments: comments ?? "",
+              },
+            },
+          },
+          resourceKey: `ts:timeentry:${tempId}`,
+        });
+      }
+    }
+
+    // Reload to reflect changes
+    await this._loadWeek(this._currentWeek);
+  }
+
+  /**
+   * Handle updating a field on all source entries of an aggregated row
+   */
+  private async _updateAggregatedField(
+    aggRowId: string,
+    field: "parentProject" | "project" | "issue" | "activity" | "comments",
+    value: number | string | null,
+    sourceRowIds: string[],
+    confirmed: boolean
+  ): Promise<void> {
+    if (!this._draftQueue || !this._draftModeManager?.isEnabled) return;
+
+    // Find all source rows
+    const sourceRows = this._rows.filter(r => sourceRowIds.includes(r.id));
+    if (sourceRows.length === 0) return;
+
+    // If multiple source rows and not confirmed, request confirm
+    if (sourceRows.length > 1 && !confirmed) {
+      this._postMessage({
+        type: "showToast",
+        message: `Apply to ${sourceRows.length} entries?`,
+        duration: 0, // Persistent until action
+      });
+      return;
+    }
+
+    // Apply field update to all source rows
+    for (const row of sourceRows) {
+      await this._updateRowField(row.id, field, value);
+    }
+
+    // Show toast
+    this._postMessage({
+      type: "showToast",
+      message: `Updated ${sourceRows.length} entries`,
+      duration: 3000,
+    });
+  }
+
+  /**
+   * Restore original entries (undo for aggregated cell edit)
+   */
+  private async _restoreAggregatedEntries(
+    entries: Array<{ rowId: string; entryId: number; hours: number; issueId: number; activityId: number; comments: string | null; spentOn: string }>,
+    aggRowId: string,
+    dayIndex: number
+  ): Promise<void> {
+    if (!this._draftQueue || !this._draftModeManager?.isEnabled) return;
+
+    // First, remove any pending operations for this cell
+    const tempKey = `${aggRowId}:${dayIndex}`;
+    this._draftQueue.removeByKey(`ts:timeentry:${tempKey}`);
+    this._draftQueue.removeByKey(`ts:timeentry:${tempKey}:new`);
+
+    // Remove delete operations for original entries
+    for (const entry of entries) {
+      this._draftQueue.removeByKey(`ts:timeentry:${entry.entryId}`);
+    }
+
+    // Reload to show original state
+    await this._loadWeek(this._currentWeek);
+
+    // Show toast
+    this._postMessage({
+      type: "showToast",
+      message: "Restored original entries",
+      duration: 3000,
+    });
   }
 
   private _getHtml(): string {
