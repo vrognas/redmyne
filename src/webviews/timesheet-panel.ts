@@ -126,9 +126,20 @@ export class TimeSheetPanel {
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
     context: vscode.ExtensionContext,
-    server: RedmineServer | undefined
+    server: RedmineServer | undefined,
+    draftQueue?: DraftQueue,
+    draftModeManager?: DraftModeManager,
+    getCachedIssues?: () => Issue[]
   ): TimeSheetPanel {
-    TimeSheetPanel.currentPanel = new TimeSheetPanel(panel, extensionUri, context, server);
+    TimeSheetPanel.currentPanel = new TimeSheetPanel(
+      panel,
+      extensionUri,
+      context,
+      server,
+      draftQueue,
+      draftModeManager,
+      getCachedIssues
+    );
     return TimeSheetPanel.currentPanel;
   }
 
