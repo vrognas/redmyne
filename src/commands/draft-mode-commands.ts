@@ -160,7 +160,9 @@ export function registerDraftModeCommands(
 
       if (confirm !== "Discard All") return;
 
+      console.log("[DraftMode] Discarding drafts, calling queue.clear()");
       await queue.clear();
+      console.log("[DraftMode] Calling refreshTrees after discard");
       refreshTrees(); // Refresh all views after discard
       vscode.window.showInformationMessage(`Discarded ${count} draft${count === 1 ? "" : "s"}`);
     }

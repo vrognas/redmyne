@@ -140,6 +140,7 @@ export class TimeSheetPanel {
 
   /** Refresh the timesheet panel if it's open */
   public static refresh(): void {
+    console.log("[Timesheet] static refresh called, currentPanel:", !!TimeSheetPanel.currentPanel);
     if (TimeSheetPanel.currentPanel) {
       void TimeSheetPanel.currentPanel._loadWeek(TimeSheetPanel.currentPanel._currentWeek);
     }
@@ -238,6 +239,50 @@ export class TimeSheetPanel {
             type: "draftModeChanged",
             isDraftMode: this._draftModeManager?.isEnabled ?? false,
           });
+        })
+      );
+    }
+
+    // Listen for draft queue changes from external sources (Draft Review apply/discard)
+    // Only reload if the change wasn't triggered by this panel
+    if (this._draftQueue) {
+      let isLocalChange = false;
+      const originalAdd = this._draftQueue.add.bind(this._draftQueue);
+      const originalRemoveByKey = this._draftQueue.removeByKey.bind(this._draftQueue);
+      const originalRemoveByTempIdPrefix = this._draftQueue.removeByTempIdPrefix.bind(this._draftQueue);
+
+      // Track when we're making changes so we don't reload on our own changes
+      this._draftQueue.add = async (op) => {
+        isLocalChange = true;
+        try {
+          return await originalAdd(op);
+        } finally {
+          isLocalChange = false;
+        }
+      };
+      this._draftQueue.removeByKey = async (key) => {
+        isLocalChange = true;
+        try {
+          return await originalRemoveByKey(key);
+        } finally {
+          isLocalChange = false;
+        }
+      };
+      this._draftQueue.removeByTempIdPrefix = async (prefix) => {
+        isLocalChange = true;
+        try {
+          return await originalRemoveByTempIdPrefix(prefix);
+        } finally {
+          isLocalChange = false;
+        }
+      };
+
+      this._disposables.push(
+        this._draftQueue.onDidChange(() => {
+          if (!isLocalChange && this._panel.visible) {
+            console.log("[Timesheet] External queue change detected, reloading");
+            void this._loadWeek(this._currentWeek);
+          }
         })
       );
     }
@@ -667,10 +712,32 @@ export class TimeSheetPanel {
       this._getIncompleteRowsKey(weekStart)
     );
     if (saved && saved.length > 0) {
-      // Add incomplete rows that aren't already in _rows
+      // Get current draft operations to check which rows still have pending drafts
+      const draftOps = this._draftQueue?.getAll() || [];
+      const draftTempIdPrefixes = new Set(
+        draftOps.map(op => op.tempId?.split(":")[0]).filter(Boolean)
+      );
+
+      // Add incomplete rows that aren't already in _rows AND have pending drafts (or no hours yet)
       for (const row of saved) {
         if (!this._rows.find((r) => r.id === row.id)) {
-          this._rows.push(row);
+          // Only restore if: row has no hours yet, OR row has pending draft operations
+          const hasHours = row.weekTotal > 0;
+          const hasDraftOps = draftTempIdPrefixes.has(row.id);
+          if (!hasHours || hasDraftOps) {
+            this._rows.push(row);
+          }
+        }
+      }
+
+      // Clean up storage - remove rows that were not restored
+      const restoredIds = new Set(this._rows.filter(r => r.isNew).map(r => r.id));
+      const stillValid = saved.filter(r => restoredIds.has(r.id));
+      if (stillValid.length !== saved.length) {
+        if (stillValid.length > 0) {
+          void this._context.globalState.update(this._getIncompleteRowsKey(weekStart), stillValid);
+        } else {
+          void this._context.globalState.update(this._getIncompleteRowsKey(weekStart), undefined);
         }
       }
     }
@@ -807,7 +874,14 @@ export class TimeSheetPanel {
       // Also remove any queued draft operations for this row
       if (this._draftQueue) {
         // tempId format is "rowId:dayIndex", so use rowId as prefix
-        void this._draftQueue.removeByTempIdPrefix(`${rowId}:`);
+        const prefix = `${rowId}:`;
+        console.log("[Timesheet] Removing draft ops with tempId prefix:", prefix);
+        console.log("[Timesheet] Queue count before:", this._draftQueue.count);
+        void this._draftQueue.removeByTempIdPrefix(prefix).then(() => {
+          console.log("[Timesheet] Queue count after:", this._draftQueue?.count);
+        });
+      } else {
+        console.log("[Timesheet] No draft queue available for removal");
       }
     }
 
