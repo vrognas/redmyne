@@ -138,6 +138,13 @@ export class TimeSheetPanel {
     return TimeSheetPanel.currentPanel;
   }
 
+  /** Refresh the timesheet panel if it's open */
+  public static refresh(): void {
+    if (TimeSheetPanel.currentPanel) {
+      void TimeSheetPanel.currentPanel._loadWeek(TimeSheetPanel.currentPanel._currentWeek);
+    }
+  }
+
   public static restore(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,

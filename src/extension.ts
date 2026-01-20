@@ -1682,6 +1682,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         projectsTree.refresh();
         myTimeEntriesTree.refresh();
         vscode.commands.executeCommand("redmyne.refreshGanttData");
+        vscode.commands.executeCommand("redmyne.refreshTimesheet");
       },
       showReviewPanel: () => {
         DraftReviewPanel.createOrShow(draftQueue);

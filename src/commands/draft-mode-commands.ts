@@ -161,6 +161,7 @@ export function registerDraftModeCommands(
       if (confirm !== "Discard All") return;
 
       await queue.clear();
+      refreshTrees(); // Refresh all views after discard
       vscode.window.showInformationMessage(`Discarded ${count} draft${count === 1 ? "" : "s"}`);
     }
   );
@@ -169,6 +170,7 @@ export function registerDraftModeCommands(
     "redmyne.removeDraft",
     async (draftId: string) => {
       await queue.remove(draftId);
+      refreshTrees(); // Refresh all views after remove
     }
   );
 

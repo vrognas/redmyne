@@ -36,6 +36,13 @@ export function registerTimeSheetCommands(
     })
   );
 
+  // Register refresh command (used by draft mode commands)
+  disposables.push(
+    vscode.commands.registerCommand("redmyne.refreshTimesheet", () => {
+      TimeSheetPanel.refresh();
+    })
+  );
+
   // Register webview panel serializer for restore on reload
   vscode.window.registerWebviewPanelSerializer("redmyneTimeSheet", {
     async deserializeWebviewPanel(panel: vscode.WebviewPanel) {
