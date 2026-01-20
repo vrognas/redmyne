@@ -327,7 +327,7 @@
     parentTd.className = "col-parent";
     const parentSelect = document.createElement("select");
     parentSelect.className = "parent-select";
-    parentSelect.disabled = isAggregated;
+    // Aggregated rows can edit fields (will update all source entries)
     parentSelect.innerHTML = '<option value="">Client...</option>';
 
     for (const parent of state.parentProjects) {
@@ -358,12 +358,23 @@
 
     parentSelect.addEventListener("change", () => {
       const value = parentSelect.value ? parseInt(parentSelect.value, 10) : null;
-      vscode.postMessage({
-        type: "updateRowField",
-        rowId: row.id,
-        field: "parentProject",
-        value,
-      });
+      if (isAggregated && row.sourceRowIds?.length > 0) {
+        vscode.postMessage({
+          type: "updateAggregatedField",
+          aggRowId: row.id,
+          field: "parentProject",
+          value,
+          sourceRowIds: row.sourceRowIds,
+          confirmed: false,
+        });
+      } else {
+        vscode.postMessage({
+          type: "updateRowField",
+          rowId: row.id,
+          field: "parentProject",
+          value,
+        });
+      }
       // Request child projects for this parent
       if (value !== null) {
         vscode.postMessage({
@@ -382,9 +393,9 @@
     projectSelect.className = "project-select";
     projectSelect.innerHTML = '<option value="">Project...</option>';
 
-    // Disable if no parent selected
+    // Disable if no parent selected (aggregated rows can still edit)
     const hasParent = row.parentProjectId !== null;
-    projectSelect.disabled = isAggregated || !hasParent;
+    projectSelect.disabled = !hasParent;
 
     // Populate projects from cache
     if (hasParent) {
@@ -412,12 +423,23 @@
 
     projectSelect.addEventListener("change", () => {
       const value = projectSelect.value ? parseInt(projectSelect.value, 10) : null;
-      vscode.postMessage({
-        type: "updateRowField",
-        rowId: row.id,
-        field: "project",
-        value,
-      });
+      if (isAggregated && row.sourceRowIds?.length > 0) {
+        vscode.postMessage({
+          type: "updateAggregatedField",
+          aggRowId: row.id,
+          field: "project",
+          value,
+          sourceRowIds: row.sourceRowIds,
+          confirmed: false,
+        });
+      } else {
+        vscode.postMessage({
+          type: "updateRowField",
+          rowId: row.id,
+          field: "project",
+          value,
+        });
+      }
       // Request issues for this project
       if (value !== null) {
         vscode.postMessage({
@@ -439,9 +461,9 @@
     taskSelect.className = "task-select";
     taskSelect.innerHTML = '<option value="">Task...</option>';
 
-    // Disable if no project selected or aggregated
+    // Disable if no project selected (aggregated rows can still edit)
     const hasProject = row.projectId !== null;
-    taskSelect.disabled = isAggregated || !hasProject;
+    taskSelect.disabled = !hasProject;
 
     // Populate issues from cache
     if (hasProject) {
@@ -467,12 +489,23 @@
 
     taskSelect.addEventListener("change", () => {
       const value = taskSelect.value ? parseInt(taskSelect.value, 10) : null;
-      vscode.postMessage({
-        type: "updateRowField",
-        rowId: row.id,
-        field: "issue",
-        value,
-      });
+      if (isAggregated && row.sourceRowIds?.length > 0) {
+        vscode.postMessage({
+          type: "updateAggregatedField",
+          aggRowId: row.id,
+          field: "issue",
+          value,
+          sourceRowIds: row.sourceRowIds,
+          confirmed: false,
+        });
+      } else {
+        vscode.postMessage({
+          type: "updateRowField",
+          rowId: row.id,
+          field: "issue",
+          value,
+        });
+      }
     });
     taskContent.appendChild(taskSelect);
 
@@ -496,8 +529,8 @@
     activitySelect.className = "activity-select";
     activitySelect.innerHTML = '<option value="">Activity...</option>';
 
-    // Disable if no project selected
-    activitySelect.disabled = isAggregated || !hasProject;
+    // Disable if no project selected (aggregated rows can still edit)
+    activitySelect.disabled = !hasProject;
 
     // Populate activities if available
     const activities = state.activitiesByProject.get(row.projectId) || [];
@@ -516,12 +549,23 @@
 
     activitySelect.addEventListener("change", () => {
       const value = activitySelect.value ? parseInt(activitySelect.value, 10) : null;
-      vscode.postMessage({
-        type: "updateRowField",
-        rowId: row.id,
-        field: "activity",
-        value,
-      });
+      if (isAggregated && row.sourceRowIds?.length > 0) {
+        vscode.postMessage({
+          type: "updateAggregatedField",
+          aggRowId: row.id,
+          field: "activity",
+          value,
+          sourceRowIds: row.sourceRowIds,
+          confirmed: false,
+        });
+      } else {
+        vscode.postMessage({
+          type: "updateRowField",
+          rowId: row.id,
+          field: "activity",
+          value,
+        });
+      }
     });
     activityTd.appendChild(activitySelect);
     tr.appendChild(activityTd);
@@ -533,15 +577,26 @@
     commentsInput.type = "text";
     commentsInput.className = "comments-input";
     commentsInput.value = row.comments || "";
-    commentsInput.disabled = isAggregated;
+    // Aggregated rows can edit comments (will update all source entries)
     commentsInput.addEventListener("blur", (e) => {
       const value = e.target.value.trim() || null;
-      vscode.postMessage({
-        type: "updateRowField",
-        rowId: row.id,
-        field: "comments",
-        value,
-      });
+      if (isAggregated && row.sourceRowIds?.length > 0) {
+        vscode.postMessage({
+          type: "updateAggregatedField",
+          aggRowId: row.id,
+          field: "comments",
+          value,
+          sourceRowIds: row.sourceRowIds,
+          confirmed: false,
+        });
+      } else {
+        vscode.postMessage({
+          type: "updateRowField",
+          rowId: row.id,
+          field: "comments",
+          value,
+        });
+      }
     });
     commentsInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") e.target.blur();
