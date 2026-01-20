@@ -29,6 +29,7 @@
     groupBy: "none", // 'none' | 'client' | 'project' | 'issue' | 'activity'
     collapsedGroups: new Set(), // Group keys that are collapsed
     aggregateRows: false, // Merge identical rows (same issue+activity+comment)
+    expandedCells: new Set(), // Set of "rowId:dayIndex" for expanded multi-entry cells
   };
 
   // Push action to undo stack
@@ -619,9 +620,14 @@
       if (cell.hours > 0) dayTd.classList.add("has-value");
 
       // Mark multi-entry aggregated cells with visual indicator
+      const cellKey = `${row.id}:${i}`;
+      const isExpanded = state.expandedCells.has(cellKey);
       if (isAggregated && sourceEntryCount > 1) {
         dayTd.classList.add("multi-entry");
         dayTd.dataset.entryCount = sourceEntryCount;
+        if (isExpanded) {
+          dayTd.classList.add("expanded");
+        }
       }
 
       const input = document.createElement("input");
@@ -679,6 +685,27 @@
         }
       });
       dayTd.appendChild(input);
+
+      // Add expand dropdown for multi-entry cells
+      if (isAggregated && sourceEntryCount > 1) {
+        // Add expand button (clicking the badge)
+        const expandBtn = document.createElement("button");
+        expandBtn.className = "expand-btn";
+        expandBtn.dataset.tooltip = isExpanded ? "Collapse" : `Expand ${sourceEntryCount} entries`;
+        expandBtn.textContent = isExpanded ? "▲" : "▼";
+        expandBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          toggleCellExpand(row.id, i);
+        });
+        dayTd.appendChild(expandBtn);
+
+        // Render expanded dropdown if this cell is expanded
+        if (isExpanded && cell.sourceEntries) {
+          const dropdown = renderExpandedCellDropdown(row, i, cell.sourceEntries);
+          dayTd.appendChild(dropdown);
+        }
+      }
+
       tr.appendChild(dayTd);
     }
 
@@ -1657,6 +1684,134 @@
         activeToast = null;
       }, 200);
     }
+  }
+
+  /**
+   * Toggle expand/collapse state for a multi-entry cell
+   */
+  function toggleCellExpand(rowId, dayIndex) {
+    const cellKey = `${rowId}:${dayIndex}`;
+    if (state.expandedCells.has(cellKey)) {
+      state.expandedCells.delete(cellKey);
+    } else {
+      // Collapse all other cells first (only one expanded at a time)
+      state.expandedCells.clear();
+      state.expandedCells.add(cellKey);
+    }
+    render();
+  }
+
+  /**
+   * Collapse all expanded cells
+   */
+  function collapseAllCells() {
+    if (state.expandedCells.size > 0) {
+      state.expandedCells.clear();
+      render();
+    }
+  }
+
+  /**
+   * Render expanded dropdown for multi-entry cell
+   */
+  function renderExpandedCellDropdown(row, dayIndex, sourceEntries) {
+    const dropdown = document.createElement("div");
+    dropdown.className = "expanded-cell-dropdown";
+
+    // Prevent clicks inside dropdown from bubbling
+    dropdown.addEventListener("click", (e) => e.stopPropagation());
+
+    // Header showing total
+    const header = document.createElement("div");
+    header.className = "dropdown-header";
+    const totalHours = sourceEntries.reduce((sum, e) => sum + e.hours, 0);
+    header.textContent = `${sourceEntries.length} entries (${formatHours(totalHours)})`;
+    dropdown.appendChild(header);
+
+    // List of individual entries
+    const list = document.createElement("div");
+    list.className = "dropdown-entry-list";
+
+    for (const entry of sourceEntries) {
+      const entryRow = document.createElement("div");
+      entryRow.className = "dropdown-entry";
+
+      // Hours input
+      const hoursInput = document.createElement("input");
+      hoursInput.type = "text";
+      hoursInput.className = "dropdown-entry-hours";
+      hoursInput.value = formatHours(entry.hours);
+      hoursInput.dataset.entryId = entry.entryId;
+      hoursInput.dataset.rowId = entry.rowId;
+      hoursInput.dataset.oldValue = entry.hours;
+      hoursInput.addEventListener("focus", (e) => {
+        e.target.dataset.oldValue = parseHours(e.target.value);
+        e.target.select();
+      });
+      hoursInput.addEventListener("blur", (e) => {
+        const oldHours = parseFloat(e.target.dataset.oldValue) || 0;
+        const newHours = parseHours(e.target.value);
+        e.target.value = formatHours(newHours);
+        if (oldHours !== newHours) {
+          // Update individual entry
+          vscode.postMessage({
+            type: "updateExpandedEntry",
+            rowId: entry.rowId,
+            entryId: entry.entryId,
+            dayIndex,
+            newHours,
+            oldHours,
+          });
+        }
+      });
+      hoursInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") e.target.blur();
+        if (e.key === "Escape") {
+          e.target.value = formatHours(parseFloat(e.target.dataset.oldValue) || 0);
+          e.target.blur();
+        }
+      });
+      entryRow.appendChild(hoursInput);
+
+      // Entry ID label
+      const idLabel = document.createElement("span");
+      idLabel.className = "dropdown-entry-id";
+      idLabel.textContent = `#${entry.entryId}`;
+      entryRow.appendChild(idLabel);
+
+      // Delete button
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "dropdown-entry-delete";
+      deleteBtn.textContent = "×";
+      deleteBtn.dataset.tooltip = "Delete this entry";
+      deleteBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        vscode.postMessage({
+          type: "deleteExpandedEntry",
+          rowId: entry.rowId,
+          entryId: entry.entryId,
+          aggRowId: row.id,
+          dayIndex,
+        });
+        showToast("Deleted 1 entry");
+      });
+      entryRow.appendChild(deleteBtn);
+
+      list.appendChild(entryRow);
+    }
+    dropdown.appendChild(list);
+
+    // Close button
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "dropdown-close-btn";
+    closeBtn.textContent = "Close";
+    closeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      collapseAllCells();
+    });
+    dropdown.appendChild(closeBtn);
+
+    return dropdown;
   }
 
   /**

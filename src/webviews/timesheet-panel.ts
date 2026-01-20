@@ -342,6 +342,24 @@ export class TimeSheetPanel {
           message.dayIndex
         );
         break;
+
+      case "updateExpandedEntry":
+        await this._updateExpandedEntry(
+          message.rowId,
+          message.entryId,
+          message.dayIndex,
+          message.newHours
+        );
+        break;
+
+      case "deleteExpandedEntry":
+        await this._deleteExpandedEntry(
+          message.rowId,
+          message.entryId,
+          message.aggRowId,
+          message.dayIndex
+        );
+        break;
     }
   }
 
@@ -1600,6 +1618,85 @@ export class TimeSheetPanel {
       message: "Restored original entries",
       duration: 3000,
     });
+  }
+
+  /**
+   * Update individual entry from expanded cell dropdown
+   */
+  private async _updateExpandedEntry(
+    rowId: string,
+    entryId: number,
+    dayIndex: number,
+    newHours: number
+  ): Promise<void> {
+    if (!this._draftQueue || !this._draftModeManager?.isEnabled) return;
+
+    // Find the original row
+    const row = this._rows.find(r => r.id === rowId);
+    if (!row) return;
+
+    if (newHours > 0) {
+      // Update entry
+      this._draftQueue.add({
+        id: crypto.randomUUID(),
+        type: "updateTimeEntry",
+        timestamp: Date.now(),
+        resourceId: entryId,
+        description: `Update time entry ${entryId} to ${newHours}h`,
+        resourceKey: `ts:timeentry:${entryId}`,
+        http: {
+          method: "PUT",
+          path: `/time_entries/${entryId}.json`,
+          data: { time_entry: { hours: newHours } },
+        },
+      });
+    } else {
+      // Delete entry (hours = 0)
+      this._draftQueue.add({
+        id: crypto.randomUUID(),
+        type: "deleteTimeEntry",
+        timestamp: Date.now(),
+        resourceId: entryId,
+        description: `Delete time entry ${entryId}`,
+        resourceKey: `ts:timeentry:${entryId}`,
+        http: {
+          method: "DELETE",
+          path: `/time_entries/${entryId}.json`,
+        },
+      });
+    }
+
+    // Reload to reflect changes
+    await this._loadWeek(this._currentWeek);
+  }
+
+  /**
+   * Delete individual entry from expanded cell dropdown
+   */
+  private async _deleteExpandedEntry(
+    rowId: string,
+    entryId: number,
+    aggRowId: string,
+    dayIndex: number
+  ): Promise<void> {
+    if (!this._draftQueue || !this._draftModeManager?.isEnabled) return;
+
+    // Queue delete operation
+    this._draftQueue.add({
+      id: crypto.randomUUID(),
+      type: "deleteTimeEntry",
+      timestamp: Date.now(),
+      resourceId: entryId,
+      description: `Delete time entry ${entryId}`,
+      resourceKey: `ts:timeentry:${entryId}`,
+      http: {
+        method: "DELETE",
+        path: `/time_entries/${entryId}.json`,
+      },
+    });
+
+    // Reload to reflect changes
+    await this._loadWeek(this._currentWeek);
   }
 
   private _getHtml(): string {

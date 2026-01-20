@@ -354,6 +354,23 @@ export interface RestoreAggregatedEntriesMessage {
   dayIndex: number;
 }
 
+export interface UpdateExpandedEntryMessage {
+  type: "updateExpandedEntry";
+  rowId: string;
+  entryId: number;
+  dayIndex: number;
+  newHours: number;
+  oldHours: number;
+}
+
+export interface DeleteExpandedEntryMessage {
+  type: "deleteExpandedEntry";
+  rowId: string;
+  entryId: number;
+  aggRowId: string;
+  dayIndex: number;
+}
+
 export type WebviewToExtensionMessage =
   | WebviewReadyMessage
   | NavigateWeekMessage
@@ -378,7 +395,9 @@ export type WebviewToExtensionMessage =
   | SetAggregateRowsMessage
   | UpdateAggregatedCellMessage
   | UpdateAggregatedFieldMessage
-  | RestoreAggregatedEntriesMessage;
+  | RestoreAggregatedEntriesMessage
+  | UpdateExpandedEntryMessage
+  | DeleteExpandedEntryMessage;
 
 // Combined type for message handling
 export type TimeSheetMessage = ExtensionToWebviewMessage | WebviewToExtensionMessage;

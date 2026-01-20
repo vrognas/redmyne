@@ -1195,3 +1195,132 @@ body.draft-mode-disabled .action-btn {
 .aggregated-row select {
   cursor: pointer;
 }
+
+/* ========== Multi-Entry Cell Expand/Collapse ========== */
+.day-cell.multi-entry {
+  position: relative;
+}
+
+.expand-btn {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 16px;
+  height: 14px;
+  padding: 0;
+  font-size: 8px;
+  line-height: 14px;
+  text-align: center;
+  border: none;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border-radius: 3px;
+  cursor: pointer;
+  opacity: 0.7;
+  z-index: 2;
+}
+
+.expand-btn:hover {
+  opacity: 1;
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.day-cell.expanded .expand-btn {
+  opacity: 1;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+/* Expanded cell dropdown */
+.expanded-cell-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 160px;
+  background: var(--vscode-dropdown-background);
+  border: 1px solid var(--vscode-dropdown-border);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px var(--vscode-widget-shadow);
+  z-index: 100;
+  padding: 6px;
+  margin-top: 2px;
+}
+
+.dropdown-header {
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--vscode-widget-border);
+}
+
+.dropdown-entry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dropdown-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dropdown-entry-hours {
+  width: 50px;
+  padding: 3px 6px;
+  font-size: 12px;
+  text-align: right;
+  border: 1px solid var(--vscode-input-border);
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border-radius: 3px;
+}
+
+.dropdown-entry-hours:focus {
+  outline: none;
+  border-color: var(--vscode-focusBorder);
+}
+
+.dropdown-entry-id {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+  flex: 1;
+}
+
+.dropdown-entry-delete {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--vscode-errorForeground);
+  font-size: 14px;
+  line-height: 18px;
+  text-align: center;
+  cursor: pointer;
+  border-radius: 3px;
+  opacity: 0.6;
+}
+
+.dropdown-entry-delete:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--vscode-errorForeground) 20%, transparent);
+}
+
+.dropdown-close-btn {
+  width: 100%;
+  margin-top: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  border: none;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.dropdown-close-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
