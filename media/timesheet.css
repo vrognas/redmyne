@@ -454,6 +454,11 @@ body {
   min-width: var(--ts-cell-width);
 }
 
+thead .col-day {
+  text-align: right;
+  padding-right: 8px;
+}
+
 .col-total {
   width: var(--ts-total-width);
   font-weight: 600;
