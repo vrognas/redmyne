@@ -90,6 +90,17 @@ export class DraftQueue {
     }
   }
 
+  /** Remove all operations where tempId starts with a given prefix */
+  async removeByTempIdPrefix(prefix: string): Promise<void> {
+    const initialLength = this.operations.length;
+    this.operations = this.operations.filter(op => !op.tempId?.startsWith(prefix));
+
+    if (this.operations.length !== initialLength) {
+      await this.persist();
+      this.emitChange();
+    }
+  }
+
   async clear(): Promise<void> {
     this.operations = [];
     await this.persist();

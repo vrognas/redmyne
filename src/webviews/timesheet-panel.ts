@@ -797,6 +797,11 @@ export class TimeSheetPanel {
     // Clear from incomplete rows storage if it was stored there
     if (row.isNew) {
       this._clearCompletedRow(rowId);
+      // Also remove any queued draft operations for this row
+      if (this._draftQueue) {
+        // tempId format is "rowId:dayIndex", so use rowId as prefix
+        void this._draftQueue.removeByTempIdPrefix(`${rowId}:`);
+      }
     }
 
     const totals = this._calculateTotals();
