@@ -1325,3 +1325,18 @@ body.draft-mode-disabled .action-btn {
 .dropdown-close-btn:hover {
   background: var(--vscode-button-secondaryHoverBackground);
 }
+
+/* ========== Incomplete Rows (missing task/activity but has hours) ========== */
+.incomplete-row {
+  /* Warning left border to indicate incomplete status */
+  border-left: 3px solid var(--vscode-editorWarning-foreground);
+}
+
+.incomplete-row td:first-child {
+  padding-left: 5px; /* Adjust for border width */
+}
+
+.incomplete-row .day-input.dirty {
+  /* More prominent warning for dirty cells on incomplete rows */
+  background: color-mix(in srgb, var(--vscode-editorWarning-foreground) 25%, transparent);
+}

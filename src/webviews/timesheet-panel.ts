@@ -417,6 +417,9 @@ export class TimeSheetPanel {
       // Convert entries to rows (each entry = separate row)
       this._rows = this._entriesToRows(entries, week);
 
+      // Restore incomplete rows for this week
+      this._restoreIncompleteRows(week.startDate);
+
       // Auto-add empty row if no entries exist
       if (this._rows.length === 0) {
         this._rows.push(this._createEmptyRow());
@@ -625,6 +628,66 @@ export class TimeSheetPanel {
     };
   }
 
+  /** Storage key for incomplete rows, per week */
+  private _getIncompleteRowsKey(weekStart: string): string {
+    return `redmyne.timesheet.incompleteRows.${weekStart}`;
+  }
+
+  /** Save incomplete rows (new rows with hours but missing issue/activity) to globalState */
+  private _saveIncompleteRows(): void {
+    const incompleteRows = this._rows.filter(
+      (r) => r.isNew && (!r.issueId || !r.activityId) && r.weekTotal > 0
+    );
+    if (incompleteRows.length > 0) {
+      void this._context.globalState.update(
+        this._getIncompleteRowsKey(this._currentWeek.startDate),
+        incompleteRows
+      );
+    } else {
+      // Clear if no incomplete rows
+      void this._context.globalState.update(
+        this._getIncompleteRowsKey(this._currentWeek.startDate),
+        undefined
+      );
+    }
+  }
+
+  /** Restore incomplete rows for a week from globalState */
+  private _restoreIncompleteRows(weekStart: string): void {
+    const saved = this._context.globalState.get<TimeSheetRow[]>(
+      this._getIncompleteRowsKey(weekStart)
+    );
+    if (saved && saved.length > 0) {
+      // Add incomplete rows that aren't already in _rows
+      for (const row of saved) {
+        if (!this._rows.find((r) => r.id === row.id)) {
+          this._rows.push(row);
+        }
+      }
+    }
+  }
+
+  /** Clear completed row from incomplete rows storage */
+  private _clearCompletedRow(rowId: string): void {
+    const saved = this._context.globalState.get<TimeSheetRow[]>(
+      this._getIncompleteRowsKey(this._currentWeek.startDate)
+    );
+    if (saved) {
+      const updated = saved.filter((r) => r.id !== rowId);
+      if (updated.length > 0) {
+        void this._context.globalState.update(
+          this._getIncompleteRowsKey(this._currentWeek.startDate),
+          updated
+        );
+      } else {
+        void this._context.globalState.update(
+          this._getIncompleteRowsKey(this._currentWeek.startDate),
+          undefined
+        );
+      }
+    }
+  }
+
   private _calculateTotals(): DailyTotals {
     const days: number[] = [0, 0, 0, 0, 0, 0, 0];
     let weekTotal = 0;
@@ -726,6 +789,12 @@ export class TimeSheetPanel {
     const deletedRow = { ...row };
 
     this._rows.splice(rowIndex, 1);
+
+    // Clear from incomplete rows storage if it was stored there
+    if (row.isNew) {
+      this._clearCompletedRow(rowId);
+    }
+
     const totals = this._calculateTotals();
     this._postMessage({
       type: "render",
@@ -919,6 +988,17 @@ export class TimeSheetPanel {
     // Queue operation to draft queue if draft mode enabled
     this._queueCellOperation(row, dayIndex, hours, entryId, isDirty);
 
+    // If row is incomplete (missing issue/activity), save to persistent storage
+    // and show a warning toast
+    if (row.isNew && (!row.issueId || !row.activityId) && hours > 0) {
+      this._saveIncompleteRows();
+      this._postMessage({
+        type: "showToast",
+        message: "Select task & activity to save draft",
+        duration: 3000,
+      });
+    }
+
     const totals = this._calculateTotals();
     this._postMessage({ type: "updateRow", row, totals });
   }
@@ -1077,6 +1157,23 @@ export class TimeSheetPanel {
       for (const cell of Object.values(row.days)) {
         cell.isDirty = true;
       }
+    }
+
+    // Queue all dirty cells if row is now complete (has issue + activity)
+    if (row.issueId && row.activityId) {
+      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+        const cell = row.days[dayIndex];
+        if (cell && cell.isDirty && cell.hours > 0) {
+          this._queueCellOperation(row, dayIndex, cell.hours, cell.entryId, true);
+        }
+      }
+      // Row is now complete - remove from incomplete rows storage
+      if (row.isNew) {
+        this._clearCompletedRow(row.id);
+      }
+    } else if (row.isNew && row.weekTotal > 0) {
+      // Row is still incomplete but has hours - save to storage
+      this._saveIncompleteRows();
     }
 
     const totals = this._calculateTotals();

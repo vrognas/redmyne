@@ -323,6 +323,12 @@
       tr.classList.add("aggregated-row");
     }
 
+    // Check if this is an incomplete row (new, has hours, but missing issue/activity)
+    const isIncomplete = row.isNew && (!row.issueId || !row.activityId) && row.weekTotal > 0;
+    if (isIncomplete) {
+      tr.classList.add("incomplete-row");
+    }
+
     // --- Parent (Client) cell ---
     const parentTd = document.createElement("td");
     parentTd.className = "col-parent";
