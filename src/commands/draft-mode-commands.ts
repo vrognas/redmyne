@@ -248,12 +248,15 @@ async function executeOperation(
       break;
     }
     case "setIssueAssignee": {
-      // This is part of applyQuickUpdate, we'll handle via direct PUT
-      // For now, skip - the full quick update should handle this
+      const issueId = op.issueId!;
+      const assignedToId = (http.data as { issue: { assigned_to_id: number } }).issue.assigned_to_id;
+      await server.put(`/issues/${issueId}.json`, { issue: { assigned_to_id: assignedToId } });
       break;
     }
     case "addIssueNote": {
-      // Notes are part of applyQuickUpdate, skip for now
+      const issueId = op.issueId!;
+      const notes = (http.data as { issue: { notes: string } }).issue.notes;
+      await server.put(`/issues/${issueId}.json`, { issue: { notes } });
       break;
     }
     case "createIssue": {

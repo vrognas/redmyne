@@ -1400,4 +1400,27 @@ export class RedmineServer {
         JSON.stringify(other.options.additionalHeaders)
     );
   }
+
+  // ============ Generic HTTP Methods ============
+
+  /**
+   * Generic POST request
+   */
+  async post<T = unknown>(path: string, data: Record<string, unknown>): Promise<T> {
+    return this.doRequest<T>(path, "POST", this.encodeJson(data));
+  }
+
+  /**
+   * Generic PUT request
+   */
+  async put<T = unknown>(path: string, data: Record<string, unknown>): Promise<T> {
+    return this.doRequest<T>(path, "PUT", this.encodeJson(data));
+  }
+
+  /**
+   * Generic DELETE request
+   */
+  async delete<T = unknown>(path: string): Promise<T> {
+    return this.doRequest<T>(path, "DELETE");
+  }
 }

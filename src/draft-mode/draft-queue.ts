@@ -11,7 +11,8 @@ export interface DraftQueueOptions {
   fs: vscode.FileSystem;
 }
 
-type ChangeHandler = () => void;
+/** Handler receives optional source identifier of who made the change */
+type ChangeHandler = (source?: string) => void;
 
 export class DraftQueue {
   private operations: DraftOperation[] = [];
@@ -56,7 +57,12 @@ export class DraftQueue {
     }
   }
 
-  async add(op: DraftOperation): Promise<void> {
+  /**
+   * Add operation to queue
+   * @param op Operation to add
+   * @param source Optional identifier of the caller (for filtering change events)
+   */
+  async add(op: DraftOperation, source?: string): Promise<void> {
     // Conflict resolution: replace existing operation with same resourceKey
     const existingIndex = this.operations.findIndex(
       existing => existing.resourceKey === op.resourceKey
@@ -69,44 +75,44 @@ export class DraftQueue {
     }
 
     await this.persist();
-    this.emitChange();
+    this.emitChange(source);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, source?: string): Promise<void> {
     const initialLength = this.operations.length;
     this.operations = this.operations.filter(op => op.id !== id);
 
     if (this.operations.length !== initialLength) {
       await this.persist();
-      this.emitChange();
+      this.emitChange(source);
     }
   }
 
-  async removeByKey(resourceKey: string): Promise<void> {
+  async removeByKey(resourceKey: string, source?: string): Promise<void> {
     const initialLength = this.operations.length;
     this.operations = this.operations.filter(op => op.resourceKey !== resourceKey);
 
     if (this.operations.length !== initialLength) {
       await this.persist();
-      this.emitChange();
+      this.emitChange(source);
     }
   }
 
   /** Remove all operations where tempId starts with a given prefix */
-  async removeByTempIdPrefix(prefix: string): Promise<void> {
+  async removeByTempIdPrefix(prefix: string, source?: string): Promise<void> {
     const initialLength = this.operations.length;
     this.operations = this.operations.filter(op => !op.tempId?.startsWith(prefix));
 
     if (this.operations.length !== initialLength) {
       await this.persist();
-      this.emitChange();
+      this.emitChange(source);
     }
   }
 
-  async clear(): Promise<void> {
+  async clear(source?: string): Promise<void> {
     this.operations = [];
     await this.persist();
-    this.emitChange();
+    this.emitChange(source);
   }
 
   getAll(): DraftOperation[] {
@@ -132,9 +138,16 @@ export class DraftQueue {
     };
   }
 
-  private emitChange(): void {
+  /**
+   * Dispose all change handlers to prevent memory leaks
+   */
+  dispose(): void {
+    this.changeHandlers.clear();
+  }
+
+  private emitChange(source?: string): void {
     for (const handler of this.changeHandlers) {
-      handler();
+      handler(source);
     }
   }
 

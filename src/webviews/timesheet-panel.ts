@@ -40,6 +40,9 @@ import { startOfISOWeek } from "date-fns";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+/** Source identifier for DraftQueue changes from this panel */
+const TIMESHEET_SOURCE = "timesheet-panel";
+
 export class TimeSheetPanel {
   public static currentPanel: TimeSheetPanel | undefined;
 
@@ -245,40 +248,11 @@ export class TimeSheetPanel {
     // Listen for draft queue changes from external sources (Draft Review apply/discard)
     // Only reload if the change wasn't triggered by this panel
     if (this._draftQueue) {
-      let isLocalChange = false;
-      const originalAdd = this._draftQueue.add.bind(this._draftQueue);
-      const originalRemoveByKey = this._draftQueue.removeByKey.bind(this._draftQueue);
-      const originalRemoveByTempIdPrefix = this._draftQueue.removeByTempIdPrefix.bind(this._draftQueue);
-
-      // Track when we're making changes so we don't reload on our own changes
-      this._draftQueue.add = async (op) => {
-        isLocalChange = true;
-        try {
-          return await originalAdd(op);
-        } finally {
-          isLocalChange = false;
-        }
-      };
-      this._draftQueue.removeByKey = async (key) => {
-        isLocalChange = true;
-        try {
-          return await originalRemoveByKey(key);
-        } finally {
-          isLocalChange = false;
-        }
-      };
-      this._draftQueue.removeByTempIdPrefix = async (prefix) => {
-        isLocalChange = true;
-        try {
-          return await originalRemoveByTempIdPrefix(prefix);
-        } finally {
-          isLocalChange = false;
-        }
-      };
-
       this._disposables.push(
-        this._draftQueue.onDidChange(() => {
-          if (!isLocalChange && this._panel.visible) {
+        this._draftQueue.onDidChange((source) => {
+          // Skip reload if the change came from this panel
+          if (source === TIMESHEET_SOURCE) return;
+          if (this._panel.visible) {
             void this._loadWeek(this._currentWeek);
           }
         })
@@ -856,7 +830,7 @@ export class TimeSheetPanel {
               path: `/time_entries/${cell.entryId}.json`,
             },
             resourceKey: `ts:timeentry:${cell.entryId}`,
-          });
+          }, TIMESHEET_SOURCE);
         }
       }
     }
@@ -872,7 +846,7 @@ export class TimeSheetPanel {
       // Also remove any queued draft operations for this row
       if (this._draftQueue) {
         // tempId format is "rowId:dayIndex", so use rowId as prefix
-        void this._draftQueue.removeByTempIdPrefix(`${rowId}:`);
+        void this._draftQueue.removeByTempIdPrefix(`${rowId}:`, TIMESHEET_SOURCE);
       }
     }
 
@@ -934,7 +908,7 @@ export class TimeSheetPanel {
               path: `/time_entries/${cell.entryId}.json`,
             },
             resourceKey: `ts:timeentry:${cell.entryId}`,
-          });
+          }, TIMESHEET_SOURCE);
         }
       }
     }
@@ -1114,7 +1088,7 @@ export class TimeSheetPanel {
 
     // If not dirty (restored to original), remove any pending operation
     if (!isDirty) {
-      this._draftQueue.removeByKey(resourceKey);
+      this._draftQueue.removeByKey(resourceKey, TIMESHEET_SOURCE);
       return;
     }
 
@@ -1141,7 +1115,7 @@ export class TimeSheetPanel {
             },
           },
           resourceKey,
-        });
+        }, TIMESHEET_SOURCE);
       } else {
         // Delete (hours = 0)
         this._draftQueue.add({
@@ -1155,7 +1129,7 @@ export class TimeSheetPanel {
             path: `/time_entries/${entryId}.json`,
           },
           resourceKey,
-        });
+        }, TIMESHEET_SOURCE);
       }
     } else if (hours > 0) {
       // New entry (no entryId, hours > 0)
@@ -1182,7 +1156,7 @@ export class TimeSheetPanel {
         resourceKey,
       };
       console.log("[Timesheet] Adding createTimeEntry operation:", operation);
-      this._draftQueue.add(operation);
+      this._draftQueue.add(operation, TIMESHEET_SOURCE);
     }
     // If no entryId and hours = 0, nothing to queue (or remove pending create)
   }
@@ -1485,7 +1459,7 @@ export class TimeSheetPanel {
             await this._server.delete(path);
           }
           // Remove from queue after successful apply
-          await this._draftQueue.remove(op.id);
+          await this._draftQueue.remove(op.id, TIMESHEET_SOURCE);
           successCount++;
         } catch (error) {
           errorCount++;
@@ -1601,7 +1575,7 @@ export class TimeSheetPanel {
               },
             },
             resourceKey: `ts:timeentry:${tempId}`,
-          });
+          }, TIMESHEET_SOURCE);
           created++;
         }
       }
@@ -1689,7 +1663,7 @@ export class TimeSheetPanel {
           },
         },
         resourceKey: `ts:timeentry:${tempId}`,
-      });
+      }, TIMESHEET_SOURCE);
     } else if (sourceCount === 1) {
       const entry = sourceEntries[0];
       if (newHours > 0) {
@@ -1713,7 +1687,7 @@ export class TimeSheetPanel {
             },
           },
           resourceKey: `ts:timeentry:${entry.entryId}`,
-        });
+        }, TIMESHEET_SOURCE);
       } else {
         // Single entry + 0h → delete
         this._draftQueue.add({
@@ -1727,7 +1701,7 @@ export class TimeSheetPanel {
             path: `/time_entries/${entry.entryId}.json`,
           },
           resourceKey: `ts:timeentry:${entry.entryId}`,
-        });
+        }, TIMESHEET_SOURCE);
       }
     } else {
       // Multiple entries → delete all, create one (if hours > 0)
@@ -1743,7 +1717,7 @@ export class TimeSheetPanel {
             path: `/time_entries/${entry.entryId}.json`,
           },
           resourceKey: `ts:timeentry:${entry.entryId}`,
-        });
+        }, TIMESHEET_SOURCE);
       }
 
       if (newHours > 0) {
@@ -1769,7 +1743,7 @@ export class TimeSheetPanel {
             },
           },
           resourceKey: `ts:timeentry:${tempId}`,
-        });
+        }, TIMESHEET_SOURCE);
       }
     }
 
@@ -1828,12 +1802,12 @@ export class TimeSheetPanel {
 
     // First, remove any pending operations for this cell
     const tempKey = `${aggRowId}:${dayIndex}`;
-    this._draftQueue.removeByKey(`ts:timeentry:${tempKey}`);
-    this._draftQueue.removeByKey(`ts:timeentry:${tempKey}:new`);
+    this._draftQueue.removeByKey(`ts:timeentry:${tempKey}`, TIMESHEET_SOURCE);
+    this._draftQueue.removeByKey(`ts:timeentry:${tempKey}:new`, TIMESHEET_SOURCE);
 
     // Remove delete operations for original entries
     for (const entry of entries) {
-      this._draftQueue.removeByKey(`ts:timeentry:${entry.entryId}`);
+      this._draftQueue.removeByKey(`ts:timeentry:${entry.entryId}`, TIMESHEET_SOURCE);
     }
 
     // Reload to show original state
@@ -1876,7 +1850,7 @@ export class TimeSheetPanel {
           path: `/time_entries/${entryId}.json`,
           data: { time_entry: { hours: newHours } },
         },
-      });
+      }, TIMESHEET_SOURCE);
     } else {
       // Delete entry (hours = 0)
       this._draftQueue.add({
@@ -1890,7 +1864,7 @@ export class TimeSheetPanel {
           method: "DELETE",
           path: `/time_entries/${entryId}.json`,
         },
-      });
+      }, TIMESHEET_SOURCE);
     }
 
     // Reload to reflect changes
@@ -1920,7 +1894,7 @@ export class TimeSheetPanel {
         method: "DELETE",
         path: `/time_entries/${entryId}.json`,
       },
-    });
+    }, TIMESHEET_SOURCE);
 
     // Reload to reflect changes
     await this._loadWeek(this._currentWeek);

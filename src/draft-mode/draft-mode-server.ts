@@ -620,4 +620,18 @@ export class DraftModeServer {
   get options() {
     return this.inner.options;
   }
+
+  // ============ Generic HTTP Methods (passthrough) ============
+
+  post<T = unknown>(path: string, data: Record<string, unknown>): Promise<T> {
+    return this.inner.post<T>(path, data);
+  }
+
+  put<T = unknown>(path: string, data: Record<string, unknown>): Promise<T> {
+    return this.inner.put<T>(path, data);
+  }
+
+  delete<T = unknown>(path: string): Promise<T> {
+    return this.inner.delete<T>(path);
+  }
 }
