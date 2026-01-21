@@ -826,8 +826,8 @@
     const groups = new Map(); // key -> merged row
 
     for (const row of rows) {
-      // Build aggregation key: issueId:activityId:comments
-      const key = `${row.issueId ?? "null"}:${row.activityId ?? "null"}:${row.comments ?? ""}`;
+      // Build aggregation key using :: delimiter (: in comments won't break parsing)
+      const key = `${row.issueId ?? "null"}::${row.activityId ?? "null"}::${row.comments ?? ""}`;
 
       if (!groups.has(key)) {
         // Create new aggregated row (copy structure)

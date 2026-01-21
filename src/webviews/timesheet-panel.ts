@@ -776,16 +776,20 @@ export class TimeSheetPanel {
       } else if (op.type === "createTimeEntry" && op.tempId) {
         // Parse tempId - two formats:
         // 1. Normal: "rowId:dayIndex"
-        // 2. Aggregated: "agg-{issueId}:{activityId}:{comments}:{dayIndex}"
-        const parts = op.tempId.split(":");
-        console.log("[Timesheet] createTimeEntry tempId:", op.tempId, "parts:", parts);
+        // 2. Aggregated: "agg-{issueId}::{activityId}::{comments}:{dayIndex}"
+        console.log("[Timesheet] createTimeEntry tempId:", op.tempId);
 
-        if (parts[0].startsWith("agg-")) {
-          // Aggregated row format: agg-{issueId}:{activityId}:{comments}:{dayIndex}
-          const issueIdStr = parts[0].slice(4); // Remove "agg-" prefix
+        if (op.tempId.startsWith("agg-")) {
+          // Aggregated row format uses :: as delimiter for issueId/activityId/comments
+          // Format: agg-{issueId}::{activityId}::{comments}:{dayIndex}
+          const aggMatch = op.tempId.match(/^agg-(.+?)::(.+?)::(.*)$/);
+          if (!aggMatch) continue;
+          const [, issueIdStr, activityIdStr, rest] = aggMatch;
+          // rest = "comments:dayIndex" - dayIndex is last segment after :
+          const lastColonIdx = rest.lastIndexOf(":");
+          const dayIndex = lastColonIdx >= 0 ? parseInt(rest.slice(lastColonIdx + 1), 10) : NaN;
           const issueId = issueIdStr === "null" ? null : parseInt(issueIdStr, 10);
-          const activityId = parts[1] === "null" ? null : parseInt(parts[1], 10);
-          const dayIndex = parseInt(parts[parts.length - 1], 10);
+          const activityId = activityIdStr === "null" ? null : parseInt(activityIdStr, 10);
           console.log("[Timesheet] Aggregated: issueId:", issueId, "activityId:", activityId, "dayIndex:", dayIndex);
 
           // Find source row with matching issueId and activityId
@@ -798,10 +802,12 @@ export class TimeSheetPanel {
             row.days[dayIndex] = { ...cell, hours, isDirty: true };
             row.weekTotal = Object.values(row.days).reduce((sum, c) => sum + c.hours, 0);
           }
-        } else if (parts.length >= 2) {
+        } else {
           // Normal row format: "rowId:dayIndex"
-          const rowId = parts.slice(0, -1).join(":"); // Handle rowIds with colons
-          const dayIndex = parseInt(parts[parts.length - 1], 10);
+          const lastColonIdx = op.tempId.lastIndexOf(":");
+          if (lastColonIdx < 0) continue;
+          const rowId = op.tempId.slice(0, lastColonIdx);
+          const dayIndex = parseInt(op.tempId.slice(lastColonIdx + 1), 10);
           console.log("[Timesheet] Normal: rowId:", rowId, "dayIndex:", dayIndex);
           const row = this._rows.find((r) => r.id === rowId);
           console.log("[Timesheet] Found row:", row ? "yes" : "no", row?.id);
@@ -963,7 +969,7 @@ export class TimeSheetPanel {
     if (!this._draftQueue || !this._draftModeManager?.isEnabled) return;
 
     // Parse key from aggRowId: agg-{issueId}:{activityId}:{comments}
-    const keyMatch = aggRowId.match(/^agg-(.+):(.+):(.*)$/);
+    const keyMatch = aggRowId.match(/^agg-(.+?)::(.+?)::(.*)$/);
     if (!keyMatch) return;
 
     const issueId = keyMatch[1] === "null" ? null : parseInt(keyMatch[1], 10);
@@ -1025,7 +1031,7 @@ export class TimeSheetPanel {
 
     if (isAggregated) {
       // Parse key from aggRowId: agg-{issueId}:{activityId}:{comments}
-      const keyMatch = rowId.match(/^agg-(.+):(.+):(.*)$/);
+      const keyMatch = rowId.match(/^agg-(.+?)::(.+?)::(.*)$/);
       if (!keyMatch) return;
 
       const issueId = keyMatch[1] === "null" ? null : parseInt(keyMatch[1], 10);
@@ -1713,7 +1719,7 @@ export class TimeSheetPanel {
 
     // Parse issueId, activityId, comments from aggRowId
     // Format: agg-{issueId}:{activityId}:{comments}
-    const keyMatch = aggRowId.match(/^agg-(.+):(.+):(.*)$/);
+    const keyMatch = aggRowId.match(/^agg-(.+?)::(.+?)::(.*)$/);
     if (!keyMatch) return;
 
     const issueId = keyMatch[1] === "null" ? null : parseInt(keyMatch[1], 10);
