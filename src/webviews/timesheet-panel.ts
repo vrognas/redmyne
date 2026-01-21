@@ -1788,6 +1788,9 @@ export class TimeSheetPanel {
           // Delete draft → remove pending CREATE
           await this._draftQueue.removeByKey(resourceKey, TIMESHEET_SOURCE);
         }
+      } else if (newHours === entry.hours) {
+        // Single saved entry + same hours → remove any pending operation (reverted to original)
+        await this._draftQueue.removeByKey(`ts:timeentry:${entry.entryId}`, TIMESHEET_SOURCE);
       } else if (newHours > 0) {
         // Single saved entry → update
         await this._draftQueue.add({
