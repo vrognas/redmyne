@@ -4,6 +4,16 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 ## [Unreleased]
 
+## [4.10.1]
+
+### Improved
+
+- **Time Sheet stateless webview** - refactored webview to pure renderer pattern
+  - Extension owns all state; webview renders from message data
+  - Cascade data (projects, issues, activities) sent with render messages
+  - Reduced coupling between extension and webview
+  - Cleaner separation of concerns for maintainability
+
 ## [4.10.0]
 
 ### Added
