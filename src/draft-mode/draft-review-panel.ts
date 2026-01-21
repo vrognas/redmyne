@@ -23,6 +23,7 @@ export class DraftReviewPanel implements vscode.Disposable {
   private readonly queue: DraftQueue;
   private disposables: vscode.Disposable[] = [];
   private lastOperationIds: Set<string> = new Set();
+  private disposed = false;
 
   public static createOrShow(queue: DraftQueue): DraftReviewPanel {
     const column = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
@@ -90,34 +91,41 @@ export class DraftReviewPanel implements vscode.Disposable {
   }
 
   private async handleApplyAll(): Promise<void> {
+    if (this.disposed) return;
     this.panel.webview.postMessage({ command: "setLoading", loading: true, action: "applyAll" });
     try {
       await vscode.commands.executeCommand("redmyne.applyDrafts");
     } finally {
+      if (this.disposed) return;
       this.panel.webview.postMessage({ command: "setLoading", loading: false });
     }
   }
 
   private async handleApplyDraft(id: string): Promise<void> {
+    if (this.disposed) return;
     this.panel.webview.postMessage({ command: "setRowLoading", id, loading: true });
     try {
       await vscode.commands.executeCommand("redmyne.applySingleDraft", id);
     } finally {
+      if (this.disposed) return;
       this.panel.webview.postMessage({ command: "setRowLoading", id, loading: false });
     }
   }
 
   private async handleDiscardAll(): Promise<void> {
+    if (this.disposed) return;
     // Command already shows confirmation modal
     this.panel.webview.postMessage({ command: "setLoading", loading: true, action: "discardAll" });
     try {
       await vscode.commands.executeCommand("redmyne.discardDrafts");
     } finally {
+      if (this.disposed) return;
       this.panel.webview.postMessage({ command: "setLoading", loading: false });
     }
   }
 
   private async handleShowApiDetails(method: string, path: string, data: unknown): Promise<void> {
+    if (this.disposed) return;
     const jsonStr = data ? JSON.stringify(data, null, 2) : "(no body)";
     const header = `${method} ${path}`;
 
@@ -138,29 +146,25 @@ export class DraftReviewPanel implements vscode.Disposable {
     const operations = this.queue.getAll();
     const currentIds = new Set(operations.map(op => op.id));
 
-    // Detect added, removed, or if we should just do full update
-    const added = operations.filter(op => !this.lastOperationIds.has(op.id));
-    const removed = [...this.lastOperationIds].filter(id => !currentIds.has(id));
 
-    // For simplicity, if changes are complex (updates in place), do full update
-    // Otherwise send delta
-    if (added.length > 0 || removed.length > 0) {
-      this.panel.webview.postMessage({
-        command: "updateOperations",
-        operations: operations.map(op => ({
-          id: op.id,
-          type: op.type,
-          description: op.description,
-          issueId: op.issueId,
-          timestamp: op.timestamp,
-          http: op.http,
-        })),
-        count: operations.length,
-      });
-    }
+    // Always send update since this handler is only called when queue actually changes.
+    // Covers additions, removals, AND in-place updates (same ID, different content).
+    this.panel.webview.postMessage({
+      command: "updateOperations",
+      operations: operations.map(op => ({
+        id: op.id,
+        type: op.type,
+        description: op.description,
+        issueId: op.issueId,
+        timestamp: op.timestamp,
+        http: op.http,
+      })),
+      count: operations.length,
+    });
 
     this.lastOperationIds = currentIds;
   }
+
 
   public update(): void {
     const operations = this.queue.getAll();
@@ -677,6 +681,7 @@ export class DraftReviewPanel implements vscode.Disposable {
   }
 
   public dispose(): void {
+    this.disposed = true;
     DraftReviewPanel.currentPanel = undefined;
     this.panel.dispose();
     for (const d of this.disposables) {

@@ -11,6 +11,20 @@ export interface DraftQueueOptions {
   fs: vscode.FileSystem;
 }
 
+export interface DraftQueueLoadOptions {
+  /** If true, discard conflicting drafts without confirmation */
+  force?: boolean;
+}
+
+/** Error thrown when server identity changes and drafts would be lost */
+export class ServerConflictError extends Error {
+  readonly code = "SERVER_CONFLICT";
+  constructor(public readonly draftCount: number) {
+    super(`Server changed - ${draftCount} drafts would be lost`);
+    this.name = "ServerConflictError";
+  }
+}
+
 /** Handler receives optional source identifier of who made the change */
 type ChangeHandler = (source?: string) => void;
 
@@ -29,10 +43,38 @@ export class DraftQueue {
   }
 
   /**
+   * Check if loading with given server identity would discard existing drafts
+   * @param serverIdentity Hash of server URL + API key
+   * @returns Info about potential conflict, or null if no conflict
+   *
+   * Note: TOCTOU race between checkServerConflict() and load() is acceptable:
+   * - Worst case: user confirms discard, file changes, load() sees different data
+   * - Impact: benign - either fewer drafts discarded or conflict re-detected
+   * - Atomic operation not worth complexity for this advisory check
+   */
+  async checkServerConflict(serverIdentity: string): Promise<{ count: number } | null> {
+    try {
+      const data = await this.fs.readFile(this.storagePath);
+      const text = new TextDecoder().decode(data);
+      const state = JSON.parse(text) as DraftQueueState;
+
+      if (state.version !== 1) return null;
+      if (state.serverIdentity === serverIdentity) return null;
+      if (state.operations.length === 0) return null;
+
+      return { count: state.operations.length };
+    } catch {
+      return null; // No file or parse error - no conflict
+    }
+  }
+
+  /**
    * Load queue from storage, validating server identity
    * @param serverIdentity Hash of server URL + API key
+   * @param options Load options
    */
-  async load(serverIdentity: string): Promise<void> {
+  async load(serverIdentity: string, options: DraftQueueLoadOptions = {}): Promise<void> {
+    const { force = false } = options;
     this.loadedServerIdentity = serverIdentity;
     try {
       const data = await this.fs.readFile(this.storagePath);
@@ -43,6 +85,10 @@ export class DraftQueue {
 
       // Reject if server identity changed
       if (state.serverIdentity !== serverIdentity) {
+        if (!force && state.operations.length > 0) {
+          // Caller should have checked for conflict first
+          throw new ServerConflictError(state.operations.length);
+        }
         // Clear persisted data from different server
         this.operations = [];
         await this.persist();
@@ -51,7 +97,11 @@ export class DraftQueue {
 
       this.operations = state.operations;
       this.emitChange();
-    } catch {
+    } catch (e) {
+      // Re-throw server conflict errors
+      if (e instanceof ServerConflictError) {
+        throw e;
+      }
       // File doesn't exist or parse error - start fresh
       this.operations = [];
     }
@@ -61,8 +111,13 @@ export class DraftQueue {
    * Add operation to queue
    * @param op Operation to add
    * @param source Optional identifier of the caller (for filtering change events)
+   * @throws Error if queue hasn't been loaded yet
    */
   async add(op: DraftOperation, source?: string): Promise<void> {
+    if (!this.loadedServerIdentity) {
+      throw new Error("DraftQueue not loaded - call load() first");
+    }
+
     // Conflict resolution: replace existing operation with same resourceKey
     const existingIndex = this.operations.findIndex(
       existing => existing.resourceKey === op.resourceKey
@@ -147,7 +202,11 @@ export class DraftQueue {
 
   private emitChange(source?: string): void {
     for (const handler of this.changeHandlers) {
-      handler(source);
+      try {
+        handler(source);
+      } catch {
+        // Ignore handler errors to prevent one bad handler from breaking others
+      }
     }
   }
 
@@ -171,7 +230,9 @@ export class DraftQueue {
     });
 
     // Update lock to include this write (ignore errors to keep chain alive)
-    this.persistLock = writePromise.catch(() => {});
+    this.persistLock = writePromise.catch((err) => {
+      console.error("[DraftQueue] persist error:", err);
+    });
 
     // Return the actual write promise so callers see errors
     return writePromise;

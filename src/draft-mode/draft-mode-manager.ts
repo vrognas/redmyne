@@ -71,6 +71,14 @@ export class DraftModeManager {
     };
   }
 
+  
+  /**
+   * Dispose all change handlers to prevent memory leaks
+   */
+  dispose(): void {
+    this.changeHandlers.clear();
+  }
+
   private emitChange(enabled: boolean): void {
     for (const handler of this.changeHandlers) {
       handler(enabled);

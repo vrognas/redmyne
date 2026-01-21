@@ -433,10 +433,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         const server = draftModeServer;
 
         // Load draft queue with server identity check (async, non-blocking)
-        hashString(config.get<string>("serverUrl")! + apiKey!).then((serverIdentity) => {
-          draftQueue.load(serverIdentity).catch(() => {
+        hashString(config.get<string>("serverUrl")! + apiKey!).then(async (serverIdentity) => {
+          try {
+            const conflict = await draftQueue.checkServerConflict(serverIdentity);
+            if (conflict) {
+              const action = await vscode.window.showWarningMessage(
+                `Server changed. ${conflict.count} draft${conflict.count === 1 ? "" : "s"} from previous server will be discarded.`,
+                { modal: true },
+                "Discard Drafts",
+                "Cancel"
+              );
+              if (action !== "Discard Drafts") {
+                // User cancelled - don't load queue (drafts won't work for new server)
+                return;
+              }
+            }
+            await draftQueue.load(serverIdentity, { force: true });
+          } catch {
             // Silent fail - draft queue loading is non-critical
-          });
+          }
         });
 
         projectsTree.setServer(server as unknown as RedmineServer);
@@ -1674,7 +1689,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Register draft mode commands
   context.subscriptions.push(
-    ...registerDraftModeCommands(context, {
+    ...registerDraftModeCommands({
       queue: draftQueue,
       manager: draftModeManager,
       getServer: () => cleanupResources.draftModeServer,

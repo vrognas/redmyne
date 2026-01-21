@@ -9,7 +9,7 @@ import { TimeEntry } from "../redmine/models/time-entry";
 import { Issue } from "../redmine/models/issue";
 import { DraftQueue } from "../draft-mode/draft-queue";
 import { DraftModeManager } from "../draft-mode/draft-mode-manager";
-import { generateTempId } from "../draft-mode/draft-operation";
+import { generateTempId, generateDraftId } from "../draft-mode/draft-operation";
 import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "../utilities/flexibility-calculator";
 import { parseLocalDate, getLocalToday } from "../utilities/date-utils";
 import { pickIssue } from "../utilities/issue-picker";
@@ -819,8 +819,8 @@ export class TimeSheetPanel {
     if (!row.isNew && this._draftQueue && this._draftModeManager?.isEnabled) {
       for (const cell of Object.values(row.days)) {
         if (cell.entryId) {
-          this._draftQueue.add({
-            id: crypto.randomUUID(),
+          await this._draftQueue.add({
+            id: generateDraftId(),
             type: "deleteTimeEntry",
             timestamp: Date.now(),
             resourceId: cell.entryId,
@@ -897,8 +897,8 @@ export class TimeSheetPanel {
     for (const row of sourceRows) {
       for (const cell of Object.values(row.days)) {
         if (cell.entryId) {
-          this._draftQueue.add({
-            id: crypto.randomUUID(),
+          await this._draftQueue.add({
+            id: generateDraftId(),
             type: "deleteTimeEntry",
             timestamp: Date.now(),
             resourceId: cell.entryId,
@@ -918,6 +918,15 @@ export class TimeSheetPanel {
   }
 
   private _restoreRow(row: TimeSheetRow): void {
+    // Remove queued delete operations for this row's entries
+    if (!row.isNew && this._draftQueue) {
+      for (const cell of Object.values(row.days)) {
+        if (cell.entryId) {
+          void this._draftQueue.removeByKey(`ts:timeentry:${cell.entryId}`, TIMESHEET_SOURCE);
+        }
+      }
+    }
+
     // Re-add the row to the list
     this._rows.push(row);
     const totals = this._calculateTotals();
@@ -1053,13 +1062,13 @@ export class TimeSheetPanel {
   }
 
   /** Queue a cell change to the draft queue */
-  private _queueCellOperation(
+  private async _queueCellOperation(
     row: TimeSheetRow,
     dayIndex: number,
     hours: number,
     entryId: number | null,
     isDirty: boolean
-  ): void {
+  ): Promise<void> {
     console.log("[Timesheet] _queueCellOperation called:", {
       rowId: row.id,
       dayIndex,
@@ -1088,7 +1097,7 @@ export class TimeSheetPanel {
 
     // If not dirty (restored to original), remove any pending operation
     if (!isDirty) {
-      this._draftQueue.removeByKey(resourceKey, TIMESHEET_SOURCE);
+      await this._draftQueue.removeByKey(resourceKey, TIMESHEET_SOURCE);
       return;
     }
 
@@ -1096,8 +1105,8 @@ export class TimeSheetPanel {
       // Existing entry
       if (hours > 0) {
         // Update
-        this._draftQueue.add({
-          id: crypto.randomUUID(),
+        await this._draftQueue.add({
+          id: generateDraftId(),
           type: "updateTimeEntry",
           timestamp: Date.now(),
           resourceId: entryId,
@@ -1118,8 +1127,8 @@ export class TimeSheetPanel {
         }, TIMESHEET_SOURCE);
       } else {
         // Delete (hours = 0)
-        this._draftQueue.add({
-          id: crypto.randomUUID(),
+        await this._draftQueue.add({
+          id: generateDraftId(),
           type: "deleteTimeEntry",
           timestamp: Date.now(),
           resourceId: entryId,
@@ -1134,7 +1143,7 @@ export class TimeSheetPanel {
     } else if (hours > 0) {
       // New entry (no entryId, hours > 0)
       const operation = {
-        id: crypto.randomUUID(),
+        id: generateDraftId(),
         type: "createTimeEntry" as const,
         timestamp: Date.now(),
         issueId: row.issueId,
@@ -1156,7 +1165,7 @@ export class TimeSheetPanel {
         resourceKey,
       };
       console.log("[Timesheet] Adding createTimeEntry operation:", operation);
-      this._draftQueue.add(operation, TIMESHEET_SOURCE);
+      await this._draftQueue.add(operation, TIMESHEET_SOURCE);
     }
     // If no entryId and hours = 0, nothing to queue (or remove pending create)
   }
@@ -1554,8 +1563,8 @@ export class TimeSheetPanel {
 
         for (const entry of entries) {
           const tempId = generateTempId("timeentry");
-          this._draftQueue.add({
-            id: crypto.randomUUID(),
+          await this._draftQueue.add({
+            id: generateDraftId(),
             type: "createTimeEntry",
             timestamp: Date.now(),
             issueId: entry.issue_id,
@@ -1642,8 +1651,8 @@ export class TimeSheetPanel {
     if (sourceCount === 0 && newHours > 0) {
       // Empty cell → create new entry
       const tempId = `${aggRowId}:${dayIndex}`;
-      this._draftQueue.add({
-        id: crypto.randomUUID(),
+      await this._draftQueue.add({
+        id: generateDraftId(),
         type: "createTimeEntry",
         timestamp: Date.now(),
         issueId,
@@ -1668,8 +1677,8 @@ export class TimeSheetPanel {
       const entry = sourceEntries[0];
       if (newHours > 0) {
         // Single entry → update
-        this._draftQueue.add({
-          id: crypto.randomUUID(),
+        await this._draftQueue.add({
+          id: generateDraftId(),
           type: "updateTimeEntry",
           timestamp: Date.now(),
           resourceId: entry.entryId,
@@ -1690,8 +1699,8 @@ export class TimeSheetPanel {
         }, TIMESHEET_SOURCE);
       } else {
         // Single entry + 0h → delete
-        this._draftQueue.add({
-          id: crypto.randomUUID(),
+        await this._draftQueue.add({
+          id: generateDraftId(),
           type: "deleteTimeEntry",
           timestamp: Date.now(),
           resourceId: entry.entryId,
@@ -1706,8 +1715,8 @@ export class TimeSheetPanel {
     } else {
       // Multiple entries → delete all, create one (if hours > 0)
       for (const entry of sourceEntries) {
-        this._draftQueue.add({
-          id: crypto.randomUUID(),
+        await this._draftQueue.add({
+          id: generateDraftId(),
           type: "deleteTimeEntry",
           timestamp: Date.now(),
           resourceId: entry.entryId,
@@ -1722,8 +1731,8 @@ export class TimeSheetPanel {
 
       if (newHours > 0) {
         const tempId = `${aggRowId}:${dayIndex}:new`;
-        this._draftQueue.add({
-          id: crypto.randomUUID(),
+        await this._draftQueue.add({
+          id: generateDraftId(),
           type: "createTimeEntry",
           timestamp: Date.now(),
           issueId,
@@ -1838,8 +1847,8 @@ export class TimeSheetPanel {
 
     if (newHours > 0) {
       // Update entry
-      this._draftQueue.add({
-        id: crypto.randomUUID(),
+      await this._draftQueue.add({
+        id: generateDraftId(),
         type: "updateTimeEntry",
         timestamp: Date.now(),
         resourceId: entryId,
@@ -1853,8 +1862,8 @@ export class TimeSheetPanel {
       }, TIMESHEET_SOURCE);
     } else {
       // Delete entry (hours = 0)
-      this._draftQueue.add({
-        id: crypto.randomUUID(),
+      await this._draftQueue.add({
+        id: generateDraftId(),
         type: "deleteTimeEntry",
         timestamp: Date.now(),
         resourceId: entryId,
@@ -1883,8 +1892,8 @@ export class TimeSheetPanel {
     if (!this._draftQueue || !this._draftModeManager?.isEnabled) return;
 
     // Queue delete operation
-    this._draftQueue.add({
-      id: crypto.randomUUID(),
+    await this._draftQueue.add({
+      id: generateDraftId(),
       type: "deleteTimeEntry",
       timestamp: Date.now(),
       resourceId: entryId,

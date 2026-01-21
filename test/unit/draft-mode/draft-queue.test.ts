@@ -67,25 +67,81 @@ describe("DraftQueue", () => {
       expect(queue.getAll()[0].id).toBe("persisted");
     });
 
-    it("rejects queue from different server", async () => {
+    it("throws error when server changed and has drafts (without force)", async () => {
       mockFileData = new TextEncoder().encode(JSON.stringify({
         version: 1,
         serverIdentity: "different-server",
         operations: [createOp()],
       }));
 
-      await queue.load(serverIdentity);
+      await expect(queue.load(serverIdentity)).rejects.toThrow("Server changed");
+    });
+
+    it("clears queue from different server when force=true", async () => {
+      mockFileData = new TextEncoder().encode(JSON.stringify({
+        version: 1,
+        serverIdentity: "different-server",
+        operations: [createOp()],
+      }));
+
+      await queue.load(serverIdentity, { force: true });
 
       expect(queue.getAll()).toHaveLength(0);
     });
   });
 
-  describe("add", () => {
-    beforeEach(async () => {
-      await queue.load(serverIdentity);
+  describe("checkServerConflict", () => {
+    it("returns null when no file exists", async () => {
+      const result = await queue.checkServerConflict(serverIdentity);
+      expect(result).toBeNull();
     });
 
-    it("adds operation to queue", async () => {
+    it("returns null when server matches", async () => {
+      mockFileData = new TextEncoder().encode(JSON.stringify({
+        version: 1,
+        serverIdentity,
+        operations: [createOp()],
+      }));
+
+      const result = await queue.checkServerConflict(serverIdentity);
+      expect(result).toBeNull();
+    });
+
+    it("returns null when different server but no operations", async () => {
+      mockFileData = new TextEncoder().encode(JSON.stringify({
+        version: 1,
+        serverIdentity: "different-server",
+        operations: [],
+      }));
+
+      const result = await queue.checkServerConflict(serverIdentity);
+      expect(result).toBeNull();
+    });
+
+    it("returns count when different server with operations", async () => {
+      mockFileData = new TextEncoder().encode(JSON.stringify({
+        version: 1,
+        serverIdentity: "different-server",
+        operations: [createOp(), createOp({ id: "op2" })],
+      }));
+
+      const result = await queue.checkServerConflict(serverIdentity);
+      expect(result).toEqual({ count: 2 });
+    });
+  });
+
+  describe("add", () => {
+    it("throws error when queue not loaded", async () => {
+      const op = createOp();
+      await expect(queue.add(op)).rejects.toThrow("DraftQueue not loaded");
+    });
+
+    describe("when loaded", () => {
+      beforeEach(async () => {
+        await queue.load(serverIdentity);
+      });
+
+      it("adds operation to queue", async () => {
       const op = createOp();
       await queue.add(op);
       expect(queue.getAll()).toContain(op);
@@ -144,6 +200,7 @@ describe("DraftQueue", () => {
       await queue.add(createOp());
 
       expect(mockFs.writeFile).toHaveBeenCalled();
+    });
     });
   });
 

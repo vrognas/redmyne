@@ -7,6 +7,7 @@ import * as vscode from "vscode";
 import type { DraftQueue } from "../draft-mode/draft-queue";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
 import type { DraftModeServer } from "../draft-mode/draft-mode-server";
+import type { DraftOperation } from "../draft-mode/draft-operation";
 
 export interface DraftModeCommandDeps {
   queue: DraftQueue;
@@ -16,8 +17,79 @@ export interface DraftModeCommandDeps {
   showReviewPanel: () => void;
 }
 
+/** Result of applying drafts with tracking */
+export interface ApplyDraftsResult {
+  succeeded: DraftOperation[];
+  failed: Array<{ operation: DraftOperation; error: string }>;
+  skipped: DraftOperation[];
+}
+
+/**
+ * Apply drafts with full tracking of succeeded/failed/skipped operations.
+ * Exported for testing.
+ */
+export async function applyDraftsWithTracking(
+  server: DraftModeServer,
+  queue: Pick<DraftQueue, "remove">,
+  operations: DraftOperation[],
+  onError: (op: DraftOperation, error: string) => boolean | Promise<boolean>,
+  onProgress?: (current: number, total: number, description: string) => void
+): Promise<ApplyDraftsResult> {
+  const result: ApplyDraftsResult = {
+    succeeded: [],
+    failed: [],
+    skipped: [],
+  };
+
+  for (let i = 0; i < operations.length; i++) {
+    const op = operations[i];
+    onProgress?.(i + 1, operations.length, op.description);
+
+    try {
+      await executeOperation(server, op);
+      await queue.remove(op.id);
+      result.succeeded.push(op);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      result.failed.push({ operation: op, error: msg });
+
+      const shouldContinue = await onError(op, msg);
+      if (!shouldContinue) {
+        for (let j = i + 1; j < operations.length; j++) {
+          result.skipped.push(operations[j]);
+        }
+        break;
+      }
+    }
+  }
+
+  return result;
+}
+
+function formatApplyResultSummary(result: ApplyDraftsResult): string {
+  const parts: string[] = [];
+  if (result.succeeded.length > 0) {
+    parts.push(`${result.succeeded.length} applied`);
+  }
+  if (result.failed.length > 0) {
+    parts.push(`${result.failed.length} failed`);
+  }
+  if (result.skipped.length > 0) {
+    parts.push(`${result.skipped.length} skipped`);
+  }
+  return parts.join(", ");
+}
+
+function formatFailedOperationsReport(failed: ApplyDraftsResult["failed"]): string {
+  if (failed.length === 0) return "";
+  const lines = ["Failed operations:"];
+  for (const { operation, error } of failed) {
+    lines.push(`  - ${operation.description}: ${error}`);
+  }
+  return lines.join("\n");
+}
+
 export function registerDraftModeCommands(
-  _context: vscode.ExtensionContext,
   deps: DraftModeCommandDeps
 ): vscode.Disposable[] {
   const { queue, manager, refreshTrees, showReviewPanel } = deps;
@@ -67,7 +139,6 @@ export function registerDraftModeCommands(
       showReviewPanel();
     }
   );
-
   const applyDrafts = vscode.commands.registerCommand(
     "redmyne.applyDrafts",
     async () => {
@@ -90,58 +161,64 @@ export function registerDraftModeCommands(
       );
 
       if (confirm !== "Apply All") return;
-
-      await vscode.window.withProgress(
+      const result = await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
           title: "Applying drafts",
           cancellable: false,
         },
         async (progress) => {
-          let successCount = 0;
-          let errorCount = 0;
-
-          for (let i = 0; i < operations.length; i++) {
-            const op = operations[i];
-            progress.report({
-              message: `${i + 1}/${operations.length}: ${op.description}`,
-              increment: 100 / operations.length,
-            });
-
-            try {
-              // Execute the operation through the inner server
-              // This bypasses draft mode interception
-              await executeOperation(server, op);
-              await queue.remove(op.id);
-              successCount++;
-            } catch (error) {
-              errorCount++;
-              const msg = error instanceof Error ? error.message : String(error);
+          return applyDraftsWithTracking(
+            server,
+            queue,
+            operations,
+            async (op, msg) => {
               const action = await vscode.window.showErrorMessage(
-                `Failed to apply: ${op.description}\n${msg}`,
+                `Failed to apply: ${op.description}
+${msg}`,
                 "Continue",
                 "Stop"
               );
-              if (action === "Stop") break;
+              return action === "Continue";
+            },
+            (current, total, description) => {
+              progress.report({
+                message: `${current}/${total}: ${description}`,
+                increment: 100 / total,
+              });
             }
-          }
-
-          // Refresh trees after all operations
-          refreshTrees();
-
-          if (errorCount === 0) {
-            vscode.window.showInformationMessage(
-              `Successfully applied ${successCount} draft${successCount === 1 ? "" : "s"}`
-            );
-          } else {
-            vscode.window.showWarningMessage(
-              `Applied ${successCount} draft${successCount === 1 ? "" : "s"}, ${errorCount} failed`
-            );
-          }
+          );
         }
       );
+
+      refreshTrees();
+
+      if (result.failed.length === 0 && result.skipped.length === 0) {
+        vscode.window.showInformationMessage(
+          `Successfully applied ${result.succeeded.length} draft${result.succeeded.length === 1 ? "" : "s"}`
+        );
+      } else {
+        const summary = formatApplyResultSummary(result);
+        const action = await vscode.window.showWarningMessage(
+          `Drafts: ${summary}`,
+          "Show Details"
+        );
+        if (action === "Show Details") {
+          const report = formatFailedOperationsReport(result.failed);
+          if (result.skipped.length > 0) {
+            const skippedNames = result.skipped.map(op => op.description).join(", ");
+            const fullReport = report + `
+
+Skipped (not attempted): ${skippedNames}`;
+            vscode.window.showInformationMessage(fullReport, { modal: true });
+          } else {
+            vscode.window.showInformationMessage(report, { modal: true });
+          }
+        }
+      }
     }
   );
+
 
   const discardDrafts = vscode.commands.registerCommand(
     "redmyne.discardDrafts",

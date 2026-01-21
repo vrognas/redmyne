@@ -11,23 +11,12 @@ import type { QuickUpdate, QuickUpdateResult } from "../controllers/domain";
 import type { DraftQueue } from "./draft-queue";
 import type { DraftModeManager } from "./draft-mode-manager";
 import type { DraftOperation, DraftOperationType, HttpMethod } from "./draft-operation";
-import { generateDraftId, generateTempId } from "./draft-operation";
+import { generateDraftId, generateTempId, generateNumericTempId } from "./draft-operation";
 
 export interface DraftBypassOptions {
   _bypassDraft?: boolean;
 }
 
-/**
- * Generate a unique negative temp ID to distinguish from real Redmine IDs.
- * Uses timestamp + random to avoid collisions across extension reloads.
- */
-function nextTempId(): number {
-  // Use lower 20 bits of timestamp + 10 bits of random, negated
-  // This gives ~1M unique IDs per second with random disambiguation
-  const timePart = Date.now() & 0xFFFFF; // 20 bits
-  const randPart = Math.floor(Math.random() * 1024); // 10 bits
-  return -((timePart << 10) | randPart) - 1; // Negate and offset to ensure negative
-}
 
 export class DraftModeServer {
   private inner: RedmineServer;
@@ -137,7 +126,7 @@ export class DraftModeServer {
       return this.inner.createIssue(issue);
     }
 
-    const tempId = nextTempId();
+    const tempId = generateNumericTempId();
     const tempIdStr = generateTempId("issue");
 
     await this.queue.add(
@@ -379,7 +368,7 @@ export class DraftModeServer {
       return this.inner.addTimeEntry(issueId, activityId, hours, message, spentOn);
     }
 
-    const tempId = nextTempId();
+    const tempId = generateNumericTempId();
     const tempIdStr = generateTempId("timeentry");
 
     // Default spentOn to today if not provided (needed for tree filtering)
@@ -478,7 +467,7 @@ export class DraftModeServer {
       return this.inner.createVersion(projectId, version);
     }
 
-    const tempId = nextTempId();
+    const tempId = generateNumericTempId();
     const tempIdStr = generateTempId("version");
 
     await this.queue.add(
@@ -564,7 +553,7 @@ export class DraftModeServer {
       return this.inner.createRelation(issueId, targetIssueId, relationType);
     }
 
-    const tempId = nextTempId();
+    const tempId = generateNumericTempId();
     const tempIdStr = generateTempId("relation");
 
     await this.queue.add(

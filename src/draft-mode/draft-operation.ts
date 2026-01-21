@@ -80,6 +80,20 @@ export function generateTempId(type: "issue" | "version" | "relation" | "timeent
   return `draft-${type}-${crypto.randomUUID()}`;
 }
 
+
+/**
+ * Generate a unique negative numeric temp ID for draft resources.
+ * Uses UUID to ensure no collisions across sessions/reloads.
+ * Returns negative number to distinguish from real Redmine IDs (always positive).
+ */
+export function generateNumericTempId(): number {
+  // Use first 8 hex chars of UUID (32 bits) as base, negate to ensure negative
+  const uuid = crypto.randomUUID();
+  const hex = uuid.replace(/-/g, "").slice(0, 8);
+  const num = parseInt(hex, 16);
+  return -(num + 1); // +1 ensures we never return -0
+}
+
 /** Hash a string (for API key hashing) */
 export async function hashString(str: string): Promise<string> {
   const encoder = new TextEncoder();
