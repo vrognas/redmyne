@@ -1003,10 +1003,13 @@ body.draft-mode-disabled .action-btn {
   cursor: not-allowed;
 }
 
-/* ========== Issue Tooltip (matches Gantt tooltip styling) ========== */
+/* ========== Issue Tooltip ========== */
+/* Base styles from webview-common.css (.webview-tooltip)
+ * Local overrides: .issue-tooltip enables pointer-events for interactive content
+ * Content classes: .issue-tooltip-line, -title, -key, -divider, -spacer match webview-tooltip-* */
 .issue-tooltip {
   position: fixed;
-  pointer-events: auto;
+  pointer-events: auto; /* Override: interactive tooltip */
   z-index: 1000;
   max-width: 360px;
   padding: 6px 8px;
@@ -1060,9 +1063,10 @@ body.draft-mode-disabled .action-btn {
 }
 
 /* ========== Generic Tooltip (for simple text tooltips) ========== */
+/* Extends webview-tooltip--static from webview-common.css */
 .generic-tooltip {
   position: fixed;
-  pointer-events: none;
+  pointer-events: none; /* Static tooltip - matches .webview-tooltip--static */
   z-index: 1000;
   max-width: 300px;
   padding: 4px 8px;

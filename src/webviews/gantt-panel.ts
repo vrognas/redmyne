@@ -696,6 +696,7 @@ export class GanttPanel {
   private _getBaseHtml(): string {
     const nonce = getNonce();
     const webview = this._panel.webview;
+    const commonCssUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "media", "webview-common.css"));
     const cssUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "media", "gantt.css"));
     const jsUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, "media", "gantt.js"));
     const csp = [
@@ -712,6 +713,7 @@ export class GanttPanel {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="${csp}">
   <title>Redmyne Gantt</title>
+  <link rel="stylesheet" href="${commonCssUri}">
   <link rel="stylesheet" href="${cssUri}">
 </head>
 <body>

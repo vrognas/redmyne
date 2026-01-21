@@ -1928,6 +1928,9 @@ export class TimeSheetPanel {
 
   private _getHtml(): string {
     const webview = this._panel.webview;
+    const commonCssUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this._extensionUri, "media", "webview-common.css")
+    );
     const cssUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this._extensionUri, "media", "timesheet.css")
     );
@@ -1952,6 +1955,7 @@ export class TimeSheetPanel {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
   <link href="${flatpickrCssUri}" rel="stylesheet">
+  <link href="${commonCssUri}" rel="stylesheet">
   <link href="${cssUri}" rel="stylesheet">
   <title>Time Sheet</title>
 </head>

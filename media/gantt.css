@@ -592,11 +592,11 @@
     .relation-picker { position: fixed; background: var(--vscode-menu-background); border: 1px solid var(--vscode-menu-border); border-radius: 2px; padding: 4px 0; z-index: 1000; box-shadow: 0 2px 8px var(--vscode-widget-shadow); }
     .relation-picker button { display: block; width: 100%; padding: 4px 12px; border: none; background: transparent; color: var(--vscode-menu-foreground); text-align: left; cursor: pointer; font-size: 13px; }
     .relation-picker button:hover, .relation-picker button:focus { background: var(--vscode-menu-selectionBackground); color: var(--vscode-menu-selectionForeground); }
-    /* Drag date tooltip */
+    /* Drag date tooltip - extends webview-tooltip--compact */
     .drag-date-tooltip { position: fixed; pointer-events: auto; z-index: 1000; background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-editorWidget-border); border-radius: 3px; box-shadow: 0 2px 4px var(--vscode-widget-shadow); padding: 3px 6px; font-size: 11px; font-family: var(--vscode-font-family); color: var(--vscode-editorWidget-foreground); white-space: nowrap; transform: translateX(-50%); }
     .drag-date-tooltip::after { content: ''; position: absolute; left: 50%; transform: translateX(-50%); bottom: -5px; border: 5px solid transparent; border-top-color: var(--vscode-editorWidget-border); }
     .drag-date-tooltip.flipped::after { bottom: auto; top: -5px; border-top-color: transparent; border-bottom-color: var(--vscode-editorWidget-border); }
-    /* Gantt custom tooltip */
+    /* Gantt tooltip - aliases for shared webview-tooltip classes (see webview-common.css) */
     .gantt-tooltip { position: fixed; pointer-events: auto; z-index: 1000; max-width: 360px; padding: 6px 8px; border-radius: 4px; background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background)); border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-editorWidget-border)); color: var(--vscode-editorHoverWidget-foreground, var(--vscode-editorWidget-foreground)); box-shadow: 0 2px 8px var(--vscode-widget-shadow); font-family: var(--vscode-font-family); font-size: calc(var(--vscode-font-size) - 1px); line-height: 1.4; opacity: 0; visibility: hidden; transition: opacity 0.08s ease-out; }
     .gantt-tooltip.visible { opacity: 1; visibility: visible; }
     .gantt-tooltip-line { white-space: pre-wrap; word-break: break-word; }
@@ -606,7 +606,7 @@
     .gantt-tooltip-spacer { height: 4px; }
     .gantt-tooltip a { color: var(--vscode-textLink-foreground); text-decoration: none; }
     .gantt-tooltip a:hover { text-decoration: underline; }
-    /* Drag confirmation modal */
+    /* Drag confirmation modal - aliases for shared webview-modal classes (see webview-common.css) */
     .drag-confirm-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 1001; display: none; align-items: center; justify-content: center; }
     .drag-confirm-modal { background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-editorWidget-border); border-radius: 6px; box-shadow: 0 4px 16px var(--vscode-widget-shadow); padding: 16px; min-width: 280px; max-width: 400px; }
     .drag-confirm-modal h3 { margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: var(--vscode-foreground); }
