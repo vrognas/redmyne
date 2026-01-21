@@ -44,6 +44,15 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 /** Source identifier for DraftQueue changes from this panel */
 const TIMESHEET_SOURCE = "timesheet-panel";
 
+/** Safely extract hours from draft operation http data */
+function extractHoursFromDraftOp(data: Record<string, unknown> | undefined): number {
+  if (!data || typeof data !== "object") return 0;
+  const timeEntry = data.time_entry;
+  if (!timeEntry || typeof timeEntry !== "object") return 0;
+  const hours = (timeEntry as Record<string, unknown>).hours;
+  return typeof hours === "number" ? hours : 0;
+}
+
 export class TimeSheetPanel {
   public static currentPanel: TimeSheetPanel | undefined;
 
@@ -580,8 +589,8 @@ export class TimeSheetPanel {
 
       // Sort parents alphabetically
       this._parentProjects.sort((a, b) => a.name.localeCompare(b.name));
-    } catch {
-      // Silent fail - projects will be empty
+    } catch (_err) {
+      // Silent fail - projects stay empty, UI shows placeholders
     }
   }
 
@@ -748,7 +757,7 @@ export class TimeSheetPanel {
           for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
             const cell = row.days[dayIndex];
             if (cell?.entryId === op.resourceId) {
-              const hours = (op.http.data?.time_entry as { hours?: number })?.hours ?? 0;
+              const hours = extractHoursFromDraftOp(op.http.data);
               console.log("[Timesheet] updateTimeEntry: Found entryId", op.resourceId, "applying hours:", hours);
               row.days[dayIndex] = { ...cell, hours, isDirty: true };
               row.weekTotal = Object.values(row.days).reduce((sum, c) => sum + c.hours, 0);
@@ -796,7 +805,7 @@ export class TimeSheetPanel {
           const row = this._rows.find((r) => r.issueId === issueId && r.activityId === activityId);
           console.log("[Timesheet] Found source row:", row ? "yes" : "no", row?.id);
           if (row && !isNaN(dayIndex) && dayIndex >= 0 && dayIndex < 7) {
-            const hours = (op.http.data?.time_entry as { hours?: number })?.hours ?? 0;
+            const hours = extractHoursFromDraftOp(op.http.data);
             console.log("[Timesheet] Applying hours:", hours, "to dayIndex:", dayIndex);
             const cell = row.days[dayIndex] || { hours: 0, originalHours: 0, entryId: null, isDirty: false };
             row.days[dayIndex] = { ...cell, hours, isDirty: true };
@@ -812,7 +821,7 @@ export class TimeSheetPanel {
           const row = this._rows.find((r) => r.id === rowId);
           console.log("[Timesheet] Found row:", row ? "yes" : "no", row?.id);
           if (row && !isNaN(dayIndex) && dayIndex >= 0 && dayIndex < 7) {
-            const hours = (op.http.data?.time_entry as { hours?: number })?.hours ?? 0;
+            const hours = extractHoursFromDraftOp(op.http.data);
             console.log("[Timesheet] Applying hours:", hours, "to dayIndex:", dayIndex);
             const cell = row.days[dayIndex] || { hours: 0, originalHours: 0, entryId: null, isDirty: false };
             row.days[dayIndex] = { ...cell, hours, isDirty: true };
@@ -1377,8 +1386,8 @@ export class TimeSheetPanel {
       }));
       this._issuesByProject.set(projectId, issues);
       this._postMessage({ type: "updateIssues", issues, forProjectId: projectId });
-    } catch {
-      // Silent fail
+    } catch (_err) {
+      // Silent fail - issues dropdown stays empty, user can retry or use issue picker
     }
   }
 
@@ -1401,8 +1410,8 @@ export class TimeSheetPanel {
       }));
       this._activitiesByProject.set(projectId, activityOptions);
       this._postMessage({ type: "updateActivities", activities: activityOptions, forProjectId: projectId });
-    } catch {
-      // Silent fail
+    } catch (_err) {
+      // Silent fail - activities dropdown stays empty, user can retry by re-selecting project
     }
   }
 
@@ -1446,8 +1455,8 @@ export class TimeSheetPanel {
       };
       this._issueDetailsCache.set(issueId, details);
       this._postMessage({ type: "updateIssueDetails", issueId, details });
-    } catch {
-      // Silent fail - tooltip just won't show
+    } catch (_err) {
+      // Silent fail - tooltip won't show, core functionality unaffected
     }
   }
 
@@ -2019,12 +2028,12 @@ export class TimeSheetPanel {
 
     // First, remove any pending operations for this cell
     const tempKey = `${aggRowId}:${dayIndex}`;
-    this._draftQueue.removeByKey(`ts:timeentry:${tempKey}`, TIMESHEET_SOURCE);
-    this._draftQueue.removeByKey(`ts:timeentry:${tempKey}:new`, TIMESHEET_SOURCE);
+    await this._draftQueue.removeByKey(`ts:timeentry:${tempKey}`, TIMESHEET_SOURCE);
+    await this._draftQueue.removeByKey(`ts:timeentry:${tempKey}:new`, TIMESHEET_SOURCE);
 
     // Remove delete operations for original entries
     for (const entry of entries) {
-      this._draftQueue.removeByKey(`ts:timeentry:${entry.entryId}`, TIMESHEET_SOURCE);
+      await this._draftQueue.removeByKey(`ts:timeentry:${entry.entryId}`, TIMESHEET_SOURCE);
     }
 
     // Reload to show original state
