@@ -1697,6 +1697,8 @@ export class TimeSheetPanel {
 
         for (const entry of entries) {
           const tempId = generateTempId("timeentry");
+          // Use canonical resourceKey for new entries
+          const resourceKey = `ts:timeentry:new:${entry.issue_id}:${entry.activity_id}:${targetDate}`;
           await this._draftQueue.add({
             id: generateDraftId(),
             type: "createTimeEntry",
@@ -1717,7 +1719,7 @@ export class TimeSheetPanel {
                 },
               },
             },
-            resourceKey: `ts:timeentry:${tempId}`,
+            resourceKey,
           }, TIMESHEET_SOURCE);
           created++;
         }
@@ -1883,8 +1885,8 @@ export class TimeSheetPanel {
       // Multiple entries → delete/remove all, create one (if hours > 0)
       for (const entry of sourceEntries) {
         if (entry.isDraft || entry.entryId === null) {
-          // Draft entry → remove pending CREATE
-          const resourceKey = `ts:timeentry:${entry.rowId}:${dayIndex}`;
+          // Draft entry → remove pending CREATE using canonical resourceKey
+          const resourceKey = `ts:timeentry:new:${entry.issueId}:${entry.activityId}:${date}`;
           await this._draftQueue.removeByKey(resourceKey, TIMESHEET_SOURCE);
         } else {
           // Saved entry → queue DELETE
@@ -1904,13 +1906,14 @@ export class TimeSheetPanel {
       }
 
       if (newHours > 0) {
-        const tempId = `${aggRowId}:${dayIndex}:new`;
+        // Use canonical resourceKey for new entries
+        const resourceKey = `ts:timeentry:new:${issueId}:${activityId}:${date}`;
         await this._draftQueue.add({
           id: generateDraftId(),
           type: "createTimeEntry",
           timestamp: Date.now(),
           issueId,
-          tempId,
+          tempId: `${aggRowId}:${dayIndex}:new`,
           description: `Log ${newHours}h to #${issueId} on ${date}`,
           http: {
             method: "POST",
@@ -1925,7 +1928,7 @@ export class TimeSheetPanel {
               },
             },
           },
-          resourceKey: `ts:timeentry:${tempId}`,
+          resourceKey,
         }, TIMESHEET_SOURCE);
       }
     }
