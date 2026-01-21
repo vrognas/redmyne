@@ -8,8 +8,8 @@
   --ts-task-width: 160px;
   --ts-activity-width: 110px;
   --ts-comments-width: 200px;
-  --ts-total-width: 68px;
-  --ts-actions-width: 64px;
+  --ts-total-width: 80px;
+  --ts-actions-width: 72px;
 
   /* Borders - low opacity for subtle grid lines */
   --ts-border: 1px solid color-mix(in srgb, var(--vscode-panel-border) 40%, transparent);
@@ -461,6 +461,7 @@ thead .col-day {
 
 .col-total {
   width: var(--ts-total-width);
+  min-width: var(--ts-total-width);
   font-weight: 600;
   text-align: right !important;
   padding-right: 12px !important;
@@ -471,10 +472,13 @@ td.col-total,
 .group-total {
   font-family: var(--ts-font-mono);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .col-actions {
   width: var(--ts-actions-width);
+  min-width: var(--ts-actions-width);
+  white-space: nowrap;
 }
 
 /* ========== Day Input Cells ========== */
@@ -827,6 +831,7 @@ td.col-total,
 #weekTotal {
   font-size: 12px;
   font-family: var(--ts-font-mono);
+  white-space: nowrap;
 }
 
 /* ========== Loading States ========== */

@@ -1756,8 +1756,106 @@ export class TimeSheetPanel {
       }
     }
 
-    // Reload to reflect changes
-    await this._loadWeek(this._currentWeek);
+    // Update local state instead of reloading (draft entries aren't on server yet)
+    this._updateAggregatedCellLocal(sourceEntries, dayIndex, newHours, issueId, activityId, comments);
+  }
+
+  /** Update local row state for aggregated cell edit */
+  private _updateAggregatedCellLocal(
+    sourceEntries: Array<{ rowId: string; entryId: number; hours: number }>,
+    dayIndex: number,
+    newHours: number,
+    issueId: number,
+    activityId: number,
+    comments: string | null
+  ): void {
+    // Find project info from existing rows with same issueId
+    const existingRow = this._rows.find(r => r.issueId === issueId);
+    const projectId = existingRow?.projectId ?? null;
+    const projectName = existingRow?.projectName ?? null;
+    const parentProjectId = existingRow?.parentProjectId ?? null;
+    const parentProjectName = existingRow?.parentProjectName ?? null;
+    const issueSubject = existingRow?.issueSubject ?? null;
+    const activityName = existingRow?.activityName ?? null;
+
+    if (sourceEntries.length === 0 && newHours > 0) {
+      // Create new row for this entry
+      const newRow = this._createEmptyRow();
+      newRow.issueId = issueId;
+      newRow.activityId = activityId;
+      newRow.comments = comments ?? "";
+      newRow.projectId = projectId;
+      newRow.projectName = projectName;
+      newRow.parentProjectId = parentProjectId;
+      newRow.parentProjectName = parentProjectName;
+      newRow.issueSubject = issueSubject;
+      newRow.activityName = activityName;
+      newRow.days[dayIndex] = { hours: newHours, originalHours: 0, entryId: null, isDirty: true };
+      newRow.weekTotal = newHours;
+      this._rows.push(newRow);
+      this._saveIncompleteRows();
+    } else if (sourceEntries.length === 1) {
+      // Update or delete the single source row
+      const entry = sourceEntries[0];
+      const row = this._rows.find(r => r.id === entry.rowId);
+      if (row) {
+        row.days[dayIndex] = {
+          hours: newHours,
+          originalHours: row.days[dayIndex]?.originalHours ?? entry.hours,
+          entryId: entry.entryId,
+          isDirty: newHours !== (row.days[dayIndex]?.originalHours ?? entry.hours),
+        };
+        row.weekTotal = Object.values(row.days).reduce((sum, cell) => sum + cell.hours, 0);
+      }
+    } else {
+      // Multiple entries → mark all as deleted (hours=0), create new if needed
+      for (const entry of sourceEntries) {
+        const row = this._rows.find(r => r.id === entry.rowId);
+        if (row) {
+          row.days[dayIndex] = {
+            hours: 0,
+            originalHours: row.days[dayIndex]?.originalHours ?? entry.hours,
+            entryId: entry.entryId,
+            isDirty: true,
+          };
+          row.weekTotal = Object.values(row.days).reduce((sum, cell) => sum + cell.hours, 0);
+        }
+      }
+      // Create new entry if hours > 0
+      if (newHours > 0) {
+        const newRow = this._createEmptyRow();
+        newRow.issueId = issueId;
+        newRow.activityId = activityId;
+        newRow.comments = comments ?? "";
+        newRow.projectId = projectId;
+        newRow.projectName = projectName;
+        newRow.parentProjectId = parentProjectId;
+        newRow.parentProjectName = parentProjectName;
+        newRow.issueSubject = issueSubject;
+        newRow.activityName = activityName;
+        newRow.days[dayIndex] = { hours: newHours, originalHours: 0, entryId: null, isDirty: true };
+        newRow.weekTotal = newHours;
+        this._rows.push(newRow);
+        this._saveIncompleteRows();
+      }
+    }
+
+    // Re-render with updated state
+    const totals = this._calculateTotals();
+    this._postMessage({
+      type: "render",
+      rows: this._rows,
+      week: this._currentWeek,
+      totals,
+      projects: this._projects,
+      parentProjects: this._parentProjects,
+      isDraftMode: this._draftModeManager?.isEnabled ?? false,
+      sortColumn: this._sortColumn,
+      sortDirection: this._sortDirection,
+      groupBy: this._groupBy,
+      collapsedGroups: [...this._collapsedGroups],
+      aggregateRows: this._aggregateRows,
+    });
   }
 
   /**
