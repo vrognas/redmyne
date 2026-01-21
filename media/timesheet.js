@@ -877,23 +877,24 @@
         for (let d = 0; d < 7; d++) {
           if (row.days[d]) {
             const sourceEntries = [];
-            // Only add source entry if there's an actual entry (not new row)
-            if (row.days[d].entryId && row.days[d].hours > 0) {
+            // Track any entry with hours (including drafts without entryId)
+            if (row.days[d].hours > 0) {
               sourceEntries.push({
                 rowId: row.id,
-                entryId: row.days[d].entryId,
+                entryId: row.days[d].entryId, // null for drafts
                 hours: row.days[d].hours,
                 issueId: row.issueId,
                 activityId: row.activityId,
                 comments: row.comments,
                 spentOn: state.week?.dayDates[d] || "",
+                isDraft: !row.days[d].entryId, // Flag for drafts
               });
             }
             aggRow.days[d] = {
               hours: row.days[d].hours,
               originalHours: row.days[d].originalHours,
               entryId: null, // Aggregated has no single entry
-              isDirty: false,
+              isDirty: row.days[d].isDirty || false,
               sourceEntries,
             };
             aggRow.weekTotal += row.days[d].hours || 0;
@@ -918,16 +919,19 @@
             aggRow.days[d].hours += row.days[d].hours || 0;
             aggRow.days[d].originalHours += row.days[d].originalHours || 0;
             aggRow.weekTotal += row.days[d].hours || 0;
-            // Add source entry for this day
-            if (row.days[d].entryId && row.days[d].hours > 0) {
+            // Track dirty state from any source
+            if (row.days[d].isDirty) aggRow.days[d].isDirty = true;
+            // Add source entry for this day (including drafts)
+            if (row.days[d].hours > 0) {
               aggRow.days[d].sourceEntries.push({
                 rowId: row.id,
-                entryId: row.days[d].entryId,
+                entryId: row.days[d].entryId, // null for drafts
                 hours: row.days[d].hours,
                 issueId: row.issueId,
                 activityId: row.activityId,
                 comments: row.comments,
                 spentOn: state.week?.dayDates[d] || "",
+                isDraft: !row.days[d].entryId, // Flag for drafts
               });
             }
           }
@@ -1085,6 +1089,14 @@
 
   // Update a single row
   function updateRow(row, totals) {
+    // In aggregate mode, row IDs in DOM are "agg-{key}" not original IDs
+    // Full re-render is needed to properly aggregate the updated row
+    if (state.aggregateRows) {
+      if (totals) state.totals = totals;
+      renderGrid();
+      return;
+    }
+
     const existingRow = gridBody.querySelector(`tr[data-row-id="${row.id}"]`);
     if (existingRow) {
       const newRow = renderRow(row);

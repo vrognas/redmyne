@@ -1613,7 +1613,7 @@ export class TimeSheetPanel {
     aggRowId: string,
     dayIndex: number,
     newHours: number,
-    sourceEntries: Array<{ rowId: string; entryId: number; hours: number; issueId: number; activityId: number; comments: string | null; spentOn: string }>,
+    sourceEntries: Array<{ rowId: string; entryId: number | null; hours: number; issueId: number; activityId: number; comments: string | null; spentOn: string; isDraft?: boolean }>,
     confirmed: boolean
   ): Promise<void> {
     if (!this._draftQueue || !this._draftModeManager?.isEnabled) return;
@@ -1675,13 +1675,44 @@ export class TimeSheetPanel {
       }, TIMESHEET_SOURCE);
     } else if (sourceCount === 1) {
       const entry = sourceEntries[0];
-      if (newHours > 0) {
-        // Single entry → update
+      if (entry.isDraft || entry.entryId === null) {
+        // Draft entry (not saved to server yet)
+        const resourceKey = `ts:timeentry:${entry.rowId}:${dayIndex}`;
+        if (newHours > 0) {
+          // Update draft → replace pending CREATE with new hours
+          await this._draftQueue.add({
+            id: generateDraftId(),
+            type: "createTimeEntry",
+            timestamp: Date.now(),
+            issueId: entry.issueId,
+            tempId: `${entry.rowId}:${dayIndex}`,
+            description: `Log ${newHours}h to #${entry.issueId} on ${date}`,
+            http: {
+              method: "POST",
+              path: "/time_entries.json",
+              data: {
+                time_entry: {
+                  issue_id: entry.issueId,
+                  hours: newHours,
+                  activity_id: entry.activityId,
+                  spent_on: date,
+                  comments: entry.comments ?? "",
+                },
+              },
+            },
+            resourceKey,
+          }, TIMESHEET_SOURCE);
+        } else {
+          // Delete draft → remove pending CREATE
+          await this._draftQueue.removeByKey(resourceKey, TIMESHEET_SOURCE);
+        }
+      } else if (newHours > 0) {
+        // Single saved entry → update
         await this._draftQueue.add({
           id: generateDraftId(),
           type: "updateTimeEntry",
           timestamp: Date.now(),
-          resourceId: entry.entryId,
+          resourceId: entry.entryId!,
           issueId: entry.issueId,
           description: `Update #${entry.issueId} on ${date}: ${newHours}h`,
           http: {
@@ -1698,12 +1729,12 @@ export class TimeSheetPanel {
           resourceKey: `ts:timeentry:${entry.entryId}`,
         }, TIMESHEET_SOURCE);
       } else {
-        // Single entry + 0h → delete
+        // Single saved entry + 0h → delete
         await this._draftQueue.add({
           id: generateDraftId(),
           type: "deleteTimeEntry",
           timestamp: Date.now(),
-          resourceId: entry.entryId,
+          resourceId: entry.entryId!,
           description: `Delete time entry on ${date}`,
           http: {
             method: "DELETE",
@@ -1713,20 +1744,27 @@ export class TimeSheetPanel {
         }, TIMESHEET_SOURCE);
       }
     } else {
-      // Multiple entries → delete all, create one (if hours > 0)
+      // Multiple entries → delete/remove all, create one (if hours > 0)
       for (const entry of sourceEntries) {
-        await this._draftQueue.add({
-          id: generateDraftId(),
-          type: "deleteTimeEntry",
-          timestamp: Date.now(),
-          resourceId: entry.entryId,
-          description: `Delete time entry #${entry.entryId}`,
-          http: {
-            method: "DELETE",
-            path: `/time_entries/${entry.entryId}.json`,
-          },
-          resourceKey: `ts:timeentry:${entry.entryId}`,
-        }, TIMESHEET_SOURCE);
+        if (entry.isDraft || entry.entryId === null) {
+          // Draft entry → remove pending CREATE
+          const resourceKey = `ts:timeentry:${entry.rowId}:${dayIndex}`;
+          await this._draftQueue.removeByKey(resourceKey, TIMESHEET_SOURCE);
+        } else {
+          // Saved entry → queue DELETE
+          await this._draftQueue.add({
+            id: generateDraftId(),
+            type: "deleteTimeEntry",
+            timestamp: Date.now(),
+            resourceId: entry.entryId,
+            description: `Delete time entry #${entry.entryId}`,
+            http: {
+              method: "DELETE",
+              path: `/time_entries/${entry.entryId}.json`,
+            },
+            resourceKey: `ts:timeentry:${entry.entryId}`,
+          }, TIMESHEET_SOURCE);
+        }
       }
 
       if (newHours > 0) {
@@ -1762,7 +1800,7 @@ export class TimeSheetPanel {
 
   /** Update local row state for aggregated cell edit */
   private _updateAggregatedCellLocal(
-    sourceEntries: Array<{ rowId: string; entryId: number; hours: number }>,
+    sourceEntries: Array<{ rowId: string; entryId: number | null; hours: number }>,
     dayIndex: number,
     newHours: number,
     issueId: number,
