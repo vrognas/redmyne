@@ -19,6 +19,8 @@ export class DraftQueue {
   private fs: vscode.FileSystem;
   private changeHandlers: Set<ChangeHandler> = new Set();
   private loadedServerIdentity: string | null = null;
+  /** Write lock to prevent concurrent persist() calls from racing */
+  private persistLock: Promise<void> = Promise.resolve();
 
   constructor(options: DraftQueueOptions) {
     this.storagePath = options.storagePath;
@@ -144,11 +146,21 @@ export class DraftQueue {
     };
   }
 
-  private async persist(): Promise<void> {
-    if (!this.loadedServerIdentity) return; // Don't persist until loaded
+  private persist(): Promise<void> {
+    if (!this.loadedServerIdentity) return Promise.resolve(); // Don't persist until loaded
 
-    const state = this.createState();
-    const data = new TextEncoder().encode(JSON.stringify(state, null, 2));
-    await this.fs.writeFile(this.storagePath, data);
+    // Chain onto the lock to serialize writes and prevent race conditions.
+    // Each persist() waits for prior writes to complete before starting.
+    const writePromise = this.persistLock.then(async () => {
+      const state = this.createState();
+      const data = new TextEncoder().encode(JSON.stringify(state, null, 2));
+      await this.fs.writeFile(this.storagePath, data);
+    });
+
+    // Update lock to include this write (ignore errors to keep chain alive)
+    this.persistLock = writePromise.catch(() => {});
+
+    // Return the actual write promise so callers see errors
+    return writePromise;
   }
 }

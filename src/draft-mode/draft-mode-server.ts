@@ -17,11 +17,16 @@ export interface DraftBypassOptions {
   _bypassDraft?: boolean;
 }
 
-// Counter for temp IDs (negative to distinguish from real IDs)
-let tempIdCounter = -1;
-
+/**
+ * Generate a unique negative temp ID to distinguish from real Redmine IDs.
+ * Uses timestamp + random to avoid collisions across extension reloads.
+ */
 function nextTempId(): number {
-  return tempIdCounter--;
+  // Use lower 20 bits of timestamp + 10 bits of random, negated
+  // This gives ~1M unique IDs per second with random disambiguation
+  const timePart = Date.now() & 0xFFFFF; // 20 bits
+  const randPart = Math.floor(Math.random() * 1024); // 10 bits
+  return -((timePart << 10) | randPart) - 1; // Negate and offset to ensure negative
 }
 
 export class DraftModeServer {
