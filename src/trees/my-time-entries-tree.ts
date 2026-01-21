@@ -41,6 +41,13 @@ export interface TimeEntryNode {
   _isDraft?: boolean; // True for draft time entries
 }
 
+/** Generate stable negative ID from UUID string */
+function uuidToNegativeId(uuid: string): number {
+  // Use first 12 hex chars of UUID as stable number (max ~281 trillion)
+  const hex = uuid.replace(/-/g, "").slice(0, 12);
+  return -parseInt(hex, 16);
+}
+
 /** Convert draft create operation to TimeEntry-like object for display */
 function draftOperationToTimeEntry(op: DraftOperation): TimeEntry | null {
   if (op.type !== "createTimeEntry") return null;
@@ -48,7 +55,7 @@ function draftOperationToTimeEntry(op: DraftOperation): TimeEntry | null {
   if (!data) return null;
 
   return {
-    id: op.resourceId ?? -Date.now(), // Use negative ID for drafts
+    id: op.resourceId ?? uuidToNegativeId(op.id), // Stable negative ID from UUID
     issue_id: data.issue_id as number,
     issue: { id: data.issue_id as number },
     activity_id: data.activity_id as number,
