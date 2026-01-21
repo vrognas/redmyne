@@ -422,6 +422,28 @@ export class TimeSheetPanel {
     this._panel.webview.postMessage(message);
   }
 
+  /** Post a full render message with current state */
+  private _postRenderMessage(): void {
+    const totals = this._calculateTotals();
+    this._postMessage({
+      type: "render",
+      rows: this._rows,
+      week: this._currentWeek,
+      totals,
+      projects: this._projects,
+      parentProjects: this._parentProjects,
+      isDraftMode: this._draftModeManager?.isEnabled ?? false,
+      sortColumn: this._sortColumn,
+      sortDirection: this._sortDirection,
+      groupBy: this._groupBy,
+      collapsedGroups: [...this._collapsedGroups],
+      aggregateRows: this._aggregateRows,
+      childProjectsByParent: Object.fromEntries(this._childrenByParent),
+      issuesByProject: Object.fromEntries(this._issuesByProject),
+      activitiesByProject: Object.fromEntries(this._activitiesByProject),
+    });
+  }
+
   private async _loadWeek(week: WeekInfo): Promise<void> {
     if (!this._server) {
       this._postMessage({ type: "showError", message: "No server configured" });
@@ -482,23 +504,7 @@ export class TimeSheetPanel {
       const totals = this._calculateTotals();
 
       // Send to webview with cascade data (stateless pattern)
-      this._postMessage({
-        type: "render",
-        rows: this._rows,
-        week: this._currentWeek,
-        totals,
-        projects: this._projects,
-        parentProjects: this._parentProjects,
-        isDraftMode: this._draftModeManager?.isEnabled ?? false,
-        sortColumn: this._sortColumn,
-        sortDirection: this._sortDirection,
-        groupBy: this._groupBy,
-        collapsedGroups: [...this._collapsedGroups],
-        aggregateRows: this._aggregateRows,
-        childProjectsByParent: Object.fromEntries(this._childrenByParent),
-        issuesByProject: Object.fromEntries(this._issuesByProject),
-        activitiesByProject: Object.fromEntries(this._activitiesByProject),
-      });
+      this._postRenderMessage();
 
       // Pre-send child projects for all parents in existing rows
       for (const parentId of parentIds) {
@@ -889,24 +895,7 @@ export class TimeSheetPanel {
     this._rows.push(newRow);
     // Save immediately so row persists across view changes
     this._saveIncompleteRows();
-    const totals = this._calculateTotals();
-    this._postMessage({
-      type: "render",
-      rows: this._rows,
-      week: this._currentWeek,
-      totals,
-      projects: this._projects,
-      parentProjects: this._parentProjects,
-      isDraftMode: this._draftModeManager?.isEnabled ?? false,
-      sortColumn: this._sortColumn,
-      sortDirection: this._sortDirection,
-      groupBy: this._groupBy,
-      collapsedGroups: [...this._collapsedGroups],
-      aggregateRows: this._aggregateRows,
-      childProjectsByParent: Object.fromEntries(this._childrenByParent),
-      issuesByProject: Object.fromEntries(this._issuesByProject),
-      activitiesByProject: Object.fromEntries(this._activitiesByProject),
-    });
+    this._postRenderMessage();
   }
 
   private async _deleteRow(rowId: string): Promise<void> {
@@ -959,24 +948,7 @@ export class TimeSheetPanel {
       }
     }
 
-    const totals = this._calculateTotals();
-    this._postMessage({
-      type: "render",
-      rows: this._rows,
-      week: this._currentWeek,
-      totals,
-      projects: this._projects,
-      parentProjects: this._parentProjects,
-      isDraftMode: this._draftModeManager?.isEnabled ?? false,
-      sortColumn: this._sortColumn,
-      sortDirection: this._sortDirection,
-      groupBy: this._groupBy,
-      collapsedGroups: [...this._collapsedGroups],
-      aggregateRows: this._aggregateRows,
-      childProjectsByParent: Object.fromEntries(this._childrenByParent),
-      issuesByProject: Object.fromEntries(this._issuesByProject),
-      activitiesByProject: Object.fromEntries(this._activitiesByProject),
-    });
+    this._postRenderMessage();
     // Send rowDeleted for undo/redo support
     this._postMessage({
       type: "rowDeleted",
@@ -1041,24 +1013,7 @@ export class TimeSheetPanel {
 
     // Re-add the row to the list
     this._rows.push(row);
-    const totals = this._calculateTotals();
-    this._postMessage({
-      type: "render",
-      rows: this._rows,
-      week: this._currentWeek,
-      totals,
-      projects: this._projects,
-      parentProjects: this._parentProjects,
-      isDraftMode: this._draftModeManager?.isEnabled ?? false,
-      sortColumn: this._sortColumn,
-      sortDirection: this._sortDirection,
-      groupBy: this._groupBy,
-      collapsedGroups: [...this._collapsedGroups],
-      aggregateRows: this._aggregateRows,
-      childProjectsByParent: Object.fromEntries(this._childrenByParent),
-      issuesByProject: Object.fromEntries(this._issuesByProject),
-      activitiesByProject: Object.fromEntries(this._activitiesByProject),
-    });
+    this._postRenderMessage();
   }
 
   private _duplicateRow(rowId: string): void {
@@ -1124,24 +1079,7 @@ export class TimeSheetPanel {
     newRow.weekTotal = totalHoursPerDay.reduce((sum, h) => sum + h, 0);
 
     this._rows.push(newRow);
-    const totals = this._calculateTotals();
-    this._postMessage({
-      type: "render",
-      rows: this._rows,
-      week: this._currentWeek,
-      totals,
-      projects: this._projects,
-      parentProjects: this._parentProjects,
-      isDraftMode: this._draftModeManager?.isEnabled ?? false,
-      sortColumn: this._sortColumn,
-      sortDirection: this._sortDirection,
-      groupBy: this._groupBy,
-      collapsedGroups: [...this._collapsedGroups],
-      aggregateRows: this._aggregateRows,
-      childProjectsByParent: Object.fromEntries(this._childrenByParent),
-      issuesByProject: Object.fromEntries(this._issuesByProject),
-      activitiesByProject: Object.fromEntries(this._activitiesByProject),
-    });
+    this._postRenderMessage();
     // Send rowDuplicated for undo/redo support
     this._postMessage({
       type: "rowDuplicated",
@@ -2018,24 +1956,7 @@ export class TimeSheetPanel {
     }
 
     // Re-render with updated state
-    const totals = this._calculateTotals();
-    this._postMessage({
-      type: "render",
-      rows: this._rows,
-      week: this._currentWeek,
-      totals,
-      projects: this._projects,
-      parentProjects: this._parentProjects,
-      isDraftMode: this._draftModeManager?.isEnabled ?? false,
-      sortColumn: this._sortColumn,
-      sortDirection: this._sortDirection,
-      groupBy: this._groupBy,
-      collapsedGroups: [...this._collapsedGroups],
-      aggregateRows: this._aggregateRows,
-      childProjectsByParent: Object.fromEntries(this._childrenByParent),
-      issuesByProject: Object.fromEntries(this._issuesByProject),
-      activitiesByProject: Object.fromEntries(this._activitiesByProject),
-    });
+    this._postRenderMessage();
   }
 
   /**
