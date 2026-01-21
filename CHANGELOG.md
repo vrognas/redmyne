@@ -8,6 +8,12 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 - **24h per day validation** - time sheet prevents entering hours that exceed 24h/day
 
+### Fixed
+
+- **Gantt draft mode support** - Gantt now correctly uses DraftModeServer for write operations
+  - Date drag, relation create/delete now queue to draft instead of calling server directly
+  - Uses getter function pattern (like TimeSheet) for late-binding server reference
+
 ## [4.10.1]
 
 ### Improved

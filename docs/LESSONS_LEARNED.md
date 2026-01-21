@@ -823,3 +823,35 @@ groupBySelect?.addEventListener("change", (e) => {
 3. **Context object pattern**: Pass everything render functions need explicitly
 4. **Maps can't postMessage**: Convert to/from Records for serialization
 5. **Local UI state is fine**: expandedCells, tooltipCache stay in webview
+
+## Late-Binding Server References (2026-01-21)
+
+### Getter Function Pattern for Webview Panels
+
+**Problem**: GanttPanel stored server reference at construction time. If panel was created/restored before DraftModeServer was initialized (async timing), it stored undefined or stale reference.
+
+**Solution**: Use getter function pattern (like TimeSheetPanel)
+```typescript
+// Before (broken - stores value at construction time)
+private _server: RedmineServer | undefined;
+constructor(server?: RedmineServer) {
+  this._server = server; // Captured once, never updated
+}
+
+// After (fixed - fetches fresh value each time)
+private _getServerFn: (() => RedmineServer | undefined) | undefined;
+private get _server(): RedmineServer | undefined {
+  return this._getServerFn?.();
+}
+constructor(getServer?: () => RedmineServer | undefined) {
+  this._getServerFn = getServer;
+}
+```
+
+**Why it matters**: Extension activation is async. DraftModeServer wraps RedmineServer and is created in `updateConfiguredContext()`. If webview panel is restored (via serializer) before server init completes, direct reference would be undefined or raw server.
+
+### Lessons
+
+1. **Getter functions for async-initialized resources**: Use `() => resource` not `resource` for late-binding
+2. **Webview serializers run early**: May execute before extension fully initializes
+3. **Consistent pattern across panels**: TimeSheetPanel and GanttPanel now both use getter pattern

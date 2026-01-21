@@ -360,8 +360,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Register Gantt panel serializer for window reload persistence
   vscode.window.registerWebviewPanelSerializer("redmyneGantt", {
     async deserializeWebviewPanel(panel: vscode.WebviewPanel) {
-      // Restore panel with loading skeleton
-      const ganttPanel = GanttPanel.restore(panel, context.extensionUri, projectsTree.server);
+      // Restore panel with loading skeleton (use getter function for late binding)
+      const ganttPanel = GanttPanel.restore(panel, context.extensionUri, () => projectsTree.server);
       // Fetch and populate data
       const issues = await projectsTree.fetchIssuesIfNeeded();
       if (issues.length > 0) {
@@ -374,7 +374,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           schedule,
           projectsTree.getFilter(),
           projectsTree.getDependencyIssues(),
-          projectsTree.server
+          () => projectsTree.server
         );
         ganttPanel.setFilterChangeCallback((filter) => projectsTree.setFilter(filter));
       }

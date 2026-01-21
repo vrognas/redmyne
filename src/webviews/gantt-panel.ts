@@ -378,7 +378,12 @@ export class GanttPanel {
   private _projects: RedmineProject[] = [];
   private _versions: Version[] = []; // Milestones across all projects
   private _flexibilityCache: Map<number, FlexibilityScore | null> = new Map();
-  private _server: RedmineServer | undefined;
+  private _getServerFn: (() => RedmineServer | undefined) | undefined;
+
+  /** Get current server (called fresh each time to handle late connection) */
+  private get _server(): RedmineServer | undefined {
+    return this._getServerFn?.();
+  }
   private _zoomLevel: ZoomLevel = "month";
   private _schedule: WeeklySchedule = DEFAULT_WEEKLY_SCHEDULE;
   private _showWorkloadHeatmap: boolean = false;
@@ -431,10 +436,10 @@ export class GanttPanel {
   private _contributionSources?: Map<number, { fromIssueId: number; hours: number }[]>;
   private _donationTargets?: Map<number, { toIssueId: number; hours: number }[]>;
 
-  private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, server?: RedmineServer) {
+  private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, getServer?: () => RedmineServer | undefined) {
     this._panel = panel;
     this._extensionUri = extensionUri;
-    this._server = server;
+    this._getServerFn = getServer;
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
     this._panel.webview.onDidReceiveMessage(
       (message) => this._handleMessage(message),
@@ -461,14 +466,14 @@ export class GanttPanel {
     this._debouncedCollapseUpdate = debounce(COLLAPSE_DEBOUNCE_MS, () => this._updateContent());
   }
 
-  public static createOrShow(extensionUri: vscode.Uri, server?: RedmineServer): GanttPanel {
+  public static createOrShow(extensionUri: vscode.Uri, getServer?: () => RedmineServer | undefined): GanttPanel {
     const column = vscode.ViewColumn.One;
 
     if (GanttPanel.currentPanel) {
       GanttPanel.currentPanel._panel.reveal(column);
-      // Update server reference
-      if (server) {
-        GanttPanel.currentPanel._server = server;
+      // Update server getter reference
+      if (getServer) {
+        GanttPanel.currentPanel._getServerFn = getServer;
       }
       return GanttPanel.currentPanel;
     }
@@ -484,7 +489,7 @@ export class GanttPanel {
       }
     );
 
-    GanttPanel.currentPanel = new GanttPanel(panel, extensionUri, server);
+    GanttPanel.currentPanel = new GanttPanel(panel, extensionUri, getServer);
     // Show loading skeleton immediately
     GanttPanel.currentPanel._showLoadingSkeleton();
     return GanttPanel.currentPanel;
@@ -493,8 +498,8 @@ export class GanttPanel {
   /**
    * Restore panel from serialized state (after window reload)
    */
-  public static restore(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, server?: RedmineServer): GanttPanel {
-    GanttPanel.currentPanel = new GanttPanel(panel, extensionUri, server);
+  public static restore(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, getServer?: () => RedmineServer | undefined): GanttPanel {
+    GanttPanel.currentPanel = new GanttPanel(panel, extensionUri, getServer);
     GanttPanel.currentPanel._showLoadingSkeleton();
     return GanttPanel.currentPanel;
   }
@@ -802,11 +807,11 @@ export class GanttPanel {
     schedule?: WeeklySchedule,
     filter?: IssueFilter,
     dependencyIssues?: Issue[],
-    server?: RedmineServer
+    getServer?: () => RedmineServer | undefined
   ): Promise<void> {
-    // Update server if provided (for restored panels)
-    if (server) {
-      this._server = server;
+    // Update server getter if provided (for restored panels)
+    if (getServer) {
+      this._getServerFn = getServer;
     }
     // Update schedule if provided
     if (schedule) {
