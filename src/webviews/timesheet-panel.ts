@@ -448,6 +448,9 @@ export class TimeSheetPanel {
       // Restore incomplete rows for this week
       this._restoreIncompleteRows(week.startDate);
 
+      // Apply pending draft changes to rows (restore unsaved edits)
+      this._applyPendingDraftChanges();
+
       // Auto-add empty row if no entries exist
       if (this._rows.length === 0) {
         this._rows.push(this._createEmptyRow());
@@ -714,6 +717,58 @@ export class TimeSheetPanel {
           void this._context.globalState.update(this._getIncompleteRowsKey(weekStart), stillValid);
         } else {
           void this._context.globalState.update(this._getIncompleteRowsKey(weekStart), undefined);
+        }
+      }
+    }
+  }
+
+  /** Apply pending draft changes to loaded rows (restore unsaved edits) */
+  private _applyPendingDraftChanges(): void {
+    const draftOps = this._draftQueue?.getAll() || [];
+    const timeEntryOps = draftOps.filter(
+      (op) => op.type === "createTimeEntry" || op.type === "updateTimeEntry" || op.type === "deleteTimeEntry"
+    );
+    if (timeEntryOps.length === 0) return;
+
+    for (const op of timeEntryOps) {
+      if (op.type === "updateTimeEntry" && op.resourceId) {
+        // Find row with this entryId
+        for (const row of this._rows) {
+          for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+            const cell = row.days[dayIndex];
+            if (cell?.entryId === op.resourceId) {
+              const hours = (op.http.data?.time_entry as { hours?: number })?.hours ?? 0;
+              row.days[dayIndex] = { ...cell, hours, isDirty: true };
+              row.weekTotal = Object.values(row.days).reduce((sum, c) => sum + c.hours, 0);
+              break;
+            }
+          }
+        }
+      } else if (op.type === "deleteTimeEntry" && op.resourceId) {
+        // Find row with this entryId and set hours to 0
+        for (const row of this._rows) {
+          for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+            const cell = row.days[dayIndex];
+            if (cell?.entryId === op.resourceId) {
+              row.days[dayIndex] = { ...cell, hours: 0, isDirty: true };
+              row.weekTotal = Object.values(row.days).reduce((sum, c) => sum + c.hours, 0);
+              break;
+            }
+          }
+        }
+      } else if (op.type === "createTimeEntry" && op.tempId) {
+        // Parse tempId: "rowId:dayIndex"
+        const parts = op.tempId.split(":");
+        if (parts.length >= 2) {
+          const rowId = parts.slice(0, -1).join(":"); // Handle rowIds with colons
+          const dayIndex = parseInt(parts[parts.length - 1], 10);
+          const row = this._rows.find((r) => r.id === rowId);
+          if (row && !isNaN(dayIndex) && dayIndex >= 0 && dayIndex < 7) {
+            const hours = (op.http.data?.time_entry as { hours?: number })?.hours ?? 0;
+            const cell = row.days[dayIndex] || { hours: 0, originalHours: 0, entryId: null, isDirty: false };
+            row.days[dayIndex] = { ...cell, hours, isDirty: true };
+            row.weekTotal = Object.values(row.days).reduce((sum, c) => sum + c.hours, 0);
+          }
         }
       }
     }
