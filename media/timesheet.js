@@ -1676,7 +1676,9 @@
     const dismissBtn = toast.querySelector(".toast-dismiss-btn");
     dismissBtn?.addEventListener("click", () => hideToast());
 
-    document.body.appendChild(toast);
+    // Append to container for proper positioning
+    const container = document.querySelector(".timesheet-container") || document.body;
+    container.appendChild(toast);
     activeToast = toast;
 
     // Trigger enter animation

@@ -62,6 +62,7 @@ body {
   flex-direction: column;
   height: 100%;
   gap: 16px;
+  position: relative;
 }
 
 /* ========== Header ========== */
@@ -1096,8 +1097,8 @@ body.draft-mode-disabled .action-btn {
 
 /* ========== Toast Notifications ========== */
 .toast-notification {
-  position: fixed;
-  bottom: 24px;
+  position: absolute;
+  bottom: 20px;
   left: 50%;
   transform: translateX(-50%) translateY(100%);
   display: flex;
