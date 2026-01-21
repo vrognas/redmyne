@@ -238,6 +238,14 @@
     return isNaN(parsed) ? 0 : Math.max(0, parsed);
   }
 
+  // Check if changing hours would exceed 24h for the day
+  function wouldExceed24Hours(dayIndex, oldHours, newHours) {
+    if (!lastRenderContext?.totals?.days) return false;
+    const currentDayTotal = lastRenderContext.totals.days[dayIndex] || 0;
+    const newDayTotal = currentDayTotal - oldHours + newHours;
+    return newDayTotal > 24;
+  }
+
   // Escape HTML
   function escapeHtml(str) {
     if (!str) return "";
@@ -616,6 +624,12 @@
       input.addEventListener("blur", (e) => {
         const oldHours = parseFloat(e.target.dataset.oldValue) || 0;
         const newHours = parseHours(e.target.value);
+        // Validate: day total cannot exceed 24h
+        if (newHours > oldHours && wouldExceed24Hours(i, oldHours, newHours)) {
+          e.target.value = formatHours(oldHours);
+          showToast("Cannot exceed 24h per day");
+          return;
+        }
         e.target.value = formatHours(newHours);
         // Only send message and track undo if value changed
         if (oldHours !== newHours) {
@@ -1756,6 +1770,12 @@
       hoursInput.addEventListener("blur", (e) => {
         const oldHours = parseFloat(e.target.dataset.oldValue) || 0;
         const newHours = parseHours(e.target.value);
+        // Validate: day total cannot exceed 24h
+        if (newHours > oldHours && wouldExceed24Hours(dayIndex, oldHours, newHours)) {
+          e.target.value = formatHours(oldHours);
+          showToast("Cannot exceed 24h per day");
+          return;
+        }
         e.target.value = formatHours(newHours);
         if (oldHours !== newHours) {
           // Update individual entry

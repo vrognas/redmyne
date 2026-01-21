@@ -4,6 +4,10 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **24h per day validation** - time sheet prevents entering hours that exceed 24h/day
+
 ## [4.10.1]
 
 ### Improved
