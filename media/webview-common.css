@@ -1,0 +1,217 @@
+/**
+ * Shared Webview Styles
+ * Common styles for all Redmyne webviews (Gantt, Timesheet, Draft Review, etc.)
+ */
+
+/* ========== Base Tooltip ========== */
+.webview-tooltip {
+  position: fixed;
+  z-index: 1000;
+  max-width: 360px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
+  border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-editorWidget-border));
+  color: var(--vscode-editorHoverWidget-foreground, var(--vscode-editorWidget-foreground));
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+  font-family: var(--vscode-font-family);
+  font-size: calc(var(--vscode-font-size) - 1px);
+  line-height: 1.4;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.08s ease-out;
+}
+
+/* Interactive tooltip (clickable links, etc.) */
+.webview-tooltip--interactive {
+  pointer-events: auto;
+}
+
+/* Non-interactive tooltip (hover info only) */
+.webview-tooltip--static {
+  pointer-events: none;
+}
+
+/* Visible state */
+.webview-tooltip.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* ========== Tooltip Content Elements ========== */
+.webview-tooltip-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.webview-tooltip-title {
+  font-weight: 600;
+}
+
+.webview-tooltip-key {
+  font-weight: 600;
+}
+
+.webview-tooltip-divider {
+  border-top: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-editorWidget-border));
+  margin: 4px 0;
+}
+
+.webview-tooltip-spacer {
+  height: 4px;
+}
+
+.webview-tooltip a {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+}
+
+.webview-tooltip a:hover {
+  text-decoration: underline;
+}
+
+/* ========== Compact Tooltip (for drag handles, etc.) ========== */
+.webview-tooltip--compact {
+  padding: 3px 6px;
+  font-size: 11px;
+  max-width: none;
+  white-space: nowrap;
+}
+
+/* Arrow pointing down (tooltip above element) */
+.webview-tooltip--arrow-down::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: -5px;
+  border: 5px solid transparent;
+  border-top-color: var(--vscode-editorWidget-border);
+}
+
+/* Arrow pointing up (tooltip below element) */
+.webview-tooltip--arrow-up::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: -5px;
+  border: 5px solid transparent;
+  border-bottom-color: var(--vscode-editorWidget-border);
+}
+
+/* ========== Modal Overlay ========== */
+.webview-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1001;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.webview-modal-overlay.visible {
+  display: flex;
+}
+
+.webview-modal {
+  background: var(--vscode-editorWidget-background);
+  border: 1px solid var(--vscode-editorWidget-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px var(--vscode-widget-shadow);
+  padding: 16px;
+  min-width: 280px;
+  max-width: 400px;
+}
+
+.webview-modal h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+}
+
+.webview-modal p {
+  margin: 0 0 16px 0;
+  font-size: 13px;
+  color: var(--vscode-descriptionForeground);
+  line-height: 1.4;
+}
+
+.webview-modal-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* ========== Dropdown/Menu ========== */
+.webview-dropdown {
+  position: absolute;
+  background: var(--vscode-editorWidget-background, var(--vscode-dropdown-background));
+  border: 1px solid var(--vscode-editorWidget-border, var(--vscode-dropdown-border));
+  border-radius: 4px;
+  box-shadow: 0 4px 12px var(--vscode-widget-shadow);
+  z-index: 100;
+  padding: 4px 0;
+}
+
+.webview-dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 4px 12px;
+  border: none;
+  background: transparent;
+  color: var(--vscode-menu-foreground);
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--vscode-font-family);
+}
+
+.webview-dropdown-item:hover,
+.webview-dropdown-item:focus {
+  background: var(--vscode-menu-selectionBackground);
+  color: var(--vscode-menu-selectionForeground);
+}
+
+/* ========== Common Animations ========== */
+@keyframes webview-fade-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes webview-glow {
+  0%, 100% { box-shadow: 0 0 8px color-mix(in srgb, var(--vscode-focusBorder) 30%, transparent); }
+  50% { box-shadow: 0 0 12px color-mix(in srgb, var(--vscode-focusBorder) 50%, transparent); }
+}
+
+@keyframes webview-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ========== Spinner ========== */
+.webview-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--vscode-descriptionForeground);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: webview-spin 0.8s linear infinite;
+}
+
+.webview-spinner--small {
+  width: 12px;
+  height: 12px;
+}
+
+/* ========== Focus Glow ========== */
+.webview-focus-glow:focus {
+  outline: none;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--vscode-focusBorder) 30%, transparent);
+  border-color: var(--vscode-focusBorder);
+}

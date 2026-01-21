@@ -76,6 +76,9 @@ export class DraftReviewPanel implements vscode.Disposable {
           case "removeDraft":
             await vscode.commands.executeCommand("redmyne.removeDraft", message.id);
             break;
+          case "showApiDetails":
+            await this.handleShowApiDetails(message.method, message.path, message.data);
+            break;
         }
       },
       null,
@@ -111,6 +114,23 @@ export class DraftReviewPanel implements vscode.Disposable {
       await vscode.commands.executeCommand("redmyne.discardDrafts");
     } finally {
       this.panel.webview.postMessage({ command: "setLoading", loading: false });
+    }
+  }
+
+  private async handleShowApiDetails(method: string, path: string, data: unknown): Promise<void> {
+    const jsonStr = data ? JSON.stringify(data, null, 2) : "(no body)";
+    const header = `${method} ${path}`;
+
+    const action = await vscode.window.showInformationMessage(
+      header,
+      { modal: true, detail: jsonStr },
+      "Copy to Clipboard"
+    );
+
+    if (action === "Copy to Clipboard") {
+      const fullText = `${header}\n\n${jsonStr}`;
+      await vscode.env.clipboard.writeText(fullText);
+      vscode.window.showInformationMessage("Copied to clipboard");
     }
   }
 
@@ -164,12 +184,14 @@ export class DraftReviewPanel implements vscode.Disposable {
 
     const operationRows = operations.map((op) => {
       const httpInfo = op.http ? `${op.http.method} ${op.http.path}` : "-";
-      const httpData = op.http?.data ? JSON.stringify(op.http.data, null, 2) : "";
+      const httpMethod = op.http?.method || "";
+      const httpPath = op.http?.path || "";
+      const httpDataJson = op.http?.data ? JSON.stringify(op.http.data) : "";
       return `
       <tr data-id="${escapeHtml(op.id)}" tabindex="0">
         <td class="type">${escapeHtml(op.type)}</td>
         <td class="description">${escapeHtml(op.description)}</td>
-        <td class="api-call" title="${escapeHtml(httpData)}">${escapeHtml(httpInfo)}</td>
+        <td class="api-call" data-method="${escapeHtml(httpMethod)}" data-path="${escapeHtml(httpPath)}" data-body="${escapeHtml(httpDataJson)}" title="Click to view details">${escapeHtml(httpInfo)}</td>
         <td class="issue">${op.issueId ? `#${op.issueId}` : "-"}</td>
         <td class="time">${formatTime(op.timestamp)}</td>
         <td class="actions">
@@ -333,7 +355,15 @@ export class DraftReviewPanel implements vscode.Disposable {
       font-family: var(--vscode-editor-font-family);
       font-size: 0.85em;
       color: var(--vscode-textLink-foreground);
-      cursor: help;
+      cursor: pointer;
+    }
+    .api-call:hover {
+      text-decoration: underline;
+    }
+    .api-call::after {
+      content: " ⓘ";
+      opacity: 0.6;
+      font-size: 0.9em;
     }
     .time {
       width: 80px;
@@ -454,6 +484,17 @@ export class DraftReviewPanel implements vscode.Disposable {
 
     // Event delegation for buttons
     document.addEventListener('click', (e) => {
+      // Handle API call cell click
+      const apiCell = e.target.closest('.api-call');
+      if (apiCell) {
+        const method = apiCell.dataset.method || '';
+        const path = apiCell.dataset.path || '';
+        const bodyStr = apiCell.dataset.body || '';
+        const data = bodyStr ? JSON.parse(bodyStr) : null;
+        vscode.postMessage({ command: 'showApiDetails', method, path, data });
+        return;
+      }
+
       const target = e.target.closest('button');
       if (!target) return;
 
@@ -548,11 +589,13 @@ export class DraftReviewPanel implements vscode.Disposable {
 
       const rows = ops.map(op => {
         const httpInfo = op.http ? op.http.method + ' ' + op.http.path : '-';
-        const httpData = op.http && op.http.data ? JSON.stringify(op.http.data, null, 2) : '';
+        const httpMethod = op.http ? op.http.method : '';
+        const httpPath = op.http ? op.http.path : '';
+        const httpDataJson = op.http && op.http.data ? JSON.stringify(op.http.data) : '';
         return '<tr data-id="' + escapeHtml(op.id) + '" tabindex="0">' +
           '<td class="type">' + escapeHtml(op.type) + '</td>' +
           '<td class="description">' + escapeHtml(op.description) + '</td>' +
-          '<td class="api-call" title="' + escapeHtml(httpData) + '">' + escapeHtml(httpInfo) + '</td>' +
+          '<td class="api-call" data-method="' + escapeHtml(httpMethod) + '" data-path="' + escapeHtml(httpPath) + '" data-body="' + escapeHtml(httpDataJson) + '" title="Click to view details">' + escapeHtml(httpInfo) + '</td>' +
           '<td class="issue">' + (op.issueId ? '#' + op.issueId : '-') + '</td>' +
           '<td class="time">' + formatTime(op.timestamp) + '</td>' +
           '<td class="actions">' +
