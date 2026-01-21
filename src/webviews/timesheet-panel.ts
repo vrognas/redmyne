@@ -297,7 +297,7 @@ export class TimeSheetPanel {
         break;
 
       case "updateCell":
-        this._updateCell(message.rowId, message.dayIndex, message.hours);
+        await this._updateCell(message.rowId, message.dayIndex, message.hours);
         break;
 
       case "updateRowField":
@@ -725,24 +725,35 @@ export class TimeSheetPanel {
   /** Apply pending draft changes to loaded rows (restore unsaved edits) */
   private _applyPendingDraftChanges(): void {
     const draftOps = this._draftQueue?.getAll() || [];
+    console.log("[Timesheet] _applyPendingDraftChanges: draftOps count:", draftOps.length);
     const timeEntryOps = draftOps.filter(
       (op) => op.type === "createTimeEntry" || op.type === "updateTimeEntry" || op.type === "deleteTimeEntry"
     );
+    console.log("[Timesheet] _applyPendingDraftChanges: timeEntryOps:", timeEntryOps);
+    console.log("[Timesheet] _applyPendingDraftChanges: current rows:", this._rows.map(r => ({ id: r.id, isNew: r.isNew })));
     if (timeEntryOps.length === 0) return;
 
     for (const op of timeEntryOps) {
+      console.log("[Timesheet] Processing op:", op.type, "resourceId:", op.resourceId, "tempId:", op.tempId);
       if (op.type === "updateTimeEntry" && op.resourceId) {
         // Find row with this entryId
+        let found = false;
         for (const row of this._rows) {
           for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
             const cell = row.days[dayIndex];
             if (cell?.entryId === op.resourceId) {
               const hours = (op.http.data?.time_entry as { hours?: number })?.hours ?? 0;
+              console.log("[Timesheet] updateTimeEntry: Found entryId", op.resourceId, "applying hours:", hours);
               row.days[dayIndex] = { ...cell, hours, isDirty: true };
               row.weekTotal = Object.values(row.days).reduce((sum, c) => sum + c.hours, 0);
+              found = true;
               break;
             }
           }
+          if (found) break;
+        }
+        if (!found) {
+          console.log("[Timesheet] updateTimeEntry: Could not find entryId", op.resourceId, "in rows");
         }
       } else if (op.type === "deleteTimeEntry" && op.resourceId) {
         // Find row with this entryId and set hours to 0
@@ -757,14 +768,40 @@ export class TimeSheetPanel {
           }
         }
       } else if (op.type === "createTimeEntry" && op.tempId) {
-        // Parse tempId: "rowId:dayIndex"
+        // Parse tempId - two formats:
+        // 1. Normal: "rowId:dayIndex"
+        // 2. Aggregated: "agg-{issueId}:{activityId}:{comments}:{dayIndex}"
         const parts = op.tempId.split(":");
-        if (parts.length >= 2) {
-          const rowId = parts.slice(0, -1).join(":"); // Handle rowIds with colons
+        console.log("[Timesheet] createTimeEntry tempId:", op.tempId, "parts:", parts);
+
+        if (parts[0].startsWith("agg-")) {
+          // Aggregated row format: agg-{issueId}:{activityId}:{comments}:{dayIndex}
+          const issueIdStr = parts[0].slice(4); // Remove "agg-" prefix
+          const issueId = issueIdStr === "null" ? null : parseInt(issueIdStr, 10);
+          const activityId = parts[1] === "null" ? null : parseInt(parts[1], 10);
           const dayIndex = parseInt(parts[parts.length - 1], 10);
-          const row = this._rows.find((r) => r.id === rowId);
+          console.log("[Timesheet] Aggregated: issueId:", issueId, "activityId:", activityId, "dayIndex:", dayIndex);
+
+          // Find source row with matching issueId and activityId
+          const row = this._rows.find((r) => r.issueId === issueId && r.activityId === activityId);
+          console.log("[Timesheet] Found source row:", row ? "yes" : "no", row?.id);
           if (row && !isNaN(dayIndex) && dayIndex >= 0 && dayIndex < 7) {
             const hours = (op.http.data?.time_entry as { hours?: number })?.hours ?? 0;
+            console.log("[Timesheet] Applying hours:", hours, "to dayIndex:", dayIndex);
+            const cell = row.days[dayIndex] || { hours: 0, originalHours: 0, entryId: null, isDirty: false };
+            row.days[dayIndex] = { ...cell, hours, isDirty: true };
+            row.weekTotal = Object.values(row.days).reduce((sum, c) => sum + c.hours, 0);
+          }
+        } else if (parts.length >= 2) {
+          // Normal row format: "rowId:dayIndex"
+          const rowId = parts.slice(0, -1).join(":"); // Handle rowIds with colons
+          const dayIndex = parseInt(parts[parts.length - 1], 10);
+          console.log("[Timesheet] Normal: rowId:", rowId, "dayIndex:", dayIndex);
+          const row = this._rows.find((r) => r.id === rowId);
+          console.log("[Timesheet] Found row:", row ? "yes" : "no", row?.id);
+          if (row && !isNaN(dayIndex) && dayIndex >= 0 && dayIndex < 7) {
+            const hours = (op.http.data?.time_entry as { hours?: number })?.hours ?? 0;
+            console.log("[Timesheet] Applying hours:", hours, "to dayIndex:", dayIndex);
             const cell = row.days[dayIndex] || { hours: 0, originalHours: 0, entryId: null, isDirty: false };
             row.days[dayIndex] = { ...cell, hours, isDirty: true };
             row.weekTotal = Object.values(row.days).reduce((sum, c) => sum + c.hours, 0);
@@ -1113,7 +1150,7 @@ export class TimeSheetPanel {
     });
   }
 
-  private _updateCell(rowId: string, dayIndex: number, hours: number): void {
+  private async _updateCell(rowId: string, dayIndex: number, hours: number): Promise<void> {
     const row = this._rows.find((r) => r.id === rowId);
     if (!row) return;
 
@@ -1131,7 +1168,7 @@ export class TimeSheetPanel {
     row.weekTotal = Object.values(row.days).reduce((sum, cell) => sum + cell.hours, 0);
 
     // Queue operation to draft queue if draft mode enabled
-    this._queueCellOperation(row, dayIndex, hours, entryId, isDirty);
+    await this._queueCellOperation(row, dayIndex, hours, entryId, isDirty);
 
     // Save new rows to persistent storage
     if (row.isNew) {
@@ -1176,10 +1213,11 @@ export class TimeSheetPanel {
     }
 
     const date = this._currentWeek.dayDates[dayIndex];
-    // Use consistent resourceKey with ts: prefix for timesheet operations
+    // Use canonical resourceKey: entryId for existing, or issueId:activityId:date for new
+    // This ensures consistency between aggregate mode and normal mode
     const resourceKey = entryId
       ? `ts:timeentry:${entryId}`
-      : `ts:timeentry:${row.id}:${dayIndex}`;
+      : `ts:timeentry:new:${row.issueId}:${row.activityId}:${date}`;
 
     // If not dirty (restored to original), remove any pending operation
     if (!isDirty) {
@@ -1252,8 +1290,10 @@ export class TimeSheetPanel {
       };
       console.log("[Timesheet] Adding createTimeEntry operation:", operation);
       await this._draftQueue.add(operation, TIMESHEET_SOURCE);
+    } else {
+      // No entryId and hours = 0 → remove pending create if exists
+      await this._draftQueue.removeByKey(resourceKey, TIMESHEET_SOURCE);
     }
-    // If no entryId and hours = 0, nothing to queue (or remove pending create)
   }
 
   private async _updateRowField(
@@ -1336,7 +1376,7 @@ export class TimeSheetPanel {
         const cell = row.days[dayIndex];
         if (cell && cell.isDirty && cell.hours > 0) {
           console.log("[Timesheet] Queueing cell:", { dayIndex, hours: cell.hours, isDirty: cell.isDirty });
-          this._queueCellOperation(row, dayIndex, cell.hours, cell.entryId, true);
+          await this._queueCellOperation(row, dayIndex, cell.hours, cell.entryId, true);
         }
       }
       // Row is now complete - clear from incomplete storage (will be saved via draft queue)
@@ -1475,10 +1515,8 @@ export class TimeSheetPanel {
         issueIds.add(row.issueId);
       }
     }
-    // Load in parallel but don't await all (fire and forget)
-    for (const issueId of issueIds) {
-      this._loadIssueDetails(issueId);
-    }
+    // Load in parallel with proper error handling (errors logged, don't crash)
+    await Promise.allSettled([...issueIds].map((id) => this._loadIssueDetails(id)));
   }
 
   private async _pickIssueForRow(rowId: string): Promise<void> {
@@ -1746,13 +1784,14 @@ export class TimeSheetPanel {
 
     if (sourceCount === 0 && newHours > 0) {
       // Empty cell → create new entry
-      const tempId = `${aggRowId}:${dayIndex}`;
+      // Use canonical resourceKey based on issueId:activityId:date (not rowId)
+      const resourceKey = `ts:timeentry:new:${issueId}:${activityId}:${date}`;
       await this._draftQueue.add({
         id: generateDraftId(),
         type: "createTimeEntry",
         timestamp: Date.now(),
         issueId,
-        tempId,
+        tempId: `${aggRowId}:${dayIndex}`,
         description: `Log ${newHours}h to #${issueId} on ${date}`,
         http: {
           method: "POST",
@@ -1767,13 +1806,14 @@ export class TimeSheetPanel {
             },
           },
         },
-        resourceKey: `ts:timeentry:${tempId}`,
+        resourceKey,
       }, TIMESHEET_SOURCE);
     } else if (sourceCount === 1) {
       const entry = sourceEntries[0];
       if (entry.isDraft || entry.entryId === null) {
         // Draft entry (not saved to server yet)
-        const resourceKey = `ts:timeentry:${entry.rowId}:${dayIndex}`;
+        // Use canonical resourceKey based on issueId:activityId:date (not rowId)
+        const resourceKey = `ts:timeentry:new:${entry.issueId}:${entry.activityId}:${date}`;
         if (newHours > 0) {
           // Update draft → replace pending CREATE with new hours
           await this._draftQueue.add({
