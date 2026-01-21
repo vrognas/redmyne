@@ -17,7 +17,7 @@ import {
   calculatePasteTargetDates,
   getEntriesForTargetDate,
 } from "../utilities/time-entry-clipboard";
-import { parseLocalDate } from "../utilities/date-utils";
+import { parseLocalDate, getWeekStart, formatLocalDate } from "../utilities/date-utils";
 import { DEFAULT_WEEKLY_SCHEDULE, WeeklySchedule } from "../utilities/flexibility-calculator";
 import { MonthlyScheduleOverrides } from "../utilities/monthly-schedule";
 
@@ -338,12 +338,26 @@ export function registerTimeEntryCommands(
 
   // Copy all entries from a week
   context.subscriptions.push(
-    vscode.commands.registerCommand("redmyne.copyWeekTimeEntries", (node: WeekGroupNode) => {
-      const entries = node?._cachedEntries;
-      const weekStart = node?._weekStart;
+    vscode.commands.registerCommand("redmyne.copyWeekTimeEntries", async (node?: WeekGroupNode) => {
+      let entries = node?._cachedEntries;
+      let weekStart = node?._weekStart;
+
+      // If no node (toolbar invocation), fetch current week from server
       if (!weekStart) {
-        vscode.window.showErrorMessage("Could not determine week start");
-        return;
+        const server = deps.getServer();
+        if (!server) {
+          vscode.window.showErrorMessage("No Redmine server configured");
+          return;
+        }
+        weekStart = getWeekStart();
+        const today = formatLocalDate(new Date());
+        try {
+          const result = await server.getTimeEntries({ from: weekStart, to: today });
+          entries = result.time_entries;
+        } catch {
+          vscode.window.showErrorMessage("Failed to fetch time entries");
+          return;
+        }
       }
 
       // Group entries by day-of-week (0=Mon)
@@ -402,7 +416,7 @@ export function registerTimeEntryCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "redmyne.pasteTimeEntries",
-      async (node: DayGroupNode | WeekGroupNode) => {
+      async (node?: DayGroupNode | WeekGroupNode) => {
         const clipboard = getClipboard();
         if (!clipboard || clipboard.entries.length === 0) {
           vscode.window.showInformationMessage("Clipboard is empty");
@@ -416,17 +430,25 @@ export function registerTimeEntryCommands(
         }
 
         // Determine target type and date
-        const isDayTarget = "_date" in node && !!node._date;
-        const isWeekTarget = "_weekStart" in node && !!node._weekStart;
+        const isDayTarget = node && "_date" in node && !!node._date;
+        const isWeekTarget = node && "_weekStart" in node && !!node._weekStart;
 
-        if (!isDayTarget && !isWeekTarget) {
-          vscode.window.showErrorMessage("Invalid paste target");
-          return;
+        // Default to "This Week" if no node (toolbar invocation)
+        let targetKind: "day" | "week";
+        let targetDate: string | undefined;
+        let targetWeekStart: string | undefined;
+
+        if (isDayTarget) {
+          targetKind = "day";
+          targetDate = (node as DayGroupNode)._date;
+        } else if (isWeekTarget) {
+          targetKind = "week";
+          targetWeekStart = (node as WeekGroupNode)._weekStart;
+        } else {
+          // Toolbar: default to current week
+          targetKind = "week";
+          targetWeekStart = getWeekStart();
         }
-
-        const targetKind = isDayTarget ? "day" : "week";
-        const targetDate = isDayTarget ? (node as DayGroupNode)._date : undefined;
-        const targetWeekStart = isWeekTarget ? (node as WeekGroupNode)._weekStart : undefined;
 
         // Get schedule config
         const config = vscode.workspace.getConfiguration("redmyne.workingHours");

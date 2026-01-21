@@ -127,23 +127,14 @@ export async function quickLogTime(
 
     if (comment === undefined) return; // User cancelled
 
-    // 7. Post time entry (only pass spentOn if not today)
-    if (selectedDate === today) {
-      await props.server.addTimeEntry(
-        selection.issueId,
-        selection.activityId,
-        hoursStr,
-        comment || ""
-      );
-    } else {
-      await props.server.addTimeEntry(
-        selection.issueId,
-        selection.activityId,
-        hoursStr,
-        comment || "",
-        selectedDate
-      );
-    }
+    // 7. Post time entry (always pass date for draft mode compatibility)
+    await props.server.addTimeEntry(
+      selection.issueId,
+      selection.activityId,
+      hoursStr,
+      comment || "",
+      selectedDate
+    );
 
     // 8. Refresh time entries tree
     vscode.commands.executeCommand("redmyne.refreshTimeEntries");

@@ -377,6 +377,9 @@ export class DraftModeServer {
     const tempId = nextTempId();
     const tempIdStr = generateTempId("timeentry");
 
+    // Default spentOn to today if not provided (needed for tree filtering)
+    const effectiveSpentOn = spentOn ?? new Date().toISOString().split("T")[0];
+
     await this.queue.add(
       this.createOperation(
         "createTimeEntry",
@@ -391,7 +394,7 @@ export class DraftModeServer {
               activity_id: activityId,
               hours,
               comments: message,
-              ...(spentOn && { spent_on: spentOn }),
+              spent_on: effectiveSpentOn,
             },
           },
         },
@@ -407,7 +410,7 @@ export class DraftModeServer {
         activity_id: activityId,
         hours,
         comments: message,
-        spent_on: spentOn ?? new Date().toISOString().split("T")[0],
+        spent_on: effectiveSpentOn,
         activity: { id: activityId, name: "" },
         issue: { id: issueId },
         created_on: new Date().toISOString(),
