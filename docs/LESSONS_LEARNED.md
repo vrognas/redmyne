@@ -751,3 +751,75 @@ fi
 3. **Event delegation scales**: Single handler beats N listeners on N elements
 4. **Keyboard nav = tabindex + focus**: Make rows focusable for accessibility
 5. **Confirm destructive actions**: Modal dialogs for "Discard All" type operations
+
+## Stateless Webview Pattern (2026-01-21)
+
+### Context-Based Rendering
+
+**Problem**: Webview cached extension state locally, causing sync issues and duplicated state management
+
+**Solution**: Pure renderer pattern with context object
+- Extension owns all state (rows, projects, cascade data)
+- Webview builds context from each message, no caching
+- Render functions accept context parameter: `renderGrid(ctx)`
+- Only local UI state remains in webview (expandedCells, tooltipCache)
+
+**Message Structure**:
+```javascript
+// Extension sends full state in render message
+{
+  type: "render",
+  rows, week, totals, projects, parentProjects,
+  childProjectsByParent: Object.fromEntries(map), // Maps → Records
+  issuesByProject: Object.fromEntries(map),
+  activitiesByProject: Object.fromEntries(map),
+  isDraftMode, sortColumn, sortDirection, groupBy, ...
+}
+```
+
+**Webview Handles**:
+```javascript
+case "render": {
+  const ctx = {
+    rows: message.rows,
+    childProjectsByParent: new Map(Object.entries(message.childProjectsByParent || {})),
+    // ... build context from message
+  };
+  lastRenderContext = ctx; // For event handlers
+  renderGrid(ctx);
+  break;
+}
+```
+
+### Map Serialization
+
+**Problem**: `postMessage` can't serialize `Map` objects
+
+**Solution**: Convert to/from plain objects
+- Extension: `Object.fromEntries(map)` before sending
+- Webview: `new Map(Object.entries(obj))` after receiving
+- Use string keys: `ctx.childProjectsByParent.get(String(parentId))`
+
+### Event Handler Access to Context
+
+**Problem**: Event handlers need context but are set up at render time
+
+**Solution**: Module-scope `lastRenderContext` reference
+```javascript
+let lastRenderContext = null;
+
+// In event handlers:
+groupBySelect?.addEventListener("change", (e) => {
+  if (!lastRenderContext) return;
+  lastRenderContext.groupBy = e.target.value;
+  renderGrid(lastRenderContext);
+});
+```
+
+### Lessons
+
+1. **Extension owns state**: Single source of truth simplifies debugging
+2. **Webview = pure renderer**: No caching, just renders from message data
+3. **Context object pattern**: Pass everything render functions need explicitly
+4. **Maps can't postMessage**: Convert to/from Records for serialization
+5. **Local UI state is fine**: expandedCells, tooltipCache stay in webview

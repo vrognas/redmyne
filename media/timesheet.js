@@ -12,25 +12,14 @@
   const redoStack = [];
   const MAX_UNDO_STACK = 50;
 
-  // State
+  // Local-only UI state (not from extension)
   let state = {
-    rows: [],
-    week: null,
-    totals: null,
-    projects: [],
-    parentProjects: [],
-    childProjectsByParent: new Map(), // parentId -> ProjectOption[]
-    issuesByProject: new Map(), // projectId -> IssueOption[]
-    activitiesByProject: new Map(), // projectId -> ActivityOption[]
-    issueDetails: new Map(), // issueId -> IssueDetails (for tooltips)
-    isDraftMode: false,
-    sortColumn: null, // 'client' | 'project' | 'task' | 'activity' | 'comments' | 'total' | null
-    sortDirection: "asc", // 'asc' | 'desc'
-    groupBy: "none", // 'none' | 'client' | 'project' | 'issue' | 'activity'
-    collapsedGroups: new Set(), // Group keys that are collapsed
-    aggregateRows: false, // Merge identical rows (same issue+activity+comment)
     expandedCells: new Set(), // Set of "rowId:dayIndex" for expanded multi-entry cells
+    issueDetails: new Map(), // issueId -> IssueDetails (cached for tooltips)
   };
+
+  // Last render context from extension (stateless - rebuilt on each render message)
+  let lastRenderContext = null;
 
   // Push action to undo stack
   function pushUndo(action) {
@@ -193,8 +182,8 @@
     weekLabel?.addEventListener("click", () => {
       if (weekPicker) {
         // Set current week's Monday as the default date
-        if (state.week?.startDate) {
-          weekPicker.setDate(state.week.startDate, false);
+        if (lastRenderContext?.week?.startDate) {
+          weekPicker.setDate(lastRenderContext.week.startDate, false);
         }
         weekPicker.open();
       }
@@ -202,8 +191,8 @@
   }
 
   // Update draft mode UI state
-  function updateDraftModeUI() {
-    if (state.isDraftMode) {
+  function updateDraftModeUI(ctx) {
+    if (ctx.isDraftMode) {
       draftModeWarning.classList.add("hidden");
       document.body.classList.remove("draft-mode-disabled");
     } else {
@@ -260,44 +249,6 @@
       .replace(/'/g, "&#39;");
   }
 
-  // Get sorted rows based on current sort state
-  function getSortedRows() {
-    if (!state.sortColumn) return state.rows;
-    return [...state.rows].sort((a, b) => {
-      let valA, valB;
-      switch (state.sortColumn) {
-        case "client":
-          valA = a.parentProjectName || "";
-          valB = b.parentProjectName || "";
-          break;
-        case "project":
-          valA = a.projectName || "";
-          valB = b.projectName || "";
-          break;
-        case "task":
-          valA = a.issueId || 0;
-          valB = b.issueId || 0;
-          break;
-        case "activity":
-          valA = a.activityName || "";
-          valB = b.activityName || "";
-          break;
-        case "comments":
-          valA = a.comments || "";
-          valB = b.comments || "";
-          break;
-        case "total":
-          valA = a.weekTotal;
-          valB = b.weekTotal;
-          break;
-        default:
-          return 0;
-      }
-      const cmp = typeof valA === "string" ? valA.localeCompare(valB) : valA - valB;
-      return state.sortDirection === "asc" ? cmp : -cmp;
-    });
-  }
-
   // Get today's day index in current week (0=Mon, 6=Sun)
   function getTodayDayIndex(week) {
     if (!week) return -1;
@@ -313,7 +264,7 @@
   }
 
   // Render a single row
-  function renderRow(row) {
+  function renderRow(row, ctx) {
     const tr = document.createElement("tr");
     tr.dataset.rowId = row.id;
 
@@ -337,7 +288,7 @@
     // Aggregated rows can edit fields (will update all source entries)
     parentSelect.innerHTML = '<option value="">Client...</option>';
 
-    for (const parent of state.parentProjects) {
+    for (const parent of ctx.parentProjects) {
       const option = document.createElement("option");
       option.value = parent.id;
       option.textContent = parent.id === OTHERS_PARENT_ID ? parent.name : `#${parent.id} ${parent.name}`;
@@ -353,7 +304,7 @@
       parentSelect.dataset.tooltip = label;
       // Context menu data (only for real projects, not "Others")
       if (row.parentProjectId !== OTHERS_PARENT_ID) {
-        const parentProject = state.parentProjects.find(p => p.id === row.parentProjectId);
+        const parentProject = ctx.parentProjects.find(p => p.id === row.parentProjectId);
         parentSelect.dataset.vscodeContext = JSON.stringify({
           webviewSection: "tsClient",
           projectId: row.parentProjectId,
@@ -406,7 +357,7 @@
 
     // Populate projects from cache
     if (hasParent) {
-      const children = state.childProjectsByParent.get(row.parentProjectId) || [];
+      const children = ctx.childProjectsByParent.get(String(row.parentProjectId)) || [];
       for (const child of children) {
         const option = document.createElement("option");
         option.value = child.id;
@@ -419,7 +370,7 @@
     // Set tooltip for selected project
     if (row.projectId !== null) {
       projectSelect.dataset.tooltip = `#${row.projectId} ${row.projectName || ""}`;
-      const childProject = state.projects.find(p => p.id === row.projectId);
+      const childProject = ctx.projects.find(p => p.id === row.projectId);
       projectSelect.dataset.vscodeContext = JSON.stringify({
         webviewSection: "tsProject",
         projectId: row.projectId,
@@ -474,7 +425,7 @@
 
     // Populate issues from cache
     if (hasProject) {
-      const issues = state.issuesByProject.get(row.projectId) || [];
+      const issues = ctx.issuesByProject.get(String(row.projectId)) || [];
       for (const issue of issues) {
         const option = document.createElement("option");
         option.value = issue.id;
@@ -540,7 +491,7 @@
     activitySelect.disabled = !hasProject;
 
     // Populate activities if available
-    const activities = state.activitiesByProject.get(row.projectId) || [];
+    const activities = ctx.activitiesByProject.get(String(row.projectId)) || [];
     for (const activity of activities) {
       const option = document.createElement("option");
       option.value = activity.id;
@@ -617,7 +568,7 @@
     tr.appendChild(commentsTd);
 
     // --- Day cells ---
-    const todayIndex = getTodayDayIndex(state.week);
+    const todayIndex = getTodayDayIndex(ctx.week);
     for (let i = 0; i < 7; i++) {
       const dayTd = document.createElement("td");
       dayTd.className = "col-day day-cell";
@@ -649,7 +600,7 @@
         input.classList.add("aggregated-cell-input");
       }
       input.value = formatHours(cell.hours);
-      input.dataset.tooltip = state.week ? state.week.dayDates[i] : "";
+      input.dataset.tooltip = ctx.week ? ctx.week.dayDates[i] : "";
       input.disabled = !isRowComplete;
       input.dataset.oldValue = cell.hours; // Store for undo
       // Store source entries for aggregated row handling
@@ -764,8 +715,8 @@
   }
 
   // Get group key for a row based on groupBy setting
-  function getGroupKey(row) {
-    switch (state.groupBy) {
+  function getGroupKey(row, ctx) {
+    switch (ctx.groupBy) {
       case "client":
         return row.parentProjectId !== null ? `client:${row.parentProjectId}` : "client:none";
       case "project":
@@ -780,8 +731,8 @@
   }
 
   // Get group label for display
-  function getGroupLabel(row) {
-    switch (state.groupBy) {
+  function getGroupLabel(row, ctx) {
+    switch (ctx.groupBy) {
       case "client":
         // parentProjectId -1 = "Others" synthetic group
         if (row.parentProjectId === OTHERS_PARENT_ID) return row.parentProjectName || "Others";
@@ -803,7 +754,7 @@
   }
 
   // Render a group header row
-  function renderGroupHeader(groupKey, label, total, isCollapsed) {
+  function renderGroupHeader(groupKey, label, total, isCollapsed, ctx) {
     const tr = document.createElement("tr");
     tr.className = "group-header" + (isCollapsed ? " collapsed" : "");
     tr.dataset.groupKey = groupKey;
@@ -824,13 +775,14 @@
     td.appendChild(labelSpan);
 
     td.addEventListener("click", () => {
-      if (state.collapsedGroups.has(groupKey)) {
-        state.collapsedGroups.delete(groupKey);
+      if (!lastRenderContext) return;
+      if (lastRenderContext.collapsedGroups.has(groupKey)) {
+        lastRenderContext.collapsedGroups.delete(groupKey);
       } else {
-        state.collapsedGroups.add(groupKey);
+        lastRenderContext.collapsedGroups.add(groupKey);
       }
       vscode.postMessage({ type: "toggleGroup", groupKey });
-      renderGrid();
+      renderGrid(lastRenderContext);
     });
 
     tr.appendChild(td);
@@ -854,7 +806,7 @@
    * Merges hours per day, returns new array of aggregated rows
    * Tracks source entries per day cell for edit/undo support
    */
-  function aggregateIdenticalRows(rows) {
+  function aggregateIdenticalRows(rows, ctx) {
     if (!rows || rows.length === 0) return rows;
 
     const groups = new Map(); // key -> merged row
@@ -886,7 +838,7 @@
                 issueId: row.issueId,
                 activityId: row.activityId,
                 comments: row.comments,
-                spentOn: state.week?.dayDates[d] || "",
+                spentOn: ctx.week?.dayDates[d] || "",
                 isDraft: !row.days[d].entryId, // Flag for drafts
               });
             }
@@ -930,7 +882,7 @@
                 issueId: row.issueId,
                 activityId: row.activityId,
                 comments: row.comments,
-                spentOn: state.week?.dayDates[d] || "",
+                spentOn: ctx.week?.dayDates[d] || "",
                 isDraft: !row.days[d].entryId, // Flag for drafts
               });
             }
@@ -943,13 +895,16 @@
   }
 
   // Render grid
-  function renderGrid() {
-    gridBody.innerHTML = "";
+  function renderGrid(ctx) {
+    // Clear grid body safely
+    while (gridBody.firstChild) {
+      gridBody.removeChild(gridBody.firstChild);
+    }
 
     // Get rows to render (aggregated or original)
-    const rowsToRender = state.aggregateRows
-      ? aggregateIdenticalRows(state.rows)
-      : state.rows;
+    const rowsToRender = ctx.aggregateRows
+      ? aggregateIdenticalRows(ctx.rows, ctx)
+      : ctx.rows;
 
     if (rowsToRender.length === 0) {
       const tr = document.createElement("tr");
@@ -959,11 +914,11 @@
       td.textContent = "No time entries yet.";
       tr.appendChild(td);
       gridBody.appendChild(tr);
-    } else if (state.groupBy === "none") {
+    } else if (ctx.groupBy === "none") {
       // No grouping - flat list
-      const sortedRows = sortRows(rowsToRender);
+      const sortedRows = sortRows(rowsToRender, ctx);
       for (const row of sortedRows) {
-        gridBody.appendChild(renderRow(row));
+        gridBody.appendChild(renderRow(row, ctx));
       }
     } else {
       // Grouped rendering
@@ -971,9 +926,9 @@
 
       // First pass: organize rows into groups
       for (const row of rowsToRender) {
-        const groupKey = getGroupKey(row);
+        const groupKey = getGroupKey(row, ctx);
         if (!groups.has(groupKey)) {
-          groups.set(groupKey, { label: getGroupLabel(row), rows: [] });
+          groups.set(groupKey, { label: getGroupLabel(row, ctx), rows: [] });
         }
         groups.get(groupKey).rows.push(row);
       }
@@ -985,33 +940,33 @@
 
       // Render each group
       for (const [groupKey, group] of sortedGroups) {
-        const isCollapsed = state.collapsedGroups.has(groupKey);
+        const isCollapsed = ctx.collapsedGroups.has(groupKey);
         const total = getGroupTotal(group.rows);
 
         // Group header
-        gridBody.appendChild(renderGroupHeader(groupKey, group.label, total, isCollapsed));
+        gridBody.appendChild(renderGroupHeader(groupKey, group.label, total, isCollapsed, ctx));
 
         // Rows (if not collapsed)
         if (!isCollapsed) {
           // Sort rows within group
-          const sortedGroupRows = sortRows(group.rows);
+          const sortedGroupRows = sortRows(group.rows, ctx);
           for (const row of sortedGroupRows) {
-            gridBody.appendChild(renderRow(row));
+            gridBody.appendChild(renderRow(row, ctx));
           }
         }
       }
     }
 
-    renderTotals();
-    updateSortIndicators();
+    renderTotals(ctx);
+    updateSortIndicators(ctx);
   }
 
   // Sort rows (extracted for reuse in grouping)
-  function sortRows(rows) {
-    if (!state.sortColumn) return rows;
+  function sortRows(rows, ctx) {
+    if (!ctx.sortColumn) return rows;
     return [...rows].sort((a, b) => {
       let valA, valB;
-      switch (state.sortColumn) {
+      switch (ctx.sortColumn) {
         case "client":
           valA = a.parentProjectName || "";
           valB = b.parentProjectName || "";
@@ -1040,19 +995,19 @@
           return 0;
       }
       const cmp = typeof valA === "string" ? valA.localeCompare(valB) : valA - valB;
-      return state.sortDirection === "asc" ? cmp : -cmp;
+      return ctx.sortDirection === "asc" ? cmp : -cmp;
     });
   }
 
   // Render totals row
-  function renderTotals() {
-    if (!state.totals) return;
+  function renderTotals(ctx) {
+    if (!ctx.totals) return;
 
-    const todayIndex = getTodayDayIndex(state.week);
+    const todayIndex = getTodayDayIndex(ctx.week);
     const dayCells = totalsRow.querySelectorAll(".col-day.total-cell");
     dayCells.forEach((cell, i) => {
-      const hours = state.totals.days[i];
-      const target = state.totals.targetHours[i];
+      const hours = ctx.totals.days[i];
+      const target = ctx.totals.targetHours[i];
 
       // Update value display - always show "hours / target" format
       const valueSpan = cell.querySelector(".total-value");
@@ -1081,30 +1036,30 @@
     });
 
     // Week total - always show "hours / target" format
-    const targetTotal = state.totals.weekTargetTotal;
-    const weekHours = state.totals.weekTotal;
+    const targetTotal = ctx.totals.weekTargetTotal;
+    const weekHours = ctx.totals.weekTotal;
     const weekHoursDisplay = weekHours === 0 ? "0" : formatHours(weekHours);
     weekTotal.textContent = `${weekHoursDisplay} / ${targetTotal}`;
   }
 
   // Update a single row
-  function updateRow(row, totals) {
+  function updateRow(row, totals, ctx) {
     // In aggregate mode, row IDs in DOM are "agg-{key}" not original IDs
     // Full re-render is needed to properly aggregate the updated row
-    if (state.aggregateRows) {
-      if (totals) state.totals = totals;
-      renderGrid();
+    if (ctx.aggregateRows) {
+      if (totals) ctx.totals = totals;
+      renderGrid(ctx);
       return;
     }
 
     const existingRow = gridBody.querySelector(`tr[data-row-id="${row.id}"]`);
     if (existingRow) {
-      const newRow = renderRow(row);
+      const newRow = renderRow(row, ctx);
       existingRow.replaceWith(newRow);
     }
     if (totals) {
-      state.totals = totals;
-      renderTotals();
+      ctx.totals = totals;
+      renderTotals(ctx);
     }
   }
 
@@ -1112,69 +1067,87 @@
   window.addEventListener("message", (event) => {
     const message = event.data;
     switch (message.type) {
-      case "render":
-        state.rows = message.rows;
-        state.week = message.week;
-        state.totals = message.totals;
-        state.projects = message.projects;
-        state.parentProjects = message.parentProjects || [];
-        state.isDraftMode = message.isDraftMode;
-        // Apply persisted sort state
-        state.sortColumn = message.sortColumn ?? null;
-        state.sortDirection = message.sortDirection ?? "asc";
-        // Apply persisted grouping state
-        state.groupBy = message.groupBy ?? "none";
-        state.collapsedGroups = new Set(message.collapsedGroups || []);
-        state.aggregateRows = message.aggregateRows ?? false;
-        // Update dropdowns and toggles
-        if (groupBySelect) groupBySelect.value = state.groupBy;
-        const aggregateToggle = document.getElementById("aggregateToggle");
-        if (aggregateToggle) aggregateToggle.checked = state.aggregateRows;
-        weekLabel.textContent = formatWeekLabel(state.week);
-        // Update header for weekend
-        updateWeekHeaders();
-        // Update draft mode UI
-        updateDraftModeUI();
-        renderGrid();
-        break;
+      case "render": {
+        // Build render context from message (stateless pattern)
+        const ctx = {
+          rows: message.rows,
+          week: message.week,
+          totals: message.totals,
+          projects: message.projects || [],
+          parentProjects: message.parentProjects || [],
+          childProjectsByParent: new Map(Object.entries(message.childProjectsByParent || {})),
+          issuesByProject: new Map(Object.entries(message.issuesByProject || {})),
+          activitiesByProject: new Map(Object.entries(message.activitiesByProject || {})),
+          isDraftMode: message.isDraftMode,
+          sortColumn: message.sortColumn ?? null,
+          sortDirection: message.sortDirection ?? "asc",
+          groupBy: message.groupBy ?? "none",
+          collapsedGroups: new Set(message.collapsedGroups || []),
+          aggregateRows: message.aggregateRows ?? false,
+        };
 
-      case "updateRow":
-        // Find and update the row in state
-        const rowIndex = state.rows.findIndex((r) => r.id === message.row.id);
-        if (rowIndex !== -1) {
-          state.rows[rowIndex] = message.row;
-        }
-        state.totals = message.totals;
-        updateRow(message.row, message.totals);
+        // Store for re-use in event handlers
+        lastRenderContext = ctx;
+
+        // Update dropdowns and toggles
+        if (groupBySelect) groupBySelect.value = ctx.groupBy;
+        const aggregateToggle = document.getElementById("aggregateToggle");
+        if (aggregateToggle) aggregateToggle.checked = ctx.aggregateRows;
+        weekLabel.textContent = formatWeekLabel(ctx.week);
+        // Update header for weekend
+        updateWeekHeaders(ctx);
+        // Update draft mode UI
+        updateDraftModeUI(ctx);
+        renderGrid(ctx);
         break;
+      }
+
+      case "updateRow": {
+        if (!lastRenderContext) break;
+
+        // Update cascade data if provided
+        if (message.rowCascadeData) {
+          const { childProjects, issues, activities } = message.rowCascadeData;
+          if (childProjects && message.row.parentProjectId !== null) {
+            lastRenderContext.childProjectsByParent.set(String(message.row.parentProjectId), childProjects);
+          }
+          if (issues && message.row.projectId !== null) {
+            lastRenderContext.issuesByProject.set(String(message.row.projectId), issues);
+          }
+          if (activities && message.row.projectId !== null) {
+            lastRenderContext.activitiesByProject.set(String(message.row.projectId), activities);
+          }
+        }
+
+        // Update row in context
+        const rowIndex = lastRenderContext.rows.findIndex((r) => r.id === message.row.id);
+        if (rowIndex !== -1) {
+          lastRenderContext.rows[rowIndex] = message.row;
+        }
+        lastRenderContext.totals = message.totals;
+
+        updateRow(message.row, message.totals, lastRenderContext);
+        break;
+      }
 
       case "updateChildProjects":
-        state.childProjectsByParent.set(message.forParentId, message.projects);
-        // Re-render rows for this parent
-        for (const row of state.rows) {
-          if (row.parentProjectId === message.forParentId) {
-            updateRow(row, null);
-          }
+        if (lastRenderContext) {
+          lastRenderContext.childProjectsByParent.set(String(message.forParentId), message.projects);
+          renderGrid(lastRenderContext);
         }
         break;
 
       case "updateIssues":
-        state.issuesByProject.set(message.forProjectId, message.issues);
-        // Re-render rows for this project
-        for (const row of state.rows) {
-          if (row.projectId === message.forProjectId) {
-            updateRow(row, null);
-          }
+        if (lastRenderContext) {
+          lastRenderContext.issuesByProject.set(String(message.forProjectId), message.issues);
+          renderGrid(lastRenderContext);
         }
         break;
 
       case "updateActivities":
-        state.activitiesByProject.set(message.forProjectId, message.activities);
-        // Re-render rows for this project to show activities
-        for (const row of state.rows) {
-          if (row.projectId === message.forProjectId) {
-            updateRow(row, null);
-          }
+        if (lastRenderContext) {
+          lastRenderContext.activitiesByProject.set(String(message.forProjectId), message.activities);
+          renderGrid(lastRenderContext);
         }
         break;
 
@@ -1183,9 +1156,11 @@
         break;
 
       case "weekChanged":
-        state.week = message.week;
-        weekLabel.textContent = formatWeekLabel(state.week);
-        updateWeekHeaders();
+        if (lastRenderContext) {
+          lastRenderContext.week = message.week;
+          weekLabel.textContent = formatWeekLabel(lastRenderContext.week);
+          updateWeekHeaders(lastRenderContext);
+        }
         break;
 
       case "showError":
@@ -1194,8 +1169,10 @@
         break;
 
       case "draftModeChanged":
-        state.isDraftMode = message.isDraftMode;
-        updateDraftModeUI();
+        if (lastRenderContext) {
+          lastRenderContext.isDraftMode = message.isDraftMode;
+          updateDraftModeUI(lastRenderContext);
+        }
         break;
 
       case "updateIssueDetails":
@@ -1234,13 +1211,13 @@
   });
 
   // Update header cells with dates
-  function updateWeekHeaders() {
-    if (!state.week) return;
+  function updateWeekHeaders(ctx) {
+    if (!ctx.week) return;
     const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     const headerCells = document.querySelectorAll("thead .col-day");
-    const todayIndex = getTodayDayIndex(state.week);
+    const todayIndex = getTodayDayIndex(ctx.week);
     headerCells.forEach((cell, i) => {
-      const date = new Date(state.week.dayDates[i] + "T12:00:00");
+      const date = new Date(ctx.week.dayDates[i] + "T12:00:00");
       const day = date.getDate();
       cell.textContent = `${dayNames[i]} ${day}`;
       cell.classList.toggle("today", i === todayIndex);
@@ -1248,17 +1225,17 @@
   }
 
   // Update sort indicators on headers
-  function updateSortIndicators() {
+  function updateSortIndicators(ctx) {
     const sortableHeaders = document.querySelectorAll("thead .sortable");
     sortableHeaders.forEach((header) => {
       const sortKey = header.dataset.sort;
       const existingIndicator = header.querySelector(".sort-indicator");
       if (existingIndicator) existingIndicator.remove();
 
-      if (sortKey === state.sortColumn) {
+      if (sortKey === ctx.sortColumn) {
         const indicator = document.createElement("span");
         indicator.className = "sort-indicator";
-        indicator.textContent = state.sortDirection === "asc" ? "▲" : "▼";
+        indicator.textContent = ctx.sortDirection === "asc" ? "▲" : "▼";
         header.appendChild(indicator);
       }
     });
@@ -1266,25 +1243,27 @@
 
   // Handle sort header click
   function handleSortClick(sortKey) {
-    if (state.sortColumn === sortKey) {
-      if (state.sortDirection === "asc") {
-        state.sortDirection = "desc";
+    if (!lastRenderContext) return;
+
+    if (lastRenderContext.sortColumn === sortKey) {
+      if (lastRenderContext.sortDirection === "asc") {
+        lastRenderContext.sortDirection = "desc";
       } else {
         // Clear sort
-        state.sortColumn = null;
-        state.sortDirection = "asc";
+        lastRenderContext.sortColumn = null;
+        lastRenderContext.sortDirection = "asc";
       }
     } else {
-      state.sortColumn = sortKey;
-      state.sortDirection = "asc";
+      lastRenderContext.sortColumn = sortKey;
+      lastRenderContext.sortDirection = "asc";
     }
     // Notify extension to persist
     vscode.postMessage({
       type: "sortChanged",
-      sortColumn: state.sortColumn,
-      sortDirection: state.sortDirection,
+      sortColumn: lastRenderContext.sortColumn,
+      sortDirection: lastRenderContext.sortDirection,
     });
-    renderGrid();
+    renderGrid(lastRenderContext);
   }
 
   // Setup sort header click handlers
@@ -1317,16 +1296,18 @@
 
   // Grouping dropdown
   groupBySelect?.addEventListener("change", (e) => {
-    state.groupBy = e.target.value;
-    vscode.postMessage({ type: "setGroupBy", groupBy: state.groupBy });
-    renderGrid();
+    if (!lastRenderContext) return;
+    lastRenderContext.groupBy = e.target.value;
+    vscode.postMessage({ type: "setGroupBy", groupBy: lastRenderContext.groupBy });
+    renderGrid(lastRenderContext);
   });
 
   // Aggregate toggle
   document.getElementById("aggregateToggle")?.addEventListener("change", (e) => {
-    state.aggregateRows = e.target.checked;
-    vscode.postMessage({ type: "setAggregateRows", aggregateRows: state.aggregateRows });
-    renderGrid();
+    if (!lastRenderContext) return;
+    lastRenderContext.aggregateRows = e.target.checked;
+    vscode.postMessage({ type: "setAggregateRows", aggregateRows: lastRenderContext.aggregateRows });
+    renderGrid(lastRenderContext);
   });
 
   // Copy/Paste buttons
@@ -1722,7 +1703,7 @@
       state.expandedCells.clear();
       state.expandedCells.add(cellKey);
     }
-    render();
+    if (lastRenderContext) renderGrid(lastRenderContext);
   }
 
   /**
@@ -1731,7 +1712,7 @@
   function collapseAllCells() {
     if (state.expandedCells.size > 0) {
       state.expandedCells.clear();
-      render();
+      if (lastRenderContext) renderGrid(lastRenderContext);
     }
   }
 

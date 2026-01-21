@@ -35,6 +35,7 @@ import {
   SortColumn,
   SortDirection,
   GroupBy,
+  RowCascadeData,
 } from "./timesheet-webview-messages";
 import { startOfISOWeek } from "date-fns";
 
@@ -477,7 +478,7 @@ export class TimeSheetPanel {
       // Calculate totals
       const totals = this._calculateTotals();
 
-      // Send to webview
+      // Send to webview with cascade data (stateless pattern)
       this._postMessage({
         type: "render",
         rows: this._rows,
@@ -491,6 +492,9 @@ export class TimeSheetPanel {
         groupBy: this._groupBy,
         collapsedGroups: [...this._collapsedGroups],
         aggregateRows: this._aggregateRows,
+        childProjectsByParent: Object.fromEntries(this._childrenByParent),
+        issuesByProject: Object.fromEntries(this._issuesByProject),
+        activitiesByProject: Object.fromEntries(this._activitiesByProject),
       });
 
       // Pre-send child projects for all parents in existing rows
@@ -736,6 +740,15 @@ export class TimeSheetPanel {
     }
   }
 
+  /** Get cascade data for a specific row (for efficient updateRow messages) */
+  private _getRowCascadeData(row: TimeSheetRow): RowCascadeData {
+    return {
+      childProjects: row.parentProjectId ? this._childrenByParent.get(row.parentProjectId) : undefined,
+      issues: row.projectId ? this._issuesByProject.get(row.projectId) : undefined,
+      activities: row.projectId ? this._activitiesByProject.get(row.projectId) : undefined,
+    };
+  }
+
   private _calculateTotals(): DailyTotals {
     const days: number[] = [0, 0, 0, 0, 0, 0, 0];
     let weekTotal = 0;
@@ -797,6 +810,10 @@ export class TimeSheetPanel {
       sortDirection: this._sortDirection,
       groupBy: this._groupBy,
       collapsedGroups: [...this._collapsedGroups],
+      aggregateRows: this._aggregateRows,
+      childProjectsByParent: Object.fromEntries(this._childrenByParent),
+      issuesByProject: Object.fromEntries(this._issuesByProject),
+      activitiesByProject: Object.fromEntries(this._activitiesByProject),
     });
   }
 
@@ -864,6 +881,9 @@ export class TimeSheetPanel {
       groupBy: this._groupBy,
       collapsedGroups: [...this._collapsedGroups],
       aggregateRows: this._aggregateRows,
+      childProjectsByParent: Object.fromEntries(this._childrenByParent),
+      issuesByProject: Object.fromEntries(this._issuesByProject),
+      activitiesByProject: Object.fromEntries(this._activitiesByProject),
     });
     // Send rowDeleted for undo/redo support
     this._postMessage({
@@ -943,6 +963,9 @@ export class TimeSheetPanel {
       groupBy: this._groupBy,
       collapsedGroups: [...this._collapsedGroups],
       aggregateRows: this._aggregateRows,
+      childProjectsByParent: Object.fromEntries(this._childrenByParent),
+      issuesByProject: Object.fromEntries(this._issuesByProject),
+      activitiesByProject: Object.fromEntries(this._activitiesByProject),
     });
   }
 
@@ -1023,6 +1046,9 @@ export class TimeSheetPanel {
       groupBy: this._groupBy,
       collapsedGroups: [...this._collapsedGroups],
       aggregateRows: this._aggregateRows,
+      childProjectsByParent: Object.fromEntries(this._childrenByParent),
+      issuesByProject: Object.fromEntries(this._issuesByProject),
+      activitiesByProject: Object.fromEntries(this._activitiesByProject),
     });
     // Send rowDuplicated for undo/redo support
     this._postMessage({
@@ -1058,7 +1084,12 @@ export class TimeSheetPanel {
     }
 
     const totals = this._calculateTotals();
-    this._postMessage({ type: "updateRow", row, totals });
+    this._postMessage({
+      type: "updateRow",
+      row,
+      totals,
+      rowCascadeData: this._getRowCascadeData(row),
+    });
   }
 
   /** Queue a cell change to the draft queue */
@@ -1263,7 +1294,12 @@ export class TimeSheetPanel {
     }
 
     const totals = this._calculateTotals();
-    this._postMessage({ type: "updateRow", row, totals });
+    this._postMessage({
+      type: "updateRow",
+      row,
+      totals,
+      rowCascadeData: this._getRowCascadeData(row),
+    });
   }
 
   private async _loadIssuesForProject(projectId: number, forceRefresh = false): Promise<void> {
@@ -1434,7 +1470,12 @@ export class TimeSheetPanel {
     }
 
     const totals = this._calculateTotals();
-    this._postMessage({ type: "updateRow", row, totals });
+    this._postMessage({
+      type: "updateRow",
+      row,
+      totals,
+      rowCascadeData: this._getRowCascadeData(row),
+    });
   }
 
   private async _saveAll(): Promise<void> {
@@ -1893,6 +1934,9 @@ export class TimeSheetPanel {
       groupBy: this._groupBy,
       collapsedGroups: [...this._collapsedGroups],
       aggregateRows: this._aggregateRows,
+      childProjectsByParent: Object.fromEntries(this._childrenByParent),
+      issuesByProject: Object.fromEntries(this._issuesByProject),
+      activitiesByProject: Object.fromEntries(this._activitiesByProject),
     });
   }
 

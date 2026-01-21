@@ -121,12 +121,24 @@ export interface RenderMessage {
   groupBy: GroupBy;
   collapsedGroups: string[]; // Group keys that are collapsed
   aggregateRows: boolean; // Merge identical rows (same issue+activity+comment)
+  // Cascade data (stateless webview - all dropdown data in one message)
+  childProjectsByParent: Record<string, ProjectOption[]>; // parentId -> children
+  issuesByProject: Record<string, IssueOption[]>; // projectId -> issues
+  activitiesByProject: Record<string, ActivityOption[]>; // projectId -> activities
+}
+
+// Row-specific cascade data for efficient single-row updates
+export interface RowCascadeData {
+  childProjects?: ProjectOption[];
+  issues?: IssueOption[];
+  activities?: ActivityOption[];
 }
 
 export interface UpdateRowMessage {
   type: "updateRow";
   row: TimeSheetRow;
   totals: DailyTotals;
+  rowCascadeData?: RowCascadeData; // Include cascade data for this specific row
 }
 
 export interface UpdateChildProjectsMessage {
