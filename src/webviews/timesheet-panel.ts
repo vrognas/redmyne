@@ -104,13 +104,7 @@ export class TimeSheetPanel {
     getCachedIssues?: () => Issue[]
   ): TimeSheetPanel {
     const column = vscode.window.activeTextEditor?.viewColumn;
-
-    // Auto-enable draft mode
     const draftModeManager = getDraftModeManager();
-    if (draftModeManager && !draftModeManager.isEnabled) {
-      draftModeManager.enable();
-      showStatusBarMessage("$(pencil) Draft Mode enabled", 2000);
-    }
 
     // If panel exists, reveal it
     if (TimeSheetPanel.currentPanel) {
