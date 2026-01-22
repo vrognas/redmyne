@@ -2203,7 +2203,7 @@ export class TimeSheetPanel {
         </label>
         <div class="toolbar-separator"></div>
         <button id="undoBtn" class="toolbar-btn" disabled data-tooltip="Undo (Ctrl+Z)">↩ Undo</button>
-        <button id="redoBtn" class="toolbar-btn" disabled data-tooltip="Redo (Ctrl+Shift+Z)">↪ Redo</button>
+        <button id="redoBtn" class="toolbar-btn" disabled data-tooltip="Redo (Ctrl+Y)">↪ Redo</button>
         <div class="toolbar-separator"></div>
         <button id="copyWeekBtn" class="toolbar-btn" data-tooltip="Copy week (Ctrl+C)">📋 Copy</button>
         <button id="pasteWeekBtn" class="toolbar-btn" data-tooltip="Paste week (Ctrl+V)">📥 Paste</button>
