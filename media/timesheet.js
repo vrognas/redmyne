@@ -158,6 +158,26 @@
           console.log("[Timesheet] applyAction aggregatedCell: input not found for", action.aggRowId, action.dayIndex);
         }
         break;
+      case "aggregatedField":
+        console.log("[Timesheet] applyAction aggregatedField: sending updateAggregatedField", { aggRowId: action.aggRowId, field: action.field, value, sourceRowIds: action.sourceRowIds });
+        vscode.postMessage({
+          type: "updateAggregatedField",
+          aggRowId: action.aggRowId,
+          field: action.field,
+          value: value,
+          sourceRowIds: action.sourceRowIds,
+          confirmed: true,
+          skipUndo: true,
+        });
+        // Update input visually
+        const fieldInput = document.querySelector(
+          `tr[data-row-id="${action.aggRowId}"] .comments-input`
+        );
+        if (fieldInput) {
+          fieldInput.value = value || "";
+          console.log("[Timesheet] applyAction aggregatedField: updated input visually to", value);
+        }
+        break;
     }
   }
 
@@ -588,12 +608,31 @@
     commentsInput.value = row.comments || "";
     commentsInput.placeholder = isRowComplete ? "" : "Select client/project/task/activity first";
     commentsInput.disabled = !isRowComplete;
+    // Store original value for undo
+    let commentsOldValue = row.comments || null;
+    commentsInput.addEventListener("focus", (e) => {
+      commentsOldValue = e.target.value.trim() || null;
+    });
     // Aggregated rows can edit comments (will update all source entries)
     commentsInput.addEventListener("blur", (e) => {
       const value = e.target.value.trim() || null;
-      console.log("[Timesheet] comments blur:", { rowId: row.id, isAggregated, sourceRowIds: row.sourceRowIds, value });
+      console.log("[Timesheet] comments blur:", { rowId: row.id, isAggregated, sourceRowIds: row.sourceRowIds, value, oldValue: commentsOldValue });
+      // Skip if unchanged
+      if (value === commentsOldValue) {
+        console.log("[Timesheet] comments blur: unchanged, skipping");
+        return;
+      }
       if (isAggregated && row.sourceRowIds?.length > 0) {
         console.log("[Timesheet] comments blur: sending updateAggregatedField for", row.sourceRowIds.length, "entries");
+        // Push to undo stack
+        pushUndo({
+          type: "aggregatedField",
+          aggRowId: row.id,
+          field: "comments",
+          oldValue: commentsOldValue,
+          newValue: value,
+          sourceRowIds: row.sourceRowIds,
+        });
         vscode.postMessage({
           type: "updateAggregatedField",
           aggRowId: row.id,
@@ -603,6 +642,14 @@
           confirmed: false,
         });
       } else {
+        // Push to undo stack for single row
+        pushUndo({
+          type: "field",
+          rowId: row.id,
+          field: "comments",
+          oldValue: commentsOldValue,
+          newValue: value,
+        });
         vscode.postMessage({
           type: "updateRowField",
           rowId: row.id,
