@@ -218,6 +218,16 @@ export interface RequestAggregatedCellConfirmMessage {
   sourceEntries: SourceEntry[];
 }
 
+export interface RequestAggregatedFieldConfirmMessage {
+  type: "requestAggregatedFieldConfirm";
+  aggRowId: string;
+  field: "parentProject" | "project" | "issue" | "activity" | "comments";
+  value: number | string | null;
+  oldValue: number | string | null;
+  sourceRowIds: string[];
+  sourceEntryCount: number;
+}
+
 export type ExtensionToWebviewMessage =
   | RenderMessage
   | UpdateRowMessage
@@ -232,7 +242,8 @@ export type ExtensionToWebviewMessage =
   | RowDuplicatedMessage
   | RowDeletedMessage
   | ShowToastMessage
-  | RequestAggregatedCellConfirmMessage;
+  | RequestAggregatedCellConfirmMessage
+  | RequestAggregatedFieldConfirmMessage;
 
 // --- Webview -> Extension Messages ---
 

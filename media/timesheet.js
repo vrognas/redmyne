@@ -591,7 +591,9 @@
     // Aggregated rows can edit comments (will update all source entries)
     commentsInput.addEventListener("blur", (e) => {
       const value = e.target.value.trim() || null;
+      console.log("[Timesheet] comments blur:", { rowId: row.id, isAggregated, sourceRowIds: row.sourceRowIds, value });
       if (isAggregated && row.sourceRowIds?.length > 0) {
+        console.log("[Timesheet] comments blur: sending updateAggregatedField for", row.sourceRowIds.length, "entries");
         vscode.postMessage({
           type: "updateAggregatedField",
           aggRowId: row.id,
@@ -1267,6 +1269,11 @@
       case "requestAggregatedCellConfirm":
         // Extension is asking us to confirm editing multiple entries
         handleAggregatedCellConfirm(message);
+        break;
+
+      case "requestAggregatedFieldConfirm":
+        // Extension is asking us to confirm field change on multiple entries
+        handleAggregatedFieldConfirm(message);
         break;
     }
   });
@@ -1969,6 +1976,40 @@
       dayIndex,
       newHours,
       sourceEntries,
+      confirmed: true,
+    });
+  }
+
+  /**
+   * Handle confirmation request for field change on aggregated row with multiple entries
+   * Uses toast+undo pattern instead of blocking confirm dialog
+   */
+  function handleAggregatedFieldConfirm(message) {
+    const { aggRowId, field, value, oldValue, sourceRowIds, sourceEntryCount } = message;
+    console.log("[Timesheet] handleAggregatedFieldConfirm:", { aggRowId, field, value, oldValue, sourceRowIds, sourceEntryCount });
+
+    // Apply immediately with toast showing undo option
+    showToast(
+      `Updated ${sourceEntryCount} entries`,
+      {
+        type: "updateAggregatedField",
+        aggRowId,
+        field,
+        value: oldValue, // Undo restores old value
+        sourceRowIds,
+        confirmed: true,
+      },
+      5000
+    );
+
+    // Send confirmed message to extension
+    console.log("[Timesheet] handleAggregatedFieldConfirm: sending confirmed message");
+    vscode.postMessage({
+      type: "updateAggregatedField",
+      aggRowId,
+      field,
+      value,
+      sourceRowIds,
       confirmed: true,
     });
   }

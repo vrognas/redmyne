@@ -2013,23 +2013,38 @@ export class TimeSheetPanel {
     sourceRowIds: string[],
     confirmed: boolean
   ): Promise<void> {
-    if (!this._draftQueue || !this._draftModeManager?.isEnabled) return;
+    console.log("[Timesheet] _updateAggregatedField:", { aggRowId, field, value, sourceRowIds, confirmed });
+    if (!this._draftQueue || !this._draftModeManager?.isEnabled) {
+      console.log("[Timesheet] _updateAggregatedField: draft mode not enabled, skipping");
+      return;
+    }
 
     // Find all source rows
     const sourceRows = this._rows.filter(r => sourceRowIds.includes(r.id));
+    console.log("[Timesheet] _updateAggregatedField: found sourceRows:", sourceRows.length);
     if (sourceRows.length === 0) return;
 
-    // If multiple source rows and not confirmed, request confirm
+    // Get old value from first source row for undo
+    const oldValue = this._getFieldValue(sourceRows[0], field);
+    console.log("[Timesheet] _updateAggregatedField: oldValue=", oldValue, "newValue=", value);
+
+    // If multiple source rows and not confirmed, request confirm via toast
     if (sourceRows.length > 1 && !confirmed) {
+      console.log("[Timesheet] _updateAggregatedField: requesting confirmation for", sourceRows.length, "entries");
       this._postMessage({
-        type: "showToast",
-        message: `Apply to ${sourceRows.length} entries?`,
-        duration: 0, // Persistent until action
+        type: "requestAggregatedFieldConfirm",
+        aggRowId,
+        field,
+        value,
+        oldValue,
+        sourceRowIds,
+        sourceEntryCount: sourceRows.length,
       });
       return;
     }
 
     // Apply field update to all source rows
+    console.log("[Timesheet] _updateAggregatedField: applying field update to", sourceRows.length, "rows");
     for (const row of sourceRows) {
       await this._updateRowField(row.id, field, value);
     }
@@ -2040,6 +2055,20 @@ export class TimeSheetPanel {
       message: `Updated ${sourceRows.length} entries`,
       duration: 3000,
     });
+  }
+
+  /**
+   * Get field value from row
+   */
+  private _getFieldValue(row: TimeSheetRow, field: "parentProject" | "project" | "issue" | "activity" | "comments"): number | string | null {
+    switch (field) {
+      case "parentProject": return row.parentProjectId;
+      case "project": return row.projectId;
+      case "issue": return row.issueId;
+      case "activity": return row.activityId;
+      case "comments": return row.comments;
+      default: return null;
+    }
   }
 
   /**
