@@ -181,14 +181,14 @@ export class DraftReviewPanel implements vscode.Disposable {
         : "-";
       return `
       <tr data-id="${escapeHtml(op.id)}" tabindex="0">
-        <td class="type">${escapeHtml(op.type)}</td>
+        <td class="type"><span class="type-pill" data-type="${escapeHtml(op.type.toLowerCase())}">${escapeHtml(op.type)}</span></td>
         <td class="description">${escapeHtml(op.description)}</td>
         <td class="api-call" data-method="${escapeHtml(httpMethod)}" data-path="${escapeHtml(httpPath)}" data-body="${escapeHtml(httpDataJson)}">${apiCellContent}</td>
         <td class="issue">${op.issueId ? `#${op.issueId}` : "-"}</td>
         <td class="time">${formatTime(op.timestamp)}</td>
         <td class="actions">
-          <button class="icon-btn apply-btn" data-id="${escapeHtml(op.id)}" title="Apply this draft">✓</button>
-          <button class="icon-btn remove-btn" data-id="${escapeHtml(op.id)}" title="Remove">🗑️</button>
+          <button class="icon-btn apply-btn" data-id="${escapeHtml(op.id)}" title="Apply (Enter)">✓</button>
+          <button class="icon-btn remove-btn" data-id="${escapeHtml(op.id)}" title="Remove (⌫)">✕</button>
           <span class="row-spinner" style="display:none;"></span>
         </td>
       </tr>
@@ -210,31 +210,53 @@ export class DraftReviewPanel implements vscode.Disposable {
       font-size: var(--vscode-font-size);
       color: var(--vscode-foreground);
       background: var(--vscode-editor-background);
-      padding: 20px;
+      padding: 16px;
       margin: 0;
     }
+    /* Header */
     .header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 20px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--vscode-widget-border);
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--vscode-panel-border, var(--vscode-widget-border));
     }
+    .header-left { display: flex; flex-direction: column; gap: 6px; }
     .header-left h1 {
-      margin: 0 0 4px 0;
-      font-size: 1.3em;
-      font-weight: 500;
+      margin: 0;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--vscode-foreground);
     }
     .count {
-      color: var(--vscode-descriptionForeground);
-      font-size: 0.85em;
-    }
-    .actions-bar {
-      display: flex;
-      gap: 8px;
+      display: inline-flex;
       align-items: center;
+      gap: 6px;
+      color: var(--vscode-descriptionForeground);
+      font-size: 12px;
     }
+    .count-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 9px;
+      background: var(--vscode-badge-background);
+      color: var(--vscode-badge-foreground);
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .count-badge.empty {
+      background: var(--vscode-input-background);
+      color: var(--vscode-descriptionForeground);
+    }
+    .actions-bar { display: flex; gap: 8px; align-items: center; }
+    /* Buttons */
     .spinner {
       display: none;
       width: 12px;
@@ -251,14 +273,14 @@ export class DraftReviewPanel implements vscode.Disposable {
       background: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
       border: none;
-      padding: 6px 14px;
+      padding: 5px 12px;
       cursor: pointer;
-      border-radius: 4px;
+      border-radius: 3px;
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      font-size: 0.9em;
-      transition: background 0.15s, opacity 0.15s;
+      font-size: 12px;
+      transition: background 0.1s, opacity 0.1s;
     }
     button:hover:not(:disabled) { background: var(--vscode-button-hoverBackground); }
     button.secondary {
@@ -267,108 +289,130 @@ export class DraftReviewPanel implements vscode.Disposable {
     }
     button.secondary:hover:not(:disabled) { background: var(--vscode-button-secondaryHoverBackground); }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
-    button:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
+    button:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
+    /* Table */
     .table-container {
-      max-height: calc(100vh - 140px);
+      max-height: calc(100vh - 150px);
       overflow-y: auto;
-      border-radius: 6px;
-      border: 1px solid var(--vscode-widget-border);
-      background: var(--vscode-editor-background);
+      border-radius: 4px;
+      border: 1px solid var(--vscode-panel-border, var(--vscode-widget-border));
     }
-    table { width: 100%; border-collapse: collapse; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     th, td {
       text-align: left;
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--vscode-widget-border);
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--vscode-list-inactiveSelectionBackground, rgba(128,128,128,0.1));
     }
     th {
       font-weight: 500;
-      font-size: 0.8em;
+      font-size: 10px;
       text-transform: uppercase;
-      letter-spacing: 0.03em;
+      letter-spacing: 0.04em;
       color: var(--vscode-descriptionForeground);
-      background: var(--vscode-editorWidget-background);
+      background: var(--vscode-sideBarSectionHeader-background, var(--vscode-editorWidget-background));
       position: sticky;
       top: 0;
       z-index: 5;
     }
-    tbody tr { outline: none; transition: background 0.1s; }
+    tbody tr { outline: none; transition: background 0.1s ease-out; }
     tbody tr:hover { background: var(--vscode-list-hoverBackground); }
-    tbody tr:focus {
-      background: var(--vscode-list-focusBackground);
-      outline: 1px solid var(--vscode-focusBorder);
-      outline-offset: -1px;
-    }
-    tbody tr.selected {
+    tbody tr:focus, tbody tr.selected {
       background: var(--vscode-list-activeSelectionBackground);
       color: var(--vscode-list-activeSelectionForeground);
     }
+    tbody tr:focus { box-shadow: inset 0 0 0 1px var(--vscode-focusBorder); }
     tbody tr:last-child td { border-bottom: none; }
-    .type {
-      width: 110px;
+    /* Type pill */
+    .type { width: 90px; }
+    .type-pill {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 3px;
       font-family: var(--vscode-editor-font-family);
-      font-size: 0.82em;
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: capitalize;
+      background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.1));
       color: var(--vscode-descriptionForeground);
     }
-    .description { min-width: 180px; }
+    .type-pill[data-type="create"] {
+      background: color-mix(in srgb, var(--vscode-charts-green, #4caf50) 15%, transparent);
+      color: var(--vscode-charts-green, #4caf50);
+    }
+    .type-pill[data-type="update"] {
+      background: color-mix(in srgb, var(--vscode-charts-blue, #2196f3) 15%, transparent);
+      color: var(--vscode-charts-blue, #2196f3);
+    }
+    .type-pill[data-type="delete"] {
+      background: color-mix(in srgb, var(--vscode-charts-red, #f44336) 15%, transparent);
+      color: var(--vscode-charts-red, #f44336);
+    }
+    .description { min-width: 160px; font-size: 12px; }
     .issue {
-      width: 70px;
+      width: 60px;
       font-family: var(--vscode-editor-font-family);
-      font-size: 0.9em;
+      font-size: 11px;
       color: var(--vscode-textLink-foreground);
     }
+    /* API call */
     .api-call {
       width: 200px;
       font-family: var(--vscode-editor-font-family);
-      font-size: 0.82em;
-      position: relative;
+      font-size: 11px;
+      cursor: help;
     }
     .api-method {
       display: inline-block;
-      padding: 2px 6px;
+      padding: 1px 5px;
       border-radius: 3px;
-      font-size: 0.75em;
+      font-size: 9px;
       font-weight: 600;
-      margin-right: 6px;
-      background: var(--vscode-badge-background);
-      color: var(--vscode-badge-foreground);
+      letter-spacing: 0.02em;
+      margin-right: 5px;
+      vertical-align: middle;
     }
-    .api-method.PUT { background: var(--vscode-charts-orange, #d19a66); color: #1e1e1e; }
-    .api-method.POST { background: var(--vscode-charts-green, #98c379); color: #1e1e1e; }
-    .api-method.DELETE { background: var(--vscode-charts-red, #e06c75); color: #fff; }
-    .api-path {
-      color: var(--vscode-descriptionForeground);
-      word-break: break-all;
+    .api-method.GET {
+      background: color-mix(in srgb, var(--vscode-charts-blue, #61afef) 20%, transparent);
+      color: var(--vscode-charts-blue, #61afef);
     }
-    .time {
-      width: 80px;
-      color: var(--vscode-descriptionForeground);
-      font-size: 0.82em;
+    .api-method.POST {
+      background: color-mix(in srgb, var(--vscode-charts-green, #98c379) 20%, transparent);
+      color: var(--vscode-charts-green, #98c379);
     }
-    .actions {
-      width: 70px;
-      text-align: right;
-      white-space: nowrap;
+    .api-method.PUT {
+      background: color-mix(in srgb, var(--vscode-charts-orange, #d19a66) 20%, transparent);
+      color: var(--vscode-charts-orange, #d19a66);
     }
+    .api-method.DELETE {
+      background: color-mix(in srgb, var(--vscode-charts-red, #e06c75) 20%, transparent);
+      color: var(--vscode-charts-red, #e06c75);
+    }
+    .api-path { color: var(--vscode-descriptionForeground); word-break: break-all; vertical-align: middle; }
+    .time { width: 70px; color: var(--vscode-descriptionForeground); font-size: 11px; }
+    /* Actions */
+    .actions { width: 60px; text-align: right; white-space: nowrap; }
     .icon-btn {
       background: transparent;
-      padding: 4px 6px;
-      font-size: 0.9em;
-      min-width: 26px;
-      border-radius: 4px;
-      opacity: 0.6;
-      transition: opacity 0.15s, background 0.15s;
+      padding: 3px;
+      font-size: 12px;
+      min-width: 22px;
+      height: 22px;
+      border-radius: 3px;
+      opacity: 0;
+      transition: opacity 0.1s, background 0.1s, color 0.1s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--vscode-foreground);
     }
-    tbody tr:hover .icon-btn { opacity: 1; }
-    .icon-btn:hover:not(:disabled) {
-      opacity: 1;
-      background: var(--vscode-toolbar-hoverBackground);
-    }
-    .apply-btn:hover:not(:disabled) { color: var(--vscode-charts-green, #98c379); }
-    .remove-btn:hover:not(:disabled) { color: var(--vscode-charts-red, #e06c75); }
+    tbody tr:hover .icon-btn, tbody tr:focus .icon-btn, tbody tr.selected .icon-btn { opacity: 0.6; }
+    .icon-btn:hover:not(:disabled) { opacity: 1; background: var(--vscode-toolbar-hoverBackground); }
+    .icon-btn:focus { opacity: 1; outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+    .apply-btn:hover:not(:disabled) { color: var(--vscode-testing-iconPassed, #73c991); }
+    .remove-btn:hover:not(:disabled) { color: var(--vscode-testing-iconFailed, #f14c4c); }
     .row-spinner {
-      width: 14px;
-      height: 14px;
+      width: 12px;
+      height: 12px;
       border: 2px solid var(--vscode-descriptionForeground);
       border-top-color: transparent;
       border-radius: 50%;
@@ -377,44 +421,95 @@ export class DraftReviewPanel implements vscode.Disposable {
     }
     tr.row-loading .icon-btn { display: none; }
     tr.row-loading .row-spinner { display: inline-block !important; }
+    tr.row-loading { animation: row-pulse 1s ease-in-out infinite; }
+    @keyframes row-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    /* Empty state */
     .empty {
-      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 180px;
+      padding: 40px 24px;
       color: var(--vscode-descriptionForeground);
-      padding: 48px 24px;
+      text-align: center;
     }
-    .empty-icon { font-size: 2em; margin-bottom: 12px; opacity: 0.5; }
-    .keyboard-hint {
+    .empty-icon {
+      width: 40px;
+      height: 40px;
+      margin-bottom: 12px;
+      opacity: 0.35;
       color: var(--vscode-descriptionForeground);
-      font-size: 0.75em;
-      margin-top: 12px;
-      text-align: center;
-      opacity: 0.8;
+    }
+    .empty-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--vscode-foreground);
+      margin-bottom: 6px;
+    }
+    .empty-description {
+      font-size: 12px;
+      line-height: 1.5;
+      max-width: 260px;
+    }
+    /* Keyboard hints */
+    .keyboard-hint {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      padding: 10px 0;
+      margin-top: 8px;
+      border-top: 1px solid var(--vscode-panel-border, var(--vscode-widget-border));
+    }
+    .hint-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--vscode-descriptionForeground);
+      font-size: 11px;
     }
     kbd {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 4px;
       background: var(--vscode-keybindingLabel-background);
       color: var(--vscode-keybindingLabel-foreground);
       border: 1px solid var(--vscode-keybindingLabel-border);
+      border-bottom-width: 2px;
       border-radius: 3px;
-      padding: 2px 5px;
       font-family: var(--vscode-editor-font-family);
-      font-size: 0.85em;
-      margin: 0 2px;
+      font-size: 10px;
+      font-weight: 500;
     }
-    /* API tooltip overrides for webview-tooltip from webview-common.css */
+    /* Tooltip */
     #api-tooltip { max-width: 400px; }
+    #api-tooltip.visible { animation: tooltip-enter 0.1s ease-out; }
+    @keyframes tooltip-enter { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
+    #api-tooltip .webview-tooltip-title { font-family: var(--vscode-editor-font-family); font-size: 12px; }
     #api-tooltip .webview-tooltip-body {
       font-family: var(--vscode-editor-font-family);
+      font-size: 11px;
       white-space: pre-wrap;
-      max-height: 200px;
+      max-height: 180px;
       overflow-y: auto;
+      line-height: 1.4;
     }
+    /* Row animations */
+    @keyframes row-enter { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
+    tbody tr.entering { animation: row-enter 0.2s ease-out; }
   </style>
 </head>
 <body>
   <div class="header">
-    <div>
+    <div class="header-left">
       <h1>Pending Drafts</h1>
-      <span class="count" id="count">${operations.length} change${operations.length === 1 ? "" : "s"} queued</span>
+      <span class="count">
+        <span class="count-badge ${operations.length === 0 ? "empty" : ""}" id="count-badge">${operations.length}</span>
+        <span id="count-text">${operations.length === 1 ? "change queued" : "changes queued"}</span>
+      </span>
     </div>
     <div class="actions-bar">
       <button id="apply-all" ${operations.length === 0 ? "disabled" : ""}>
@@ -431,7 +526,11 @@ export class DraftReviewPanel implements vscode.Disposable {
   <div id="content">
     ${operations.length === 0 ? `
       <div class="empty">
-        No pending drafts. Changes you make in draft mode will appear here.
+        <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        <div class="empty-title">No pending drafts</div>
+        <div class="empty-description">Changes you make while in draft mode will be queued here for review.</div>
       </div>
     ` : `
       <div class="table-container">
@@ -452,9 +551,9 @@ export class DraftReviewPanel implements vscode.Disposable {
         </table>
       </div>
       <div class="keyboard-hint">
-        <kbd>↑</kbd><kbd>↓</kbd> Navigate
-        <kbd>Enter</kbd> Apply
-        <kbd>Backspace</kbd> Remove
+        <span class="hint-group"><kbd>↑</kbd><kbd>↓</kbd> Navigate</span>
+        <span class="hint-group"><kbd>Enter</kbd> Apply</span>
+        <span class="hint-group"><kbd>⌫</kbd> Remove</span>
       </div>
     `}
   </div>
@@ -600,12 +699,26 @@ export class DraftReviewPanel implements vscode.Disposable {
       const applyBtn = document.getElementById('apply-all');
       const discardBtn = document.getElementById('discard-all');
 
-      countEl.textContent = ops.length + ' change' + (ops.length === 1 ? '' : 's') + ' queued';
+      // Update count badge
+      const countBadge = document.getElementById('count-badge');
+      const countText = document.getElementById('count-text');
+      if (countBadge) {
+        countBadge.textContent = ops.length;
+        countBadge.classList.toggle('empty', ops.length === 0);
+      }
+      if (countText) {
+        countText.textContent = ops.length === 1 ? 'change queued' : 'changes queued';
+      }
       applyBtn.disabled = ops.length === 0;
       discardBtn.disabled = ops.length === 0;
 
       if (ops.length === 0) {
-        content.innerHTML = '<div class="empty">No pending drafts. Changes you make in draft mode will appear here.</div>';
+        // Empty state - use safe DOM construction
+        content.replaceChildren();
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'empty';
+        emptyDiv.innerHTML = '<svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg><div class="empty-title">No pending drafts</div><div class="empty-description">Changes you make while in draft mode will be queued here for review.</div>';
+        content.appendChild(emptyDiv);
         selectedIndex = -1;
         return;
       }
@@ -618,31 +731,30 @@ export class DraftReviewPanel implements vscode.Disposable {
           ? '<span class="api-method ' + escapeHtml(httpMethod) + '">' + escapeHtml(httpMethod) + '</span><span class="api-path">' + escapeHtml(httpPath) + '</span>'
           : '-';
         return '<tr data-id="' + escapeHtml(op.id) + '" tabindex="0">' +
-          '<td class="type">' + escapeHtml(op.type) + '</td>' +
+          '<td class="type"><span class="type-pill" data-type="' + escapeHtml(op.type.toLowerCase()) + '">' + escapeHtml(op.type) + '</span></td>' +
           '<td class="description">' + escapeHtml(op.description) + '</td>' +
           '<td class="api-call" data-method="' + escapeHtml(httpMethod) + '" data-path="' + escapeHtml(httpPath) + '" data-body="' + escapeHtml(httpDataJson) + '">' + apiCellContent + '</td>' +
           '<td class="issue">' + (op.issueId ? '#' + op.issueId : '-') + '</td>' +
           '<td class="time">' + formatTime(op.timestamp) + '</td>' +
           '<td class="actions">' +
-            '<button class="icon-btn apply-btn" data-id="' + escapeHtml(op.id) + '" title="Apply this draft">✓</button>' +
-            '<button class="icon-btn remove-btn" data-id="' + escapeHtml(op.id) + '" title="Remove">🗑️</button>' +
+            '<button class="icon-btn apply-btn" data-id="' + escapeHtml(op.id) + '" title="Apply (Enter)">✓</button>' +
+            '<button class="icon-btn remove-btn" data-id="' + escapeHtml(op.id) + '" title="Remove (⌫)">✕</button>' +
             '<span class="row-spinner" style="display:none;"></span>' +
           '</td>' +
         '</tr>';
       }).join('');
 
-      content.innerHTML =
-        '<div class="table-container">' +
-          '<table>' +
-            '<thead><tr><th>Type</th><th>Description</th><th>API Call</th><th>Issue</th><th>Time</th><th></th></tr></thead>' +
-            '<tbody id="operations-body">' + rows + '</tbody>' +
-          '</table>' +
-        '</div>' +
-        '<div class="keyboard-hint">' +
-          '<kbd>↑</kbd><kbd>↓</kbd> Navigate ' +
-          '<kbd>Enter</kbd> Apply ' +
-          '<kbd>Backspace</kbd> Remove' +
-        '</div>';
+      // Build table structure safely
+      content.replaceChildren();
+      const container = document.createElement('div');
+      container.className = 'table-container';
+      container.innerHTML = '<table><thead><tr><th>Type</th><th>Description</th><th>API Call</th><th>Issue</th><th>Time</th><th></th></tr></thead><tbody id="operations-body">' + rows + '</tbody></table>';
+      content.appendChild(container);
+
+      const hint = document.createElement('div');
+      hint.className = 'keyboard-hint';
+      hint.innerHTML = '<span class="hint-group"><kbd>↑</kbd><kbd>↓</kbd> Navigate</span><span class="hint-group"><kbd>Enter</kbd> Apply</span><span class="hint-group"><kbd>⌫</kbd> Remove</span>';
+      content.appendChild(hint);
 
       // Restore selection if still valid
       if (selectedIndex >= ops.length) {
