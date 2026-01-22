@@ -179,10 +179,14 @@ export class DraftReviewPanel implements vscode.Disposable {
       const apiCellContent = op.http
         ? `<span class="api-method ${escapeHtml(httpMethod)}">${escapeHtml(httpMethod)}</span><span class="api-path">${escapeHtml(httpPath)}</span>`
         : "-";
+      const changesPreview = formatChangesPreview(op.http?.data);
       return `
       <tr data-id="${escapeHtml(op.id)}" tabindex="0">
         <td class="type"><span class="type-pill" data-type="${escapeHtml(op.type.toLowerCase())}">${escapeHtml(op.type)}</span></td>
-        <td class="description">${escapeHtml(op.description)}</td>
+        <td class="description">
+          <div class="desc-text">${escapeHtml(op.description)}</div>
+          ${changesPreview ? `<div class="changes-preview">${changesPreview}</div>` : ""}
+        </td>
         <td class="api-call" data-method="${escapeHtml(httpMethod)}" data-path="${escapeHtml(httpPath)}" data-body="${escapeHtml(httpDataJson)}">${apiCellContent}</td>
         <td class="issue">${op.issueId ? `#${op.issueId}` : "-"}</td>
         <td class="time">${formatTime(op.timestamp)}</td>
@@ -347,7 +351,24 @@ export class DraftReviewPanel implements vscode.Disposable {
       background: color-mix(in srgb, var(--vscode-charts-red, #f44336) 15%, transparent);
       color: var(--vscode-charts-red, #f44336);
     }
-    .description { min-width: 160px; font-size: 12px; }
+    .description { min-width: 180px; font-size: 12px; }
+    .desc-text { margin-bottom: 2px; }
+    .changes-preview {
+      font-family: var(--vscode-editor-font-family);
+      font-size: 10px;
+      color: var(--vscode-descriptionForeground);
+      background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.08));
+      padding: 3px 6px;
+      border-radius: 3px;
+      margin-top: 4px;
+      max-width: 280px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .changes-preview .change-key { color: var(--vscode-symbolIcon-propertyForeground, #9cdcfe); }
+    .changes-preview .change-val { color: var(--vscode-symbolIcon-stringForeground, #ce9178); }
+    .changes-preview .change-num { color: var(--vscode-symbolIcon-numberForeground, #b5cea8); }
     .issue {
       width: 60px;
       font-family: var(--vscode-editor-font-family);
@@ -692,6 +713,41 @@ export class DraftReviewPanel implements vscode.Disposable {
         .replace(/'/g, '&#039;');
     }
 
+    function formatChangesPreview(data) {
+      if (!data) return '';
+      const entries = Object.entries(data);
+      if (entries.length === 0) return '';
+      const innerData = entries[0][1];
+      if (!innerData || typeof innerData !== 'object') return '';
+      const fields = innerData;
+      const parts = [];
+      const fieldLabels = {
+        hours: 'hours', comments: 'comment', activity_id: 'activity',
+        issue_id: 'issue', spent_on: 'date', status_id: 'status',
+        done_ratio: 'progress', priority_id: 'priority', assigned_to_id: 'assignee',
+        start_date: 'start', due_date: 'due', subject: 'subject', description: 'desc'
+      };
+      const priorityFields = ['hours', 'comments', 'subject', 'status_id', 'done_ratio', 'start_date', 'due_date'];
+      const sortedKeys = [
+        ...priorityFields.filter(k => k in fields),
+        ...Object.keys(fields).filter(k => !priorityFields.includes(k) && k in fieldLabels)
+      ];
+      for (const key of sortedKeys.slice(0, 3)) {
+        const label = fieldLabels[key] || key;
+        const value = fields[key];
+        if (value === null || value === undefined) continue;
+        let formatted;
+        if (typeof value === 'string') {
+          const truncated = value.length > 30 ? value.slice(0, 27) + '...' : value;
+          formatted = '<span class="change-key">' + escapeHtml(label) + '</span>: <span class="change-val">"' + escapeHtml(truncated) + '"</span>';
+        } else if (typeof value === 'number') {
+          formatted = '<span class="change-key">' + escapeHtml(label) + '</span>: <span class="change-num">' + value + '</span>';
+        } else continue;
+        parts.push(formatted);
+      }
+      return parts.join(' · ');
+    }
+
     function renderOperations(ops) {
       operations = ops;
       const content = document.getElementById('content');
@@ -730,9 +786,11 @@ export class DraftReviewPanel implements vscode.Disposable {
         const apiCellContent = op.http
           ? '<span class="api-method ' + escapeHtml(httpMethod) + '">' + escapeHtml(httpMethod) + '</span><span class="api-path">' + escapeHtml(httpPath) + '</span>'
           : '-';
+        const changesPreview = formatChangesPreview(op.http ? op.http.data : null);
+        const changesHtml = changesPreview ? '<div class="changes-preview">' + changesPreview + '</div>' : '';
         return '<tr data-id="' + escapeHtml(op.id) + '" tabindex="0">' +
           '<td class="type"><span class="type-pill" data-type="' + escapeHtml(op.type.toLowerCase()) + '">' + escapeHtml(op.type) + '</span></td>' +
-          '<td class="description">' + escapeHtml(op.description) + '</td>' +
+          '<td class="description"><div class="desc-text">' + escapeHtml(op.description) + '</div>' + changesHtml + '</td>' +
           '<td class="api-call" data-method="' + escapeHtml(httpMethod) + '" data-path="' + escapeHtml(httpPath) + '" data-body="' + escapeHtml(httpDataJson) + '">' + apiCellContent + '</td>' +
           '<td class="issue">' + (op.issueId ? '#' + op.issueId : '-') + '</td>' +
           '<td class="time">' + formatTime(op.timestamp) + '</td>' +
@@ -852,4 +910,70 @@ export function formatTime(timestamp: number): string {
 
   // Otherwise show date
   return date.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+/**
+ * Format a preview of the changes being made from the HTTP data payload
+ * Returns HTML string showing key fields that will be updated
+ */
+export function formatChangesPreview(data: Record<string, unknown> | undefined): string {
+  if (!data) return "";
+
+  // Extract the inner object (time_entry, issue, etc.)
+  const entries = Object.entries(data);
+  if (entries.length === 0) return "";
+
+  const [, innerData] = entries[0];
+  if (!innerData || typeof innerData !== "object") return "";
+
+  const fields = innerData as Record<string, unknown>;
+  const parts: string[] = [];
+
+  // Field display names and formatting
+  const fieldLabels: Record<string, string> = {
+    hours: "hours",
+    comments: "comment",
+    activity_id: "activity",
+    issue_id: "issue",
+    spent_on: "date",
+    status_id: "status",
+    done_ratio: "progress",
+    priority_id: "priority",
+    assigned_to_id: "assignee",
+    start_date: "start",
+    due_date: "due",
+    subject: "subject",
+    description: "desc",
+  };
+
+  // Priority order for display
+  const priorityFields = ["hours", "comments", "subject", "status_id", "done_ratio", "start_date", "due_date"];
+
+  // Get fields in priority order, then remaining fields
+  const sortedKeys = [
+    ...priorityFields.filter(k => k in fields),
+    ...Object.keys(fields).filter(k => !priorityFields.includes(k) && k in fieldLabels),
+  ];
+
+  for (const key of sortedKeys.slice(0, 3)) { // Max 3 fields
+    const label = fieldLabels[key] || key;
+    const value = fields[key];
+
+    if (value === null || value === undefined) continue;
+
+    let formatted: string;
+    if (typeof value === "string") {
+      // Truncate long strings
+      const truncated = value.length > 30 ? value.slice(0, 27) + "..." : value;
+      formatted = `<span class="change-key">${escapeHtml(label)}</span>: <span class="change-val">"${escapeHtml(truncated)}"</span>`;
+    } else if (typeof value === "number") {
+      formatted = `<span class="change-key">${escapeHtml(label)}</span>: <span class="change-num">${value}</span>`;
+    } else {
+      continue;
+    }
+
+    parts.push(formatted);
+  }
+
+  return parts.join(" · ");
 }
