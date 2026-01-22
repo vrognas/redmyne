@@ -1731,10 +1731,22 @@ export class TimeSheetPanel {
 
     if (!issueId || !activityId) return;
 
+    // Canonical resourceKey for new entries in this cell
+    const newEntryResourceKey = `ts:timeentry:new:${issueId}:${activityId}:${date}`;
+
+    if (sourceCount === 0 && newHours === 0) {
+      // Empty cell set to 0 → remove any pending CREATE (e.g., undo of create)
+      console.log("[Timesheet] _updateAggregatedCell: removing pending create for", newEntryResourceKey);
+      await this._draftQueue.removeByKey(newEntryResourceKey, TIMESHEET_SOURCE);
+      // Update local state
+      this._updateAggregatedCellLocal(sourceEntries, dayIndex, newHours, issueId, activityId, comments);
+      return;
+    }
+
     if (sourceCount === 0 && newHours > 0) {
       // Empty cell → create new entry
       // Use canonical resourceKey based on issueId:activityId:date (not rowId)
-      const resourceKey = `ts:timeentry:new:${issueId}:${activityId}:${date}`;
+      const resourceKey = newEntryResourceKey;
       await this._draftQueue.add({
         id: generateDraftId(),
         type: "createTimeEntry",

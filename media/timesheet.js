@@ -23,6 +23,7 @@
 
   // Push action to undo stack
   function pushUndo(action) {
+    console.log("[Timesheet] pushUndo:", action);
     undoStack.push(action);
     if (undoStack.length > MAX_UNDO_STACK) {
       undoStack.shift();
@@ -30,12 +31,18 @@
     // Clear redo stack on new action
     redoStack.length = 0;
     updateUndoRedoButtons();
+    console.log("[Timesheet] undoStack length:", undoStack.length, "redoStack length:", redoStack.length);
   }
 
   // Undo last action
   function undo() {
-    if (undoStack.length === 0) return;
+    console.log("[Timesheet] undo() called, undoStack length:", undoStack.length);
+    if (undoStack.length === 0) {
+      console.log("[Timesheet] undo: nothing to undo");
+      return;
+    }
     const action = undoStack.pop();
+    console.log("[Timesheet] undo: popped action:", action);
     redoStack.push(action);
     applyAction(action, true);
     updateUndoRedoButtons();
@@ -43,8 +50,13 @@
 
   // Redo last undone action
   function redo() {
-    if (redoStack.length === 0) return;
+    console.log("[Timesheet] redo() called, redoStack length:", redoStack.length);
+    if (redoStack.length === 0) {
+      console.log("[Timesheet] redo: nothing to redo");
+      return;
+    }
     const action = redoStack.pop();
+    console.log("[Timesheet] redo: popped action:", action);
     undoStack.push(action);
     applyAction(action, false);
     updateUndoRedoButtons();
@@ -59,8 +71,10 @@
   // Apply an undo/redo action
   function applyAction(action, isUndo) {
     const value = isUndo ? action.oldValue : action.newValue;
+    console.log("[Timesheet] applyAction:", { type: action.type, isUndo, value, action });
     switch (action.type) {
       case "cell":
+        console.log("[Timesheet] applyAction cell: sending updateCell", { rowId: action.rowId, dayIndex: action.dayIndex, hours: value });
         vscode.postMessage({
           type: "updateCell",
           rowId: action.rowId,
@@ -75,6 +89,9 @@
         if (input) {
           input.value = formatHours(value);
           input.classList.toggle("zero", value === 0);
+          console.log("[Timesheet] applyAction cell: updated input visually to", value);
+        } else {
+          console.log("[Timesheet] applyAction cell: input not found for", action.rowId, action.dayIndex);
         }
         break;
       case "field":
@@ -119,6 +136,7 @@
         }
         break;
       case "aggregatedCell":
+        console.log("[Timesheet] applyAction aggregatedCell: sending updateAggregatedCell", { aggRowId: action.aggRowId, dayIndex: action.dayIndex, newHours: value, sourceEntries: action.sourceEntries });
         vscode.postMessage({
           type: "updateAggregatedCell",
           aggRowId: action.aggRowId,
@@ -135,6 +153,9 @@
         if (aggInput) {
           aggInput.value = formatHours(value);
           aggInput.classList.toggle("zero", value === 0);
+          console.log("[Timesheet] applyAction aggregatedCell: updated input visually to", value);
+        } else {
+          console.log("[Timesheet] applyAction aggregatedCell: input not found for", action.aggRowId, action.dayIndex);
         }
         break;
     }
@@ -643,6 +664,7 @@
       input.addEventListener("blur", (e) => {
         const oldHours = parseFloat(e.target.dataset.oldValue) || 0;
         const newHours = parseHours(e.target.value);
+        console.log("[Timesheet] cell blur:", { rowId: row.id, dayIndex: i, oldHours, newHours, isAggregated: e.target.dataset.isAggregated });
         // Validate: day total cannot exceed 24h
         if (newHours > oldHours && wouldExceed24Hours(i, oldHours, newHours)) {
           e.target.value = formatHours(oldHours);
@@ -652,10 +674,12 @@
         e.target.value = formatHours(newHours);
         // Only send message and track undo if value changed
         if (oldHours !== newHours) {
+          console.log("[Timesheet] cell blur: value changed, processing...");
           // Check if this is an aggregated row
           if (e.target.dataset.isAggregated === "true") {
             handleAggregatedCellBlur(row, i, newHours, oldHours, cell);
           } else {
+            console.log("[Timesheet] cell blur: regular cell, pushing undo and sending updateCell");
             pushUndo({
               type: "cell",
               rowId: row.id,
@@ -670,6 +694,8 @@
               hours: newHours,
             });
           }
+        } else {
+          console.log("[Timesheet] cell blur: value unchanged, skipping");
         }
       });
       input.addEventListener("keydown", (e) => {
@@ -1867,6 +1893,7 @@
    * Determines the appropriate action based on source entry count
    */
   function handleAggregatedCellBlur(row, dayIndex, newHours, oldHours, cell) {
+    console.log("[Timesheet] handleAggregatedCellBlur:", { rowId: row.id, dayIndex, newHours, oldHours, sourceEntries: cell.sourceEntries });
     const sourceEntries = cell.sourceEntries || [];
     const sourceCount = sourceEntries.length;
 
