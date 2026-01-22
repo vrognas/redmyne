@@ -398,7 +398,7 @@ body {
 
 /* Header row */
 .timesheet-grid thead th {
-  background: color-mix(in srgb, var(--vscode-sideBar-background) 80%, var(--vscode-editor-background));
+  background: var(--vscode-sideBarSectionHeader-background, color-mix(in srgb, var(--vscode-sideBar-background) 90%, black 10%));
   font-weight: 500;
   font-size: 11px;
   text-transform: uppercase;
@@ -407,7 +407,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 10;
-  border-bottom: var(--ts-border-strong);
+  border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border, var(--vscode-panel-border));
 }
 
 /* Footer row */
