@@ -21,11 +21,12 @@ export class DraftReviewPanel implements vscode.Disposable {
 
   private readonly panel: vscode.WebviewPanel;
   private readonly queue: DraftQueue;
+  private readonly extensionUri: vscode.Uri;
   private disposables: vscode.Disposable[] = [];
   private lastOperationIds: Set<string> = new Set();
   private disposed = false;
 
-  public static createOrShow(queue: DraftQueue): DraftReviewPanel {
+  public static createOrShow(queue: DraftQueue, extensionUri: vscode.Uri): DraftReviewPanel {
     const column = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
 
     if (DraftReviewPanel.currentPanel) {
@@ -41,16 +42,18 @@ export class DraftReviewPanel implements vscode.Disposable {
       {
         enableScripts: true,
         retainContextWhenHidden: true,
+        localResourceRoots: [vscode.Uri.joinPath(extensionUri, "media")],
       }
     );
 
-    DraftReviewPanel.currentPanel = new DraftReviewPanel(panel, queue);
+    DraftReviewPanel.currentPanel = new DraftReviewPanel(panel, queue, extensionUri);
     return DraftReviewPanel.currentPanel;
   }
 
-  private constructor(panel: vscode.WebviewPanel, queue: DraftQueue) {
+  private constructor(panel: vscode.WebviewPanel, queue: DraftQueue, extensionUri: vscode.Uri) {
     this.panel = panel;
     this.queue = queue;
+    this.extensionUri = extensionUri;
 
     // Initial render
     this.panel.webview.html = this.getHtmlForWebview(this.queue.getAll());
@@ -164,6 +167,10 @@ export class DraftReviewPanel implements vscode.Disposable {
 
   private getHtmlForWebview(operations: DraftOperation[]): string {
     const nonce = getNonce();
+    const webview = this.panel.webview;
+    const commonCssUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "media", "webview-common.css")
+    );
 
     const operationRows = operations.map((op) => {
       const httpMethod = op.http?.method || "";
@@ -193,8 +200,9 @@ export class DraftReviewPanel implements vscode.Disposable {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
   <title>Draft Review</title>
+  <link rel="stylesheet" href="${commonCssUri}">
   <style>
     * { box-sizing: border-box; }
     body {
@@ -392,40 +400,11 @@ export class DraftReviewPanel implements vscode.Disposable {
       font-size: 0.85em;
       margin: 0 2px;
     }
-    /* Hover tooltip for API details - matches webview-common.css .webview-tooltip */
-    .api-tooltip {
-      position: fixed;
-      z-index: 1000;
-      max-width: 400px;
-      padding: 6px 8px;
-      border-radius: 4px;
-      background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
-      border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-editorWidget-border));
-      color: var(--vscode-editorHoverWidget-foreground, var(--vscode-editorWidget-foreground));
-      box-shadow: 0 2px 8px var(--vscode-widget-shadow);
-      font-family: var(--vscode-font-family);
-      font-size: calc(var(--vscode-font-size) - 1px);
-      line-height: 1.4;
-      pointer-events: none;
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.08s ease-out;
-    }
-    .api-tooltip.visible {
-      opacity: 1;
-      visibility: visible;
-    }
-    .api-tooltip-header {
-      font-weight: 600;
-      margin-bottom: 6px;
-      padding-bottom: 4px;
-      border-bottom: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-editorWidget-border));
-    }
-    .api-tooltip-body {
+    /* API tooltip overrides for webview-tooltip from webview-common.css */
+    #api-tooltip { max-width: 400px; }
+    #api-tooltip .webview-tooltip-body {
       font-family: var(--vscode-editor-font-family);
-      font-size: 0.9em;
       white-space: pre-wrap;
-      word-break: break-word;
       max-height: 200px;
       overflow-y: auto;
     }
@@ -480,9 +459,10 @@ export class DraftReviewPanel implements vscode.Disposable {
     `}
   </div>
 
-  <div id="api-tooltip" class="api-tooltip">
-    <div class="api-tooltip-header"></div>
-    <div class="api-tooltip-body"></div>
+  <div id="api-tooltip" class="webview-tooltip webview-tooltip--static">
+    <div class="webview-tooltip-title"></div>
+    <div class="webview-tooltip-divider"></div>
+    <div class="webview-tooltip-body"></div>
   </div>
 
   <script nonce="${nonce}">
@@ -499,8 +479,8 @@ export class DraftReviewPanel implements vscode.Disposable {
 
     // API tooltip hover
     const tooltip = document.getElementById('api-tooltip');
-    const tooltipHeader = tooltip.querySelector('.api-tooltip-header');
-    const tooltipBody = tooltip.querySelector('.api-tooltip-body');
+    const tooltipHeader = tooltip.querySelector('.webview-tooltip-title');
+    const tooltipBody = tooltip.querySelector('.webview-tooltip-body');
     let tooltipTimeout = null;
 
     document.addEventListener('mouseover', (e) => {

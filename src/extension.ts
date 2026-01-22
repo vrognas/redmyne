@@ -1702,7 +1702,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         vscode.commands.executeCommand("redmyne.refreshTimesheet");
       },
       showReviewPanel: () => {
-        DraftReviewPanel.createOrShow(draftQueue);
+        DraftReviewPanel.createOrShow(draftQueue, context.extensionUri);
       },
     })
   );
