@@ -392,35 +392,42 @@ export class DraftReviewPanel implements vscode.Disposable {
       font-size: 0.85em;
       margin: 0 2px;
     }
-    /* Hover tooltip for API details */
+    /* Hover tooltip for API details - matches webview-common.css .webview-tooltip */
     .api-tooltip {
       position: fixed;
       z-index: 1000;
-      background: var(--vscode-editorHoverWidget-background);
-      border: 1px solid var(--vscode-editorHoverWidget-border);
-      border-radius: 4px;
-      padding: 10px 12px;
       max-width: 400px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      padding: 6px 8px;
+      border-radius: 4px;
+      background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
+      border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-editorWidget-border));
+      color: var(--vscode-editorHoverWidget-foreground, var(--vscode-editorWidget-foreground));
+      box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+      font-family: var(--vscode-font-family);
+      font-size: calc(var(--vscode-font-size) - 1px);
+      line-height: 1.4;
       pointer-events: none;
       opacity: 0;
-      transition: opacity 0.15s;
+      visibility: hidden;
+      transition: opacity 0.08s ease-out;
     }
-    .api-tooltip.visible { opacity: 1; }
+    .api-tooltip.visible {
+      opacity: 1;
+      visibility: visible;
+    }
     .api-tooltip-header {
-      font-weight: 500;
-      margin-bottom: 8px;
-      padding-bottom: 6px;
-      border-bottom: 1px solid var(--vscode-widget-border);
+      font-weight: 600;
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-editorWidget-border));
     }
     .api-tooltip-body {
       font-family: var(--vscode-editor-font-family);
-      font-size: 0.85em;
+      font-size: 0.9em;
       white-space: pre-wrap;
       word-break: break-word;
       max-height: 200px;
       overflow-y: auto;
-      color: var(--vscode-descriptionForeground);
     }
   </style>
 </head>
