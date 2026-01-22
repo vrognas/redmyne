@@ -1917,7 +1917,27 @@ export class TimeSheetPanel {
     const issueSubject = existingRow?.issueSubject ?? null;
     const activityName = existingRow?.activityName ?? null;
 
-    if (sourceEntries.length === 0 && newHours > 0) {
+    if (sourceEntries.length === 0 && newHours === 0) {
+      // Undo of create: find and remove/zero-out any new row for this issue/activity/day
+      const newRowIndex = this._rows.findIndex(r =>
+        r.isNew &&
+        r.issueId === issueId &&
+        r.activityId === activityId &&
+        r.days[dayIndex]?.entryId === null &&
+        r.days[dayIndex]?.hours > 0
+      );
+      if (newRowIndex !== -1) {
+        const row = this._rows[newRowIndex];
+        // Set hours to 0 for this day
+        row.days[dayIndex] = { hours: 0, originalHours: 0, entryId: null, isDirty: false };
+        row.weekTotal = Object.values(row.days).reduce((sum, cell) => sum + cell.hours, 0);
+        // Remove row if it has no hours at all
+        if (row.weekTotal === 0) {
+          this._rows.splice(newRowIndex, 1);
+          this._clearCompletedRow(row.id);
+        }
+      }
+    } else if (sourceEntries.length === 0 && newHours > 0) {
       // Create new row for this entry
       const newRow = this._createEmptyRow();
       newRow.issueId = issueId;
