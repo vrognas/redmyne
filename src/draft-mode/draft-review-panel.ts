@@ -351,20 +351,19 @@ export class DraftReviewPanel implements vscode.Disposable {
     .desc-text { margin-bottom: 2px; }
     .changes-preview {
       font-family: var(--vscode-editor-font-family);
-      font-size: 10px;
-      color: var(--vscode-descriptionForeground);
-      background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.08));
-      padding: 3px 6px;
-      border-radius: 3px;
-      margin-top: 4px;
-      max-width: 280px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      font-size: 11px;
+      line-height: 1.4;
+      color: var(--vscode-foreground);
+      background: color-mix(in srgb, var(--vscode-badge-background) 30%, transparent);
+      border: 1px solid color-mix(in srgb, var(--vscode-badge-background) 50%, transparent);
+      padding: 4px 8px;
+      border-radius: 4px;
+      margin-top: 6px;
+      display: inline-block;
     }
-    .changes-preview .change-key { color: var(--vscode-symbolIcon-propertyForeground, #9cdcfe); }
+    .changes-preview .change-key { color: var(--vscode-symbolIcon-propertyForeground, #9cdcfe); font-weight: 500; }
     .changes-preview .change-val { color: var(--vscode-symbolIcon-stringForeground, #ce9178); }
-    .changes-preview .change-num { color: var(--vscode-symbolIcon-numberForeground, #b5cea8); }
+    .changes-preview .change-num { color: var(--vscode-symbolIcon-numberForeground, #b5cea8); font-weight: 500; }
     .issue {
       width: 60px;
       font-family: var(--vscode-editor-font-family);
