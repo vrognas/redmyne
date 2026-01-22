@@ -118,6 +118,25 @@
           });
         }
         break;
+      case "aggregatedCell":
+        vscode.postMessage({
+          type: "updateAggregatedCell",
+          aggRowId: action.aggRowId,
+          dayIndex: action.dayIndex,
+          newHours: value,
+          sourceEntries: action.sourceEntries,
+          confirmed: true,
+          skipUndo: true,
+        });
+        // Update input visually
+        const aggInput = document.querySelector(
+          `tr[data-row-id="${action.aggRowId}"] .day-cell[data-day="${action.dayIndex}"] .day-input`
+        );
+        if (aggInput) {
+          aggInput.value = formatHours(value);
+          aggInput.classList.toggle("zero", value === 0);
+        }
+        break;
     }
   }
 
@@ -1850,6 +1869,16 @@
   function handleAggregatedCellBlur(row, dayIndex, newHours, oldHours, cell) {
     const sourceEntries = cell.sourceEntries || [];
     const sourceCount = sourceEntries.length;
+
+    // Push undo action for aggregated cell edit
+    pushUndo({
+      type: "aggregatedCell",
+      aggRowId: row.id,
+      dayIndex,
+      oldValue: oldHours,
+      newValue: newHours,
+      sourceEntries,
+    });
 
     if (sourceCount === 0) {
       // Empty aggregated cell → create new entry (no confirm)
