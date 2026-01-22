@@ -255,10 +255,6 @@ export class DraftReviewPanel implements vscode.Disposable {
       font-size: 11px;
       font-weight: 600;
     }
-    .count-badge.empty {
-      background: var(--vscode-input-background);
-      color: var(--vscode-descriptionForeground);
-    }
     .actions-bar { display: flex; gap: 8px; align-items: center; }
     /* Buttons */
     .spinner {
@@ -528,7 +524,7 @@ export class DraftReviewPanel implements vscode.Disposable {
     <div class="header-left">
       <h1>Pending Drafts</h1>
       <span class="count">
-        <span class="count-badge ${operations.length === 0 ? "empty" : ""}" id="count-badge">${operations.length}</span>
+        <span class="count-badge" id="count-badge">${operations.length}</span>
         <span id="count-text">${operations.length === 1 ? "change queued" : "changes queued"}</span>
       </span>
     </div>
@@ -760,7 +756,6 @@ export class DraftReviewPanel implements vscode.Disposable {
       const countText = document.getElementById('count-text');
       if (countBadge) {
         countBadge.textContent = ops.length;
-        countBadge.classList.toggle('empty', ops.length === 0);
       }
       if (countText) {
         countText.textContent = ops.length === 1 ? 'change queued' : 'changes queued';
