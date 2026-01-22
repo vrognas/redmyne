@@ -178,6 +178,21 @@
           console.log("[Timesheet] applyAction aggregatedField: updated input visually to", value);
         }
         break;
+      case "paste":
+        // Undo/redo paste by removing/adding draft ops
+        if (isUndo) {
+          console.log("[Timesheet] applyAction paste: undoing paste, removing draftIds:", action.draftIds);
+          vscode.postMessage({
+            type: "undoPaste",
+            draftIds: action.draftIds,
+          });
+          showToast(`Undid paste of ${action.count} entries`);
+        } else {
+          // Redo paste is complex - user should just paste again
+          console.log("[Timesheet] applyAction paste: redo paste not supported, user should paste again");
+          showToast("Redo paste not supported - use Paste again");
+        }
+        break;
     }
   }
 
@@ -201,6 +216,7 @@
     weekPicker = flatpickr(weekPickerInput, {
       weekNumbers: true,
       locale: { firstDayOfWeek: 1 }, // Monday
+      positionElement: weekLabel, // Position relative to week label
       plugins: typeof weekSelectPlugin !== "undefined" ? [new weekSelectPlugin({})] : [],
       onChange: function(selectedDates) {
         if (selectedDates.length > 0) {
@@ -213,14 +229,20 @@
           vscode.postMessage({ type: "navigateWeek", direction: "date", targetDate: dateStr });
         }
       },
+      onReady: function(selectedDates, dateStr, instance) {
+        // Add "This Week" button to calendar - jumps view to current week
+        const thisWeekBtn = document.createElement("button");
+        thisWeekBtn.className = "flatpickr-this-week-btn";
+        thisWeekBtn.textContent = "This week";
+        thisWeekBtn.type = "button";
+        thisWeekBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          instance.jumpToDate(new Date());
+        });
+        instance.calendarContainer.appendChild(thisWeekBtn);
+      },
       onOpen: function(selectedDates, dateStr, instance) {
-        // Position calendar near the week label
-        const rect = weekLabel.getBoundingClientRect();
-        const calendar = this.calendarContainer;
-        if (calendar) {
-          calendar.style.top = `${rect.bottom + 4}px`;
-          calendar.style.left = `${rect.left}px`;
-        }
         // Add Escape key listener when calendar opens
         instance._escHandler = function(e) {
           if (e.key === "Escape") {
@@ -272,11 +294,19 @@
     return `W${String(week.weekNumber).padStart(2, "0")} (${startStr} - ${endStr} ${week.year})`;
   }
 
-  // Format hours for display
+  // Format hours for display (decimal)
   function formatHours(hours) {
     if (hours === 0) return "";
     if (hours === Math.floor(hours)) return hours.toString();
     return hours.toFixed(1);
+  }
+
+  // Format decimal hours as H:MM (e.g., 1.5 → "1:30", 0.75 → "0:45")
+  function formatHoursAsHHMM(hours) {
+    const totalMinutes = Math.round(hours * 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return `${h}:${m.toString().padStart(2, "0")}`;
   }
 
   // Parse hours input
@@ -697,7 +727,16 @@
         input.classList.add("aggregated-cell-input");
       }
       input.value = formatHours(cell.hours);
-      input.dataset.tooltip = ctx.week ? ctx.week.dayDates[i] : "";
+      // Tooltip: show entry ID for single entries, count for multi-entries
+      if (isAggregated && cell.sourceEntries?.length > 1) {
+        input.dataset.tooltip = `${cell.sourceEntries.length} entries`;
+      } else if (cell.entryId) {
+        input.dataset.tooltip = `#${cell.entryId}`;
+      } else if (cell.hours > 0) {
+        input.dataset.tooltip = "Draft";
+      } else {
+        input.dataset.tooltip = "";
+      }
       input.disabled = !isRowComplete;
       input.dataset.oldValue = cell.hours; // Store for undo
       // Store source entries for aggregated row handling
@@ -757,18 +796,17 @@
       });
       dayTd.appendChild(input);
 
-      // Add expand dropdown for multi-entry cells
+      // Add count badge for multi-entry cells
       if (isAggregated && sourceEntryCount > 1) {
-        // Add expand button (clicking the badge)
-        const expandBtn = document.createElement("button");
-        expandBtn.className = "expand-btn";
-        expandBtn.dataset.tooltip = isExpanded ? "Collapse" : `Expand ${sourceEntryCount} entries`;
-        expandBtn.textContent = isExpanded ? "▲" : "▼";
-        expandBtn.addEventListener("click", (e) => {
+        const badge = document.createElement("span");
+        badge.className = "multi-entry-badge";
+        badge.dataset.tooltip = isExpanded ? "Click to collapse" : `${sourceEntryCount} entries - click to expand`;
+        badge.textContent = sourceEntryCount;
+        badge.addEventListener("click", (e) => {
           e.stopPropagation();
           toggleCellExpand(row.id, i);
         });
-        dayTd.appendChild(expandBtn);
+        dayTd.appendChild(badge);
 
         // Render expanded dropdown if this cell is expanded
         if (isExpanded && cell.sourceEntries) {
@@ -1322,6 +1360,15 @@
         // Extension is asking us to confirm field change on multiple entries
         handleAggregatedFieldConfirm(message);
         break;
+
+      case "pasteComplete":
+        // Push undo action for paste operation
+        pushUndo({
+          type: "paste",
+          draftIds: message.draftIds,
+          count: message.count,
+        });
+        break;
     }
   });
 
@@ -1490,6 +1537,14 @@
   let pendingTooltipX = 0;
   let pendingTooltipY = 0;
 
+  // Track cursor position for delayed tooltips
+  let lastMouseX = 0;
+  let lastMouseY = 0;
+  document.addEventListener("pointermove", (e) => {
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+  }, { passive: true });
+
   function showIssueTooltip(target, x, y) {
     if (!issueTooltip || !tooltipContent) return;
 
@@ -1530,10 +1585,10 @@
     ];
 
     if (details.estimatedHours !== null) {
-      fields.push({ key: "Estimated", value: `${details.estimatedHours}h` });
+      fields.push({ key: "Estimated", value: formatHoursAsHHMM(details.estimatedHours) });
     }
     if (details.spentHours !== null) {
-      fields.push({ key: "Spent", value: `${details.spentHours}h` });
+      fields.push({ key: "Spent", value: formatHoursAsHHMM(details.spentHours) });
     }
     if (details.startDate) {
       fields.push({ key: "Start", value: details.startDate });
@@ -1636,7 +1691,7 @@
     tooltipShowTimer = setTimeout(() => {
       tooltipShowTimer = null;
       if (tooltipTarget === target) {
-        showIssueTooltip(target, e.clientX, e.clientY);
+        showIssueTooltip(target, lastMouseX, lastMouseY);
       }
     }, 400);
   }, true);
@@ -1728,7 +1783,7 @@
     genericTooltipTimer = setTimeout(() => {
       genericTooltipTimer = null;
       if (genericTooltipTarget === target) {
-        showGenericTooltip(target, e.clientX, e.clientY);
+        showGenericTooltip(target, lastMouseX, lastMouseY);
       }
     }, 400);
   }, true);
@@ -1843,20 +1898,61 @@
     // Prevent clicks inside dropdown from bubbling
     dropdown.addEventListener("click", (e) => e.stopPropagation());
 
-    // Header showing total
+    // Header with clear labeling
     const header = document.createElement("div");
     header.className = "dropdown-header";
+    const headerLabel = document.createElement("span");
+    headerLabel.textContent = `${sourceEntries.length} time entries`;
+    header.appendChild(headerLabel);
+
+    // Merge button - only show if 2+ saved entries (not drafts)
+    const savedEntries = sourceEntries.filter(e => e.entryId);
+    if (savedEntries.length >= 2) {
+      const mergeBtn = document.createElement("button");
+      mergeBtn.className = "dropdown-merge-btn";
+      mergeBtn.textContent = "Merge";
+      mergeBtn.dataset.tooltip = "Combine all entries into one";
+      mergeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        vscode.postMessage({
+          type: "mergeEntries",
+          aggRowId: row.id,
+          dayIndex,
+          sourceEntries: savedEntries,
+        });
+      });
+      header.appendChild(mergeBtn);
+    }
+
     const totalHours = sourceEntries.reduce((sum, e) => sum + e.hours, 0);
-    header.textContent = `${sourceEntries.length} entries (${formatHours(totalHours)})`;
+    const headerTotal = document.createElement("span");
+    headerTotal.className = "dropdown-header-total";
+    headerTotal.textContent = `${formatHours(totalHours)}h total`;
+    header.appendChild(headerTotal);
     dropdown.appendChild(header);
 
     // List of individual entries
     const list = document.createElement("div");
     list.className = "dropdown-entry-list";
 
-    for (const entry of sourceEntries) {
+    sourceEntries.forEach((entry, index) => {
       const entryRow = document.createElement("div");
       entryRow.className = "dropdown-entry";
+
+      // Context label first (entry ID or Draft status)
+      const contextLabel = document.createElement("span");
+      contextLabel.className = "dropdown-entry-context";
+      if (!entry.entryId) {
+        contextLabel.textContent = "Draft";
+        contextLabel.classList.add("draft");
+        contextLabel.dataset.tooltip = `Draft entry on ${entry.spentOn}`;
+      } else {
+        contextLabel.textContent = `#${entry.entryId}`;
+        const date = new Date(entry.spentOn + "T12:00:00");
+        const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        contextLabel.dataset.tooltip = `Created on ${dateStr}`;
+      }
+      entryRow.appendChild(contextLabel);
 
       // Hours input
       const hoursInput = document.createElement("input");
@@ -1901,12 +1997,6 @@
       });
       entryRow.appendChild(hoursInput);
 
-      // Entry ID label
-      const idLabel = document.createElement("span");
-      idLabel.className = "dropdown-entry-id";
-      idLabel.textContent = `#${entry.entryId}`;
-      entryRow.appendChild(idLabel);
-
       // Delete button
       const deleteBtn = document.createElement("button");
       deleteBtn.className = "dropdown-entry-delete";
@@ -1926,18 +2016,8 @@
       entryRow.appendChild(deleteBtn);
 
       list.appendChild(entryRow);
-    }
-    dropdown.appendChild(list);
-
-    // Close button
-    const closeBtn = document.createElement("button");
-    closeBtn.className = "dropdown-close-btn";
-    closeBtn.textContent = "Close";
-    closeBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      collapseAllCells();
     });
-    dropdown.appendChild(closeBtn);
+    dropdown.appendChild(list);
 
     return dropdown;
   }
@@ -2060,6 +2140,16 @@
       confirmed: true,
     });
   }
+
+  // Click outside to close expanded cell dropdowns
+  document.addEventListener("click", (e) => {
+    if (state.expandedCells.size === 0) return;
+    const dropdown = e.target.closest(".expanded-cell-dropdown");
+    const badge = e.target.closest(".multi-entry-badge");
+    if (!dropdown && !badge) {
+      collapseAllCells();
+    }
+  });
 
   // Notify extension that webview is ready
   vscode.postMessage({ type: "webviewReady" });

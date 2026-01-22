@@ -418,6 +418,18 @@ export class TimeSheetPanel {
           message.dayIndex
         );
         break;
+
+      case "mergeEntries":
+        await this._mergeEntries(
+          message.aggRowId,
+          message.dayIndex,
+          message.sourceEntries
+        );
+        break;
+
+      case "undoPaste":
+        await this._undoPaste(message.draftIds);
+        break;
     }
   }
 
@@ -779,9 +791,10 @@ export class TimeSheetPanel {
           }
         }
       } else if (op.type === "createTimeEntry" && op.tempId) {
-        // Parse tempId - two formats:
-        // 1. Normal: "rowId:dayIndex"
-        // 2. Aggregated: "agg-{issueId}::{activityId}::{comments}:{dayIndex}"
+        // Parse tempId - three formats:
+        // 1. Aggregated: "agg-{issueId}::{activityId}::{comments}:{dayIndex}"
+        // 2. Paste: "draft-timeentry-xxx" (data in http body)
+        // 3. Normal: "rowId:dayIndex"
         console.log("[Timesheet] createTimeEntry tempId:", op.tempId);
 
         if (op.tempId.startsWith("agg-")) {
@@ -807,6 +820,56 @@ export class TimeSheetPanel {
             row.days[dayIndex] = { ...cell, hours, isDirty: true };
             row.weekTotal = Object.values(row.days).reduce((sum, c) => sum + c.hours, 0);
           }
+        } else if (op.tempId.startsWith("draft-timeentry-")) {
+          // Paste format: extract data from http body, find/create row
+          const timeEntry = op.http?.data?.time_entry;
+          if (!timeEntry) continue;
+
+          const issueId = timeEntry.issue_id;
+          const activityId = timeEntry.activity_id;
+          const projectId = timeEntry.project_id;
+          const hours = timeEntry.hours || 0;
+          const spentOn = timeEntry.spent_on;
+          const comments = timeEntry.comments || "";
+
+          // Calculate dayIndex from spent_on
+          const dayIndex = this._currentWeek.dayDates.indexOf(spentOn);
+          if (dayIndex < 0) continue; // Not in current week
+
+          console.log("[Timesheet] Paste: issueId:", issueId, "activityId:", activityId, "projectId:", projectId, "dayIndex:", dayIndex, "hours:", hours);
+
+          // Find existing row with same issue/activity/comments, or create new one
+          let row = this._rows.find(
+            (r) => r.issueId === issueId && r.activityId === activityId && (r.comments || "") === comments
+          );
+
+          if (!row) {
+            // Create new row for this draft entry
+            row = this._createEmptyRow();
+            row.issueId = issueId;
+            row.activityId = activityId;
+            row.projectId = projectId ?? null;
+            row.comments = comments;
+            row.isNew = true;
+            this._rows.push(row);
+            console.log("[Timesheet] Created new row for paste:", row.id);
+
+            // Try to look up project info from cached data
+            if (projectId) {
+              const project = this._projects.find((p) => p.id === projectId);
+              if (project) {
+                row.projectName = project.name;
+                row.parentProjectId = project.parentId ?? null;
+                const parent = this._parentProjects.find((p) => p.id === project.parentId);
+                row.parentProjectName = parent?.name ?? null;
+              }
+            }
+          }
+
+          // Apply hours to this day
+          const cell = row.days[dayIndex] || { hours: 0, originalHours: 0, entryId: null, isDirty: false };
+          row.days[dayIndex] = { ...cell, hours: cell.hours + hours, isDirty: true };
+          row.weekTotal = Object.values(row.days).reduce((sum, c) => sum + c.hours, 0);
         } else {
           // Normal row format: "rowId:dayIndex"
           const lastColonIdx = op.tempId.lastIndexOf(":");
@@ -1618,6 +1681,7 @@ export class TimeSheetPanel {
           activity_id: row.activityId,
           hours: String(cell.hours),
           comments: row.comments || "",
+          project_id: row.projectId ?? undefined,
         };
 
         allEntries.push(entry);
@@ -1660,6 +1724,7 @@ export class TimeSheetPanel {
 
     try {
       let created = 0;
+      const pastedDraftIds: string[] = [];
 
       // Paste entries for each day in the weekMap
       for (const [dayOffset, entries] of clipboard.weekMap) {
@@ -1668,10 +1733,11 @@ export class TimeSheetPanel {
 
         for (const entry of entries) {
           const tempId = generateTempId("timeentry");
+          const draftId = generateDraftId();
           // Use canonical resourceKey for new entries
           const resourceKey = `ts:timeentry:new:${entry.issue_id}:${entry.activity_id}:${targetDate}`;
           await this._draftQueue.add({
-            id: generateDraftId(),
+            id: draftId,
             type: "createTimeEntry",
             timestamp: Date.now(),
             issueId: entry.issue_id,
@@ -1687,11 +1753,13 @@ export class TimeSheetPanel {
                   activity_id: entry.activity_id,
                   spent_on: targetDate,
                   comments: entry.comments,
+                  project_id: entry.project_id,
                 },
               },
             },
             resourceKey,
           }, TIMESHEET_SOURCE);
+          pastedDraftIds.push(draftId);
           created++;
         }
       }
@@ -1700,11 +1768,32 @@ export class TimeSheetPanel {
 
       // Reload week to show new entries
       await this._loadWeek(this._currentWeek);
+
+      // Send undo data to webview
+      if (pastedDraftIds.length > 0) {
+        this._postMessage({
+          type: "pasteComplete",
+          draftIds: pastedDraftIds,
+          count: created,
+        });
+      }
     } catch (error) {
       this._postMessage({ type: "showError", message: `Failed to paste: ${error}` });
     } finally {
       this._postMessage({ type: "setLoading", loading: false });
     }
+  }
+
+  private async _undoPaste(draftIds: string[]): Promise<void> {
+    if (!this._draftQueue) return;
+
+    // Remove each draft op by ID
+    for (const draftId of draftIds) {
+      await this._draftQueue.remove(draftId, TIMESHEET_SOURCE);
+    }
+
+    // Reload to reflect changes
+    await this._loadWeek(this._currentWeek);
   }
 
   private async _enableDraftMode(): Promise<void> {
@@ -2205,6 +2294,75 @@ export class TimeSheetPanel {
     await this._loadWeek(this._currentWeek);
   }
 
+  /**
+   * Merge multiple entries into one (sum hours, keep first entry, delete rest)
+   */
+  private async _mergeEntries(
+    aggRowId: string,
+    dayIndex: number,
+    sourceEntries: Array<{
+      entryId: number;
+      hours: number;
+      rowId: string;
+      issueId: number;
+      activityId: number;
+      comments: string;
+      spentOn: string;
+    }>
+  ): Promise<void> {
+    if (!this._draftQueue || !this._draftModeManager?.isEnabled) {
+      this._postMessage({ type: "showError", message: "Draft mode required for merge" });
+      return;
+    }
+
+    if (sourceEntries.length < 2) return;
+
+    // Sort by entryId to keep oldest (lowest ID) as target
+    const sorted = [...sourceEntries].sort((a, b) => a.entryId - b.entryId);
+    const targetEntry = sorted[0];
+    const entriesToDelete = sorted.slice(1);
+
+    // Sum all hours
+    const totalHours = sourceEntries.reduce((sum, e) => sum + e.hours, 0);
+
+    // Queue update for target entry with total hours
+    await this._draftQueue.add({
+      id: generateDraftId(),
+      type: "updateTimeEntry",
+      timestamp: Date.now(),
+      resourceId: targetEntry.entryId,
+      description: `Merge ${sourceEntries.length} entries → ${totalHours}h`,
+      resourceKey: `ts:timeentry:${targetEntry.entryId}`,
+      http: {
+        method: "PUT",
+        path: `/time_entries/${targetEntry.entryId}.json`,
+        data: { time_entry: { hours: totalHours } },
+      },
+    }, TIMESHEET_SOURCE);
+
+    // Queue delete for all other entries
+    for (const entry of entriesToDelete) {
+      await this._draftQueue.add({
+        id: generateDraftId(),
+        type: "deleteTimeEntry",
+        timestamp: Date.now(),
+        resourceId: entry.entryId,
+        description: `Delete merged entry ${entry.entryId}`,
+        resourceKey: `ts:timeentry:${entry.entryId}`,
+        http: {
+          method: "DELETE",
+          path: `/time_entries/${entry.entryId}.json`,
+        },
+      }, TIMESHEET_SOURCE);
+    }
+
+    // Show toast
+    showStatusBarMessage(`$(git-merge) Merged ${sourceEntries.length} entries (${totalHours}h)`, 3000);
+
+    // Reload to reflect changes
+    await this._loadWeek(this._currentWeek);
+  }
+
   private _getHtml(): string {
     const webview = this._panel.webview;
     const commonCssUri = webview.asWebviewUri(
@@ -2241,33 +2399,29 @@ export class TimeSheetPanel {
 <body class="${this._draftModeManager?.isEnabled ? "" : "draft-mode-disabled"}">
   <div class="timesheet-container">
     <header class="timesheet-header">
-      <div class="header-left">
-        <h1>Time Sheet</h1>
-        <select id="groupBySelect" class="toolbar-select" data-tooltip="Group by">
-          <option value="none">No grouping</option>
-          <option value="client">By Client</option>
-          <option value="project">By Project</option>
-          <option value="issue">By Task</option>
-          <option value="activity">By Activity</option>
-        </select>
-        <label class="toolbar-checkbox" data-tooltip="Merge identical rows (same task+activity+comment)">
-          <input type="checkbox" id="aggregateToggle">
-          <span>Aggregate</span>
-        </label>
-        <div class="toolbar-separator"></div>
-        <button id="undoBtn" class="toolbar-btn" disabled data-tooltip="Undo (Ctrl+Z)">↩ Undo</button>
-        <button id="redoBtn" class="toolbar-btn" disabled data-tooltip="Redo (Ctrl+Y)">↪ Redo</button>
-        <div class="toolbar-separator"></div>
-        <button id="copyWeekBtn" class="toolbar-btn" data-tooltip="Copy week (Ctrl+C)">📋 Copy</button>
-        <button id="pasteWeekBtn" class="toolbar-btn" data-tooltip="Paste week (Ctrl+V)">📥 Paste</button>
-      </div>
-      <div class="week-nav">
-        <button id="prevWeek" class="nav-btn" data-tooltip="Previous week">‹</button>
-        <span id="weekLabel" class="week-label-picker" data-tooltip="Click to pick a week">Loading...</span>
-        <input type="text" id="weekPickerInput" class="week-picker-input" readonly>
-        <button id="nextWeek" class="nav-btn" data-tooltip="Next week">›</button>
-        <button id="todayBtn" class="nav-btn today-btn" data-tooltip="Go to current week">Today</button>
-      </div>
+      <select id="groupBySelect" class="native-select" data-tooltip="Group rows">
+        <option value="none">No grouping</option>
+        <option value="client">By client</option>
+        <option value="project">By project</option>
+        <option value="issue">By task</option>
+        <option value="activity">By activity</option>
+      </select>
+      <label class="toolbar-checkbox" data-tooltip="View identical rows as one merged row">
+        <input type="checkbox" id="aggregateToggle">
+        <span>View as merged</span>
+      </label>
+      <div class="toolbar-spacer"></div>
+      <button id="undoBtn" class="toolbar-btn" data-tooltip="Undo (Ctrl+Z)" disabled>↶</button>
+      <button id="redoBtn" class="toolbar-btn" data-tooltip="Redo (Ctrl+Y)" disabled>↷</button>
+      <div class="toolbar-separator"></div>
+      <button id="copyWeekBtn" class="toolbar-btn text-btn" data-tooltip="Copy week">Copy</button>
+      <button id="pasteWeekBtn" class="toolbar-btn text-btn" data-tooltip="Paste week">Paste</button>
+      <div class="toolbar-separator"></div>
+      <button id="prevWeek" class="toolbar-btn" data-tooltip="Previous week">‹</button>
+      <span id="weekLabel" class="week-label-picker" data-tooltip="Click to pick week">Loading...</span>
+      <input type="text" id="weekPickerInput" class="week-picker-input" readonly>
+      <button id="nextWeek" class="toolbar-btn" data-tooltip="Next week">›</button>
+      <button id="todayBtn" class="toolbar-btn text-btn" data-tooltip="Current week">T</button>
     </header>
 
     <div id="draftModeWarning" class="draft-mode-warning${this._draftModeManager?.isEnabled ? " hidden" : ""}">
@@ -2310,13 +2464,9 @@ export class TimeSheetPanel {
       </table>
       <div id="addRowContainer" class="add-row-container">
         <button id="addEntryBtn" class="add-entry-btn">+ Add Time Entry...</button>
+        <button id="saveBtn" class="save-btn">Save to Redmine Server</button>
       </div>
     </div>
-
-    <footer class="timesheet-footer">
-      <div class="footer-spacer"></div>
-      <button id="saveBtn" class="save-btn">Save to Redmine Server</button>
-    </footer>
   </div>
 
   <div id="loadingOverlay" class="loading-overlay hidden">

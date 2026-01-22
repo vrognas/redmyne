@@ -65,168 +65,160 @@ body {
   position: relative;
 }
 
-/* ========== Header ========== */
+/* ========== Header - Single Row Native VS Code Style ========== */
 .timesheet-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  height: 32px;
+  padding: 0 8px;
   flex-shrink: 0;
-  padding-bottom: 8px;
-  border-bottom: var(--ts-border);
+  gap: 4px;
+  border-bottom: 1px solid var(--vscode-panel-border);
 }
 
-.header-left {
+/* Spacer pushes right content */
+.toolbar-spacer {
+  flex: 1;
+}
+
+/* Hide h1 title - week label serves as title */
+.timesheet-header h1 {
+  display: none;
+}
+
+/* Ghost icon buttons - VS Code native 22x22 */
+.toolbar-btn {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--vscode-foreground);
+  opacity: 0.6;
+  font-size: 14px;
+  cursor: pointer;
+  transition: opacity 0.1s, background 0.1s;
 }
 
-.timesheet-header h1 {
-  margin: 0;
-  font-size: 14px;
+.toolbar-btn:hover:not(:disabled) {
+  opacity: 1;
+  background: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31));
+}
+
+.toolbar-btn:active:not(:disabled) {
+  background: var(--vscode-toolbar-activeBackground, rgba(99, 102, 103, 0.31));
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.toolbar-btn kbd {
+  display: none;
+}
+
+/* Text buttons (Copy/Paste) */
+.toolbar-btn.text-btn {
+  width: auto;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Week label - clickable picker */
+#weekLabel {
+  font-size: 11px;
   font-weight: 500;
   color: var(--vscode-foreground);
-  letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 
-.toolbar-select {
+.week-label-picker {
+  cursor: pointer;
   padding: 4px 8px;
-  border: 1px solid var(--vscode-dropdown-border, var(--vscode-panel-border));
+  border-radius: 3px;
+  transition: background 0.1s;
+}
+
+.week-label-picker:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31));
+}
+
+/* Native select dropdown */
+.native-select {
+  padding: 2px 6px;
+  border: 1px solid var(--vscode-dropdown-border);
   border-radius: 3px;
   background: var(--vscode-dropdown-background);
   color: var(--vscode-dropdown-foreground);
   font-family: var(--ts-font-sans);
   font-size: 11px;
   cursor: pointer;
-}
-
-.toolbar-select:hover {
-  border-color: var(--vscode-focusBorder);
-}
-
-.toolbar-select:focus {
   outline: none;
+}
+
+.native-select:hover {
   border-color: var(--vscode-focusBorder);
 }
 
+.native-select:focus {
+  border-color: var(--vscode-focusBorder);
+  outline: none;
+}
+
+/* Hide separators - use gaps only */
 .toolbar-separator {
-  width: 1px;
-  height: 20px;
-  background: var(--vscode-panel-border);
-  margin: 0 4px;
-}
-
-.toolbar-btn {
-  padding: 4px 10px;
-  border: 1px solid transparent;
-  border-radius: 3px;
+  width: 8px;
+  height: 1px;
   background: transparent;
-  color: var(--vscode-foreground);
-  font-family: var(--ts-font-sans);
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 0.15s ease;
+  margin: 0;
 }
 
-.toolbar-btn:hover {
-  background: var(--ts-hover-bg);
-  border-color: color-mix(in srgb, var(--vscode-panel-border) 50%, transparent);
+/* No visual grouping */
+.toolbar-btn-group {
+  display: flex;
+  gap: 0;
 }
 
-.toolbar-btn:active {
-  background: var(--ts-active-bg);
+.toolbar-btn-group .toolbar-btn {
+  border-radius: 3px;
 }
 
-/* Toolbar checkbox (aggregate toggle) */
+/* Checkbox - compact */
 .toolbar-checkbox {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
-  font-family: var(--ts-font-sans);
+  padding: 2px 6px;
   font-size: 11px;
   color: var(--vscode-foreground);
+  opacity: 0.7;
   cursor: pointer;
   border-radius: 3px;
-  transition: background 0.15s ease;
+  transition: opacity 0.1s, background 0.1s;
+  user-select: none;
 }
 
 .toolbar-checkbox:hover {
-  background: var(--ts-hover-bg);
+  opacity: 1;
+  background: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31));
+}
+
+.toolbar-checkbox:has(input:checked) {
+  opacity: 1;
 }
 
 .toolbar-checkbox input[type="checkbox"] {
+  width: 13px;
+  height: 13px;
   margin: 0;
   cursor: pointer;
-  accent-color: var(--vscode-button-background);
-}
-
-.week-nav {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-/* Ghost-style navigation buttons */
-.nav-btn {
-  background: transparent;
-  color: var(--vscode-foreground);
-  border: none;
-  padding: 6px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.nav-btn:hover {
-  background: var(--ts-hover-bg);
-}
-
-.nav-btn:active {
-  background: var(--ts-active-bg);
-}
-
-.today-btn {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 5px 10px;
-  color: var(--vscode-descriptionForeground);
-}
-
-.today-btn:hover {
-  color: var(--vscode-foreground);
-}
-
-#weekLabel {
-  font-size: 12px;
-  min-width: 200px;
-  text-align: center;
-  color: var(--vscode-descriptionForeground);
-  font-weight: 400;
-  font-family: var(--ts-font-sans);
-}
-
-/* Week picker label - clickable */
-.week-label-picker {
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 3px;
-  transition: background 0.1s ease, color 0.1s ease;
-}
-
-.week-label-picker:hover {
-  background: var(--ts-hover-bg);
-  color: var(--vscode-foreground);
-}
-
-.week-label-picker::after {
-  content: " ▼";
-  font-size: 8px;
-  opacity: 0.5;
+  accent-color: var(--vscode-textLink-foreground);
 }
 
 /* Hidden input for flatpickr */
@@ -238,32 +230,51 @@ body {
   pointer-events: none;
 }
 
-/* Flatpickr dark theme overrides for VS Code */
+/* Flatpickr dark theme overrides for VS Code - tooltip style */
 .flatpickr-calendar {
   background: var(--vscode-editorWidget-background, var(--vscode-dropdown-background)) !important;
-  border: 1px solid var(--vscode-editorWidget-border, var(--vscode-dropdown-border)) !important;
-  border-radius: 4px !important;
-  box-shadow: 0 4px 16px var(--vscode-widget-shadow) !important;
+  border: 1px solid var(--vscode-focusBorder) !important;
+  border-radius: 8px !important;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--vscode-focusBorder) 30%, transparent),
+    0 4px 20px var(--vscode-widget-shadow),
+    0 0 12px color-mix(in srgb, var(--vscode-focusBorder) 25%, transparent) !important;
   font-family: var(--vscode-font-family) !important;
-  font-size: calc(var(--vscode-font-size, 13px) - 1px) !important;
+  font-size: var(--vscode-font-size, 13px) !important;
+  overflow: hidden !important;
 }
 
 .flatpickr-months {
   background: var(--vscode-editorWidget-background, var(--vscode-dropdown-background)) !important;
+  padding: 4px 0 !important;
+  border-radius: 8px 8px 0 0 !important;
 }
 
 .flatpickr-month {
   color: var(--vscode-foreground) !important;
   fill: var(--vscode-foreground) !important;
+  height: 32px !important;
 }
 
 .flatpickr-current-month {
   color: var(--vscode-foreground) !important;
   font-family: var(--vscode-font-family) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  padding-top: 6px !important;
+}
+
+.flatpickr-current-month .flatpickr-monthDropdown-months {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
 }
 
 .flatpickr-current-month input.cur-year {
   font-family: var(--vscode-font-family) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
 }
 
 /* Navigation arrows */
@@ -271,19 +282,24 @@ body {
 .flatpickr-next-month {
   fill: var(--vscode-foreground) !important;
   color: var(--vscode-foreground) !important;
-  padding: 4px !important;
-  border-radius: 3px !important;
-  transition: background 0.1s ease !important;
+  padding: 6px !important;
+  border-radius: 4px !important;
+  transition: background 0.1s ease, opacity 0.1s ease !important;
+  opacity: 0.7 !important;
+  top: 6px !important;
 }
 
 .flatpickr-prev-month:hover,
 .flatpickr-next-month:hover {
-  background: var(--vscode-list-hoverBackground) !important;
+  background: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31)) !important;
+  opacity: 1 !important;
 }
 
 .flatpickr-prev-month svg,
 .flatpickr-next-month svg {
   fill: var(--vscode-foreground) !important;
+  width: 10px !important;
+  height: 10px !important;
 }
 
 .flatpickr-prev-month:hover svg,
@@ -295,62 +311,118 @@ body {
   background: var(--vscode-dropdown-background) !important;
   color: var(--vscode-dropdown-foreground) !important;
   font-family: var(--vscode-font-family) !important;
+  border: 1px solid var(--vscode-dropdown-border) !important;
+  border-radius: 4px !important;
+  padding: 2px 4px !important;
 }
 
 .flatpickr-weekdays {
   background: var(--vscode-editorWidget-background, var(--vscode-dropdown-background)) !important;
+  padding: 4px 4px 0 !important;
 }
 
 .flatpickr-weekday {
   color: var(--vscode-descriptionForeground) !important;
   font-family: var(--vscode-font-family) !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
 }
 
 .flatpickr-days {
   background: var(--vscode-editorWidget-background, var(--vscode-dropdown-background)) !important;
   border: none !important;
+  border-radius: 0 0 8px 8px !important;
+  padding: 4px !important;
 }
 
 .flatpickr-day {
   color: var(--vscode-foreground) !important;
-  border-radius: 3px !important;
+  border-radius: 4px !important;
   font-family: var(--vscode-font-family) !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 32px !important;
+  height: 32px !important;
+  margin: 1px !important;
 }
 
 .flatpickr-day:hover {
   background: var(--vscode-list-hoverBackground) !important;
-  border-color: var(--vscode-list-hoverBackground) !important;
+  border-color: transparent !important;
 }
 
 .flatpickr-day.selected,
 .flatpickr-day.selected:hover {
   background: var(--vscode-button-background) !important;
-  border-color: var(--vscode-button-background) !important;
+  border-color: transparent !important;
   color: var(--vscode-button-foreground) !important;
+  font-weight: 600 !important;
 }
 
 .flatpickr-day.today {
-  border-color: var(--vscode-focusBorder) !important;
+  border: 1px solid var(--vscode-focusBorder) !important;
+  background: color-mix(in srgb, var(--vscode-focusBorder) 15%, transparent) !important;
+}
+
+.flatpickr-day.today:hover {
+  background: color-mix(in srgb, var(--vscode-focusBorder) 25%, transparent) !important;
 }
 
 .flatpickr-day.prevMonthDay,
 .flatpickr-day.nextMonthDay {
   color: var(--vscode-disabledForeground) !important;
+  opacity: 0.5 !important;
 }
 
 /* Week select plugin styles */
 .flatpickr-day.week.selected {
   background: var(--vscode-button-background) !important;
-  border-color: var(--vscode-button-background) !important;
+  border-color: transparent !important;
   color: var(--vscode-button-foreground) !important;
+  font-weight: 600 !important;
 }
 
 .flatpickr-weekwrapper .flatpickr-weeks {
   background: var(--vscode-editorWidget-background) !important;
+  border-radius: 0 0 0 8px !important;
 }
 
 .flatpickr-weekwrapper span.flatpickr-day {
   color: var(--vscode-descriptionForeground) !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+}
+
+/* Inner container rounding */
+.flatpickr-innerContainer {
+  border-radius: 0 0 8px 8px !important;
+}
+
+.dayContainer {
+  padding: 2px !important;
+}
+
+/* "This week" button in datepicker */
+.flatpickr-this-week-btn {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  margin: 0;
+  font-family: var(--vscode-font-family);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--vscode-textLink-foreground);
+  background: var(--vscode-editorWidget-background, var(--vscode-dropdown-background));
+  border: none;
+  border-top: 1px solid var(--vscode-widget-border, var(--vscode-editorWidget-border));
+  cursor: pointer;
+  text-align: center;
+}
+
+.flatpickr-this-week-btn:hover {
+  background: var(--vscode-list-hoverBackground);
 }
 
 /* ========== Grid Container ========== */
@@ -399,10 +471,9 @@ body {
 /* Header row */
 .timesheet-grid thead th {
   background: var(--vscode-sideBarSectionHeader-background, color-mix(in srgb, var(--vscode-sideBar-background) 90%, black 10%));
-  font-weight: 500;
+  font-weight: 600;
   font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.01em;
   color: var(--vscode-descriptionForeground);
   position: sticky;
   top: 0;
@@ -514,6 +585,12 @@ td.col-total,
   background: var(--vscode-input-background);
   border-color: var(--vscode-focusBorder);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--vscode-focusBorder) 30%, transparent);
+  animation: focusRing 0.2s ease-out;
+}
+
+@keyframes focusRing {
+  from { box-shadow: 0 0 0 3px color-mix(in srgb, var(--vscode-focusBorder) 40%, transparent); }
+  to { box-shadow: 0 0 0 1px color-mix(in srgb, var(--vscode-focusBorder) 30%, transparent); }
 }
 
 /* Cell with value - just change text style, no background */
@@ -539,9 +616,9 @@ td.col-total,
 .task-select,
 .activity-select {
   width: 100%;
-  padding: 5px 8px;
+  padding: 6px 10px;
   border: 1px solid var(--vscode-dropdown-border, var(--vscode-panel-border));
-  border-radius: 3px;
+  border-radius: 4px;
   background: var(--vscode-dropdown-background);
   color: var(--vscode-dropdown-foreground);
   font-family: var(--ts-font-sans);
@@ -621,7 +698,7 @@ td.col-total,
 /* ========== Comments Input - Visually Editable ========== */
 .comments-input {
   width: 100%;
-  padding: 6px 10px;
+  padding: 7px 10px;
   border: 1px solid color-mix(in srgb, var(--vscode-input-border, var(--vscode-panel-border)) 40%, transparent);
   border-radius: 4px;
   background: color-mix(in srgb, var(--vscode-input-background) 30%, transparent);
@@ -728,12 +805,15 @@ td.col-total,
 
 /* ========== Add Row Container (below table) ========== */
 .add-row-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: 12px 8px;
   border-top: var(--ts-border);
   background: var(--vscode-editor-background);
   position: sticky;
   bottom: 0;
-  z-index: 5;
+  z-index: 15;
 }
 
 .add-entry-btn {
@@ -754,40 +834,37 @@ td.col-total,
   border-style: solid;
 }
 
-/* ========== Footer ========== */
+/* ========== Footer (legacy - now merged into add-row-container) ========== */
 .timesheet-footer {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  flex-shrink: 0;
-  gap: 12px;
-  padding-top: 12px;
-  border-top: var(--ts-border);
-}
-
-.footer-spacer {
-  flex: 1;
+  display: none;
 }
 
 .save-btn {
   background: var(--vscode-button-background);
   color: var(--vscode-button-foreground);
   border: none;
-  padding: 7px 18px;
+  padding: 8px 20px;
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
+  box-shadow: 0 1px 3px color-mix(in srgb, black 20%, transparent);
   transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .save-btn:hover {
   background: var(--vscode-button-hoverBackground);
+  box-shadow: 0 2px 6px color-mix(in srgb, black 25%, transparent);
+}
+
+.save-btn:active {
+  box-shadow: 0 1px 2px color-mix(in srgb, black 15%, transparent);
 }
 
 .save-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 /* ========== Daily Totals Row ========== */
@@ -803,6 +880,7 @@ td.col-total,
   font-family: var(--ts-font-mono);
   font-weight: 500;
   color: var(--vscode-foreground);
+  white-space: nowrap;
 }
 
 .progress-bar {
@@ -847,11 +925,15 @@ td.col-total,
   justify-content: center;
   align-items: center;
   z-index: 1000;
-  backdrop-filter: blur(3px);
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.15s ease, visibility 0.15s ease;
 }
 
 .loading-overlay.hidden {
-  display: none;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .spinner {
@@ -892,20 +974,18 @@ thead .col-day[data-day="6"] {
   background: color-mix(in srgb, var(--vscode-sideBar-background) 90%, var(--vscode-editor-background));
 }
 
-/* ========== Today Column - Glow Effect ========== */
+/* ========== Today Column - Subtle Highlight ========== */
 .col-day.today {
-  background: color-mix(in srgb, var(--vscode-focusBorder) 8%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vscode-focusBorder) 25%, transparent);
+  background: color-mix(in srgb, var(--vscode-focusBorder) 6%, transparent);
 }
 
 thead .col-day.today {
-  background: color-mix(in srgb, var(--vscode-focusBorder) 18%, var(--vscode-sideBar-background));
-  box-shadow: inset 0 -2px 0 0 var(--vscode-focusBorder);
+  background: color-mix(in srgb, var(--vscode-focusBorder) 12%, var(--vscode-sideBarSectionHeader-background));
+  box-shadow: inset 0 -2px 0 0 color-mix(in srgb, var(--vscode-focusBorder) 70%, transparent);
 }
 
 tfoot .col-day.today {
-  background: color-mix(in srgb, var(--vscode-focusBorder) 12%, var(--vscode-sideBar-background));
-  box-shadow: inset 0 2px 0 0 color-mix(in srgb, var(--vscode-focusBorder) 50%, transparent);
+  background: color-mix(in srgb, var(--vscode-focusBorder) 8%, var(--vscode-sideBar-background));
 }
 
 /* Today cell hover enhancement */
@@ -938,6 +1018,19 @@ tfoot .col-day.today {
 
 .timesheet-grid tbody tr:hover .col-day.today {
   background: color-mix(in srgb, var(--vscode-focusBorder) 12%, var(--vscode-list-hoverBackground));
+}
+
+/* ========== Zebra Striping ========== */
+.timesheet-grid tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--vscode-list-hoverBackground) 15%, transparent);
+}
+
+.timesheet-grid tbody tr:nth-child(even):hover td {
+  background: color-mix(in srgb, var(--vscode-list-hoverBackground) 50%, transparent);
+}
+
+.timesheet-grid tbody tr:nth-child(even) td.col-day.today {
+  background: color-mix(in srgb, var(--vscode-focusBorder) 8%, color-mix(in srgb, var(--vscode-list-hoverBackground) 15%, transparent));
 }
 
 /* ========== Draft Mode Warning Banner ========== */
@@ -1164,41 +1257,52 @@ body.draft-mode-disabled .action-btn {
   background: var(--ts-hover-bg);
 }
 
-/* ========== Multi-Entry Cell Indicator ========== */
+/* ========== Multi-Entry Cell Indicator - Count Badge ========== */
 .day-cell.multi-entry {
   position: relative;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vscode-textLink-foreground) 50%, transparent);
 }
 
-.day-cell.multi-entry::after {
-  content: attr(data-entry-count);
+/* Count badge in top-right corner */
+.multi-entry-badge {
   position: absolute;
   top: 2px;
   right: 2px;
-  background: var(--vscode-textLink-foreground);
-  color: var(--vscode-editor-background);
-  font-size: 9px;
-  font-weight: bold;
-  padding: 0 4px;
-  border-radius: 8px;
-  line-height: 14px;
   min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 14px;
   text-align: center;
-  z-index: 1;
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  border-radius: 7px;
+  cursor: pointer;
+  z-index: 5;
+  opacity: 0.85;
+  transition: opacity 0.1s ease, transform 0.1s ease;
+}
+
+.multi-entry-badge:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.day-cell.expanded .multi-entry-badge {
+  background: var(--vscode-textLink-foreground);
+  opacity: 1;
 }
 
 /* ========== Aggregated Cell Input Styling ========== */
 .aggregated-cell-input {
-  border-style: dashed !important;
-  border-color: color-mix(in srgb, var(--vscode-textLink-foreground) 40%, transparent) !important;
+  border-color: color-mix(in srgb, var(--vscode-textLink-foreground) 30%, transparent) !important;
 }
 
 .aggregated-cell-input:hover {
-  border-color: var(--vscode-textLink-foreground) !important;
+  border-color: color-mix(in srgb, var(--vscode-textLink-foreground) 60%, transparent) !important;
 }
 
 .aggregated-cell-input:focus {
-  border-style: solid !important;
   border-color: var(--vscode-focusBorder) !important;
 }
 
@@ -1213,87 +1317,113 @@ body.draft-mode-disabled .action-btn {
   cursor: pointer;
 }
 
-/* ========== Multi-Entry Cell Expand/Collapse ========== */
-.day-cell.multi-entry {
-  position: relative;
-}
-
-.expand-btn {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 16px;
-  height: 14px;
-  padding: 0;
-  font-size: 8px;
-  line-height: 14px;
-  text-align: center;
-  border: none;
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
-  border-radius: 3px;
-  cursor: pointer;
-  opacity: 0.7;
-  z-index: 10;
-  pointer-events: auto;
-}
-
-.expand-btn:hover {
-  opacity: 1;
-  background: var(--vscode-button-secondaryHoverBackground);
-}
-
-.day-cell.expanded .expand-btn {
-  opacity: 1;
-  background: var(--vscode-button-background);
-  color: var(--vscode-button-foreground);
-}
-
-/* Expanded cell dropdown */
+/* ========== Multi-Entry Dropdown ========== */
 .expanded-cell-dropdown {
   position: absolute;
-  top: 100%;
-  left: 0;
-  min-width: 160px;
-  background: var(--vscode-dropdown-background);
-  border: 1px solid var(--vscode-dropdown-border);
-  border-radius: 4px;
-  box-shadow: 0 4px 12px var(--vscode-widget-shadow);
+  top: calc(100% + 4px);
+  left: -20px;
+  min-width: 200px;
+  background: var(--vscode-editorWidget-background);
+  border: 1px solid var(--vscode-editorWidget-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px var(--vscode-widget-shadow);
   z-index: 100;
-  padding: 6px;
-  margin-top: 2px;
+  padding: 10px;
+}
+
+/* Arrow pointer at top */
+.expanded-cell-dropdown::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 32px;
+  width: 10px;
+  height: 10px;
+  background: var(--vscode-editorWidget-background);
+  border-left: 1px solid var(--vscode-editorWidget-border);
+  border-top: 1px solid var(--vscode-editorWidget-border);
+  transform: rotate(45deg);
 }
 
 .dropdown-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 11px;
-  font-weight: bold;
-  color: var(--vscode-descriptionForeground);
-  margin-bottom: 6px;
-  padding-bottom: 4px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+  margin-bottom: 10px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--vscode-widget-border);
+}
+
+.dropdown-header > span:last-of-type {
+  margin-left: auto;
+}
+
+.dropdown-header-total {
+  font-family: var(--ts-font-mono);
+  color: var(--vscode-textLink-foreground);
+}
+
+.dropdown-merge-btn {
+  padding: 0;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--vscode-textLink-foreground);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+
+.dropdown-merge-btn:hover {
+  color: var(--vscode-textLink-activeForeground);
+  text-decoration-style: solid;
 }
 
 .dropdown-entry-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 .dropdown-entry {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--vscode-input-background) 50%, transparent);
+  border-radius: 4px;
+}
+
+.dropdown-entry:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+/* Entry context label (date or Draft status) - first in row */
+.dropdown-entry-context {
+  min-width: 50px;
+  font-size: 11px;
+  color: var(--vscode-foreground);
+  white-space: nowrap;
 }
 
 .dropdown-entry-hours {
-  width: 50px;
-  padding: 3px 6px;
+  width: 54px;
+  padding: 4px 6px;
   font-size: 12px;
+  font-family: var(--ts-font-mono);
   text-align: right;
   border: 1px solid var(--vscode-input-border);
   background: var(--vscode-input-background);
   color: var(--vscode-input-foreground);
-  border-radius: 3px;
+  border-radius: 4px;
+  margin-left: auto;
 }
 
 .dropdown-entry-hours:focus {
@@ -1301,46 +1431,37 @@ body.draft-mode-disabled .action-btn {
   border-color: var(--vscode-focusBorder);
 }
 
-.dropdown-entry-id {
-  font-size: 10px;
-  color: var(--vscode-descriptionForeground);
-  flex: 1;
+/* Draft indicator - warning color */
+.dropdown-entry-context.draft {
+  color: var(--vscode-editorWarning-foreground);
+  font-weight: 600;
+}
+
+/* Ordinal suffix for same-day entries */
+.dropdown-entry-ordinal {
+  opacity: 0.6;
 }
 
 .dropdown-entry-delete {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   border: none;
   background: transparent;
-  color: var(--vscode-errorForeground);
+  color: var(--vscode-descriptionForeground);
   font-size: 14px;
-  line-height: 18px;
+  line-height: 22px;
   text-align: center;
   cursor: pointer;
-  border-radius: 3px;
-  opacity: 0.6;
+  border-radius: 4px;
+  opacity: 0.5;
+  flex-shrink: 0;
 }
 
 .dropdown-entry-delete:hover {
   opacity: 1;
-  background: color-mix(in srgb, var(--vscode-errorForeground) 20%, transparent);
-}
-
-.dropdown-close-btn {
-  width: 100%;
-  margin-top: 6px;
-  padding: 4px 8px;
-  font-size: 11px;
-  border: none;
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
-  border-radius: 3px;
-  cursor: pointer;
-}
-
-.dropdown-close-btn:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  color: var(--vscode-errorForeground);
+  background: color-mix(in srgb, var(--vscode-errorForeground) 15%, transparent);
 }
 
 /* ========== Incomplete Rows (missing task/activity but has hours) ========== */
@@ -1356,4 +1477,47 @@ body.draft-mode-disabled .action-btn {
 .incomplete-row .day-input.dirty {
   /* More prominent warning for dirty cells on incomplete rows */
   background: color-mix(in srgb, var(--vscode-editorWarning-foreground) 25%, transparent);
+}
+
+/* ========== Reduced Motion Support ========== */
+@media (prefers-reduced-motion: reduce) {
+  body,
+  .toast-notification,
+  .day-input,
+  .toolbar-btn,
+  .save-btn,
+  .progress-fill,
+  .action-btn,
+  .comments-input {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .spinner {
+    animation: none;
+    border-style: dotted;
+  }
+}
+
+/* ========== Enhanced Action Button States ========== */
+.action-btn {
+  position: relative;
+}
+
+.action-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.action-btn:hover::before {
+  opacity: 0.1;
+}
+
+.action-btn:active::before {
+  opacity: 0.15;
 }
