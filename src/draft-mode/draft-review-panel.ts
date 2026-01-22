@@ -77,9 +77,6 @@ export class DraftReviewPanel implements vscode.Disposable {
           case "removeDraft":
             await vscode.commands.executeCommand("redmyne.removeDraft", message.id);
             break;
-          case "showApiDetails":
-            await this.handleShowApiDetails(message.method, message.path, message.data);
-            break;
         }
       },
       null,
@@ -121,24 +118,6 @@ export class DraftReviewPanel implements vscode.Disposable {
     } finally {
       if (this.disposed) return;
       this.panel.webview.postMessage({ command: "setLoading", loading: false });
-    }
-  }
-
-  private async handleShowApiDetails(method: string, path: string, data: unknown): Promise<void> {
-    if (this.disposed) return;
-    const jsonStr = data ? JSON.stringify(data, null, 2) : "(no body)";
-    const header = `${method} ${path}`;
-
-    const action = await vscode.window.showInformationMessage(
-      header,
-      { modal: true, detail: jsonStr },
-      "Copy to Clipboard"
-    );
-
-    if (action === "Copy to Clipboard") {
-      const fullText = `${header}\n\n${jsonStr}`;
-      await vscode.env.clipboard.writeText(fullText);
-      vscode.window.showInformationMessage("Copied to clipboard");
     }
   }
 
@@ -187,20 +166,22 @@ export class DraftReviewPanel implements vscode.Disposable {
     const nonce = getNonce();
 
     const operationRows = operations.map((op) => {
-      const httpInfo = op.http ? `${op.http.method} ${op.http.path}` : "-";
       const httpMethod = op.http?.method || "";
       const httpPath = op.http?.path || "";
       const httpDataJson = op.http?.data ? JSON.stringify(op.http.data) : "";
+      const apiCellContent = op.http
+        ? `<span class="api-method ${escapeHtml(httpMethod)}">${escapeHtml(httpMethod)}</span><span class="api-path">${escapeHtml(httpPath)}</span>`
+        : "-";
       return `
       <tr data-id="${escapeHtml(op.id)}" tabindex="0">
         <td class="type">${escapeHtml(op.type)}</td>
         <td class="description">${escapeHtml(op.description)}</td>
-        <td class="api-call" data-method="${escapeHtml(httpMethod)}" data-path="${escapeHtml(httpPath)}" data-body="${escapeHtml(httpDataJson)}" title="Click to view details">${escapeHtml(httpInfo)}</td>
+        <td class="api-call" data-method="${escapeHtml(httpMethod)}" data-path="${escapeHtml(httpPath)}" data-body="${escapeHtml(httpDataJson)}">${apiCellContent}</td>
         <td class="issue">${op.issueId ? `#${op.issueId}` : "-"}</td>
         <td class="time">${formatTime(op.timestamp)}</td>
         <td class="actions">
-          <button class="apply-btn" data-id="${escapeHtml(op.id)}" title="Apply this draft">✓</button>
-          <button class="remove-btn" data-id="${escapeHtml(op.id)}" title="Remove">🗑️</button>
+          <button class="icon-btn apply-btn" data-id="${escapeHtml(op.id)}" title="Apply this draft">✓</button>
+          <button class="icon-btn remove-btn" data-id="${escapeHtml(op.id)}" title="Remove">🗑️</button>
           <span class="row-spinner" style="display:none;"></span>
         </td>
       </tr>
@@ -215,32 +196,31 @@ export class DraftReviewPanel implements vscode.Disposable {
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
   <title>Draft Review</title>
   <style>
+    * { box-sizing: border-box; }
     body {
       font-family: var(--vscode-font-family);
       font-size: var(--vscode-font-size);
       color: var(--vscode-foreground);
       background: var(--vscode-editor-background);
-      padding: 16px;
+      padding: 20px;
       margin: 0;
     }
     .header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-      position: sticky;
-      top: 0;
-      background: var(--vscode-editor-background);
-      padding: 8px 0;
-      z-index: 10;
+      align-items: flex-start;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--vscode-widget-border);
     }
-    h1 {
-      margin: 0;
-      font-size: 1.4em;
+    .header-left h1 {
+      margin: 0 0 4px 0;
+      font-size: 1.3em;
+      font-weight: 500;
     }
     .count {
       color: var(--vscode-descriptionForeground);
-      font-size: 0.9em;
+      font-size: 0.85em;
     }
     .actions-bar {
       display: flex;
@@ -256,83 +236,56 @@ export class DraftReviewPanel implements vscode.Disposable {
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }
-    .loading .spinner {
-      display: inline-block;
-      margin-right: 8px;
-    }
-    .loading .btn-text {
-      opacity: 0.6;
-    }
-    .row-spinner {
-      width: 14px;
-      height: 14px;
-      border: 2px solid var(--vscode-descriptionForeground);
-      border-top-color: transparent;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+    .loading .spinner { display: inline-block; margin-right: 6px; }
+    .loading .btn-text { opacity: 0.7; }
+    @keyframes spin { to { transform: rotate(360deg); } }
     button {
       background: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
       border: none;
-      padding: 6px 12px;
+      padding: 6px 14px;
       cursor: pointer;
-      border-radius: 2px;
+      border-radius: 4px;
       display: inline-flex;
       align-items: center;
       gap: 4px;
+      font-size: 0.9em;
+      transition: background 0.15s, opacity 0.15s;
     }
-    button:hover:not(:disabled) {
-      background: var(--vscode-button-hoverBackground);
-    }
+    button:hover:not(:disabled) { background: var(--vscode-button-hoverBackground); }
     button.secondary {
       background: var(--vscode-button-secondaryBackground);
       color: var(--vscode-button-secondaryForeground);
     }
-    button.secondary:hover:not(:disabled) {
-      background: var(--vscode-button-secondaryHoverBackground);
-    }
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    button:focus {
-      outline: 1px solid var(--vscode-focusBorder);
-      outline-offset: 2px;
-    }
+    button.secondary:hover:not(:disabled) { background: var(--vscode-button-secondaryHoverBackground); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
     .table-container {
-      max-height: calc(100vh - 120px);
+      max-height: calc(100vh - 140px);
       overflow-y: auto;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    thead {
-      position: sticky;
-      top: 0;
+      border-radius: 6px;
+      border: 1px solid var(--vscode-widget-border);
       background: var(--vscode-editor-background);
-      z-index: 5;
     }
+    table { width: 100%; border-collapse: collapse; }
     th, td {
       text-align: left;
-      padding: 8px;
+      padding: 10px 12px;
       border-bottom: 1px solid var(--vscode-widget-border);
     }
     th {
-      font-weight: 600;
-      color: var(--vscode-foreground);
-      border-bottom: 2px solid var(--vscode-widget-border);
+      font-weight: 500;
+      font-size: 0.8em;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--vscode-descriptionForeground);
+      background: var(--vscode-editorWidget-background);
+      position: sticky;
+      top: 0;
+      z-index: 5;
     }
-    tbody tr {
-      outline: none;
-    }
-    tbody tr:hover {
-      background: var(--vscode-list-hoverBackground);
-    }
+    tbody tr { outline: none; transition: background 0.1s; }
+    tbody tr:hover { background: var(--vscode-list-hoverBackground); }
     tbody tr:focus {
       background: var(--vscode-list-focusBackground);
       outline: 1px solid var(--vscode-focusBorder);
@@ -342,86 +295,132 @@ export class DraftReviewPanel implements vscode.Disposable {
       background: var(--vscode-list-activeSelectionBackground);
       color: var(--vscode-list-activeSelectionForeground);
     }
+    tbody tr:last-child td { border-bottom: none; }
     .type {
-      width: 120px;
+      width: 110px;
       font-family: var(--vscode-editor-font-family);
-      font-size: 0.85em;
+      font-size: 0.82em;
+      color: var(--vscode-descriptionForeground);
     }
-    .description {
-      min-width: 200px;
-    }
+    .description { min-width: 180px; }
     .issue {
-      width: 60px;
+      width: 70px;
       font-family: var(--vscode-editor-font-family);
+      font-size: 0.9em;
+      color: var(--vscode-textLink-foreground);
     }
     .api-call {
-      width: 180px;
+      width: 200px;
       font-family: var(--vscode-editor-font-family);
-      font-size: 0.85em;
-      color: var(--vscode-textLink-foreground);
-      cursor: pointer;
+      font-size: 0.82em;
+      position: relative;
     }
-    .api-call:hover {
-      text-decoration: underline;
+    .api-method {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 0.75em;
+      font-weight: 600;
+      margin-right: 6px;
+      background: var(--vscode-badge-background);
+      color: var(--vscode-badge-foreground);
     }
-    .api-call::after {
-      content: " ⓘ";
-      opacity: 0.6;
-      font-size: 0.9em;
+    .api-method.PUT { background: var(--vscode-charts-orange, #d19a66); color: #1e1e1e; }
+    .api-method.POST { background: var(--vscode-charts-green, #98c379); color: #1e1e1e; }
+    .api-method.DELETE { background: var(--vscode-charts-red, #e06c75); color: #fff; }
+    .api-path {
+      color: var(--vscode-descriptionForeground);
+      word-break: break-all;
     }
     .time {
       width: 80px;
       color: var(--vscode-descriptionForeground);
-      font-size: 0.85em;
+      font-size: 0.82em;
     }
     .actions {
-      width: 80px;
-      text-align: center;
+      width: 70px;
+      text-align: right;
       white-space: nowrap;
     }
-    .apply-btn, .remove-btn {
+    .icon-btn {
       background: transparent;
       padding: 4px 6px;
-      font-size: 1em;
-      min-width: 28px;
+      font-size: 0.9em;
+      min-width: 26px;
+      border-radius: 4px;
+      opacity: 0.6;
+      transition: opacity 0.15s, background 0.15s;
     }
-    .apply-btn:hover:not(:disabled) {
-      background: var(--vscode-list-hoverBackground);
-      color: var(--vscode-charts-green);
+    tbody tr:hover .icon-btn { opacity: 1; }
+    .icon-btn:hover:not(:disabled) {
+      opacity: 1;
+      background: var(--vscode-toolbar-hoverBackground);
     }
-    .remove-btn:hover:not(:disabled) {
-      background: var(--vscode-list-hoverBackground);
-      color: var(--vscode-charts-red);
-    }
+    .apply-btn:hover:not(:disabled) { color: var(--vscode-charts-green, #98c379); }
+    .remove-btn:hover:not(:disabled) { color: var(--vscode-charts-red, #e06c75); }
     .row-spinner {
-      color: var(--vscode-descriptionForeground);
-    }
-    tr.row-loading .apply-btn,
-    tr.row-loading .remove-btn {
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--vscode-descriptionForeground);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
       display: none;
     }
-    tr.row-loading .row-spinner {
-      display: inline-block !important;
-    }
+    tr.row-loading .icon-btn { display: none; }
+    tr.row-loading .row-spinner { display: inline-block !important; }
     .empty {
       text-align: center;
       color: var(--vscode-descriptionForeground);
-      padding: 32px;
+      padding: 48px 24px;
     }
+    .empty-icon { font-size: 2em; margin-bottom: 12px; opacity: 0.5; }
     .keyboard-hint {
       color: var(--vscode-descriptionForeground);
-      font-size: 0.8em;
-      margin-top: 16px;
+      font-size: 0.75em;
+      margin-top: 12px;
       text-align: center;
+      opacity: 0.8;
     }
     kbd {
       background: var(--vscode-keybindingLabel-background);
       color: var(--vscode-keybindingLabel-foreground);
       border: 1px solid var(--vscode-keybindingLabel-border);
       border-radius: 3px;
-      padding: 1px 4px;
+      padding: 2px 5px;
       font-family: var(--vscode-editor-font-family);
-      font-size: 0.9em;
+      font-size: 0.85em;
+      margin: 0 2px;
+    }
+    /* Hover tooltip for API details */
+    .api-tooltip {
+      position: fixed;
+      z-index: 1000;
+      background: var(--vscode-editorHoverWidget-background);
+      border: 1px solid var(--vscode-editorHoverWidget-border);
+      border-radius: 4px;
+      padding: 10px 12px;
+      max-width: 400px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .api-tooltip.visible { opacity: 1; }
+    .api-tooltip-header {
+      font-weight: 500;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--vscode-widget-border);
+    }
+    .api-tooltip-body {
+      font-family: var(--vscode-editor-font-family);
+      font-size: 0.85em;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 200px;
+      overflow-y: auto;
+      color: var(--vscode-descriptionForeground);
     }
   </style>
 </head>
@@ -474,6 +473,11 @@ export class DraftReviewPanel implements vscode.Disposable {
     `}
   </div>
 
+  <div id="api-tooltip" class="api-tooltip">
+    <div class="api-tooltip-header"></div>
+    <div class="api-tooltip-body"></div>
+  </div>
+
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
     let selectedIndex = -1;
@@ -486,19 +490,47 @@ export class DraftReviewPanel implements vscode.Disposable {
       http: op.http,
     })))};
 
-    // Event delegation for buttons
-    document.addEventListener('click', (e) => {
-      // Handle API call cell click
+    // API tooltip hover
+    const tooltip = document.getElementById('api-tooltip');
+    const tooltipHeader = tooltip.querySelector('.api-tooltip-header');
+    const tooltipBody = tooltip.querySelector('.api-tooltip-body');
+    let tooltipTimeout = null;
+
+    document.addEventListener('mouseover', (e) => {
       const apiCell = e.target.closest('.api-call');
-      if (apiCell) {
+      if (apiCell && apiCell.dataset.method) {
+        clearTimeout(tooltipTimeout);
         const method = apiCell.dataset.method || '';
         const path = apiCell.dataset.path || '';
         const bodyStr = apiCell.dataset.body || '';
-        const data = bodyStr ? JSON.parse(bodyStr) : null;
-        vscode.postMessage({ command: 'showApiDetails', method, path, data });
-        return;
-      }
 
+        tooltipHeader.textContent = method + ' ' + path;
+        if (bodyStr) {
+          try {
+            tooltipBody.textContent = JSON.stringify(JSON.parse(bodyStr), null, 2);
+          } catch { tooltipBody.textContent = bodyStr; }
+        } else {
+          tooltipBody.textContent = '(no body)';
+        }
+
+        const rect = apiCell.getBoundingClientRect();
+        tooltip.style.left = rect.left + 'px';
+        tooltip.style.top = (rect.bottom + 6) + 'px';
+        tooltip.classList.add('visible');
+      }
+    });
+
+    document.addEventListener('mouseout', (e) => {
+      const apiCell = e.target.closest('.api-call');
+      if (apiCell) {
+        tooltipTimeout = setTimeout(() => {
+          tooltip.classList.remove('visible');
+        }, 100);
+      }
+    });
+
+    // Event delegation for buttons
+    document.addEventListener('click', (e) => {
       const target = e.target.closest('button');
       if (!target) return;
 
@@ -592,19 +624,21 @@ export class DraftReviewPanel implements vscode.Disposable {
       }
 
       const rows = ops.map(op => {
-        const httpInfo = op.http ? op.http.method + ' ' + op.http.path : '-';
         const httpMethod = op.http ? op.http.method : '';
         const httpPath = op.http ? op.http.path : '';
         const httpDataJson = op.http && op.http.data ? JSON.stringify(op.http.data) : '';
+        const apiCellContent = op.http
+          ? '<span class="api-method ' + escapeHtml(httpMethod) + '">' + escapeHtml(httpMethod) + '</span><span class="api-path">' + escapeHtml(httpPath) + '</span>'
+          : '-';
         return '<tr data-id="' + escapeHtml(op.id) + '" tabindex="0">' +
           '<td class="type">' + escapeHtml(op.type) + '</td>' +
           '<td class="description">' + escapeHtml(op.description) + '</td>' +
-          '<td class="api-call" data-method="' + escapeHtml(httpMethod) + '" data-path="' + escapeHtml(httpPath) + '" data-body="' + escapeHtml(httpDataJson) + '" title="Click to view details">' + escapeHtml(httpInfo) + '</td>' +
+          '<td class="api-call" data-method="' + escapeHtml(httpMethod) + '" data-path="' + escapeHtml(httpPath) + '" data-body="' + escapeHtml(httpDataJson) + '">' + apiCellContent + '</td>' +
           '<td class="issue">' + (op.issueId ? '#' + op.issueId : '-') + '</td>' +
           '<td class="time">' + formatTime(op.timestamp) + '</td>' +
           '<td class="actions">' +
-            '<button class="apply-btn" data-id="' + escapeHtml(op.id) + '" title="Apply this draft">✓</button>' +
-            '<button class="remove-btn" data-id="' + escapeHtml(op.id) + '" title="Remove">🗑️</button>' +
+            '<button class="icon-btn apply-btn" data-id="' + escapeHtml(op.id) + '" title="Apply this draft">✓</button>' +
+            '<button class="icon-btn remove-btn" data-id="' + escapeHtml(op.id) + '" title="Remove">🗑️</button>' +
             '<span class="row-spinner" style="display:none;"></span>' +
           '</td>' +
         '</tr>';
