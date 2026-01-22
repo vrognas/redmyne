@@ -107,6 +107,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
   cleanupResources.draftModeManager = draftModeManager;
   await draftModeManager.initialize();
+  // Always start with draft mode OFF
+  await draftModeManager.disable();
 
   // Initialize draft queue with file system persistence
   const draftQueue = new DraftQueue({
