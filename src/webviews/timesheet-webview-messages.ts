@@ -38,6 +38,7 @@ export interface TimeSheetRow {
   activityId: number | null;
   activityName: string | null;
   comments: string | null;
+  originalComments?: string | null; // Server value for dirty detection
   days: Record<number, DayCell>; // 0=Mon...6=Sun
   isNew: boolean;
   weekTotal: number;

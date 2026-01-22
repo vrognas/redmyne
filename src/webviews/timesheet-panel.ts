@@ -629,6 +629,7 @@ export class TimeSheetPanel {
       row.activityId = entry.activity?.id ?? null;
       row.activityName = entry.activity?.name ?? null;
       row.comments = entry.comments ?? null;
+      row.originalComments = entry.comments ?? null;
       row.isNew = false;
 
       // Set hours for this entry's day
@@ -665,6 +666,7 @@ export class TimeSheetPanel {
       activityId: null,
       activityName: null,
       comments: null,
+      originalComments: null,
       days,
       isNew: true,
       weekTotal: 0,
@@ -1303,9 +1305,31 @@ export class TimeSheetPanel {
         cell.isDirty = true;
       }
     } else if (field === "comments") {
-      row.comments = value as string | null;
-      for (const cell of Object.values(row.days)) {
-        cell.isDirty = true;
+      const newComment = value as string | null;
+      const isRevertingToOriginal = (newComment ?? "") === (row.originalComments ?? "");
+      console.log("[Timesheet] _updateRowField comments:", { newComment, originalComments: row.originalComments, isRevertingToOriginal });
+      row.comments = newComment;
+
+      if (isRevertingToOriginal) {
+        // Reverting to original - check each cell and remove drafts if fully reverted
+        for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+          const cell = row.days[dayIndex];
+          if (cell && cell.entryId && cell.hours === cell.originalHours) {
+            // Cell is back to original state - mark clean and remove draft
+            cell.isDirty = false;
+            const resourceKey = `ts:timeentry:${cell.entryId}`;
+            console.log("[Timesheet] Reverting to original, removing draft:", resourceKey);
+            await this._draftQueue?.removeByKey(resourceKey, TIMESHEET_SOURCE);
+          } else if (cell) {
+            // Hours changed or no entryId - still dirty
+            cell.isDirty = true;
+          }
+        }
+      } else {
+        // New comment value - mark all cells dirty
+        for (const cell of Object.values(row.days)) {
+          cell.isDirty = true;
+        }
       }
     }
 
