@@ -849,6 +849,7 @@
                 rowId: row.id,
                 entryId: row.days[d].entryId, // null for drafts
                 hours: row.days[d].hours,
+                originalHours: row.days[d].originalHours || 0,
                 issueId: row.issueId,
                 activityId: row.activityId,
                 comments: row.comments,
@@ -893,6 +894,7 @@
                 rowId: row.id,
                 entryId: row.days[d].entryId, // null for drafts
                 hours: row.days[d].hours,
+                originalHours: row.days[d].originalHours || 0,
                 issueId: row.issueId,
                 activityId: row.activityId,
                 comments: row.comments,

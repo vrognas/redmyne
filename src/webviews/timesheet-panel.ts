@@ -1696,7 +1696,7 @@ export class TimeSheetPanel {
     aggRowId: string,
     dayIndex: number,
     newHours: number,
-    sourceEntries: Array<{ rowId: string; entryId: number | null; hours: number; issueId: number; activityId: number; comments: string | null; spentOn: string; isDraft?: boolean }>,
+    sourceEntries: Array<{ rowId: string; entryId: number | null; hours: number; originalHours: number; issueId: number; activityId: number; comments: string | null; spentOn: string; isDraft?: boolean }>,
     confirmed: boolean
   ): Promise<void> {
     if (!this._draftQueue || !this._draftModeManager?.isEnabled) return;
@@ -1791,8 +1791,8 @@ export class TimeSheetPanel {
           // Delete draft → remove pending CREATE
           await this._draftQueue.removeByKey(resourceKey, TIMESHEET_SOURCE);
         }
-      } else if (newHours === entry.hours) {
-        // Single saved entry + same hours → remove any pending operation (reverted to original)
+      } else if (newHours === entry.originalHours) {
+        // Single saved entry + same as original → remove any pending operation (reverted to original)
         await this._draftQueue.removeByKey(`ts:timeentry:${entry.entryId}`, TIMESHEET_SOURCE);
       } else if (newHours > 0) {
         // Single saved entry → update
@@ -1889,7 +1889,7 @@ export class TimeSheetPanel {
 
   /** Update local row state for aggregated cell edit */
   private _updateAggregatedCellLocal(
-    sourceEntries: Array<{ rowId: string; entryId: number | null; hours: number }>,
+    sourceEntries: Array<{ rowId: string; entryId: number | null; hours: number; originalHours?: number }>,
     dayIndex: number,
     newHours: number,
     issueId: number,
