@@ -436,6 +436,7 @@ export class GanttPanel {
   private _currentUserId: number | null = null;
   private _currentUserName: string | null = null;
   private _draftModeSubscribed = false; // Track if draft mode subscriptions are set up
+  private _isUpdatingDates = false; // Skip queue-triggered refresh during our own updates
   // Keyboard navigation state
   private _selectedCollapseKey: string | null = null;
   // Expand all on first render and when switching project/person
@@ -497,6 +498,9 @@ export class GanttPanel {
         });
       }),
       this._draftModeManager.queue.onDidChange(() => {
+        // Skip if we're the ones making the change (already handled in _updateIssueDates)
+        if (this._isUpdatingDates) return;
+        // External change (e.g., Draft Review discard) - refresh to sync
         this._panel.webview.postMessage({
           command: "setDraftQueueCount",
           count: this._draftModeManager?.queue?.count ?? 0,
@@ -1630,9 +1634,11 @@ export class GanttPanel {
   ): Promise<void> {
     if (!this._server) return;
 
+    // Set flag to skip queue-triggered refresh (we'll handle refresh ourselves)
+    this._isUpdatingDates = true;
     try {
       await this._server.updateIssueDates(issueId, startDate, dueDate);
-      // Update local data
+      // Update local data for immediate visual feedback
       const issue = this._issueById.get(issueId);
       if (issue) {
         if (startDate !== null) issue.start_date = startDate;
@@ -1641,13 +1647,24 @@ export class GanttPanel {
       // Re-render to reflect changes (needed for undo/redo)
       this._bumpRevision();
       this._updateContent();
-      showStatusBarMessage(`$(check) #${issueId} dates saved`, 2000);
+      // Update badge count if in draft mode
+      if (this._draftModeManager?.isEnabled) {
+        this._panel.webview.postMessage({
+          command: "setDraftQueueCount",
+          count: this._draftModeManager.queue?.count ?? 0,
+        });
+        showStatusBarMessage(`$(check) #${issueId} dates queued`, 2000);
+      } else {
+        showStatusBarMessage(`$(check) #${issueId} dates saved`, 2000);
+      }
     } catch (error) {
       // On error, re-render to reset UI to correct state
       this._updateContent();
       vscode.window.showErrorMessage(
         `Failed to update dates: ${errorToString(error)}`
       );
+    } finally {
+      this._isUpdatingDates = false;
     }
   }
 
