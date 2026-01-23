@@ -3218,11 +3218,16 @@ export class GanttPanel {
             // Same row, target to right: straight horizontal line
             path = `M ${x1} ${y1} H ${x2 - arrowSize}`;
           } else if (!sameRow && nearlyVertical) {
-            // Nearly vertical: small jog out, down, then across
+            // Nearly vertical: S-curve - jog out, down to midpoint, back, down, in
             const jogX = 12;
+            const midY = (y1 + y2) / 2;
             const goingDown = y2 > y1;
             path = `M ${x1} ${y1} H ${x1 + jogX - r}` +
               ` q ${r} 0 ${r} ${goingDown ? r : -r}` +
+              ` V ${midY + (goingDown ? -r : r)}` +
+              ` q 0 ${goingDown ? r : -r} ${-r} ${goingDown ? r : -r}` +
+              ` H ${x2 - jogX + r}` +
+              ` q ${-r} 0 ${-r} ${goingDown ? r : -r}` +
               ` V ${y2 + (goingDown ? -r : r)}` +
               ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
               ` H ${x2 - arrowSize}`;
