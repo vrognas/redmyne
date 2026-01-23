@@ -59,13 +59,13 @@ describe("calculateFlexibility", () => {
   });
 
   it("calculates flexibility correctly for issue with buffer time", () => {
-    // 10 working days (Mon-Fri x2), 8h/day = 80h available
-    // 40h estimated = +100% flexibility (80/40 - 1 = 1.0 = 100%)
+    // Due date is EXCLUSIVE: start Mon Nov 3, due Sat Nov 15 means work Mon-Fri = 10 days
+    // 10 working days × 8h = 80h available, 40h estimated = +100% flexibility
     vi.setSystemTime(new Date("2025-11-03")); // Monday
 
     const issue = createMockIssue({
       start_date: "2025-11-03", // Monday
-      due_date: "2025-11-14", // Friday (2 weeks = 10 working days)
+      due_date: "2025-11-15", // Saturday (work Mon-Fri = 10 working days before due)
       estimated_hours: 40,
       spent_hours: 0,
     });
@@ -78,13 +78,13 @@ describe("calculateFlexibility", () => {
   });
 
   it("returns overbooked status when remaining time exceeds available", () => {
-    // Set today to Nov 13 (Thursday) - 2 days left (Thu, Fri) = 16h available
-    // But 30h remaining work = overbooked
+    // Due date exclusive: today Nov 13 (Thu), due Nov 15 (Sat) = Thu+Fri = 2 days = 16h
+    // 30h remaining work = overbooked
     vi.setSystemTime(new Date("2025-11-13"));
 
     const issue = createMockIssue({
       start_date: "2025-11-03",
-      due_date: "2025-11-14", // Friday
+      due_date: "2025-11-15", // Saturday (work Thu-Fri = 2 days before due)
       estimated_hours: 40,
       spent_hours: 10, // 30h remaining
     });
@@ -97,12 +97,13 @@ describe("calculateFlexibility", () => {
   });
 
   it("returns at-risk status when flexibility is low but positive", () => {
-    // 5 working days = 40h available, 35h remaining = +14% (under 20%)
+    // Due date exclusive: Nov 10 to Nov 15 (Sat) = work Mon-Fri = 5 days = 40h available
+    // 35h remaining = (40/35 - 1) × 100 = +14% (under 20% = at-risk)
     vi.setSystemTime(new Date("2025-11-10")); // Monday
 
     const issue = createMockIssue({
       start_date: "2025-11-03",
-      due_date: "2025-11-14", // Friday
+      due_date: "2025-11-15", // Saturday (work Mon-Fri = 5 working days from today)
       estimated_hours: 40,
       spent_hours: 5, // 35h remaining
     });
@@ -120,7 +121,7 @@ describe("calculateFlexibility", () => {
 
     const issue = createMockIssue({
       start_date: "2025-11-03",
-      due_date: "2025-11-14",
+      due_date: "2025-11-15", // Due date value doesn't matter for completed status
       estimated_hours: 40,
       spent_hours: 40, // All time spent = done
     });
@@ -135,12 +136,12 @@ describe("calculateFlexibility", () => {
 
   it("uses done_ratio for remaining work when over budget", () => {
     // Issue #7359 scenario: 32h estimated, 51h spent, 80% done
-    // Should NOT be "on-track" - still has work remaining
-    vi.setSystemTime(new Date("2025-11-10")); // Monday, 5 days left = 40h
+    // Due date exclusive: Nov 10 (Mon) to Nov 15 (Sat) = Mon-Fri = 5 days = 40h
+    vi.setSystemTime(new Date("2025-11-10")); // Monday
 
     const issue = createMockIssue({
       start_date: "2025-11-03",
-      due_date: "2025-11-14",
+      due_date: "2025-11-15", // Saturday (work Mon-Fri = 5 days from today)
       estimated_hours: 32,
       spent_hours: 51, // Over budget!
     });
@@ -156,12 +157,12 @@ describe("calculateFlexibility", () => {
   });
 
   it("marks over-budget issue as overbooked when not enough time", () => {
-    // Over budget with tight deadline
-    vi.setSystemTime(new Date("2025-11-13")); // Thursday, 2 days = 16h
+    // Due date exclusive: Nov 13 (Thu), due Nov 15 (Sat) = Thu+Fri = 2 days = 16h
+    vi.setSystemTime(new Date("2025-11-13")); // Thursday
 
     const issue = createMockIssue({
       start_date: "2025-11-03",
-      due_date: "2025-11-14",
+      due_date: "2025-11-15", // Saturday (work Thu+Fri = 2 days = 16h)
       estimated_hours: 100,
       spent_hours: 120, // Way over budget
     });

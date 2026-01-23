@@ -197,8 +197,9 @@ describe("quickLogTime", () => {
 
     await quickLogTime(props, mockContext);
 
-    // Verify API called with correct params (comment is empty, no spentOn for today)
-    expect(mockServer.addTimeEntry).toHaveBeenCalledWith(123, 9, "2.5", "");
+    // Verify API called with correct params (always includes date for draft mode)
+    const today = new Date().toISOString().split("T")[0];
+    expect(mockServer.addTimeEntry).toHaveBeenCalledWith(123, 9, "2.5", "", today);
 
     // Verify cache updated
     expect(mockContext.globalState.update).toHaveBeenCalledWith(
