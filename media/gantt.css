@@ -1208,16 +1208,18 @@ svg {
   color: var(--vscode-menu-selectionForeground);
 }
 
-/* Drag date tooltip - extends webview-tooltip--compact */
+/* Drag date tooltip - compact variant matching webview-tooltip */
 .drag-date-tooltip {
   position: fixed;
   pointer-events: auto;
   z-index: 1000;
   background: var(--vscode-editorWidget-background);
   border: 1px solid var(--vscode-editorWidget-border);
-  border-radius: 4px;
-  box-shadow: 0 4px 8px var(--vscode-widget-shadow);
-  padding: 3px 6px;
+  border-radius: 6px;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--vscode-focusBorder) 20%, transparent),
+    0 4px 8px var(--vscode-widget-shadow);
+  padding: 4px 8px;
   font-size: 11px;
   font-family: var(--vscode-font-family);
   color: var(--vscode-editorWidget-foreground);
@@ -1242,18 +1244,20 @@ svg {
   border-bottom-color: var(--vscode-editorWidget-border);
 }
 
-/* Gantt tooltip - aliases for shared webview-tooltip classes (see webview-common.css) */
+/* Gantt tooltip - matches webview-tooltip from webview-common.css */
 .gantt-tooltip {
   position: fixed;
   pointer-events: auto;
   z-index: 1000;
   max-width: 360px;
-  padding: 8px 10px;
+  padding: 6px 10px;
   border-radius: 6px;
   background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
   border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-editorWidget-border));
   color: var(--vscode-editorHoverWidget-foreground, var(--vscode-editorWidget-foreground));
-  box-shadow: 0 4px 12px var(--vscode-widget-shadow);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--vscode-focusBorder) 20%, transparent),
+    0 4px 12px var(--vscode-widget-shadow);
   font-family: var(--vscode-font-family);
   font-size: calc(var(--vscode-font-size) - 1px);
   line-height: 1.4;
