@@ -177,7 +177,8 @@ export function setupDrag(ctx) {
     }
 
     // Arrow path calculation for drag updates
-    const arrowSize = 6;
+    // Must match gantt-panel.ts initial render (arrowSize=4, chevron style)
+    const arrowSize = 4;
     function calcArrowPath(x1, y1, x2, y2, isScheduling) {
       const goingRight = x2 > x1;
       const horizontalDist = Math.abs(x2 - x1);
@@ -186,24 +187,25 @@ export function setupDrag(ctx) {
 
       let path;
       if (sameRow && goingRight) {
-        path = 'M ' + x1 + ' ' + y1 + ' H ' + (x2 - arrowSize);
+        path = 'M ' + x1 + ' ' + y1 + ' H ' + x2;
       } else if (!sameRow && nearlyVertical) {
         const jogX = 20;
         const midY = (y1 + y2) / 2;
-        path = 'M ' + x1 + ' ' + y1 + ' H ' + (x1 + jogX) + ' V ' + midY + ' H ' + (x2 - jogX) + ' V ' + y2 + ' H ' + (x2 - arrowSize);
+        path = 'M ' + x1 + ' ' + y1 + ' H ' + (x1 + jogX) + ' V ' + midY + ' H ' + (x2 - jogX) + ' V ' + y2 + ' H ' + x2;
       } else if (goingRight) {
         const midX = (x1 + x2) / 2;
-        path = 'M ' + x1 + ' ' + y1 + ' H ' + midX + ' V ' + y2 + ' H ' + (x2 - arrowSize);
+        path = 'M ' + x1 + ' ' + y1 + ' H ' + midX + ' V ' + y2 + ' H ' + x2;
       } else if (sameRow) {
         const gap = 12;
         const routeY = y1 - barHeight;
-        path = 'M ' + x1 + ' ' + y1 + ' V ' + routeY + ' H ' + (x2 - gap) + ' V ' + y2 + ' H ' + (x2 - arrowSize);
+        path = 'M ' + x1 + ' ' + y1 + ' V ' + routeY + ' H ' + (x2 - gap) + ' V ' + y2 + ' H ' + x2;
       } else {
         const gap = 12;
         const midY = (y1 + y2) / 2;
-        path = 'M ' + x1 + ' ' + y1 + ' V ' + midY + ' H ' + (x2 - gap) + ' V ' + y2 + ' H ' + (x2 - arrowSize);
+        path = 'M ' + x1 + ' ' + y1 + ' V ' + midY + ' H ' + (x2 - gap) + ' V ' + y2 + ' H ' + x2;
       }
-      const arrowHead = 'M ' + x2 + ' ' + y2 + ' l -' + arrowSize + ' -' + (arrowSize * 0.6) + ' l 0 ' + (arrowSize * 1.2) + ' Z';
+      // Chevron arrowhead (two angled lines, not filled) - matches gantt-panel.ts
+      const arrowHead = 'M ' + (x2 - arrowSize) + ' ' + (y2 - arrowSize * 0.6) + ' L ' + x2 + ' ' + y2 + ' L ' + (x2 - arrowSize) + ' ' + (y2 + arrowSize * 0.6);
       return { path, arrowHead };
     }
 
