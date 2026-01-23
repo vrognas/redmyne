@@ -3218,22 +3218,14 @@ export class GanttPanel {
             // Same row, target to right: straight horizontal line
             path = `M ${x1} ${y1} H ${x2 - arrowSize}`;
           } else if (!sameRow && nearlyVertical) {
-            // Nearly vertical: S-curve jogs out and back with rounded corners
-            const jogX = 20;
-            const midY = (y1 + y2) / 2;
+            // Nearly vertical: go down then across (no S-curve)
             const goingDown = y2 > y1;
-            path = `M ${x1} ${y1} H ${x1 + jogX - r}` +
-              ` q ${r} 0 ${r} ${goingDown ? r : -r}` +
-              ` V ${midY + (goingDown ? -r : r)}` +
-              ` q 0 ${goingDown ? r : -r} ${-r} ${goingDown ? r : -r}` +
-              ` H ${x2 - jogX + r}` +
-              ` q ${-r} 0 ${-r} ${goingDown ? r : -r}` +
-              ` V ${y2 + (goingDown ? -r : r)}` +
+            path = `M ${x1} ${y1} V ${y2 + (goingDown ? -r : r)}` +
               ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
               ` H ${x2 - arrowSize}`;
           } else if (goingRight) {
             // Different row, target to right: bend near source, then across
-            const bendX = x1 + 8; // bend soon after leaving source
+            const bendX = Math.min(x1 + 8, (x1 + x2) / 2); // bend soon, but not past midpoint
             const goingDown = y2 > y1;
             path = `M ${x1} ${y1} H ${bendX - r}` +
               ` q ${r} 0 ${r} ${goingDown ? r : -r}` +
