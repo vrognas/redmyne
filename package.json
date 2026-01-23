@@ -1395,16 +1395,6 @@
           "command": "redmyne.openTimeEntriesSettings",
           "when": "view == 'redmyne-explorer-my-time-entries'",
           "group": "navigation@5"
-        },
-        {
-          "command": "redmyne.copyWeekTimeEntries",
-          "when": "view == 'redmyne-explorer-my-time-entries' && redmyne:configured",
-          "group": "navigation@6"
-        },
-        {
-          "command": "redmyne.pasteTimeEntries",
-          "when": "view == 'redmyne-explorer-my-time-entries' && redmyne:configured && redmyne:timeEntryClipboardType",
-          "group": "navigation@7"
         }
       ],
       "view/item/context": [
@@ -1462,6 +1452,16 @@
           "command": "redmyne.pasteTimeEntries",
           "when": "view == 'redmyne-explorer-my-time-entries' && viewItem == 'week-group' && redmyne:timeEntryClipboardType",
           "group": "1_edit@2"
+        },
+        {
+          "command": "redmyne.copyWeekTimeEntries",
+          "when": "view == 'redmyne-explorer-my-time-entries' && viewItem == 'week-group'",
+          "group": "inline@1"
+        },
+        {
+          "command": "redmyne.pasteTimeEntries",
+          "when": "view == 'redmyne-explorer-my-time-entries' && viewItem == 'week-group' && redmyne:timeEntryClipboardType",
+          "group": "inline@2"
         },
         {
           "command": "redmyne.copyTimeEntry",
