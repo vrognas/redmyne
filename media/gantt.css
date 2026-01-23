@@ -285,12 +285,15 @@ body {
 }
 
 .capacity-legend {
-  display: flex;
-  gap: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 6px;
 }
 
 .capacity-label {
-  font-size: 9px;
+  font-size: 10px;
+  font-weight: 500;
 }
 
 .capacity-label.available {

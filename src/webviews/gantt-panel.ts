@@ -3740,12 +3740,12 @@ export class GanttPanel {
       <div class="capacity-ribbon-row capacity-ribbon${this._viewFocus !== "person" || !this._showCapacityRibbon ? " hidden" : ""}">
         <div class="gantt-sticky-left gantt-corner">
           <div class="capacity-ribbon-label" style="width: ${stickyLeftWidth}px; height: ${ribbonHeight}px;">
+            Capacity
             <span class="capacity-legend">
               <span class="capacity-label available">&lt;80%</span>
               <span class="capacity-label busy">80-100%</span>
               <span class="capacity-label overbooked">&gt;100%</span>
             </span>
-            Capacity
           </div>
         </div>
         <div class="capacity-ribbon-timeline">
