@@ -3216,10 +3216,10 @@ export class GanttPanel {
 
           if (sameRow && goingRight) {
             // Same row, target to right: straight horizontal line
-            path = `M ${x1} ${y1} H ${x2 - arrowSize}`;
+            path = `M ${x1} ${y1} H ${x2}`;
           } else if (!sameRow && nearlyVertical) {
             // Nearly vertical: S-curve - jog out, down to midpoint, back, down, in
-            const jogX = 12;
+            const jogX = 8;
             const midY = (y1 + y2) / 2;
             const goingDown = y2 > y1;
             path = `M ${x1} ${y1} H ${x1 + jogX - r}` +
@@ -3230,16 +3230,16 @@ export class GanttPanel {
               ` q ${-r} 0 ${-r} ${goingDown ? r : -r}` +
               ` V ${y2 + (goingDown ? -r : r)}` +
               ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
-              ` H ${x2 - arrowSize}`;
+              ` H ${x2}`;
           } else if (goingRight) {
             // Different row, target to right: bend near source, then across
-            const bendX = Math.min(x1 + 8, (x1 + x2) / 2); // bend soon, but not past midpoint
+            const bendX = Math.min(x1 + 8, (x1 + x2) / 2);
             const goingDown = y2 > y1;
             path = `M ${x1} ${y1} H ${bendX - r}` +
               ` q ${r} 0 ${r} ${goingDown ? r : -r}` +
               ` V ${y2 + (goingDown ? -r : r)}` +
               ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
-              ` H ${x2 - arrowSize}`;
+              ` H ${x2}`;
           } else if (sameRow) {
             // Same row, target to left: route above with rounded corners
             const gap = 12;
@@ -3248,7 +3248,7 @@ export class GanttPanel {
               ` q 0 ${-r} ${-r} ${-r}` +
               ` H ${x2 - gap + r}` +
               ` q ${-r} 0 ${-r} ${r}` +
-              ` V ${y2} H ${x2 - arrowSize}`;
+              ` V ${y2} H ${x2}`;
           } else {
             // Different row, target to left: route through gap with rounded corners
             const gap = 12;
@@ -3258,7 +3258,7 @@ export class GanttPanel {
               ` q 0 ${goingDown ? r : -r} ${-r} ${goingDown ? r : -r}` +
               ` H ${x2 - gap + r}` +
               ` q ${-r} 0 ${-r} ${goingDown ? r : -r}` +
-              ` V ${y2} H ${x2 - arrowSize}`;
+              ` V ${y2} H ${x2}`;
           }
 
           // Chevron arrowhead (two angled lines, not filled)
