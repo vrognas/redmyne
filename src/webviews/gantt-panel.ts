@@ -871,9 +871,14 @@ export class GanttPanel {
       this._currentFilter = { ...filter };
     }
 
-    // Store issues with dates, projects, and flexibilityCache for shared sorting
-    this._issues = issues.filter((i) => i.start_date || i.due_date);
-    this._dependencyIssues = (dependencyIssues ?? []).filter((i) => i.start_date || i.due_date);
+    // Store deep copies of issues (shallow copy each object) to avoid mutating source cache
+    // when applying draft date changes
+    this._issues = issues
+      .filter((i) => i.start_date || i.due_date)
+      .map(i => ({ ...i }));
+    this._dependencyIssues = (dependencyIssues ?? [])
+      .filter((i) => i.start_date || i.due_date)
+      .map(i => ({ ...i }));
 
     // Apply draft date changes if draft mode is active
     if (this._draftModeManager?.isEnabled) {
@@ -3784,13 +3789,13 @@ export class GanttPanel {
       <!-- Header row - sticky at top -->
       <div class="gantt-header-row">
         <div class="gantt-sticky-left gantt-corner">
-          <div class="gantt-col-status"><div class="gantt-col-header sortable${this._sortBy === "status" ? " sorted" : ""}" data-sort="status">Status${this._sortBy === "status" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
-          <div class="gantt-col-id"><div class="gantt-col-header sortable${this._sortBy === "id" ? " sorted" : ""}" data-sort="id">#ID${this._sortBy === "id" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
-          <div class="gantt-left-header" id="ganttLeftHeader"><div class="gantt-col-header">Task</div></div>
+          <div class="gantt-col-status"><div class="gantt-col-header sortable${this._sortBy === "status" ? " sorted" : ""}" data-sort="status" data-toolbar-tooltip="Click to sort by status">Status${this._sortBy === "status" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
+          <div class="gantt-col-id"><div class="gantt-col-header sortable${this._sortBy === "id" ? " sorted" : ""}" data-sort="id" data-toolbar-tooltip="Click to sort by ID">#ID${this._sortBy === "id" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
+          <div class="gantt-left-header" id="ganttLeftHeader"><div class="gantt-col-header" data-toolbar-tooltip="Task name">Task</div></div>
           <div class="gantt-resize-handle-header" id="resizeHandleHeader"></div>
-          <div class="gantt-col-start"><div class="gantt-col-header sortable${this._sortBy === "start" ? " sorted" : ""}" data-sort="start">Start${this._sortBy === "start" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
-          <div class="gantt-col-due"><div class="gantt-col-header sortable${this._sortBy === "due" ? " sorted" : ""}" data-sort="due">Due${this._sortBy === "due" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
-          <div class="gantt-col-assignee"><div class="gantt-col-header sortable${this._sortBy === "assignee" ? " sorted" : ""}" data-sort="assignee">Who${this._sortBy === "assignee" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
+          <div class="gantt-col-start"><div class="gantt-col-header sortable${this._sortBy === "start" ? " sorted" : ""}" data-sort="start" data-toolbar-tooltip="Click to sort by start date">Start${this._sortBy === "start" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
+          <div class="gantt-col-due"><div class="gantt-col-header sortable${this._sortBy === "due" ? " sorted" : ""}" data-sort="due" data-toolbar-tooltip="Click to sort by due date">Due${this._sortBy === "due" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
+          <div class="gantt-col-assignee"><div class="gantt-col-header sortable${this._sortBy === "assignee" ? " sorted" : ""}" data-sort="assignee" data-toolbar-tooltip="Click to sort by assignee">Who${this._sortBy === "assignee" ? (this._sortOrder === "asc" ? " ▲" : " ▼") : ""}</div></div>
         </div>
         <div class="gantt-timeline-header" id="ganttTimelineHeader">
           <svg width="${timelineWidth}" height="${headerHeight}">

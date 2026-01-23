@@ -241,7 +241,7 @@ body {
   font-size: 11px;
   font-family: var(--vscode-font-family);
   white-space: nowrap;
-  z-index: 1001;
+  z-index: 10001;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -1300,7 +1300,7 @@ svg {
 .gantt-tooltip {
   position: fixed;
   pointer-events: auto;
-  z-index: 1000;
+  z-index: 10001;
   max-width: 360px;
   padding: 6px 10px;
   border-radius: 6px;
