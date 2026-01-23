@@ -36,6 +36,7 @@ import {
   SortDirection,
   GroupBy,
   RowCascadeData,
+  SourceEntry,
 } from "./timesheet-webview-messages";
 import { startOfISOWeek } from "date-fns";
 
@@ -807,17 +808,25 @@ export class TimeSheetPanel {
           }
         } else if (op.tempId.startsWith("draft-timeentry-")) {
           // Paste format: extract data from http body, find/create row
-          const timeEntry = op.http?.data?.time_entry;
+          const timeEntry = op.http?.data?.time_entry as {
+            issue_id?: number;
+            activity_id?: number;
+            project_id?: number;
+            hours?: number;
+            spent_on?: string;
+            comments?: string;
+          } | undefined;
           if (!timeEntry) continue;
 
-          const issueId = timeEntry.issue_id;
-          const activityId = timeEntry.activity_id;
-          const projectId = timeEntry.project_id;
+          const issueId = timeEntry.issue_id ?? null;
+          const activityId = timeEntry.activity_id ?? null;
+          const projectId = timeEntry.project_id ?? null;
           const hours = timeEntry.hours || 0;
           const spentOn = timeEntry.spent_on;
           const comments = timeEntry.comments || "";
 
           // Calculate dayIndex from spent_on
+          if (!spentOn) continue; // Skip if no date
           const dayIndex = this._currentWeek.dayDates.indexOf(spentOn);
           if (dayIndex < 0) continue; // Not in current week
 
@@ -1763,7 +1772,7 @@ export class TimeSheetPanel {
     aggRowId: string,
     dayIndex: number,
     newHours: number,
-    sourceEntries: Array<{ rowId: string; entryId: number | null; hours: number; originalHours: number; issueId: number; activityId: number; comments: string | null; spentOn: string; isDraft?: boolean }>,
+    sourceEntries: SourceEntry[],
     confirmed: boolean
   ): Promise<void> {
     if (!this._draftQueue || !this._draftModeManager?.isEnabled) return;
@@ -2135,7 +2144,7 @@ export class TimeSheetPanel {
    * Restore original entries (undo for aggregated cell edit)
    */
   private async _restoreAggregatedEntries(
-    entries: Array<{ rowId: string; entryId: number; hours: number; issueId: number; activityId: number; comments: string | null; spentOn: string }>,
+    entries: SourceEntry[],
     aggRowId: string,
     dayIndex: number
   ): Promise<void> {
@@ -2148,7 +2157,9 @@ export class TimeSheetPanel {
 
     // Remove delete operations for original entries
     for (const entry of entries) {
-      await this._draftQueue.removeByKey(`ts:timeentry:${entry.entryId}`, TIMESHEET_SOURCE);
+      if (entry.entryId !== null) {
+        await this._draftQueue.removeByKey(`ts:timeentry:${entry.entryId}`, TIMESHEET_SOURCE);
+      }
     }
 
     // Reload to show original state
@@ -2168,7 +2179,7 @@ export class TimeSheetPanel {
   private async _updateExpandedEntry(
     rowId: string,
     entryId: number,
-    dayIndex: number,
+    _dayIndex: number,
     newHours: number
   ): Promise<void> {
     if (!this._draftQueue || !this._draftModeManager?.isEnabled) return;
@@ -2216,7 +2227,7 @@ export class TimeSheetPanel {
    * Delete individual entry from expanded cell dropdown
    */
   private async _deleteExpandedEntry(
-    rowId: string,
+    _rowId: string,
     entryId: number,
     _aggRowId: string,
     _dayIndex: number
@@ -2245,8 +2256,8 @@ export class TimeSheetPanel {
    * Merge multiple entries into one (sum hours, keep first entry, delete rest)
    */
   private async _mergeEntries(
-    aggRowId: string,
-    dayIndex: number,
+    _aggRowId: string,
+    _dayIndex: number,
     sourceEntries: Array<{
       entryId: number;
       hours: number;

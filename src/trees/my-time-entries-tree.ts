@@ -95,6 +95,7 @@ function applyDraftsToEntries(
   // Process server entries: apply updates, filter deletes
   const result: TimeEntry[] = [];
   for (const entry of serverEntries) {
+    if (entry.id === undefined) continue; // Skip entries without ID
     if (deleteIds.has(entry.id)) continue; // Skip deleted entries
 
     const updateOp = updateMap.get(entry.id);
@@ -761,6 +762,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const userLine = this.showAllUsers && entry.user?.name ? `**User:** ${entry.user.name}\n\n` : "";
       const draftLine = isDraft ? `**⚠️ DRAFT** - Not yet saved to server\n\n` :
         isDraftModified ? `**✏️ MODIFIED** - Changes pending save\n\n` : "";
+      const entryIdLine = isDraft ? "" : `**Entry ID:** ${entry.id}\n\n`;
       const tooltip = new vscode.MarkdownString(
         draftLine +
         `**Issue:** #${issueId} ${issueSubject}\n\n` +
@@ -771,6 +773,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
           `**Activity:** ${entry.activity?.name || "Unknown"}\n\n` +
           `**Date:** ${entry.spent_on}\n\n` +
           `**Comments:** ${entry.comments || "(none)"}\n\n` +
+          entryIdLine +
           (isDraft ? "" : `---\n\n[Open Issue in Browser](command:redmyne.openTimeEntryInBrowser?${commandArgs})`)
       );
       tooltip.isTrusted = true;

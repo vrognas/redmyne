@@ -23,7 +23,6 @@ export class DraftReviewPanel implements vscode.Disposable {
   private readonly queue: DraftQueue;
   private readonly extensionUri: vscode.Uri;
   private disposables: vscode.Disposable[] = [];
-  private lastOperationIds: Set<string> = new Set();
   private disposed = false;
 
   public static createOrShow(queue: DraftQueue, extensionUri: vscode.Uri): DraftReviewPanel {
@@ -57,7 +56,6 @@ export class DraftReviewPanel implements vscode.Disposable {
 
     // Initial render
     this.panel.webview.html = this.getHtmlForWebview(this.queue.getAll());
-    this.lastOperationIds = new Set(this.queue.getAll().map(op => op.id));
 
     // Listen for queue changes - send incremental updates
     this.disposables.push(
@@ -129,8 +127,6 @@ export class DraftReviewPanel implements vscode.Disposable {
 
   private sendIncrementalUpdate(): void {
     const operations = this.queue.getAll();
-    const currentIds = new Set(operations.map(op => op.id));
-
 
     // Always send update since this handler is only called when queue actually changes.
     // Covers additions, removals, AND in-place updates (same ID, different content).
@@ -146,8 +142,6 @@ export class DraftReviewPanel implements vscode.Disposable {
       })),
       count: operations.length,
     });
-
-    this.lastOperationIds = currentIds;
   }
 
 
@@ -165,7 +159,6 @@ export class DraftReviewPanel implements vscode.Disposable {
       })),
       count: operations.length,
     });
-    this.lastOperationIds = new Set(operations.map(op => op.id));
   }
 
   private getHtmlForWebview(operations: DraftOperation[]): string {

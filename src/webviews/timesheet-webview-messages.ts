@@ -9,12 +9,14 @@ export const OTHERS_PARENT_ID = -1;
 // Source entry for aggregated cells
 export interface SourceEntry {
   rowId: string;
-  entryId: number;
+  entryId: number | null;
   hours: number;
+  originalHours?: number; // For dirty detection
   issueId: number;
   activityId: number;
   comments: string | null;
   spentOn: string;
+  isDraft?: boolean;
 }
 
 // Day cell data
@@ -229,6 +231,12 @@ export interface RequestAggregatedFieldConfirmMessage {
   sourceEntryCount: number;
 }
 
+export interface PasteCompleteMessage {
+  type: "pasteComplete";
+  draftIds: string[];
+  count: number;
+}
+
 export type ExtensionToWebviewMessage =
   | RenderMessage
   | UpdateRowMessage
@@ -244,7 +252,8 @@ export type ExtensionToWebviewMessage =
   | RowDeletedMessage
   | ShowToastMessage
   | RequestAggregatedCellConfirmMessage
-  | RequestAggregatedFieldConfirmMessage;
+  | RequestAggregatedFieldConfirmMessage
+  | PasteCompleteMessage;
 
 // --- Webview -> Extension Messages ---
 
@@ -395,6 +404,26 @@ export interface DeleteExpandedEntryMessage {
   dayIndex: number;
 }
 
+export interface MergeEntriesMessage {
+  type: "mergeEntries";
+  aggRowId: string;
+  dayIndex: number;
+  sourceEntries: Array<{
+    entryId: number;
+    hours: number;
+    rowId: string;
+    issueId: number;
+    activityId: number;
+    comments: string;
+    spentOn: string;
+  }>;
+}
+
+export interface UndoPasteMessage {
+  type: "undoPaste";
+  draftIds: string[];
+}
+
 export type WebviewToExtensionMessage =
   | WebviewReadyMessage
   | NavigateWeekMessage
@@ -421,7 +450,9 @@ export type WebviewToExtensionMessage =
   | UpdateAggregatedFieldMessage
   | RestoreAggregatedEntriesMessage
   | UpdateExpandedEntryMessage
-  | DeleteExpandedEntryMessage;
+  | DeleteExpandedEntryMessage
+  | MergeEntriesMessage
+  | UndoPasteMessage;
 
 // Combined type for message handling
 export type TimeSheetMessage = ExtensionToWebviewMessage | WebviewToExtensionMessage;
