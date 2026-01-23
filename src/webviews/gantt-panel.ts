@@ -3232,10 +3232,10 @@ export class GanttPanel {
               ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
               ` H ${x2 - arrowSize}`;
           } else if (goingRight) {
-            // Different row, target to right: 3-segment elbow with rounded corners
-            const midX = (x1 + x2) / 2;
+            // Different row, target to right: bend near source, then across
+            const bendX = x1 + 8; // bend soon after leaving source
             const goingDown = y2 > y1;
-            path = `M ${x1} ${y1} H ${midX - r}` +
+            path = `M ${x1} ${y1} H ${bendX - r}` +
               ` q ${r} 0 ${r} ${goingDown ? r : -r}` +
               ` V ${y2 + (goingDown ? -r : r)}` +
               ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
