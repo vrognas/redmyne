@@ -3214,34 +3214,14 @@ export class GanttPanel {
           let path: string;
           const r = 4; // corner radius for rounded turns
 
-          // Back-to-back tasks: route below when horizontal gap is small
-          const backToBack = horizontalDist < 20 && !sameRow;
-
           if (sameRow && goingRight) {
             // Same row, target to right: straight horizontal line
             path = `M ${x1} ${y1} H ${x2 - arrowSize}`;
-          } else if (backToBack) {
-            // Back-to-back tasks: route below both bars with stepped connector
-            // Pattern: right → down → horizontal → up → right
-            const belowY = Math.max(source.y, target.y) + barHeight / 2 + 12;
-            const exitX = x1 + 8;
-            const entryX = x2 - 8;
-            // Right, rounded down, horizontal below, rounded up, right to target
-            path = `M ${x1} ${y1} H ${exitX - r}` +
-              ` q ${r} 0 ${r} ${r}` + // round corner: down
-              ` V ${belowY - r}` +
-              ` q 0 ${r} ${x2 < x1 ? -r : r} ${r}` + // round corner: horizontal
-              ` H ${entryX + (x2 < x1 ? r : -r)}` +
-              ` q ${x2 < x1 ? -r : r} 0 ${x2 < x1 ? -r : r} ${y2 > belowY ? r : -r}` + // round corner: up
-              ` V ${y2 + (y2 > belowY ? -r : r)}` +
-              ` q 0 ${y2 > belowY ? r : -r} ${r} ${y2 > belowY ? r : -r}` + // round corner: right
-              ` H ${x2 - arrowSize}`;
           } else if (!sameRow && nearlyVertical) {
             // Nearly vertical: S-curve jogs out and back with rounded corners
             const jogX = 20;
             const midY = (y1 + y2) / 2;
             const goingDown = y2 > y1;
-            // Right, rounded down, vertical, rounded left, vertical, rounded right
             path = `M ${x1} ${y1} H ${x1 + jogX - r}` +
               ` q ${r} 0 ${r} ${goingDown ? r : -r}` +
               ` V ${midY + (goingDown ? -r : r)}` +
@@ -3252,7 +3232,7 @@ export class GanttPanel {
               ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
               ` H ${x2 - arrowSize}`;
           } else if (goingRight) {
-            // Different row, target to right: elbow with rounded corners
+            // Different row, target to right: 3-segment elbow with rounded corners
             const midX = (x1 + x2) / 2;
             const goingDown = y2 > y1;
             path = `M ${x1} ${y1} H ${midX - r}` +
@@ -3268,8 +3248,7 @@ export class GanttPanel {
               ` q 0 ${-r} ${-r} ${-r}` +
               ` H ${x2 - gap + r}` +
               ` q ${-r} 0 ${-r} ${r}` +
-              ` V ${y2}` +
-              ` H ${x2 - arrowSize}`;
+              ` V ${y2} H ${x2 - arrowSize}`;
           } else {
             // Different row, target to left: route through gap with rounded corners
             const gap = 12;
@@ -3279,8 +3258,7 @@ export class GanttPanel {
               ` q 0 ${goingDown ? r : -r} ${-r} ${goingDown ? r : -r}` +
               ` H ${x2 - gap + r}` +
               ` q ${-r} 0 ${-r} ${goingDown ? r : -r}` +
-              ` V ${y2}` +
-              ` H ${x2 - arrowSize}`;
+              ` V ${y2} H ${x2 - arrowSize}`;
           }
 
           // Chevron arrowhead (two angled lines, not filled)
