@@ -776,8 +776,8 @@ export function setupDrag(ctx) {
             if (leftRect) leftRect.setAttribute('x', newStartX);
             if (rightRect) rightRect.setAttribute('x', newEndX - 14);
             // Update grip dot positions
-            b.leftHandle.querySelectorAll('.drag-grip circle').forEach((c, i) => c.setAttribute('cx', newStartX + 7));
-            b.rightHandle.querySelectorAll('.drag-grip circle').forEach((c, i) => c.setAttribute('cx', newEndX - 7));
+            b.leftHandle.querySelectorAll('.drag-grip circle').forEach((c, i) => c.setAttribute('cx', newStartX + 9));
+            b.rightHandle.querySelectorAll('.drag-grip circle').forEach((c, i) => c.setAttribute('cx', newEndX - 9));
             b.newStartX = newStartX;
             b.newEndX = newEndX;
             // Update badge position
@@ -824,8 +824,8 @@ export function setupDrag(ctx) {
           if (leftRect) leftRect.setAttribute('x', newStartX);
           if (rightRect) rightRect.setAttribute('x', newEndX - 14);
           // Update grip dot positions
-          dragState.leftHandle.querySelectorAll('.drag-grip circle').forEach(c => c.setAttribute('cx', newStartX + 7));
-          dragState.rightHandle.querySelectorAll('.drag-grip circle').forEach(c => c.setAttribute('cx', newEndX - 7));
+          dragState.leftHandle.querySelectorAll('.drag-grip circle').forEach(c => c.setAttribute('cx', newStartX + 9));
+          dragState.rightHandle.querySelectorAll('.drag-grip circle').forEach(c => c.setAttribute('cx', newEndX - 9));
           dragState.newStartX = newStartX;
           dragState.newEndX = newEndX;
 
@@ -908,12 +908,12 @@ export function setupDrag(ctx) {
       if (leftHandle) {
         const rect = leftHandle.querySelector('rect');
         if (rect) rect.setAttribute('x', String(startX));
-        leftHandle.querySelectorAll('.drag-grip circle').forEach(c => c.setAttribute('cx', startX + 7));
+        leftHandle.querySelectorAll('.drag-grip circle').forEach(c => c.setAttribute('cx', startX + 9));
       }
       if (rightHandle) {
         const rect = rightHandle.querySelector('rect');
         if (rect) rect.setAttribute('x', String(endX - 14));
-        rightHandle.querySelectorAll('.drag-grip circle').forEach(c => c.setAttribute('cx', endX - 7));
+        rightHandle.querySelectorAll('.drag-grip circle').forEach(c => c.setAttribute('cx', endX - 9));
       }
       if (barLabels) barLabels.removeAttribute('transform');
       if (connectedArrows && connectedArrows.length > 0) {

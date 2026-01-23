@@ -3027,17 +3027,17 @@ export class GanttPanel {
             <g class="drag-handle drag-left cursor-ew-resize">
               <rect x="${startX}" y="0" width="${handleWidth}" height="${barHeight}" fill="transparent"/>
               <g class="drag-grip" pointer-events="none">
-                <circle cx="${startX + 7}" cy="${barHeight / 2 - 4}" r="1.5"/>
-                <circle cx="${startX + 7}" cy="${barHeight / 2}" r="1.5"/>
-                <circle cx="${startX + 7}" cy="${barHeight / 2 + 4}" r="1.5"/>
+                <circle cx="${startX + 9}" cy="${barHeight / 2 - 4}" r="1.5"/>
+                <circle cx="${startX + 9}" cy="${barHeight / 2}" r="1.5"/>
+                <circle cx="${startX + 9}" cy="${barHeight / 2 + 4}" r="1.5"/>
               </g>
             </g>
             <g class="drag-handle drag-right cursor-ew-resize">
               <rect x="${startX + width - handleWidth}" y="0" width="${handleWidth}" height="${barHeight}" fill="transparent"/>
               <g class="drag-grip" pointer-events="none">
-                <circle cx="${startX + width - 7}" cy="${barHeight / 2 - 4}" r="1.5"/>
-                <circle cx="${startX + width - 7}" cy="${barHeight / 2}" r="1.5"/>
-                <circle cx="${startX + width - 7}" cy="${barHeight / 2 + 4}" r="1.5"/>
+                <circle cx="${startX + width - 9}" cy="${barHeight / 2 - 4}" r="1.5"/>
+                <circle cx="${startX + width - 9}" cy="${barHeight / 2}" r="1.5"/>
+                <circle cx="${startX + width - 9}" cy="${barHeight / 2 + 4}" r="1.5"/>
               </g>
             </g>
             <!-- Link handle for creating relations (larger hit area for Fitts's Law) -->
