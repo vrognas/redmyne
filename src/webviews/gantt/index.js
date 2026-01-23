@@ -405,7 +405,8 @@ function initializeGantt(state) {
     barHeight,
     todayX,
     todayInRange,
-    isDraftMode
+    isDraftMode,
+    draftQueueCount
   } = state;
   const dayWidth = timelineWidth / totalDays;
 
@@ -413,6 +414,17 @@ function initializeGantt(state) {
   const confirmBtn = document.getElementById('dragConfirmOk');
   if (confirmBtn) {
     confirmBtn.textContent = isDraftMode ? 'Queue to Draft' : 'Save to Redmine';
+  }
+
+  // Initialize draft badge visibility and count
+  const draftBadge = document.getElementById('draftBadge');
+  if (draftBadge) {
+    if (isDraftMode) {
+      draftBadge.classList.remove('hidden');
+      draftBadge.textContent = (draftQueueCount ?? 0) + ' queued';
+    } else {
+      draftBadge.classList.add('hidden');
+    }
   }
 
   // Cleanup previous event listeners (prevents accumulation on re-render)
@@ -621,6 +633,22 @@ function initializeGantt(state) {
         const confirmBtn = document.getElementById('dragConfirmOk');
         if (confirmBtn) {
           confirmBtn.textContent = message.enabled ? 'Queue to Draft' : 'Save to Redmine';
+        }
+        // Update draft badge visibility
+        const draftBadge = document.getElementById('draftBadge');
+        if (draftBadge) {
+          if (message.enabled) {
+            draftBadge.classList.remove('hidden');
+            draftBadge.textContent = (message.queueCount ?? 0) + ' queued';
+          } else {
+            draftBadge.classList.add('hidden');
+          }
+        }
+      } else if (message.command === 'setDraftQueueCount') {
+        // Update draft badge count
+        const draftBadge = document.getElementById('draftBadge');
+        if (draftBadge) {
+          draftBadge.textContent = message.count + ' queued';
         }
       } else if (message.command === 'pushUndoAction') {
         // Push relation action to undo stack
@@ -1038,6 +1066,11 @@ function initializeGantt(state) {
     document.getElementById('refreshBtn')?.addEventListener('click', () => {
       document.getElementById('loadingOverlay')?.classList.add('visible');
       vscode.postMessage({ command: 'refresh' });
+    });
+
+    // Draft badge handler - open draft review
+    document.getElementById('draftBadge')?.addEventListener('click', () => {
+      vscode.postMessage({ command: 'openDraftReview' });
     });
 
     // Show delete confirmation picker

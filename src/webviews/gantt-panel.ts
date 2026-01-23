@@ -101,6 +101,7 @@ interface GanttRenderState {
   stickyLeftWidth: number;
   perfDebug: boolean;
   isDraftMode: boolean;
+  draftQueueCount: number;
 }
 
 interface GanttRenderPayload {
@@ -478,13 +479,20 @@ export class GanttPanel {
     // Create debounced collapse update to prevent rapid re-renders
     this._debouncedCollapseUpdate = debounce(COLLAPSE_DEBOUNCE_MS, () => this._updateContent());
 
-    // Subscribe to draft mode changes
+    // Subscribe to draft mode and queue changes
     if (this._draftModeManager) {
       this._disposables.push(
         this._draftModeManager.onDidChangeEnabled(() => {
           this._panel.webview.postMessage({
             command: "setDraftModeState",
             enabled: this._draftModeManager?.isEnabled ?? false,
+            queueCount: this._draftModeManager?.queue?.count ?? 0,
+          });
+        }),
+        this._draftModeManager.queue.onDidChange(() => {
+          this._panel.webview.postMessage({
+            command: "setDraftQueueCount",
+            count: this._draftModeManager?.queue?.count ?? 0,
           });
         })
       );
@@ -833,6 +841,7 @@ export class GanttPanel {
       stickyLeftWidth,
       perfDebug,
       isDraftMode: this._draftModeManager?.isEnabled ?? false,
+      draftQueueCount: this._draftModeManager?.queue?.count ?? 0,
     };
 
     return { ...baseState, ...overrides };
@@ -1358,6 +1367,9 @@ export class GanttPanel {
         resetDownstreamCountCache();
         // Clear cache and refetch data (including new relations)
         vscode.commands.executeCommand("redmyne.refreshIssues");
+        break;
+      case "openDraftReview":
+        vscode.commands.executeCommand("redmyne.reviewDrafts");
         break;
       case "toggleCollapse":
         if (message.collapseKey) {
@@ -3619,6 +3631,8 @@ export class GanttPanel {
         <option value="closed"${this._currentFilter.status === "closed" ? " selected" : ""}>Closed</option>
         <option value="any"${this._currentFilter.status === "any" ? " selected" : ""}>Any status</option>
       </select>
+      <!-- Draft mode badge -->
+      <button id="draftBadge" class="draft-badge${this._draftModeManager?.isEnabled ? "" : " hidden"}" data-toolbar-tooltip="Review queued changes">${this._draftModeManager?.queue?.count ?? 0} queued</button>
       <!-- Primary actions -->
       <button id="refreshBtn" class="toggle-btn text-btn" data-toolbar-tooltip="Refresh (R)">↻</button>
       <button id="todayBtn" class="toggle-btn text-btn" data-toolbar-tooltip="${todayInRange ? "Today (T)" : "Today is outside timeline range"}"${todayInRange ? "" : " disabled"}>T</button>
@@ -3873,6 +3887,7 @@ export class GanttPanel {
       stickyLeftWidth,
       perfDebug: isPerfDebugEnabled(),
       isDraftMode: this._draftModeManager?.isEnabled ?? false,
+      draftQueueCount: this._draftModeManager?.queue?.count ?? 0,
     };
 
     perfEnd("_getRenderPayload", `issues=${this._issues.length}, rows=${filteredRowCount}, days=${totalDays}`);
