@@ -36,8 +36,8 @@ export interface GanttIssue {
   status: FlexibilityScore["status"] | null;
   /** Redmine status name (e.g., "New", "In Progress", "Closed") */
   statusName: string;
-  /** Flexibility slack in days (positive = buffer, 0/negative = critical) */
-  flexibilitySlack: number | null;
+  /** Flexibility percentage: ((available - estimated) / estimated) * 100 */
+  flexibilityPercent: number | null;
   isClosed: boolean;
   project: string;
   projectId: number;
@@ -142,11 +142,9 @@ export function toGanttIssue(
     due_date: issue.due_date || null,
     status: flexibility?.status ?? null,
     statusName: issue.status?.name ?? "Unknown",
-    // Calculate days of slack: daysRemaining - (hoursRemaining / 8)
-    // This gives actual buffer in working days, not percentage
-    flexibilitySlack: flexibility
-      ? Math.round(flexibility.daysRemaining - flexibility.hoursRemaining / 8)
-      : null,
+    // Flexibility as percentage: ((available - estimated) / estimated) * 100
+    // 0% = exactly enough time, 100% = double the time needed, -50% = need 50% more time
+    flexibilityPercent: flexibility?.initial ?? null,
     isClosed: isClosedById || isClosedByName,
     project: issue.project?.name ?? "Unknown",
     projectId: issue.project?.id ?? 0,

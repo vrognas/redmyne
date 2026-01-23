@@ -2342,11 +2342,11 @@ export class GanttPanel {
         // Closed issues always show as "completed" regardless of calculated flexibility
         const leftEffectiveStatus = issue.isClosed ? "completed" : issue.status;
         const leftStatusDesc = this._getStatusDescription(leftEffectiveStatus);
-        const leftFlexSlack = issue.flexibilitySlack;
-        const leftFlexText = leftFlexSlack === null ? null
-          : leftFlexSlack > 0 ? `Flexibility: +${leftFlexSlack}d buffer`
-          : leftFlexSlack === 0 ? `Flexibility: ⚠ Critical path (no buffer)`
-          : `Flexibility: ⚠ ${leftFlexSlack}d behind`;
+        const leftFlexPct = issue.flexibilityPercent;
+        const leftFlexText = leftFlexPct === null ? null
+          : leftFlexPct > 0 ? `Flexibility: +${leftFlexPct}%`
+          : leftFlexPct === 0 ? `Flexibility: 0% (no buffer)`
+          : `Flexibility: ${leftFlexPct}%`;
 
         // Build consolidated tooltip with all info
         const tooltipLines = [
@@ -2701,11 +2701,11 @@ export class GanttPanel {
         const statusDesc = this._getStatusDescription(effectiveStatus);
 
         // Build tooltip with contribution info
-        const flexSlack = issue.flexibilitySlack;
-        const flexText = flexSlack === null ? null
-          : flexSlack > 0 ? `Flexibility: +${flexSlack}d buffer`
-          : flexSlack === 0 ? `Flexibility: ⚠ Critical path (no buffer)`
-          : `Flexibility: ⚠ ${flexSlack}d behind`;
+        const flexPct = issue.flexibilityPercent;
+        const flexText = flexPct === null ? null
+          : flexPct > 0 ? `Flexibility: +${flexPct}%`
+          : flexPct === 0 ? `Flexibility: 0% (no buffer)`
+          : `Flexibility: ${flexPct}%`;
         // Blocks info (issues waiting on this one)
         const blocksLines: string[] = [];
         if (issue.blocks.length > 0) {
@@ -2919,7 +2919,7 @@ export class GanttPanel {
         }
 
         // Critical path: zero or negative flexibility
-        const isCritical = flexSlack !== null && flexSlack <= 0 && !issue.isClosed;
+        const isCritical = flexPct !== null && flexPct <= 0 && !issue.isClosed;
         return `
           <g class="issue-bar gantt-row${hiddenClass}${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${issue.isAdHoc ? " bar-adhoc" : ""}${isCritical ? " bar-critical" : ""}" data-issue-id="${issue.id}"
              data-project-id="${issue.projectId}"
@@ -2998,13 +2998,14 @@ export class GanttPanel {
             ${(() => {
               // Progress badge width (varies by digit count)
               const progressBadgeW = visualDoneRatio === 100 ? 32 : visualDoneRatio >= 10 ? 28 : 22;
-              // Flexibility badge: "+5d", "0d", "-3d" (width ~28)
-              const showFlex = flexSlack !== null && !issue.isClosed;
-              const flexBadgeW = showFlex ? 28 : 0;
-              const flexLabel = showFlex ? (flexSlack > 0 ? `+${flexSlack}d` : `${flexSlack}d`) : "";
+              // Flexibility badge: "+100%", "0%", "-50%" (width varies by digit count)
+              const showFlex = flexPct !== null && !issue.isClosed;
+              const flexLabelText = showFlex ? (flexPct > 0 ? `+${flexPct}%` : `${flexPct}%`) : "";
+              const flexBadgeW = showFlex ? (Math.abs(flexPct) >= 100 ? 38 : Math.abs(flexPct) >= 10 ? 32 : 26) : 0;
+              const flexLabel = flexLabelText;
               const flexColor = showFlex
-                ? (flexSlack > 2 ? "var(--vscode-charts-green)"
-                  : flexSlack > 0 ? "var(--vscode-charts-yellow)"
+                ? (flexPct >= 50 ? "var(--vscode-charts-green)"
+                  : flexPct > 0 ? "var(--vscode-charts-yellow)"
                   : "var(--vscode-charts-red)")
                 : "";
               // Blocks badge: "🚧3" for tasks blocked by this (only show if >0)

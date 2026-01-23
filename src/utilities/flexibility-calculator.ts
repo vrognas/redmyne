@@ -91,9 +91,13 @@ export function calculateFlexibility(
   }
 
   // Initial flexibility: total available vs estimated
+  // Due date is EXCLUSIVE - work must be done BEFORE the due date
+  // e.g., start Mon, due Wed = Mon+Tue available (2 days)
+  const dayBeforeDue = new Date(dueDate);
+  dayBeforeDue.setDate(dayBeforeDue.getDate() - 1);
   const totalAvailableHours = countAvailableHours(
     startDate,
-    dueDate,
+    dayBeforeDue,
     schedule
   );
   const initial = calculateFlexibilityPercent(
@@ -102,8 +106,9 @@ export function calculateFlexibility(
   );
 
   // Remaining flexibility: remaining time vs remaining work
-  const daysRemaining = countWorkingDays(today, dueDate, schedule);
-  const availableRemaining = countAvailableHours(today, dueDate, schedule);
+  // Also use exclusive due date for consistency
+  const daysRemaining = countWorkingDays(today, dayBeforeDue, schedule);
+  const availableRemaining = countAvailableHours(today, dayBeforeDue, schedule);
   const remaining =
     hoursRemaining > 0
       ? calculateFlexibilityPercent(availableRemaining, hoursRemaining)
