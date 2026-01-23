@@ -3183,7 +3183,7 @@ export class GanttPanel {
           if (!source || !target) return "";
 
           const style = relationStyles[rel.type] || relationStyles.relates;
-          const arrowSize = 6;
+          const arrowSize = 4;
           const sameRow = Math.abs(source.y - target.y) < 5;
 
           // Temporal relations: end → start (or based on type for extended)
