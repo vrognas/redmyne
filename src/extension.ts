@@ -346,6 +346,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     clearProjects: () => projectsTree.clearProjects(),
     getFilter: () => projectsTree.getFilter(),
     setFilter: (filter) => projectsTree.setFilter(filter),
+    getDraftModeManager: () => draftModeManager,
   });
 
   // Register timesheet commands

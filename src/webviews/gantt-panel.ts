@@ -33,6 +33,7 @@ import { GanttWebviewMessage, parseLookbackYears } from "./gantt-webview-message
 import { escapeAttr, escapeHtml } from "./gantt-html-escape";
 import { CreatableRelationType, GanttIssue, GanttRow, nodeToGanttRow } from "./gantt-model";
 import { deriveAssigneeState, filterIssuesForView } from "./gantt-view-filter";
+import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
 
 // Performance instrumentation (gated behind redmyne.gantt.perfDebug config)
 const perfTimers: Map<string, number> = new Map();
@@ -99,6 +100,7 @@ interface GanttRenderState {
   assigneeColumnWidth: number;
   stickyLeftWidth: number;
   perfDebug: boolean;
+  isDraftMode: boolean;
 }
 
 interface GanttRenderPayload {
@@ -379,10 +381,15 @@ export class GanttPanel {
   private _versions: Version[] = []; // Milestones across all projects
   private _flexibilityCache: Map<number, FlexibilityScore | null> = new Map();
   private _getServerFn: (() => RedmineServer | undefined) | undefined;
+  private _getDraftModeManagerFn: (() => DraftModeManager | undefined) | undefined;
 
   /** Get current server (called fresh each time to handle late connection) */
   private get _server(): RedmineServer | undefined {
     return this._getServerFn?.();
+  }
+  /** Get current draft mode manager */
+  private get _draftModeManager(): DraftModeManager | undefined {
+    return this._getDraftModeManagerFn?.();
   }
   private _zoomLevel: ZoomLevel = "month";
   private _schedule: WeeklySchedule = DEFAULT_WEEKLY_SCHEDULE;
@@ -436,10 +443,16 @@ export class GanttPanel {
   private _contributionSources?: Map<number, { fromIssueId: number; hours: number }[]>;
   private _donationTargets?: Map<number, { toIssueId: number; hours: number }[]>;
 
-  private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, getServer?: () => RedmineServer | undefined) {
+  private constructor(
+    panel: vscode.WebviewPanel,
+    extensionUri: vscode.Uri,
+    getServer?: () => RedmineServer | undefined,
+    getDraftModeManager?: () => DraftModeManager | undefined
+  ) {
     this._panel = panel;
     this._extensionUri = extensionUri;
     this._getServerFn = getServer;
+    this._getDraftModeManagerFn = getDraftModeManager;
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
     this._panel.webview.onDidReceiveMessage(
       (message) => this._handleMessage(message),
@@ -464,9 +477,25 @@ export class GanttPanel {
 
     // Create debounced collapse update to prevent rapid re-renders
     this._debouncedCollapseUpdate = debounce(COLLAPSE_DEBOUNCE_MS, () => this._updateContent());
+
+    // Subscribe to draft mode changes
+    if (this._draftModeManager) {
+      this._disposables.push(
+        this._draftModeManager.onDidChangeEnabled(() => {
+          this._panel.webview.postMessage({
+            command: "setDraftModeState",
+            enabled: this._draftModeManager?.isEnabled ?? false,
+          });
+        })
+      );
+    }
   }
 
-  public static createOrShow(extensionUri: vscode.Uri, getServer?: () => RedmineServer | undefined): GanttPanel {
+  public static createOrShow(
+    extensionUri: vscode.Uri,
+    getServer?: () => RedmineServer | undefined,
+    getDraftModeManager?: () => DraftModeManager | undefined
+  ): GanttPanel {
     const column = vscode.ViewColumn.One;
 
     if (GanttPanel.currentPanel) {
@@ -474,6 +503,9 @@ export class GanttPanel {
       // Update server getter reference
       if (getServer) {
         GanttPanel.currentPanel._getServerFn = getServer;
+      }
+      if (getDraftModeManager) {
+        GanttPanel.currentPanel._getDraftModeManagerFn = getDraftModeManager;
       }
       return GanttPanel.currentPanel;
     }
@@ -489,7 +521,7 @@ export class GanttPanel {
       }
     );
 
-    GanttPanel.currentPanel = new GanttPanel(panel, extensionUri, getServer);
+    GanttPanel.currentPanel = new GanttPanel(panel, extensionUri, getServer, getDraftModeManager);
     // Show loading skeleton immediately
     GanttPanel.currentPanel._showLoadingSkeleton();
     return GanttPanel.currentPanel;
@@ -498,8 +530,13 @@ export class GanttPanel {
   /**
    * Restore panel from serialized state (after window reload)
    */
-  public static restore(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, getServer?: () => RedmineServer | undefined): GanttPanel {
-    GanttPanel.currentPanel = new GanttPanel(panel, extensionUri, getServer);
+  public static restore(
+    panel: vscode.WebviewPanel,
+    extensionUri: vscode.Uri,
+    getServer?: () => RedmineServer | undefined,
+    getDraftModeManager?: () => DraftModeManager | undefined
+  ): GanttPanel {
+    GanttPanel.currentPanel = new GanttPanel(panel, extensionUri, getServer, getDraftModeManager);
     GanttPanel.currentPanel._showLoadingSkeleton();
     return GanttPanel.currentPanel;
   }
@@ -795,6 +832,7 @@ export class GanttPanel {
       assigneeColumnWidth,
       stickyLeftWidth,
       perfDebug,
+      isDraftMode: this._draftModeManager?.isEnabled ?? false,
     };
 
     return { ...baseState, ...overrides };
@@ -3834,6 +3872,7 @@ export class GanttPanel {
       assigneeColumnWidth,
       stickyLeftWidth,
       perfDebug: isPerfDebugEnabled(),
+      isDraftMode: this._draftModeManager?.isEnabled ?? false,
     };
 
     perfEnd("_getRenderPayload", `issues=${this._issues.length}, rows=${filteredRowCount}, days=${totalDays}`);

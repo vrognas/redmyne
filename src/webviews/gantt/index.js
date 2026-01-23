@@ -404,9 +404,16 @@ function initializeGantt(state) {
     selectedCollapseKey,
     barHeight,
     todayX,
-    todayInRange
+    todayInRange,
+    isDraftMode
   } = state;
   const dayWidth = timelineWidth / totalDays;
+
+  // Initialize confirm button text based on draft mode
+  const confirmBtn = document.getElementById('dragConfirmOk');
+  if (confirmBtn) {
+    confirmBtn.textContent = isDraftMode ? 'Queue to Draft' : 'Save to Redmine';
+  }
 
   // Cleanup previous event listeners (prevents accumulation on re-render)
   if (window._ganttCleanup) {
@@ -608,6 +615,12 @@ function initializeGantt(state) {
         } else {
           ganttContainer?.classList.remove('intensity-enabled');
           if (menuIntensity) menuIntensity.classList.remove('active');
+        }
+      } else if (message.command === 'setDraftModeState') {
+        // Update confirm button text based on draft mode
+        const confirmBtn = document.getElementById('dragConfirmOk');
+        if (confirmBtn) {
+          confirmBtn.textContent = message.enabled ? 'Queue to Draft' : 'Save to Redmine';
         }
       } else if (message.command === 'pushUndoAction') {
         // Push relation action to undo stack

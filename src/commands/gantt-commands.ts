@@ -10,6 +10,7 @@ import { Issue } from "../redmine/models/issue";
 import { RedmineServer } from "../redmine/redmine-server";
 import { RedmineProject } from "../redmine/redmine-project";
 import { IssueFilter } from "../redmine/models/common";
+import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
 
 export interface GanttCommandDeps {
   getServer: () => RedmineServer | undefined;
@@ -20,6 +21,7 @@ export interface GanttCommandDeps {
   clearProjects: () => void;
   getFilter: () => IssueFilter;
   setFilter: (filter: IssueFilter) => void;
+  getDraftModeManager: () => DraftModeManager | undefined;
 }
 
 export function registerGanttCommands(
@@ -43,7 +45,7 @@ export function registerGanttCommands(
       const scheduleConfig = vscode.workspace.getConfiguration("redmyne.workingHours");
       const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
 
-      const panel = GanttPanel.createOrShow(context.extensionUri, deps.getServer);
+      const panel = GanttPanel.createOrShow(context.extensionUri, deps.getServer, deps.getDraftModeManager);
       panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule, deps.getFilter(), deps.getDependencyIssues(), deps.getServer);
       panel.setFilterChangeCallback((filter) => deps.setFilter(filter));
     }),
@@ -83,7 +85,7 @@ export function registerGanttCommands(
       const scheduleConfig = vscode.workspace.getConfiguration("redmyne.workingHours");
       const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
 
-      const panel = GanttPanel.createOrShow(context.extensionUri, deps.getServer);
+      const panel = GanttPanel.createOrShow(context.extensionUri, deps.getServer, deps.getDraftModeManager);
       panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule, deps.getFilter(), deps.getDependencyIssues(), deps.getServer);
       panel.setFilterChangeCallback((filter) => deps.setFilter(filter));
 
