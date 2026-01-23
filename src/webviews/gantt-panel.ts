@@ -2799,7 +2799,7 @@ export class GanttPanel {
         // Calculate done portion width for progress visualization
         const doneWidth = (visualDoneRatio / 100) * width;
 
-        const handleWidth = 8;
+        const handleWidth = 14;
 
         // Calculate daily intensity for this issue (skip for parent issues - work is in subtasks)
         // Always compute in person view for instant toggle (CSS controls visibility)
@@ -2989,17 +2989,17 @@ export class GanttPanel {
             <g class="drag-handle drag-left cursor-ew-resize">
               <rect x="${startX}" y="0" width="${handleWidth}" height="${barHeight}" fill="transparent"/>
               <g class="drag-grip" pointer-events="none">
-                <circle cx="${startX + 4}" cy="${barHeight / 2 - 4}" r="1.5"/>
-                <circle cx="${startX + 4}" cy="${barHeight / 2}" r="1.5"/>
-                <circle cx="${startX + 4}" cy="${barHeight / 2 + 4}" r="1.5"/>
+                <circle cx="${startX + 7}" cy="${barHeight / 2 - 4}" r="1.5"/>
+                <circle cx="${startX + 7}" cy="${barHeight / 2}" r="1.5"/>
+                <circle cx="${startX + 7}" cy="${barHeight / 2 + 4}" r="1.5"/>
               </g>
             </g>
             <g class="drag-handle drag-right cursor-ew-resize">
               <rect x="${startX + width - handleWidth}" y="0" width="${handleWidth}" height="${barHeight}" fill="transparent"/>
               <g class="drag-grip" pointer-events="none">
-                <circle cx="${startX + width - handleWidth + 4}" cy="${barHeight / 2 - 4}" r="1.5"/>
-                <circle cx="${startX + width - handleWidth + 4}" cy="${barHeight / 2}" r="1.5"/>
-                <circle cx="${startX + width - handleWidth + 4}" cy="${barHeight / 2 + 4}" r="1.5"/>
+                <circle cx="${startX + width - 7}" cy="${barHeight / 2 - 4}" r="1.5"/>
+                <circle cx="${startX + width - 7}" cy="${barHeight / 2}" r="1.5"/>
+                <circle cx="${startX + width - 7}" cy="${barHeight / 2 + 4}" r="1.5"/>
               </g>
             </g>
             <!-- Link handle for creating relations (larger hit area for Fitts's Law) -->

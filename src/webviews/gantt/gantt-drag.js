@@ -774,10 +774,10 @@ export function setupDrag(ctx) {
             const leftRect = b.leftHandle.querySelector('rect');
             const rightRect = b.rightHandle.querySelector('rect');
             if (leftRect) leftRect.setAttribute('x', newStartX);
-            if (rightRect) rightRect.setAttribute('x', newEndX - 8);
+            if (rightRect) rightRect.setAttribute('x', newEndX - 14);
             // Update grip dot positions
-            b.leftHandle.querySelectorAll('.drag-grip circle').forEach((c, i) => c.setAttribute('cx', newStartX + 4));
-            b.rightHandle.querySelectorAll('.drag-grip circle').forEach((c, i) => c.setAttribute('cx', newEndX - 8 + 4));
+            b.leftHandle.querySelectorAll('.drag-grip circle').forEach((c, i) => c.setAttribute('cx', newStartX + 7));
+            b.rightHandle.querySelectorAll('.drag-grip circle').forEach((c, i) => c.setAttribute('cx', newEndX - 7));
             b.newStartX = newStartX;
             b.newEndX = newEndX;
             // Update badge position
@@ -822,10 +822,10 @@ export function setupDrag(ctx) {
           const leftRect = dragState.leftHandle.querySelector('rect');
           const rightRect = dragState.rightHandle.querySelector('rect');
           if (leftRect) leftRect.setAttribute('x', newStartX);
-          if (rightRect) rightRect.setAttribute('x', newEndX - 8);
+          if (rightRect) rightRect.setAttribute('x', newEndX - 14);
           // Update grip dot positions
-          dragState.leftHandle.querySelectorAll('.drag-grip circle').forEach(c => c.setAttribute('cx', newStartX + 4));
-          dragState.rightHandle.querySelectorAll('.drag-grip circle').forEach(c => c.setAttribute('cx', newEndX - 8 + 4));
+          dragState.leftHandle.querySelectorAll('.drag-grip circle').forEach(c => c.setAttribute('cx', newStartX + 7));
+          dragState.rightHandle.querySelectorAll('.drag-grip circle').forEach(c => c.setAttribute('cx', newEndX - 7));
           dragState.newStartX = newStartX;
           dragState.newEndX = newEndX;
 
@@ -908,12 +908,12 @@ export function setupDrag(ctx) {
       if (leftHandle) {
         const rect = leftHandle.querySelector('rect');
         if (rect) rect.setAttribute('x', String(startX));
-        leftHandle.querySelectorAll('.drag-grip circle').forEach(c => c.setAttribute('cx', startX + 4));
+        leftHandle.querySelectorAll('.drag-grip circle').forEach(c => c.setAttribute('cx', startX + 7));
       }
       if (rightHandle) {
         const rect = rightHandle.querySelector('rect');
-        if (rect) rect.setAttribute('x', String(endX - 8));
-        rightHandle.querySelectorAll('.drag-grip circle').forEach(c => c.setAttribute('cx', endX - 8 + 4));
+        if (rect) rect.setAttribute('x', String(endX - 14));
+        rightHandle.querySelectorAll('.drag-grip circle').forEach(c => c.setAttribute('cx', endX - 7));
       }
       if (barLabels) barLabels.removeAttribute('transform');
       if (connectedArrows && connectedArrows.length > 0) {
