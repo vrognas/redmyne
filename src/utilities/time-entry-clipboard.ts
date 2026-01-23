@@ -17,6 +17,7 @@ export interface ClipboardEntry {
   activity_id: number;
   hours: string;
   comments: string;
+  project_id?: number;
 }
 
 export interface TimeEntryClipboard {
