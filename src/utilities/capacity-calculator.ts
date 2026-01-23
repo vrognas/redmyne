@@ -337,6 +337,10 @@ const DOWNSTREAM_WEIGHT = 5; // Points per downstream issue
 const EXTERNAL_BLOCK_MULTIPLIER = 2; // 2x priority for external blocks
 const PREDICTION_CAPACITY_FACTOR = 0.75; // Default: 75% capacity (buffer for meetings)
 const OVERPLAN_CAPACITY_FACTOR = 1.0; // Allow 100% for tasks that can't fit at 75%
+const CONTINUITY_BONUS = 500; // Finish what you started - minimize context switching
+const START_DATE_BONUS = 200; // Pull work to start_date to surface blockers early
+const SMALL_TASK_BONUS = 150; // Quick wins: tasks < 1 working day get priority
+const SMALL_TASK_THRESHOLD = 8; // Hours threshold for "small task" (1 working day)
 
 /**
  * Calculate remaining work for an issue
@@ -403,6 +407,15 @@ function allBlockersComplete(
 /**
  * Calculate priority score for scheduling
  * Higher score = higher priority (scheduled first)
+ *
+ * Priority factors (in rough order of importance):
+ * 0. User-tagged precedence (highest)
+ * 1. Continuity - finish what you started to minimize context switching
+ * 2. Start date pull - spend time on day 1 to surface blockers early
+ * 3. Small tasks - quick wins for tasks < 1 working day
+ * 4. External blocks - don't block teammates
+ * 5. Due date urgency - earlier due = higher priority
+ * 6. Downstream impact - more dependents = higher priority
  */
 function calculatePriorityScore(
   issue: Issue,
@@ -410,7 +423,10 @@ function calculatePriorityScore(
   issueMap: Map<number, Issue>,
   maxDueDate: Date,
   myUserId?: number,
-  precedenceIssues?: Set<number>
+  precedenceIssues?: Set<number>,
+  scheduledIssues?: Set<number>,
+  currentDate?: string,
+  remainingWork?: Map<number, number>
 ): number {
   let score = 0;
 
@@ -419,7 +435,49 @@ function calculatePriorityScore(
     score += PRECEDENCE_BONUS;
   }
 
-  // 1. Due date urgency: earlier due = higher priority
+  // 1. Continuity: finish what you started (minimize context switching)
+  if (scheduledIssues?.has(issue.id)) {
+    score += CONTINUITY_BONUS;
+  }
+
+  // 2. Start date pull: spend at least some time on day 1 to surface blockers
+  if (currentDate && issue.start_date === currentDate) {
+    score += START_DATE_BONUS;
+  }
+
+  // 3. Small task bonus: quick wins for tasks < 1 working day
+  // Only apply if task has >= 2 days slack (don't preempt tight deadlines)
+  if (remainingWork && currentDate && issue.due_date) {
+    const remaining = remainingWork.get(issue.id) ?? 0;
+    if (remaining > 0 && remaining <= SMALL_TASK_THRESHOLD) {
+      // Check slack: only apply bonus if not tight on deadline
+      const dueDate = parseLocalDate(issue.due_date);
+      const today = parseLocalDate(currentDate);
+      const daysUntilDue = Math.floor(
+        (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      // Need at least 2 days slack (quick win shouldn't preempt urgent work)
+      if (daysUntilDue >= 2) {
+        score += SMALL_TASK_BONUS;
+      }
+    }
+  }
+
+  // 4. External block bonus: 2x if blocking someone else's work
+  if (myUserId !== undefined) {
+    const node = graph.get(issue.id);
+    if (node) {
+      for (const downstreamId of node.downstream) {
+        const downstream = issueMap.get(downstreamId);
+        if (downstream?.assigned_to?.id && downstream.assigned_to.id !== myUserId) {
+          score += EXTERNAL_BLOCK_BONUS * EXTERNAL_BLOCK_MULTIPLIER;
+          break; // Only count once
+        }
+      }
+    }
+  }
+
+  // 5. Due date urgency: earlier due = higher priority
   if (issue.due_date) {
     const dueDate = parseLocalDate(issue.due_date);
     const daysUntilDue = Math.floor(
@@ -428,24 +486,9 @@ function calculatePriorityScore(
     score += daysUntilDue * URGENCY_WEIGHT;
   }
 
-  // 2. Downstream impact: more dependents = higher priority
+  // 6. Downstream impact: more dependents = higher priority
   const downstreamCount = countDownstream(issue.id, graph);
   score += downstreamCount * DOWNSTREAM_WEIGHT;
-
-  // 3. External block bonus: 2x if blocking someone else's work
-  if (myUserId !== undefined) {
-    const node = graph.get(issue.id);
-    if (node) {
-      for (const downstreamId of node.downstream) {
-        const downstream = issueMap.get(downstreamId);
-        if (downstream?.assigned_to?.id && downstream.assigned_to.id !== myUserId) {
-          // Blocking external assignee - major priority boost
-          score += EXTERNAL_BLOCK_BONUS * EXTERNAL_BLOCK_MULTIPLIER;
-          break; // Only count once
-        }
-      }
-    }
-  }
 
   return score;
 }
@@ -564,6 +607,9 @@ export function calculateScheduledCapacity(
     }
   }
 
+  // Track issues that have received scheduled time (for continuity bonus)
+  const scheduledIssues = new Set<number>();
+
   const result: ScheduledDailyCapacity[] = [];
   // Use parseLocalDate to avoid UTC/local timezone mismatch with getScheduledIntensity
   const current = parseLocalDate(startDate);
@@ -616,8 +662,14 @@ export function calculateScheduledCapacity(
         });
 
         todaysIssues.sort((a, b) => {
-          const scoreA = calculatePriorityScore(a, graph, issueMap, maxDueDate, myUserId, precedenceIssues);
-          const scoreB = calculatePriorityScore(b, graph, issueMap, maxDueDate, myUserId, precedenceIssues);
+          const scoreA = calculatePriorityScore(
+            a, graph, issueMap, maxDueDate, myUserId, precedenceIssues,
+            scheduledIssues, dateStr, remainingWork
+          );
+          const scoreB = calculatePriorityScore(
+            b, graph, issueMap, maxDueDate, myUserId, precedenceIssues,
+            scheduledIssues, dateStr, remainingWork
+          );
           if (scoreB !== scoreA) return scoreB - scoreA;
           if (a.due_date && b.due_date && a.due_date !== b.due_date) {
             return a.due_date.localeCompare(b.due_date);
@@ -645,6 +697,7 @@ export function calculateScheduledCapacity(
             loadHours += hours;
             availableNormal -= hours;
             availableOverplan -= hours;
+            scheduledIssues.add(issue.id); // Track for continuity bonus
             const newRemaining = issueRemaining - hours;
             remainingWork.set(issue.id, newRemaining);
             if (newRemaining <= 0) {

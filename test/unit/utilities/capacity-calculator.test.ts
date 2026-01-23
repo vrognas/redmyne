@@ -1159,4 +1159,131 @@ describe("calculateScheduledCapacity", () => {
       expect(result[0].breakdown.length).toBe(1);
     });
   });
+
+  describe("scheduling heuristics", () => {
+    it("continuity bonus: finishes started task before new one", () => {
+      // Two tasks with same priority, but Issue 1 already has work scheduled
+      // Due to continuity bonus, Issue 1 should continue before Issue 2 starts
+      // Issue 1: 10h, Mon-Fri (started, partially done)
+      // Issue 2: 10h, Mon-Fri (not started)
+      const issues = [
+        createMockIssue({
+          id: 1,
+          subject: "Started task",
+          start_date: "2025-01-06",
+          due_date: "2025-01-10",
+          estimated_hours: 10,
+        }),
+        createMockIssue({
+          id: 2,
+          subject: "New task",
+          start_date: "2025-01-06",
+          due_date: "2025-01-10",
+          estimated_hours: 10,
+        }),
+      ];
+
+      const result = calculateScheduledCapacity(
+        issues,
+        DEFAULT_WEEKLY_SCHEDULE,
+        "2025-01-06",
+        "2025-01-10",
+        emptyGraph,
+        emptyEstimates
+      );
+
+      // Monday: lower ID gets scheduled first (both equal priority initially)
+      expect(result[0].breakdown[0].issueId).toBe(1);
+
+      // Tuesday: Issue 1 should continue (continuity bonus) until complete
+      // Issue 1 has 10h, at 6h/day takes ~2 days
+      expect(result[1].breakdown[0].issueId).toBe(1);
+
+      // Once Issue 1 completes, Issue 2 starts
+      // Check that Issue 2 eventually gets scheduled
+      const issue2Days = result.filter(
+        day => day.breakdown.some(b => b.issueId === 2)
+      );
+      expect(issue2Days.length).toBeGreaterThan(0);
+    });
+
+    it("start date pull: new task gets time on its start_date", () => {
+      // Issue 1: ongoing, Mon-Fri, lots of work
+      // Issue 2: starts Wednesday, should get time on Wed (start_date bonus)
+      const issues = [
+        createMockIssue({
+          id: 1,
+          subject: "Ongoing task",
+          start_date: "2025-01-06",
+          due_date: "2025-01-10",
+          estimated_hours: 30, // 5 days of work
+        }),
+        createMockIssue({
+          id: 2,
+          subject: "New task starting Wed",
+          start_date: "2025-01-08", // Wednesday
+          due_date: "2025-01-10",
+          estimated_hours: 8,
+        }),
+      ];
+
+      const result = calculateScheduledCapacity(
+        issues,
+        DEFAULT_WEEKLY_SCHEDULE,
+        "2025-01-06",
+        "2025-01-10",
+        emptyGraph,
+        emptyEstimates
+      );
+
+      // Wednesday: Issue 2 should get some time (start_date bonus)
+      // Even though Issue 1 has continuity, start_date pull should help
+      const wedBreakdown = result[2].breakdown;
+      const hasIssue2 = wedBreakdown.some(b => b.issueId === 2);
+      expect(hasIssue2).toBe(true);
+    });
+
+    it("small task priority: quick wins under 8h get boost", () => {
+      // Issue 1: 20h task (multi-day)
+      // Issue 2: 4h task (small, < 8h threshold)
+      // Both start same day, same due date
+      // Small task should get priority to clear it quickly
+      const issues = [
+        createMockIssue({
+          id: 1,
+          subject: "Big task",
+          start_date: "2025-01-06",
+          due_date: "2025-01-10",
+          estimated_hours: 20,
+        }),
+        createMockIssue({
+          id: 2,
+          subject: "Small task (quick win)",
+          start_date: "2025-01-06",
+          due_date: "2025-01-10",
+          estimated_hours: 4, // Under 8h threshold
+        }),
+      ];
+
+      const result = calculateScheduledCapacity(
+        issues,
+        DEFAULT_WEEKLY_SCHEDULE,
+        "2025-01-06",
+        "2025-01-10",
+        emptyGraph,
+        emptyEstimates
+      );
+
+      // Monday: Small task (Issue 2) should be scheduled first (small task bonus)
+      expect(result[0].breakdown[0].issueId).toBe(2);
+
+      // Small task should complete quickly (4h = within 1 day at 6h capacity)
+      // Then Issue 1 takes over
+      const issue2Total = result.reduce((sum, day) => {
+        const issue2Entry = day.breakdown.find(b => b.issueId === 2);
+        return sum + (issue2Entry?.hours ?? 0);
+      }, 0);
+      expect(issue2Total).toBe(4);
+    });
+  });
 });

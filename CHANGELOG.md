@@ -33,6 +33,12 @@ All notable changes to the "Redmyne" extension will be documented in this file.
   - Blocked task shows intensity starting on its start_date (after blocker's due_date)
   - Example: #7741 (Jan 26-29) blocks #7742 (Jan 30-Feb 5) → #7742 shows forecast from Jan 30
 
+- **Smarter scheduling heuristics** - three new priority factors for better forecasting
+  - **Continuity bonus (500pts)**: finish started tasks before new ones (minimize context switching)
+  - **Start date pull (200pts)**: prioritize tasks on their start_date (surface blockers early)
+  - **Small task bonus (150pts)**: quick wins for tasks < 8h (only if >= 2 days slack)
+  - Combined with existing: precedence tag, external blocks, due date urgency, downstream impact
+
 ### Fixed
 
 - **Gantt draft mode support** - Gantt now correctly uses DraftModeServer for write operations
