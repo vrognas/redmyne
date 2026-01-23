@@ -593,22 +593,22 @@ export class GanttPanel {
     <div class="gantt-title"><span class="loading-text">Loading issues...</span></div>
     <div class="gantt-actions" role="toolbar" aria-label="Gantt chart controls">
       <!-- Zoom -->
-      <select class="toolbar-select" disabled title="Zoom level"><option>Month</option></select>
+      <select class="toolbar-select" disabled data-toolbar-tooltip="Zoom level"><option>Month</option></select>
       <!-- View -->
-      <select class="toolbar-select" disabled title="View by"><option>By Project</option></select>
+      <select class="toolbar-select" disabled data-toolbar-tooltip="View by"><option>By Project</option></select>
       <!-- Context selector -->
-      <select class="toolbar-select" disabled title="Select project"><option>Loading...</option></select>
+      <select class="toolbar-select" disabled data-toolbar-tooltip="Select project"><option>Loading...</option></select>
       <div class="toolbar-separator"></div>
       <!-- Filters -->
-      <select class="toolbar-select" disabled title="Filter by assignee"><option>My issues</option></select>
-      <select class="toolbar-select" disabled title="Filter by status"><option>Open</option></select>
+      <select class="toolbar-select" disabled data-toolbar-tooltip="Filter by assignee"><option>My issues</option></select>
+      <select class="toolbar-select" disabled data-toolbar-tooltip="Filter by status"><option>Open</option></select>
       <!-- Primary actions -->
-      <button class="toggle-btn text-btn" disabled title="Refresh">↻</button>
-      <button class="toggle-btn text-btn" disabled title="Today">T</button>
+      <button class="toggle-btn text-btn" disabled data-toolbar-tooltip="Refresh">↻</button>
+      <button class="toggle-btn text-btn" disabled data-toolbar-tooltip="Today">T</button>
       <!-- Overflow menu -->
-      <button class="toggle-btn text-btn" disabled title="More options">⋮</button>
+      <button class="toggle-btn text-btn" disabled data-toolbar-tooltip="More options">⋮</button>
       <div class="toolbar-separator"></div>
-      <button class="toggle-btn text-btn" disabled title="Help">?</button>
+      <button class="toggle-btn text-btn" disabled data-toolbar-tooltip="Help">?</button>
     </div>
   </div>
   <div class="gantt-container">
@@ -3504,14 +3504,14 @@ export class GanttPanel {
     })()}
     <div class="gantt-actions" role="toolbar" aria-label="Gantt chart controls">
       <!-- Lookback period -->
-      <select id="lookbackSelect" class="toolbar-select" title="Data lookback period">
+      <select id="lookbackSelect" class="toolbar-select" data-toolbar-tooltip="Data lookback period">
         <option value="2"${this._lookbackYears === 2 ? " selected" : ""}>2 Years</option>
         <option value="5"${this._lookbackYears === 5 ? " selected" : ""}>5 Years</option>
         <option value="10"${this._lookbackYears === 10 ? " selected" : ""}>10 Years</option>
         <option value=""${this._lookbackYears === null ? " selected" : ""}>All Time</option>
       </select>
       <!-- Zoom -->
-      <select id="zoomSelect" class="toolbar-select" title="Zoom level (1-5)">
+      <select id="zoomSelect" class="toolbar-select" data-toolbar-tooltip="Zoom level">
         <option value="day"${this._zoomLevel === "day" ? " selected" : ""}>Day</option>
         <option value="week"${this._zoomLevel === "week" ? " selected" : ""}>Week</option>
         <option value="month"${this._zoomLevel === "month" ? " selected" : ""}>Month</option>
@@ -3519,13 +3519,13 @@ export class GanttPanel {
         <option value="year"${this._zoomLevel === "year" ? " selected" : ""}>Year</option>
       </select>
       <!-- View -->
-      <select id="viewFocusSelect" class="toolbar-select" title="View by (V)">
+      <select id="viewFocusSelect" class="toolbar-select" data-toolbar-tooltip="View by (V)">
         <option value="project"${this._viewFocus === "project" ? " selected" : ""}>By Project</option>
         <option value="person"${this._viewFocus === "person" ? " selected" : ""}>By Person</option>
       </select>
       <!-- Context selector -->
       ${this._viewFocus === "project" ? `
-      <select id="projectSelector" class="toolbar-select" title="Select project">
+      <select id="projectSelector" class="toolbar-select" data-toolbar-tooltip="Select project">
         <option value=""${this._selectedProjectId === null ? " selected" : ""}>All Projects</option>
         ${(() => {
           const childrenMap = new Map<number, typeof this._projects>();
@@ -3546,7 +3546,7 @@ export class GanttPanel {
           return rootProjects.map(p => renderProject(p)).join("");
         })()}
       </select>` : `
-      <select id="focusSelector" class="toolbar-select" title="Select person">
+      <select id="focusSelector" class="toolbar-select" data-toolbar-tooltip="Select person">
         ${this._uniqueAssignees.map(name => {
           const isMe = name === this._currentUserName;
           return `<option value="${escapeHtml(name)}"${this._selectedAssignee === name ? " selected" : ""}>${escapeHtml(name)}${isMe ? " (me)" : ""}</option>`;
@@ -3555,21 +3555,21 @@ export class GanttPanel {
       <div class="toolbar-separator"></div>
       <!-- Filters (assignee filter only in project view) -->
       ${this._viewFocus === "project" ? `
-      <select id="filterAssignee" class="toolbar-select" title="Filter by assignee">
+      <select id="filterAssignee" class="toolbar-select" data-toolbar-tooltip="Filter by assignee">
         <option value="me"${this._currentFilter.assignee === "me" ? " selected" : ""}>My issues</option>
         <option value="any"${this._currentFilter.assignee === "any" ? " selected" : ""}>All assignees</option>
       </select>` : ""}
-      <select id="filterStatus" class="toolbar-select" title="Filter by status">
+      <select id="filterStatus" class="toolbar-select" data-toolbar-tooltip="Filter by status">
         <option value="open"${this._currentFilter.status === "open" ? " selected" : ""}>Open</option>
         <option value="closed"${this._currentFilter.status === "closed" ? " selected" : ""}>Closed</option>
         <option value="any"${this._currentFilter.status === "any" ? " selected" : ""}>Any status</option>
       </select>
       <!-- Primary actions -->
-      <button id="refreshBtn" class="toggle-btn text-btn" title="Refresh (R)">↻</button>
-      <button id="todayBtn" class="toggle-btn text-btn" title="${todayInRange ? "Today (T)" : "Today is outside timeline range"}"${todayInRange ? "" : " disabled"}>T</button>
+      <button id="refreshBtn" class="toggle-btn text-btn" data-toolbar-tooltip="Refresh (R)">↻</button>
+      <button id="todayBtn" class="toggle-btn text-btn" data-toolbar-tooltip="${todayInRange ? "Today (T)" : "Today is outside timeline range"}"${todayInRange ? "" : " disabled"}>T</button>
       <!-- Overflow menu -->
       <div class="toolbar-dropdown">
-        <button class="toggle-btn text-btn" title="More options">⋮</button>
+        <button class="toggle-btn text-btn" data-toolbar-tooltip="More options">⋮</button>
         <div class="toolbar-dropdown-menu">
           <div class="toolbar-dropdown-menu-inner">
             <div class="toolbar-dropdown-item" id="menuFilterHealth">
