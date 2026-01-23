@@ -494,6 +494,8 @@ export class GanttPanel {
             command: "setDraftQueueCount",
             count: this._draftModeManager?.queue?.count ?? 0,
           });
+          // Refresh Gantt data to apply/remove draft changes (affects intensity/capacity)
+          vscode.commands.executeCommand("redmyne.refreshGanttData");
         })
       );
     }
@@ -872,6 +874,12 @@ export class GanttPanel {
     // Store issues with dates, projects, and flexibilityCache for shared sorting
     this._issues = issues.filter((i) => i.start_date || i.due_date);
     this._dependencyIssues = (dependencyIssues ?? []).filter((i) => i.start_date || i.due_date);
+
+    // Apply draft date changes if draft mode is active
+    if (this._draftModeManager?.isEnabled) {
+      this._applyDraftDateChanges();
+    }
+
     // Build O(1) lookup map (includes dependencies for arrow rendering)
     const allIssues = [...this._issues, ...this._dependencyIssues];
     this._issueById = new Map(allIssues.map(i => [i.id, i]));
@@ -1231,6 +1239,46 @@ export class GanttPanel {
    */
   public setFilterChangeCallback(callback: (filter: IssueFilter) => void): void {
     this._filterChangeCallback = callback;
+  }
+
+  /**
+   * Apply draft date changes to in-memory issues for "what-if" planning.
+   * Modifies _issues and _dependencyIssues in place with draft dates.
+   */
+  private _applyDraftDateChanges(): void {
+    const queue = this._draftModeManager?.queue;
+    if (!queue) return;
+
+    const allOps = queue.getAll();
+    const dateOps = allOps.filter(op => op.type === "setIssueDates" && op.issueId);
+
+    if (dateOps.length === 0) return;
+
+    // Build map of issue ID -> draft dates
+    const draftDates = new Map<number, { start_date?: string; due_date?: string }>();
+    for (const op of dateOps) {
+      const issueData = op.http.data?.issue as { start_date?: string; due_date?: string } | undefined;
+      if (issueData && op.issueId) {
+        const existing = draftDates.get(op.issueId) ?? {};
+        if (issueData.start_date !== undefined) existing.start_date = issueData.start_date;
+        if (issueData.due_date !== undefined) existing.due_date = issueData.due_date;
+        draftDates.set(op.issueId, existing);
+      }
+    }
+
+    // Apply draft dates to issues
+    const applyDrafts = (issues: Issue[]): void => {
+      for (const issue of issues) {
+        const draft = draftDates.get(issue.id);
+        if (draft) {
+          if (draft.start_date !== undefined) issue.start_date = draft.start_date;
+          if (draft.due_date !== undefined) issue.due_date = draft.due_date;
+        }
+      }
+    };
+
+    applyDrafts(this._issues);
+    applyDrafts(this._dependencyIssues);
   }
 
   /** Bump revision counter and clear caches (call on any data mutation) */
