@@ -335,7 +335,8 @@ const URGENCY_WEIGHT = 10; // Points per day earlier due date
 const EXTERNAL_BLOCK_BONUS = 100; // Bonus for blocking external assignee
 const DOWNSTREAM_WEIGHT = 5; // Points per downstream issue
 const EXTERNAL_BLOCK_MULTIPLIER = 2; // 2x priority for external blocks
-const PREDICTION_CAPACITY_FACTOR = 0.75; // Only use 75% of capacity for predictions (buffer for meetings, etc.)
+const PREDICTION_CAPACITY_FACTOR = 0.75; // Default: 75% capacity (buffer for meetings)
+const OVERPLAN_CAPACITY_FACTOR = 1.0; // Allow 100% for tasks that can't fit at 75%
 
 /**
  * Calculate remaining work for an issue
@@ -365,21 +366,36 @@ function calculateRemainingWork(
 }
 
 /**
- * Check if all blockers for an issue are complete
+ * Check if all blockers for an issue are complete (or assumed complete for forecasting)
+ *
+ * For forecasting purposes, we assume blockers complete on time.
+ * A blocker is considered "virtually complete" if:
+ * - It's in completedIssues (simulation marked it done), OR
+ * - Current date >= blocker's due_date (assume on-time completion)
  */
 function allBlockersComplete(
   issue: Issue,
   completedIssues: Set<number>,
-  graph: DependencyGraph
+  graph: DependencyGraph,
+  currentDate: string,
+  issueMap: Map<number, Issue>
 ): boolean {
   const node = graph.get(issue.id);
   if (!node) return true; // No dependency info = not blocked
 
   for (const blockerId of node.upstream) {
-    // If blocker is not in our completed set, issue is still blocked
-    if (!completedIssues.has(blockerId)) {
-      return false;
+    // Already marked complete in simulation
+    if (completedIssues.has(blockerId)) continue;
+
+    // Check if blocker's due_date has passed (assume on-time completion for forecast)
+    const blocker = issueMap.get(blockerId);
+    if (blocker?.due_date && currentDate > blocker.due_date) {
+      // Blocker's deadline passed - assume it completed on time for forecasting
+      continue;
     }
+
+    // Blocker still incomplete and deadline not passed
+    return false;
   }
   return true;
 }
@@ -514,6 +530,31 @@ export function calculateScheduledCapacity(
     remainingWork.set(issue.id, calculateRemainingWork(issue, internalEstimates));
   }
 
+  // Identify issues that need overplanning (can't fit at 75% capacity)
+  const needsOverplan = new Set<number>();
+  for (const issue of schedulableIssues) {
+    if (!issue.due_date) continue; // No deadline = no overplan needed
+    const work = remainingWork.get(issue.id) ?? 0;
+    if (work <= 0) continue;
+
+    // Calculate available hours at 75% between start and due date
+    let available75 = 0;
+    const issueStart = parseLocalDate(issue.start_date!);
+    const issueDue = parseLocalDate(issue.due_date);
+    const cursor = new Date(issueStart);
+    while (cursor <= issueDue) {
+      const dow = cursor.getDay();
+      const dayCapacity = schedule[DAY_KEYS[dow]];
+      available75 += dayCapacity * PREDICTION_CAPACITY_FACTOR;
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    // If work doesn't fit at 75%, mark for overplanning
+    if (work > available75) {
+      needsOverplan.add(issue.id);
+    }
+  }
+
   // Track completed issues for blocker resolution (start with fully done issues)
   const completedIssues = new Set<number>();
   for (const issue of issues) {
@@ -535,16 +576,42 @@ export function calculateScheduledCapacity(
 
     // Skip non-working days
     if (capacityHours > 0) {
-      // Check if this is past/today (use actual) or future (use prediction)
-      const usePrediction = !today || dateStr > today;
+      const isToday = today && dateStr === today;
+      const isPast = today && dateStr < today;
+      const isFuture = !today || dateStr > today;
 
-      if (usePrediction) {
-        // FUTURE: Priority-based scheduling prediction
+      const breakdown: IssueScheduleEntry[] = [];
+      let loadHours = 0;
+      // Track both normal (75%) and overplan (100%) capacity budgets
+      let availableNormal = capacityHours * PREDICTION_CAPACITY_FACTOR;
+      let availableOverplan = capacityHours * OVERPLAN_CAPACITY_FACTOR;
+
+      // Step 1: Add actuals for past and today (truth)
+      if ((isPast || isToday) && actualTimeEntries) {
+        for (const [issueId, dateMap] of actualTimeEntries) {
+          const hours = dateMap.get(dateStr) ?? 0;
+          if (hours > 0) {
+            const issue = issueMap.get(issueId);
+            const isSlippage = issue?.due_date ? dateStr > issue.due_date : false;
+            breakdown.push({
+              issueId,
+              hours: Math.round(hours * 100) / 100,
+              isSlippage,
+            });
+            loadHours += hours;
+            availableNormal -= hours;
+            availableOverplan -= hours;
+          }
+        }
+      }
+
+      // Step 2: Fill remaining capacity with predictions for future and today
+      if ((isFuture || isToday) && availableOverplan > 0) {
         const todaysIssues = schedulableIssues.filter((issue) => {
           if (issue.start_date! > dateStr) return false;  // Not started yet
-          if (issue.due_date && issue.due_date < dateStr) return false;  // Past due date - no more capacity
+          if (issue.due_date && issue.due_date < dateStr) return false;  // Past due date
           if ((remainingWork.get(issue.id) ?? 0) <= 0) return false;
-          if (!allBlockersComplete(issue, completedIssues, graph)) return false;
+          if (!allBlockersComplete(issue, completedIssues, graph, dateStr, issueMap)) return false;
           return true;
         });
 
@@ -559,13 +626,12 @@ export function calculateScheduledCapacity(
           return a.id - b.id;
         });
 
-        const breakdown: IssueScheduleEntry[] = [];
-        let loadHours = 0;
-        // Use reduced capacity for predictions (buffer for meetings, interruptions)
-        let available = capacityHours * PREDICTION_CAPACITY_FACTOR;
-
         for (const issue of todaysIssues) {
-          if (available <= 0) break;
+          // Determine available capacity based on whether issue needs overplanning
+          const isOverplan = needsOverplan.has(issue.id);
+          const available = isOverplan ? availableOverplan : Math.max(0, availableNormal);
+          if (available <= 0) continue;
+
           const issueRemaining = remainingWork.get(issue.id) ?? 0;
           const hours = Math.min(available, issueRemaining);
 
@@ -577,7 +643,8 @@ export function calculateScheduledCapacity(
               isSlippage,
             });
             loadHours += hours;
-            available -= hours;
+            availableNormal -= hours;
+            availableOverplan -= hours;
             const newRemaining = issueRemaining - hours;
             remainingWork.set(issue.id, newRemaining);
             if (newRemaining <= 0) {
@@ -585,49 +652,17 @@ export function calculateScheduledCapacity(
             }
           }
         }
-
-        const percentage = capacityHours > 0 ? (loadHours / capacityHours) * 100 : 0;
-        result.push({
-          date: dateStr,
-          loadHours: Math.round(loadHours * 100) / 100,
-          capacityHours,
-          percentage: Math.round(percentage),
-          status: getCapacityStatus(percentage),
-          breakdown,
-        });
-      } else {
-        // PAST: Use actual time entries (truth)
-        // Iterate ALL time entries, not just filteredIssues - capacity reflects real work
-        const breakdown: IssueScheduleEntry[] = [];
-        let loadHours = 0;
-
-        if (actualTimeEntries) {
-          for (const [issueId, dateMap] of actualTimeEntries) {
-            const hours = dateMap.get(dateStr) ?? 0;
-            if (hours > 0) {
-              // Look up issue for slippage check (may not be in filtered list)
-              const issue = issueMap.get(issueId);
-              const isSlippage = issue?.due_date ? dateStr > issue.due_date : false;
-              breakdown.push({
-                issueId,
-                hours: Math.round(hours * 100) / 100,
-                isSlippage,
-              });
-              loadHours += hours;
-            }
-          }
-        }
-
-        const percentage = capacityHours > 0 ? (loadHours / capacityHours) * 100 : 0;
-        result.push({
-          date: dateStr,
-          loadHours: Math.round(loadHours * 100) / 100,
-          capacityHours,
-          percentage: Math.round(percentage),
-          status: getCapacityStatus(percentage),
-          breakdown,
-        });
       }
+
+      const percentage = capacityHours > 0 ? (loadHours / capacityHours) * 100 : 0;
+      result.push({
+        date: dateStr,
+        loadHours: Math.round(loadHours * 100) / 100,
+        capacityHours,
+        percentage: Math.round(percentage),
+        status: getCapacityStatus(percentage),
+        breakdown,
+      });
     }
 
     current.setDate(current.getDate() + 1);  // Local increment

@@ -1508,6 +1508,7 @@
     const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
     const ctrlOrCmd = isMac ? e.metaKey : e.ctrlKey;
     const isInInput = e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT";
+    const isDayInput = e.target.classList?.contains("day-input");
 
     if (ctrlOrCmd && e.key === "z" && !e.shiftKey) {
       e.preventDefault();
@@ -1523,8 +1524,80 @@
       // T for Today (when not in input field)
       e.preventDefault();
       vscode.postMessage({ type: "navigateWeek", direction: "today" });
+    } else if (isDayInput && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", "Tab"].includes(e.key)) {
+      // Grid navigation when in a day cell
+      handleGridNavigation(e);
     }
   });
+
+  /**
+   * Handle keyboard navigation in the timesheet grid
+   */
+  function handleGridNavigation(e) {
+    const currentInput = e.target;
+    const currentCell = currentInput.closest("td");
+    const currentRow = currentCell?.closest("tr");
+    if (!currentCell || !currentRow) return;
+
+    // Get all day inputs in grid order
+    const allDayInputs = Array.from(document.querySelectorAll(".day-input:not(:disabled)"));
+    const currentIndex = allDayInputs.indexOf(currentInput);
+    if (currentIndex === -1) return;
+
+    // Get row structure
+    const rowInputs = Array.from(currentRow.querySelectorAll(".day-input:not(:disabled)"));
+    const colIndex = rowInputs.indexOf(currentInput);
+    const allRows = Array.from(document.querySelectorAll("#gridBody tr:not(.group-header-row)"));
+    const rowIndex = allRows.indexOf(currentRow);
+
+    let targetInput = null;
+
+    switch (e.key) {
+      case "ArrowRight":
+        if (colIndex < rowInputs.length - 1) {
+          targetInput = rowInputs[colIndex + 1];
+        }
+        break;
+      case "ArrowLeft":
+        if (colIndex > 0) {
+          targetInput = rowInputs[colIndex - 1];
+        }
+        break;
+      case "ArrowDown":
+      case "Enter":
+        // Move to same column in next row
+        if (rowIndex < allRows.length - 1) {
+          const nextRow = allRows[rowIndex + 1];
+          const nextRowInputs = Array.from(nextRow.querySelectorAll(".day-input:not(:disabled)"));
+          if (nextRowInputs[colIndex]) {
+            targetInput = nextRowInputs[colIndex];
+          }
+        }
+        break;
+      case "ArrowUp":
+        // Move to same column in previous row
+        if (rowIndex > 0) {
+          const prevRow = allRows[rowIndex - 1];
+          const prevRowInputs = Array.from(prevRow.querySelectorAll(".day-input:not(:disabled)"));
+          if (prevRowInputs[colIndex]) {
+            targetInput = prevRowInputs[colIndex];
+          }
+        }
+        break;
+      case "Tab":
+        // Let default Tab behavior work, but select content
+        return;
+    }
+
+    if (targetInput) {
+      e.preventDefault();
+      // Blur current to trigger save
+      currentInput.blur();
+      // Focus and select new cell
+      targetInput.focus();
+      targetInput.select();
+    }
+  }
 
   // ========== Issue Tooltips ==========
   const issueTooltip = document.getElementById("issueTooltip");

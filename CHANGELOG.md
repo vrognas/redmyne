@@ -8,6 +8,31 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 - **24h per day validation** - time sheet prevents entering hours that exceed 24h/day
 
+### Improved
+
+- **Hybrid today intensity** - today shows actuals + fills remaining capacity with predictions
+  - Past: actuals only (truth)
+  - Today: actuals logged + predicted work for remaining capacity
+  - Future: predictions only
+  - Previously, today showed 0 until you logged time
+
+- **Blocking badges show hidden issues** - blocks/blocked badges now show count even when
+  referenced issue is filtered out (e.g., viewing "My Issues" but blocking someone else's task)
+  - Badge shows full count including hidden/external issues
+  - Tooltip shows `#ID` placeholder for hidden issues
+
+- **Smart capacity scheduling** - 75% default with 100% for tight deadlines
+  - Normal tasks use 75% capacity (buffer for meetings/interruptions)
+  - Tasks that can't fit at 75% automatically get 100% (overplanning)
+  - Flexibility indicator shows yellow/red when schedule is tight
+  - Example: 24h task in 4 days × 6.4h/day = needs 100%, flexibility turns yellow
+
+- **Blocked tasks show forecasted intensity** - blocked issues now show intensity forecast
+  - Previously: blocked tasks showed 0 intensity until blocker "completed" in simulation
+  - Now: assumes blockers complete on time for forecasting purposes
+  - Blocked task shows intensity starting on its start_date (after blocker's due_date)
+  - Example: #7741 (Jan 26-29) blocks #7742 (Jan 30-Feb 5) → #7742 shows forecast from Jan 30
+
 ### Fixed
 
 - **Gantt draft mode support** - Gantt now correctly uses DraftModeServer for write operations

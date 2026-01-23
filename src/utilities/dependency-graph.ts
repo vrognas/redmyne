@@ -20,6 +20,8 @@ export interface BlockerInfo {
   subject: string;
   assignee: string | null;
   status: string;
+  /** True if issue not in visible issueMap (e.g., filtered out, different assignee) */
+  isHidden?: boolean;
 }
 
 // Relation types that indicate "source must complete before target"
@@ -134,6 +136,7 @@ export function resetDownstreamCountCache(graph?: DependencyGraph): void {
 
 /**
  * Get downstream issues blocked by this one (direct only, open only)
+ * Returns partial info for issues not in issueMap (hidden/filtered)
  */
 export function getDownstream(
   issueId: number,
@@ -147,7 +150,18 @@ export function getDownstream(
 
   for (const blockedId of node.downstream) {
     const blocked = issueMap.get(blockedId);
-    if (!blocked) continue;
+
+    if (!blocked) {
+      // Issue exists in graph but not in visible issueMap (filtered out)
+      downstream.push({
+        id: blockedId,
+        subject: `#${blockedId}`,
+        assignee: null,
+        status: "Unknown",
+        isHidden: true,
+      });
+      continue;
+    }
 
     // Skip closed issues
     if (blocked.closed_on !== null) continue;
@@ -165,6 +179,7 @@ export function getDownstream(
 
 /**
  * Get blocker details for an issue (direct upstream, open only)
+ * Returns partial info for issues not in issueMap (hidden/filtered)
  */
 export function getBlockers(
   issueId: number,
@@ -178,7 +193,18 @@ export function getBlockers(
 
   for (const blockerId of node.upstream) {
     const blocker = issueMap.get(blockerId);
-    if (!blocker) continue;
+
+    if (!blocker) {
+      // Issue exists in graph but not in visible issueMap (filtered out)
+      blockers.push({
+        id: blockerId,
+        subject: `#${blockerId}`,
+        assignee: null,
+        status: "Unknown",
+        isHidden: true,
+      });
+      continue;
+    }
 
     // Skip closed blockers
     if (blocker.closed_on !== null) continue;

@@ -87,9 +87,16 @@ function setupTooltips({ addDocListener, addWinListener }) {
   }
 
   function findHeaderIndex(lines) {
+    // Only return header index for multi-line tooltips with explicit # header
+    // Single-line tooltips should not be bolded
     const headerIndex = lines.findIndex((line) => line.trim().startsWith('#'));
     if (headerIndex >= 0) return headerIndex;
-    return lines.findIndex((line) => line.trim());
+    // Only treat first line as header if there are multiple content lines
+    const nonEmptyLines = lines.filter((line) => line.trim());
+    if (nonEmptyLines.length > 1) {
+      return lines.findIndex((line) => line.trim());
+    }
+    return -1; // No header for single-line tooltips
   }
 
   function buildTooltipContent(text) {
