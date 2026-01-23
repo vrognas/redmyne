@@ -1004,14 +1004,39 @@ svg {
   opacity: 1;
 }
 
-.issue-bar .drag-handle:hover {
-  fill: var(--vscode-focusBorder);
-  opacity: 0.5;
+/* Drag handle grip dots - hidden by default */
+.drag-grip {
+  opacity: 0;
+  transition: opacity 0.15s ease-out;
 }
 
-.issue-bar:hover .drag-handle {
-  fill: var(--vscode-list-hoverBackground);
+.drag-grip circle {
+  fill: var(--vscode-descriptionForeground);
+}
+
+/* Show grip dots on bar hover (subtle) */
+.issue-bar:hover .drag-grip {
+  opacity: 0.4;
+}
+
+/* Brighter grip dots on handle hover */
+.issue-bar .drag-handle:hover .drag-grip {
+  opacity: 0.9;
+}
+
+.issue-bar .drag-handle:hover .drag-grip circle {
+  fill: var(--vscode-foreground);
+}
+
+/* Handle background on hover */
+.issue-bar .drag-handle:hover rect {
+  fill: var(--vscode-focusBorder);
   opacity: 0.3;
+}
+
+.issue-bar:hover .drag-handle rect {
+  fill: var(--vscode-list-hoverBackground);
+  opacity: 0.2;
 }
 
 /* Link handles hidden by default, shown on hover */

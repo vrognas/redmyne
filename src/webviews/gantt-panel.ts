@@ -2986,10 +2986,22 @@ export class GanttPanel {
                     fill="${textColor}" font-size="9" font-weight="500"
                     pointer-events="none">${escapeHtml(displaySubject)}</text>`;
             })()}
-            <rect class="drag-handle drag-left cursor-ew-resize" x="${startX}" y="0" width="${handleWidth}" height="${barHeight}"
-                  fill="transparent"/>
-            <rect class="drag-handle drag-right cursor-ew-resize" x="${startX + width - handleWidth}" y="0" width="${handleWidth}" height="${barHeight}"
-                  fill="transparent"/>
+            <g class="drag-handle drag-left cursor-ew-resize">
+              <rect x="${startX}" y="0" width="${handleWidth}" height="${barHeight}" fill="transparent"/>
+              <g class="drag-grip" pointer-events="none">
+                <circle cx="${startX + 4}" cy="${barHeight / 2 - 4}" r="1.5"/>
+                <circle cx="${startX + 4}" cy="${barHeight / 2}" r="1.5"/>
+                <circle cx="${startX + 4}" cy="${barHeight / 2 + 4}" r="1.5"/>
+              </g>
+            </g>
+            <g class="drag-handle drag-right cursor-ew-resize">
+              <rect x="${startX + width - handleWidth}" y="0" width="${handleWidth}" height="${barHeight}" fill="transparent"/>
+              <g class="drag-grip" pointer-events="none">
+                <circle cx="${startX + width - handleWidth + 4}" cy="${barHeight / 2 - 4}" r="1.5"/>
+                <circle cx="${startX + width - handleWidth + 4}" cy="${barHeight / 2}" r="1.5"/>
+                <circle cx="${startX + width - handleWidth + 4}" cy="${barHeight / 2 + 4}" r="1.5"/>
+              </g>
+            </g>
             <!-- Link handle for creating relations (larger hit area for Fitts's Law) -->
             <g class="link-handle cursor-crosshair" data-cx="${endX + 8}" data-cy="${y + barY + barContentHeight / 2}">
               <title>Drag to link</title>
