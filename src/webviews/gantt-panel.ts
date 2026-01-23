@@ -2776,10 +2776,13 @@ export class GanttPanel {
         const flexTooltip = flexText || "";
 
         // Blocks tooltip: issues this one blocks
+        // Hidden issues have subject="#ID" - avoid showing "#7744 #7744"
         const blocksTooltip = issue.blocks.length > 0
           ? `🚧 Blocks ${issue.blocks.length} issue(s):\n` + issue.blocks.slice(0, 5).map(b => {
               const assigneeText = b.assignee ? ` (${b.assignee})` : "";
-              return `#${b.id} ${b.subject.length > 30 ? b.subject.substring(0, 29) + "…" : b.subject}${assigneeText}`;
+              const isHidden = b.subject === `#${b.id}`;
+              const subjectText = isHidden ? "(not in view)" : (b.subject.length > 30 ? b.subject.substring(0, 29) + "…" : b.subject);
+              return `#${b.id} ${subjectText}${assigneeText}`;
             }).join("\n") + (issue.blocks.length > 5 ? `\n... and ${issue.blocks.length - 5} more` : "") + "\n\nClick to highlight dependencies"
           : "";
 
@@ -2787,7 +2790,9 @@ export class GanttPanel {
         const blockerTooltip = issue.blockedBy.length > 0
           ? `⛔ Blocked by ${issue.blockedBy.length} issue(s):\n` + issue.blockedBy.slice(0, 5).map(b => {
               const assigneeText = b.assignee ? ` (${b.assignee})` : "";
-              return `#${b.id} ${b.subject.length > 30 ? b.subject.substring(0, 29) + "…" : b.subject}${assigneeText}`;
+              const isHidden = b.subject === `#${b.id}`;
+              const subjectText = isHidden ? "(not in view)" : (b.subject.length > 30 ? b.subject.substring(0, 29) + "…" : b.subject);
+              return `#${b.id} ${subjectText}${assigneeText}`;
             }).join("\n") + (issue.blockedBy.length > 5 ? `\n... and ${issue.blockedBy.length - 5} more` : "") + "\n\nClick to highlight and jump to blocker"
           : "";
 
