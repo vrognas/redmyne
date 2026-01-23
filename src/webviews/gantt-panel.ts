@@ -3212,34 +3212,79 @@ export class GanttPanel {
           const nearlyVertical = horizontalDist < 30; // bars are vertically aligned
 
           let path: string;
+          const r = 4; // corner radius for rounded turns
+
+          // Back-to-back tasks: route below when horizontal gap is small
+          const backToBack = horizontalDist < 20 && !sameRow;
 
           if (sameRow && goingRight) {
             // Same row, target to right: straight horizontal line
             path = `M ${x1} ${y1} H ${x2 - arrowSize}`;
+          } else if (backToBack) {
+            // Back-to-back tasks: route below both bars with stepped connector
+            // Pattern: right → down → horizontal → up → right
+            const belowY = Math.max(source.y, target.y) + barHeight / 2 + 12;
+            const exitX = x1 + 8;
+            const entryX = x2 - 8;
+            // Right, rounded down, horizontal below, rounded up, right to target
+            path = `M ${x1} ${y1} H ${exitX - r}` +
+              ` q ${r} 0 ${r} ${r}` + // round corner: down
+              ` V ${belowY - r}` +
+              ` q 0 ${r} ${x2 < x1 ? -r : r} ${r}` + // round corner: horizontal
+              ` H ${entryX + (x2 < x1 ? r : -r)}` +
+              ` q ${x2 < x1 ? -r : r} 0 ${x2 < x1 ? -r : r} ${y2 > belowY ? r : -r}` + // round corner: up
+              ` V ${y2 + (y2 > belowY ? -r : r)}` +
+              ` q 0 ${y2 > belowY ? r : -r} ${r} ${y2 > belowY ? r : -r}` + // round corner: right
+              ` H ${x2 - arrowSize}`;
           } else if (!sameRow && nearlyVertical) {
-            // Nearly vertical: S-curve that jogs out and back
-            // Go right, down to midpoint, left to align, down to target
-            const jogX = 20; // small horizontal offset
+            // Nearly vertical: S-curve jogs out and back with rounded corners
+            const jogX = 20;
             const midY = (y1 + y2) / 2;
-            path = `M ${x1} ${y1} H ${x1 + jogX} V ${midY} H ${x2 - jogX} V ${y2} H ${x2 - arrowSize}`;
+            const goingDown = y2 > y1;
+            // Right, rounded down, vertical, rounded left, vertical, rounded right
+            path = `M ${x1} ${y1} H ${x1 + jogX - r}` +
+              ` q ${r} 0 ${r} ${goingDown ? r : -r}` +
+              ` V ${midY + (goingDown ? -r : r)}` +
+              ` q 0 ${goingDown ? r : -r} ${-r} ${goingDown ? r : -r}` +
+              ` H ${x2 - jogX + r}` +
+              ` q ${-r} 0 ${-r} ${goingDown ? r : -r}` +
+              ` V ${y2 + (goingDown ? -r : r)}` +
+              ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
+              ` H ${x2 - arrowSize}`;
           } else if (goingRight) {
-            // Different row, target to right: 3-segment elbow
+            // Different row, target to right: elbow with rounded corners
             const midX = (x1 + x2) / 2;
-            path = `M ${x1} ${y1} H ${midX} V ${y2} H ${x2 - arrowSize}`;
+            const goingDown = y2 > y1;
+            path = `M ${x1} ${y1} H ${midX - r}` +
+              ` q ${r} 0 ${r} ${goingDown ? r : -r}` +
+              ` V ${y2 + (goingDown ? -r : r)}` +
+              ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
+              ` H ${x2 - arrowSize}`;
           } else if (sameRow) {
-            // Same row, target to left: must route above or below
+            // Same row, target to left: route above with rounded corners
             const gap = 12;
-            const routeY = y1 - barHeight; // go above
-            path = `M ${x1} ${y1} V ${routeY} H ${x2 - gap} V ${y2} H ${x2 - arrowSize}`;
+            const routeY = y1 - barHeight;
+            path = `M ${x1} ${y1} V ${routeY + r}` +
+              ` q 0 ${-r} ${-r} ${-r}` +
+              ` H ${x2 - gap + r}` +
+              ` q ${-r} 0 ${-r} ${r}` +
+              ` V ${y2}` +
+              ` H ${x2 - arrowSize}`;
           } else {
-            // Different row, target to left: route BETWEEN the bars (through the gap)
+            // Different row, target to left: route through gap with rounded corners
             const gap = 12;
-            const midY = (y1 + y2) / 2; // midpoint falls in gap between rows
-            path = `M ${x1} ${y1} V ${midY} H ${x2 - gap} V ${y2} H ${x2 - arrowSize}`;
+            const midY = (y1 + y2) / 2;
+            const goingDown = y2 > y1;
+            path = `M ${x1} ${y1} V ${midY + (goingDown ? -r : r)}` +
+              ` q 0 ${goingDown ? r : -r} ${-r} ${goingDown ? r : -r}` +
+              ` H ${x2 - gap + r}` +
+              ` q ${-r} 0 ${-r} ${goingDown ? r : -r}` +
+              ` V ${y2}` +
+              ` H ${x2 - arrowSize}`;
           }
 
-          // Arrowhead points toward target
-          const arrowHead = `M ${x2} ${y2} l -${arrowSize} -${arrowSize * 0.6} l 0 ${arrowSize * 1.2} Z`;
+          // Chevron arrowhead (two angled lines, not filled)
+          const arrowHead = `M ${x2 - arrowSize} ${y2 - arrowSize * 0.6} L ${x2} ${y2} L ${x2 - arrowSize} ${y2 + arrowSize * 0.6}`;
 
           const dashAttr = style.dash ? `stroke-dasharray="${style.dash}"` : "";
 
@@ -3250,7 +3295,7 @@ export class GanttPanel {
               <!-- Wide invisible hit area for easier clicking -->
               <path class="arrow-hit-area" d="${path}" stroke="transparent" stroke-width="16" fill="none"/>
               <path class="arrow-line" d="${path}" stroke-width="2" fill="none" ${dashAttr}/>
-              <path class="arrow-head" d="${arrowHead}"/>
+              <path class="arrow-head" d="${arrowHead}" fill="none"/>
             </g>
           `;
         })
