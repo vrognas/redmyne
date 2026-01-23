@@ -26,7 +26,8 @@ export function setupDrag(ctx) {
       clearFocus,
       getFocusedIssueId,
       scrollToAndHighlight,
-      setAllowScrollChange
+      setAllowScrollChange,
+      isDraftMode
     } = ctx;
     function showIssueContextMenu(x, y, issueId) {
       document.querySelector('.relation-picker')?.remove();
@@ -985,23 +986,26 @@ export function setupDrag(ctx) {
 
           if (changes.length > 0) {
             hideDragTooltip();
-            const message = 'Move ' + changes.length + ' issue(s) to new dates?';
-            showDragConfirmModal(message,
-              () => {
-                // Confirm: commit changes
-                undoStack.push({ type: 'bulk', changes: changes.map(c => ({ issueId: c.issueId, oldStartDate: c.oldStartDate, oldDueDate: c.oldDueDate, newStartDate: c.newStartDate, newDueDate: c.newDueDate })) });
-                redoStack.length = 0;
-                updateUndoRedoButtons();
-                saveState();
-                changes.forEach(c => {
-                  vscode.postMessage({ command: 'updateDates', issueId: c.issueId, startDate: c.newStartDate, dueDate: c.newDueDate });
-                });
-              },
-              () => {
+            const confirmBulk = () => {
+              // Confirm: commit changes
+              undoStack.push({ type: 'bulk', changes: changes.map(c => ({ issueId: c.issueId, oldStartDate: c.oldStartDate, oldDueDate: c.oldDueDate, newStartDate: c.newStartDate, newDueDate: c.newDueDate })) });
+              redoStack.length = 0;
+              updateUndoRedoButtons();
+              saveState();
+              changes.forEach(c => {
+                vscode.postMessage({ command: 'updateDates', issueId: c.issueId, startDate: c.newStartDate, dueDate: c.newDueDate });
+              });
+            };
+            if (isDraftMode) {
+              // Draft mode: skip confirmation, changes are queued for review
+              confirmBulk();
+            } else {
+              const message = 'Move ' + changes.length + ' issue(s) to new dates?';
+              showDragConfirmModal(message, confirmBulk, () => {
                 // Cancel: restore all bars
                 bulkBars.forEach(b => restoreBarPosition(b));
-              }
-            );
+              });
+            }
           } else {
             // No changes - restore all bars
             hideDragTooltip();
@@ -1037,36 +1041,38 @@ export function setupDrag(ctx) {
           const newDueDate = calcDueDate && calcDueDate !== oldDueDate ? calcDueDate : null;
 
           if (newStartDate || newDueDate) {
-            // Build confirmation message
-            let message = 'Issue #' + issueId + ': ';
-            if (newStartDate && newDueDate) {
-              message += formatDateRange(oldStartDate, oldDueDate) + ' → ' + formatDateRange(newStartDate, newDueDate);
-            } else if (newStartDate) {
-              message += 'Start: ' + formatDateShort(oldStartDate) + ' → ' + formatDateShort(newStartDate);
+            const confirmSingle = () => {
+              // Confirm: commit change
+              undoStack.push({
+                issueId,
+                oldStartDate: newStartDate ? oldStartDate : null,
+                oldDueDate: newDueDate ? oldDueDate : null,
+                newStartDate,
+                newDueDate
+              });
+              redoStack.length = 0;
+              updateUndoRedoButtons();
+              saveState();
+              vscode.postMessage({ command: 'updateDates', issueId, startDate: newStartDate, dueDate: newDueDate });
+            };
+            if (isDraftMode) {
+              // Draft mode: skip confirmation, changes are queued for review
+              confirmSingle();
             } else {
-              message += 'Due: ' + formatDateShort(oldDueDate) + ' → ' + formatDateShort(newDueDate);
-            }
-
-            showDragConfirmModal(message,
-              () => {
-                // Confirm: commit change
-                undoStack.push({
-                  issueId,
-                  oldStartDate: newStartDate ? oldStartDate : null,
-                  oldDueDate: newDueDate ? oldDueDate : null,
-                  newStartDate,
-                  newDueDate
-                });
-                redoStack.length = 0;
-                updateUndoRedoButtons();
-                saveState();
-                vscode.postMessage({ command: 'updateDates', issueId, startDate: newStartDate, dueDate: newDueDate });
-              },
-              () => {
+              // Build confirmation message
+              let message = 'Issue #' + issueId + ': ';
+              if (newStartDate && newDueDate) {
+                message += formatDateRange(oldStartDate, oldDueDate) + ' → ' + formatDateRange(newStartDate, newDueDate);
+              } else if (newStartDate) {
+                message += 'Start: ' + formatDateShort(oldStartDate) + ' → ' + formatDateShort(newStartDate);
+              } else {
+                message += 'Due: ' + formatDateShort(oldDueDate) + ' → ' + formatDateShort(newDueDate);
+              }
+              showDragConfirmModal(message, confirmSingle, () => {
                 // Cancel: restore bar
                 restoreBarPosition(savedState);
-              }
-            );
+              });
+            }
           } else {
             // No date change - restore bar to original position
             restoreBarPosition(savedState);

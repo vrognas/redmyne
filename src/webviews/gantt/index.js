@@ -1369,7 +1369,8 @@ function initializeGantt(state) {
       clearFocus,
       getFocusedIssueId,
       scrollToAndHighlight,
-      setAllowScrollChange
+      setAllowScrollChange,
+      isDraftMode
     });
 
     setupCollapse({

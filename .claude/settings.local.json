@@ -42,7 +42,10 @@
       "mcp__plugin_context7_context7__query-docs",
       "Bash(xargs:*)",
       "Bash(git checkout:*)",
-      "Bash(npx vitest:*)"
+      "Bash(npx vitest:*)",
+      "WebFetch(domain:open-vsx.org)",
+      "Bash(npm version:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

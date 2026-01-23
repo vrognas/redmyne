@@ -435,6 +435,7 @@ export class GanttPanel {
   // Current user for special highlighting
   private _currentUserId: number | null = null;
   private _currentUserName: string | null = null;
+  private _draftModeSubscribed = false; // Track if draft mode subscriptions are set up
   // Keyboard navigation state
   private _selectedCollapseKey: string | null = null;
   // Expand all on first render and when switching project/person
@@ -480,25 +481,30 @@ export class GanttPanel {
     this._debouncedCollapseUpdate = debounce(COLLAPSE_DEBOUNCE_MS, () => this._updateContent());
 
     // Subscribe to draft mode and queue changes
-    if (this._draftModeManager) {
-      this._disposables.push(
-        this._draftModeManager.onDidChangeEnabled(() => {
-          this._panel.webview.postMessage({
-            command: "setDraftModeState",
-            enabled: this._draftModeManager?.isEnabled ?? false,
-            queueCount: this._draftModeManager?.queue?.count ?? 0,
-          });
-        }),
-        this._draftModeManager.queue.onDidChange(() => {
-          this._panel.webview.postMessage({
-            command: "setDraftQueueCount",
-            count: this._draftModeManager?.queue?.count ?? 0,
-          });
-          // Refresh Gantt data to apply/remove draft changes (affects intensity/capacity)
-          vscode.commands.executeCommand("redmyne.refreshGanttData");
-        })
-      );
-    }
+    this._setupDraftModeSubscriptions();
+  }
+
+  /** Set up draft mode subscriptions if manager is available and not already subscribed */
+  private _setupDraftModeSubscriptions(): void {
+    if (this._draftModeSubscribed || !this._draftModeManager) return;
+    this._draftModeSubscribed = true;
+    this._disposables.push(
+      this._draftModeManager.onDidChangeEnabled(() => {
+        this._panel.webview.postMessage({
+          command: "setDraftModeState",
+          enabled: this._draftModeManager?.isEnabled ?? false,
+          queueCount: this._draftModeManager?.queue?.count ?? 0,
+        });
+      }),
+      this._draftModeManager.queue.onDidChange(() => {
+        this._panel.webview.postMessage({
+          command: "setDraftQueueCount",
+          count: this._draftModeManager?.queue?.count ?? 0,
+        });
+        // Refresh Gantt data to apply/remove draft changes (affects intensity/capacity)
+        vscode.commands.executeCommand("redmyne.refreshGanttData");
+      })
+    );
   }
 
   public static createOrShow(
@@ -516,6 +522,8 @@ export class GanttPanel {
       }
       if (getDraftModeManager) {
         GanttPanel.currentPanel._getDraftModeManagerFn = getDraftModeManager;
+        // Set up subscriptions if not already done (manager may not have been available initially)
+        GanttPanel.currentPanel._setupDraftModeSubscriptions();
       }
       return GanttPanel.currentPanel;
     }
