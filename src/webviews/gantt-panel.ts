@@ -524,6 +524,15 @@ export class GanttPanel {
         GanttPanel.currentPanel._getDraftModeManagerFn = getDraftModeManager;
         // Set up subscriptions if not already done (manager may not have been available initially)
         GanttPanel.currentPanel._setupDraftModeSubscriptions();
+        // Send current state to webview (subscriptions only fire on changes)
+        const mgr = GanttPanel.currentPanel._draftModeManager;
+        if (mgr) {
+          GanttPanel.currentPanel._panel.webview.postMessage({
+            command: "setDraftModeState",
+            enabled: mgr.isEnabled,
+            queueCount: mgr.queue?.count ?? 0,
+          });
+        }
       }
       return GanttPanel.currentPanel;
     }
