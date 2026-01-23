@@ -177,32 +177,59 @@ export function setupDrag(ctx) {
     }
 
     // Arrow path calculation for drag updates
-    // Must match gantt-panel.ts initial render (arrowSize=4, chevron style)
+    // Must match gantt-panel.ts initial render (arrowSize=4, chevron style, r=4 corner radius)
     const arrowSize = 4;
+    const r = 4; // corner radius for rounded turns - must match gantt-panel.ts
     function calcArrowPath(x1, y1, x2, y2, isScheduling) {
       const goingRight = x2 > x1;
       const horizontalDist = Math.abs(x2 - x1);
       const nearlyVertical = horizontalDist < 30;
       const sameRow = Math.abs(y1 - y2) < 5;
+      const goingDown = y2 > y1;
 
       let path;
       if (sameRow && goingRight) {
+        // Same row, target to right: straight horizontal line
         path = 'M ' + x1 + ' ' + y1 + ' H ' + x2;
       } else if (!sameRow && nearlyVertical) {
-        const jogX = 20;
+        // Nearly vertical: S-curve with rounded corners
+        const jogX = 8;
         const midY = (y1 + y2) / 2;
-        path = 'M ' + x1 + ' ' + y1 + ' H ' + (x1 + jogX) + ' V ' + midY + ' H ' + (x2 - jogX) + ' V ' + y2 + ' H ' + x2;
+        path = 'M ' + x1 + ' ' + y1 + ' H ' + (x1 + jogX - r) +
+          ' q ' + r + ' 0 ' + r + ' ' + (goingDown ? r : -r) +
+          ' V ' + (midY + (goingDown ? -r : r)) +
+          ' q 0 ' + (goingDown ? r : -r) + ' ' + (-r) + ' ' + (goingDown ? r : -r) +
+          ' H ' + (x2 - jogX + r) +
+          ' q ' + (-r) + ' 0 ' + (-r) + ' ' + (goingDown ? r : -r) +
+          ' V ' + (y2 + (goingDown ? -r : r)) +
+          ' q 0 ' + (goingDown ? r : -r) + ' ' + r + ' ' + (goingDown ? r : -r) +
+          ' H ' + x2;
       } else if (goingRight) {
-        const midX = (x1 + x2) / 2;
-        path = 'M ' + x1 + ' ' + y1 + ' H ' + midX + ' V ' + y2 + ' H ' + x2;
+        // Different row, target to right: bend near source with rounded corners
+        const bendX = Math.min(x1 + 8, (x1 + x2) / 2);
+        path = 'M ' + x1 + ' ' + y1 + ' H ' + (bendX - r) +
+          ' q ' + r + ' 0 ' + r + ' ' + (goingDown ? r : -r) +
+          ' V ' + (y2 + (goingDown ? -r : r)) +
+          ' q 0 ' + (goingDown ? r : -r) + ' ' + r + ' ' + (goingDown ? r : -r) +
+          ' H ' + x2;
       } else if (sameRow) {
+        // Same row, target to left: route above with rounded corners
         const gap = 12;
         const routeY = y1 - barHeight;
-        path = 'M ' + x1 + ' ' + y1 + ' V ' + routeY + ' H ' + (x2 - gap) + ' V ' + y2 + ' H ' + x2;
+        path = 'M ' + x1 + ' ' + y1 + ' V ' + (routeY + r) +
+          ' q 0 ' + (-r) + ' ' + (-r) + ' ' + (-r) +
+          ' H ' + (x2 - gap + r) +
+          ' q ' + (-r) + ' 0 ' + (-r) + ' ' + r +
+          ' V ' + y2 + ' H ' + x2;
       } else {
+        // Different row, target to left: route through gap with rounded corners
         const gap = 12;
         const midY = (y1 + y2) / 2;
-        path = 'M ' + x1 + ' ' + y1 + ' V ' + midY + ' H ' + (x2 - gap) + ' V ' + y2 + ' H ' + x2;
+        path = 'M ' + x1 + ' ' + y1 + ' V ' + (midY + (goingDown ? -r : r)) +
+          ' q 0 ' + (goingDown ? r : -r) + ' ' + (-r) + ' ' + (goingDown ? r : -r) +
+          ' H ' + (x2 - gap + r) +
+          ' q ' + (-r) + ' 0 ' + (-r) + ' ' + (goingDown ? r : -r) +
+          ' V ' + y2 + ' H ' + x2;
       }
       // Chevron arrowhead (two angled lines, not filled) - matches gantt-panel.ts
       const arrowHead = 'M ' + (x2 - arrowSize) + ' ' + (y2 - arrowSize * 0.6) + ' L ' + x2 + ' ' + y2 + ' L ' + (x2 - arrowSize) + ' ' + (y2 + arrowSize * 0.6);
