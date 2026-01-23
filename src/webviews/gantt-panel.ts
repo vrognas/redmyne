@@ -1860,7 +1860,7 @@ export class GanttPanel {
     // Build dependency graph for downstream impact calculation
     const depGraph = buildDependencyGraph(sortedIssues);
     const issueMap = new Map(sortedIssues.map(i => [i.id, i]));
-    const allRows = flatNodes.map((node) => nodeToGanttRow(node, this._flexibilityCache, this._closedStatusIds, depGraph, issueMap));
+    const allRows = flatNodes.map((node) => nodeToGanttRow(node, this._flexibilityCache, this._closedStatusIds, depGraph, issueMap, this._issueById));
 
     // Extract issue IDs that are actually displayed as rows
     const issueIdsInRows = new Set<number>();
@@ -2776,12 +2776,12 @@ export class GanttPanel {
         const flexTooltip = flexText || "";
 
         // Blocks tooltip: issues this one blocks
-        // Hidden issues have subject="#ID" - avoid showing "#7744 #7744"
+        // If subject is still "#ID" (no metadata available), show "(not in view)"
         const blocksTooltip = issue.blocks.length > 0
           ? `🚧 Blocks ${issue.blocks.length} issue(s):\n` + issue.blocks.slice(0, 5).map(b => {
               const assigneeText = b.assignee ? ` (${b.assignee})` : "";
-              const isHidden = b.subject === `#${b.id}`;
-              const subjectText = isHidden ? "(not in view)" : (b.subject.length > 30 ? b.subject.substring(0, 29) + "…" : b.subject);
+              const noMetadata = b.subject === `#${b.id}`;
+              const subjectText = noMetadata ? "(not in view)" : (b.subject.length > 30 ? b.subject.substring(0, 29) + "…" : b.subject);
               return `#${b.id} ${subjectText}${assigneeText}`;
             }).join("\n") + (issue.blocks.length > 5 ? `\n... and ${issue.blocks.length - 5} more` : "") + "\n\nClick to highlight dependencies"
           : "";
@@ -2790,8 +2790,8 @@ export class GanttPanel {
         const blockerTooltip = issue.blockedBy.length > 0
           ? `⛔ Blocked by ${issue.blockedBy.length} issue(s):\n` + issue.blockedBy.slice(0, 5).map(b => {
               const assigneeText = b.assignee ? ` (${b.assignee})` : "";
-              const isHidden = b.subject === `#${b.id}`;
-              const subjectText = isHidden ? "(not in view)" : (b.subject.length > 30 ? b.subject.substring(0, 29) + "…" : b.subject);
+              const noMetadata = b.subject === `#${b.id}`;
+              const subjectText = noMetadata ? "(not in view)" : (b.subject.length > 30 ? b.subject.substring(0, 29) + "…" : b.subject);
               return `#${b.id} ${subjectText}${assigneeText}`;
             }).join("\n") + (issue.blockedBy.length > 5 ? `\n... and ${issue.blockedBy.length - 5} more` : "") + "\n\nClick to highlight and jump to blocker"
           : "";

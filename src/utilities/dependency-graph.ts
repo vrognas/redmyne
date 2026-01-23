@@ -137,11 +137,13 @@ export function resetDownstreamCountCache(graph?: DependencyGraph): void {
 /**
  * Get downstream issues blocked by this one (direct only, open only)
  * Returns partial info for issues not in issueMap (hidden/filtered)
+ * @param allIssueMap - Optional map of ALL issues for looking up hidden issue details
  */
 export function getDownstream(
   issueId: number,
   graph: DependencyGraph,
-  issueMap: Map<number, Issue>
+  issueMap: Map<number, Issue>,
+  allIssueMap?: Map<number, Issue>
 ): BlockerInfo[] {
   const node = graph.get(issueId);
   if (!node) return [];
@@ -153,11 +155,13 @@ export function getDownstream(
 
     if (!blocked) {
       // Issue exists in graph but not in visible issueMap (filtered out)
+      // Try to get details from allIssueMap if available
+      const hiddenIssue = allIssueMap?.get(blockedId);
       downstream.push({
         id: blockedId,
-        subject: `#${blockedId}`,
-        assignee: null,
-        status: "Unknown",
+        subject: hiddenIssue?.subject ?? `#${blockedId}`,
+        assignee: hiddenIssue?.assigned_to?.name ?? null,
+        status: hiddenIssue?.status?.name ?? "Unknown",
         isHidden: true,
       });
       continue;
@@ -180,11 +184,13 @@ export function getDownstream(
 /**
  * Get blocker details for an issue (direct upstream, open only)
  * Returns partial info for issues not in issueMap (hidden/filtered)
+ * @param allIssueMap - Optional map of ALL issues for looking up hidden issue details
  */
 export function getBlockers(
   issueId: number,
   graph: DependencyGraph,
-  issueMap: Map<number, Issue>
+  issueMap: Map<number, Issue>,
+  allIssueMap?: Map<number, Issue>
 ): BlockerInfo[] {
   const node = graph.get(issueId);
   if (!node) return [];
@@ -196,11 +202,13 @@ export function getBlockers(
 
     if (!blocker) {
       // Issue exists in graph but not in visible issueMap (filtered out)
+      // Try to get details from allIssueMap if available
+      const hiddenIssue = allIssueMap?.get(blockerId);
       blockers.push({
         id: blockerId,
-        subject: `#${blockerId}`,
-        assignee: null,
-        status: "Unknown",
+        subject: hiddenIssue?.subject ?? `#${blockerId}`,
+        assignee: hiddenIssue?.assigned_to?.name ?? null,
+        status: hiddenIssue?.status?.name ?? "Unknown",
         isHidden: true,
       });
       continue;

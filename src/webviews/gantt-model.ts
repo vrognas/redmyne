@@ -104,6 +104,7 @@ export interface GanttRow {
 
 /**
  * Convert Issue to GanttIssue for SVG rendering.
+ * @param allIssueMap - Optional map of ALL issues for looking up hidden issue details
  */
 export function toGanttIssue(
   issue: Issue,
@@ -111,7 +112,8 @@ export function toGanttIssue(
   closedStatusIds: Set<number>,
   depGraph: DependencyGraph | null,
   issueMap: Map<number, Issue> | null,
-  isExternal = false
+  isExternal = false,
+  allIssueMap?: Map<number, Issue>
 ): GanttIssue {
   // Check if closed via status ID, or fallback to status name containing "closed"
   const isClosedById = closedStatusIds.has(issue.status?.id ?? 0);
@@ -121,14 +123,14 @@ export function toGanttIssue(
   // Calculate downstream impact and blockers if graph available
   const downstreamCount = depGraph ? countDownstream(issue.id, depGraph) : 0;
   const blockedIssues = depGraph && issueMap
-    ? getDownstream(issue.id, depGraph, issueMap).map(b => ({
+    ? getDownstream(issue.id, depGraph, issueMap, allIssueMap).map(b => ({
         id: b.id,
         subject: b.subject,
         assignee: b.assignee,
       }))
     : [];
   const blockers = depGraph && issueMap
-    ? getBlockers(issue.id, depGraph, issueMap).map(b => ({
+    ? getBlockers(issue.id, depGraph, issueMap, allIssueMap).map(b => ({
         id: b.id,
         subject: b.subject,
         assignee: b.assignee,
@@ -179,13 +181,15 @@ export function toGanttIssue(
 
 /**
  * Convert FlatNodeWithVisibility to GanttRow for SVG rendering.
+ * @param allIssueMap - Optional map of ALL issues for looking up hidden issue details
  */
 export function nodeToGanttRow(
   node: FlatNodeWithVisibility,
   flexibilityCache: Map<number, FlexibilityScore | null>,
   closedStatusIds: Set<number>,
   depGraph: DependencyGraph | null,
-  issueMap: Map<number, Issue> | null
+  issueMap: Map<number, Issue> | null,
+  allIssueMap?: Map<number, Issue>
 ): GanttRow {
   if (node.type === "project") {
     return {
@@ -246,7 +250,7 @@ export function nodeToGanttRow(
     id: node.id,
     label: node.label,
     depth: node.depth,
-    issue: toGanttIssue(issue, flexibilityCache, closedStatusIds, depGraph, issueMap, node.isExternal),
+    issue: toGanttIssue(issue, flexibilityCache, closedStatusIds, depGraph, issueMap, node.isExternal, allIssueMap),
     isParent: node.children.length > 0,
     collapseKey: node.collapseKey,
     parentKey: node.parentKey,
