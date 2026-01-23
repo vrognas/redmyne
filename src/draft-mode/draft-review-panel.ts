@@ -96,8 +96,9 @@ export class DraftReviewPanel implements vscode.Disposable {
     try {
       await vscode.commands.executeCommand("redmyne.applyDrafts");
     } finally {
-      if (this.disposed) return;
-      this.panel.webview.postMessage({ command: "setLoading", loading: false });
+      if (!this.disposed) {
+        this.panel.webview.postMessage({ command: "setLoading", loading: false });
+      }
     }
   }
 
@@ -107,8 +108,9 @@ export class DraftReviewPanel implements vscode.Disposable {
     try {
       await vscode.commands.executeCommand("redmyne.applySingleDraft", id);
     } finally {
-      if (this.disposed) return;
-      this.panel.webview.postMessage({ command: "setRowLoading", id, loading: false });
+      if (!this.disposed) {
+        this.panel.webview.postMessage({ command: "setRowLoading", id, loading: false });
+      }
     }
   }
 
@@ -119,8 +121,9 @@ export class DraftReviewPanel implements vscode.Disposable {
     try {
       await vscode.commands.executeCommand("redmyne.discardDrafts");
     } finally {
-      if (this.disposed) return;
-      this.panel.webview.postMessage({ command: "setLoading", loading: false });
+      if (!this.disposed) {
+        this.panel.webview.postMessage({ command: "setLoading", loading: false });
+      }
     }
   }
 
@@ -173,23 +176,23 @@ export class DraftReviewPanel implements vscode.Disposable {
     );
 
     const operationRows = operations.map((op) => {
-      const httpMethod = op.http?.method || "";
-      const httpPath = op.http?.path || "";
-      const httpDataJson = op.http?.data ? JSON.stringify(op.http.data) : "";
-      const apiCellContent = op.http
-        ? `<span class="api-method ${escapeHtml(httpMethod)}">${escapeHtml(httpMethod)}</span><span class="api-path">${escapeHtml(httpPath)}</span>`
-        : "-";
       const changesPreview = formatChangesPreview(op.http?.data);
+      const typeVerb = getTypeVerb(op.type);
+      const typeClass = getTypeClass(op.type);
       return `
       <tr data-id="${escapeHtml(op.id)}" tabindex="0">
-        <td class="type"><span class="type-pill" data-type="${escapeHtml(op.type.toLowerCase())}">${escapeHtml(op.type)}</span></td>
+        <td class="type"><span class="type-pill ${typeClass}">${typeVerb}</span></td>
         <td class="description">
           <div class="desc-text">${escapeHtml(op.description)}</div>
           ${changesPreview ? `<div class="changes-preview">${changesPreview}</div>` : ""}
+          <div class="desc-meta">
+            ${op.issueId ? `<span class="meta-issue">#${op.issueId}</span>` : ""}
+            <span class="meta-time">${formatTime(op.timestamp)}</span>
+          </div>
         </td>
-        <td class="api-call" data-method="${escapeHtml(httpMethod)}" data-path="${escapeHtml(httpPath)}" data-body="${escapeHtml(httpDataJson)}">${apiCellContent}</td>
-        <td class="issue">${op.issueId ? `#${op.issueId}` : "-"}</td>
-        <td class="time">${formatTime(op.timestamp)}</td>
+        <td class="api-call" data-method="${op.http?.method || ""}" data-path="${op.http?.path || ""}" data-body="${escapeHtml(op.http?.data ? JSON.stringify(op.http.data) : "")}">
+          ${op.http ? `<span class="api-method ${op.http.method}">${op.http.method}</span><span class="api-path">${escapeHtml(op.http.path)}</span>` : "-"}
+        </td>
         <td class="actions">
           <button class="icon-btn apply-btn" data-id="${escapeHtml(op.id)}" title="Apply (Enter)">✓</button>
           <button class="icon-btn remove-btn" data-id="${escapeHtml(op.id)}" title="Remove (⌫)">✕</button>
@@ -323,88 +326,90 @@ export class DraftReviewPanel implements vscode.Disposable {
     tbody tr:focus { box-shadow: inset 0 0 0 1px var(--vscode-focusBorder); }
     tbody tr:last-child td { border-bottom: none; }
     /* Type pill */
-    .type { width: 90px; }
+    .type { width: 65px; vertical-align: top; padding-top: 12px; }
     .type-pill {
       display: inline-block;
-      padding: 2px 7px;
+      padding: 3px 8px;
       border-radius: 3px;
-      font-family: var(--vscode-editor-font-family);
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 500;
-      text-transform: capitalize;
       background: var(--vscode-textBlockQuote-background, rgba(128,128,128,0.1));
       color: var(--vscode-descriptionForeground);
     }
-    .type-pill[data-type="create"] {
-      background: color-mix(in srgb, var(--vscode-charts-green, #4caf50) 15%, transparent);
+    .type-pill.type-create {
+      background: color-mix(in srgb, var(--vscode-charts-green, #4caf50) 18%, transparent);
       color: var(--vscode-charts-green, #4caf50);
     }
-    .type-pill[data-type="update"] {
-      background: color-mix(in srgb, var(--vscode-charts-blue, #2196f3) 15%, transparent);
+    .type-pill.type-update {
+      background: color-mix(in srgb, var(--vscode-charts-blue, #2196f3) 18%, transparent);
       color: var(--vscode-charts-blue, #2196f3);
     }
-    .type-pill[data-type="delete"] {
-      background: color-mix(in srgb, var(--vscode-charts-red, #f44336) 15%, transparent);
+    .type-pill.type-delete {
+      background: color-mix(in srgb, var(--vscode-charts-red, #f44336) 18%, transparent);
       color: var(--vscode-charts-red, #f44336);
     }
-    .description { min-width: 180px; font-size: 12px; }
-    .desc-text { margin-bottom: 2px; }
+    .type-pill.type-add {
+      background: color-mix(in srgb, var(--vscode-charts-green, #4caf50) 18%, transparent);
+      color: var(--vscode-charts-green, #4caf50);
+    }
+    /* Description */
+    .description { font-size: 12px; padding: 10px 12px; }
+    .desc-text { margin-bottom: 4px; color: var(--vscode-foreground); }
     .changes-preview {
       font-family: var(--vscode-editor-font-family);
       font-size: 11px;
       line-height: 1.4;
       color: var(--vscode-foreground);
-      background: color-mix(in srgb, var(--vscode-badge-background) 30%, transparent);
-      border: 1px solid color-mix(in srgb, var(--vscode-badge-background) 50%, transparent);
+      background: color-mix(in srgb, var(--vscode-badge-background) 25%, transparent);
+      border-left: 2px solid var(--vscode-badge-background);
       padding: 4px 8px;
-      border-radius: 4px;
-      margin-top: 6px;
-      display: inline-block;
+      margin: 6px 0;
     }
-    .changes-preview .change-key { color: var(--vscode-symbolIcon-propertyForeground, #9cdcfe); font-weight: 500; }
+    .changes-preview .change-key { color: var(--vscode-symbolIcon-propertyForeground, #9cdcfe); }
     .changes-preview .change-val { color: var(--vscode-symbolIcon-stringForeground, #ce9178); }
-    .changes-preview .change-num { color: var(--vscode-symbolIcon-numberForeground, #b5cea8); font-weight: 500; }
-    .issue {
-      width: 60px;
-      font-family: var(--vscode-editor-font-family);
+    .changes-preview .change-num { color: var(--vscode-symbolIcon-numberForeground, #b5cea8); }
+    .desc-meta {
+      display: flex;
+      gap: 12px;
       font-size: 11px;
-      color: var(--vscode-textLink-foreground);
+      color: var(--vscode-descriptionForeground);
+      margin-top: 6px;
     }
-    /* API call */
+    .meta-issue { color: var(--vscode-textLink-foreground); }
+    .meta-time { opacity: 0.8; }
+    /* API Call */
     .api-call {
-      width: 200px;
       font-family: var(--vscode-editor-font-family);
       font-size: 11px;
-      cursor: help;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 200px;
+      vertical-align: top;
+      padding-top: 12px;
+      cursor: default;
     }
     .api-method {
       display: inline-block;
-      padding: 1px 5px;
+      padding: 2px 5px;
       border-radius: 3px;
-      font-size: 9px;
+      font-size: 10px;
       font-weight: 600;
-      letter-spacing: 0.02em;
-      margin-right: 5px;
-      vertical-align: middle;
-    }
-    .api-method.GET {
-      background: color-mix(in srgb, var(--vscode-charts-blue, #61afef) 20%, transparent);
-      color: var(--vscode-charts-blue, #61afef);
-    }
-    .api-method.POST {
-      background: color-mix(in srgb, var(--vscode-charts-green, #98c379) 20%, transparent);
-      color: var(--vscode-charts-green, #98c379);
+      margin-right: 6px;
     }
     .api-method.PUT {
-      background: color-mix(in srgb, var(--vscode-charts-orange, #d19a66) 20%, transparent);
-      color: var(--vscode-charts-orange, #d19a66);
+      background: color-mix(in srgb, var(--vscode-charts-orange, #ff9800) 18%, transparent);
+      color: var(--vscode-charts-orange, #ff9800);
+    }
+    .api-method.POST {
+      background: color-mix(in srgb, var(--vscode-charts-green, #4caf50) 18%, transparent);
+      color: var(--vscode-charts-green, #4caf50);
     }
     .api-method.DELETE {
-      background: color-mix(in srgb, var(--vscode-charts-red, #e06c75) 20%, transparent);
-      color: var(--vscode-charts-red, #e06c75);
+      background: color-mix(in srgb, var(--vscode-charts-red, #f44336) 18%, transparent);
+      color: var(--vscode-charts-red, #f44336);
     }
-    .api-path { color: var(--vscode-descriptionForeground); word-break: break-all; vertical-align: middle; }
-    .time { width: 70px; color: var(--vscode-descriptionForeground); font-size: 11px; }
+    .api-path { color: var(--vscode-descriptionForeground); }
     /* Actions */
     .actions { width: 60px; text-align: right; white-space: nowrap; }
     .icon-btn {
@@ -556,8 +561,6 @@ export class DraftReviewPanel implements vscode.Disposable {
               <th>Type</th>
               <th>Description</th>
               <th>API Call</th>
-              <th>Issue</th>
-              <th>Time</th>
               <th></th>
             </tr>
           </thead>
@@ -743,6 +746,22 @@ export class DraftReviewPanel implements vscode.Disposable {
       return parts.join(' · ');
     }
 
+    function getTypeVerb(type) {
+      if (type.toLowerCase().includes('create')) return 'Create';
+      if (type.toLowerCase().includes('update') || type.toLowerCase().includes('set')) return 'Update';
+      if (type.toLowerCase().includes('delete')) return 'Delete';
+      if (type.toLowerCase().includes('add')) return 'Add';
+      return type.replace(/([a-z])([A-Z])/g, '$1 $2');
+    }
+
+    function getTypeClass(type) {
+      if (type.toLowerCase().includes('create')) return 'type-create';
+      if (type.toLowerCase().includes('update') || type.toLowerCase().includes('set')) return 'type-update';
+      if (type.toLowerCase().includes('delete')) return 'type-delete';
+      if (type.toLowerCase().includes('add')) return 'type-add';
+      return '';
+    }
+
     function renderOperations(ops) {
       operations = ops;
       const content = document.getElementById('content');
@@ -782,12 +801,17 @@ export class DraftReviewPanel implements vscode.Disposable {
           : '-';
         const changesPreview = formatChangesPreview(op.http ? op.http.data : null);
         const changesHtml = changesPreview ? '<div class="changes-preview">' + changesPreview + '</div>' : '';
+        const typeVerb = getTypeVerb(op.type);
+        const typeClass = getTypeClass(op.type);
+        const metaIssue = op.issueId ? '<span class="meta-issue">#' + op.issueId + '</span>' : '';
         return '<tr data-id="' + escapeHtml(op.id) + '" tabindex="0">' +
-          '<td class="type"><span class="type-pill" data-type="' + escapeHtml(op.type.toLowerCase()) + '">' + escapeHtml(op.type) + '</span></td>' +
-          '<td class="description"><div class="desc-text">' + escapeHtml(op.description) + '</div>' + changesHtml + '</td>' +
+          '<td class="type"><span class="type-pill ' + typeClass + '">' + typeVerb + '</span></td>' +
+          '<td class="description">' +
+            '<div class="desc-text">' + escapeHtml(op.description) + '</div>' +
+            changesHtml +
+            '<div class="desc-meta">' + metaIssue + '<span class="meta-time">' + formatTime(op.timestamp) + '</span></div>' +
+          '</td>' +
           '<td class="api-call" data-method="' + escapeHtml(httpMethod) + '" data-path="' + escapeHtml(httpPath) + '" data-body="' + escapeHtml(httpDataJson) + '">' + apiCellContent + '</td>' +
-          '<td class="issue">' + (op.issueId ? '#' + op.issueId : '-') + '</td>' +
-          '<td class="time">' + formatTime(op.timestamp) + '</td>' +
           '<td class="actions">' +
             '<button class="icon-btn apply-btn" data-id="' + escapeHtml(op.id) + '" title="Apply (Enter)">✓</button>' +
             '<button class="icon-btn remove-btn" data-id="' + escapeHtml(op.id) + '" title="Remove (⌫)">✕</button>' +
@@ -800,7 +824,7 @@ export class DraftReviewPanel implements vscode.Disposable {
       content.replaceChildren();
       const container = document.createElement('div');
       container.className = 'table-container';
-      container.innerHTML = '<table><thead><tr><th>Type</th><th>Description</th><th>API Call</th><th>Issue</th><th>Time</th><th></th></tr></thead><tbody id="operations-body">' + rows + '</tbody></table>';
+      container.innerHTML = '<table><thead><tr><th>Type</th><th>Description</th><th>API Call</th><th></th></tr></thead><tbody id="operations-body">' + rows + '</tbody></table>';
       content.appendChild(container);
 
       const hint = document.createElement('div');
@@ -910,6 +934,24 @@ export function formatTime(timestamp: number): string {
  * Format a preview of the changes being made from the HTTP data payload
  * Returns HTML string showing key fields that will be updated
  */
+/** Get short verb from operation type */
+export function getTypeVerb(type: string): string {
+  if (type.toLowerCase().includes("create")) return "Create";
+  if (type.toLowerCase().includes("update") || type.toLowerCase().includes("set")) return "Update";
+  if (type.toLowerCase().includes("delete")) return "Delete";
+  if (type.toLowerCase().includes("add")) return "Add";
+  return type.replace(/([a-z])([A-Z])/g, "$1 $2"); // fallback: split camelCase
+}
+
+/** Get CSS class from operation type */
+export function getTypeClass(type: string): string {
+  if (type.toLowerCase().includes("create")) return "type-create";
+  if (type.toLowerCase().includes("update") || type.toLowerCase().includes("set")) return "type-update";
+  if (type.toLowerCase().includes("delete")) return "type-delete";
+  if (type.toLowerCase().includes("add")) return "type-add";
+  return "";
+}
+
 export function formatChangesPreview(data: Record<string, unknown> | undefined): string {
   if (!data) return "";
 

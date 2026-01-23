@@ -230,8 +230,8 @@ export class DraftQueue {
     });
 
     // Update lock to include this write (ignore errors to keep chain alive)
-    this.persistLock = writePromise.catch((err) => {
-      console.error("[DraftQueue] persist error:", err);
+    this.persistLock = writePromise.catch(() => {
+      // Persist errors are non-fatal - queue still works in memory
     });
 
     // Return the actual write promise so callers see errors

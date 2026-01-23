@@ -515,9 +515,6 @@ export class TimeSheetPanel {
         }
       }
 
-      // Calculate totals
-      const totals = this._calculateTotals();
-
       // Send to webview with cascade data (stateless pattern)
       this._postRenderMessage();
 
@@ -748,16 +745,12 @@ export class TimeSheetPanel {
   /** Apply pending draft changes to loaded rows (restore unsaved edits) */
   private _applyPendingDraftChanges(): void {
     const draftOps = this._draftQueue?.getAll() || [];
-    console.log("[Timesheet] _applyPendingDraftChanges: draftOps count:", draftOps.length);
     const timeEntryOps = draftOps.filter(
       (op) => op.type === "createTimeEntry" || op.type === "updateTimeEntry" || op.type === "deleteTimeEntry"
     );
-    console.log("[Timesheet] _applyPendingDraftChanges: timeEntryOps:", timeEntryOps);
-    console.log("[Timesheet] _applyPendingDraftChanges: current rows:", this._rows.map(r => ({ id: r.id, isNew: r.isNew })));
     if (timeEntryOps.length === 0) return;
 
     for (const op of timeEntryOps) {
-      console.log("[Timesheet] Processing op:", op.type, "resourceId:", op.resourceId, "tempId:", op.tempId);
       if (op.type === "updateTimeEntry" && op.resourceId) {
         // Find row with this entryId
         let found = false;
@@ -766,7 +759,6 @@ export class TimeSheetPanel {
             const cell = row.days[dayIndex];
             if (cell?.entryId === op.resourceId) {
               const hours = extractHoursFromDraftOp(op.http.data);
-              console.log("[Timesheet] updateTimeEntry: Found entryId", op.resourceId, "applying hours:", hours);
               row.days[dayIndex] = { ...cell, hours, isDirty: true };
               row.weekTotal = Object.values(row.days).reduce((sum, c) => sum + c.hours, 0);
               found = true;
@@ -774,9 +766,6 @@ export class TimeSheetPanel {
             }
           }
           if (found) break;
-        }
-        if (!found) {
-          console.log("[Timesheet] updateTimeEntry: Could not find entryId", op.resourceId, "in rows");
         }
       } else if (op.type === "deleteTimeEntry" && op.resourceId) {
         // Find row with this entryId and set hours to 0
@@ -795,7 +784,6 @@ export class TimeSheetPanel {
         // 1. Aggregated: "agg-{issueId}::{activityId}::{comments}:{dayIndex}"
         // 2. Paste: "draft-timeentry-xxx" (data in http body)
         // 3. Normal: "rowId:dayIndex"
-        console.log("[Timesheet] createTimeEntry tempId:", op.tempId);
 
         if (op.tempId.startsWith("agg-")) {
           // Aggregated row format uses :: as delimiter for issueId/activityId/comments
@@ -808,14 +796,11 @@ export class TimeSheetPanel {
           const dayIndex = lastColonIdx >= 0 ? parseInt(rest.slice(lastColonIdx + 1), 10) : NaN;
           const issueId = issueIdStr === "null" ? null : parseInt(issueIdStr, 10);
           const activityId = activityIdStr === "null" ? null : parseInt(activityIdStr, 10);
-          console.log("[Timesheet] Aggregated: issueId:", issueId, "activityId:", activityId, "dayIndex:", dayIndex);
 
           // Find source row with matching issueId and activityId
           const row = this._rows.find((r) => r.issueId === issueId && r.activityId === activityId);
-          console.log("[Timesheet] Found source row:", row ? "yes" : "no", row?.id);
           if (row && !isNaN(dayIndex) && dayIndex >= 0 && dayIndex < 7) {
             const hours = extractHoursFromDraftOp(op.http.data);
-            console.log("[Timesheet] Applying hours:", hours, "to dayIndex:", dayIndex);
             const cell = row.days[dayIndex] || { hours: 0, originalHours: 0, entryId: null, isDirty: false };
             row.days[dayIndex] = { ...cell, hours, isDirty: true };
             row.weekTotal = Object.values(row.days).reduce((sum, c) => sum + c.hours, 0);
@@ -836,8 +821,6 @@ export class TimeSheetPanel {
           const dayIndex = this._currentWeek.dayDates.indexOf(spentOn);
           if (dayIndex < 0) continue; // Not in current week
 
-          console.log("[Timesheet] Paste: issueId:", issueId, "activityId:", activityId, "projectId:", projectId, "dayIndex:", dayIndex, "hours:", hours);
-
           // Find existing row with same issue/activity/comments, or create new one
           let row = this._rows.find(
             (r) => r.issueId === issueId && r.activityId === activityId && (r.comments || "") === comments
@@ -852,7 +835,6 @@ export class TimeSheetPanel {
             row.comments = comments;
             row.isNew = true;
             this._rows.push(row);
-            console.log("[Timesheet] Created new row for paste:", row.id);
 
             // Try to look up project info from cached data
             if (projectId) {
@@ -876,12 +858,9 @@ export class TimeSheetPanel {
           if (lastColonIdx < 0) continue;
           const rowId = op.tempId.slice(0, lastColonIdx);
           const dayIndex = parseInt(op.tempId.slice(lastColonIdx + 1), 10);
-          console.log("[Timesheet] Normal: rowId:", rowId, "dayIndex:", dayIndex);
           const row = this._rows.find((r) => r.id === rowId);
-          console.log("[Timesheet] Found row:", row ? "yes" : "no", row?.id);
           if (row && !isNaN(dayIndex) && dayIndex >= 0 && dayIndex < 7) {
             const hours = extractHoursFromDraftOp(op.http.data);
-            console.log("[Timesheet] Applying hours:", hours, "to dayIndex:", dayIndex);
             const cell = row.days[dayIndex] || { hours: 0, originalHours: 0, entryId: null, isDirty: false };
             row.days[dayIndex] = { ...cell, hours, isDirty: true };
             row.weekTotal = Object.values(row.days).reduce((sum, c) => sum + c.hours, 0);
@@ -1095,7 +1074,7 @@ export class TimeSheetPanel {
     const isAggregated = rowId.startsWith("agg-");
 
     let row: TimeSheetRow | undefined;
-    let totalHoursPerDay: number[] = [0, 0, 0, 0, 0, 0, 0];
+    const totalHoursPerDay: number[] = [0, 0, 0, 0, 0, 0, 0];
 
     if (isAggregated) {
       // Parse key from aggRowId: agg-{issueId}:{activityId}:{comments}
@@ -1204,23 +1183,10 @@ export class TimeSheetPanel {
     entryId: number | null,
     isDirty: boolean
   ): Promise<void> {
-    console.log("[Timesheet] _queueCellOperation called:", {
-      rowId: row.id,
-      dayIndex,
-      hours,
-      entryId,
-      isDirty,
-      issueId: row.issueId,
-      activityId: row.activityId,
-      draftQueue: !!this._draftQueue,
-      draftModeEnabled: this._draftModeManager?.isEnabled,
-    });
     if (!this._draftQueue || !this._draftModeManager?.isEnabled) {
-      console.log("[Timesheet] Skipping: draftQueue or draftMode not available");
       return;
     }
     if (!row.issueId || !row.activityId) {
-      console.log("[Timesheet] Skipping: missing issueId or activityId");
       return;
     }
 
@@ -1300,7 +1266,6 @@ export class TimeSheetPanel {
         },
         resourceKey,
       };
-      console.log("[Timesheet] Adding createTimeEntry operation:", operation);
       await this._draftQueue.add(operation, TIMESHEET_SOURCE);
     } else {
       // No entryId and hours = 0 → remove pending create if exists
@@ -1370,7 +1335,6 @@ export class TimeSheetPanel {
     } else if (field === "comments") {
       const newComment = value as string | null;
       const isRevertingToOriginal = (newComment ?? "") === (row.originalComments ?? "");
-      console.log("[Timesheet] _updateRowField comments:", { newComment, originalComments: row.originalComments, isRevertingToOriginal });
       row.comments = newComment;
 
       if (isRevertingToOriginal) {
@@ -1381,7 +1345,6 @@ export class TimeSheetPanel {
             // Cell is back to original state - mark clean and remove draft
             cell.isDirty = false;
             const resourceKey = `ts:timeentry:${cell.entryId}`;
-            console.log("[Timesheet] Reverting to original, removing draft:", resourceKey);
             await this._draftQueue?.removeByKey(resourceKey, TIMESHEET_SOURCE);
           } else if (cell) {
             // Hours changed or no entryId - still dirty
@@ -1397,19 +1360,10 @@ export class TimeSheetPanel {
     }
 
     // Queue all dirty cells if row is now complete (has issue + activity)
-    console.log("[Timesheet] _updateRowField: checking if row is complete", {
-      rowId: row.id,
-      issueId: row.issueId,
-      activityId: row.activityId,
-      weekTotal: row.weekTotal,
-      isNew: row.isNew,
-    });
     if (row.issueId && row.activityId) {
-      console.log("[Timesheet] Row is complete, queueing dirty cells");
       for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
         const cell = row.days[dayIndex];
         if (cell && cell.isDirty && cell.hours > 0) {
-          console.log("[Timesheet] Queueing cell:", { dayIndex, hours: cell.hours, isDirty: cell.isDirty });
           await this._queueCellOperation(row, dayIndex, cell.hours, cell.entryId, true);
         }
       }
@@ -1849,7 +1803,6 @@ export class TimeSheetPanel {
 
     if (sourceCount === 0 && newHours === 0) {
       // Empty cell set to 0 → remove any pending CREATE (e.g., undo of create)
-      console.log("[Timesheet] _updateAggregatedCell: removing pending create for", newEntryResourceKey);
       await this._draftQueue.removeByKey(newEntryResourceKey, TIMESHEET_SOURCE);
       // Update local state
       this._updateAggregatedCellLocal(sourceEntries, dayIndex, newHours, issueId, activityId, comments);
@@ -2126,24 +2079,19 @@ export class TimeSheetPanel {
     sourceRowIds: string[],
     confirmed: boolean
   ): Promise<void> {
-    console.log("[Timesheet] _updateAggregatedField:", { aggRowId, field, value, sourceRowIds, confirmed });
     if (!this._draftQueue || !this._draftModeManager?.isEnabled) {
-      console.log("[Timesheet] _updateAggregatedField: draft mode not enabled, skipping");
       return;
     }
 
     // Find all source rows
     const sourceRows = this._rows.filter(r => sourceRowIds.includes(r.id));
-    console.log("[Timesheet] _updateAggregatedField: found sourceRows:", sourceRows.length);
     if (sourceRows.length === 0) return;
 
     // Get old value from first source row for undo
     const oldValue = this._getFieldValue(sourceRows[0], field);
-    console.log("[Timesheet] _updateAggregatedField: oldValue=", oldValue, "newValue=", value);
 
     // If multiple source rows and not confirmed, request confirm via toast
     if (sourceRows.length > 1 && !confirmed) {
-      console.log("[Timesheet] _updateAggregatedField: requesting confirmation for", sourceRows.length, "entries");
       this._postMessage({
         type: "requestAggregatedFieldConfirm",
         aggRowId,
@@ -2157,7 +2105,6 @@ export class TimeSheetPanel {
     }
 
     // Apply field update to all source rows
-    console.log("[Timesheet] _updateAggregatedField: applying field update to", sourceRows.length, "rows");
     for (const row of sourceRows) {
       await this._updateRowField(row.id, field, value);
     }
@@ -2271,8 +2218,8 @@ export class TimeSheetPanel {
   private async _deleteExpandedEntry(
     rowId: string,
     entryId: number,
-    aggRowId: string,
-    dayIndex: number
+    _aggRowId: string,
+    _dayIndex: number
   ): Promise<void> {
     if (!this._draftQueue || !this._draftModeManager?.isEnabled) return;
 
@@ -2413,9 +2360,6 @@ export class TimeSheetPanel {
       <div class="toolbar-spacer"></div>
       <button id="undoBtn" class="toolbar-btn" data-tooltip="Undo (Ctrl+Z)" disabled>↶</button>
       <button id="redoBtn" class="toolbar-btn" data-tooltip="Redo (Ctrl+Y)" disabled>↷</button>
-      <div class="toolbar-separator"></div>
-      <button id="copyWeekBtn" class="toolbar-btn text-btn" data-tooltip="Copy week">Copy</button>
-      <button id="pasteWeekBtn" class="toolbar-btn text-btn" data-tooltip="Paste week">Paste</button>
       <div class="toolbar-separator"></div>
       <button id="prevWeek" class="toolbar-btn" data-tooltip="Previous week">‹</button>
       <span id="weekLabel" class="week-label-picker" data-tooltip="Click to pick week">Loading...</span>
