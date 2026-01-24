@@ -1385,6 +1385,7 @@ export class GanttPanel {
       case "setZoom":
         if (message.zoomLevel) {
           this._zoomLevel = message.zoomLevel;
+          this._cachedHierarchy = undefined; // Clear cache to ensure fresh recalculation
           this._updateContent();
         }
         break;
@@ -1829,15 +1830,16 @@ export class GanttPanel {
     try {
       // Redmine doesn't support updating delay directly - must delete and recreate
       await this._server.deleteRelation(relationId);
-      await this._server.createRelation(
+      const response = await this._server.createRelation(
         parseInt(fromId),
         parseInt(toId),
         relationType as "precedes" | "follows",
         newDelay
       );
 
-      // Refresh data
-      await this._refreshData();
+      // Update local data and re-render
+      this._removeRelationLocally(relationId);
+      this._addRelationLocally(parseInt(fromId), parseInt(toId), relationType, response.relation.id);
       showStatusBarMessage(`$(check) Delay updated to ${newDelay}`, 2000);
     } catch (error) {
       vscode.window.showErrorMessage(`Failed to update delay: ${errorToString(error)}`);
@@ -2965,25 +2967,25 @@ export class GanttPanel {
           : flexPct > 0 ? `Flexibility: +${flexPct}%`
           : flexPct === 0 ? `Flexibility: 0% (no buffer)`
           : `Flexibility: ${flexPct}%`;
-        // Blocks info (issues waiting on this one)
+        // Blocks info (issues blocked by this one - downstream)
         const blocksLines: string[] = [];
         if (issue.blocks.length > 0) {
-          blocksLines.push(`🚧 BLOCKS ${issue.blocks.length} TASK${issue.blocks.length > 1 ? "S" : ""}:`);
+          blocksLines.push(`⛔ BLOCKING ${issue.blocks.length}:`);
           for (const b of issue.blocks.slice(0, 3)) {
             const assigneeText = b.assignee ? ` (${b.assignee})` : "";
-            blocksLines.push(`  → #${b.id} ${b.subject.length > 25 ? b.subject.substring(0, 24) + "…" : b.subject}${assigneeText}`);
+            blocksLines.push(`  ⛔ #${b.id} ${b.subject.length > 25 ? b.subject.substring(0, 24) + "…" : b.subject}${assigneeText}`);
           }
           if (issue.blocks.length > 3) {
             blocksLines.push(`  ... and ${issue.blocks.length - 3} more`);
           }
         }
-        // Blocker info
+        // Blocker info (issues this is waiting on - upstream)
         const blockerLines: string[] = [];
         if (issue.blockedBy.length > 0) {
-          blockerLines.push(`⛔ BLOCKED BY:`);
+          blockerLines.push(`⏳ WAITING ON ${issue.blockedBy.length}:`);
           for (const b of issue.blockedBy.slice(0, 3)) {
             const assigneeText = b.assignee ? ` (${b.assignee})` : "";
-            blockerLines.push(`  • #${b.id} ${b.subject.length > 25 ? b.subject.substring(0, 24) + "…" : b.subject}${assigneeText}`);
+            blockerLines.push(`  ⏳ #${b.id} ${b.subject.length > 25 ? b.subject.substring(0, 24) + "…" : b.subject}${assigneeText}`);
           }
           if (issue.blockedBy.length > 3) {
             blockerLines.push(`  ... and ${issue.blockedBy.length - 3} more`);
@@ -3038,10 +3040,10 @@ export class GanttPanel {
         // Flexibility tooltip
         const flexTooltip = flexText || "";
 
-        // Blocks tooltip: issues this one blocks
+        // Blocks tooltip: issues blocked by this one (downstream)
         // If subject is still "#ID" (no metadata available), show "(not in view)"
         const blocksTooltip = issue.blocks.length > 0
-          ? `🚧 Blocks ${issue.blocks.length} issue(s):\n` + issue.blocks.slice(0, 5).map(b => {
+          ? `⛔ Blocking ${issue.blocks.length}:\n` + issue.blocks.slice(0, 5).map(b => {
               const assigneeText = b.assignee ? ` (${b.assignee})` : "";
               const noMetadata = b.subject === `#${b.id}`;
               const subjectText = noMetadata ? "(not in view)" : (b.subject.length > 30 ? b.subject.substring(0, 29) + "…" : b.subject);
@@ -3049,14 +3051,14 @@ export class GanttPanel {
             }).join("\n") + (issue.blocks.length > 5 ? `\n... and ${issue.blocks.length - 5} more` : "") + "\n\nClick to highlight dependencies"
           : "";
 
-        // Blockers tooltip: issues blocking this one
+        // Blockers tooltip: issues this one is waiting on (upstream)
         const blockerTooltip = issue.blockedBy.length > 0
-          ? `⛔ Blocked by ${issue.blockedBy.length} issue(s):\n` + issue.blockedBy.slice(0, 5).map(b => {
+          ? `⏳ Waiting on ${issue.blockedBy.length}:\n` + issue.blockedBy.slice(0, 5).map(b => {
               const assigneeText = b.assignee ? ` (${b.assignee})` : "";
               const noMetadata = b.subject === `#${b.id}`;
               const subjectText = noMetadata ? "(not in view)" : (b.subject.length > 30 ? b.subject.substring(0, 29) + "…" : b.subject);
               return `#${b.id} ${subjectText}${assigneeText}`;
-            }).join("\n") + (issue.blockedBy.length > 5 ? `\n... and ${issue.blockedBy.length - 5} more` : "") + "\n\nClick to highlight and jump to blocker"
+            }).join("\n") + (issue.blockedBy.length > 5 ? `\n... and ${issue.blockedBy.length - 5} more` : "") + "\n\nClick to highlight and jump"
           : "";
 
         // Calculate done portion width for progress visualization
@@ -3271,7 +3273,7 @@ export class GanttPanel {
               <title>Drag to link (from start)</title>
               <circle cx="${startX - 8}" cy="${barY + barContentHeight / 2}" r="12" fill="transparent" pointer-events="all"/>
               <circle class="link-handle-visual" cx="${startX - 8}" cy="${barY + barContentHeight / 2}" r="4"
-                      fill="var(--vscode-button-secondaryBackground)" stroke="var(--vscode-button-secondaryForeground)"
+                      fill="var(--vscode-button-background)" stroke="var(--vscode-button-foreground)"
                       stroke-width="1" pointer-events="none"/>
             </g>
             <!-- End anchor (for finish-to-start, finish-to-finish relations) -->
@@ -3297,25 +3299,29 @@ export class GanttPanel {
                   : flexPct > 0 ? "var(--vscode-charts-yellow)"
                   : "var(--vscode-charts-red)")
                 : "";
-              // Blocks badge: "🚧3" for tasks blocked by this (only show if >0)
+              // Blocks badge: "⛔3" for tasks blocked by this (downstream, shown at END of bar)
               const blocksCount = issue.blocks.length;
               const showBlocks = blocksCount > 0 && !issue.isClosed;
-              const impactBadgeW = showBlocks ? 26 : 0;
-              const impactLabel = showBlocks ? `🚧${blocksCount}` : "";
+              const impactBadgeW = showBlocks ? 28 : 0;
+              const impactLabel = showBlocks ? `⛔${blocksCount}` : "";
               const impactColor = showBlocks
                 ? (blocksCount >= 5 ? "var(--vscode-charts-red)"
                   : blocksCount >= 2 ? "var(--vscode-charts-orange)"
                   : "var(--vscode-descriptionForeground)")
                 : "";
-              // Blocker badge: "⛔1" for blocked issues (clickable)
+              // Blocker badge: "⏳2" for waiting on others (shown at START of bar)
               const blockerCount = issue.blockedBy.length;
               const showBlocker = blockerCount > 0 && !issue.isClosed;
-              const blockerBadgeW = showBlocker ? 26 : 0;
-              const blockerLabel = showBlocker ? `⛔${blockerCount}` : "";
+              const blockerBadgeW = showBlocker ? 28 : 0;
+              const blockerLabel = showBlocker ? `⏳${blockerCount}` : "";
               const firstBlockerId = showBlocker ? issue.blockedBy[0].id : null;
+              // Blocker badge position: at START of bar (left side, 16px gap to match right side)
+              const blockerBadgeStartX = startX - blockerBadgeW - 16;
+              const blockerBadgeCenterXLeft = blockerBadgeStartX + blockerBadgeW / 2;
+              const blockerColor = blockerCount >= 2 ? "var(--vscode-charts-red)" : "var(--vscode-charts-yellow)";
               const assigneeW = issue.assignee ? 90 : 0;
-              // Total width: progress + flex + blocks + blocker + assignee + spacing
-              const totalLabelW = progressBadgeW + flexBadgeW + impactBadgeW + blockerBadgeW + assigneeW + 24;
+              // Total width: progress + flex + blocks + assignee + spacing (blocker is now at start)
+              const totalLabelW = progressBadgeW + flexBadgeW + impactBadgeW + assigneeW + 24;
               const onLeft = endX + totalLabelW > timelineWidth;
               const labelX = onLeft ? startX - 8 : endX + 16;
 
@@ -3351,15 +3357,10 @@ export class GanttPanel {
               const afterProgressW = showFlex ? flexBadgeW : progressBadgeW;
               const impactBadgeX = onLeft ? afterProgressX - afterProgressW - 4 : afterProgressX + afterProgressW + 4;
               const impactBadgeCenterX = onLeft ? impactBadgeX - impactBadgeW / 2 : impactBadgeX + impactBadgeW / 2;
-              // Blocker badge position: after impact badge (or previous)
+              // Assignee position: after blocks badge (blocker badge is now at start of bar)
               const afterImpactX = showBlocks ? impactBadgeX : afterProgressX;
               const afterImpactW = showBlocks ? impactBadgeW : afterProgressW;
-              const blockerBadgeX = onLeft ? afterImpactX - afterImpactW - 4 : afterImpactX + afterImpactW + 4;
-              const blockerBadgeCenterX = onLeft ? blockerBadgeX - blockerBadgeW / 2 : blockerBadgeX + blockerBadgeW / 2;
-              // Assignee position: after last badge
-              const afterBlockerX = showBlocker ? blockerBadgeX : afterImpactX;
-              const afterBlockerW = showBlocker ? blockerBadgeW : afterImpactW;
-              const assigneeX = onLeft ? afterBlockerX - afterBlockerW - 4 : afterBlockerX + afterBlockerW + 4;
+              const assigneeX = onLeft ? afterImpactX - afterImpactW - 4 : afterImpactX + afterImpactW + 4;
               return `<g class="bar-labels${onLeft ? " labels-left" : ""}">
                 <g class="progress-badge-group">
                   <title>${escapeAttr(progressTooltip)}</title>
@@ -3385,20 +3386,20 @@ export class GanttPanel {
                   <text class="blocks-badge" x="${impactBadgeCenterX}" y="${barHeight / 2 + 4}"
                         text-anchor="middle" fill="${impactColor}" font-size="10" font-weight="500">${impactLabel}</text>
                 </g>` : ""}
-                ${showBlocker ? `<g class="blocker-badge" data-blocker-id="${firstBlockerId}" style="cursor: pointer;">
-                  <title>${escapeAttr(blockerTooltip)}</title>
-                  <rect x="${onLeft ? blockerBadgeX - blockerBadgeW : blockerBadgeX}" y="${barY + barContentHeight / 2 - 6}" width="${blockerBadgeW}" height="12" rx="2"
-                        fill="var(--vscode-charts-red)" opacity="0.15"/>
-                  <rect x="${onLeft ? blockerBadgeX - blockerBadgeW : blockerBadgeX}" y="${barY + barContentHeight / 2 - 6}" width="${blockerBadgeW}" height="12" fill="transparent"/>
-                  <text x="${blockerBadgeCenterX}" y="${barHeight / 2 + 4}"
-                        text-anchor="middle" fill="var(--vscode-charts-red)" font-size="10" font-weight="500">${blockerLabel}</text>
-                </g>` : ""}
                 ${issue.assignee ? `<g class="bar-assignee-group">
                   <title>${escapeAttr(issue.assignee)}</title>
                   <text class="bar-assignee${issue.assigneeId === this._currentUserId ? " current-user" : ""}" x="${assigneeX}" y="${barHeight / 2 + 4}"
                         text-anchor="${onLeft ? "end" : "start"}" fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(formatShortName(issue.assignee))}</text>
                 </g>` : ""}
-              </g>`;
+              </g>
+              ${showBlocker ? `<g class="blocker-badge" data-blocker-id="${firstBlockerId}" style="cursor: pointer;">
+                <title>${escapeAttr(blockerTooltip)}</title>
+                <rect x="${blockerBadgeStartX}" y="${barY + barContentHeight / 2 - 6}" width="${blockerBadgeW}" height="12" rx="2"
+                      fill="${blockerColor}" opacity="0.15"/>
+                <rect x="${blockerBadgeStartX}" y="${barY + barContentHeight / 2 - 6}" width="${blockerBadgeW}" height="12" fill="transparent"/>
+                <text x="${blockerBadgeCenterXLeft}" y="${barHeight / 2 + 4}"
+                      text-anchor="middle" fill="${blockerColor}" font-size="10" font-weight="600">${blockerLabel}</text>
+              </g>` : ""}`;
             })()}
           </g>
         `;
@@ -3465,11 +3466,11 @@ export class GanttPanel {
       .flatMap((row) =>
         row.issue.relations
           .filter((rel) => visibleRelTypes.has(rel.type))
-          .map((rel) => {
+          .map((rel): { svg: string; hasDash: boolean } | null => {
           const issue = row.issue;
           const source = issuePositions.get(issue.id);
           const target = issuePositions.get(rel.targetId);
-          if (!source || !target) return "";
+          if (!source || !target) return null;
 
           const style = relationStyles[rel.type] || relationStyles.relates;
           const arrowSize = 4;
@@ -3485,34 +3486,68 @@ export class GanttPanel {
           const toEnd = rel.type === "finish_to_finish" || rel.type === "start_to_finish";
 
           let x1: number, y1: number, x2: number, y2: number;
+          let path: string;
+          const r = 4; // corner radius for rounded turns
 
-          if (isScheduling) {
+          if (!isScheduling) {
+            // Non-scheduling (relates, duplicates, copied_to): center-to-center with border anchors
+            const centerX1 = (source.startX + source.endX) / 2;
+            const centerX2 = (target.startX + target.endX) / 2;
+            const goingDown = target.y > source.y;
+            const sameRowCenter = Math.abs(source.y - target.y) < 5;
+
+            const centersAligned = Math.abs(centerX1 - centerX2) < 5;
+
+            if (sameRowCenter) {
+              // Same row: route above the bars
+              x1 = centerX1;
+              y1 = source.y - barHeight / 2; // top border
+              x2 = centerX2;
+              y2 = target.y - barHeight / 2; // top border
+              const routeY = y1 - 8; // above bars
+              path = `M ${x1} ${y1} V ${routeY + r}` +
+                ` q 0 ${-r} ${x2 > x1 ? r : -r} ${-r}` +
+                ` H ${x2 + (x2 > x1 ? -r : r)}` +
+                ` q ${x2 > x1 ? r : -r} 0 ${x2 > x1 ? r : -r} ${r}` +
+                ` V ${y2}`;
+            } else if (centersAligned) {
+              // Centers aligned: straight vertical line
+              x1 = centerX1;
+              y1 = goingDown ? source.y + barHeight / 2 : source.y - barHeight / 2;
+              x2 = centerX1; // use same x for straight line
+              y2 = goingDown ? target.y - barHeight / 2 : target.y + barHeight / 2;
+              path = `M ${x1} ${y1} V ${y2}`;
+            } else {
+              // Different rows: vertical first, then horizontal, then vertical
+              x1 = centerX1;
+              y1 = goingDown ? source.y + barHeight / 2 : source.y - barHeight / 2; // bottom or top border
+              x2 = centerX2;
+              y2 = goingDown ? target.y - barHeight / 2 : target.y + barHeight / 2; // top or bottom border
+              const midY = (source.y + target.y) / 2;
+              path = `M ${x1} ${y1} V ${midY + (goingDown ? -r : r)}` +
+                ` q 0 ${goingDown ? r : -r} ${x2 > x1 ? r : -r} ${goingDown ? r : -r}` +
+                ` H ${x2 + (x2 > x1 ? -r : r)}` +
+                ` q ${x2 > x1 ? r : -r} 0 ${x2 > x1 ? r : -r} ${goingDown ? r : -r}` +
+                ` V ${y2}`;
+            }
+          } else {
+            // Scheduling relations: edge-to-edge anchors
             x1 = fromStart ? source.startX - 2 : source.endX + 2;
             y1 = source.y;
             x2 = toEnd ? target.endX + 2 : target.startX - 2;
             y2 = target.y;
-          } else {
-            // Center of source → center of target (non-scheduling)
-            x1 = (source.startX + source.endX) / 2;
-            y1 = source.y;
-            x2 = (target.startX + target.endX) / 2;
-            y2 = target.y;
           }
 
-          // Is target to the right (natural flow) or left/overlapping (route around)?
+          // Variables for scheduling arrow routing
           const goingRight = x2 > x1;
           const horizontalDist = Math.abs(x2 - x1);
-          const nearlyVertical = horizontalDist < 30; // bars are vertically aligned
-
-          let path: string;
-          const r = 4; // corner radius for rounded turns
-          // Jog direction depends on which anchor we're leaving from
-          // fromStart: jog LEFT (negative), fromEnd: jog RIGHT (positive)
+          const nearlyVertical = horizontalDist < 30;
           const jogDir = fromStart ? -1 : 1;
-          // Target approach direction (unused for nearlyVertical, used for other cases)
           const approachDir = toEnd ? 1 : -1;
 
-          if (sameRow && goingRight) {
+          if (!isScheduling) {
+            // Path already computed above
+          } else if (sameRow && goingRight) {
             // Same row, target to right: straight horizontal line
             path = `M ${x1} ${y1} H ${x2}`;
           } else if (sameRow && !goingRight) {
@@ -3539,37 +3574,72 @@ export class GanttPanel {
               ` V ${y2 + (goingDown ? -r : r)}` +
               ` q 0 ${goingDown ? r : -r} ${-approachDir * r} ${goingDown ? r : -r}` +
               ` H ${x2}`;
-          } else if (goingRight) {
-            // Different row, target to right: bend near source, then across
-            const bendX = fromStart ? Math.max(x1 - 8, (x1 + x2) / 2) : Math.min(x1 + 8, (x1 + x2) / 2);
+          } else if (goingRight && !fromStart) {
+            // FS/FF with target to right: small jog, vertical to target level, horizontal approach
+            const jogX = 8;
             const goingDown = y2 > y1;
-            path = `M ${x1} ${y1} H ${bendX - jogDir * r}` +
+            // Second curve turns toward target (right), not back toward source
+            path = `M ${x1} ${y1} H ${x1 + jogDir * jogX - jogDir * r}` +
               ` q ${jogDir * r} 0 ${jogDir * r} ${goingDown ? r : -r}` +
+              ` V ${y2 + (goingDown ? -r : r)}` +
+              ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
+              ` H ${x2}`;
+          } else if (goingRight) {
+            // SS/SF with target to right: horizontal at source level, then down, then approach
+            const jogX = 8;
+            const goingDown = y2 > y1;
+            path = `M ${x1} ${y1} H ${x2 + approachDir * jogX - approachDir * r}` +
+              ` q ${approachDir * r} 0 ${approachDir * r} ${goingDown ? r : -r}` +
               ` V ${y2 + (goingDown ? -r : r)}` +
               ` q 0 ${goingDown ? r : -r} ${-approachDir * r} ${goingDown ? r : -r}` +
               ` H ${x2}`;
+          } else if (fromStart) {
+            // SS/SF going left: horizontal at source level, then down, then approach
+            const jogX = 8;
+            const goingDown = y2 > y1;
+            path = `M ${x1} ${y1} H ${x2 + approachDir * jogX + r}` +
+              ` q ${-r} 0 ${-r} ${goingDown ? r : -r}` +
+              ` V ${y2 + (goingDown ? -r : r)}` +
+              ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
+              ` H ${x2}`;
           } else {
-            // Different row, target to left: S-curve
+            // FS/FF going left: S-curve with horizontal between rows
             const jogX = 8;
             const midY = (y1 + y2) / 2;
             const goingDown = y2 > y1;
             path = `M ${x1} ${y1} H ${x1 + jogDir * jogX - jogDir * r}` +
               ` q ${jogDir * r} 0 ${jogDir * r} ${goingDown ? r : -r}` +
               ` V ${midY + (goingDown ? -r : r)}` +
-              ` q 0 ${goingDown ? r : -r} ${-jogDir * r} ${goingDown ? r : -r}` +
-              ` H ${x2 + approachDir * jogX - approachDir * r}` +
-              ` q ${approachDir * r} 0 ${approachDir * r} ${goingDown ? r : -r}` +
+              ` q 0 ${goingDown ? r : -r} ${-r} ${goingDown ? r : -r}` +
+              ` H ${x2 + approachDir * jogX + r}` +
+              ` q ${-r} 0 ${-r} ${goingDown ? r : -r}` +
               ` V ${y2 + (goingDown ? -r : r)}` +
-              ` q 0 ${goingDown ? r : -r} ${-approachDir * r} ${goingDown ? r : -r}` +
+              ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
               ` H ${x2}`;
           }
 
-          // Chevron arrowhead - direction depends on approach side
-          // toStart: arrow comes from left, points right (wings at x2-size)
-          // toEnd: arrow comes from right, points left (wings at x2+size)
-          const arrowHead = toEnd
-            ? `M ${x2 + arrowSize} ${y2 - arrowSize * 0.6} L ${x2} ${y2} L ${x2 + arrowSize} ${y2 + arrowSize * 0.6}`
-            : `M ${x2 - arrowSize} ${y2 - arrowSize * 0.6} L ${x2} ${y2} L ${x2 - arrowSize} ${y2 + arrowSize * 0.6}`;
+          // Chevron arrowhead - direction depends on approach
+          let arrowHead: string;
+          if (!isScheduling) {
+            // Non-scheduling: vertical approach, arrowhead points down or up
+            const goingDown = target.y > source.y;
+            const sameRowCenter = Math.abs(source.y - target.y) < 5;
+            if (sameRowCenter) {
+              // Same row routed above: arrowhead points down
+              arrowHead = `M ${x2 - arrowSize * 0.6} ${y2 - arrowSize} L ${x2} ${y2} L ${x2 + arrowSize * 0.6} ${y2 - arrowSize}`;
+            } else {
+              arrowHead = goingDown
+                ? `M ${x2 - arrowSize * 0.6} ${y2 - arrowSize} L ${x2} ${y2} L ${x2 + arrowSize * 0.6} ${y2 - arrowSize}`
+                : `M ${x2 - arrowSize * 0.6} ${y2 + arrowSize} L ${x2} ${y2} L ${x2 + arrowSize * 0.6} ${y2 + arrowSize}`;
+            }
+          } else {
+            // Scheduling: horizontal approach
+            // toStart: arrow comes from left, points right (wings at x2-size)
+            // toEnd: arrow comes from right, points left (wings at x2+size)
+            arrowHead = toEnd
+              ? `M ${x2 + arrowSize} ${y2 - arrowSize * 0.6} L ${x2} ${y2} L ${x2 + arrowSize} ${y2 + arrowSize * 0.6}`
+              : `M ${x2 - arrowSize} ${y2 - arrowSize * 0.6} L ${x2} ${y2} L ${x2 - arrowSize} ${y2 + arrowSize * 0.6}`;
+          }
 
           // Debug logging for arrow paths (when perfDebug enabled)
           if (isPerfDebugEnabled()) {
@@ -3594,7 +3664,8 @@ export class GanttPanel {
           const dashAttr = style.dash ? `stroke-dasharray="${style.dash}"` : "";
 
           const arrowTooltip = `#${issue.id} ${style.label} #${rel.targetId}\n${style.tip}\n(right-click to delete)`;
-          return `
+          return {
+            svg: `
             <g class="dependency-arrow rel-${rel.type} cursor-pointer" data-relation-id="${rel.id}" data-from="${issue.id}" data-to="${rel.targetId}">
               <title>${escapeAttr(arrowTooltip)}</title>
               <!-- Wide invisible hit area for easier clicking -->
@@ -3602,10 +3673,14 @@ export class GanttPanel {
               <path class="arrow-line" d="${path}" stroke-width="2" fill="none" ${dashAttr}/>
               <path class="arrow-head" d="${arrowHead}" fill="none"/>
             </g>
-          `;
+          `,
+            hasDash: !!style.dash
+          };
         })
       )
-      .filter(Boolean)
+      .filter((item): item is { svg: string; hasDash: boolean } => item !== null)
+      .sort((a, b) => (a.hasDash === b.hasDash ? 0 : a.hasDash ? 1 : -1))
+      .map(item => item.svg)
       .join("");
 
     // Generate milestone markers (diamond shapes with vertical dashed lines)
