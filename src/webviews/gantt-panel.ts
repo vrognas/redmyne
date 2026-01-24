@@ -3182,9 +3182,18 @@ export class GanttPanel {
                 <circle cx="${startX + width - 9}" cy="${barHeight / 2 + 4}" r="1.5"/>
               </g>
             </g>
-            <!-- Link handle for creating relations (larger hit area for Fitts's Law) -->
-            <g class="link-handle cursor-crosshair" data-cx="${endX + 8}" data-cy="${y + barY + barContentHeight / 2}">
-              <title>Drag to link</title>
+            <!-- Link handles for creating relations (larger hit area for Fitts's Law) -->
+            <!-- Start anchor (for start-to-start, start-to-finish relations) -->
+            <g class="link-handle link-handle-start cursor-crosshair" data-anchor="start" data-cx="${startX - 8}" data-cy="${y + barY + barContentHeight / 2}">
+              <title>Drag to link (from start)</title>
+              <circle cx="${startX - 8}" cy="${barY + barContentHeight / 2}" r="12" fill="transparent" pointer-events="all"/>
+              <circle class="link-handle-visual" cx="${startX - 8}" cy="${barY + barContentHeight / 2}" r="4"
+                      fill="var(--vscode-button-secondaryBackground)" stroke="var(--vscode-button-secondaryForeground)"
+                      stroke-width="1" pointer-events="none"/>
+            </g>
+            <!-- End anchor (for finish-to-start, finish-to-finish relations) -->
+            <g class="link-handle link-handle-end cursor-crosshair" data-anchor="end" data-cx="${endX + 8}" data-cy="${y + barY + barContentHeight / 2}">
+              <title>Drag to link (from end)</title>
               <circle cx="${endX + 8}" cy="${barY + barContentHeight / 2}" r="12" fill="transparent" pointer-events="all"/>
               <circle class="link-handle-visual" cx="${endX + 8}" cy="${barY + barContentHeight / 2}" r="4"
                       fill="var(--vscode-button-background)" stroke="var(--vscode-button-foreground)"

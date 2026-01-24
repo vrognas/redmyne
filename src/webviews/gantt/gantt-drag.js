@@ -579,7 +579,7 @@ export function setupDrag(ctx) {
       document.body.classList.remove('cursor-crosshair');
     }
 
-    function showRelationPicker(x, y, fromId, toId) {
+    function showRelationPicker(x, y, fromId, toId, fromAnchor = 'end', toAnchor = 'start') {
       // Remove existing picker
       document.querySelector('.relation-picker')?.remove();
 
@@ -593,6 +593,15 @@ export function setupDrag(ctx) {
       const clampedY = Math.min(y, window.innerHeight - pickerHeight - 10);
       picker.style.left = Math.max(10, clampedX) + 'px';
       picker.style.top = Math.max(10, clampedY) + 'px';
+
+      // Map anchor combination to suggested relation type
+      const anchorToRelation = {
+        'end_start': 'finish_to_start',
+        'end_end': 'finish_to_finish',
+        'start_start': 'start_to_start',
+        'start_end': 'start_to_finish'
+      };
+      const suggestedType = anchorToRelation[`${fromAnchor}_${toAnchor}`] || 'finish_to_start';
 
       const baseTypes = [
         { value: 'blocks', label: '🚫 Blocks', cssClass: 'rel-line-blocks',
@@ -620,11 +629,14 @@ export function setupDrag(ctx) {
 
       types.forEach(t => {
         const btn = document.createElement('button');
+        if (t.value === suggestedType) {
+          btn.classList.add('suggested');
+        }
         const swatch = document.createElement('span');
         swatch.className = 'color-swatch ' + t.cssClass;
         btn.appendChild(swatch);
         btn.appendChild(document.createTextNode(t.label));
-        btn.title = t.tooltip;
+        btn.title = t.tooltip + (t.value === suggestedType ? ' (suggested based on anchors)' : '');
         btn.addEventListener('click', () => {
           saveState();
           vscode.postMessage({
@@ -808,7 +820,8 @@ export function setupDrag(ctx) {
         tempArrow.setAttribute('marker-end', 'url(#temp-arrow-head)');
         svg.appendChild(tempArrow);
 
-        linkingState = { fromId: issueId, fromBar: bar, startX: cx, startY: cy };
+        const fromAnchor = handle.dataset.anchor || 'end'; // 'start' or 'end'
+        linkingState = { fromId: issueId, fromBar: bar, startX: cx, startY: cy, fromAnchor };
       });
     });
 
@@ -1162,11 +1175,21 @@ export function setupDrag(ctx) {
       // Handle linking drag end
       if (linkingState) {
         const fromId = linkingState.fromId;
+        const fromAnchor = linkingState.fromAnchor;
         if (currentTarget) {
           const toId = parseInt(currentTarget.dataset.issueId);
           // Prevent self-referential relations
           if (fromId !== toId) {
-            showRelationPicker(e.clientX, e.clientY, fromId, toId);
+            // Determine target anchor based on drop position relative to target bar center
+            const svg = document.querySelector('#ganttTimeline svg');
+            const rect = svg.getBoundingClientRect();
+            const dropX = e.clientX - rect.left;
+            const targetOutline = currentTarget.querySelector('.bar-outline');
+            const targetStartX = parseFloat(targetOutline.getAttribute('x'));
+            const targetEndX = targetStartX + parseFloat(targetOutline.getAttribute('width'));
+            const targetCenterX = (targetStartX + targetEndX) / 2;
+            const toAnchor = dropX < targetCenterX ? 'start' : 'end';
+            showRelationPicker(e.clientX, e.clientY, fromId, toId, fromAnchor, toAnchor);
           }
         }
         cancelLinking();

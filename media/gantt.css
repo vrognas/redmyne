@@ -1304,6 +1304,16 @@ svg {
   color: var(--vscode-menu-selectionForeground);
 }
 
+.relation-picker button.suggested {
+  background: color-mix(in srgb, var(--vscode-button-background) 15%, transparent);
+  border-left: 2px solid var(--vscode-button-background);
+}
+
+.relation-picker button.suggested:hover,
+.relation-picker button.suggested:focus {
+  background: var(--vscode-menu-selectionBackground);
+}
+
 /* Drag date tooltip - compact variant matching webview-tooltip */
 .drag-date-tooltip {
   position: fixed;
