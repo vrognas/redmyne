@@ -53,11 +53,15 @@ export function setupMinimap({
   // Use ganttScroll for single-container scroll
   function updateMinimapViewport() {
     if (!ganttScroll || !minimapViewport) return;
+    // Guard against invalid dimensions during initialization
+    if (!timelineWidth || !ganttScroll.scrollWidth || !ganttScroll.clientWidth) return;
     const scrollableRange = Math.max(1, ganttScroll.scrollWidth - ganttScroll.clientWidth);
     const scrollRatio = Math.min(1, ganttScroll.scrollLeft / scrollableRange);
     const viewportRatio = Math.min(1, ganttScroll.clientWidth / ganttScroll.scrollWidth);
     const viewportWidth = Math.max(20, viewportRatio * timelineWidth);
     const viewportX = scrollRatio * (timelineWidth - viewportWidth);
+    // Final NaN guard
+    if (isNaN(viewportX) || isNaN(viewportWidth)) return;
     minimapViewport.setAttribute('x', viewportX.toString());
     minimapViewport.setAttribute('width', viewportWidth.toString());
   }

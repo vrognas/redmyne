@@ -49,6 +49,18 @@ export class DraftReviewPanel implements vscode.Disposable {
     return DraftReviewPanel.currentPanel;
   }
 
+  /**
+   * Restore panel from serialized state (after window reload)
+   */
+  public static restore(
+    panel: vscode.WebviewPanel,
+    queue: DraftQueue,
+    extensionUri: vscode.Uri
+  ): DraftReviewPanel {
+    DraftReviewPanel.currentPanel = new DraftReviewPanel(panel, queue, extensionUri);
+    return DraftReviewPanel.currentPanel;
+  }
+
   private constructor(panel: vscode.WebviewPanel, queue: DraftQueue, extensionUri: vscode.Uri) {
     this.panel = panel;
     this.queue = queue;

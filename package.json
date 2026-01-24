@@ -1293,8 +1293,7 @@
           "when": "false"
         },
         {
-          "command": "redmyne.reviewDrafts",
-          "when": "redmyne:draftMode && redmyne:hasDrafts"
+          "command": "redmyne.reviewDrafts"
         },
         {
           "command": "redmyne.applyDrafts",

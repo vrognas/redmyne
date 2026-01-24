@@ -45,7 +45,9 @@
       "Bash(npx vitest:*)",
       "WebFetch(domain:open-vsx.org)",
       "Bash(npm version:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(npm run bundle:*)",
+      "Bash(npm run:*)"
     ],
     "deny": [],
     "ask": []
