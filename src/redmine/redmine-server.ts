@@ -920,6 +920,7 @@ export class RedmineServer {
   /**
    * Create a relation between two issues
    * @param relationType One of: relates, duplicates, blocks, precedes, follows, copied_to
+   * @param delay Optional delay in days for precedes/follows (default: 0 means +1 day, -1 means same day)
    * @returns The created relation with its ID
    */
   async createRelation(
@@ -931,22 +932,23 @@ export class RedmineServer {
       | "blocks"
       | "precedes"
       | "follows"
-      | "copied_to"
-  ): Promise<{ relation: { id: number; issue_id: number; issue_to_id: number; relation_type: string } }> {
+      | "copied_to",
+    delay?: number
+  ): Promise<{ relation: { id: number; issue_id: number; issue_to_id: number; relation_type: string; delay?: number } }> {
+    const relationData: { issue_to_id: number; relation_type: string; delay?: number } = {
+      issue_to_id: targetIssueId,
+      relation_type: relationType,
+    };
+    // Only include delay for precedes/follows relations
+    if (delay !== undefined && (relationType === "precedes" || relationType === "follows")) {
+      relationData.delay = delay;
+    }
     const response = await this.doRequest<{
-      relation: { id: number; issue_id: number; issue_to_id: number; relation_type: string };
+      relation: { id: number; issue_id: number; issue_to_id: number; relation_type: string; delay?: number };
     }>(
       `/issues/${issueId}/relations.json`,
       "POST",
-      Buffer.from(
-        JSON.stringify({
-          relation: {
-            issue_to_id: targetIssueId,
-            relation_type: relationType,
-          },
-        }),
-        "utf8"
-      )
+      Buffer.from(JSON.stringify({ relation: relationData }), "utf8")
     );
     return response!;
   }

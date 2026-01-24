@@ -638,6 +638,57 @@ export function setupDrag(ctx) {
       ];
       const types = extendedRelationTypes ? [...baseTypes, ...extendedTypes] : baseTypes;
 
+      // Delay input for precedes (hidden by default, shown when precedes is hovered/focused)
+      let currentDelay = -1; // Default: same day (most useful)
+      const delayRow = document.createElement('div');
+      delayRow.className = 'delay-row';
+
+      const delayLabel = document.createElement('label');
+      delayLabel.textContent = 'Delay:';
+      delayRow.appendChild(delayLabel);
+
+      const sameDayBtn = document.createElement('button');
+      sameDayBtn.className = 'delay-preset active';
+      sameDayBtn.dataset.delay = '-1';
+      sameDayBtn.title = 'Start same day predecessor ends';
+      sameDayBtn.textContent = 'Same day';
+      delayRow.appendChild(sameDayBtn);
+
+      const nextDayBtn = document.createElement('button');
+      nextDayBtn.className = 'delay-preset';
+      nextDayBtn.dataset.delay = '0';
+      nextDayBtn.title = 'Start day after predecessor ends';
+      nextDayBtn.textContent = '+1 day';
+      delayRow.appendChild(nextDayBtn);
+
+      const delayInput = document.createElement('input');
+      delayInput.type = 'number';
+      delayInput.className = 'delay-input';
+      delayInput.value = currentDelay;
+      delayInput.min = '-30';
+      delayInput.max = '30';
+      delayInput.title = 'Custom delay in days (-1=same day, 0=next day, 3=+4 days)';
+      delayRow.appendChild(delayInput);
+
+      delayRow.style.display = 'none'; // Hidden until precedes selected
+
+      delayRow.querySelectorAll('.delay-preset').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          currentDelay = parseInt(btn.dataset.delay);
+          delayInput.value = currentDelay;
+          delayRow.querySelectorAll('.delay-preset').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        });
+      });
+      delayInput.addEventListener('input', () => {
+        currentDelay = parseInt(delayInput.value) || 0;
+        delayRow.querySelectorAll('.delay-preset').forEach(b => {
+          b.classList.toggle('active', parseInt(b.dataset.delay) === currentDelay);
+        });
+      });
+      delayInput.addEventListener('click', (e) => e.stopPropagation());
+
       types.forEach(t => {
         const btn = document.createElement('button');
         if (t.value === suggestedType) {
@@ -648,19 +699,32 @@ export function setupDrag(ctx) {
         btn.appendChild(swatch);
         btn.appendChild(document.createTextNode(t.label));
         btn.title = t.tooltip + (t.value === suggestedType ? ' (suggested based on anchors)' : '');
+
+        // Show delay row on hover/focus for precedes
+        if (t.value === 'precedes') {
+          btn.addEventListener('mouseenter', () => { delayRow.style.display = 'flex'; });
+          btn.addEventListener('focus', () => { delayRow.style.display = 'flex'; });
+        }
+
         btn.addEventListener('click', () => {
           saveState();
-          vscode.postMessage({
+          const message = {
             command: 'createRelation',
             issueId: fromId,
             targetIssueId: toId,
             relationType: t.value
-          });
+          };
+          // Include delay for precedes
+          if (t.value === 'precedes') {
+            message.delay = currentDelay;
+          }
+          vscode.postMessage(message);
           picker.remove();
         });
         picker.appendChild(btn);
       });
 
+      picker.appendChild(delayRow);
       document.body.appendChild(picker);
       closeOnOutsideClick(picker);
     }

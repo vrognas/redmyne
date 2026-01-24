@@ -547,29 +547,35 @@ export class DraftModeServer {
     issueId: number,
     targetIssueId: number,
     relationType: Parameters<RedmineServer["createRelation"]>[2],
+    delay?: number,
     options?: DraftBypassOptions
   ): ReturnType<RedmineServer["createRelation"]> {
     if (!this.shouldIntercept(options)) {
-      return this.inner.createRelation(issueId, targetIssueId, relationType);
+      return this.inner.createRelation(issueId, targetIssueId, relationType, delay);
     }
 
     const tempId = generateNumericTempId();
     const tempIdStr = generateTempId("relation");
 
+    // Build relation data, including delay for precedes/follows
+    const relationData: { issue_to_id: number; relation_type: string; delay?: number } = {
+      issue_to_id: targetIssueId,
+      relation_type: relationType,
+    };
+    if (delay !== undefined && (relationType === "precedes" || relationType === "follows")) {
+      relationData.delay = delay;
+    }
+
+    const delayLabel = delay !== undefined ? ` (delay: ${delay})` : "";
     await this.queue.add(
       this.createOperation(
         "createRelation",
-        `Create ${relationType} relation: #${issueId} → #${targetIssueId}`,
+        `Create ${relationType} relation: #${issueId} → #${targetIssueId}${delayLabel}`,
         `relation:create:${tempIdStr}`,
         {
           method: "POST",
           path: `/issues/${issueId}/relations.json`,
-          data: {
-            relation: {
-              issue_to_id: targetIssueId,
-              relation_type: relationType,
-            },
-          },
+          data: { relation: relationData },
         },
         { issueId, tempId: tempIdStr }
       )
@@ -581,6 +587,7 @@ export class DraftModeServer {
         issue_id: issueId,
         issue_to_id: targetIssueId,
         relation_type: relationType,
+        delay,
       },
     };
   }

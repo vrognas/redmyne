@@ -7,6 +7,10 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 ### Added
 
 - **24h per day validation** - time sheet prevents entering hours that exceed 24h/day
+- **Gantt precedes delay support** - when creating `precedes` relations, set delay
+  - Same day (delay=-1): successor can start same day predecessor ends
+  - +1 day (delay=0): successor starts day after predecessor (Redmine default)
+  - Custom delay: enter any value for flexible scheduling
 
 ### Improved
 

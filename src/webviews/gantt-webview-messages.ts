@@ -13,7 +13,7 @@ export type GanttWebviewMessage =
   | { command: "setSelectedProject"; projectId?: number | null }
   | { command: "setSelectedAssignee"; assignee?: string | null }
   | { command: "deleteRelation"; relationId: number }
-  | { command: "createRelation"; issueId: number; targetIssueId: number; relationType: string }
+  | { command: "createRelation"; issueId: number; targetIssueId: number; relationType: string; delay?: number }
   | { command: "toggleWorkloadHeatmap" }
   | { command: "toggleDependencies" }
   | { command: "toggleCapacityRibbon" }

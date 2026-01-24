@@ -62,6 +62,15 @@ Quick reference of key patterns. Details in sections below.
 - Runs after `npm install`, ensuring hooks are always installed
 - Script should exit 0 silently if not in git repo (for CI)
 
+### Webview Security
+
+**Avoid innerHTML in webviews**
+
+- `innerHTML` triggers security warnings for XSS vulnerabilities
+- Use DOM manipulation: `createElement`, `appendChild`, `textContent`
+- For dynamic UI (pickers, dialogs), build elements programmatically
+- Example: relation picker delay UI uses DOM methods instead of innerHTML
+
 ## v3.0.0 Modernization (2025-11-22)
 
 ### TypeScript 5.7 Migration

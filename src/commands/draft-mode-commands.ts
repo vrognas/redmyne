@@ -393,11 +393,12 @@ async function executeOperation(
       const match = http.path.match(/\/issues\/(\d+)\/relations\.json/);
       if (!match) throw new Error("Invalid relation path");
       const issueId = parseInt(match[1], 10);
-      const relationData = (http.data as { relation: { issue_to_id: number; relation_type: string } }).relation;
+      const relationData = (http.data as { relation: { issue_to_id: number; relation_type: string; delay?: number } }).relation;
       await server.createRelation(
         issueId,
         relationData.issue_to_id,
         relationData.relation_type as Parameters<typeof server.createRelation>[2],
+        relationData.delay,
         { _bypassDraft: true }
       );
       break;

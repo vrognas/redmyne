@@ -1431,7 +1431,7 @@ export class GanttPanel {
         break;
       case "createRelation":
         if (message.issueId && message.targetIssueId && message.relationType && this._server) {
-          this._createRelation(message.issueId, message.targetIssueId, message.relationType as CreatableRelationType);
+          this._createRelation(message.issueId, message.targetIssueId, message.relationType as CreatableRelationType, message.delay);
         }
         break;
       case "toggleWorkloadHeatmap":
@@ -1765,7 +1765,8 @@ export class GanttPanel {
   private async _createRelation(
     issueId: number,
     targetIssueId: number,
-    relationType: CreatableRelationType
+    relationType: CreatableRelationType,
+    delay?: number
   ): Promise<void> {
     if (!this._server) return;
 
@@ -1787,8 +1788,8 @@ export class GanttPanel {
         target: { start: targetIssue?.start_date, due: targetIssue?.due_date },
       };
 
-      // Create relation and get the ID
-      const response = await this._server.createRelation(issueId, targetIssueId, relationType);
+      // Create relation and get the ID (delay only applies to precedes/follows)
+      const response = await this._server.createRelation(issueId, targetIssueId, relationType, delay);
       const relationId = response.relation.id;
 
       showStatusBarMessage(`$(check) ${labels[relationType]} relation created`, 2000);

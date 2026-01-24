@@ -1318,6 +1318,56 @@ svg {
   background: var(--vscode-menu-selectionBackground);
 }
 
+/* Delay row for precedes relation */
+.relation-picker .delay-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--vscode-menu-separatorBackground);
+  font-size: 11px;
+}
+
+.relation-picker .delay-row label {
+  color: var(--vscode-descriptionForeground);
+  margin-right: 4px;
+}
+
+.relation-picker .delay-preset {
+  padding: 2px 6px;
+  font-size: 10px;
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 3px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  cursor: pointer;
+}
+
+.relation-picker .delay-preset:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.relation-picker .delay-preset.active {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border-color: var(--vscode-button-background);
+}
+
+.relation-picker .delay-input {
+  width: 40px;
+  padding: 2px 4px;
+  font-size: 10px;
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 3px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  text-align: center;
+}
+
+.relation-picker .delay-input:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+}
+
 /* Drag date tooltip - compact variant matching webview-tooltip */
 .drag-date-tooltip {
   position: fixed;
