@@ -901,6 +901,10 @@ body {
   flex-shrink: 0;
 }
 
+.gantt-timeline svg {
+  overflow: visible; /* Allow link handles to extend beyond bar edges */
+}
+
 svg {
   display: block;
 }
