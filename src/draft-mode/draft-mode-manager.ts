@@ -3,6 +3,8 @@
  * Singleton managing draft mode on/off state with persistence and events
  */
 
+import type { DraftQueue } from "./draft-queue";
+
 export interface DraftModeManagerDeps {
   globalState: {
     get<T>(key: string): T | undefined;
@@ -20,9 +22,20 @@ export class DraftModeManager {
   private enabled = false;
   private deps: DraftModeManagerDeps;
   private changeHandlers: Set<EnabledChangeHandler> = new Set();
+  private _queue: DraftQueue | undefined;
 
   constructor(deps: DraftModeManagerDeps) {
     this.deps = deps;
+  }
+
+  /** Set the queue reference (called after both are initialized) */
+  setQueue(queue: DraftQueue): void {
+    this._queue = queue;
+  }
+
+  /** Get the associated draft queue */
+  get queue(): DraftQueue | undefined {
+    return this._queue;
   }
 
   async initialize(): Promise<void> {

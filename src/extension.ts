@@ -117,6 +117,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
   cleanupResources.draftQueue = draftQueue;
 
+  // Link queue to manager so panels can access it via manager.queue
+  draftModeManager.setQueue(draftQueue);
+
   // Create draft mode status bar
   const draftModeStatusBar = new DraftModeStatusBar(draftQueue, draftModeManager);
   cleanupResources.draftModeStatusBar = draftModeStatusBar;
@@ -364,7 +367,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   vscode.window.registerWebviewPanelSerializer("redmyneGantt", {
     async deserializeWebviewPanel(panel: vscode.WebviewPanel) {
       // Restore panel with loading skeleton (use getter function for late binding)
-      const ganttPanel = GanttPanel.restore(panel, context.extensionUri, () => projectsTree.server);
+      const ganttPanel = GanttPanel.restore(panel, context.extensionUri, () => projectsTree.server, () => draftModeManager);
       // Fetch and populate data
       const issues = await projectsTree.fetchIssuesIfNeeded();
       if (issues.length > 0) {
@@ -381,6 +384,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         );
         ganttPanel.setFilterChangeCallback((filter) => projectsTree.setFilter(filter));
       }
+    },
+  });
+
+  // Register Draft Review panel serializer for window reload persistence
+  vscode.window.registerWebviewPanelSerializer("redmyneDraftReview", {
+    async deserializeWebviewPanel(panel: vscode.WebviewPanel) {
+      DraftReviewPanel.restore(panel, draftQueue, context.extensionUri);
     },
   });
 

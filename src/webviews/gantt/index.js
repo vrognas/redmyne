@@ -81,9 +81,21 @@ function setupTooltips({ addDocListener, addWinListener }) {
     });
   }
 
+  function convertToolbarTooltips() {
+    // Convert data-toolbar-tooltip to data-tooltip (JS system avoids overflow clipping)
+    root.querySelectorAll('[data-toolbar-tooltip]').forEach((el) => {
+      const text = normalizeTooltipText(el.dataset.toolbarTooltip);
+      delete el.dataset.toolbarTooltip;
+      if (text) {
+        el.dataset.tooltip = text;
+      }
+    });
+  }
+
   function prepareTooltips() {
     convertSvgTitles();
     convertTitleAttributes();
+    convertToolbarTooltips();
   }
 
   function findHeaderIndex(lines) {
@@ -410,6 +422,9 @@ function initializeGantt(state) {
   } = state;
   const dayWidth = timelineWidth / totalDays;
 
+  // Mutable draft mode state (updated via setDraftModeState message)
+  let currentDraftMode = isDraftMode;
+
   // Initialize confirm button text based on draft mode
   const confirmBtn = document.getElementById('dragConfirmOk');
   if (confirmBtn) {
@@ -421,10 +436,24 @@ function initializeGantt(state) {
   if (draftBadge) {
     if (isDraftMode) {
       draftBadge.classList.remove('hidden');
-      draftBadge.textContent = (draftQueueCount ?? 0) + ' queued';
+      const c = draftQueueCount ?? 0;
+      draftBadge.textContent = c;
+      draftBadge.dataset.toolbarTooltip = c === 1 ? '1 change queued - click to review' : c + ' changes queued - click to review';
     } else {
       draftBadge.classList.add('hidden');
     }
+    // Click badge to open draft review
+    draftBadge.addEventListener('click', () => {
+      vscode.postMessage({ command: 'openDraftReview' });
+    });
+  }
+
+  // Draft mode toggle button
+  const draftModeToggle = document.getElementById('draftModeToggle');
+  if (draftModeToggle) {
+    draftModeToggle.addEventListener('click', () => {
+      vscode.postMessage({ command: 'toggleDraftMode' });
+    });
   }
 
   // Cleanup previous event listeners (prevents accumulation on re-render)
@@ -629,17 +658,27 @@ function initializeGantt(state) {
           if (menuIntensity) menuIntensity.classList.remove('active');
         }
       } else if (message.command === 'setDraftModeState') {
+        // Update mutable draft mode state for drag handlers
+        currentDraftMode = message.enabled;
         // Update confirm button text based on draft mode
         const confirmBtn = document.getElementById('dragConfirmOk');
         if (confirmBtn) {
           confirmBtn.textContent = message.enabled ? 'Queue to Draft' : 'Save to Redmine';
+        }
+        // Update toggle button active state and text
+        const toggleBtn = document.getElementById('draftModeToggle');
+        if (toggleBtn) {
+          toggleBtn.classList.toggle('active', message.enabled);
+          toggleBtn.textContent = message.enabled ? 'Disable Draft Mode' : 'Enable Draft Mode';
         }
         // Update draft badge visibility
         const draftBadge = document.getElementById('draftBadge');
         if (draftBadge) {
           if (message.enabled) {
             draftBadge.classList.remove('hidden');
-            draftBadge.textContent = (message.queueCount ?? 0) + ' queued';
+            const c = message.queueCount ?? 0;
+            draftBadge.textContent = c;
+            draftBadge.dataset.toolbarTooltip = c === 1 ? '1 change queued - click to review' : c + ' changes queued - click to review';
           } else {
             draftBadge.classList.add('hidden');
           }
@@ -648,7 +687,9 @@ function initializeGantt(state) {
         // Update draft badge count
         const draftBadge = document.getElementById('draftBadge');
         if (draftBadge) {
-          draftBadge.textContent = message.count + ' queued';
+          const c = message.count;
+          draftBadge.textContent = c;
+          draftBadge.dataset.toolbarTooltip = c === 1 ? '1 change queued - click to review' : c + ' changes queued - click to review';
         }
       } else if (message.command === 'pushUndoAction') {
         // Push relation action to undo stack
@@ -1370,7 +1411,8 @@ function initializeGantt(state) {
       getFocusedIssueId,
       scrollToAndHighlight,
       setAllowScrollChange,
-      isDraftMode
+      isDraftModeEnabled: () => currentDraftMode,
+      isPerfDebugEnabled: () => PERF_DEBUG
     });
 
     setupCollapse({

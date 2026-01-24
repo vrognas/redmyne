@@ -19,6 +19,8 @@ export type GanttWebviewMessage =
   | { command: "toggleCapacityRibbon" }
   | { command: "toggleIntensity" }
   | { command: "refresh" }
+  | { command: "openDraftReview" }
+  | { command: "toggleDraftMode" }
   | { command: "toggleCollapse"; collapseKey: string; action?: "collapse" | "expand" }
   | { command: "expandAll"; keys?: string[] }
   | { command: "collapseAll" }

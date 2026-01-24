@@ -488,6 +488,8 @@ export class GanttPanel {
   /** Set up draft mode subscriptions if manager is available and not already subscribed */
   private _setupDraftModeSubscriptions(): void {
     if (this._draftModeSubscribed || !this._draftModeManager) return;
+    const queue = this._draftModeManager.queue;
+    if (!queue) return; // Queue not yet linked to manager
     this._draftModeSubscribed = true;
     this._disposables.push(
       this._draftModeManager.onDidChangeEnabled(() => {
@@ -497,7 +499,7 @@ export class GanttPanel {
           queueCount: this._draftModeManager?.queue?.count ?? 0,
         });
       }),
-      this._draftModeManager.queue.onDidChange(() => {
+      queue.onDidChange(() => {
         // Skip if we're the ones making the change (already handled in _updateIssueDates)
         if (this._isUpdatingDates) return;
         // External change (e.g., Draft Review discard) - refresh to sync
@@ -660,6 +662,9 @@ export class GanttPanel {
   <div class="gantt-header">
     <div class="gantt-title"><span class="loading-text">Loading issues...</span></div>
     <div class="gantt-actions" role="toolbar" aria-label="Gantt chart controls">
+      <!-- Draft mode toggle -->
+      <button class="draft-mode-toggle" disabled data-toolbar-tooltip="Queue changes for review before saving">Enable Draft Mode</button>
+      <div class="toolbar-separator"></div>
       <!-- Zoom -->
       <select class="toolbar-select" disabled data-toolbar-tooltip="Zoom level"><option>Month</option></select>
       <!-- View -->
@@ -674,7 +679,7 @@ export class GanttPanel {
       <button class="toggle-btn text-btn" disabled data-toolbar-tooltip="Refresh">↻</button>
       <button class="toggle-btn text-btn" disabled data-toolbar-tooltip="Today">T</button>
       <!-- Overflow menu -->
-      <button class="toggle-btn text-btn" disabled data-toolbar-tooltip="More options">⋮</button>
+      <button class="toggle-btn text-btn" disabled>⋮</button>
       <div class="toolbar-separator"></div>
       <button class="toggle-btn text-btn" disabled data-toolbar-tooltip="Help">?</button>
     </div>
@@ -1353,6 +1358,30 @@ export class GanttPanel {
           );
         }
         break;
+      case "removeDraft":
+        // Remove draft for an issue (used by undo in draft mode)
+        if (message.issueId && this._draftModeManager?.queue) {
+          const resourceKey = `issue:${message.issueId}:dates`;
+          this._draftModeManager.queue.removeByKey(resourceKey).then(() => {
+            // Update local UI to show old dates
+            const issue = this._issueById.get(message.issueId);
+            if (issue && message.startDate !== undefined) {
+              issue.start_date = message.startDate;
+            }
+            if (issue && message.dueDate !== undefined) {
+              issue.due_date = message.dueDate;
+            }
+            this._bumpRevision();
+            this._updateContent();
+            // Update badge count
+            this._panel.webview.postMessage({
+              command: "setDraftQueueCount",
+              count: this._draftModeManager?.queue?.count ?? 0,
+            });
+            showStatusBarMessage(`$(discard) #${message.issueId} draft removed`, 2000);
+          });
+        }
+        break;
       case "setZoom":
         if (message.zoomLevel) {
           this._zoomLevel = message.zoomLevel;
@@ -1444,6 +1473,16 @@ export class GanttPanel {
         break;
       case "openDraftReview":
         vscode.commands.executeCommand("redmyne.reviewDrafts");
+        break;
+      case "toggleDraftMode":
+        vscode.commands.executeCommand("redmyne.toggleDraftMode").then(() => {
+          // Explicitly send state update after toggle (subscription may not be set up)
+          this._panel.webview.postMessage({
+            command: "setDraftModeState",
+            enabled: this._draftModeManager?.isEnabled ?? false,
+            queueCount: this._draftModeManager?.queue?.count ?? 0,
+          });
+        });
         break;
       case "toggleCollapse":
         if (message.collapseKey) {
@@ -2877,11 +2916,15 @@ export class GanttPanel {
           ? hasPrecedence(GanttPanel._globalState, issue.id)
           : false;
 
+        // Critical path: zero or negative flexibility (used for tooltip and styling)
+        const isCriticalPath = flexPct !== null && flexPct <= 0 && !issue.isClosed;
+
         // Bar tooltip: basic info + progress
         const barTooltip = [
           issuePrecedence ? "⏫ PRECEDENCE PRIORITY" : null,
           issue.isAdHoc ? "🎲 AD-HOC BUDGET POOL" : null,
           issue.isExternal ? "⚡ EXTERNAL DEPENDENCY" : null,
+          isCriticalPath ? "🔶 CRITICAL PATH - no schedule flexibility" : null,
           statusDesc,
           `#${issue.id} ${escapedSubject}`,
           `Project: ${escapedProject}`,
@@ -3060,8 +3103,8 @@ export class GanttPanel {
           `;
         }
 
-        // Critical path: zero or negative flexibility
-        const isCritical = flexPct !== null && flexPct <= 0 && !issue.isClosed;
+        // Use pre-calculated critical path flag
+        const isCritical = isCriticalPath;
         return `
           <g class="issue-bar gantt-row${hiddenClass}${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${issue.isAdHoc ? " bar-adhoc" : ""}${isCritical ? " bar-critical" : ""}" data-issue-id="${issue.id}"
              data-project-id="${issue.projectId}"
@@ -3418,6 +3461,26 @@ export class GanttPanel {
           // Chevron arrowhead (two angled lines, not filled)
           const arrowHead = `M ${x2 - arrowSize} ${y2 - arrowSize * 0.6} L ${x2} ${y2} L ${x2 - arrowSize} ${y2 + arrowSize * 0.6}`;
 
+          // Debug logging for arrow paths (when perfDebug enabled)
+          if (isPerfDebugEnabled()) {
+            const pathCase = sameRow && goingRight ? "sameRow-right"
+              : !sameRow && nearlyVertical ? "nearlyVertical"
+              : goingRight ? "diffRow-right"
+              : sameRow ? "sameRow-left"
+              : "diffRow-left";
+            // eslint-disable-next-line no-console
+            console.log("[Arrow Debug] initialRender", {
+              arrow: `${issue.id} -> ${rel.targetId}`,
+              isScheduling,
+              source: { startX: source.startX, endX: source.endX, y: source.y },
+              target: { startX: target.startX, endX: target.endX, y: target.y },
+              coords: { x1, y1, x2, y2 },
+              conditions: { goingRight, horizontalDist, nearlyVertical, sameRow, goingDown: y2 > y1 },
+              pathCase,
+              path: path.substring(0, 80) + (path.length > 80 ? "..." : ""),
+            });
+          }
+
           const dashAttr = style.dash ? `stroke-dasharray="${style.dash}"` : "";
 
           const arrowTooltip = `#${issue.id} ${style.label} #${rel.targetId}\n${style.tip}\n(right-click to delete)`;
@@ -3657,6 +3720,10 @@ export class GanttPanel {
       return '<div class="gantt-title"></div>';
     })()}
     <div class="gantt-actions" role="toolbar" aria-label="Gantt chart controls">
+      <!-- Draft mode badge and toggle -->
+      <span id="draftBadge" class="draft-count-badge${this._draftModeManager?.isEnabled ? "" : " hidden"}" data-toolbar-tooltip="${(() => { const c = this._draftModeManager?.queue?.count ?? 0; return c === 1 ? "1 change queued - click to review" : `${c} changes queued - click to review`; })()}">${this._draftModeManager?.queue?.count ?? 0}</span>
+      <button id="draftModeToggle" class="draft-mode-toggle${this._draftModeManager?.isEnabled ? " active" : ""}">${this._draftModeManager?.isEnabled ? "Disable Draft Mode" : "Enable Draft Mode"}</button>
+      <div class="toolbar-separator"></div>
       <!-- Lookback period -->
       <select id="lookbackSelect" class="toolbar-select" data-toolbar-tooltip="Data lookback period">
         <option value="2"${this._lookbackYears === 2 ? " selected" : ""}>2 Years</option>
@@ -3718,14 +3785,12 @@ export class GanttPanel {
         <option value="closed"${this._currentFilter.status === "closed" ? " selected" : ""}>Closed</option>
         <option value="any"${this._currentFilter.status === "any" ? " selected" : ""}>Any status</option>
       </select>
-      <!-- Draft mode badge -->
-      <button id="draftBadge" class="draft-badge${this._draftModeManager?.isEnabled ? "" : " hidden"}" data-toolbar-tooltip="Review queued changes">${this._draftModeManager?.queue?.count ?? 0} queued</button>
       <!-- Primary actions -->
       <button id="refreshBtn" class="toggle-btn text-btn" data-toolbar-tooltip="Refresh (R)">↻</button>
       <button id="todayBtn" class="toggle-btn text-btn" data-toolbar-tooltip="${todayInRange ? "Today (T)" : "Today is outside timeline range"}"${todayInRange ? "" : " disabled"}>T</button>
       <!-- Overflow menu -->
       <div class="toolbar-dropdown">
-        <button class="toggle-btn text-btn" data-toolbar-tooltip="More options">⋮</button>
+        <button class="toggle-btn text-btn">⋮</button>
         <div class="toolbar-dropdown-menu">
           <div class="toolbar-dropdown-menu-inner">
             <div class="toolbar-dropdown-item" id="menuFilterHealth">

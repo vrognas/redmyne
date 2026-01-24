@@ -27,7 +27,8 @@ export function setupDrag(ctx) {
       getFocusedIssueId,
       scrollToAndHighlight,
       setAllowScrollChange,
-      isDraftMode
+      isDraftModeEnabled,
+      isPerfDebugEnabled
     } = ctx;
     function showIssueContextMenu(x, y, issueId) {
       document.querySelector('.relation-picker')?.remove();
@@ -181,12 +182,28 @@ export function setupDrag(ctx) {
     // Must match gantt-panel.ts initial render (arrowSize=4, chevron style, r=4 corner radius)
     const arrowSize = 4;
     const r = 4; // corner radius for rounded turns - must match gantt-panel.ts
+
+    // Debug logging for arrow paths (enabled via redmyne.gantt.perfDebug setting)
+    function logArrowDebug(label, data) {
+      if (isPerfDebugEnabled && isPerfDebugEnabled()) {
+        console.log('[Arrow Debug]', label, data);
+      }
+    }
+
     function calcArrowPath(x1, y1, x2, y2, isScheduling) {
       const goingRight = x2 > x1;
       const horizontalDist = Math.abs(x2 - x1);
       const nearlyVertical = horizontalDist < 30;
       const sameRow = Math.abs(y1 - y2) < 5;
       const goingDown = y2 > y1;
+
+      // Determine which path case we're in
+      let pathCase;
+      if (sameRow && goingRight) pathCase = 'sameRow-right';
+      else if (!sameRow && nearlyVertical) pathCase = 'nearlyVertical';
+      else if (goingRight) pathCase = 'diffRow-right';
+      else if (sameRow) pathCase = 'sameRow-left';
+      else pathCase = 'diffRow-left';
 
       let path;
       if (sameRow && goingRight) {
@@ -234,6 +251,14 @@ export function setupDrag(ctx) {
       }
       // Chevron arrowhead (two angled lines, not filled) - matches gantt-panel.ts
       const arrowHead = 'M ' + (x2 - arrowSize) + ' ' + (y2 - arrowSize * 0.6) + ' L ' + x2 + ' ' + y2 + ' L ' + (x2 - arrowSize) + ' ' + (y2 + arrowSize * 0.6);
+
+      logArrowDebug('calcArrowPath', {
+        inputs: { x1, y1, x2, y2, isScheduling },
+        conditions: { goingRight, horizontalDist, nearlyVertical, sameRow, goingDown },
+        pathCase,
+        path: path.substring(0, 80) + (path.length > 80 ? '...' : '')
+      });
+
       return { path, arrowHead };
     }
 
@@ -265,6 +290,9 @@ export function setupDrag(ctx) {
 
     function updateArrowPositions(arrows, draggedIssueId, newStartX, newEndX) {
       arrows.forEach(a => {
+        // Capture original path before update for debugging
+        const originalPath = a.linePath ? a.linePath.getAttribute('d') : null;
+
         // Get current positions (may be dragged or original)
         const fromStartX = a.fromId == draggedIssueId ? newStartX : parseFloat(a.fromBar.dataset.startX);
         const fromEndX = a.fromId == draggedIssueId ? newEndX : parseFloat(a.fromBar.dataset.endX);
@@ -281,6 +309,23 @@ export function setupDrag(ctx) {
           x1 = (fromStartX + fromEndX) / 2; y1 = fromY;
           x2 = (toStartX + toEndX) / 2; y2 = toY;
         }
+
+        logArrowDebug('updateArrowPositions', {
+          arrow: a.fromId + ' -> ' + a.toId,
+          isScheduling: a.isScheduling,
+          draggedId: draggedIssueId,
+          barData: {
+            fromStartX: a.fromBar.dataset.startX,
+            fromEndX: a.fromBar.dataset.endX,
+            fromY: a.fromBar.dataset.centerY,
+            toStartX: a.toBar.dataset.startX,
+            toEndX: a.toBar.dataset.endX,
+            toY: a.toBar.dataset.centerY
+          },
+          computed: { fromStartX, fromEndX, fromY, toStartX, toEndX, toY },
+          coords: { x1, y1, x2, y2 },
+          originalPath: originalPath ? originalPath.substring(0, 60) + '...' : null
+        });
 
         const { path, arrowHead } = calcArrowPath(x1, y1, x2, y2, a.isScheduling);
         if (a.linePath) a.linePath.setAttribute('d', path);
@@ -386,6 +431,18 @@ export function setupDrag(ctx) {
         const labelsOnLeft = barLabels?.classList.contains('labels-left');
         const connectedArrows = getConnectedArrows(issueId);
         const linkHandle = bar.querySelector('.link-handle');
+
+        logArrowDebug('dragStart (resize)', {
+          issueId,
+          isLeft,
+          connectedArrowCount: connectedArrows.length,
+          arrows: connectedArrows.map(a => ({
+            from: a.fromId,
+            to: a.toId,
+            isScheduling: a.isScheduling,
+            currentPath: a.linePath ? a.linePath.getAttribute('d')?.substring(0, 60) + '...' : null
+          }))
+        });
         dragState = {
           issueId,
           isLeft,
@@ -461,6 +518,18 @@ export function setupDrag(ctx) {
         const singleLabelsOnLeft = singleBarLabels?.classList.contains('labels-left');
         const connectedArrows = getConnectedArrows(issueId);
         const singleLinkHandle = bar.querySelector('.link-handle');
+
+        logArrowDebug('dragStart (move)', {
+          issueId,
+          isBulkDrag,
+          connectedArrowCount: connectedArrows.length,
+          arrows: connectedArrows.map(a => ({
+            from: a.fromId,
+            to: a.toId,
+            isScheduling: a.isScheduling,
+            currentPath: a.linePath ? a.linePath.getAttribute('d')?.substring(0, 60) + '...' : null
+          }))
+        });
         dragState = {
           issueId: parseInt(issueId),
           isLeft: false,
@@ -996,7 +1065,7 @@ export function setupDrag(ctx) {
                 vscode.postMessage({ command: 'updateDates', issueId: c.issueId, startDate: c.newStartDate, dueDate: c.newDueDate });
               });
             };
-            if (isDraftMode) {
+            if (isDraftModeEnabled && isDraftModeEnabled()) {
               // Draft mode: skip confirmation, changes are queued for review
               confirmBulk();
             } else {
@@ -1055,7 +1124,7 @@ export function setupDrag(ctx) {
               saveState();
               vscode.postMessage({ command: 'updateDates', issueId, startDate: newStartDate, dueDate: newDueDate });
             };
-            if (isDraftMode) {
+            if (isDraftModeEnabled && isDraftModeEnabled()) {
               // Draft mode: skip confirmation, changes are queued for review
               confirmSingle();
             } else {
@@ -1136,22 +1205,44 @@ export function setupDrag(ctx) {
         }
       } else if (action.type === 'bulk') {
         // Undo bulk date changes - revert all to old dates
+        const inDraftMode = isDraftModeEnabled && isDraftModeEnabled();
         action.changes.forEach(c => {
-          vscode.postMessage({
-            command: 'updateDates',
-            issueId: c.issueId,
-            startDate: c.oldStartDate,
-            dueDate: c.oldDueDate
-          });
+          if (inDraftMode) {
+            // In draft mode: remove the draft instead of creating new one
+            vscode.postMessage({
+              command: 'removeDraft',
+              issueId: c.issueId,
+              startDate: c.oldStartDate,
+              dueDate: c.oldDueDate
+            });
+          } else {
+            vscode.postMessage({
+              command: 'updateDates',
+              issueId: c.issueId,
+              startDate: c.oldStartDate,
+              dueDate: c.oldDueDate
+            });
+          }
         });
       } else {
         // Date change action
-        vscode.postMessage({
-          command: 'updateDates',
-          issueId: action.issueId,
-          startDate: action.oldStartDate,
-          dueDate: action.oldDueDate
-        });
+        const inDraftMode = isDraftModeEnabled && isDraftModeEnabled();
+        if (inDraftMode) {
+          // In draft mode: remove the draft instead of creating new one
+          vscode.postMessage({
+            command: 'removeDraft',
+            issueId: action.issueId,
+            startDate: action.oldStartDate,
+            dueDate: action.oldDueDate
+          });
+        } else {
+          vscode.postMessage({
+            command: 'updateDates',
+            issueId: action.issueId,
+            startDate: action.oldStartDate,
+            dueDate: action.oldDueDate
+          });
+        }
       }
     });
 
