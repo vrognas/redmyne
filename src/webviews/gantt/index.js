@@ -438,7 +438,7 @@ function initializeGantt(state) {
       draftBadge.classList.remove('hidden');
       const c = draftQueueCount ?? 0;
       draftBadge.textContent = c;
-      draftBadge.dataset.toolbarTooltip = c === 1 ? '1 change queued - click to review' : c + ' changes queued - click to review';
+      draftBadge.dataset.tooltip = c === 1 ? '1 change queued - click to review' : c + ' changes queued - click to review';
     } else {
       draftBadge.classList.add('hidden');
     }
@@ -678,7 +678,7 @@ function initializeGantt(state) {
             draftBadge.classList.remove('hidden');
             const c = message.queueCount ?? 0;
             draftBadge.textContent = c;
-            draftBadge.dataset.toolbarTooltip = c === 1 ? '1 change queued - click to review' : c + ' changes queued - click to review';
+            draftBadge.dataset.tooltip = c === 1 ? '1 change queued - click to review' : c + ' changes queued - click to review';
           } else {
             draftBadge.classList.add('hidden');
           }
@@ -689,7 +689,7 @@ function initializeGantt(state) {
         if (draftBadge) {
           const c = message.count;
           draftBadge.textContent = c;
-          draftBadge.dataset.toolbarTooltip = c === 1 ? '1 change queued - click to review' : c + ' changes queued - click to review';
+          draftBadge.dataset.tooltip = c === 1 ? '1 change queued - click to review' : c + ' changes queued - click to review';
         }
       } else if (message.command === 'pushUndoAction') {
         // Push relation action to undo stack
