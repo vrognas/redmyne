@@ -19,8 +19,14 @@ export type CreatableRelationType =
   | "precedes"
   | "follows"
   | "copied_to";
+// Extended scheduling types (for advanced dependency rendering)
+export type ExtendedRelationType =
+  | "start_to_start"
+  | "start_to_finish"
+  | "finish_to_start"
+  | "finish_to_finish";
 // All relation types (including inverse types returned by API)
-export type RelationType = CreatableRelationType | "blocked";
+export type RelationType = CreatableRelationType | ExtendedRelationType | "blocked";
 
 export interface GanttRelation {
   id: number;

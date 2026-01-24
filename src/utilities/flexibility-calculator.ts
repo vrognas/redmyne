@@ -44,7 +44,7 @@ export interface FlexibilityScore {
 }
 
 export interface FlexibilityIssue {
-  start_date: string;
+  start_date: string | null;
   due_date: string | null;
   estimated_hours: number | null;
   spent_hours?: number;
@@ -66,8 +66,8 @@ export function calculateFlexibility(
   schedule: WeeklySchedule,
   effectiveSpentHours?: number
 ): FlexibilityScore | null {
-  // Can't calculate without due date or estimate
-  if (!issue.due_date || !issue.estimated_hours) {
+  // Can't calculate without start date, due date or estimate
+  if (!issue.start_date || !issue.due_date || !issue.estimated_hours) {
     return null;
   }
 

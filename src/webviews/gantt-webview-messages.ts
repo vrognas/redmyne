@@ -6,6 +6,7 @@ export type GanttWebviewMessage =
   | { command: "webviewReady" }
   | { command: "openIssue"; issueId: number }
   | { command: "updateDates"; issueId: number; startDate: string | null; dueDate: string | null }
+  | { command: "removeDraft"; issueId: number; startDate?: string | null; dueDate?: string | null }
   | { command: "setZoom"; zoomLevel: GanttZoomLevel }
   | { command: "setLookback"; years?: string }
   | { command: "setViewMode"; viewMode: GanttViewMode }

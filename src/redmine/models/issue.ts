@@ -70,7 +70,7 @@ export interface Issue {
   assigned_to: NamedEntity;
   subject: string;
   description: string;
-  start_date: string;
+  start_date: string | null;
   due_date: string | null;
   done_ratio: number;
   is_private: boolean;

@@ -3486,7 +3486,7 @@ export class GanttPanel {
           const toEnd = rel.type === "finish_to_finish" || rel.type === "start_to_finish";
 
           let x1: number, y1: number, x2: number, y2: number;
-          let path: string;
+          let path = "";
           const r = 4; // corner radius for rounded turns
 
           if (!isScheduling) {
