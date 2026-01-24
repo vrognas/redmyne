@@ -3396,16 +3396,20 @@ export class GanttPanel {
           // Non-temporal relations (relates, duplicates, copied_to): center → center
           const isScheduling = ["blocks", "precedes", "finish_to_start", "start_to_start", "finish_to_finish", "start_to_finish"].includes(rel.type);
 
+          // Arrow anchor points: fromStart/toEnd determine which side of bars to connect
+          // SS = start→start, SF = start→finish, FS = finish→start, FF = finish→finish
+          const fromStart = rel.type === "start_to_start" || rel.type === "start_to_finish";
+          const toEnd = rel.type === "finish_to_finish" || rel.type === "start_to_finish";
+
           let x1: number, y1: number, x2: number, y2: number;
 
           if (isScheduling) {
-            // End of source → start of target
-            x1 = source.endX + 2;
+            x1 = fromStart ? source.startX - 2 : source.endX + 2;
             y1 = source.y;
-            x2 = target.startX - 2;
+            x2 = toEnd ? target.endX + 2 : target.startX - 2;
             y2 = target.y;
           } else {
-            // Center of source → center of target
+            // Center of source → center of target (non-scheduling)
             x1 = (source.startX + source.endX) / 2;
             y1 = source.y;
             x2 = (target.startX + target.endX) / 2;
@@ -3419,60 +3423,68 @@ export class GanttPanel {
 
           let path: string;
           const r = 4; // corner radius for rounded turns
+          // Jog direction depends on which anchor we're leaving from
+          // fromStart: jog LEFT (negative), fromEnd: jog RIGHT (positive)
+          const jogDir = fromStart ? -1 : 1;
+          // Target approach: toStart approaches from left, toEnd approaches from right
+          const approachDir = toEnd ? -1 : 1;
 
           if (sameRow && goingRight) {
             // Same row, target to right: straight horizontal line
             path = `M ${x1} ${y1} H ${x2}`;
+          } else if (sameRow && !goingRight) {
+            // Same row, target to left: route above with rounded corners
+            const routeY = y1 - barHeight;
+            path = `M ${x1} ${y1} V ${routeY + r}` +
+              ` q 0 ${-r} ${jogDir * -r} ${-r}` +
+              ` H ${x2 + approachDir * 12 - approachDir * r}` +
+              ` q ${approachDir * -r} 0 ${approachDir * -r} ${r}` +
+              ` V ${y2} H ${x2}`;
           } else if (!sameRow && nearlyVertical) {
             // Nearly vertical: S-curve - jog out, down to midpoint, back, down, in
             const jogX = 8;
             const midY = (y1 + y2) / 2;
             const goingDown = y2 > y1;
-            path = `M ${x1} ${y1} H ${x1 + jogX - r}` +
-              ` q ${r} 0 ${r} ${goingDown ? r : -r}` +
+            path = `M ${x1} ${y1} H ${x1 + jogDir * jogX - jogDir * r}` +
+              ` q ${jogDir * r} 0 ${jogDir * r} ${goingDown ? r : -r}` +
               ` V ${midY + (goingDown ? -r : r)}` +
-              ` q 0 ${goingDown ? r : -r} ${-r} ${goingDown ? r : -r}` +
-              ` H ${x2 - jogX + r}` +
-              ` q ${-r} 0 ${-r} ${goingDown ? r : -r}` +
+              ` q 0 ${goingDown ? r : -r} ${jogDir * -r} ${goingDown ? r : -r}` +
+              ` H ${x2 + approachDir * jogX - approachDir * r}` +
+              ` q ${approachDir * -r} 0 ${approachDir * -r} ${goingDown ? r : -r}` +
               ` V ${y2 + (goingDown ? -r : r)}` +
-              ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
+              ` q 0 ${goingDown ? r : -r} ${approachDir * r} ${goingDown ? r : -r}` +
               ` H ${x2}`;
           } else if (goingRight) {
             // Different row, target to right: bend near source, then across
-            const bendX = Math.min(x1 + 8, (x1 + x2) / 2);
+            const bendX = fromStart ? Math.max(x1 - 8, (x1 + x2) / 2) : Math.min(x1 + 8, (x1 + x2) / 2);
             const goingDown = y2 > y1;
-            path = `M ${x1} ${y1} H ${bendX - r}` +
-              ` q ${r} 0 ${r} ${goingDown ? r : -r}` +
+            path = `M ${x1} ${y1} H ${bendX - jogDir * r}` +
+              ` q ${jogDir * r} 0 ${jogDir * r} ${goingDown ? r : -r}` +
               ` V ${y2 + (goingDown ? -r : r)}` +
-              ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
+              ` q 0 ${goingDown ? r : -r} ${approachDir * r} ${goingDown ? r : -r}` +
               ` H ${x2}`;
-          } else if (sameRow) {
-            // Same row, target to left: route above with rounded corners
-            const gap = 12;
-            const routeY = y1 - barHeight;
-            path = `M ${x1} ${y1} V ${routeY + r}` +
-              ` q 0 ${-r} ${-r} ${-r}` +
-              ` H ${x2 - gap + r}` +
-              ` q ${-r} 0 ${-r} ${r}` +
-              ` V ${y2} H ${x2}`;
           } else {
-            // Different row, target to left: S-curve like nearly vertical case
+            // Different row, target to left: S-curve
             const jogX = 8;
             const midY = (y1 + y2) / 2;
             const goingDown = y2 > y1;
-            path = `M ${x1} ${y1} H ${x1 + jogX - r}` +
-              ` q ${r} 0 ${r} ${goingDown ? r : -r}` +
+            path = `M ${x1} ${y1} H ${x1 + jogDir * jogX - jogDir * r}` +
+              ` q ${jogDir * r} 0 ${jogDir * r} ${goingDown ? r : -r}` +
               ` V ${midY + (goingDown ? -r : r)}` +
-              ` q 0 ${goingDown ? r : -r} ${-r} ${goingDown ? r : -r}` +
-              ` H ${x2 - jogX + r}` +
-              ` q ${-r} 0 ${-r} ${goingDown ? r : -r}` +
+              ` q 0 ${goingDown ? r : -r} ${jogDir * -r} ${goingDown ? r : -r}` +
+              ` H ${x2 + approachDir * jogX - approachDir * r}` +
+              ` q ${approachDir * -r} 0 ${approachDir * -r} ${goingDown ? r : -r}` +
               ` V ${y2 + (goingDown ? -r : r)}` +
-              ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
+              ` q 0 ${goingDown ? r : -r} ${approachDir * r} ${goingDown ? r : -r}` +
               ` H ${x2}`;
           }
 
-          // Chevron arrowhead (two angled lines, not filled)
-          const arrowHead = `M ${x2 - arrowSize} ${y2 - arrowSize * 0.6} L ${x2} ${y2} L ${x2 - arrowSize} ${y2 + arrowSize * 0.6}`;
+          // Chevron arrowhead - direction depends on approach side
+          // toStart: arrow comes from left, points right (wings at x2-size)
+          // toEnd: arrow comes from right, points left (wings at x2+size)
+          const arrowHead = toEnd
+            ? `M ${x2 + arrowSize} ${y2 - arrowSize * 0.6} L ${x2} ${y2} L ${x2 + arrowSize} ${y2 + arrowSize * 0.6}`
+            : `M ${x2 - arrowSize} ${y2 - arrowSize * 0.6} L ${x2} ${y2} L ${x2 - arrowSize} ${y2 + arrowSize * 0.6}`;
 
           // Debug logging for arrow paths (when perfDebug enabled)
           if (isPerfDebugEnabled()) {

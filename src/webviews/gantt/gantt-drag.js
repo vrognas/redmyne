@@ -190,12 +190,16 @@ export function setupDrag(ctx) {
       }
     }
 
-    function calcArrowPath(x1, y1, x2, y2, isScheduling) {
+    function calcArrowPath(x1, y1, x2, y2, isScheduling, fromStart = false, toEnd = false) {
       const goingRight = x2 > x1;
       const horizontalDist = Math.abs(x2 - x1);
       const nearlyVertical = horizontalDist < 30;
       const sameRow = Math.abs(y1 - y2) < 5;
       const goingDown = y2 > y1;
+
+      // Jog direction depends on which anchor we're leaving from
+      const jogDir = fromStart ? -1 : 1;
+      const approachDir = toEnd ? -1 : 1;
 
       // Determine which path case we're in
       let pathCase;
@@ -209,52 +213,53 @@ export function setupDrag(ctx) {
       if (sameRow && goingRight) {
         // Same row, target to right: straight horizontal line
         path = 'M ' + x1 + ' ' + y1 + ' H ' + x2;
+      } else if (sameRow && !goingRight) {
+        // Same row, target to left: route above with rounded corners
+        const routeY = y1 - barHeight;
+        path = 'M ' + x1 + ' ' + y1 + ' V ' + (routeY + r) +
+          ' q 0 ' + (-r) + ' ' + (jogDir * -r) + ' ' + (-r) +
+          ' H ' + (x2 + approachDir * 12 - approachDir * r) +
+          ' q ' + (approachDir * -r) + ' 0 ' + (approachDir * -r) + ' ' + r +
+          ' V ' + y2 + ' H ' + x2;
       } else if (!sameRow && nearlyVertical) {
         // Nearly vertical: S-curve with rounded corners
         const jogX = 8;
         const midY = (y1 + y2) / 2;
-        path = 'M ' + x1 + ' ' + y1 + ' H ' + (x1 + jogX - r) +
-          ' q ' + r + ' 0 ' + r + ' ' + (goingDown ? r : -r) +
+        path = 'M ' + x1 + ' ' + y1 + ' H ' + (x1 + jogDir * jogX - jogDir * r) +
+          ' q ' + (jogDir * r) + ' 0 ' + (jogDir * r) + ' ' + (goingDown ? r : -r) +
           ' V ' + (midY + (goingDown ? -r : r)) +
-          ' q 0 ' + (goingDown ? r : -r) + ' ' + (-r) + ' ' + (goingDown ? r : -r) +
-          ' H ' + (x2 - jogX + r) +
-          ' q ' + (-r) + ' 0 ' + (-r) + ' ' + (goingDown ? r : -r) +
+          ' q 0 ' + (goingDown ? r : -r) + ' ' + (jogDir * -r) + ' ' + (goingDown ? r : -r) +
+          ' H ' + (x2 + approachDir * jogX - approachDir * r) +
+          ' q ' + (approachDir * -r) + ' 0 ' + (approachDir * -r) + ' ' + (goingDown ? r : -r) +
           ' V ' + (y2 + (goingDown ? -r : r)) +
-          ' q 0 ' + (goingDown ? r : -r) + ' ' + r + ' ' + (goingDown ? r : -r) +
+          ' q 0 ' + (goingDown ? r : -r) + ' ' + (approachDir * r) + ' ' + (goingDown ? r : -r) +
           ' H ' + x2;
       } else if (goingRight) {
         // Different row, target to right: bend near source with rounded corners
-        const bendX = Math.min(x1 + 8, (x1 + x2) / 2);
-        path = 'M ' + x1 + ' ' + y1 + ' H ' + (bendX - r) +
-          ' q ' + r + ' 0 ' + r + ' ' + (goingDown ? r : -r) +
+        const bendX = fromStart ? Math.max(x1 - 8, (x1 + x2) / 2) : Math.min(x1 + 8, (x1 + x2) / 2);
+        path = 'M ' + x1 + ' ' + y1 + ' H ' + (bendX - jogDir * r) +
+          ' q ' + (jogDir * r) + ' 0 ' + (jogDir * r) + ' ' + (goingDown ? r : -r) +
           ' V ' + (y2 + (goingDown ? -r : r)) +
-          ' q 0 ' + (goingDown ? r : -r) + ' ' + r + ' ' + (goingDown ? r : -r) +
+          ' q 0 ' + (goingDown ? r : -r) + ' ' + (approachDir * r) + ' ' + (goingDown ? r : -r) +
           ' H ' + x2;
-      } else if (sameRow) {
-        // Same row, target to left: route above with rounded corners
-        const gap = 12;
-        const routeY = y1 - barHeight;
-        path = 'M ' + x1 + ' ' + y1 + ' V ' + (routeY + r) +
-          ' q 0 ' + (-r) + ' ' + (-r) + ' ' + (-r) +
-          ' H ' + (x2 - gap + r) +
-          ' q ' + (-r) + ' 0 ' + (-r) + ' ' + r +
-          ' V ' + y2 + ' H ' + x2;
       } else {
-        // Different row, target to left: S-curve like nearly vertical case
+        // Different row, target to left: S-curve
         const jogX = 8;
         const midY = (y1 + y2) / 2;
-        path = 'M ' + x1 + ' ' + y1 + ' H ' + (x1 + jogX - r) +
-          ' q ' + r + ' 0 ' + r + ' ' + (goingDown ? r : -r) +
+        path = 'M ' + x1 + ' ' + y1 + ' H ' + (x1 + jogDir * jogX - jogDir * r) +
+          ' q ' + (jogDir * r) + ' 0 ' + (jogDir * r) + ' ' + (goingDown ? r : -r) +
           ' V ' + (midY + (goingDown ? -r : r)) +
-          ' q 0 ' + (goingDown ? r : -r) + ' ' + (-r) + ' ' + (goingDown ? r : -r) +
-          ' H ' + (x2 - jogX + r) +
-          ' q ' + (-r) + ' 0 ' + (-r) + ' ' + (goingDown ? r : -r) +
+          ' q 0 ' + (goingDown ? r : -r) + ' ' + (jogDir * -r) + ' ' + (goingDown ? r : -r) +
+          ' H ' + (x2 + approachDir * jogX - approachDir * r) +
+          ' q ' + (approachDir * -r) + ' 0 ' + (approachDir * -r) + ' ' + (goingDown ? r : -r) +
           ' V ' + (y2 + (goingDown ? -r : r)) +
-          ' q 0 ' + (goingDown ? r : -r) + ' ' + r + ' ' + (goingDown ? r : -r) +
+          ' q 0 ' + (goingDown ? r : -r) + ' ' + (approachDir * r) + ' ' + (goingDown ? r : -r) +
           ' H ' + x2;
       }
-      // Chevron arrowhead (two angled lines, not filled) - matches gantt-panel.ts
-      const arrowHead = 'M ' + (x2 - arrowSize) + ' ' + (y2 - arrowSize * 0.6) + ' L ' + x2 + ' ' + y2 + ' L ' + (x2 - arrowSize) + ' ' + (y2 + arrowSize * 0.6);
+      // Chevron arrowhead - direction depends on approach side
+      const arrowHead = toEnd
+        ? 'M ' + (x2 + arrowSize) + ' ' + (y2 - arrowSize * 0.6) + ' L ' + x2 + ' ' + y2 + ' L ' + (x2 + arrowSize) + ' ' + (y2 + arrowSize * 0.6)
+        : 'M ' + (x2 - arrowSize) + ' ' + (y2 - arrowSize * 0.6) + ' L ' + x2 + ' ' + y2 + ' L ' + (x2 - arrowSize) + ' ' + (y2 + arrowSize * 0.6);
 
       logArrowDebug('calcArrowPath', {
         inputs: { x1, y1, x2, y2, isScheduling },
@@ -282,7 +287,7 @@ export function setupDrag(ctx) {
         if (!fromBar || !toBar) return;
         arrows.push({
           element: arrow,
-          fromId, toId, isScheduling,
+          fromId, toId, isScheduling, relType,
           fromBar, toBar,
           linePath: arrow.querySelector('.arrow-line'),
           hitPath: arrow.querySelector('.arrow-hit-area'),
@@ -305,10 +310,16 @@ export function setupDrag(ctx) {
         const toEndX = a.toId == draggedIssueId ? newEndX : parseFloat(a.toBar.dataset.endX);
         const toY = parseFloat(a.toBar.dataset.centerY);
 
+        // Anchor positions based on relation type
+        const fromStart = a.relType === 'start_to_start' || a.relType === 'start_to_finish';
+        const toEnd = a.relType === 'finish_to_finish' || a.relType === 'start_to_finish';
+
         let x1, y1, x2, y2;
         if (a.isScheduling) {
-          x1 = fromEndX + 2; y1 = fromY;
-          x2 = toStartX - 2; y2 = toY;
+          x1 = fromStart ? fromStartX - 2 : fromEndX + 2;
+          y1 = fromY;
+          x2 = toEnd ? toEndX + 2 : toStartX - 2;
+          y2 = toY;
         } else {
           x1 = (fromStartX + fromEndX) / 2; y1 = fromY;
           x2 = (toStartX + toEndX) / 2; y2 = toY;
@@ -331,7 +342,7 @@ export function setupDrag(ctx) {
           originalPath: originalPath ? originalPath.substring(0, 60) + '...' : null
         });
 
-        const { path, arrowHead } = calcArrowPath(x1, y1, x2, y2, a.isScheduling);
+        const { path, arrowHead } = calcArrowPath(x1, y1, x2, y2, a.isScheduling, fromStart, toEnd);
         if (a.linePath) a.linePath.setAttribute('d', path);
         if (a.hitPath) a.hitPath.setAttribute('d', path);
         if (a.headPath) a.headPath.setAttribute('d', arrowHead);
