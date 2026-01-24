@@ -1307,10 +1307,20 @@ function initializeGantt(state) {
 
     // Dependency arrow right-click delete (delegated)
     if (timelineSvg) {
+      // Hide tooltip early on right-click mousedown (before browser shows it)
+      timelineSvg.addEventListener('mousedown', (e) => {
+        if (e.button !== 2) return; // right-click only
+        const arrow = e.target.closest('.dependency-arrow');
+        if (!arrow) return;
+        const title = arrow.querySelector('title');
+        if (title) title.remove();
+      });
+
       timelineSvg.addEventListener('contextmenu', (e) => {
         const arrow = e.target.closest('.dependency-arrow');
         if (!arrow) return;
         e.preventDefault();
+
         const relationId = parseInt(arrow.dataset.relationId);
         const fromId = arrow.dataset.from;
         const toId = arrow.dataset.to;

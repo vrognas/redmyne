@@ -3516,7 +3516,7 @@ export class GanttPanel {
             <g class="dependency-arrow rel-${rel.type} cursor-pointer" data-relation-id="${rel.id}" data-from="${issue.id}" data-to="${rel.targetId}">
               <title>${escapeAttr(arrowTooltip)}</title>
               <!-- Wide invisible hit area for easier clicking -->
-              <path class="arrow-hit-area" d="${path}" stroke="transparent" stroke-width="16" fill="none"/>
+              <path class="arrow-hit-area" d="${path}" stroke="transparent" stroke-width="24" fill="none"/>
               <path class="arrow-line" d="${path}" stroke-width="2" fill="none" ${dashAttr}/>
               <path class="arrow-head" d="${arrowHead}" fill="none"/>
             </g>
