@@ -199,7 +199,8 @@ export function setupDrag(ctx) {
 
       // Jog direction depends on which anchor we're leaving from
       const jogDir = fromStart ? -1 : 1;
-      const approachDir = toEnd ? -1 : 1;
+      // Target approach direction (unused for nearlyVertical)
+      const approachDir = toEnd ? 1 : -1;
 
       // Determine which path case we're in
       let pathCase;
@@ -222,17 +223,19 @@ export function setupDrag(ctx) {
           ' q ' + (approachDir * -r) + ' 0 ' + (approachDir * -r) + ' ' + r +
           ' V ' + y2 + ' H ' + x2;
       } else if (!sameRow && nearlyVertical) {
-        // Nearly vertical: S-curve with rounded corners
+        // Nearly vertical: S-curve with 90° turns (slightly rounded)
+        // jogDir: which way to jog from source (-1=left, +1=right)
+        // approachDir: which side to approach target from (-1=left, +1=right)
         const jogX = 8;
         const midY = (y1 + y2) / 2;
         path = 'M ' + x1 + ' ' + y1 + ' H ' + (x1 + jogDir * jogX - jogDir * r) +
           ' q ' + (jogDir * r) + ' 0 ' + (jogDir * r) + ' ' + (goingDown ? r : -r) +
           ' V ' + (midY + (goingDown ? -r : r)) +
-          ' q 0 ' + (goingDown ? r : -r) + ' ' + (jogDir * -r) + ' ' + (goingDown ? r : -r) +
+          ' q 0 ' + (goingDown ? r : -r) + ' ' + (-jogDir * r) + ' ' + (goingDown ? r : -r) +
           ' H ' + (x2 + approachDir * jogX - approachDir * r) +
-          ' q ' + (approachDir * -r) + ' 0 ' + (approachDir * -r) + ' ' + (goingDown ? r : -r) +
+          ' q ' + (approachDir * r) + ' 0 ' + (approachDir * r) + ' ' + (goingDown ? r : -r) +
           ' V ' + (y2 + (goingDown ? -r : r)) +
-          ' q 0 ' + (goingDown ? r : -r) + ' ' + (approachDir * r) + ' ' + (goingDown ? r : -r) +
+          ' q 0 ' + (goingDown ? r : -r) + ' ' + (-approachDir * r) + ' ' + (goingDown ? r : -r) +
           ' H ' + x2;
       } else if (goingRight) {
         // Different row, target to right: bend near source with rounded corners
@@ -240,7 +243,7 @@ export function setupDrag(ctx) {
         path = 'M ' + x1 + ' ' + y1 + ' H ' + (bendX - jogDir * r) +
           ' q ' + (jogDir * r) + ' 0 ' + (jogDir * r) + ' ' + (goingDown ? r : -r) +
           ' V ' + (y2 + (goingDown ? -r : r)) +
-          ' q 0 ' + (goingDown ? r : -r) + ' ' + (approachDir * r) + ' ' + (goingDown ? r : -r) +
+          ' q 0 ' + (goingDown ? r : -r) + ' ' + (-approachDir * r) + ' ' + (goingDown ? r : -r) +
           ' H ' + x2;
       } else {
         // Different row, target to left: S-curve
@@ -249,11 +252,11 @@ export function setupDrag(ctx) {
         path = 'M ' + x1 + ' ' + y1 + ' H ' + (x1 + jogDir * jogX - jogDir * r) +
           ' q ' + (jogDir * r) + ' 0 ' + (jogDir * r) + ' ' + (goingDown ? r : -r) +
           ' V ' + (midY + (goingDown ? -r : r)) +
-          ' q 0 ' + (goingDown ? r : -r) + ' ' + (jogDir * -r) + ' ' + (goingDown ? r : -r) +
+          ' q 0 ' + (goingDown ? r : -r) + ' ' + (-jogDir * r) + ' ' + (goingDown ? r : -r) +
           ' H ' + (x2 + approachDir * jogX - approachDir * r) +
-          ' q ' + (approachDir * -r) + ' 0 ' + (approachDir * -r) + ' ' + (goingDown ? r : -r) +
+          ' q ' + (approachDir * r) + ' 0 ' + (approachDir * r) + ' ' + (goingDown ? r : -r) +
           ' V ' + (y2 + (goingDown ? -r : r)) +
-          ' q 0 ' + (goingDown ? r : -r) + ' ' + (approachDir * r) + ' ' + (goingDown ? r : -r) +
+          ' q 0 ' + (goingDown ? r : -r) + ' ' + (-approachDir * r) + ' ' + (goingDown ? r : -r) +
           ' H ' + x2;
       }
       // Chevron arrowhead - direction depends on approach side
