@@ -3447,15 +3447,19 @@ export class GanttPanel {
               ` q ${-r} 0 ${-r} ${r}` +
               ` V ${y2} H ${x2}`;
           } else {
-            // Different row, target to left: route through gap with rounded corners
-            const gap = 12;
+            // Different row, target to left: S-curve like nearly vertical case
+            const jogX = 8;
             const midY = (y1 + y2) / 2;
             const goingDown = y2 > y1;
-            path = `M ${x1} ${y1} V ${midY + (goingDown ? -r : r)}` +
+            path = `M ${x1} ${y1} H ${x1 + jogX - r}` +
+              ` q ${r} 0 ${r} ${goingDown ? r : -r}` +
+              ` V ${midY + (goingDown ? -r : r)}` +
               ` q 0 ${goingDown ? r : -r} ${-r} ${goingDown ? r : -r}` +
-              ` H ${x2 - gap + r}` +
+              ` H ${x2 - jogX + r}` +
               ` q ${-r} 0 ${-r} ${goingDown ? r : -r}` +
-              ` V ${y2} H ${x2}`;
+              ` V ${y2 + (goingDown ? -r : r)}` +
+              ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
+              ` H ${x2}`;
           }
 
           // Chevron arrowhead (two angled lines, not filled)
