@@ -148,6 +148,7 @@ body {
 
 .gantt-actions {
   display: flex;
+  align-items: center;
   gap: 4px;
   flex-shrink: 0;
 }
@@ -367,6 +368,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  align-self: center;
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
