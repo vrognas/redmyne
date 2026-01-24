@@ -4086,8 +4086,8 @@ export class GanttPanel {
             </defs>
             ${zebraStripes}
             ${dateMarkers.body}
-            <g class="dependency-layer${this._showDependencies ? "" : " hidden"}">${dependencyArrows}</g>
             ${bars}
+            <g class="dependency-layer${this._showDependencies ? "" : " hidden"}">${dependencyArrows}</g>
             <g class="milestone-layer">${milestoneMarkers}</g>
             ${dateMarkers.todayMarker}
           </svg>
