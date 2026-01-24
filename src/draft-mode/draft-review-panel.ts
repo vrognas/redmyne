@@ -26,14 +26,15 @@ export class DraftReviewPanel implements vscode.Disposable {
   private disposed = false;
 
   public static createOrShow(queue: DraftQueue, extensionUri: vscode.Uri): DraftReviewPanel {
-    const column = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
-
+    // If panel already exists, just reveal it in place (no column argument = keep current position)
     if (DraftReviewPanel.currentPanel) {
-      DraftReviewPanel.currentPanel.panel.reveal(column);
+      DraftReviewPanel.currentPanel.panel.reveal();
       DraftReviewPanel.currentPanel.update();
       return DraftReviewPanel.currentPanel;
     }
 
+    // For new panels, use active editor column or default to One
+    const column = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
     const panel = vscode.window.createWebviewPanel(
       DraftReviewPanel.viewType,
       "Draft Review",
