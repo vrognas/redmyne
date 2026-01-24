@@ -1429,6 +1429,11 @@ export class GanttPanel {
           this._deleteRelation(message.relationId);
         }
         break;
+      case "updateRelationDelay":
+        if (message.relationId && message.fromId && message.toId && this._server) {
+          this._updateRelationDelay(message.relationId, message.fromId, message.toId);
+        }
+        break;
       case "createRelation":
         if (message.issueId && message.targetIssueId && message.relationType && this._server) {
           this._createRelation(message.issueId, message.targetIssueId, message.relationType as CreatableRelationType, message.delay);
@@ -1759,6 +1764,83 @@ export class GanttPanel {
       vscode.window.showErrorMessage(
         `Failed to delete relation: ${errorToString(error)}`
       );
+    }
+  }
+
+  private async _updateRelationDelay(
+    relationId: number,
+    fromId: string,
+    toId: string
+  ): Promise<void> {
+    if (!this._server) return;
+
+    // Find the relation to get current delay
+    let currentDelay: number | undefined;
+    let relationType: string | undefined;
+    for (const issue of this._issues) {
+      const rel = issue.relations?.find((r) => r.id === relationId);
+      if (rel) {
+        currentDelay = rel.delay;
+        relationType = rel.relation_type;
+        break;
+      }
+    }
+
+    if (!relationType || (relationType !== "precedes" && relationType !== "follows")) {
+      vscode.window.showErrorMessage("Delay only applies to precedes/follows relations");
+      return;
+    }
+
+    // Show quick pick for common delay values
+    const items = [
+      { label: "Same day (delay = -1)", value: -1 },
+      { label: "+1 day (delay = 0)", value: 0 },
+      { label: "+2 days (delay = 1)", value: 1 },
+      { label: "+1 week (delay = 6)", value: 6 },
+      { label: "Custom...", value: "custom" },
+    ];
+
+    const selected = await vscode.window.showQuickPick(
+      items.map(i => ({
+        label: i.label,
+        description: currentDelay === i.value ? "(current)" : undefined,
+        value: i.value,
+      })),
+      { placeHolder: `Current delay: ${currentDelay ?? 0}` }
+    );
+
+    if (!selected) return;
+
+    let newDelay: number;
+    if (selected.value === "custom") {
+      const input = await vscode.window.showInputBox({
+        prompt: "Enter delay in days (-1 = same day, 0 = next day)",
+        value: String(currentDelay ?? 0),
+        validateInput: (v) => isNaN(parseInt(v)) ? "Must be a number" : undefined,
+      });
+      if (!input) return;
+      newDelay = parseInt(input);
+    } else {
+      newDelay = selected.value as number;
+    }
+
+    if (newDelay === currentDelay) return;
+
+    try {
+      // Redmine doesn't support updating delay directly - must delete and recreate
+      await this._server.deleteRelation(relationId);
+      await this._server.createRelation(
+        parseInt(fromId),
+        parseInt(toId),
+        relationType as "precedes" | "follows",
+        newDelay
+      );
+
+      // Refresh data
+      await this._refreshData();
+      showStatusBarMessage(`$(check) Delay updated to ${newDelay}`, 2000);
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to update delay: ${errorToString(error)}`);
     }
   }
 

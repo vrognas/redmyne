@@ -1114,8 +1114,8 @@ function initializeGantt(state) {
       vscode.postMessage({ command: 'openDraftReview' });
     });
 
-    // Show delete confirmation picker
-    function showDeletePicker(x, y, relationId, fromId, toId) {
+    // Show relation context menu
+    function showDeletePicker(x, y, relationId, fromId, toId, relationType) {
       document.querySelector('.relation-picker')?.remove();
 
       const picker = document.createElement('div');
@@ -1123,7 +1123,7 @@ function initializeGantt(state) {
 
       // Clamp position to viewport bounds
       const pickerWidth = 150;
-      const pickerHeight = 100;
+      const pickerHeight = 120;
       const clampedX = Math.min(x, window.innerWidth - pickerWidth - 10);
       const clampedY = Math.min(y, window.innerHeight - pickerHeight - 10);
       picker.style.left = Math.max(10, clampedX) + 'px';
@@ -1136,19 +1136,25 @@ function initializeGantt(state) {
       label.textContent = `#${fromId} → #${toId}`;
       picker.appendChild(label);
 
+      // Update delay option for precedes/follows relations
+      if (relationType === 'precedes' || relationType === 'follows') {
+        const delayBtn = document.createElement('button');
+        delayBtn.textContent = 'Update delay...';
+        delayBtn.addEventListener('click', () => {
+          picker.remove();
+          vscode.postMessage({ command: 'updateRelationDelay', relationId, fromId, toId });
+        });
+        picker.appendChild(delayBtn);
+      }
+
       const deleteBtn = document.createElement('button');
-      deleteBtn.textContent = '🗑️ Delete relation';
+      deleteBtn.textContent = 'Delete relation';
       deleteBtn.addEventListener('click', () => {
         saveState();
         vscode.postMessage({ command: 'deleteRelation', relationId });
         picker.remove();
       });
       picker.appendChild(deleteBtn);
-
-      const cancelBtn = document.createElement('button');
-      cancelBtn.textContent = 'Cancel';
-      cancelBtn.addEventListener('click', () => picker.remove());
-      picker.appendChild(cancelBtn);
 
       document.body.appendChild(picker);
       closeOnOutsideClick(picker);
@@ -1324,7 +1330,10 @@ function initializeGantt(state) {
         const relationId = parseInt(arrow.dataset.relationId);
         const fromId = arrow.dataset.from;
         const toId = arrow.dataset.to;
-        showDeletePicker(e.clientX, e.clientY, relationId, fromId, toId);
+        // Get relation type from class (e.g., rel-precedes -> precedes)
+        const relTypeClass = [...arrow.classList].find(c => c.startsWith('rel-'));
+        const relationType = relTypeClass ? relTypeClass.replace('rel-', '') : null;
+        showDeletePicker(e.clientX, e.clientY, relationId, fromId, toId, relationType);
       });
 
       // Dependency arrow click to select/highlight
