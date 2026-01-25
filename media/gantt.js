@@ -1827,8 +1827,6 @@
         const levels = ["day", "week", "month", "quarter", "year"];
         zoomSelect.value = levels[parseInt(e.key) - 1];
         zoomSelect.dispatchEvent(new Event("change"));
-      } else if (e.key.toLowerCase() === "h") {
-        document.getElementById("menuHeatmap")?.click();
       } else if (e.key.toLowerCase() === "y") {
         document.getElementById("menuCapacity")?.click();
       } else if (e.key.toLowerCase() === "i") {
@@ -1971,7 +1969,6 @@
           <div class="shortcut-section">
             <h4>View</h4>
             <div><kbd>1-5</kbd> Zoom levels</div>
-            <div><kbd>H</kbd> Heatmap</div>
             <div><kbd>D</kbd> Dependencies</div>
             <div><kbd>C</kbd> Critical path</div>
             <div><kbd>T</kbd> Today</div>
@@ -2518,20 +2515,7 @@
     }
     requestAnimationFrame(() => updateUndoRedoButtons());
     window.__ganttHandleExtensionMessage = (message) => {
-      if (message.command === "setHeatmapState") {
-        const heatmapLayer = document.querySelector(".heatmap-layer");
-        const weekendLayer = document.querySelector(".weekend-layer");
-        const menuHeatmap = document.getElementById("menuHeatmap");
-        if (message.enabled) {
-          if (heatmapLayer) heatmapLayer.classList.remove("hidden");
-          if (weekendLayer) weekendLayer.classList.add("hidden");
-          if (menuHeatmap) menuHeatmap.classList.add("active");
-        } else {
-          if (heatmapLayer) heatmapLayer.classList.add("hidden");
-          if (weekendLayer) weekendLayer.classList.remove("hidden");
-          if (menuHeatmap) menuHeatmap.classList.remove("active");
-        }
-      } else if (message.command === "setDependenciesState") {
+      if (message.command === "setDependenciesState") {
         const dependencyLayer = document.querySelector(".dependency-layer");
         const menuDeps = document.getElementById("menuDeps");
         if (message.enabled) {
@@ -2709,11 +2693,6 @@
           vscode.postMessage({ command: "setSort", sortBy: sortField, sortOrder: "asc" });
         }
       });
-    });
-    document.getElementById("menuHeatmap")?.addEventListener("click", () => {
-      if (document.getElementById("menuHeatmap")?.hasAttribute("disabled")) return;
-      saveState();
-      vscode.postMessage({ command: "toggleWorkloadHeatmap" });
     });
     document.getElementById("menuCapacity")?.addEventListener("click", () => {
       if (document.getElementById("menuCapacity")?.hasAttribute("disabled")) return;
