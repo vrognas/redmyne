@@ -2,6 +2,14 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.12.2]
+
+### Changed
+
+- **B hotkey** - now toggles all badges (progress, flexibility, assignee, blocks/blocked)
+- **Removed Heatmap** - redundant with Intensity + Capacity ribbon
+- **Removed Health Filter** - F hotkey removed, health badges still visible on bars
+
 ## [4.12.1]
 
 ### Improved
