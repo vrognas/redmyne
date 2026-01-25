@@ -204,14 +204,50 @@ export function setupDrag(ctx) {
 
       // Determine which path case we're in
       let pathCase;
-      if (sameRow && goingRight) pathCase = 'sameRow-right';
+      if (!isScheduling) pathCase = 'non-scheduling';
+      else if (sameRow && goingRight) pathCase = 'sameRow-right';
       else if (!sameRow && nearlyVertical) pathCase = 'nearlyVertical';
       else if (goingRight) pathCase = 'diffRow-right';
       else if (sameRow) pathCase = 'sameRow-left';
       else pathCase = 'diffRow-left';
 
       let path;
-      if (sameRow && goingRight) {
+      let arrowHead;
+
+      if (!isScheduling) {
+        // Non-scheduling: vertical-first routing (path computed by caller with adjusted y coords)
+        const centersAligned = Math.abs(x1 - x2) < 5;
+        if (sameRow) {
+          // Same row: route above the bars
+          const routeY = y1 - 8;
+          path = 'M ' + x1 + ' ' + y1 + ' V ' + (routeY + r) +
+            ' q 0 ' + (-r) + ' ' + (goingRight ? r : -r) + ' ' + (-r) +
+            ' H ' + (x2 + (goingRight ? -r : r)) +
+            ' q ' + (goingRight ? r : -r) + ' 0 ' + (goingRight ? r : -r) + ' ' + r +
+            ' V ' + y2;
+          // Arrowhead points down
+          arrowHead = 'M ' + (x2 - arrowSize * 0.6) + ' ' + (y2 - arrowSize) + ' L ' + x2 + ' ' + y2 + ' L ' + (x2 + arrowSize * 0.6) + ' ' + (y2 - arrowSize);
+        } else if (centersAligned) {
+          // Centers aligned: straight vertical line
+          path = 'M ' + x1 + ' ' + y1 + ' V ' + y2;
+          // Arrowhead points down or up
+          arrowHead = goingDown
+            ? 'M ' + (x2 - arrowSize * 0.6) + ' ' + (y2 - arrowSize) + ' L ' + x2 + ' ' + y2 + ' L ' + (x2 + arrowSize * 0.6) + ' ' + (y2 - arrowSize)
+            : 'M ' + (x2 - arrowSize * 0.6) + ' ' + (y2 + arrowSize) + ' L ' + x2 + ' ' + y2 + ' L ' + (x2 + arrowSize * 0.6) + ' ' + (y2 + arrowSize);
+        } else {
+          // Different rows: vertical, horizontal at midY, vertical
+          const midY = (y1 + y2) / 2;
+          path = 'M ' + x1 + ' ' + y1 + ' V ' + (midY + (goingDown ? -r : r)) +
+            ' q 0 ' + (goingDown ? r : -r) + ' ' + (goingRight ? r : -r) + ' ' + (goingDown ? r : -r) +
+            ' H ' + (x2 + (goingRight ? -r : r)) +
+            ' q ' + (goingRight ? r : -r) + ' 0 ' + (goingRight ? r : -r) + ' ' + (goingDown ? r : -r) +
+            ' V ' + y2;
+          // Arrowhead points down or up
+          arrowHead = goingDown
+            ? 'M ' + (x2 - arrowSize * 0.6) + ' ' + (y2 - arrowSize) + ' L ' + x2 + ' ' + y2 + ' L ' + (x2 + arrowSize * 0.6) + ' ' + (y2 - arrowSize)
+            : 'M ' + (x2 - arrowSize * 0.6) + ' ' + (y2 + arrowSize) + ' L ' + x2 + ' ' + y2 + ' L ' + (x2 + arrowSize * 0.6) + ' ' + (y2 + arrowSize);
+        }
+      } else if (sameRow && goingRight) {
         // Same row, target to right: straight horizontal line
         path = 'M ' + x1 + ' ' + y1 + ' H ' + x2;
       } else if (sameRow && !goingRight) {
@@ -237,32 +273,52 @@ export function setupDrag(ctx) {
           ' V ' + (y2 + (goingDown ? -r : r)) +
           ' q 0 ' + (goingDown ? r : -r) + ' ' + (-approachDir * r) + ' ' + (goingDown ? r : -r) +
           ' H ' + x2;
-      } else if (goingRight) {
-        // Different row, target to right: bend near source with rounded corners
-        const bendX = fromStart ? Math.max(x1 - 8, (x1 + x2) / 2) : Math.min(x1 + 8, (x1 + x2) / 2);
-        path = 'M ' + x1 + ' ' + y1 + ' H ' + (bendX - jogDir * r) +
+      } else if (goingRight && !fromStart) {
+        // FS/FF with target to right: small jog, vertical to target level, horizontal approach
+        const jogX = 8;
+        // Second curve turns toward target (right), not back toward source
+        path = 'M ' + x1 + ' ' + y1 + ' H ' + (x1 + jogDir * jogX - jogDir * r) +
           ' q ' + (jogDir * r) + ' 0 ' + (jogDir * r) + ' ' + (goingDown ? r : -r) +
+          ' V ' + (y2 + (goingDown ? -r : r)) +
+          ' q 0 ' + (goingDown ? r : -r) + ' ' + r + ' ' + (goingDown ? r : -r) +
+          ' H ' + x2;
+      } else if (goingRight) {
+        // SS/SF with target to right: horizontal at source level, then down, then approach
+        const jogX = 8;
+        path = 'M ' + x1 + ' ' + y1 + ' H ' + (x2 + approachDir * jogX - approachDir * r) +
+          ' q ' + (approachDir * r) + ' 0 ' + (approachDir * r) + ' ' + (goingDown ? r : -r) +
           ' V ' + (y2 + (goingDown ? -r : r)) +
           ' q 0 ' + (goingDown ? r : -r) + ' ' + (-approachDir * r) + ' ' + (goingDown ? r : -r) +
           ' H ' + x2;
+      } else if (fromStart) {
+        // SS/SF going left: horizontal at source level, then down, then approach
+        const jogX = 8;
+        path = 'M ' + x1 + ' ' + y1 + ' H ' + (x2 + approachDir * jogX + r) +
+          ' q ' + (-r) + ' 0 ' + (-r) + ' ' + (goingDown ? r : -r) +
+          ' V ' + (y2 + (goingDown ? -r : r)) +
+          ' q 0 ' + (goingDown ? r : -r) + ' ' + r + ' ' + (goingDown ? r : -r) +
+          ' H ' + x2;
       } else {
-        // Different row, target to left: S-curve
+        // FS/FF going left: S-curve with horizontal between rows
         const jogX = 8;
         const midY = (y1 + y2) / 2;
         path = 'M ' + x1 + ' ' + y1 + ' H ' + (x1 + jogDir * jogX - jogDir * r) +
           ' q ' + (jogDir * r) + ' 0 ' + (jogDir * r) + ' ' + (goingDown ? r : -r) +
           ' V ' + (midY + (goingDown ? -r : r)) +
-          ' q 0 ' + (goingDown ? r : -r) + ' ' + (-jogDir * r) + ' ' + (goingDown ? r : -r) +
-          ' H ' + (x2 + approachDir * jogX - approachDir * r) +
-          ' q ' + (approachDir * r) + ' 0 ' + (approachDir * r) + ' ' + (goingDown ? r : -r) +
+          ' q 0 ' + (goingDown ? r : -r) + ' ' + (-r) + ' ' + (goingDown ? r : -r) +
+          ' H ' + (x2 + approachDir * jogX + r) +
+          ' q ' + (-r) + ' 0 ' + (-r) + ' ' + (goingDown ? r : -r) +
           ' V ' + (y2 + (goingDown ? -r : r)) +
-          ' q 0 ' + (goingDown ? r : -r) + ' ' + (-approachDir * r) + ' ' + (goingDown ? r : -r) +
+          ' q 0 ' + (goingDown ? r : -r) + ' ' + r + ' ' + (goingDown ? r : -r) +
           ' H ' + x2;
       }
       // Chevron arrowhead - direction depends on approach side
-      const arrowHead = toEnd
-        ? 'M ' + (x2 + arrowSize) + ' ' + (y2 - arrowSize * 0.6) + ' L ' + x2 + ' ' + y2 + ' L ' + (x2 + arrowSize) + ' ' + (y2 + arrowSize * 0.6)
-        : 'M ' + (x2 - arrowSize) + ' ' + (y2 - arrowSize * 0.6) + ' L ' + x2 + ' ' + y2 + ' L ' + (x2 - arrowSize) + ' ' + (y2 + arrowSize * 0.6);
+      // Scheduling arrowhead (non-scheduling already computed above)
+      if (isScheduling) {
+        arrowHead = toEnd
+          ? 'M ' + (x2 + arrowSize) + ' ' + (y2 - arrowSize * 0.6) + ' L ' + x2 + ' ' + y2 + ' L ' + (x2 + arrowSize) + ' ' + (y2 + arrowSize * 0.6)
+          : 'M ' + (x2 - arrowSize) + ' ' + (y2 - arrowSize * 0.6) + ' L ' + x2 + ' ' + y2 + ' L ' + (x2 - arrowSize) + ' ' + (y2 + arrowSize * 0.6);
+      }
 
       logArrowDebug('calcArrowPath', {
         inputs: { x1, y1, x2, y2, isScheduling },
@@ -324,8 +380,20 @@ export function setupDrag(ctx) {
           x2 = toEnd ? toEndX + 2 : toStartX - 2;
           y2 = toY;
         } else {
-          x1 = (fromStartX + fromEndX) / 2; y1 = fromY;
-          x2 = (toStartX + toEndX) / 2; y2 = toY;
+          // Non-scheduling: center x, border y
+          x1 = (fromStartX + fromEndX) / 2;
+          x2 = (toStartX + toEndX) / 2;
+          const goingDown = toY > fromY;
+          const sameRowCenter = Math.abs(fromY - toY) < 5;
+          if (sameRowCenter) {
+            // Same row: both use top border
+            y1 = fromY - barHeight / 2;
+            y2 = toY - barHeight / 2;
+          } else {
+            // Different rows: use bottom/top borders based on direction
+            y1 = goingDown ? fromY + barHeight / 2 : fromY - barHeight / 2;
+            y2 = goingDown ? toY - barHeight / 2 : toY + barHeight / 2;
+          }
         }
 
         logArrowDebug('updateArrowPositions', {

@@ -1,10 +1,1954 @@
-"use strict";(()=>{function yt({timelineWidth:E,minimapBarsData:v,minimapHeight:Q,minimapBarHeight:Y,minimapTodayX:fe,ganttScroll:J,minimapSvg:ae,minimapViewport:_,addDocListener:me}){function Ae(){let X=document.querySelector(".gantt-body .gantt-sticky-left"),L=document.querySelector(".gantt-container");X&&L&&L.style.setProperty("--sticky-left-width",X.offsetWidth+"px")}requestAnimationFrame(Ae),ae&&requestAnimationFrame(()=>{let X=Q/(v.length+1);if(v.forEach((L,Z)=>{let f=document.createElementNS("http://www.w3.org/2000/svg","rect");f.setAttribute("class",L.classes),f.setAttribute("x",(L.startPct*E).toString()),f.setAttribute("y",(X*(Z+.5)).toString()),f.setAttribute("width",Math.max(2,(L.endPct-L.startPct)*E).toString()),f.setAttribute("height",Y.toString()),f.setAttribute("rx","1"),f.setAttribute("fill",L.color),ae.insertBefore(f,_)}),fe>0&&fe<E){let L=document.createElementNS("http://www.w3.org/2000/svg","line");L.setAttribute("class","minimap-today"),L.setAttribute("x1",fe.toString()),L.setAttribute("y1","0"),L.setAttribute("x2",fe.toString()),L.setAttribute("y2",Q.toString()),ae.insertBefore(L,_)}});function Ie(){if(!J||!_||!E||!J.scrollWidth||!J.clientWidth)return;let X=Math.max(1,J.scrollWidth-J.clientWidth),L=Math.min(1,J.scrollLeft/X),Z=Math.min(1,J.clientWidth/J.scrollWidth),f=Math.max(20,Z*E),ge=L*(E-f);isNaN(ge)||isNaN(f)||(_.setAttribute("x",ge.toString()),_.setAttribute("width",f.toString()))}let de=!1,W=0;function j(X,L=!1){if(!J||!ae||!_)return;let Z=ae.getBoundingClientRect(),ge=parseFloat(_.getAttribute("width")||"0")/E*Z.width,U=X.clientX-Z.left;L?U-=W:U-=ge/2;let P=Math.max(0,Math.min(1,U/(Z.width-ge))),oe=Math.max(0,J.scrollWidth-J.clientWidth);J.scrollLeft=P*oe}return ae&&_&&(_.addEventListener("mousedown",X=>{X.stopPropagation(),de=!0;let L=ae.getBoundingClientRect(),f=parseFloat(_.getAttribute("x")||"0")/E*L.width;W=X.clientX-L.left-f}),ae.addEventListener("mousedown",X=>{if(X.target===_)return;de=!0;let L=ae.getBoundingClientRect();W=parseFloat(_.getAttribute("width")||"0")/100*L.width/2,j(X,!0)}),me("mousemove",X=>{de&&j(X,!0)}),me("mouseup",()=>{de=!1})),{updateMinimapPosition:Ae,updateMinimapViewport:Ie}}function bt(E){let{vscode:v,menuUndo:Q,menuRedo:Y,addDocListener:fe,closeOnOutsideClick:J,announce:ae,saveState:_,updateUndoRedoButtons:me,undoStack:Ae,redoStack:Ie,selectedIssues:de,clearSelection:W,allIssueBars:j,redmineBaseUrl:X,extendedRelationTypes:L,minDateMs:Z,maxDateMs:f,timelineWidth:ge,dayWidth:U,barHeight:P,ganttScroll:oe,snapToDay:he,focusOnDependencyChain:ye,clearFocus:d,getFocusedIssueId:S,scrollToAndHighlight:b,setAllowScrollChange:C,isDraftModeEnabled:A,isPerfDebugEnabled:l}=E;function h(t,o,n){document.querySelector(".relation-picker")?.remove();let i=de.size>1&&de.has(n),r=i?Array.from(de).map(M=>parseInt(M)):[parseInt(n)],D=document.createElement("div");D.className="relation-picker";let k=160,w=180,F=Math.min(t,window.innerWidth-k-10),I=Math.min(o,window.innerHeight-w-10);D.style.left=Math.max(10,F)+"px",D.style.top=Math.max(10,I)+"px";let T=document.createElement("div");T.style.padding="6px 12px",T.style.fontSize="11px",T.style.opacity="0.7",T.textContent=i?r.length+" issues selected":"#"+n,D.appendChild(T),(i?[{label:"Set % Done...",command:"bulkSetDoneRatio",bulk:!0},{label:"Clear Selection",command:"clearSelection",local:!0}]:[{label:"Update Issue...",command:"openIssue"},{label:"Open in Browser",command:"openInBrowser"},{label:"Show in Issues",command:"showInIssues"},{label:"Log Time",command:"logTime"},{label:"Set % Done",command:"setDoneRatio"},{label:"Toggle Auto-update %",command:"toggleAutoUpdate"},{label:"Toggle Ad-hoc Budget",command:"toggleAdHoc"},{label:"Toggle Precedence",command:"togglePrecedence"},{label:"Set Internal Estimate",command:"setInternalEstimate"},{label:"Copy Link",command:"copyLink",local:!0},{label:"Copy URL",command:"copyUrl"}]).forEach(M=>{let H=document.createElement("button");H.textContent=M.label,H.addEventListener("click",async()=>{if(M.command==="copyLink"){let ie=document.querySelector('.issue-bar[data-issue-id="'+n+'"]')?.dataset?.subject||"Issue #"+n,pe=X+"/issues/"+n,K='<a href="'+pe+'">#'+n+" "+ie+"</a>",Le=pe;try{await navigator.clipboard.write([new ClipboardItem({"text/plain":new Blob([Le],{type:"text/plain"}),"text/html":new Blob([K],{type:"text/html"})})]),v.postMessage({command:"showStatus",message:"Copied #"+n+" link"})}catch{await navigator.clipboard.writeText(Le),v.postMessage({command:"showStatus",message:"Copied #"+n+" URL"})}}else M.local?W():M.bulk?v.postMessage({command:M.command,issueIds:r}):v.postMessage({command:M.command,issueId:parseInt(n)});D.remove()}),D.appendChild(H)}),document.body.appendChild(D),J(D)}function B(t){let o=Z+t/ge*(f-Z);return new Date(o).toISOString().slice(0,10)}function z(t){let o=Z+t/ge*(f-Z)-864e5;return new Date(o).toISOString().slice(0,10)}let ee=document.getElementById("dragDateTooltip"),be=null;function re(t){let o=new Date(t+"T00:00:00"),n=o.toLocaleDateString("en-US",{month:"short"}),i=o.getDate(),r=o.toLocaleDateString("en-US",{weekday:"short"});return n+" "+i+" ("+r+")"}function O(t,o){let n=new Date(t+"T00:00:00"),i=new Date(o+"T00:00:00"),r=n.toLocaleDateString("en-US",{month:"short"}),D=i.toLocaleDateString("en-US",{month:"short"});return r===D?r+" "+n.getDate()+"-"+i.getDate():r+" "+n.getDate()+"-"+D+" "+i.getDate()}function Be(t){ee.textContent=t,ee.style.display="block",be=t}function Me(t){t!==be&&(ee.textContent=t,be=t)}function Pe(t,o){let n=o-28,i=!1;n<40&&(n=o+20,i=!0),ee.style.left=t+"px",ee.style.top=n+"px",ee.classList.toggle("flipped",i)}function qe(){ee.style.display="none",be=null}let G=4,m=4;function Te(t,o){l&&l()&&console.log("[Arrow Debug]",t,o)}function Ke(t,o,n,i,r,D=!1,k=!1){let w=n>t,F=Math.abs(n-t),I=F<30,T=Math.abs(o-i)<5,g=i>o,M=D?-1:1,H=k?1:-1,V;T&&w?V="sameRow-right":!T&&I?V="nearlyVertical":w?V="diffRow-right":T?V="sameRow-left":V="diffRow-left";let ie;if(T&&w)ie="M "+t+" "+o+" H "+n;else if(T&&!w){let K=o-P;ie="M "+t+" "+o+" V "+(K+m)+" q 0 "+-m+" "+M*-m+" "+-m+" H "+(n+H*12-H*m)+" q "+H*-m+" 0 "+H*-m+" "+m+" V "+i+" H "+n}else if(!T&&I){let Le=(o+i)/2;ie="M "+t+" "+o+" H "+(t+M*8-M*m)+" q "+M*m+" 0 "+M*m+" "+(g?m:-m)+" V "+(Le+(g?-m:m))+" q 0 "+(g?m:-m)+" "+-M*m+" "+(g?m:-m)+" H "+(n+H*8-H*m)+" q "+H*m+" 0 "+H*m+" "+(g?m:-m)+" V "+(i+(g?-m:m))+" q 0 "+(g?m:-m)+" "+-H*m+" "+(g?m:-m)+" H "+n}else if(w){let K=D?Math.max(t-8,(t+n)/2):Math.min(t+8,(t+n)/2);ie="M "+t+" "+o+" H "+(K-M*m)+" q "+M*m+" 0 "+M*m+" "+(g?m:-m)+" V "+(i+(g?-m:m))+" q 0 "+(g?m:-m)+" "+-H*m+" "+(g?m:-m)+" H "+n}else{let Le=(o+i)/2;ie="M "+t+" "+o+" H "+(t+M*8-M*m)+" q "+M*m+" 0 "+M*m+" "+(g?m:-m)+" V "+(Le+(g?-m:m))+" q 0 "+(g?m:-m)+" "+-M*m+" "+(g?m:-m)+" H "+(n+H*8-H*m)+" q "+H*m+" 0 "+H*m+" "+(g?m:-m)+" V "+(i+(g?-m:m))+" q 0 "+(g?m:-m)+" "+-H*m+" "+(g?m:-m)+" H "+n}let pe=k?"M "+(n+G)+" "+(i-G*.6)+" L "+n+" "+i+" L "+(n+G)+" "+(i+G*.6):"M "+(n-G)+" "+(i-G*.6)+" L "+n+" "+i+" L "+(n-G)+" "+(i+G*.6);return Te("calcArrowPath",{inputs:{x1:t,y1:o,x2:n,y2:i,isScheduling:r},conditions:{goingRight:w,horizontalDist:F,nearlyVertical:I,sameRow:T,goingDown:g},pathCase:V,path:ie.substring(0,80)+(ie.length>80?"...":"")}),{path:ie,arrowHead:pe}}function $e(t){let o=[],n='.dependency-arrow[data-from="'+t+'"], .dependency-arrow[data-to="'+t+'"]';return document.querySelectorAll(n).forEach(i=>{let r=i.getAttribute("data-from"),D=i.getAttribute("data-to"),w=(i.getAttribute("class")||"").match(/rel-(\w+)/),F=w?w[1]:"relates",I=["blocks","precedes","finish_to_start","start_to_start","finish_to_finish","start_to_finish"].includes(F),T=document.querySelector('.issue-bar[data-issue-id="'+r+'"]'),g=document.querySelector('.issue-bar[data-issue-id="'+D+'"]');!T||!g||o.push({element:i,fromId:r,toId:D,isScheduling:I,relType:F,fromBar:T,toBar:g,linePath:i.querySelector(".arrow-line"),hitPath:i.querySelector(".arrow-hit-area"),headPath:i.querySelector(".arrow-head")})}),o}function He(t,o,n,i){t.forEach(r=>{let D=r.linePath?r.linePath.getAttribute("d"):null,k=r.fromId==o?n:parseFloat(r.fromBar.dataset.startX),w=r.fromId==o?i:parseFloat(r.fromBar.dataset.endX),F=parseFloat(r.fromBar.dataset.centerY),I=r.toId==o?n:parseFloat(r.toBar.dataset.startX),T=r.toId==o?i:parseFloat(r.toBar.dataset.endX),g=parseFloat(r.toBar.dataset.centerY),M=r.relType==="start_to_start"||r.relType==="start_to_finish",H=r.relType==="finish_to_finish"||r.relType==="start_to_finish",V,ie,pe,K;r.isScheduling?(V=M?k-2:w+2,ie=F,pe=H?T+2:I-2,K=g):(V=(k+w)/2,ie=F,pe=(I+T)/2,K=g),Te("updateArrowPositions",{arrow:r.fromId+" -> "+r.toId,isScheduling:r.isScheduling,draggedId:o,barData:{fromStartX:r.fromBar.dataset.startX,fromEndX:r.fromBar.dataset.endX,fromY:r.fromBar.dataset.centerY,toStartX:r.toBar.dataset.startX,toEndX:r.toBar.dataset.endX,toY:r.toBar.dataset.centerY},computed:{fromStartX:k,fromEndX:w,fromY:F,toStartX:I,toEndX:T,toY:g},coords:{x1:V,y1:ie,x2:pe,y2:K},originalPath:D?D.substring(0,60)+"...":null});let{path:Le,arrowHead:le}=Ke(V,ie,pe,K,r.isScheduling,M,H);r.linePath&&r.linePath.setAttribute("d",Le),r.hitPath&&r.hitPath.setAttribute("d",Le),r.headPath&&r.headPath.setAttribute("d",le)})}let xe=document.getElementById("dragConfirmOverlay"),Fe=document.getElementById("dragConfirmMessage"),Xe=document.getElementById("dragConfirmOk"),_e=document.getElementById("dragConfirmCancel"),Se=null;function ze(t,o,n){!xe||!Fe||(Fe.textContent=t,Se={onConfirm:o,onCancel:n},C(!0),xe.style.display="flex",Xe&&Xe.focus())}function Ne(){xe&&(xe.style.display="none"),Se=null}function y(){oe&&q&&(oe.scrollLeft=q.left,oe.scrollTop=q.top),q=null}Xe?.addEventListener("click",()=>{Se?.onConfirm&&Se.onConfirm(),q=null,Ne()}),_e?.addEventListener("click",()=>{Se?.onCancel&&Se.onCancel(),y(),Ne()}),xe?.addEventListener("click",t=>{t.target===xe&&(Se?.onCancel&&Se.onCancel(),y(),Ne())}),fe("keydown",t=>{Se&&(t.key==="Escape"?(t.preventDefault(),Se.onCancel&&Se.onCancel(),y(),Ne()):t.key==="Enter"&&(t.preventDefault(),Se.onConfirm&&Se.onConfirm(),q=null,Ne()))});let c=null,q=null,te=!1;document.querySelectorAll(".drag-handle").forEach(t=>{t.addEventListener("mousedown",o=>{o.preventDefault(),o.stopPropagation(),q={left:oe?.scrollLeft,top:oe?.scrollTop};let n=t.closest(".issue-bar"),i=t.classList.contains("drag-left"),r=parseInt(n.dataset.issueId),D=parseFloat(n.dataset.startX),k=parseFloat(n.dataset.endX),w=n.dataset.startDate||null,F=n.dataset.dueDate||null,I=n.querySelector(".bar-outline"),T=n.querySelector(".bar-main"),g=n.querySelector(".drag-left"),M=n.querySelector(".drag-right");n.classList.add("dragging");let H=n.querySelector(".bar-labels"),V=H?.classList.contains("labels-left"),ie=$e(r),pe=n.querySelector(".link-handle");Te("dragStart (resize)",{issueId:r,isLeft:i,connectedArrowCount:ie.length,arrows:ie.map(le=>({from:le.fromId,to:le.toId,isScheduling:le.isScheduling,currentPath:le.linePath?le.linePath.getAttribute("d")?.substring(0,60)+"...":null}))}),c={issueId:r,isLeft:i,isMove:!1,initialMouseX:o.clientX,startX:D,endX:k,oldStartDate:w,oldDueDate:F,barOutline:I,barMain:T,leftHandle:g,rightHandle:M,bar:n,barLabels:H,labelsOnLeft:V,connectedArrows:ie,linkHandle:pe};let K=i?D:k,Le=i?w:F;Le&&(Be((i?"Start: ":"Due: ")+re(Le)),Pe(o.clientX,o.clientY))})}),document.querySelectorAll(".bar-outline").forEach(t=>{t.addEventListener("mousedown",o=>{if(o.target.classList.contains("drag-handle")||o.ctrlKey||o.metaKey||o.shiftKey)return;o.preventDefault(),o.stopPropagation(),q={left:oe?.scrollLeft,top:oe?.scrollTop};let n=t.closest(".issue-bar");if(!n)return;let i=n.dataset.issueId,r=de.size>1&&de.has(i),k=(r?j.filter(g=>de.has(g.dataset.issueId)):[n]).map(g=>({issueId:g.dataset.issueId,startX:parseFloat(g.dataset.startX),endX:parseFloat(g.dataset.endX),oldStartDate:g.dataset.startDate||null,oldDueDate:g.dataset.dueDate||null,barOutline:g.querySelector(".bar-outline"),barMain:g.querySelector(".bar-main"),leftHandle:g.querySelector(".drag-left"),rightHandle:g.querySelector(".drag-right"),bar:g,barLabels:g.querySelector(".bar-labels"),labelsOnLeft:g.querySelector(".bar-labels")?.classList.contains("labels-left"),connectedArrows:$e(g.dataset.issueId),linkHandle:g.querySelector(".link-handle")}));k.forEach(g=>g.bar.classList.add("dragging"));let w=n.querySelector(".bar-labels"),F=w?.classList.contains("labels-left"),I=$e(i),T=n.querySelector(".link-handle");Te("dragStart (move)",{issueId:i,isBulkDrag:r,connectedArrowCount:I.length,arrows:I.map(g=>({from:g.fromId,to:g.toId,isScheduling:g.isScheduling,currentPath:g.linePath?g.linePath.getAttribute("d")?.substring(0,60)+"...":null}))}),c={issueId:parseInt(i),isLeft:!1,isMove:!0,isBulkDrag:r,bulkBars:k,initialMouseX:o.clientX,startX:parseFloat(n.dataset.startX),endX:parseFloat(n.dataset.endX),oldStartDate:n.dataset.startDate||null,oldDueDate:n.dataset.dueDate||null,barOutline:t,barMain:n.querySelector(".bar-main"),leftHandle:n.querySelector(".drag-left"),rightHandle:n.querySelector(".drag-right"),bar:n,barLabels:w,labelsOnLeft:F,connectedArrows:I,linkHandle:T},!r&&n.dataset.startDate&&n.dataset.dueDate&&(Be(O(n.dataset.startDate,n.dataset.dueDate)),Pe(o.clientX,o.clientY))})});let $=null,ue=null,ke=null;function Ce(){$&&($.fromBar.classList.remove("linking-source"),document.querySelectorAll(".link-target").forEach(t=>t.classList.remove("link-target")),ue&&(ue.remove(),ue=null),$=null,ke=null,document.body.classList.remove("cursor-crosshair"))}function Ue(t,o,n,i,r="end",D="start"){document.querySelector(".relation-picker")?.remove();let k=document.createElement("div");k.className="relation-picker";let w=180,F=200,I=Math.min(t,window.innerWidth-w-10),T=Math.min(o,window.innerHeight-F-10);k.style.left=Math.max(10,I)+"px",k.style.top=Math.max(10,T)+"px";let M={end_start:"finish_to_start",end_end:"finish_to_finish",start_start:"start_to_start",start_end:"start_to_finish"}[`${r}_${D}`]||"finish_to_start",H=[{value:"blocks",label:"\u{1F6AB} Blocks",cssClass:"rel-line-blocks",tooltip:"Target cannot be closed until this issue is closed"},{value:"precedes",label:"\u27A1\uFE0F Precedes",cssClass:"rel-line-scheduling",tooltip:"This issue must complete before target can start"},{value:"relates",label:"\u{1F517} Relates to",cssClass:"rel-line-informational",tooltip:"Simple link between issues (no constraints)"},{value:"duplicates",label:"\u{1F4CB} Duplicates",cssClass:"rel-line-informational",tooltip:"Closing target will automatically close this issue"},{value:"copied_to",label:"\u{1F4C4} Copied to",cssClass:"rel-line-informational",tooltip:"This issue was copied to create the target issue"}],V=[{value:"finish_to_start",label:"\u23E9 Finish\u2192Start",cssClass:"rel-line-scheduling",tooltip:"Target starts after this issue finishes (FS)"},{value:"start_to_start",label:"\u25B6\uFE0F Start\u2192Start",cssClass:"rel-line-scheduling",tooltip:"Target starts when this issue starts (SS)"},{value:"finish_to_finish",label:"\u23F9\uFE0F Finish\u2192Finish",cssClass:"rel-line-scheduling",tooltip:"Target finishes when this issue finishes (FF)"},{value:"start_to_finish",label:"\u23EA Start\u2192Finish",cssClass:"rel-line-scheduling",tooltip:"Target finishes when this issue starts (SF)"}],ie=L?[...H,...V]:H,pe=-1,K=document.createElement("div");K.className="delay-row";let Le=document.createElement("label");Le.textContent="Delay:",K.appendChild(Le);let le=document.createElement("button");le.className="delay-preset active",le.dataset.delay="-1",le.title="Start same day predecessor ends",le.textContent="Same day",K.appendChild(le);let Ee=document.createElement("button");Ee.className="delay-preset",Ee.dataset.delay="0",Ee.title="Start day after predecessor ends",Ee.textContent="+1 day",K.appendChild(Ee);let R=document.createElement("input");R.type="number",R.className="delay-input",R.value=pe,R.min="-30",R.max="30",R.title="Custom delay in days (-1=same day, 0=next day, 3=+4 days)",K.appendChild(R),K.style.display="none",K.querySelectorAll(".delay-preset").forEach(x=>{x.addEventListener("click",N=>{N.stopPropagation(),pe=parseInt(x.dataset.delay),R.value=pe,K.querySelectorAll(".delay-preset").forEach(We=>We.classList.remove("active")),x.classList.add("active")})}),R.addEventListener("input",()=>{pe=parseInt(R.value)||0,K.querySelectorAll(".delay-preset").forEach(x=>{x.classList.toggle("active",parseInt(x.dataset.delay)===pe)})}),R.addEventListener("click",x=>x.stopPropagation()),ie.forEach(x=>{let N=document.createElement("button");x.value===M&&N.classList.add("suggested");let We=document.createElement("span");We.className="color-swatch "+x.cssClass,N.appendChild(We),N.appendChild(document.createTextNode(x.label)),N.title=x.tooltip+(x.value===M?" (suggested based on anchors)":""),x.value==="precedes"&&(N.addEventListener("mouseenter",()=>{K.style.display="flex"}),N.addEventListener("focus",()=>{K.style.display="flex"})),N.addEventListener("click",()=>{_();let Oe={command:"createRelation",issueId:n,targetIssueId:i,relationType:x.value};x.value==="precedes"&&(Oe.delay=pe),v.postMessage(Oe),k.remove()}),k.appendChild(N)}),k.appendChild(K),document.body.appendChild(k),J(k)}let Re=".drag-handle, .link-handle, .bar-outline, .blocks-badge-group, .blocker-badge, .progress-badge-group, .flex-badge-group";document.querySelectorAll(".issue-bar").forEach(t=>{t.addEventListener("click",o=>{o.target.closest(Re)||c||$||te||(S()&&d(),b(t.dataset.issueId))}),t.addEventListener("dblclick",o=>{c||$||te||(o.preventDefault(),ye(t.dataset.issueId))})});function st(t,o){if(document.querySelectorAll(".dependency-arrow.selected").forEach(i=>i.classList.remove("selected")),document.querySelectorAll(".arrow-connected").forEach(i=>i.classList.remove("arrow-connected")),t.length===0)return;document.body.classList.add("arrow-selection-mode");let n=new Set;t.forEach(i=>{i.classList.add("selected"),n.add(i.dataset.from),n.add(i.dataset.to)}),n.forEach(i=>{document.querySelectorAll(`.issue-bar[data-issue-id="${i}"], .issue-label[data-issue-id="${i}"]`).forEach(r=>r.classList.add("arrow-connected"))}),ae(`Highlighted ${t.length} dependency arrow(s) for #${o}`)}document.querySelectorAll(".blocks-badge-group").forEach(t=>{t.addEventListener("mousedown",o=>{o.preventDefault(),o.stopPropagation()}),t.addEventListener("click",o=>{o.preventDefault(),o.stopPropagation();let n=t.closest(".issue-bar");if(!n)return;let i=n.dataset.issueId,r=Array.from(document.querySelectorAll(`.dependency-arrow[data-from="${i}"]`));st(r,i)})}),document.querySelectorAll(".blocker-badge").forEach(t=>{t.addEventListener("mousedown",o=>{o.preventDefault(),o.stopPropagation()}),t.addEventListener("click",o=>{o.preventDefault(),o.stopPropagation();let n=t.closest(".issue-bar");if(!n)return;let i=n.dataset.issueId,r=Array.from(document.querySelectorAll(`.dependency-arrow[data-to="${i}"]`));st(r,i)})});let ve=Array.from(document.querySelectorAll(".issue-bar")),nt=10;ve.forEach((t,o)=>{t.addEventListener("keydown",n=>{if(n.key==="Enter"||n.key===" ")n.preventDefault(),b(t.dataset.issueId);else if(n.key==="ArrowDown"&&o<ve.length-1)n.preventDefault(),ve[o+1].focus(),ae(`Issue ${ve[o+1].getAttribute("aria-label")}`);else if(n.key==="ArrowUp"&&o>0)n.preventDefault(),ve[o-1].focus(),ae(`Issue ${ve[o-1].getAttribute("aria-label")}`);else if(n.key==="Home")n.preventDefault(),ve[0].focus(),ae(`First issue: ${ve[0].getAttribute("aria-label")}`);else if(n.key==="End")n.preventDefault(),ve[ve.length-1].focus(),ae(`Last issue: ${ve[ve.length-1].getAttribute("aria-label")}`);else if(n.key==="PageDown"){n.preventDefault();let i=Math.min(o+nt,ve.length-1);ve[i].focus(),ae(`Issue ${ve[i].getAttribute("aria-label")}`)}else if(n.key==="PageUp"){n.preventDefault();let i=Math.max(o-nt,0);ve[i].focus(),ae(`Issue ${ve[i].getAttribute("aria-label")}`)}else if(n.key==="Tab"&&n.shiftKey){let i=t.dataset.issueId,r=document.querySelector(`.issue-label[data-issue-id="${i}"]`);r&&(n.preventDefault(),r.focus(),ae(`Label for issue #${i}`))}})}),document.querySelectorAll(".link-handle").forEach(t=>{t.addEventListener("mousedown",o=>{o.stopPropagation(),o.preventDefault();let n=t.closest(".issue-bar"),i=parseInt(n.dataset.issueId),r=parseFloat(t.dataset.cx),D=parseFloat(t.dataset.cy);n.classList.add("linking-source"),document.body.classList.add("cursor-crosshair");let k=document.querySelector("#ganttTimeline svg");if(!document.getElementById("temp-arrow-head")){let F=document.createElementNS("http://www.w3.org/2000/svg","defs");F.innerHTML=`
+"use strict";
+(() => {
+  // src/webviews/gantt/gantt-minimap.js
+  function setupMinimap({
+    timelineWidth,
+    minimapBarsData,
+    minimapHeight,
+    minimapBarHeight,
+    minimapTodayX,
+    ganttScroll,
+    minimapSvg,
+    minimapViewport,
+    addDocListener
+  }) {
+    function updateMinimapPosition() {
+      const stickyLeft = document.querySelector(".gantt-body .gantt-sticky-left");
+      const ganttContainer = document.querySelector(".gantt-container");
+      if (stickyLeft && ganttContainer) {
+        ganttContainer.style.setProperty("--sticky-left-width", stickyLeft.offsetWidth + "px");
+      }
+    }
+    requestAnimationFrame(updateMinimapPosition);
+    if (minimapSvg) {
+      requestAnimationFrame(() => {
+        const barSpacing = minimapHeight / (minimapBarsData.length + 1);
+        minimapBarsData.forEach((bar, i) => {
+          const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          rect.setAttribute("class", bar.classes);
+          rect.setAttribute("x", (bar.startPct * timelineWidth).toString());
+          rect.setAttribute("y", (barSpacing * (i + 0.5)).toString());
+          rect.setAttribute("width", Math.max(2, (bar.endPct - bar.startPct) * timelineWidth).toString());
+          rect.setAttribute("height", minimapBarHeight.toString());
+          rect.setAttribute("rx", "1");
+          rect.setAttribute("fill", bar.color);
+          minimapSvg.insertBefore(rect, minimapViewport);
+        });
+        if (minimapTodayX > 0 && minimapTodayX < timelineWidth) {
+          const todayLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+          todayLine.setAttribute("class", "minimap-today");
+          todayLine.setAttribute("x1", minimapTodayX.toString());
+          todayLine.setAttribute("y1", "0");
+          todayLine.setAttribute("x2", minimapTodayX.toString());
+          todayLine.setAttribute("y2", minimapHeight.toString());
+          minimapSvg.insertBefore(todayLine, minimapViewport);
+        }
+      });
+    }
+    function updateMinimapViewport() {
+      if (!ganttScroll || !minimapViewport) return;
+      if (!timelineWidth || !ganttScroll.scrollWidth || !ganttScroll.clientWidth) return;
+      const scrollableRange = Math.max(1, ganttScroll.scrollWidth - ganttScroll.clientWidth);
+      const scrollRatio = Math.min(1, ganttScroll.scrollLeft / scrollableRange);
+      const viewportRatio = Math.min(1, ganttScroll.clientWidth / ganttScroll.scrollWidth);
+      const viewportWidth = Math.max(20, viewportRatio * timelineWidth);
+      const viewportX = scrollRatio * (timelineWidth - viewportWidth);
+      if (isNaN(viewportX) || isNaN(viewportWidth)) return;
+      minimapViewport.setAttribute("x", viewportX.toString());
+      minimapViewport.setAttribute("width", viewportWidth.toString());
+    }
+    let minimapDragging = false;
+    let minimapDragOffset = 0;
+    function scrollFromMinimap(e, useOffset = false) {
+      if (!ganttScroll || !minimapSvg || !minimapViewport) return;
+      const rect = minimapSvg.getBoundingClientRect();
+      const viewportWidth = parseFloat(minimapViewport.getAttribute("width") || "0");
+      const viewportWidthPx = viewportWidth / timelineWidth * rect.width;
+      let targetX = e.clientX - rect.left;
+      if (useOffset) {
+        targetX -= minimapDragOffset;
+      } else {
+        targetX -= viewportWidthPx / 2;
+      }
+      const clickRatio = Math.max(0, Math.min(1, targetX / (rect.width - viewportWidthPx)));
+      const scrollableRange = Math.max(0, ganttScroll.scrollWidth - ganttScroll.clientWidth);
+      ganttScroll.scrollLeft = clickRatio * scrollableRange;
+    }
+    if (minimapSvg && minimapViewport) {
+      minimapViewport.addEventListener("mousedown", (e) => {
+        e.stopPropagation();
+        minimapDragging = true;
+        const rect = minimapSvg.getBoundingClientRect();
+        const viewportX = parseFloat(minimapViewport.getAttribute("x") || "0");
+        const viewportXPx = viewportX / timelineWidth * rect.width;
+        minimapDragOffset = e.clientX - rect.left - viewportXPx;
+      });
+      minimapSvg.addEventListener("mousedown", (e) => {
+        if (e.target === minimapViewport) return;
+        minimapDragging = true;
+        const rect = minimapSvg.getBoundingClientRect();
+        const viewportWidth = parseFloat(minimapViewport.getAttribute("width") || "0");
+        minimapDragOffset = viewportWidth / 100 * rect.width / 2;
+        scrollFromMinimap(e, true);
+      });
+      addDocListener("mousemove", (e) => {
+        if (minimapDragging) scrollFromMinimap(e, true);
+      });
+      addDocListener("mouseup", () => {
+        minimapDragging = false;
+      });
+    }
+    return { updateMinimapPosition, updateMinimapViewport };
+  }
+
+  // src/webviews/gantt/gantt-drag.js
+  function setupDrag(ctx) {
+    const {
+      vscode: vscode2,
+      menuUndo,
+      menuRedo,
+      addDocListener,
+      closeOnOutsideClick,
+      announce,
+      saveState,
+      updateUndoRedoButtons,
+      undoStack,
+      redoStack,
+      selectedIssues,
+      clearSelection,
+      allIssueBars,
+      redmineBaseUrl,
+      extendedRelationTypes,
+      minDateMs,
+      maxDateMs,
+      timelineWidth,
+      dayWidth,
+      barHeight,
+      ganttScroll,
+      snapToDay,
+      focusOnDependencyChain,
+      clearFocus,
+      getFocusedIssueId,
+      scrollToAndHighlight,
+      setAllowScrollChange,
+      isDraftModeEnabled,
+      isPerfDebugEnabled
+    } = ctx;
+    function showIssueContextMenu(x, y, issueId) {
+      document.querySelector(".relation-picker")?.remove();
+      const isBulkMode = selectedIssues.size > 1 && selectedIssues.has(issueId);
+      const targetIds = isBulkMode ? Array.from(selectedIssues).map((id) => parseInt(id)) : [parseInt(issueId)];
+      const picker = document.createElement("div");
+      picker.className = "relation-picker";
+      const pickerWidth = 160;
+      const pickerHeight = 180;
+      const clampedX = Math.min(x, window.innerWidth - pickerWidth - 10);
+      const clampedY = Math.min(y, window.innerHeight - pickerHeight - 10);
+      picker.style.left = Math.max(10, clampedX) + "px";
+      picker.style.top = Math.max(10, clampedY) + "px";
+      const label = document.createElement("div");
+      label.style.padding = "6px 12px";
+      label.style.fontSize = "11px";
+      label.style.opacity = "0.7";
+      label.textContent = isBulkMode ? targetIds.length + " issues selected" : "#" + issueId;
+      picker.appendChild(label);
+      const options = isBulkMode ? [
+        { label: "Set % Done...", command: "bulkSetDoneRatio", bulk: true },
+        { label: "Clear Selection", command: "clearSelection", local: true }
+      ] : [
+        { label: "Update Issue...", command: "openIssue" },
+        { label: "Open in Browser", command: "openInBrowser" },
+        { label: "Show in Issues", command: "showInIssues" },
+        { label: "Log Time", command: "logTime" },
+        { label: "Set % Done", command: "setDoneRatio" },
+        { label: "Toggle Auto-update %", command: "toggleAutoUpdate" },
+        { label: "Toggle Ad-hoc Budget", command: "toggleAdHoc" },
+        { label: "Toggle Precedence", command: "togglePrecedence" },
+        { label: "Set Internal Estimate", command: "setInternalEstimate" },
+        { label: "Copy Link", command: "copyLink", local: true },
+        { label: "Copy URL", command: "copyUrl" }
+      ];
+      options.forEach((opt) => {
+        const btn = document.createElement("button");
+        btn.textContent = opt.label;
+        btn.addEventListener("click", async () => {
+          if (opt.command === "copyLink") {
+            const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
+            const subject = bar?.dataset?.subject || "Issue #" + issueId;
+            const url = redmineBaseUrl + "/issues/" + issueId;
+            const html = '<a href="' + url + '">#' + issueId + " " + subject + "</a>";
+            const plain = url;
+            try {
+              await navigator.clipboard.write([
+                new ClipboardItem({
+                  "text/plain": new Blob([plain], { type: "text/plain" }),
+                  "text/html": new Blob([html], { type: "text/html" })
+                })
+              ]);
+              vscode2.postMessage({ command: "showStatus", message: "Copied #" + issueId + " link" });
+            } catch (e) {
+              await navigator.clipboard.writeText(plain);
+              vscode2.postMessage({ command: "showStatus", message: "Copied #" + issueId + " URL" });
+            }
+          } else if (opt.local) {
+            clearSelection();
+          } else if (opt.bulk) {
+            vscode2.postMessage({ command: opt.command, issueIds: targetIds });
+          } else {
+            vscode2.postMessage({ command: opt.command, issueId: parseInt(issueId) });
+          }
+          picker.remove();
+        });
+        picker.appendChild(btn);
+      });
+      document.body.appendChild(picker);
+      closeOnOutsideClick(picker);
+    }
+    function xToDate(x) {
+      const ms = minDateMs + x / timelineWidth * (maxDateMs - minDateMs);
+      const d = new Date(ms);
+      return d.toISOString().slice(0, 10);
+    }
+    function xToDueDate(x) {
+      const ms = minDateMs + x / timelineWidth * (maxDateMs - minDateMs) - 864e5;
+      const d = new Date(ms);
+      return d.toISOString().slice(0, 10);
+    }
+    const dragTooltip = document.getElementById("dragDateTooltip");
+    let lastTooltipDate = null;
+    function formatDateShort(dateStr) {
+      const d = /* @__PURE__ */ new Date(dateStr + "T00:00:00");
+      const month = d.toLocaleDateString("en-US", { month: "short" });
+      const day = d.getDate();
+      const weekday = d.toLocaleDateString("en-US", { weekday: "short" });
+      return month + " " + day + " (" + weekday + ")";
+    }
+    function formatDateRange(startStr, endStr) {
+      const sd = /* @__PURE__ */ new Date(startStr + "T00:00:00"), ed = /* @__PURE__ */ new Date(endStr + "T00:00:00");
+      const sm = sd.toLocaleDateString("en-US", { month: "short" });
+      const em = ed.toLocaleDateString("en-US", { month: "short" });
+      return sm === em ? sm + " " + sd.getDate() + "-" + ed.getDate() : sm + " " + sd.getDate() + "-" + em + " " + ed.getDate();
+    }
+    function showDragTooltip(text) {
+      dragTooltip.textContent = text;
+      dragTooltip.style.display = "block";
+      lastTooltipDate = text;
+    }
+    function updateDragTooltip(text) {
+      if (text === lastTooltipDate) return;
+      dragTooltip.textContent = text;
+      lastTooltipDate = text;
+    }
+    function positionDragTooltip(clientX, clientY) {
+      let top = clientY - 28;
+      let flipped = false;
+      if (top < 40) {
+        top = clientY + 20;
+        flipped = true;
+      }
+      dragTooltip.style.left = clientX + "px";
+      dragTooltip.style.top = top + "px";
+      dragTooltip.classList.toggle("flipped", flipped);
+    }
+    function hideDragTooltip() {
+      dragTooltip.style.display = "none";
+      lastTooltipDate = null;
+    }
+    const arrowSize = 4;
+    const r = 4;
+    function logArrowDebug(label, data) {
+      if (isPerfDebugEnabled && isPerfDebugEnabled()) {
+        console.log("[Arrow Debug]", label, data);
+      }
+    }
+    function calcArrowPath(x1, y1, x2, y2, isScheduling, fromStart = false, toEnd = false) {
+      const goingRight = x2 > x1;
+      const horizontalDist = Math.abs(x2 - x1);
+      const nearlyVertical = horizontalDist < 30;
+      const sameRow = Math.abs(y1 - y2) < 5;
+      const goingDown = y2 > y1;
+      const jogDir = fromStart ? -1 : 1;
+      const approachDir = toEnd ? 1 : -1;
+      let pathCase;
+      if (!isScheduling) pathCase = "non-scheduling";
+      else if (sameRow && goingRight) pathCase = "sameRow-right";
+      else if (!sameRow && nearlyVertical) pathCase = "nearlyVertical";
+      else if (goingRight) pathCase = "diffRow-right";
+      else if (sameRow) pathCase = "sameRow-left";
+      else pathCase = "diffRow-left";
+      let path;
+      let arrowHead;
+      if (!isScheduling) {
+        const centersAligned = Math.abs(x1 - x2) < 5;
+        if (sameRow) {
+          const routeY = y1 - 8;
+          path = "M " + x1 + " " + y1 + " V " + (routeY + r) + " q 0 " + -r + " " + (goingRight ? r : -r) + " " + -r + " H " + (x2 + (goingRight ? -r : r)) + " q " + (goingRight ? r : -r) + " 0 " + (goingRight ? r : -r) + " " + r + " V " + y2;
+          arrowHead = "M " + (x2 - arrowSize * 0.6) + " " + (y2 - arrowSize) + " L " + x2 + " " + y2 + " L " + (x2 + arrowSize * 0.6) + " " + (y2 - arrowSize);
+        } else if (centersAligned) {
+          path = "M " + x1 + " " + y1 + " V " + y2;
+          arrowHead = goingDown ? "M " + (x2 - arrowSize * 0.6) + " " + (y2 - arrowSize) + " L " + x2 + " " + y2 + " L " + (x2 + arrowSize * 0.6) + " " + (y2 - arrowSize) : "M " + (x2 - arrowSize * 0.6) + " " + (y2 + arrowSize) + " L " + x2 + " " + y2 + " L " + (x2 + arrowSize * 0.6) + " " + (y2 + arrowSize);
+        } else {
+          const midY = (y1 + y2) / 2;
+          path = "M " + x1 + " " + y1 + " V " + (midY + (goingDown ? -r : r)) + " q 0 " + (goingDown ? r : -r) + " " + (goingRight ? r : -r) + " " + (goingDown ? r : -r) + " H " + (x2 + (goingRight ? -r : r)) + " q " + (goingRight ? r : -r) + " 0 " + (goingRight ? r : -r) + " " + (goingDown ? r : -r) + " V " + y2;
+          arrowHead = goingDown ? "M " + (x2 - arrowSize * 0.6) + " " + (y2 - arrowSize) + " L " + x2 + " " + y2 + " L " + (x2 + arrowSize * 0.6) + " " + (y2 - arrowSize) : "M " + (x2 - arrowSize * 0.6) + " " + (y2 + arrowSize) + " L " + x2 + " " + y2 + " L " + (x2 + arrowSize * 0.6) + " " + (y2 + arrowSize);
+        }
+      } else if (sameRow && goingRight) {
+        path = "M " + x1 + " " + y1 + " H " + x2;
+      } else if (sameRow && !goingRight) {
+        const routeY = y1 - barHeight;
+        path = "M " + x1 + " " + y1 + " V " + (routeY + r) + " q 0 " + -r + " " + jogDir * -r + " " + -r + " H " + (x2 + approachDir * 12 - approachDir * r) + " q " + approachDir * -r + " 0 " + approachDir * -r + " " + r + " V " + y2 + " H " + x2;
+      } else if (!sameRow && nearlyVertical) {
+        const jogX = 8;
+        const midY = (y1 + y2) / 2;
+        path = "M " + x1 + " " + y1 + " H " + (x1 + jogDir * jogX - jogDir * r) + " q " + jogDir * r + " 0 " + jogDir * r + " " + (goingDown ? r : -r) + " V " + (midY + (goingDown ? -r : r)) + " q 0 " + (goingDown ? r : -r) + " " + -jogDir * r + " " + (goingDown ? r : -r) + " H " + (x2 + approachDir * jogX - approachDir * r) + " q " + approachDir * r + " 0 " + approachDir * r + " " + (goingDown ? r : -r) + " V " + (y2 + (goingDown ? -r : r)) + " q 0 " + (goingDown ? r : -r) + " " + -approachDir * r + " " + (goingDown ? r : -r) + " H " + x2;
+      } else if (goingRight && !fromStart) {
+        const jogX = 8;
+        path = "M " + x1 + " " + y1 + " H " + (x1 + jogDir * jogX - jogDir * r) + " q " + jogDir * r + " 0 " + jogDir * r + " " + (goingDown ? r : -r) + " V " + (y2 + (goingDown ? -r : r)) + " q 0 " + (goingDown ? r : -r) + " " + r + " " + (goingDown ? r : -r) + " H " + x2;
+      } else if (goingRight) {
+        const jogX = 8;
+        path = "M " + x1 + " " + y1 + " H " + (x2 + approachDir * jogX - approachDir * r) + " q " + approachDir * r + " 0 " + approachDir * r + " " + (goingDown ? r : -r) + " V " + (y2 + (goingDown ? -r : r)) + " q 0 " + (goingDown ? r : -r) + " " + -approachDir * r + " " + (goingDown ? r : -r) + " H " + x2;
+      } else if (fromStart) {
+        const jogX = 8;
+        path = "M " + x1 + " " + y1 + " H " + (x2 + approachDir * jogX + r) + " q " + -r + " 0 " + -r + " " + (goingDown ? r : -r) + " V " + (y2 + (goingDown ? -r : r)) + " q 0 " + (goingDown ? r : -r) + " " + r + " " + (goingDown ? r : -r) + " H " + x2;
+      } else {
+        const jogX = 8;
+        const midY = (y1 + y2) / 2;
+        path = "M " + x1 + " " + y1 + " H " + (x1 + jogDir * jogX - jogDir * r) + " q " + jogDir * r + " 0 " + jogDir * r + " " + (goingDown ? r : -r) + " V " + (midY + (goingDown ? -r : r)) + " q 0 " + (goingDown ? r : -r) + " " + -r + " " + (goingDown ? r : -r) + " H " + (x2 + approachDir * jogX + r) + " q " + -r + " 0 " + -r + " " + (goingDown ? r : -r) + " V " + (y2 + (goingDown ? -r : r)) + " q 0 " + (goingDown ? r : -r) + " " + r + " " + (goingDown ? r : -r) + " H " + x2;
+      }
+      if (isScheduling) {
+        arrowHead = toEnd ? "M " + (x2 + arrowSize) + " " + (y2 - arrowSize * 0.6) + " L " + x2 + " " + y2 + " L " + (x2 + arrowSize) + " " + (y2 + arrowSize * 0.6) : "M " + (x2 - arrowSize) + " " + (y2 - arrowSize * 0.6) + " L " + x2 + " " + y2 + " L " + (x2 - arrowSize) + " " + (y2 + arrowSize * 0.6);
+      }
+      logArrowDebug("calcArrowPath", {
+        inputs: { x1, y1, x2, y2, isScheduling },
+        conditions: { goingRight, horizontalDist, nearlyVertical, sameRow, goingDown },
+        pathCase,
+        path: path.substring(0, 80) + (path.length > 80 ? "..." : "")
+      });
+      return { path, arrowHead };
+    }
+    function getConnectedArrows(issueId) {
+      const arrows = [];
+      const selector = '.dependency-arrow[data-from="' + issueId + '"], .dependency-arrow[data-to="' + issueId + '"]';
+      document.querySelectorAll(selector).forEach((arrow) => {
+        const fromId = arrow.getAttribute("data-from");
+        const toId = arrow.getAttribute("data-to");
+        const classList = arrow.getAttribute("class") || "";
+        const relMatch = classList.match(/rel-(\w+)/);
+        const relType = relMatch ? relMatch[1] : "relates";
+        const isScheduling = ["blocks", "precedes", "finish_to_start", "start_to_start", "finish_to_finish", "start_to_finish"].includes(relType);
+        const fromBar = document.querySelector('.issue-bar[data-issue-id="' + fromId + '"]');
+        const toBar = document.querySelector('.issue-bar[data-issue-id="' + toId + '"]');
+        if (!fromBar || !toBar) return;
+        arrows.push({
+          element: arrow,
+          fromId,
+          toId,
+          isScheduling,
+          relType,
+          fromBar,
+          toBar,
+          linePath: arrow.querySelector(".arrow-line"),
+          hitPath: arrow.querySelector(".arrow-hit-area"),
+          headPath: arrow.querySelector(".arrow-head")
+        });
+      });
+      return arrows;
+    }
+    function updateArrowPositions(arrows, draggedIssueId, newStartX, newEndX) {
+      arrows.forEach((a) => {
+        const originalPath = a.linePath ? a.linePath.getAttribute("d") : null;
+        const fromStartX = a.fromId == draggedIssueId ? newStartX : parseFloat(a.fromBar.dataset.startX);
+        const fromEndX = a.fromId == draggedIssueId ? newEndX : parseFloat(a.fromBar.dataset.endX);
+        const fromY = parseFloat(a.fromBar.dataset.centerY);
+        const toStartX = a.toId == draggedIssueId ? newStartX : parseFloat(a.toBar.dataset.startX);
+        const toEndX = a.toId == draggedIssueId ? newEndX : parseFloat(a.toBar.dataset.endX);
+        const toY = parseFloat(a.toBar.dataset.centerY);
+        const fromStart = a.relType === "start_to_start" || a.relType === "start_to_finish";
+        const toEnd = a.relType === "finish_to_finish" || a.relType === "start_to_finish";
+        let x1, y1, x2, y2;
+        if (a.isScheduling) {
+          x1 = fromStart ? fromStartX - 2 : fromEndX + 2;
+          y1 = fromY;
+          x2 = toEnd ? toEndX + 2 : toStartX - 2;
+          y2 = toY;
+        } else {
+          x1 = (fromStartX + fromEndX) / 2;
+          x2 = (toStartX + toEndX) / 2;
+          const goingDown = toY > fromY;
+          const sameRowCenter = Math.abs(fromY - toY) < 5;
+          if (sameRowCenter) {
+            y1 = fromY - barHeight / 2;
+            y2 = toY - barHeight / 2;
+          } else {
+            y1 = goingDown ? fromY + barHeight / 2 : fromY - barHeight / 2;
+            y2 = goingDown ? toY - barHeight / 2 : toY + barHeight / 2;
+          }
+        }
+        logArrowDebug("updateArrowPositions", {
+          arrow: a.fromId + " -> " + a.toId,
+          isScheduling: a.isScheduling,
+          draggedId: draggedIssueId,
+          barData: {
+            fromStartX: a.fromBar.dataset.startX,
+            fromEndX: a.fromBar.dataset.endX,
+            fromY: a.fromBar.dataset.centerY,
+            toStartX: a.toBar.dataset.startX,
+            toEndX: a.toBar.dataset.endX,
+            toY: a.toBar.dataset.centerY
+          },
+          computed: { fromStartX, fromEndX, fromY, toStartX, toEndX, toY },
+          coords: { x1, y1, x2, y2 },
+          originalPath: originalPath ? originalPath.substring(0, 60) + "..." : null
+        });
+        const { path, arrowHead } = calcArrowPath(x1, y1, x2, y2, a.isScheduling, fromStart, toEnd);
+        if (a.linePath) a.linePath.setAttribute("d", path);
+        if (a.hitPath) a.hitPath.setAttribute("d", path);
+        if (a.headPath) a.headPath.setAttribute("d", arrowHead);
+      });
+    }
+    const dragConfirmOverlay = document.getElementById("dragConfirmOverlay");
+    const dragConfirmMessage = document.getElementById("dragConfirmMessage");
+    const dragConfirmOk = document.getElementById("dragConfirmOk");
+    const dragConfirmCancel = document.getElementById("dragConfirmCancel");
+    let pendingDragConfirm = null;
+    function showDragConfirmModal(message, onConfirm, onCancel) {
+      if (!dragConfirmOverlay || !dragConfirmMessage) return;
+      dragConfirmMessage.textContent = message;
+      pendingDragConfirm = { onConfirm, onCancel };
+      setAllowScrollChange(true);
+      dragConfirmOverlay.style.display = "flex";
+      if (dragConfirmOk) dragConfirmOk.focus();
+    }
+    function hideDragConfirmModal() {
+      if (dragConfirmOverlay) dragConfirmOverlay.style.display = "none";
+      pendingDragConfirm = null;
+    }
+    function restoreScrollPosition() {
+      if (ganttScroll && dragScrollSnapshot) {
+        ganttScroll.scrollLeft = dragScrollSnapshot.left;
+        ganttScroll.scrollTop = dragScrollSnapshot.top;
+      }
+      dragScrollSnapshot = null;
+    }
+    dragConfirmOk?.addEventListener("click", () => {
+      if (pendingDragConfirm?.onConfirm) pendingDragConfirm.onConfirm();
+      dragScrollSnapshot = null;
+      hideDragConfirmModal();
+    });
+    dragConfirmCancel?.addEventListener("click", () => {
+      if (pendingDragConfirm?.onCancel) pendingDragConfirm.onCancel();
+      restoreScrollPosition();
+      hideDragConfirmModal();
+    });
+    dragConfirmOverlay?.addEventListener("click", (e) => {
+      if (e.target === dragConfirmOverlay) {
+        if (pendingDragConfirm?.onCancel) pendingDragConfirm.onCancel();
+        restoreScrollPosition();
+        hideDragConfirmModal();
+      }
+    });
+    addDocListener("keydown", (e) => {
+      if (!pendingDragConfirm) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (pendingDragConfirm.onCancel) pendingDragConfirm.onCancel();
+        restoreScrollPosition();
+        hideDragConfirmModal();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (pendingDragConfirm.onConfirm) pendingDragConfirm.onConfirm();
+        dragScrollSnapshot = null;
+        hideDragConfirmModal();
+      }
+    });
+    let dragState = null;
+    let dragScrollSnapshot = null;
+    let justEndedDrag = false;
+    document.querySelectorAll(".drag-handle").forEach((handle) => {
+      handle.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragScrollSnapshot = { left: ganttScroll?.scrollLeft, top: ganttScroll?.scrollTop };
+        const bar = handle.closest(".issue-bar");
+        const isLeft = handle.classList.contains("drag-left");
+        const issueId = parseInt(bar.dataset.issueId);
+        const startX = parseFloat(bar.dataset.startX);
+        const endX = parseFloat(bar.dataset.endX);
+        const oldStartDate = bar.dataset.startDate || null;
+        const oldDueDate = bar.dataset.dueDate || null;
+        const barOutline = bar.querySelector(".bar-outline");
+        const barMain = bar.querySelector(".bar-main");
+        const leftHandle = bar.querySelector(".drag-left");
+        const rightHandle = bar.querySelector(".drag-right");
+        bar.classList.add("dragging");
+        const barLabels = bar.querySelector(".bar-labels");
+        const labelsOnLeft = barLabels?.classList.contains("labels-left");
+        const connectedArrows = getConnectedArrows(issueId);
+        const linkHandle = bar.querySelector(".link-handle");
+        logArrowDebug("dragStart (resize)", {
+          issueId,
+          isLeft,
+          connectedArrowCount: connectedArrows.length,
+          arrows: connectedArrows.map((a) => ({
+            from: a.fromId,
+            to: a.toId,
+            isScheduling: a.isScheduling,
+            currentPath: a.linePath ? a.linePath.getAttribute("d")?.substring(0, 60) + "..." : null
+          }))
+        });
+        dragState = {
+          issueId,
+          isLeft,
+          isMove: false,
+          initialMouseX: e.clientX,
+          startX,
+          endX,
+          oldStartDate,
+          oldDueDate,
+          barOutline,
+          barMain,
+          leftHandle,
+          rightHandle,
+          bar,
+          barLabels,
+          labelsOnLeft,
+          connectedArrows,
+          linkHandle
+        };
+        const edgeX = isLeft ? startX : endX;
+        const currentDate = isLeft ? oldStartDate : oldDueDate;
+        if (currentDate) {
+          showDragTooltip((isLeft ? "Start: " : "Due: ") + formatDateShort(currentDate));
+          positionDragTooltip(e.clientX, e.clientY);
+        }
+      });
+    });
+    document.querySelectorAll(".bar-outline").forEach((outline) => {
+      outline.addEventListener("mousedown", (e) => {
+        if (e.target.classList.contains("drag-handle")) return;
+        if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+        e.preventDefault();
+        e.stopPropagation();
+        dragScrollSnapshot = { left: ganttScroll?.scrollLeft, top: ganttScroll?.scrollTop };
+        const bar = outline.closest(".issue-bar");
+        if (!bar) return;
+        const issueId = bar.dataset.issueId;
+        const isBulkDrag = selectedIssues.size > 1 && selectedIssues.has(issueId);
+        const barsToMove = isBulkDrag ? allIssueBars.filter((b) => selectedIssues.has(b.dataset.issueId)) : [bar];
+        const bulkBars = barsToMove.map((b) => ({
+          issueId: b.dataset.issueId,
+          startX: parseFloat(b.dataset.startX),
+          endX: parseFloat(b.dataset.endX),
+          oldStartDate: b.dataset.startDate || null,
+          oldDueDate: b.dataset.dueDate || null,
+          barOutline: b.querySelector(".bar-outline"),
+          barMain: b.querySelector(".bar-main"),
+          leftHandle: b.querySelector(".drag-left"),
+          rightHandle: b.querySelector(".drag-right"),
+          bar: b,
+          barLabels: b.querySelector(".bar-labels"),
+          labelsOnLeft: b.querySelector(".bar-labels")?.classList.contains("labels-left"),
+          connectedArrows: getConnectedArrows(b.dataset.issueId),
+          linkHandle: b.querySelector(".link-handle")
+        }));
+        bulkBars.forEach((b) => b.bar.classList.add("dragging"));
+        const singleBarLabels = bar.querySelector(".bar-labels");
+        const singleLabelsOnLeft = singleBarLabels?.classList.contains("labels-left");
+        const connectedArrows = getConnectedArrows(issueId);
+        const singleLinkHandle = bar.querySelector(".link-handle");
+        logArrowDebug("dragStart (move)", {
+          issueId,
+          isBulkDrag,
+          connectedArrowCount: connectedArrows.length,
+          arrows: connectedArrows.map((a) => ({
+            from: a.fromId,
+            to: a.toId,
+            isScheduling: a.isScheduling,
+            currentPath: a.linePath ? a.linePath.getAttribute("d")?.substring(0, 60) + "..." : null
+          }))
+        });
+        dragState = {
+          issueId: parseInt(issueId),
+          isLeft: false,
+          isMove: true,
+          isBulkDrag,
+          bulkBars,
+          initialMouseX: e.clientX,
+          startX: parseFloat(bar.dataset.startX),
+          endX: parseFloat(bar.dataset.endX),
+          oldStartDate: bar.dataset.startDate || null,
+          oldDueDate: bar.dataset.dueDate || null,
+          barOutline: outline,
+          barMain: bar.querySelector(".bar-main"),
+          leftHandle: bar.querySelector(".drag-left"),
+          rightHandle: bar.querySelector(".drag-right"),
+          bar,
+          barLabels: singleBarLabels,
+          labelsOnLeft: singleLabelsOnLeft,
+          connectedArrows,
+          linkHandle: singleLinkHandle
+        };
+        if (!isBulkDrag && bar.dataset.startDate && bar.dataset.dueDate) {
+          showDragTooltip(formatDateRange(bar.dataset.startDate, bar.dataset.dueDate));
+          positionDragTooltip(e.clientX, e.clientY);
+        }
+      });
+    });
+    let linkingState = null;
+    let tempArrow = null;
+    let currentTarget = null;
+    function cancelLinking() {
+      if (!linkingState) return;
+      linkingState.fromBar.classList.remove("linking-source");
+      document.querySelectorAll(".link-target").forEach((el) => el.classList.remove("link-target"));
+      if (tempArrow) {
+        tempArrow.remove();
+        tempArrow = null;
+      }
+      linkingState = null;
+      currentTarget = null;
+      document.body.classList.remove("cursor-crosshair");
+    }
+    function showRelationPicker(x, y, fromId, toId, fromAnchor = "end", toAnchor = "start") {
+      document.querySelector(".relation-picker")?.remove();
+      const picker = document.createElement("div");
+      picker.className = "relation-picker";
+      const pickerWidth = 180;
+      const pickerHeight = 200;
+      const clampedX = Math.min(x, window.innerWidth - pickerWidth - 10);
+      const clampedY = Math.min(y, window.innerHeight - pickerHeight - 10);
+      picker.style.left = Math.max(10, clampedX) + "px";
+      picker.style.top = Math.max(10, clampedY) + "px";
+      const anchorToRelation = {
+        "end_start": "finish_to_start",
+        "end_end": "finish_to_finish",
+        "start_start": "start_to_start",
+        "start_end": "start_to_finish"
+      };
+      const suggestedType = anchorToRelation[`${fromAnchor}_${toAnchor}`] || "finish_to_start";
+      const baseTypes = [
+        {
+          value: "blocks",
+          label: "\u{1F6AB} Blocks",
+          cssClass: "rel-line-blocks",
+          tooltip: "Target cannot be closed until this issue is closed"
+        },
+        {
+          value: "precedes",
+          label: "\u27A1\uFE0F Precedes",
+          cssClass: "rel-line-scheduling",
+          tooltip: "This issue must complete before target can start"
+        },
+        {
+          value: "relates",
+          label: "\u{1F517} Relates to",
+          cssClass: "rel-line-informational",
+          tooltip: "Simple link between issues (no constraints)"
+        },
+        {
+          value: "duplicates",
+          label: "\u{1F4CB} Duplicates",
+          cssClass: "rel-line-informational",
+          tooltip: "Closing target will automatically close this issue"
+        },
+        {
+          value: "copied_to",
+          label: "\u{1F4C4} Copied to",
+          cssClass: "rel-line-informational",
+          tooltip: "This issue was copied to create the target issue"
+        }
+      ];
+      const extendedTypes = [
+        {
+          value: "finish_to_start",
+          label: "\u23E9 Finish\u2192Start",
+          cssClass: "rel-line-scheduling",
+          tooltip: "Target starts after this issue finishes (FS)"
+        },
+        {
+          value: "start_to_start",
+          label: "\u25B6\uFE0F Start\u2192Start",
+          cssClass: "rel-line-scheduling",
+          tooltip: "Target starts when this issue starts (SS)"
+        },
+        {
+          value: "finish_to_finish",
+          label: "\u23F9\uFE0F Finish\u2192Finish",
+          cssClass: "rel-line-scheduling",
+          tooltip: "Target finishes when this issue finishes (FF)"
+        },
+        {
+          value: "start_to_finish",
+          label: "\u23EA Start\u2192Finish",
+          cssClass: "rel-line-scheduling",
+          tooltip: "Target finishes when this issue starts (SF)"
+        }
+      ];
+      const types = extendedRelationTypes ? [...baseTypes, ...extendedTypes] : baseTypes;
+      let currentDelay = -1;
+      const delayRow = document.createElement("div");
+      delayRow.className = "delay-row";
+      const delayLabel = document.createElement("label");
+      delayLabel.textContent = "Delay:";
+      delayRow.appendChild(delayLabel);
+      const sameDayBtn = document.createElement("button");
+      sameDayBtn.className = "delay-preset active";
+      sameDayBtn.dataset.delay = "-1";
+      sameDayBtn.title = "Start same day predecessor ends";
+      sameDayBtn.textContent = "Same day";
+      delayRow.appendChild(sameDayBtn);
+      const nextDayBtn = document.createElement("button");
+      nextDayBtn.className = "delay-preset";
+      nextDayBtn.dataset.delay = "0";
+      nextDayBtn.title = "Start day after predecessor ends";
+      nextDayBtn.textContent = "+1 day";
+      delayRow.appendChild(nextDayBtn);
+      const delayInput = document.createElement("input");
+      delayInput.type = "number";
+      delayInput.className = "delay-input";
+      delayInput.value = currentDelay;
+      delayInput.min = "-30";
+      delayInput.max = "30";
+      delayInput.title = "Custom delay in days (-1=same day, 0=next day, 3=+4 days)";
+      delayRow.appendChild(delayInput);
+      delayRow.style.display = "none";
+      delayRow.querySelectorAll(".delay-preset").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          currentDelay = parseInt(btn.dataset.delay);
+          delayInput.value = currentDelay;
+          delayRow.querySelectorAll(".delay-preset").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+        });
+      });
+      delayInput.addEventListener("input", () => {
+        currentDelay = parseInt(delayInput.value) || 0;
+        delayRow.querySelectorAll(".delay-preset").forEach((b) => {
+          b.classList.toggle("active", parseInt(b.dataset.delay) === currentDelay);
+        });
+      });
+      delayInput.addEventListener("click", (e) => e.stopPropagation());
+      types.forEach((t) => {
+        const btn = document.createElement("button");
+        if (t.value === suggestedType) {
+          btn.classList.add("suggested");
+        }
+        const swatch = document.createElement("span");
+        swatch.className = "color-swatch " + t.cssClass;
+        btn.appendChild(swatch);
+        btn.appendChild(document.createTextNode(t.label));
+        btn.title = t.tooltip + (t.value === suggestedType ? " (suggested based on anchors)" : "");
+        if (t.value === "precedes") {
+          btn.addEventListener("mouseenter", () => {
+            delayRow.style.display = "flex";
+          });
+          btn.addEventListener("focus", () => {
+            delayRow.style.display = "flex";
+          });
+        }
+        btn.addEventListener("click", () => {
+          saveState();
+          const message = {
+            command: "createRelation",
+            issueId: fromId,
+            targetIssueId: toId,
+            relationType: t.value
+          };
+          if (t.value === "precedes") {
+            message.delay = currentDelay;
+          }
+          vscode2.postMessage(message);
+          picker.remove();
+        });
+        picker.appendChild(btn);
+      });
+      picker.appendChild(delayRow);
+      document.body.appendChild(picker);
+      closeOnOutsideClick(picker);
+    }
+    const interactiveSelector = ".drag-handle, .link-handle, .bar-outline, .blocks-badge-group, .blocker-badge, .progress-badge-group, .flex-badge-group";
+    document.querySelectorAll(".issue-bar").forEach((bar) => {
+      bar.addEventListener("click", (e) => {
+        if (e.target.closest(interactiveSelector)) return;
+        if (dragState || linkingState || justEndedDrag) return;
+        if (getFocusedIssueId()) {
+          clearFocus();
+        }
+        scrollToAndHighlight(bar.dataset.issueId);
+      });
+      bar.addEventListener("dblclick", (e) => {
+        if (dragState || linkingState || justEndedDrag) return;
+        e.preventDefault();
+        focusOnDependencyChain(bar.dataset.issueId);
+      });
+    });
+    function highlightArrows(arrows, issueId) {
+      document.querySelectorAll(".dependency-arrow.selected").forEach((a) => a.classList.remove("selected"));
+      document.querySelectorAll(".arrow-connected").forEach((el) => el.classList.remove("arrow-connected"));
+      if (arrows.length === 0) return;
+      document.body.classList.add("arrow-selection-mode");
+      const connectedIds = /* @__PURE__ */ new Set();
+      arrows.forEach((arrow) => {
+        arrow.classList.add("selected");
+        connectedIds.add(arrow.dataset.from);
+        connectedIds.add(arrow.dataset.to);
+      });
+      connectedIds.forEach((id) => {
+        document.querySelectorAll(`.issue-bar[data-issue-id="${id}"], .issue-label[data-issue-id="${id}"]`).forEach((el) => el.classList.add("arrow-connected"));
+      });
+      announce(`Highlighted ${arrows.length} dependency arrow(s) for #${issueId}`);
+    }
+    document.querySelectorAll(".blocks-badge-group").forEach((badge) => {
+      badge.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      badge.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const issueBar = badge.closest(".issue-bar");
+        if (!issueBar) return;
+        const issueId = issueBar.dataset.issueId;
+        const arrows = Array.from(document.querySelectorAll(`.dependency-arrow[data-from="${issueId}"]`));
+        highlightArrows(arrows, issueId);
+      });
+    });
+    document.querySelectorAll(".blocker-badge").forEach((badge) => {
+      badge.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      badge.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const issueBar = badge.closest(".issue-bar");
+        if (!issueBar) return;
+        const issueId = issueBar.dataset.issueId;
+        const arrows = Array.from(document.querySelectorAll(`.dependency-arrow[data-to="${issueId}"]`));
+        highlightArrows(arrows, issueId);
+      });
+    });
+    const issueBars = Array.from(document.querySelectorAll(".issue-bar"));
+    const PAGE_JUMP = 10;
+    issueBars.forEach((bar, index) => {
+      bar.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          scrollToAndHighlight(bar.dataset.issueId);
+        } else if (e.key === "ArrowDown" && index < issueBars.length - 1) {
+          e.preventDefault();
+          issueBars[index + 1].focus();
+          announce(`Issue ${issueBars[index + 1].getAttribute("aria-label")}`);
+        } else if (e.key === "ArrowUp" && index > 0) {
+          e.preventDefault();
+          issueBars[index - 1].focus();
+          announce(`Issue ${issueBars[index - 1].getAttribute("aria-label")}`);
+        } else if (e.key === "Home") {
+          e.preventDefault();
+          issueBars[0].focus();
+          announce(`First issue: ${issueBars[0].getAttribute("aria-label")}`);
+        } else if (e.key === "End") {
+          e.preventDefault();
+          issueBars[issueBars.length - 1].focus();
+          announce(`Last issue: ${issueBars[issueBars.length - 1].getAttribute("aria-label")}`);
+        } else if (e.key === "PageDown") {
+          e.preventDefault();
+          const nextIdx = Math.min(index + PAGE_JUMP, issueBars.length - 1);
+          issueBars[nextIdx].focus();
+          announce(`Issue ${issueBars[nextIdx].getAttribute("aria-label")}`);
+        } else if (e.key === "PageUp") {
+          e.preventDefault();
+          const prevIdx = Math.max(index - PAGE_JUMP, 0);
+          issueBars[prevIdx].focus();
+          announce(`Issue ${issueBars[prevIdx].getAttribute("aria-label")}`);
+        } else if (e.key === "Tab" && e.shiftKey) {
+          const issueId = bar.dataset.issueId;
+          const label = document.querySelector(`.issue-label[data-issue-id="${issueId}"]`);
+          if (label) {
+            e.preventDefault();
+            label.focus();
+            announce(`Label for issue #${issueId}`);
+          }
+        }
+      });
+    });
+    document.querySelectorAll(".link-handle").forEach((handle) => {
+      handle.addEventListener("mousedown", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const bar = handle.closest(".issue-bar");
+        const issueId = parseInt(bar.dataset.issueId);
+        const cx = parseFloat(handle.dataset.cx);
+        const cy = parseFloat(handle.dataset.cy);
+        bar.classList.add("linking-source");
+        document.body.classList.add("cursor-crosshair");
+        const svg = document.querySelector("#ganttTimeline svg");
+        if (!document.getElementById("temp-arrow-head")) {
+          const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+          defs.innerHTML = `
             <marker id="temp-arrow-head" markerWidth="10" markerHeight="7"
                     refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth">
               <polygon points="0 0, 10 3.5, 0 7" fill="var(--vscode-focusBorder)"/>
-            </marker>`,k.insertBefore(F,k.firstChild)}ue=document.createElementNS("http://www.w3.org/2000/svg","path"),ue.classList.add("temp-link-arrow"),ue.setAttribute("stroke","var(--vscode-focusBorder)"),ue.setAttribute("stroke-width","2"),ue.setAttribute("fill","none"),ue.setAttribute("marker-end","url(#temp-arrow-head)"),k.appendChild(ue);let w=t.dataset.anchor||"end";$={fromId:i,fromBar:n,startX:r,startY:D,fromAnchor:w}})}),fe("keydown",t=>{if(t.key==="Escape"){let o=document.querySelector(".relation-picker");if(o){t.stopImmediatePropagation(),o.remove();return}if($){t.stopImmediatePropagation(),Ce();return}S()&&(t.stopImmediatePropagation(),d(),ae("Focus cleared"))}});let Je=!1,Ze=null;fe("mousemove",t=>{!c&&!$||(Ze=t,!Je&&(Je=!0,requestAnimationFrame(()=>{Je=!1;let o=Ze;if(o){if(c){let n=o.clientX-c.initialMouseX;if(c.isMove&&c.isBulkDrag&&c.bulkBars){let i=he(n)-he(0);c.bulkBars.forEach(r=>{let D=r.endX-r.startX,k=Math.max(0,Math.min(r.startX+i,ge-D)),w=k+D,F=w-k;r.barOutline.setAttribute("x",k),r.barOutline.setAttribute("width",F),r.barMain&&(r.barMain.setAttribute("x",k),r.barMain.setAttribute("width",F));let I=r.leftHandle.querySelector("rect"),T=r.rightHandle.querySelector("rect");if(I&&I.setAttribute("x",k),T&&T.setAttribute("x",w-14),r.leftHandle.querySelectorAll(".drag-grip circle").forEach((g,M)=>g.setAttribute("cx",k+9)),r.rightHandle.querySelectorAll(".drag-grip circle").forEach((g,M)=>g.setAttribute("cx",w-9)),r.newStartX=k,r.newEndX=w,r.barLabels){let g=r.labelsOnLeft?k-r.startX:w-r.endX;r.barLabels.setAttribute("transform","translate("+g+", 0)")}r.connectedArrows&&He(r.connectedArrows,r.issueId,k,w),r.linkHandle&&r.linkHandle.querySelectorAll("circle").forEach(g=>g.setAttribute("cx",String(w+8)))}),c.snappedDelta=i}else{let i=c.startX,r=c.endX,D=c.endX-c.startX;c.isMove?(i=he(Math.max(0,Math.min(c.startX+n,ge-D))),r=i+D):c.isLeft?i=he(Math.max(0,Math.min(c.startX+n,c.endX-U))):r=he(Math.max(c.startX+U,Math.min(c.endX+n,ge)));let k=r-i;c.barOutline.setAttribute("x",i),c.barOutline.setAttribute("width",k),c.barMain&&(c.barMain.setAttribute("x",i),c.barMain.setAttribute("width",k));let w=c.leftHandle.querySelector("rect"),F=c.rightHandle.querySelector("rect");if(w&&w.setAttribute("x",i),F&&F.setAttribute("x",r-14),c.leftHandle.querySelectorAll(".drag-grip circle").forEach(I=>I.setAttribute("cx",i+9)),c.rightHandle.querySelectorAll(".drag-grip circle").forEach(I=>I.setAttribute("cx",r-9)),c.newStartX=i,c.newEndX=r,c.barLabels){let I=c.labelsOnLeft?i-c.startX:r-c.endX;c.barLabels.setAttribute("transform","translate("+I+", 0)")}if(c.connectedArrows&&He(c.connectedArrows,c.issueId,i,r),c.linkHandle&&c.linkHandle.querySelectorAll("circle").forEach(I=>I.setAttribute("cx",String(r+8))),c.isMove&&!c.isBulkDrag){let I=B(i),T=z(r),M=I!==c.oldStartDate?O(c.oldStartDate,c.oldDueDate)+" \u2192 "+O(I,T):O(I,T);Me(M),Pe(o.clientX,o.clientY)}else if(!c.isMove){let I=c.isLeft?i:r,T=c.isLeft?B(I):z(I);Me((c.isLeft?"Start: ":"Due: ")+re(T)),Pe(o.clientX,o.clientY)}}}if($&&ue){let i=document.querySelector("#ganttTimeline svg").getBoundingClientRect(),r=o.clientX-i.left,D=o.clientY-i.top,k=`M ${$.startX} ${$.startY} L ${r} ${D}`;ue.setAttribute("d",k);let w=document.elementFromPoint(o.clientX,o.clientY)?.closest(".issue-bar");ke&&ke!==w&&ke.classList.remove("link-target"),w&&w!==$.fromBar?(w.classList.add("link-target"),ke=w):ke=null}}})))});function Ge(t){if(!t)return;let{bar:o,barOutline:n,barMain:i,leftHandle:r,rightHandle:D,barLabels:k,startX:w,endX:F,connectedArrows:I,issueId:T,linkHandle:g}=t,M=F-w;if(n&&(n.setAttribute("x",String(w)),n.setAttribute("width",String(M))),i&&(i.setAttribute("x",String(w)),i.setAttribute("width",String(M))),r){let H=r.querySelector("rect");H&&H.setAttribute("x",String(w)),r.querySelectorAll(".drag-grip circle").forEach(V=>V.setAttribute("cx",w+9))}if(D){let H=D.querySelector("rect");H&&H.setAttribute("x",String(F-14)),D.querySelectorAll(".drag-grip circle").forEach(V=>V.setAttribute("cx",F-9))}k&&k.removeAttribute("transform"),I&&I.length>0&&He(I,T,w,F),g&&g.querySelectorAll("circle").forEach(H=>H.setAttribute("cx",String(F+8))),o&&o.classList.remove("dragging")}fe("mouseup",t=>{if(c){let{issueId:o,isLeft:n,isMove:i,isBulkDrag:r,bulkBars:D,newStartX:k,newEndX:w,bar:F,startX:I,endX:T,oldStartDate:g,oldDueDate:M,barOutline:H,barMain:V,leftHandle:ie,rightHandle:pe,barLabels:K,connectedArrows:Le}=c,le={...c};if(r&&D&&i){D.forEach(R=>R.bar.classList.remove("dragging"));let Ee=[];if(D.forEach(R=>{if(R.newStartX!==void 0&&R.newStartX!==R.startX){let x=B(R.newStartX),N=z(R.newEndX);(x!==R.oldStartDate||N!==R.oldDueDate)&&Ee.push({issueId:parseInt(R.issueId),oldStartDate:R.oldStartDate,oldDueDate:R.oldDueDate,newStartDate:x,newDueDate:N,barData:R})}}),Ee.length>0){qe();let R=()=>{Ae.push({type:"bulk",changes:Ee.map(x=>({issueId:x.issueId,oldStartDate:x.oldStartDate,oldDueDate:x.oldDueDate,newStartDate:x.newStartDate,newDueDate:x.newDueDate}))}),Ie.length=0,me(),_(),Ee.forEach(x=>{v.postMessage({command:"updateDates",issueId:x.issueId,startDate:x.newStartDate,dueDate:x.newDueDate})})};if(A&&A())R();else{let x="Move "+Ee.length+" issue(s) to new dates?";ze(x,R,()=>{D.forEach(N=>Ge(N))})}}else qe(),D.forEach(R=>Ge(R));c=null,te=!0,requestAnimationFrame(()=>te=!1);return}if(F.classList.remove("dragging"),qe(),k!==void 0||w!==void 0){let Ee=null,R=null;i?k!==I&&(Ee=B(k),R=z(w)):n?Ee=k!==I?B(k):null:R=w!==T?z(w):null;let x=Ee&&Ee!==g?Ee:null,N=R&&R!==M?R:null;if(x||N){let We=()=>{Ae.push({issueId:o,oldStartDate:x?g:null,oldDueDate:N?M:null,newStartDate:x,newDueDate:N}),Ie.length=0,me(),_(),v.postMessage({command:"updateDates",issueId:o,startDate:x,dueDate:N})};if(A&&A())We();else{let Oe="Issue #"+o+": ";x&&N?Oe+=O(g,M)+" \u2192 "+O(x,N):x?Oe+="Start: "+re(g)+" \u2192 "+re(x):Oe+="Due: "+re(M)+" \u2192 "+re(N),ze(Oe,We,()=>{Ge(le)})}}else Ge(le)}else Ge(le);c=null,te=!0,requestAnimationFrame(()=>te=!1)}if($){let o=$.fromId,n=$.fromAnchor;if(ke){let i=parseInt(ke.dataset.issueId);if(o!==i){let D=document.querySelector("#ganttTimeline svg").getBoundingClientRect(),k=t.clientX-D.left,w=ke.querySelector(".bar-outline"),F=parseFloat(w.getAttribute("x")),I=F+parseFloat(w.getAttribute("width")),T=(F+I)/2,g=k<T?"start":"end";Ue(t.clientX,t.clientY,o,i,n,g)}}Ce()}Se||y()}),Q?.addEventListener("click",()=>{if(Q.hasAttribute("disabled")||Ae.length===0)return;let t=Ae.pop();if(Ie.push(t),me(),_(),t.type==="relation")t.operation==="create"?v.postMessage({command:"undoRelation",operation:"delete",relationId:t.relationId,datesBefore:t.datesBefore}):v.postMessage({command:"undoRelation",operation:"create",issueId:t.issueId,targetIssueId:t.targetIssueId,relationType:t.relationType});else if(t.type==="bulk"){let o=A&&A();t.changes.forEach(n=>{o?v.postMessage({command:"removeDraft",issueId:n.issueId,startDate:n.oldStartDate,dueDate:n.oldDueDate}):v.postMessage({command:"updateDates",issueId:n.issueId,startDate:n.oldStartDate,dueDate:n.oldDueDate})})}else A&&A()?v.postMessage({command:"removeDraft",issueId:t.issueId,startDate:t.oldStartDate,dueDate:t.oldDueDate}):v.postMessage({command:"updateDates",issueId:t.issueId,startDate:t.oldStartDate,dueDate:t.oldDueDate})}),Y?.addEventListener("click",()=>{if(Y.hasAttribute("disabled")||Ie.length===0)return;let t=Ie.pop();Ae.push(t),me(),_(),t.type==="relation"?t.operation==="create"?v.postMessage({command:"redoRelation",operation:"create",issueId:t.issueId,targetIssueId:t.targetIssueId,relationType:t.relationType}):v.postMessage({command:"redoRelation",operation:"delete",relationId:t.relationId}):t.type==="bulk"?t.changes.forEach(o=>{v.postMessage({command:"updateDates",issueId:o.issueId,startDate:o.newStartDate,dueDate:o.newDueDate})}):v.postMessage({command:"updateDates",issueId:t.issueId,startDate:t.newStartDate,dueDate:t.newDueDate})})}function vt(E){let{vscode:v,addDocListener:Q,addWinListener:Y,announce:fe,barHeight:J,selectedCollapseKey:ae}=E;document.querySelectorAll(".collapse-toggle").forEach(d=>{d.addEventListener("click",S=>{S.stopPropagation();let C=d.closest("[data-collapse-key]")?.dataset.collapseKey;C&&ye(C)})}),document.getElementById("menuExpand")?.addEventListener("click",()=>{let S=document.getElementById("ganttScroll")?.dataset.allExpandableKeys,b=S?JSON.parse(S):[];v.postMessage({command:"expandAll",keys:b})}),document.getElementById("menuCollapse")?.addEventListener("click",()=>{v.postMessage({command:"collapseAll"})});let _=Array.from(document.querySelectorAll(".project-label, .issue-label, .time-group-label")),me=null,Ae=ae??null;function Ie(d){return!d.classList.contains("gantt-row-hidden")&&d.getAttribute("visibility")!=="hidden"}function de(d,S){let b=d+S;for(;b>=0&&b<_.length;){if(Ie(_[b]))return{label:_[b],index:b};b+=S}return null}function W(d){let S=document.getElementById("ganttScroll"),b=document.querySelector(".gantt-header-row");if(!S||!d)return;let C=b?.getBoundingClientRect().height||60,A=d.closest(".gantt-row");if(!A)return;let l=A.getBoundingClientRect().top,h=A.getBoundingClientRect().height,B=S.getBoundingClientRect(),z=B.top+C,ee=B.bottom;l<z?S.scrollBy({top:l-z-4,behavior:"smooth"}):l+h>ee&&S.scrollBy({top:l+h-ee+4,behavior:"smooth"})}function j(d,S=!1,b=!1,C=!1){me&&me.classList.remove("active"),me=d,d&&(d.classList.add("active"),C||d.focus(),b&&W(d),S||v.postMessage({command:"setSelectedKey",collapseKey:d.dataset.collapseKey}))}Y("focus",()=>{me&&Ie(me)&&me.focus()}),Q("keydown",d=>{d.key==="Escape"&&me&&(me.classList.remove("active"),me.blur(),me=null,v.postMessage({command:"setSelectedKey",collapseKey:null}))});let X=new Map,L=new Map,Z=new Map;function f(d){let S=d.dataset.originalY;if(Z.has(S))return Z.get(S);let b=JSON.parse(d.dataset.rowContributions||"{}");return Z.set(S,b),b}function ge(){X.clear(),document.querySelectorAll("[data-collapse-key][data-original-y]").forEach(S=>{let b=S.dataset.collapseKey,C=parseFloat(S.dataset.originalY);X.has(b)||X.set(b,{originalY:C,elements:[]}),X.get(b).elements.push(S)})}function U(){L.clear(),document.querySelectorAll("[data-collapse-key][data-parent-key]").forEach(S=>{let b=S.dataset.collapseKey;if(L.has(b))return;let C=[],A=S.dataset.parentKey;for(;A;)C.push(A),A=document.querySelector('[data-collapse-key="'+A+'"]')?.dataset.parentKey||null;L.set(b,C)})}ge(),U();function P(d,S){S?(d.setAttribute("visibility","hidden"),d.classList.add("gantt-row-hidden")):(d.removeAttribute("visibility"),d.classList.remove("gantt-row-hidden"))}function oe(d){let S=[];return L.forEach((b,C)=>{b.includes(d)&&S.push(C)}),S}function he(d){let S=[];return L.forEach((b,C)=>{let A=b.indexOf(d);if(A===-1)return;let l=!0;for(let h=0;h<A;h++){let B=b[h],z=document.querySelector('[data-collapse-key="'+B+'"].project-label, [data-collapse-key="'+B+'"].issue-label, [data-collapse-key="'+B+'"].time-group-label');if(!z||z.dataset.expanded!=="true"){l=!1;break}}l&&S.push(C)}),S}function ye(d,S){let b=document.querySelector('[data-collapse-key="'+d+'"].project-label, [data-collapse-key="'+d+'"].time-group-label, [data-collapse-key="'+d+'"].issue-label');if(!b||b.dataset.hasChildren!=="true")return;let C=b.dataset.expanded==="true",A=S==="expand"?!0:S==="collapse"?!1:!C;if(A===C)return;b.dataset.expanded=A?"true":"false";let l=b.querySelector(".collapse-toggle");l&&l.classList.toggle("expanded",A);let h=oe(d),B=A?he(d):[];if(h.length===0){v.postMessage({command:"collapseStateSync",collapseKey:d,isExpanded:A});return}let z=new Set(h),ee=new Set(B),be=X.get(d),re=be?.originalY??0,O=new Set,Be=0,Me=0,qe=A?B:he(d),G=new Set(qe);if(document.querySelectorAll(".zebra-stripe").forEach(y=>{let c=f(y);d in c&&Me===0&&(Me=parseFloat(y.dataset.originalY||"0"));for(let[q,te]of Object.entries(c))G.has(q)&&!O.has(q)&&(Be+=parseFloat(te),O.add(q))}),Be===0&&qe.length>0){v.postMessage({command:"collapseStateSync",collapseKey:d,isExpanded:A}),v.postMessage({command:"requestRerender"});return}let m=A?Be:-Be,Te=re;if(be&&be.elements.length>0){let c=(be.elements[0].getAttribute("transform")||"").match(/translate\([^,]+,\s*([-\d.]+)/);c&&(Te=parseFloat(c[1]))}let Ke=Te+J;A?B.forEach(y=>{let c=X.get(y);c&&(c.elements.forEach(q=>{let $=(q.getAttribute("transform")||"").match(/translate\(([-\d.]+)/),ue=$?$[1]:"0";q.setAttribute("transform","translate("+ue+", "+Ke+")"),P(q,!1)}),Ke+=J)}):h.forEach(y=>{let c=X.get(y);c&&c.elements.forEach(q=>{P(q,!0)})}),X.forEach(({originalY:y,elements:c},q)=>{y>re&&!z.has(q)&&c.forEach(te=>{let $=te.getAttribute("transform")||"",ue=$.match(/translate\(([-\d.]+)/),ke=ue?ue[1]:"0",Ce=$.match(/translate\([^,]+,\s*([-\d.]+)/),Re=(Ce?parseFloat(Ce[1]):y)+m;te.setAttribute("transform","translate("+ke+", "+Re+")")})});let $e=document.querySelector(".gantt-labels svg");if($e){let c=parseFloat($e.getAttribute("height")||"0")+m;$e.setAttribute("height",String(c))}[".gantt-col-status svg",".gantt-col-id svg",".gantt-col-start svg",".gantt-col-due svg",".gantt-col-assignee svg"].forEach(y=>{let c=document.querySelector(y);if(!c)return;let te=parseFloat(c.getAttribute("height")||"0")+m;c.setAttribute("height",String(te))});let xe=document.querySelector(".gantt-timeline svg");if(xe){let c=parseFloat(xe.getAttribute("height")||"0")+m;xe.setAttribute("height",c)}let Fe=new Set;document.querySelectorAll('.project-label[data-has-children="true"], .time-group-label[data-has-children="true"], .issue-label[data-has-children="true"]').forEach(y=>{y.dataset.expanded==="false"&&Fe.add(y.dataset.collapseKey)});let Xe=new Map,_e=document.querySelectorAll(".zebra-stripe");_e.forEach(y=>{let c=parseFloat(y.dataset.originalY||"0");if(Xe.has(c))return;let q=f(y),te=Object.keys(q),$=te.length>0&&te.every(Ce=>z.has(Ce)),ue=te.some(Ce=>z.has(Ce)),ke=c>Me;if($)Xe.set(c,{action:"toggle-visibility",hide:!A});else if(ue)if(A){let Ce=0;for(let[Ue,Re]of Object.entries(q))(!z.has(Ue)||ee.has(Ue))&&(Ce+=parseFloat(Re));Xe.set(c,{action:"expand",newHeight:Ce})}else{let Ce=0;for(let[Ue,Re]of Object.entries(q))z.has(Ue)||(Ce+=parseFloat(Re));Xe.set(c,{action:"shrink",newHeight:Ce})}else if(ke){let Ce=parseFloat(y.getAttribute("y")||String(c));Xe.set(c,{action:"shift",newY:Ce+m})}}),_e.forEach(y=>{let c=parseFloat(y.dataset.originalY||"0"),q=Xe.get(c);if(q)switch(q.action){case"toggle-visibility":P(y,q.hide);break;case"shrink":y.setAttribute("height",String(q.newHeight));break;case"expand":y.setAttribute("height",String(q.newHeight));break;case"shift":y.setAttribute("y",String(q.newY));break}});let Se=Array.from(document.querySelectorAll(".zebra-stripe")).filter(y=>y.getAttribute("visibility")!=="hidden"),ze=new Map;Se.forEach(y=>{let c=parseFloat(y.getAttribute("y")||"0");ze.has(c)||ze.set(c,[]),ze.get(c).push(y)}),Array.from(ze.keys()).sort((y,c)=>y-c).forEach((y,c)=>{let q=c%2===0?"0.03":"0.06";ze.get(y).forEach(te=>te.setAttribute("opacity",q))}),document.querySelectorAll(".indent-guide-line").forEach(y=>{let c=y.dataset.forParent,q=L.get(c)||[],te=Fe.has(c)||q.some($=>Fe.has($));if(P(y,te),!te){let $=X.get(c);if($&&$.originalY>re){let ue=parseFloat(y.getAttribute("y1")||"0"),ke=parseFloat(y.getAttribute("y2")||"0");y.setAttribute("y1",ue+m),y.setAttribute("y2",ke+m)}}}),document.querySelectorAll(".dependency-arrow").forEach(y=>{let c=y.dataset.from,q=y.dataset.to,te=document.querySelector('.issue-bar[data-issue-id="'+c+'"]'),$=document.querySelector('.issue-bar[data-issue-id="'+q+'"]'),ue=te?.classList.contains("gantt-row-hidden"),ke=$?.classList.contains("gantt-row-hidden");P(y,ue||ke)}),v.postMessage({command:"collapseStateSync",collapseKey:d,isExpanded:A})}if(Ae){let d=_.find(S=>S.dataset.collapseKey===Ae);d&&j(d,!0)}_.forEach((d,S)=>{d.addEventListener("click",b=>{if(b.target.closest?.(".collapse-toggle")||b.target.closest?.(".chevron-hit-area"))return;let C=d.dataset.issueId,A=d.classList.contains("project-label"),l=d.classList.contains("time-group-label"),h=d.dataset.collapseKey;if((A||l)&&h){j(d),d.dataset.hasChildren==="true"&&ye(h);return}let B=b.target.classList?.contains("issue-text")||b.target.closest(".issue-text");C&&B?(j(d,!1,!1,!0),v.postMessage({command:"openIssue",issueId:parseInt(C,10)})):d.dataset.hasChildren==="true"&&h?(j(d),ye(h)):j(d)}),d.addEventListener("keydown",b=>{let C=d.dataset.collapseKey,A=d.dataset.issueId?parseInt(d.dataset.issueId,10):NaN;switch(b.key){case"Enter":case" ":b.preventDefault(),isNaN(A)||v.postMessage({command:"openIssue",issueId:A});break;case"ArrowUp":{b.preventDefault();let l=de(S,-1);l&&j(l.label,!1,!0);break}case"ArrowDown":{b.preventDefault();let l=de(S,1);l&&j(l.label,!1,!0);break}case"ArrowLeft":if(b.preventDefault(),d.dataset.hasChildren==="true"&&d.dataset.expanded==="true")ye(C,"collapse");else if(d.dataset.parentKey){let l=_.find(h=>h.dataset.collapseKey===d.dataset.parentKey);l&&j(l,!1,!0)}break;case"ArrowRight":if(b.preventDefault(),d.dataset.hasChildren==="true"&&d.dataset.expanded==="false")ye(C,"expand");else if(d.dataset.hasChildren==="true"&&d.dataset.expanded==="true"){let l=_.find(h=>h.dataset.parentKey===C&&Ie(h));l&&j(l,!1,!0)}break;case"Home":{b.preventDefault();let l=de(-1,1);l&&j(l.label,!1,!0);break}case"End":{b.preventDefault();let l=de(_.length,-1);l&&j(l.label,!1,!0);break}case"PageDown":{b.preventDefault();let l=S,h=0;for(;h<10&&l<_.length-1;){let B=de(l,1);if(!B)break;l=B.index,h++}h>0&&j(_[l],!1,!0);break}case"PageUp":{b.preventDefault();let l=S,h=0;for(;h<10&&l>0;){let B=de(l,-1);if(!B)break;l=B.index,h++}h>0&&j(_[l],!1,!0);break}case"Tab":if(!b.shiftKey&&!isNaN(A)){let l=document.querySelector(`.issue-bar[data-issue-id="${A}"]`);l&&(b.preventDefault(),l.focus(),fe(`Timeline bar for issue #${A}`))}break}})})}function wt(E){let{vscode:v,addDocListener:Q,menuUndo:Y,menuRedo:fe,undoStack:J,redoStack:ae,saveState:_,updateUndoRedoButtons:me,announce:Ae,scrollToAndHighlight:Ie,scrollToToday:de}=E;Q("keydown",f=>{let U=navigator.platform.toUpperCase().indexOf("MAC")>=0?f.metaKey:f.ctrlKey;if(!(f.target.tagName==="INPUT"||f.target.tagName==="SELECT"||f.target.tagName==="TEXTAREA"))if(U&&f.key==="z"&&!f.shiftKey)f.preventDefault(),Y?.click();else if(U&&f.key==="z"&&f.shiftKey)f.preventDefault(),fe?.click();else if(U&&f.key==="y")f.preventDefault(),fe?.click();else if(f.key>="1"&&f.key<="5"){let P=document.getElementById("zoomSelect"),oe=["day","week","month","quarter","year"];P.value=oe[parseInt(f.key)-1],P.dispatchEvent(new Event("change"))}else if(f.key.toLowerCase()==="h")document.getElementById("menuHeatmap")?.click();else if(f.key.toLowerCase()==="y")document.getElementById("menuCapacity")?.click();else if(f.key.toLowerCase()==="i")document.getElementById("menuIntensity")?.click();else if(f.key.toLowerCase()==="d")document.getElementById("menuDeps")?.click();else if(f.key.toLowerCase()==="v"){let P=document.getElementById("viewFocusSelect");P.value=P.value==="project"?"person":"project",P.dispatchEvent(new Event("change"))}else if(f.key.toLowerCase()==="r")document.getElementById("refreshBtn")?.click();else if(f.key.toLowerCase()==="t")de();else if(f.key.toLowerCase()==="e")document.getElementById("menuExpand")?.click();else if(f.key.toLowerCase()==="c"&&!U)document.getElementById("menuCollapse")?.click();else if(f.key.toLowerCase()==="f"&&!U)f.preventDefault(),document.getElementById("menuFilterHealth")?.click();else if(f.key.toLowerCase()==="b"){f.preventDefault();let P=Array.from(document.querySelectorAll(".issue-bar[data-issue-id]")).filter(S=>S.querySelector(".blocker-badge"));if(P.length===0){Ae("No blocked issues");return}let oe=document.activeElement?.closest(".issue-bar"),ye=((oe?P.indexOf(oe):-1)+1)%P.length,d=P[ye];Ie(d.dataset.issueId),d.focus(),Ae("Blocked issue "+(ye+1)+" of "+P.length)}else if(f.key==="ArrowLeft"||f.key==="ArrowRight"){let P=document.activeElement?.closest(".issue-bar:not(.parent-bar)");if(!P)return;f.preventDefault();let oe=parseInt(P.dataset.issueId),he=P.dataset.startDate,ye=P.dataset.dueDate;if(!he&&!ye)return;let d=f.key==="ArrowRight"?1:-1,S=(A,l)=>{let h=new Date(A+"T00:00:00");return h.setDate(h.getDate()+l),h.toISOString().slice(0,10)},b=null,C=null;f.shiftKey&&ye?C=S(ye,d):f.altKey&&he?b=S(he,d):(he&&(b=S(he,d)),ye&&(C=S(ye,d))),(b||C)&&(_(),J.push({issueId:oe,oldStartDate:b?he:null,oldDueDate:C?ye:null,newStartDate:b,newDueDate:C}),ae.length=0,me(),v.postMessage({command:"updateDates",issueId:oe,startDate:b,dueDate:C}))}else f.key==="/"&&!U?(f.preventDefault(),j()):(f.key==="?"||f.shiftKey&&f.key==="/")&&(f.preventDefault(),Z())});let W=null;function j(){W&&W.remove(),W=document.createElement("div"),W.className="quick-search",W.innerHTML=`
+            </marker>`;
+          svg.insertBefore(defs, svg.firstChild);
+        }
+        tempArrow = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        tempArrow.classList.add("temp-link-arrow");
+        tempArrow.setAttribute("stroke", "var(--vscode-focusBorder)");
+        tempArrow.setAttribute("stroke-width", "2");
+        tempArrow.setAttribute("fill", "none");
+        tempArrow.setAttribute("marker-end", "url(#temp-arrow-head)");
+        svg.appendChild(tempArrow);
+        const fromAnchor = handle.dataset.anchor || "end";
+        linkingState = { fromId: issueId, fromBar: bar, startX: cx, startY: cy, fromAnchor };
+      });
+    });
+    addDocListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        const picker = document.querySelector(".relation-picker");
+        if (picker) {
+          e.stopImmediatePropagation();
+          picker.remove();
+          return;
+        }
+        if (linkingState) {
+          e.stopImmediatePropagation();
+          cancelLinking();
+          return;
+        }
+        if (getFocusedIssueId()) {
+          e.stopImmediatePropagation();
+          clearFocus();
+          announce("Focus cleared");
+        }
+      }
+    });
+    let dragRafPending = false;
+    let lastMouseEvent = null;
+    addDocListener("mousemove", (e) => {
+      if (!dragState && !linkingState) return;
+      lastMouseEvent = e;
+      if (dragRafPending) return;
+      dragRafPending = true;
+      requestAnimationFrame(() => {
+        dragRafPending = false;
+        const evt = lastMouseEvent;
+        if (!evt) return;
+        if (dragState) {
+          const delta = evt.clientX - dragState.initialMouseX;
+          if (dragState.isMove && dragState.isBulkDrag && dragState.bulkBars) {
+            const snappedDelta = snapToDay(delta) - snapToDay(0);
+            dragState.bulkBars.forEach((b) => {
+              const barWidth = b.endX - b.startX;
+              const newStartX = Math.max(0, Math.min(b.startX + snappedDelta, timelineWidth - barWidth));
+              const newEndX = newStartX + barWidth;
+              const width = newEndX - newStartX;
+              b.barOutline.setAttribute("x", newStartX);
+              b.barOutline.setAttribute("width", width);
+              if (b.barMain) {
+                b.barMain.setAttribute("x", newStartX);
+                b.barMain.setAttribute("width", width);
+              }
+              const leftRect = b.leftHandle.querySelector("rect");
+              const rightRect = b.rightHandle.querySelector("rect");
+              if (leftRect) leftRect.setAttribute("x", newStartX);
+              if (rightRect) rightRect.setAttribute("x", newEndX - 14);
+              b.leftHandle.querySelectorAll(".drag-grip circle").forEach((c, i) => c.setAttribute("cx", newStartX + 9));
+              b.rightHandle.querySelectorAll(".drag-grip circle").forEach((c, i) => c.setAttribute("cx", newEndX - 9));
+              b.newStartX = newStartX;
+              b.newEndX = newEndX;
+              if (b.barLabels) {
+                const labelDelta = b.labelsOnLeft ? newStartX - b.startX : newEndX - b.endX;
+                b.barLabels.setAttribute("transform", "translate(" + labelDelta + ", 0)");
+              }
+              if (b.connectedArrows) {
+                updateArrowPositions(b.connectedArrows, b.issueId, newStartX, newEndX);
+              }
+              if (b.linkHandle) {
+                b.linkHandle.querySelectorAll("circle").forEach((c) => c.setAttribute("cx", String(newEndX + 8)));
+              }
+            });
+            dragState.snappedDelta = snappedDelta;
+          } else {
+            let newStartX = dragState.startX;
+            let newEndX = dragState.endX;
+            const barWidth = dragState.endX - dragState.startX;
+            if (dragState.isMove) {
+              newStartX = snapToDay(Math.max(0, Math.min(dragState.startX + delta, timelineWidth - barWidth)));
+              newEndX = newStartX + barWidth;
+            } else if (dragState.isLeft) {
+              newStartX = snapToDay(Math.max(0, Math.min(dragState.startX + delta, dragState.endX - dayWidth)));
+            } else {
+              newEndX = snapToDay(Math.max(dragState.startX + dayWidth, Math.min(dragState.endX + delta, timelineWidth)));
+            }
+            const width = newEndX - newStartX;
+            dragState.barOutline.setAttribute("x", newStartX);
+            dragState.barOutline.setAttribute("width", width);
+            if (dragState.barMain) {
+              dragState.barMain.setAttribute("x", newStartX);
+              dragState.barMain.setAttribute("width", width);
+            }
+            const leftRect = dragState.leftHandle.querySelector("rect");
+            const rightRect = dragState.rightHandle.querySelector("rect");
+            if (leftRect) leftRect.setAttribute("x", newStartX);
+            if (rightRect) rightRect.setAttribute("x", newEndX - 14);
+            dragState.leftHandle.querySelectorAll(".drag-grip circle").forEach((c) => c.setAttribute("cx", newStartX + 9));
+            dragState.rightHandle.querySelectorAll(".drag-grip circle").forEach((c) => c.setAttribute("cx", newEndX - 9));
+            dragState.newStartX = newStartX;
+            dragState.newEndX = newEndX;
+            if (dragState.barLabels) {
+              const labelDelta = dragState.labelsOnLeft ? newStartX - dragState.startX : newEndX - dragState.endX;
+              dragState.barLabels.setAttribute("transform", "translate(" + labelDelta + ", 0)");
+            }
+            if (dragState.connectedArrows) {
+              updateArrowPositions(dragState.connectedArrows, dragState.issueId, newStartX, newEndX);
+            }
+            if (dragState.linkHandle) {
+              dragState.linkHandle.querySelectorAll("circle").forEach((c) => c.setAttribute("cx", String(newEndX + 8)));
+            }
+            if (dragState.isMove && !dragState.isBulkDrag) {
+              const newStartDate = xToDate(newStartX);
+              const newDueDate = xToDueDate(newEndX);
+              const changed = newStartDate !== dragState.oldStartDate;
+              const text = changed ? formatDateRange(dragState.oldStartDate, dragState.oldDueDate) + " \u2192 " + formatDateRange(newStartDate, newDueDate) : formatDateRange(newStartDate, newDueDate);
+              updateDragTooltip(text);
+              positionDragTooltip(evt.clientX, evt.clientY);
+            } else if (!dragState.isMove) {
+              const edgeX = dragState.isLeft ? newStartX : newEndX;
+              const newDate = dragState.isLeft ? xToDate(edgeX) : xToDueDate(edgeX);
+              updateDragTooltip((dragState.isLeft ? "Start: " : "Due: ") + formatDateShort(newDate));
+              positionDragTooltip(evt.clientX, evt.clientY);
+            }
+          }
+        }
+        if (linkingState && tempArrow) {
+          const svg = document.querySelector("#ganttTimeline svg");
+          const rect = svg.getBoundingClientRect();
+          const endX = evt.clientX - rect.left;
+          const endY = evt.clientY - rect.top;
+          const path = `M ${linkingState.startX} ${linkingState.startY} L ${endX} ${endY}`;
+          tempArrow.setAttribute("d", path);
+          const targetBar = document.elementFromPoint(evt.clientX, evt.clientY)?.closest(".issue-bar");
+          if (currentTarget && currentTarget !== targetBar) {
+            currentTarget.classList.remove("link-target");
+          }
+          if (targetBar && targetBar !== linkingState.fromBar) {
+            targetBar.classList.add("link-target");
+            currentTarget = targetBar;
+          } else {
+            currentTarget = null;
+          }
+        }
+      });
+    });
+    function restoreBarPosition(state) {
+      if (!state) return;
+      const { bar, barOutline, barMain, leftHandle, rightHandle, barLabels, startX, endX, connectedArrows, issueId, linkHandle } = state;
+      const width = endX - startX;
+      if (barOutline) {
+        barOutline.setAttribute("x", String(startX));
+        barOutline.setAttribute("width", String(width));
+      }
+      if (barMain) {
+        barMain.setAttribute("x", String(startX));
+        barMain.setAttribute("width", String(width));
+      }
+      if (leftHandle) {
+        const rect = leftHandle.querySelector("rect");
+        if (rect) rect.setAttribute("x", String(startX));
+        leftHandle.querySelectorAll(".drag-grip circle").forEach((c) => c.setAttribute("cx", startX + 9));
+      }
+      if (rightHandle) {
+        const rect = rightHandle.querySelector("rect");
+        if (rect) rect.setAttribute("x", String(endX - 14));
+        rightHandle.querySelectorAll(".drag-grip circle").forEach((c) => c.setAttribute("cx", endX - 9));
+      }
+      if (barLabels) barLabels.removeAttribute("transform");
+      if (connectedArrows && connectedArrows.length > 0) {
+        updateArrowPositions(connectedArrows, issueId, startX, endX);
+      }
+      if (linkHandle) {
+        linkHandle.querySelectorAll("circle").forEach((c) => c.setAttribute("cx", String(endX + 8)));
+      }
+      if (bar) bar.classList.remove("dragging");
+    }
+    addDocListener("mouseup", (e) => {
+      if (dragState) {
+        const { issueId, isLeft, isMove, isBulkDrag, bulkBars, newStartX, newEndX, bar, startX, endX, oldStartDate, oldDueDate, barOutline, barMain, leftHandle, rightHandle, barLabels, connectedArrows } = dragState;
+        const savedState = { ...dragState };
+        if (isBulkDrag && bulkBars && isMove) {
+          bulkBars.forEach((b) => b.bar.classList.remove("dragging"));
+          const changes = [];
+          bulkBars.forEach((b) => {
+            if (b.newStartX !== void 0 && b.newStartX !== b.startX) {
+              const newStart = xToDate(b.newStartX);
+              const newDue = xToDueDate(b.newEndX);
+              if (newStart !== b.oldStartDate || newDue !== b.oldDueDate) {
+                changes.push({
+                  issueId: parseInt(b.issueId),
+                  oldStartDate: b.oldStartDate,
+                  oldDueDate: b.oldDueDate,
+                  newStartDate: newStart,
+                  newDueDate: newDue,
+                  barData: b
+                });
+              }
+            }
+          });
+          if (changes.length > 0) {
+            hideDragTooltip();
+            const confirmBulk = () => {
+              undoStack.push({ type: "bulk", changes: changes.map((c) => ({ issueId: c.issueId, oldStartDate: c.oldStartDate, oldDueDate: c.oldDueDate, newStartDate: c.newStartDate, newDueDate: c.newDueDate })) });
+              redoStack.length = 0;
+              updateUndoRedoButtons();
+              saveState();
+              changes.forEach((c) => {
+                vscode2.postMessage({ command: "updateDates", issueId: c.issueId, startDate: c.newStartDate, dueDate: c.newDueDate });
+              });
+            };
+            if (isDraftModeEnabled && isDraftModeEnabled()) {
+              confirmBulk();
+            } else {
+              const message = "Move " + changes.length + " issue(s) to new dates?";
+              showDragConfirmModal(message, confirmBulk, () => {
+                bulkBars.forEach((b) => restoreBarPosition(b));
+              });
+            }
+          } else {
+            hideDragTooltip();
+            bulkBars.forEach((b) => restoreBarPosition(b));
+          }
+          dragState = null;
+          justEndedDrag = true;
+          requestAnimationFrame(() => justEndedDrag = false);
+          return;
+        }
+        bar.classList.remove("dragging");
+        hideDragTooltip();
+        if (newStartX !== void 0 || newEndX !== void 0) {
+          let calcStartDate = null;
+          let calcDueDate = null;
+          if (isMove) {
+            if (newStartX !== startX) {
+              calcStartDate = xToDate(newStartX);
+              calcDueDate = xToDueDate(newEndX);
+            }
+          } else if (isLeft) {
+            calcStartDate = newStartX !== startX ? xToDate(newStartX) : null;
+          } else {
+            calcDueDate = newEndX !== endX ? xToDueDate(newEndX) : null;
+          }
+          const newStartDate = calcStartDate && calcStartDate !== oldStartDate ? calcStartDate : null;
+          const newDueDate = calcDueDate && calcDueDate !== oldDueDate ? calcDueDate : null;
+          if (newStartDate || newDueDate) {
+            const confirmSingle = () => {
+              undoStack.push({
+                issueId,
+                oldStartDate: newStartDate ? oldStartDate : null,
+                oldDueDate: newDueDate ? oldDueDate : null,
+                newStartDate,
+                newDueDate
+              });
+              redoStack.length = 0;
+              updateUndoRedoButtons();
+              saveState();
+              vscode2.postMessage({ command: "updateDates", issueId, startDate: newStartDate, dueDate: newDueDate });
+            };
+            if (isDraftModeEnabled && isDraftModeEnabled()) {
+              confirmSingle();
+            } else {
+              let message = "Issue #" + issueId + ": ";
+              if (newStartDate && newDueDate) {
+                message += formatDateRange(oldStartDate, oldDueDate) + " \u2192 " + formatDateRange(newStartDate, newDueDate);
+              } else if (newStartDate) {
+                message += "Start: " + formatDateShort(oldStartDate) + " \u2192 " + formatDateShort(newStartDate);
+              } else {
+                message += "Due: " + formatDateShort(oldDueDate) + " \u2192 " + formatDateShort(newDueDate);
+              }
+              showDragConfirmModal(message, confirmSingle, () => {
+                restoreBarPosition(savedState);
+              });
+            }
+          } else {
+            restoreBarPosition(savedState);
+          }
+        } else {
+          restoreBarPosition(savedState);
+        }
+        dragState = null;
+        justEndedDrag = true;
+        requestAnimationFrame(() => justEndedDrag = false);
+      }
+      if (linkingState) {
+        const fromId = linkingState.fromId;
+        const fromAnchor = linkingState.fromAnchor;
+        if (currentTarget) {
+          const toId = parseInt(currentTarget.dataset.issueId);
+          if (fromId !== toId) {
+            const svg = document.querySelector("#ganttTimeline svg");
+            const rect = svg.getBoundingClientRect();
+            const dropX = e.clientX - rect.left;
+            const targetOutline = currentTarget.querySelector(".bar-outline");
+            const targetStartX = parseFloat(targetOutline.getAttribute("x"));
+            const targetEndX = targetStartX + parseFloat(targetOutline.getAttribute("width"));
+            const targetCenterX = (targetStartX + targetEndX) / 2;
+            const toAnchor = dropX < targetCenterX ? "start" : "end";
+            showRelationPicker(e.clientX, e.clientY, fromId, toId, fromAnchor, toAnchor);
+          }
+        }
+        cancelLinking();
+      }
+      if (!pendingDragConfirm) {
+        restoreScrollPosition();
+      }
+    });
+    menuUndo?.addEventListener("click", () => {
+      if (menuUndo.hasAttribute("disabled")) return;
+      if (undoStack.length === 0) return;
+      const action = undoStack.pop();
+      redoStack.push(action);
+      updateUndoRedoButtons();
+      saveState();
+      if (action.type === "relation") {
+        if (action.operation === "create") {
+          vscode2.postMessage({
+            command: "undoRelation",
+            operation: "delete",
+            relationId: action.relationId,
+            datesBefore: action.datesBefore
+          });
+        } else {
+          vscode2.postMessage({
+            command: "undoRelation",
+            operation: "create",
+            issueId: action.issueId,
+            targetIssueId: action.targetIssueId,
+            relationType: action.relationType
+          });
+        }
+      } else if (action.type === "bulk") {
+        const inDraftMode = isDraftModeEnabled && isDraftModeEnabled();
+        action.changes.forEach((c) => {
+          if (inDraftMode) {
+            vscode2.postMessage({
+              command: "removeDraft",
+              issueId: c.issueId,
+              startDate: c.oldStartDate,
+              dueDate: c.oldDueDate
+            });
+          } else {
+            vscode2.postMessage({
+              command: "updateDates",
+              issueId: c.issueId,
+              startDate: c.oldStartDate,
+              dueDate: c.oldDueDate
+            });
+          }
+        });
+      } else {
+        const inDraftMode = isDraftModeEnabled && isDraftModeEnabled();
+        if (inDraftMode) {
+          vscode2.postMessage({
+            command: "removeDraft",
+            issueId: action.issueId,
+            startDate: action.oldStartDate,
+            dueDate: action.oldDueDate
+          });
+        } else {
+          vscode2.postMessage({
+            command: "updateDates",
+            issueId: action.issueId,
+            startDate: action.oldStartDate,
+            dueDate: action.oldDueDate
+          });
+        }
+      }
+    });
+    menuRedo?.addEventListener("click", () => {
+      if (menuRedo.hasAttribute("disabled")) return;
+      if (redoStack.length === 0) return;
+      const action = redoStack.pop();
+      undoStack.push(action);
+      updateUndoRedoButtons();
+      saveState();
+      if (action.type === "relation") {
+        if (action.operation === "create") {
+          vscode2.postMessage({
+            command: "redoRelation",
+            operation: "create",
+            issueId: action.issueId,
+            targetIssueId: action.targetIssueId,
+            relationType: action.relationType
+          });
+        } else {
+          vscode2.postMessage({
+            command: "redoRelation",
+            operation: "delete",
+            relationId: action.relationId
+          });
+        }
+      } else if (action.type === "bulk") {
+        action.changes.forEach((c) => {
+          vscode2.postMessage({
+            command: "updateDates",
+            issueId: c.issueId,
+            startDate: c.newStartDate,
+            dueDate: c.newDueDate
+          });
+        });
+      } else {
+        vscode2.postMessage({
+          command: "updateDates",
+          issueId: action.issueId,
+          startDate: action.newStartDate,
+          dueDate: action.newDueDate
+        });
+      }
+    });
+  }
+
+  // src/webviews/gantt/gantt-collapse.js
+  function setupCollapse(ctx) {
+    const { vscode: vscode2, addDocListener, addWinListener, announce, barHeight, selectedCollapseKey } = ctx;
+    document.querySelectorAll(".collapse-toggle").forEach((el) => {
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const label = el.closest("[data-collapse-key]");
+        const collapseKey = label?.dataset.collapseKey;
+        if (collapseKey) {
+          toggleCollapseClientSide(collapseKey);
+        }
+      });
+    });
+    document.getElementById("menuExpand")?.addEventListener("click", () => {
+      const ganttScroll = document.getElementById("ganttScroll");
+      const allKeys = ganttScroll?.dataset.allExpandableKeys;
+      const keys = allKeys ? JSON.parse(allKeys) : [];
+      vscode2.postMessage({ command: "expandAll", keys });
+    });
+    document.getElementById("menuCollapse")?.addEventListener("click", () => {
+      vscode2.postMessage({ command: "collapseAll" });
+    });
+    const allLabels = Array.from(document.querySelectorAll(".project-label, .issue-label, .time-group-label"));
+    let activeLabel = null;
+    const savedSelectedKey = selectedCollapseKey ?? null;
+    function isLabelVisible(label) {
+      return !label.classList.contains("gantt-row-hidden") && label.getAttribute("visibility") !== "hidden";
+    }
+    function findVisibleLabel(fromIndex, direction) {
+      let i = fromIndex + direction;
+      while (i >= 0 && i < allLabels.length) {
+        if (isLabelVisible(allLabels[i])) return { label: allLabels[i], index: i };
+        i += direction;
+      }
+      return null;
+    }
+    function scrollLabelIntoView(label) {
+      const scrollContainer = document.getElementById("ganttScroll");
+      const headerRow = document.querySelector(".gantt-header-row");
+      if (!scrollContainer || !label) return;
+      const headerHeight = headerRow?.getBoundingClientRect().height || 60;
+      const labelRow = label.closest(".gantt-row");
+      if (!labelRow) return;
+      const rowTop = labelRow.getBoundingClientRect().top;
+      const rowHeight = labelRow.getBoundingClientRect().height;
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const visibleTop = containerRect.top + headerHeight;
+      const visibleBottom = containerRect.bottom;
+      if (rowTop < visibleTop) {
+        scrollContainer.scrollBy({ top: rowTop - visibleTop - 4, behavior: "smooth" });
+      } else if (rowTop + rowHeight > visibleBottom) {
+        scrollContainer.scrollBy({ top: rowTop + rowHeight - visibleBottom + 4, behavior: "smooth" });
+      }
+    }
+    function setActiveLabel(label, skipNotify = false, scrollIntoView = false, skipFocus = false) {
+      if (activeLabel) activeLabel.classList.remove("active");
+      activeLabel = label;
+      if (label) {
+        label.classList.add("active");
+        if (!skipFocus) label.focus();
+        if (scrollIntoView) scrollLabelIntoView(label);
+        if (!skipNotify) {
+          vscode2.postMessage({ command: "setSelectedKey", collapseKey: label.dataset.collapseKey });
+        }
+      }
+    }
+    addWinListener("focus", () => {
+      if (activeLabel && isLabelVisible(activeLabel)) {
+        activeLabel.focus();
+      }
+    });
+    addDocListener("keydown", (e) => {
+      if (e.key === "Escape" && activeLabel) {
+        activeLabel.classList.remove("active");
+        activeLabel.blur();
+        activeLabel = null;
+        vscode2.postMessage({ command: "setSelectedKey", collapseKey: null });
+      }
+    });
+    const rowIndex = /* @__PURE__ */ new Map();
+    const ancestorCache = /* @__PURE__ */ new Map();
+    const stripeContributionsCache = /* @__PURE__ */ new Map();
+    function getStripeContributions(stripe) {
+      const originalY = stripe.dataset.originalY;
+      if (stripeContributionsCache.has(originalY)) {
+        return stripeContributionsCache.get(originalY);
+      }
+      const contributions = JSON.parse(stripe.dataset.rowContributions || "{}");
+      stripeContributionsCache.set(originalY, contributions);
+      return contributions;
+    }
+    function buildRowIndex() {
+      rowIndex.clear();
+      const elements = document.querySelectorAll("[data-collapse-key][data-original-y]");
+      elements.forEach((el) => {
+        const key = el.dataset.collapseKey;
+        const originalY = parseFloat(el.dataset.originalY);
+        if (!rowIndex.has(key)) {
+          rowIndex.set(key, { originalY, elements: [] });
+        }
+        rowIndex.get(key).elements.push(el);
+      });
+    }
+    function buildAncestorCache() {
+      ancestorCache.clear();
+      const elements = document.querySelectorAll("[data-collapse-key][data-parent-key]");
+      elements.forEach((el) => {
+        const key = el.dataset.collapseKey;
+        if (ancestorCache.has(key)) return;
+        const ancestors = [];
+        let parentKey = el.dataset.parentKey;
+        while (parentKey) {
+          ancestors.push(parentKey);
+          const parentEl = document.querySelector('[data-collapse-key="' + parentKey + '"]');
+          parentKey = parentEl?.dataset.parentKey || null;
+        }
+        ancestorCache.set(key, ancestors);
+      });
+    }
+    buildRowIndex();
+    buildAncestorCache();
+    function setSvgVisibility(el, hidden) {
+      if (hidden) {
+        el.setAttribute("visibility", "hidden");
+        el.classList.add("gantt-row-hidden");
+      } else {
+        el.removeAttribute("visibility");
+        el.classList.remove("gantt-row-hidden");
+      }
+    }
+    function findDescendants(parentKey) {
+      const result = [];
+      ancestorCache.forEach((ancestors, key) => {
+        if (ancestors.includes(parentKey)) result.push(key);
+      });
+      return result;
+    }
+    function findVisibleDescendants(parentKey) {
+      const result = [];
+      ancestorCache.forEach((ancestors, key) => {
+        const idx = ancestors.indexOf(parentKey);
+        if (idx === -1) return;
+        let allAncestorsExpanded = true;
+        for (let i = 0; i < idx; i++) {
+          const ancestorKey = ancestors[i];
+          const ancestorLabel = document.querySelector('[data-collapse-key="' + ancestorKey + '"].project-label, [data-collapse-key="' + ancestorKey + '"].issue-label, [data-collapse-key="' + ancestorKey + '"].time-group-label');
+          if (!ancestorLabel || ancestorLabel.dataset.expanded !== "true") {
+            allAncestorsExpanded = false;
+            break;
+          }
+        }
+        if (allAncestorsExpanded) {
+          result.push(key);
+        }
+      });
+      return result;
+    }
+    function toggleCollapseClientSide(collapseKey, action) {
+      const parentLabel = document.querySelector('[data-collapse-key="' + collapseKey + '"].project-label, [data-collapse-key="' + collapseKey + '"].time-group-label, [data-collapse-key="' + collapseKey + '"].issue-label');
+      if (!parentLabel || parentLabel.dataset.hasChildren !== "true") {
+        return;
+      }
+      const wasExpanded = parentLabel.dataset.expanded === "true";
+      const shouldExpand = action === "expand" ? true : action === "collapse" ? false : !wasExpanded;
+      if (shouldExpand === wasExpanded) {
+        return;
+      }
+      parentLabel.dataset.expanded = shouldExpand ? "true" : "false";
+      const chevron = parentLabel.querySelector(".collapse-toggle");
+      if (chevron) chevron.classList.toggle("expanded", shouldExpand);
+      const allDescendants = findDescendants(collapseKey);
+      const visibleDescendants = shouldExpand ? findVisibleDescendants(collapseKey) : [];
+      if (allDescendants.length === 0) {
+        vscode2.postMessage({ command: "collapseStateSync", collapseKey, isExpanded: shouldExpand });
+        return;
+      }
+      const descendantSet = new Set(allDescendants);
+      const visibleSet = new Set(visibleDescendants);
+      const parentEntry = rowIndex.get(collapseKey);
+      const parentRowY = parentEntry?.originalY ?? 0;
+      const countedKeys = /* @__PURE__ */ new Set();
+      let actualDelta = 0;
+      let parentStripeY = 0;
+      const currentlyVisibleDescendants = shouldExpand ? visibleDescendants : findVisibleDescendants(collapseKey);
+      const deltaDescendants = currentlyVisibleDescendants;
+      const deltaSet = new Set(deltaDescendants);
+      document.querySelectorAll(".zebra-stripe").forEach((stripe) => {
+        const contributions = getStripeContributions(stripe);
+        if (collapseKey in contributions && parentStripeY === 0) {
+          parentStripeY = parseFloat(stripe.dataset.originalY || "0");
+        }
+        for (const [key, contribution] of Object.entries(contributions)) {
+          if (deltaSet.has(key) && !countedKeys.has(key)) {
+            actualDelta += parseFloat(contribution);
+            countedKeys.add(key);
+          }
+        }
+      });
+      if (actualDelta === 0 && deltaDescendants.length > 0) {
+        vscode2.postMessage({ command: "collapseStateSync", collapseKey, isExpanded: shouldExpand });
+        vscode2.postMessage({ command: "requestRerender" });
+        return;
+      }
+      const delta = shouldExpand ? actualDelta : -actualDelta;
+      let parentCurrentY = parentRowY;
+      if (parentEntry && parentEntry.elements.length > 0) {
+        const parentTransform = parentEntry.elements[0].getAttribute("transform") || "";
+        const parentYMatch = parentTransform.match(/translate\([^,]+,\s*([-\d.]+)/);
+        if (parentYMatch) {
+          parentCurrentY = parseFloat(parentYMatch[1]);
+        }
+      }
+      let nextY = parentCurrentY + barHeight;
+      if (shouldExpand) {
+        visibleDescendants.forEach((key) => {
+          const entry = rowIndex.get(key);
+          if (entry) {
+            entry.elements.forEach((el) => {
+              const transform = el.getAttribute("transform") || "";
+              const xMatch = transform.match(/translate\(([-\d.]+)/);
+              const x = xMatch ? xMatch[1] : "0";
+              el.setAttribute("transform", "translate(" + x + ", " + nextY + ")");
+              setSvgVisibility(el, false);
+            });
+            nextY += barHeight;
+          }
+        });
+      } else {
+        allDescendants.forEach((key) => {
+          const entry = rowIndex.get(key);
+          if (entry) {
+            entry.elements.forEach((el) => {
+              setSvgVisibility(el, true);
+            });
+          }
+        });
+      }
+      rowIndex.forEach(({ originalY, elements }, key) => {
+        if (originalY > parentRowY && !descendantSet.has(key)) {
+          elements.forEach((el) => {
+            const transform = el.getAttribute("transform") || "";
+            const xMatch = transform.match(/translate\(([-\d.]+)/);
+            const x = xMatch ? xMatch[1] : "0";
+            const yMatch = transform.match(/translate\([^,]+,\s*([-\d.]+)/);
+            const currentY = yMatch ? parseFloat(yMatch[1]) : originalY;
+            const newY = currentY + delta;
+            el.setAttribute("transform", "translate(" + x + ", " + newY + ")");
+          });
+        }
+      });
+      const labelColumn = document.querySelector(".gantt-labels svg");
+      if (labelColumn) {
+        const currentHeight = parseFloat(labelColumn.getAttribute("height") || "0");
+        const newHeight = currentHeight + delta;
+        labelColumn.setAttribute("height", String(newHeight));
+      }
+      const columnSelectors = [
+        ".gantt-col-status svg",
+        ".gantt-col-id svg",
+        ".gantt-col-start svg",
+        ".gantt-col-due svg",
+        ".gantt-col-assignee svg"
+      ];
+      columnSelectors.forEach((selector) => {
+        const colSvg = document.querySelector(selector);
+        if (!colSvg) return;
+        const currentHeight = parseFloat(colSvg.getAttribute("height") || "0");
+        const newHeight = currentHeight + delta;
+        colSvg.setAttribute("height", String(newHeight));
+      });
+      const timelineSvg = document.querySelector(".gantt-timeline svg");
+      if (timelineSvg) {
+        const currentHeight = parseFloat(timelineSvg.getAttribute("height") || "0");
+        const newHeight = currentHeight + delta;
+        timelineSvg.setAttribute("height", newHeight);
+      }
+      const collapsedKeys = /* @__PURE__ */ new Set();
+      document.querySelectorAll('.project-label[data-has-children="true"], .time-group-label[data-has-children="true"], .issue-label[data-has-children="true"]').forEach((lbl) => {
+        if (lbl.dataset.expanded === "false") {
+          collapsedKeys.add(lbl.dataset.collapseKey);
+        }
+      });
+      const stripeActions = /* @__PURE__ */ new Map();
+      const allStripes = document.querySelectorAll(".zebra-stripe");
+      allStripes.forEach((stripe) => {
+        const originalY = parseFloat(stripe.dataset.originalY || "0");
+        if (stripeActions.has(originalY)) return;
+        const contributions = getStripeContributions(stripe);
+        const contributingKeys = Object.keys(contributions);
+        const coversOnlyDescendants = contributingKeys.length > 0 && contributingKeys.every((key) => descendantSet.has(key));
+        const coversAnyDescendant = contributingKeys.some((key) => descendantSet.has(key));
+        const isBelowParent = originalY > parentStripeY;
+        if (coversOnlyDescendants) {
+          stripeActions.set(originalY, { action: "toggle-visibility", hide: !shouldExpand });
+        } else if (coversAnyDescendant) {
+          if (!shouldExpand) {
+            let newHeight = 0;
+            for (const [key, contribution] of Object.entries(contributions)) {
+              if (!descendantSet.has(key)) {
+                newHeight += parseFloat(contribution);
+              }
+            }
+            stripeActions.set(originalY, { action: "shrink", newHeight });
+          } else {
+            let newHeight = 0;
+            for (const [key, contribution] of Object.entries(contributions)) {
+              if (!descendantSet.has(key) || visibleSet.has(key)) {
+                newHeight += parseFloat(contribution);
+              }
+            }
+            stripeActions.set(originalY, { action: "expand", newHeight });
+          }
+        } else if (isBelowParent) {
+          const currentY = parseFloat(stripe.getAttribute("y") || String(originalY));
+          stripeActions.set(originalY, { action: "shift", newY: currentY + delta });
+        }
+      });
+      allStripes.forEach((stripe) => {
+        const originalY = parseFloat(stripe.dataset.originalY || "0");
+        const action2 = stripeActions.get(originalY);
+        if (!action2) return;
+        switch (action2.action) {
+          case "toggle-visibility":
+            setSvgVisibility(stripe, action2.hide);
+            break;
+          case "shrink":
+            stripe.setAttribute("height", String(action2.newHeight));
+            break;
+          case "expand":
+            stripe.setAttribute("height", String(action2.newHeight));
+            break;
+          case "shift":
+            stripe.setAttribute("y", String(action2.newY));
+            break;
+        }
+      });
+      const visibleStripes = Array.from(document.querySelectorAll(".zebra-stripe")).filter((s) => s.getAttribute("visibility") !== "hidden");
+      const stripesByY = /* @__PURE__ */ new Map();
+      visibleStripes.forEach((stripe) => {
+        const y = parseFloat(stripe.getAttribute("y") || "0");
+        if (!stripesByY.has(y)) stripesByY.set(y, []);
+        stripesByY.get(y).push(stripe);
+      });
+      const sortedYs = Array.from(stripesByY.keys()).sort((a, b) => a - b);
+      sortedYs.forEach((y, idx) => {
+        const opacity = idx % 2 === 0 ? "0.03" : "0.06";
+        stripesByY.get(y).forEach((stripe) => stripe.setAttribute("opacity", opacity));
+      });
+      document.querySelectorAll(".indent-guide-line").forEach((line) => {
+        const forParent = line.dataset.forParent;
+        const ancestors = ancestorCache.get(forParent) || [];
+        const shouldHide = collapsedKeys.has(forParent) || ancestors.some((a) => collapsedKeys.has(a));
+        setSvgVisibility(line, shouldHide);
+        if (!shouldHide) {
+          const parentOfGuide = rowIndex.get(forParent);
+          if (parentOfGuide && parentOfGuide.originalY > parentRowY) {
+            const y1 = parseFloat(line.getAttribute("y1") || "0");
+            const y2 = parseFloat(line.getAttribute("y2") || "0");
+            line.setAttribute("y1", y1 + delta);
+            line.setAttribute("y2", y2 + delta);
+          }
+        }
+      });
+      document.querySelectorAll(".dependency-arrow").forEach((arrow) => {
+        const fromId = arrow.dataset.from;
+        const toId = arrow.dataset.to;
+        const fromBar = document.querySelector('.issue-bar[data-issue-id="' + fromId + '"]');
+        const toBar = document.querySelector('.issue-bar[data-issue-id="' + toId + '"]');
+        const fromHidden = fromBar?.classList.contains("gantt-row-hidden");
+        const toHidden = toBar?.classList.contains("gantt-row-hidden");
+        setSvgVisibility(arrow, fromHidden || toHidden);
+      });
+      vscode2.postMessage({ command: "collapseStateSync", collapseKey, isExpanded: shouldExpand });
+    }
+    if (savedSelectedKey) {
+      const savedLabel = allLabels.find((el) => el.dataset.collapseKey === savedSelectedKey);
+      if (savedLabel) {
+        setActiveLabel(savedLabel, true);
+      }
+    }
+    allLabels.forEach((el, index) => {
+      el.addEventListener("click", (e) => {
+        if (e.target.closest?.(".collapse-toggle") || e.target.closest?.(".chevron-hit-area")) {
+          return;
+        }
+        const issueId = el.dataset.issueId;
+        const isProject = el.classList.contains("project-label");
+        const isTimeGroup = el.classList.contains("time-group-label");
+        const collapseKey = el.dataset.collapseKey;
+        if ((isProject || isTimeGroup) && collapseKey) {
+          setActiveLabel(el);
+          if (el.dataset.hasChildren === "true") {
+            toggleCollapseClientSide(collapseKey);
+          }
+          return;
+        }
+        const clickedOnText = e.target.classList?.contains("issue-text") || e.target.closest(".issue-text");
+        if (issueId && clickedOnText) {
+          setActiveLabel(el, false, false, true);
+          vscode2.postMessage({ command: "openIssue", issueId: parseInt(issueId, 10) });
+        } else if (el.dataset.hasChildren === "true" && collapseKey) {
+          setActiveLabel(el);
+          toggleCollapseClientSide(collapseKey);
+        } else {
+          setActiveLabel(el);
+        }
+      });
+      el.addEventListener("keydown", (e) => {
+        const collapseKey = el.dataset.collapseKey;
+        const issueId = el.dataset.issueId ? parseInt(el.dataset.issueId, 10) : NaN;
+        switch (e.key) {
+          case "Enter":
+          case " ":
+            e.preventDefault();
+            if (!isNaN(issueId)) {
+              vscode2.postMessage({ command: "openIssue", issueId });
+            }
+            break;
+          case "ArrowUp": {
+            e.preventDefault();
+            const prev = findVisibleLabel(index, -1);
+            if (prev) setActiveLabel(prev.label, false, true);
+            break;
+          }
+          case "ArrowDown": {
+            e.preventDefault();
+            const next = findVisibleLabel(index, 1);
+            if (next) setActiveLabel(next.label, false, true);
+            break;
+          }
+          case "ArrowLeft":
+            e.preventDefault();
+            if (el.dataset.hasChildren === "true" && el.dataset.expanded === "true") {
+              toggleCollapseClientSide(collapseKey, "collapse");
+            } else if (el.dataset.parentKey) {
+              const parent = allLabels.find((l) => l.dataset.collapseKey === el.dataset.parentKey);
+              if (parent) setActiveLabel(parent, false, true);
+            }
+            break;
+          case "ArrowRight":
+            e.preventDefault();
+            if (el.dataset.hasChildren === "true" && el.dataset.expanded === "false") {
+              toggleCollapseClientSide(collapseKey, "expand");
+            } else if (el.dataset.hasChildren === "true" && el.dataset.expanded === "true") {
+              const firstChild = allLabels.find((l) => l.dataset.parentKey === collapseKey && isLabelVisible(l));
+              if (firstChild) setActiveLabel(firstChild, false, true);
+            }
+            break;
+          case "Home": {
+            e.preventDefault();
+            const first = findVisibleLabel(-1, 1);
+            if (first) setActiveLabel(first.label, false, true);
+            break;
+          }
+          case "End": {
+            e.preventDefault();
+            const last = findVisibleLabel(allLabels.length, -1);
+            if (last) setActiveLabel(last.label, false, true);
+            break;
+          }
+          case "PageDown": {
+            e.preventDefault();
+            let target = index, count = 0;
+            while (count < 10 && target < allLabels.length - 1) {
+              const next = findVisibleLabel(target, 1);
+              if (!next) break;
+              target = next.index;
+              count++;
+            }
+            if (count > 0) setActiveLabel(allLabels[target], false, true);
+            break;
+          }
+          case "PageUp": {
+            e.preventDefault();
+            let target = index, count = 0;
+            while (count < 10 && target > 0) {
+              const prev = findVisibleLabel(target, -1);
+              if (!prev) break;
+              target = prev.index;
+              count++;
+            }
+            if (count > 0) setActiveLabel(allLabels[target], false, true);
+            break;
+          }
+          case "Tab":
+            if (!e.shiftKey && !isNaN(issueId)) {
+              const bar = document.querySelector(`.issue-bar[data-issue-id="${issueId}"]`);
+              if (bar) {
+                e.preventDefault();
+                bar.focus();
+                announce(`Timeline bar for issue #${issueId}`);
+              }
+            }
+            break;
+        }
+      });
+    });
+  }
+
+  // src/webviews/gantt/gantt-keyboard.js
+  function setupKeyboard(ctx) {
+    const { vscode: vscode2, addDocListener, menuUndo, menuRedo, undoStack, redoStack, saveState, updateUndoRedoButtons, announce, scrollToAndHighlight, scrollToToday } = ctx;
+    addDocListener("keydown", (e) => {
+      const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+      const modKey = isMac ? e.metaKey : e.ctrlKey;
+      if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
+      if (modKey && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        menuUndo?.click();
+      } else if (modKey && e.key === "z" && e.shiftKey) {
+        e.preventDefault();
+        menuRedo?.click();
+      } else if (modKey && e.key === "y") {
+        e.preventDefault();
+        menuRedo?.click();
+      } else if (e.key >= "1" && e.key <= "5") {
+        const zoomSelect = document.getElementById("zoomSelect");
+        const levels = ["day", "week", "month", "quarter", "year"];
+        zoomSelect.value = levels[parseInt(e.key) - 1];
+        zoomSelect.dispatchEvent(new Event("change"));
+      } else if (e.key.toLowerCase() === "h") {
+        document.getElementById("menuHeatmap")?.click();
+      } else if (e.key.toLowerCase() === "y") {
+        document.getElementById("menuCapacity")?.click();
+      } else if (e.key.toLowerCase() === "i") {
+        document.getElementById("menuIntensity")?.click();
+      } else if (e.key.toLowerCase() === "d") {
+        document.getElementById("menuDeps")?.click();
+      } else if (e.key.toLowerCase() === "v") {
+        const viewSelect = document.getElementById("viewFocusSelect");
+        viewSelect.value = viewSelect.value === "project" ? "person" : "project";
+        viewSelect.dispatchEvent(new Event("change"));
+      } else if (e.key.toLowerCase() === "r") {
+        document.getElementById("refreshBtn")?.click();
+      } else if (e.key.toLowerCase() === "t") {
+        scrollToToday();
+      } else if (e.key.toLowerCase() === "e") {
+        document.getElementById("menuExpand")?.click();
+      } else if (e.key.toLowerCase() === "c" && !modKey) {
+        document.getElementById("menuCollapse")?.click();
+      } else if (e.key.toLowerCase() === "f" && !modKey) {
+        e.preventDefault();
+        document.getElementById("menuFilterHealth")?.click();
+      } else if (e.key.toLowerCase() === "b") {
+        document.getElementById("menuBadges")?.click();
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        const focusedBar = document.activeElement?.closest(".issue-bar:not(.parent-bar)");
+        if (!focusedBar) return;
+        e.preventDefault();
+        const issueId = parseInt(focusedBar.dataset.issueId);
+        const startDate = focusedBar.dataset.startDate;
+        const dueDate = focusedBar.dataset.dueDate;
+        if (!startDate && !dueDate) return;
+        const delta = e.key === "ArrowRight" ? 1 : -1;
+        const addDays = (dateStr, days) => {
+          const d = /* @__PURE__ */ new Date(dateStr + "T00:00:00");
+          d.setDate(d.getDate() + days);
+          return d.toISOString().slice(0, 10);
+        };
+        let newStart = null, newDue = null;
+        if (e.shiftKey && dueDate) {
+          newDue = addDays(dueDate, delta);
+        } else if (e.altKey && startDate) {
+          newStart = addDays(startDate, delta);
+        } else {
+          if (startDate) newStart = addDays(startDate, delta);
+          if (dueDate) newDue = addDays(dueDate, delta);
+        }
+        if (newStart || newDue) {
+          saveState();
+          undoStack.push({
+            issueId,
+            oldStartDate: newStart ? startDate : null,
+            oldDueDate: newDue ? dueDate : null,
+            newStartDate: newStart,
+            newDueDate: newDue
+          });
+          redoStack.length = 0;
+          updateUndoRedoButtons();
+          vscode2.postMessage({ command: "updateDates", issueId, startDate: newStart, dueDate: newDue });
+        }
+      } else if (e.key === "/" && !modKey) {
+        e.preventDefault();
+        showQuickSearch();
+      } else if (e.key === "?" || e.shiftKey && e.key === "/") {
+        e.preventDefault();
+        toggleKeyboardHelp();
+      }
+    });
+    let quickSearchEl = null;
+    function showQuickSearch() {
+      if (quickSearchEl) {
+        quickSearchEl.remove();
+      }
+      quickSearchEl = document.createElement("div");
+      quickSearchEl.className = "quick-search";
+      quickSearchEl.innerHTML = `
       <input type="text" placeholder="Search issues..." autofocus />
-    `,document.body.appendChild(W);let f=W.querySelector("input");f.focus();let ge=Array.from(document.querySelectorAll(".issue-label"));f.addEventListener("input",()=>{let U=f.value.toLowerCase();ge.forEach(P=>{let oe=P.getAttribute("aria-label")?.toLowerCase()||"",he=U&&oe.includes(U);P.classList.toggle("search-match",he)})}),f.addEventListener("keydown",U=>{if(U.key==="Escape")X();else if(U.key==="Enter"){let P=document.querySelector(".issue-label.search-match");P&&(X(),P.focus(),Ie(P.dataset.issueId))}}),f.addEventListener("blur",()=>setTimeout(X,150))}function X(){W&&(W.remove(),W=null,document.querySelectorAll(".search-match").forEach(f=>f.classList.remove("search-match")))}let L=null;function Z(){if(L){L.remove(),L=null;return}L=document.createElement("div"),L.className="keyboard-help",L.innerHTML=`
+    `;
+      document.body.appendChild(quickSearchEl);
+      const input = quickSearchEl.querySelector("input");
+      input.focus();
+      const labels = Array.from(document.querySelectorAll(".issue-label"));
+      input.addEventListener("input", () => {
+        const query = input.value.toLowerCase();
+        labels.forEach((label) => {
+          const text = label.getAttribute("aria-label")?.toLowerCase() || "";
+          const match = query && text.includes(query);
+          label.classList.toggle("search-match", match);
+        });
+      });
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          closeQuickSearch();
+        } else if (e.key === "Enter") {
+          const match = document.querySelector(".issue-label.search-match");
+          if (match) {
+            closeQuickSearch();
+            match.focus();
+            scrollToAndHighlight(match.dataset.issueId);
+          }
+        }
+      });
+      input.addEventListener("blur", () => setTimeout(closeQuickSearch, 150));
+    }
+    function closeQuickSearch() {
+      if (quickSearchEl) {
+        quickSearchEl.remove();
+        quickSearchEl = null;
+        document.querySelectorAll(".search-match").forEach((el) => el.classList.remove("search-match"));
+      }
+    }
+    let keyboardHelpEl = null;
+    function toggleKeyboardHelp() {
+      if (keyboardHelpEl) {
+        keyboardHelpEl.remove();
+        keyboardHelpEl = null;
+        return;
+      }
+      keyboardHelpEl = document.createElement("div");
+      keyboardHelpEl.className = "keyboard-help";
+      keyboardHelpEl.innerHTML = `
       <div class="keyboard-help-content">
         <h3>Keyboard Shortcuts</h3>
         <div class="shortcut-grid">
@@ -44,6 +1988,1365 @@
         </div>
         <p class="keyboard-help-close">Press <kbd>?</kbd> or <kbd>Esc</kbd> to close</p>
       </div>
-    `,document.body.appendChild(L),L.addEventListener("click",f=>{f.target===L&&Z()})}Q("keydown",f=>{f.key==="Escape"&&L&&(f.stopImmediatePropagation(),Z())})}var ne=acquireVsCodeApi(),tt=!1;function Qe(E){tt&&typeof performance<"u"&&performance.mark(E)}function ct(E,v,Q){if(tt&&typeof performance<"u")try{performance.measure(E,v,Q);let Y=performance.getEntriesByName(E,"measure");Y.length>0&&console.log(`[Gantt Perf] ${E}: ${Y[Y.length-1].duration.toFixed(2)}ms`),performance.clearMarks(v),performance.clearMarks(Q),performance.clearMeasures(E)}catch{}}function Et(){if(tt){let E=document.getElementById("ganttRoot"),v=E?E.querySelectorAll("*").length:0,Q=E?E.querySelectorAll("svg *").length:0;console.log(`[Gantt Perf] DOM nodes: ${v}, SVG elements: ${Q}`)}}function Lt(E){if(!E)return;let v=document.documentElement;v.style.setProperty("--gantt-header-height",`${E.headerHeight}px`),v.style.setProperty("--gantt-label-width",`${E.labelWidth}px`),v.style.setProperty("--gantt-id-column-width",`${E.idColumnWidth}px`),v.style.setProperty("--gantt-start-date-column-width",`${E.startDateColumnWidth}px`),v.style.setProperty("--gantt-status-column-width",`${E.statusColumnWidth}px`),v.style.setProperty("--gantt-due-date-column-width",`${E.dueDateColumnWidth}px`),v.style.setProperty("--gantt-assignee-column-width",`${E.assigneeColumnWidth}px`),v.style.setProperty("--gantt-sticky-left-width",`${E.stickyLeftWidth}px`)}function Dt({addDocListener:E,addWinListener:v}){let Q=document.getElementById("ganttRoot"),Y=document.getElementById("ganttTooltip"),fe=Y?.querySelector(".gantt-tooltip-content");if(!Q||!Y||!fe)return;let J=l=>l?String(l).replace(/\r\n/g,`
-`).trimEnd():"";function ae(){Q.querySelectorAll("svg title").forEach(l=>{let h=l.parentElement,B=J(l.textContent);h&&B&&(h.dataset.tooltip=B),l.remove()})}function _(){Q.querySelectorAll("[title]").forEach(l=>{if(l.tagName.toLowerCase()==="title")return;let h=J(l.getAttribute("title"));l.removeAttribute("title"),h&&(l.dataset.tooltip=h)})}function me(){Q.querySelectorAll("[data-toolbar-tooltip]").forEach(l=>{let h=J(l.dataset.toolbarTooltip);delete l.dataset.toolbarTooltip,h&&(l.dataset.tooltip=h)})}function Ae(){ae(),_(),me()}function Ie(l){let h=l.findIndex(z=>z.trim().startsWith("#"));return h>=0?h:l.filter(z=>z.trim()).length>1?l.findIndex(z=>z.trim()):-1}function de(l){fe.textContent="";let h=J(l);if(!h)return;let B=h.split(`
-`),z=Ie(B),ee=!1;B.forEach((re,O)=>{let Be=re.trim();if(!Be){if(!ee){let G=document.createElement("div");G.className="gantt-tooltip-spacer",fe.appendChild(G),ee=!0}return}if(Be==="---"){let G=document.createElement("div");G.className="gantt-tooltip-divider",fe.appendChild(G),ee=!1;return}let Me=Be.match(/^cf:([^:]+):(.*)$/);if(Me){let G=Me[1].trim(),m=Me[2].trim(),Te=document.createElement("div");Te.className="gantt-tooltip-line";let Ke=document.createElement("span");Ke.className="gantt-tooltip-key",Ke.textContent=`${G}: `,Te.appendChild(Ke),m&&Te.appendChild(document.createTextNode(m)),fe.appendChild(Te),ee=!1;return}let Pe=document.createElement("div");Pe.className="gantt-tooltip-line",O===z&&Pe.classList.add("gantt-tooltip-title");let qe=Be.match(/^Open in Browser:\s*(\S+)/);if(qe&&/^https?:\/\//i.test(qe[1])){Pe.appendChild(document.createTextNode("Open in Browser: "));let G=document.createElement("a");G.href=qe[1],G.textContent=qe[1],G.target="_blank",G.rel="noopener noreferrer",Pe.appendChild(G)}else Pe.textContent=re;fe.appendChild(Pe),ee=!1});let be=fe.lastElementChild;be&&be.classList.contains("gantt-tooltip-spacer")&&be.remove()}let W=null,j=null,X=null,L={x:0,y:0};function Z(l){L={x:l.clientX,y:l.clientY}}function f(){j&&(clearTimeout(j),j=null)}function ge(){X&&(clearTimeout(X),X=null)}function U(l){return l&&(l===Y||Y.contains(l))}function P(l){return l&&W&&(l===W||W.contains(l))}function oe(){if(!L)return!1;let l=document.elementFromPoint(L.x,L.y);return U(l)||P(l)}let he=300;function ye(l){ge(),X=setTimeout(()=>{X=null,!(!W||W!==l)&&oe()&&b(l,L.x,L.y)},he)}function d(){f(),j=setTimeout(()=>{W&&(oe()||C())},300)}function S(l,h){let ee=Y.getBoundingClientRect(),be=l+8,re=h+8;be+ee.width>window.innerWidth-8&&(be=l-ee.width-8),re+ee.height>window.innerHeight-8&&(re=h-ee.height-8),be=Math.max(8,Math.min(be,window.innerWidth-ee.width-8)),re=Math.max(8,Math.min(re,window.innerHeight-ee.height-8)),Y.style.left=`${Math.round(be)}px`,Y.style.top=`${Math.round(re)}px`}function b(l,h,B){let z=l.dataset.tooltip;z&&(de(z),Y.classList.add("visible"),Y.setAttribute("aria-hidden","false"),S(h,B))}function C(l=!1){ge(),f(),Y.classList.remove("visible"),Y.setAttribute("aria-hidden","true"),l||(W=null)}function A(l){if(!l||l===Y||Y.contains(l))return null;let h=l.closest?.("[data-tooltip], [title]");if(!h||!Q.contains(h))return null;if(h.hasAttribute("title")){let B=J(h.getAttribute("title"));h.removeAttribute("title"),B&&(h.dataset.tooltip=B)}return h.dataset.tooltip?h:null}Ae(),E("pointerover",l=>{if(Z(l),U(l.target)){f(),ge();return}let h=A(l.target);if(!h){ge();return}f(),W!==h?(W=h,Y.classList.contains("visible")&&C(!0),ye(h)):Y.classList.contains("visible")||ye(h)},!0),E("pointermove",l=>{W&&(Z(l),j&&oe()&&f())},!0),E("pointerout",l=>{if(!W||(Z(l),ge(),!P(l.target)&&!U(l.target)))return;let h=l.relatedTarget;U(h)||P(h)||d()},!0),E("scroll",()=>{W&&C()},!0),E("keydown",()=>{W&&C()},!0),v("blur",()=>{W&&C()})}function kt(E){if(!E)return;E.state&&(tt=E.state.perfDebug??!1),Qe("render-start");let v=document.getElementById("ganttRoot");v&&(Lt(E.state),Qe("innerHTML-start"),v.innerHTML=E.html||"",Qe("innerHTML-end"),ct("innerHTML","innerHTML-start","innerHTML-end"),At(E.state),Qe("render-end"),ct("render","render-start","render-end"),Et())}window.addEventListener("message",E=>{let v=E.data;if(v){if(v.command==="render"){kt(v.payload);return}window.__ganttHandleExtensionMessage&&window.__ganttHandleExtensionMessage(v)}});var St=window.__GANTT_INITIAL_PAYLOAD__;St&&kt(St);ne.postMessage({command:"webviewReady"});function At(E){if(Qe("initializeGantt-start"),!E)return;let{timelineWidth:v,minDateMs:Q,maxDateMs:Y,totalDays:fe,extendedRelationTypes:J,redmineBaseUrl:ae,minimapBarsData:_,minimapHeight:me,minimapBarHeight:Ae,minimapTodayX:Ie,extScrollLeft:de,extScrollTop:W,labelWidth:j,leftExtrasWidth:X,healthFilter:L,sortBy:Z,sortOrder:f,selectedCollapseKey:ge,barHeight:U,todayX:P,todayInRange:oe,isDraftMode:he,draftQueueCount:ye}=E,d=v/fe,S=he,b=document.getElementById("dragConfirmOk");b&&(b.textContent=he?"Queue to Draft":"Save to Redmine");let C=document.getElementById("draftBadge");if(C){if(he){C.classList.remove("hidden");let e=ye??0;C.textContent=e,C.dataset.tooltip=e===1?"1 change queued - click to review":e+" changes queued - click to review"}else C.classList.add("hidden");C.addEventListener("click",()=>{ne.postMessage({command:"openDraftReview"})})}let A=document.getElementById("draftModeToggle");A&&A.addEventListener("click",()=>{ne.postMessage({command:"toggleDraftMode"})}),window._ganttCleanup&&window._ganttCleanup();let l=[],h=[];function B(e,s,a){document.addEventListener(e,s,a),l.push({type:e,handler:s,options:a})}function z(e,s,a){window.addEventListener(e,s,a),h.push({type:e,handler:s,options:a})}window._ganttCleanup=()=>{l.forEach(e=>document.removeEventListener(e.type,e.handler,e.options)),h.forEach(e=>window.removeEventListener(e.type,e.handler,e.options)),window.__ganttHandleExtensionMessage=null};function ee(e){setTimeout(()=>{document.addEventListener("click",function s(a){e.contains(a.target)||(e.remove(),document.removeEventListener("click",s))})},0)}function be(e){return Math.round(e/d)*d}function re(e){let s=document.getElementById("liveRegion");s&&(s.textContent=e)}let O=document.getElementById("ganttScroll"),Be=document.getElementById("ganttLeftHeader"),Me=document.getElementById("ganttLabels"),Pe=document.getElementById("ganttTimeline"),qe=document.getElementById("menuUndo"),G=document.getElementById("menuRedo"),m=document.getElementById("minimapSvg"),Te=document.getElementById("minimapViewport"),{updateMinimapPosition:Ke,updateMinimapViewport:$e}=yt({timelineWidth:v,minimapBarsData:_,minimapHeight:me,minimapBarHeight:Ae,minimapTodayX:Ie,ganttScroll:O,minimapSvg:m,minimapViewport:Te,addDocListener:B}),He=ne.getState()||{undoStack:[],redoStack:[],labelWidth:j,scrollLeft:null,scrollTop:null,centerDateMs:null},xe=He.undoStack||[],Fe=He.redoStack||[],Xe=He.scrollLeft??(de>0?de:null),_e=He.scrollTop??(W>0?W:null),Se=He.centerDateMs;function ze(){if(!O)return null;let s=document.querySelector(".gantt-body .gantt-sticky-left")?.offsetWidth??0,a=O.clientWidth-s,p=(O.scrollLeft+a/2)/v;return Q+p*(Y-Q)}function Ne(e){if(!O)return;let a=(e-Q)/(Y-Q)*v,p=document.querySelector(".gantt-body .gantt-sticky-left")?.offsetWidth??0,ce=O.clientWidth-p;O.scrollLeft=Math.max(0,a-ce/2)}function y(){ne.setState({undoStack:xe,redoStack:Fe,labelWidth:Me?.offsetWidth||j,scrollLeft:null,scrollTop:O?.scrollTop??null,centerDateMs:ze()})}let c=y;function q(){qe&&qe.toggleAttribute("disabled",xe.length===0),G&&G.toggleAttribute("disabled",Fe.length===0),y()}if(He.labelWidth&&Be&&Me){Be.style.width=He.labelWidth+"px",Me.style.width=He.labelWidth+"px";let e=document.querySelector(".capacity-ribbon-label");e&&(e.style.width=He.labelWidth+X+"px")}let te=!0,$=!1,ue=e=>{$=e},ke=null;O&&O.addEventListener("scroll",()=>{cancelAnimationFrame(ke),ke=requestAnimationFrame(()=>{$e(),te||y()})},{passive:!0}),requestAnimationFrame(()=>q()),window.__ganttHandleExtensionMessage=e=>{if(e.command==="setHeatmapState"){let s=document.querySelector(".heatmap-layer"),a=document.querySelector(".weekend-layer"),u=document.getElementById("menuHeatmap");e.enabled?(s&&s.classList.remove("hidden"),a&&a.classList.add("hidden"),u&&u.classList.add("active")):(s&&s.classList.add("hidden"),a&&a.classList.remove("hidden"),u&&u.classList.remove("active"))}else if(e.command==="setDependenciesState"){let s=document.querySelector(".dependency-layer"),a=document.getElementById("menuDeps");e.enabled?(s&&s.classList.remove("hidden"),a&&a.classList.add("active")):(s&&s.classList.add("hidden"),a&&a.classList.remove("active"))}else if(e.command==="setCapacityRibbonState"){let s=document.querySelector(".capacity-ribbon"),a=document.getElementById("menuCapacity");e.enabled?(s&&s.classList.remove("hidden"),a&&a.classList.add("active")):(s&&s.classList.add("hidden"),a&&a.classList.remove("active"))}else if(e.command==="setIntensityState"){let s=document.querySelector(".gantt-container"),a=document.getElementById("menuIntensity");e.enabled?(s?.classList.add("intensity-enabled"),a&&a.classList.add("active")):(s?.classList.remove("intensity-enabled"),a&&a.classList.remove("active"))}else if(e.command==="setDraftModeState"){S=e.enabled;let s=document.getElementById("dragConfirmOk");s&&(s.textContent=e.enabled?"Queue to Draft":"Save to Redmine");let a=document.getElementById("draftModeToggle");a&&(a.classList.toggle("active",e.enabled),a.textContent=e.enabled?"Disable Draft Mode":"Enable Draft Mode");let u=document.getElementById("draftBadge");if(u)if(e.enabled){u.classList.remove("hidden");let p=e.queueCount??0;u.textContent=p,u.dataset.tooltip=p===1?"1 change queued - click to review":p+" changes queued - click to review"}else u.classList.add("hidden")}else if(e.command==="setDraftQueueCount"){let s=document.getElementById("draftBadge");if(s){let a=e.count;s.textContent=a,s.dataset.tooltip=a===1?"1 change queued - click to review":a+" changes queued - click to review"}}else if(e.command==="pushUndoAction")xe.push(e.action),Fe.length=0,q(),y();else if(e.command==="updateRelationId"){let s=e.stack==="undo"?xe:Fe;if(s.length>0){let a=s[s.length-1];a.type==="relation"&&(a.relationId=e.newRelationId,y())}}else if(e.command==="scrollToIssue"){let s=e.issueId,a=document.querySelector('.issue-label[data-issue-id="'+s+'"]'),u=document.querySelector('.issue-bar[data-issue-id="'+s+'"]'),p=document.getElementById("ganttScroll"),se=document.querySelector(".gantt-header-row")?.getBoundingClientRect().height||60;if(!p)return;let De=p.scrollTop,we=p.scrollLeft;if(a){let Ye=a.closest(".gantt-row");if(Ye){let ot=Ye.offsetTop,je=Ye.getBoundingClientRect().height,Ve=p.clientHeight-se;De=Math.max(0,ot-se-(Ve-je)/2)}a.focus(),a.classList.add("highlighted"),setTimeout(()=>a.classList.remove("highlighted"),2e3)}if(u){let Ye=parseFloat(u.getAttribute("data-start-x")||"0"),je=parseFloat(u.getAttribute("data-end-x")||"0")-Ye,Ve=p.clientWidth,et=document.querySelector(".gantt-sticky-left")?.getBoundingClientRect().width||0,pt=Ve-et;je<=pt-100?we=Ye-(pt-je)/2:we=Ye-50,we=Math.max(0,we),u.classList.add("highlighted"),setTimeout(()=>u.classList.remove("highlighted"),2e3)}p.scrollTo({left:we,top:De,behavior:"smooth"})}},document.getElementById("lookbackSelect")?.addEventListener("change",e=>{ne.postMessage({command:"setLookback",years:e.target.value})}),document.getElementById("zoomSelect")?.addEventListener("change",e=>{c(),ne.postMessage({command:"setZoom",zoomLevel:e.target.value})}),document.getElementById("viewFocusSelect")?.addEventListener("change",e=>{ne.postMessage({command:"setViewFocus",focus:e.target.value})}),document.getElementById("projectSelector")?.addEventListener("change",e=>{let s=e.target.value,a=s?parseInt(s,10):null;ne.postMessage({command:"setSelectedProject",projectId:a})}),document.getElementById("focusSelector")?.addEventListener("change",e=>{let s=e.target.value;ne.postMessage({command:"setSelectedAssignee",assignee:s||null})}),document.getElementById("filterAssignee")?.addEventListener("change",e=>{let s=e.target.value;ne.postMessage({command:"setFilter",filter:{assignee:s}})}),document.getElementById("filterStatus")?.addEventListener("change",e=>{let s=e.target.value;ne.postMessage({command:"setFilter",filter:{status:s}})}),document.getElementById("menuFilterHealth")?.addEventListener("click",()=>{let e=["all","critical","warning","healthy"],s=L,u=(e.indexOf(s)+1)%e.length;ne.postMessage({command:"setHealthFilter",health:e[u]})}),document.querySelectorAll(".gantt-col-header.sortable").forEach(e=>{e.addEventListener("click",()=>{let s=e.dataset.sort;s===Z?f==="asc"?ne.postMessage({command:"setSort",sortOrder:"desc"}):ne.postMessage({command:"setSort",sortBy:null}):ne.postMessage({command:"setSort",sortBy:s,sortOrder:"asc"})})}),document.getElementById("menuHeatmap")?.addEventListener("click",()=>{document.getElementById("menuHeatmap")?.hasAttribute("disabled")||(y(),ne.postMessage({command:"toggleWorkloadHeatmap"}))}),document.getElementById("menuCapacity")?.addEventListener("click",()=>{document.getElementById("menuCapacity")?.hasAttribute("disabled")||(y(),ne.postMessage({command:"toggleCapacityRibbon"}))}),document.getElementById("menuIntensity")?.addEventListener("click",()=>{document.getElementById("menuIntensity")?.hasAttribute("disabled")||(y(),ne.postMessage({command:"toggleIntensity"}))}),document.getElementById("overloadBadge")?.addEventListener("click",e=>{e.stopPropagation();let s=e.currentTarget,a=parseInt(s.dataset.firstOverloadMs||"0",10);a>0&&(Ne(a),y())}),document.querySelectorAll(".capacity-day-bar-group").forEach(e=>{e.addEventListener("click",s=>{let a=parseInt(s.currentTarget.dataset.dateMs||"0",10);a>0&&(Ne(a),y())})}),document.getElementById("menuDeps")?.addEventListener("click",()=>{y(),ne.postMessage({command:"toggleDependencies"})});let Re=document.querySelector(".gantt-container");function st(){let e=new Map,s=new Map;return document.querySelectorAll(".dependency-arrow").forEach(a=>{if(!(a.classList.contains("rel-blocks")||a.classList.contains("rel-precedes")))return;let p=a.dataset.from,ce=a.dataset.to;e.has(p)||e.set(p,[]),e.get(p).push(ce),s.has(ce)||s.set(ce,[]),s.get(ce).push(p)}),{graph:e,reverseGraph:s}}let ve=null;function nt(e,s,a){let u=new Set([e]),p=[e];for(;p.length>0;){let se=p.shift(),De=s.get(se)||[];for(let we of De)u.has(we)||(u.add(we),p.push(we))}let ce=[e];for(;ce.length>0;){let se=ce.shift(),De=a.get(se)||[];for(let we of De)u.has(we)||(u.add(we),ce.push(we))}return u}function Je(e){if(Ze(),!e)return;ve=e;let{graph:s,reverseGraph:a}=st(),u=nt(e,s,a);Re.classList.add("focus-mode"),document.querySelectorAll(".issue-bar").forEach(p=>{u.has(p.dataset.issueId)&&p.classList.add("focus-highlighted")}),document.querySelectorAll(".issue-label").forEach(p=>{u.has(p.dataset.issueId)&&p.classList.add("focus-highlighted")}),document.querySelectorAll(".dependency-arrow").forEach(p=>{u.has(p.dataset.from)&&u.has(p.dataset.to)&&p.classList.add("focus-highlighted")}),re(`Focus: ${u.size} issue${u.size!==1?"s":""} in dependency chain`)}function Ze(){ve=null,Re.classList.remove("focus-mode"),document.querySelectorAll(".focus-highlighted").forEach(e=>e.classList.remove("focus-highlighted"))}let Ge=()=>ve,t=new Set,o=null,n=document.getElementById("selectionCount"),i=Array.from(document.querySelectorAll(".issue-bar")),r=new Map;i.forEach(e=>{let s=e.dataset.issueId;s&&(r.has(s)||r.set(s,[]),r.get(s).push(e))});function D(e){e.forEach(s=>{let a=r.get(s);a&&a.forEach(u=>u.classList.toggle("selected",t.has(s)))}),t.size>0?(n.textContent=`${t.size} selected`,n.classList.remove("hidden"),Re.classList.add("multi-select-mode")):(n.classList.add("hidden"),Re.classList.remove("multi-select-mode"))}function k(){i.forEach(e=>{e.classList.toggle("selected",t.has(e.dataset.issueId))}),t.size>0?(n.textContent=`${t.size} selected`,n.classList.remove("hidden"),Re.classList.add("multi-select-mode")):(n.classList.add("hidden"),Re.classList.remove("multi-select-mode"))}function w(){let e=[...t];t.clear(),o=null,D(e)}function F(e){t.has(e)?t.delete(e):t.add(e),o=e,D([e])}function I(e,s){let a=i.findIndex(De=>De.dataset.issueId===e),u=i.findIndex(De=>De.dataset.issueId===s);if(a===-1||u===-1)return;let p=Math.min(a,u),ce=Math.max(a,u),se=[];for(let De=p;De<=ce;De++){let we=i[De].dataset.issueId;t.has(we)||(t.add(we),se.push(we))}D(se)}function T(){i.forEach(e=>t.add(e.dataset.issueId)),k(),re(`Selected all ${t.size} issues`)}i.forEach(e=>{e.addEventListener("mousedown",s=>{if(!s.ctrlKey&&!s.metaKey&&!s.shiftKey||s.target.classList.contains("drag-handle")||s.target.classList.contains("link-handle"))return;s.preventDefault(),s.stopPropagation();let a=e.dataset.issueId;s.shiftKey&&o?I(o,a):F(a)})}),B("keydown",e=>{(e.ctrlKey||e.metaKey)&&e.key==="a"&&(e.preventDefault(),T()),e.key==="Escape"&&t.size>0&&(e.stopImmediatePropagation(),w(),re("Selection cleared"))}),document.getElementById("refreshBtn")?.addEventListener("click",()=>{document.getElementById("loadingOverlay")?.classList.add("visible"),ne.postMessage({command:"refresh"})}),document.getElementById("draftBadge")?.addEventListener("click",()=>{ne.postMessage({command:"openDraftReview"})});function g(e,s,a,u,p,ce){document.querySelector(".relation-picker")?.remove();let se=document.createElement("div");se.className="relation-picker";let De=150,we=120,Ye=Math.min(e,window.innerWidth-De-10),ot=Math.min(s,window.innerHeight-we-10);se.style.left=Math.max(10,Ye)+"px",se.style.top=Math.max(10,ot)+"px";let je=document.createElement("div");if(je.style.padding="6px 12px",je.style.fontSize="11px",je.style.opacity="0.7",je.textContent=`#${u} \u2192 #${p}`,se.appendChild(je),ce==="precedes"||ce==="follows"){let et=document.createElement("button");et.textContent="Update delay...",et.addEventListener("click",()=>{se.remove(),ne.postMessage({command:"updateRelationDelay",relationId:a,fromId:u,toId:p})}),se.appendChild(et)}let Ve=document.createElement("button");Ve.textContent="Delete relation",Ve.addEventListener("click",()=>{y(),ne.postMessage({command:"deleteRelation",relationId:a}),se.remove()}),se.appendChild(Ve),document.body.appendChild(se),ee(se)}let M=new Map,H=new Map,V=new Map,ie=new Map,pe=new Map,K=!1;function Le(){document.querySelectorAll(".issue-bar").forEach(e=>{let s=e.dataset.issueId;s&&(M.has(s)||M.set(s,[]),M.get(s).push(e))}),document.querySelectorAll(".issue-label").forEach(e=>{let s=e.dataset.issueId;s&&(H.has(s)||H.set(s,[]),H.get(s).push(e))}),document.querySelectorAll(".dependency-arrow").forEach(e=>{let s=e.dataset.from,a=e.dataset.to;s&&(V.has(s)||V.set(s,[]),V.get(s).push(e)),a&&(V.has(a)||V.set(a,[]),V.get(a).push(e))}),document.querySelectorAll(".project-label").forEach(e=>{let s=e.dataset.collapseKey;s&&(ie.has(s)||ie.set(s,[]),ie.get(s).push(e))}),document.querySelectorAll(".aggregate-bars").forEach(e=>{let s=e.dataset.collapseKey;s&&(pe.has(s)||pe.set(s,[]),pe.get(s).push(e))}),K=!0}typeof requestIdleCallback<"u"?requestIdleCallback(()=>Le(),{timeout:100}):setTimeout(Le,0);let le=[];function Ee(){document.body.classList.remove("hover-focus","dependency-hover"),le.forEach(e=>e.classList.remove("hover-highlighted","hover-source")),le=[]}function R(e){document.body.classList.add("hover-focus");let s=K?M.get(e)||[]:document.querySelectorAll('.issue-bar[data-issue-id="'+e+'"]'),a=K?H.get(e)||[]:document.querySelectorAll('.issue-label[data-issue-id="'+e+'"]'),u=K?V.get(e)||[]:document.querySelectorAll('.dependency-arrow[data-from="'+e+'"], .dependency-arrow[data-to="'+e+'"]');s.forEach(p=>{p.classList.add("hover-highlighted"),le.push(p)}),a.forEach(p=>{p.classList.add("hover-highlighted"),le.push(p)}),u.forEach(p=>{p.classList.add("hover-highlighted"),le.push(p)})}function x(e){document.body.classList.add("hover-focus");let s=K?ie.get(e)||[]:document.querySelectorAll('.project-label[data-collapse-key="'+e+'"]'),a=K?pe.get(e)||[]:document.querySelectorAll('.aggregate-bars[data-collapse-key="'+e+'"]');s.forEach(u=>{u.classList.add("hover-highlighted"),le.push(u)}),a.forEach(u=>{u.classList.add("hover-highlighted"),le.push(u)})}let N=document.querySelector(".gantt-timeline svg"),We=document.querySelector(".gantt-labels svg");if(N&&(N.addEventListener("mouseenter",e=>{let s=e.target.closest(".issue-bar"),a=e.target.closest(".aggregate-bars"),u=e.target.closest(".dependency-arrow");if(s){let p=s.dataset.issueId;p&&R(p)}else if(a){let p=a.dataset.collapseKey;p&&x(p)}else if(u){let p=u.dataset.from,ce=u.dataset.to;document.body.classList.add("dependency-hover"),u.classList.add("hover-source"),le.push(u),p&&R(p),ce&&R(ce)}},!0),N.addEventListener("mouseleave",e=>{let s=e.target.closest(".issue-bar"),a=e.target.closest(".aggregate-bars"),u=e.target.closest(".dependency-arrow");(s||a||u)&&Ee()},!0)),We&&(We.addEventListener("mouseenter",e=>{let s=e.target.closest(".issue-label"),a=e.target.closest(".project-label");if(s){let u=s.dataset.issueId;u&&R(u)}else if(a){let u=a.dataset.collapseKey;u&&x(u)}},!0),We.addEventListener("mouseleave",e=>{let s=e.target.closest(".issue-label"),a=e.target.closest(".project-label");(s||a)&&Ee()},!0)),N){let s=function(){document.querySelectorAll(".dependency-arrow.selected").forEach(a=>a.classList.remove("selected")),document.body.classList.remove("arrow-selection-mode"),document.querySelectorAll(".arrow-connected").forEach(a=>a.classList.remove("arrow-connected")),e=null};var It=s;N.addEventListener("mousedown",a=>{if(a.button!==2)return;let u=a.target.closest(".dependency-arrow");if(!u)return;let p=u.querySelector("title");p&&p.remove()}),N.addEventListener("contextmenu",a=>{let u=a.target.closest(".dependency-arrow");if(!u)return;a.preventDefault();let p=parseInt(u.dataset.relationId),ce=u.dataset.from,se=u.dataset.to,De=[...u.classList].find(Ye=>Ye.startsWith("rel-")),we=De?De.replace("rel-",""):null;g(a.clientX,a.clientY,p,ce,se,we)});let e=null;N.addEventListener("click",a=>{let u=a.target.closest(".dependency-arrow");if(e&&(e.classList.remove("selected"),document.body.classList.remove("arrow-selection-mode"),document.querySelectorAll(".arrow-connected").forEach(se=>se.classList.remove("arrow-connected")),e=null),!u)return;a.stopPropagation(),e=u,u.classList.add("selected"),document.body.classList.add("arrow-selection-mode");let p=u.dataset.from,ce=u.dataset.to;document.querySelectorAll(`.issue-bar[data-issue-id="${p}"], .issue-bar[data-issue-id="${ce}"]`).forEach(se=>se.classList.add("arrow-connected")),document.querySelectorAll(`.issue-label[data-issue-id="${p}"], .issue-label[data-issue-id="${ce}"]`).forEach(se=>se.classList.add("arrow-connected")),re(`Selected relation from #${p} to #${ce}`)}),window._ganttArrowClickHandler&&document.removeEventListener("click",window._ganttArrowClickHandler),window._ganttArrowClickHandler=a=>{(e||document.querySelector(".dependency-arrow.selected"))&&!a.target.closest(".dependency-arrow")&&!a.target.closest(".blocks-badge-group")&&!a.target.closest(".blocker-badge")&&s()},document.addEventListener("click",window._ganttArrowClickHandler),window._ganttArrowKeyHandler&&document.removeEventListener("keydown",window._ganttArrowKeyHandler),window._ganttArrowKeyHandler=a=>{let u=e||document.querySelector(".dependency-arrow.selected");a.key==="Escape"&&u&&(a.stopImmediatePropagation(),s())},document.addEventListener("keydown",window._ganttArrowKeyHandler)}bt({vscode:ne,menuUndo:qe,menuRedo:G,addDocListener:B,closeOnOutsideClick:ee,announce:re,saveState:y,updateUndoRedoButtons:q,undoStack:xe,redoStack:Fe,selectedIssues:t,clearSelection:w,allIssueBars:i,redmineBaseUrl:ae,extendedRelationTypes:J,minDateMs:Q,maxDateMs:Y,timelineWidth:v,dayWidth:d,barHeight:U,ganttScroll:O,snapToDay:be,focusOnDependencyChain:Je,clearFocus:Ze,getFocusedIssueId:Ge,scrollToAndHighlight:dt,setAllowScrollChange:ue,isDraftModeEnabled:()=>S,isPerfDebugEnabled:()=>tt}),vt({vscode:ne,addDocListener:B,addWinListener:z,announce:re,barHeight:U,selectedCollapseKey:ge});function Oe(){if(!oe){ne.postMessage({command:"todayOutOfRange"});return}if(O){let s=document.querySelector(".gantt-body .gantt-sticky-left")?.offsetWidth??0,a=O.clientWidth-s;O.scrollLeft=Math.max(0,P-a/2)}}function dt(e){if(!e)return;$=!0;let s=document.querySelector('.issue-label[data-issue-id="'+e+'"]'),a=document.querySelector('.issue-bar[data-issue-id="'+e+'"]');if(s&&(s.scrollIntoView({behavior:"smooth",block:"center"}),s.classList.add("highlighted"),setTimeout(()=>s.classList.remove("highlighted"),1500)),a&&O){let u=a.getBoundingClientRect(),p=O.getBoundingClientRect(),ce=O.scrollLeft+u.left-p.left-100;O.scrollTo({left:Math.max(0,ce),behavior:"smooth"}),a.classList.add("highlighted"),setTimeout(()=>a.classList.remove("highlighted"),1500)}}wt({vscode:ne,addDocListener:B,menuUndo:qe,menuRedo:G,undoStack:xe,redoStack:Fe,saveState:y,updateUndoRedoButtons:q,announce:re,scrollToAndHighlight:dt,scrollToToday:Oe}),Dt({addDocListener:B,addWinListener:z,ganttScroll:O}),requestAnimationFrame(()=>{if(Se!==null&&O){let e=Math.max(Q,Math.min(Y,Se));Ne(e),_e!==null&&(O.scrollTop=_e),Se=null,_e=null}else Xe!==null&&O?(O.scrollLeft=Xe,_e!==null&&(O.scrollTop=_e),Xe=null,_e=null):Oe();$e(),te=!1}),document.getElementById("todayBtn")?.addEventListener("click",Oe);let ut=document.getElementById("resizeHandle"),ft=document.getElementById("resizeHandleHeader"),at=!1,mt=0,gt=0,rt=null;function ht(e,s){at=!0,rt=s,mt=e.clientX,gt=Me.offsetWidth,s.classList.add("dragging"),document.body.classList.add("cursor-col-resize","user-select-none"),e.preventDefault()}ut?.addEventListener("mousedown",e=>ht(e,ut)),ft?.addEventListener("mousedown",e=>ht(e,ft));let it=!1,lt=null;B("mousemove",e=>{at&&(lt=e,!it&&(it=!0,requestAnimationFrame(()=>{if(it=!1,!lt)return;let s=lt.clientX-mt,a=Math.min(600,Math.max(120,gt+s));if(Be&&(Be.style.width=a+"px"),Me){Me.style.width=a+"px";let p=Me.querySelector("svg");p&&p.setAttribute("width",String(a))}let u=document.querySelector(".capacity-ribbon-label");u&&(u.style.width=a+X+"px"),Ke()})))}),B("mouseup",()=>{at&&(at=!1,rt?.classList.remove("dragging"),rt=null,document.body.classList.remove("cursor-col-resize","user-select-none"),y())}),requestAnimationFrame(()=>{document.getElementById("loadingOverlay")?.classList.remove("visible")}),Qe("initializeGantt-end"),ct("initializeGantt","initializeGantt-start","initializeGantt-end")}})();
+    `;
+      document.body.appendChild(keyboardHelpEl);
+      keyboardHelpEl.addEventListener("click", (e) => {
+        if (e.target === keyboardHelpEl) toggleKeyboardHelp();
+      });
+    }
+    addDocListener("keydown", (e) => {
+      if (e.key === "Escape" && keyboardHelpEl) {
+        e.stopImmediatePropagation();
+        toggleKeyboardHelp();
+      }
+    });
+  }
+
+  // src/webviews/gantt/index.js
+  var vscode = acquireVsCodeApi();
+  var PERF_DEBUG = false;
+  function perfMark(name) {
+    if (PERF_DEBUG && typeof performance !== "undefined") {
+      performance.mark(name);
+    }
+  }
+  function perfMeasure(name, startMark, endMark) {
+    if (PERF_DEBUG && typeof performance !== "undefined") {
+      try {
+        performance.measure(name, startMark, endMark);
+        const entries = performance.getEntriesByName(name, "measure");
+        if (entries.length > 0) {
+          console.log(`[Gantt Perf] ${name}: ${entries[entries.length - 1].duration.toFixed(2)}ms`);
+        }
+        performance.clearMarks(startMark);
+        performance.clearMarks(endMark);
+        performance.clearMeasures(name);
+      } catch (e) {
+      }
+    }
+  }
+  function logDomStats() {
+    if (PERF_DEBUG) {
+      const root = document.getElementById("ganttRoot");
+      const nodeCount = root ? root.querySelectorAll("*").length : 0;
+      const svgCount = root ? root.querySelectorAll("svg *").length : 0;
+      console.log(`[Gantt Perf] DOM nodes: ${nodeCount}, SVG elements: ${svgCount}`);
+    }
+  }
+  function applyCssVars(state) {
+    if (!state) return;
+    const root = document.documentElement;
+    root.style.setProperty("--gantt-header-height", `${state.headerHeight}px`);
+    root.style.setProperty("--gantt-label-width", `${state.labelWidth}px`);
+    root.style.setProperty("--gantt-id-column-width", `${state.idColumnWidth}px`);
+    root.style.setProperty("--gantt-start-date-column-width", `${state.startDateColumnWidth}px`);
+    root.style.setProperty("--gantt-status-column-width", `${state.statusColumnWidth}px`);
+    root.style.setProperty("--gantt-due-date-column-width", `${state.dueDateColumnWidth}px`);
+    root.style.setProperty("--gantt-assignee-column-width", `${state.assigneeColumnWidth}px`);
+    root.style.setProperty("--gantt-sticky-left-width", `${state.stickyLeftWidth}px`);
+  }
+  function setupTooltips({ addDocListener, addWinListener }) {
+    const root = document.getElementById("ganttRoot");
+    const tooltip = document.getElementById("ganttTooltip");
+    const tooltipContent = tooltip?.querySelector(".gantt-tooltip-content");
+    if (!root || !tooltip || !tooltipContent) return;
+    const normalizeTooltipText = (value) => {
+      if (!value) return "";
+      return String(value).replace(/\r\n/g, "\n").trimEnd();
+    };
+    function convertSvgTitles() {
+      root.querySelectorAll("svg title").forEach((title) => {
+        const parent = title.parentElement;
+        const text = normalizeTooltipText(title.textContent);
+        if (parent && text) {
+          parent.dataset.tooltip = text;
+        }
+        title.remove();
+      });
+    }
+    function convertTitleAttributes() {
+      root.querySelectorAll("[title]").forEach((el) => {
+        if (el.tagName.toLowerCase() === "title") return;
+        const text = normalizeTooltipText(el.getAttribute("title"));
+        el.removeAttribute("title");
+        if (text) {
+          el.dataset.tooltip = text;
+        }
+      });
+    }
+    function convertToolbarTooltips() {
+      root.querySelectorAll("[data-toolbar-tooltip]").forEach((el) => {
+        const text = normalizeTooltipText(el.dataset.toolbarTooltip);
+        delete el.dataset.toolbarTooltip;
+        if (text) {
+          el.dataset.tooltip = text;
+        }
+      });
+    }
+    function prepareTooltips() {
+      convertSvgTitles();
+      convertTitleAttributes();
+      convertToolbarTooltips();
+    }
+    function findHeaderIndex(lines) {
+      const headerIndex = lines.findIndex((line) => line.trim().startsWith("#"));
+      if (headerIndex >= 0) return headerIndex;
+      const nonEmptyLines = lines.filter((line) => line.trim());
+      if (nonEmptyLines.length > 1) {
+        return lines.findIndex((line) => line.trim());
+      }
+      return -1;
+    }
+    function buildTooltipContent(text) {
+      tooltipContent.textContent = "";
+      const normalized = normalizeTooltipText(text);
+      if (!normalized) return;
+      const lines = normalized.split("\n");
+      const headerIndex = findHeaderIndex(lines);
+      let lastWasSpacer = false;
+      lines.forEach((line, index) => {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          if (!lastWasSpacer) {
+            const spacer = document.createElement("div");
+            spacer.className = "gantt-tooltip-spacer";
+            tooltipContent.appendChild(spacer);
+            lastWasSpacer = true;
+          }
+          return;
+        }
+        if (trimmed === "---") {
+          const divider = document.createElement("div");
+          divider.className = "gantt-tooltip-divider";
+          tooltipContent.appendChild(divider);
+          lastWasSpacer = false;
+          return;
+        }
+        const customMatch = trimmed.match(/^cf:([^:]+):(.*)$/);
+        if (customMatch) {
+          const key = customMatch[1].trim();
+          const value = customMatch[2].trim();
+          const lineEl2 = document.createElement("div");
+          lineEl2.className = "gantt-tooltip-line";
+          const keyEl = document.createElement("span");
+          keyEl.className = "gantt-tooltip-key";
+          keyEl.textContent = `${key}: `;
+          lineEl2.appendChild(keyEl);
+          if (value) {
+            lineEl2.appendChild(document.createTextNode(value));
+          }
+          tooltipContent.appendChild(lineEl2);
+          lastWasSpacer = false;
+          return;
+        }
+        const lineEl = document.createElement("div");
+        lineEl.className = "gantt-tooltip-line";
+        if (index === headerIndex) {
+          lineEl.classList.add("gantt-tooltip-title");
+        }
+        const openMatch = trimmed.match(/^Open in Browser:\s*(\S+)/);
+        if (openMatch && /^https?:\/\//i.test(openMatch[1])) {
+          lineEl.appendChild(document.createTextNode("Open in Browser: "));
+          const link = document.createElement("a");
+          link.href = openMatch[1];
+          link.textContent = openMatch[1];
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          lineEl.appendChild(link);
+        } else {
+          lineEl.textContent = line;
+        }
+        tooltipContent.appendChild(lineEl);
+        lastWasSpacer = false;
+      });
+      const lastChild = tooltipContent.lastElementChild;
+      if (lastChild && lastChild.classList.contains("gantt-tooltip-spacer")) {
+        lastChild.remove();
+      }
+    }
+    let activeTarget = null;
+    let hideTimer = null;
+    let showTimer = null;
+    let lastPointer = { x: 0, y: 0 };
+    function updatePointer(event) {
+      lastPointer = { x: event.clientX, y: event.clientY };
+    }
+    function cancelHide() {
+      if (!hideTimer) return;
+      clearTimeout(hideTimer);
+      hideTimer = null;
+    }
+    function cancelShow() {
+      if (!showTimer) return;
+      clearTimeout(showTimer);
+      showTimer = null;
+    }
+    function isInTooltip(node) {
+      return node && (node === tooltip || tooltip.contains(node));
+    }
+    function isInActiveTarget(node) {
+      return node && activeTarget && (node === activeTarget || activeTarget.contains(node));
+    }
+    function isPointerOverTooltipOrTarget() {
+      if (!lastPointer) return false;
+      const hovered = document.elementFromPoint(lastPointer.x, lastPointer.y);
+      return isInTooltip(hovered) || isInActiveTarget(hovered);
+    }
+    const showDelay = 300;
+    function scheduleShow(target) {
+      cancelShow();
+      showTimer = setTimeout(() => {
+        showTimer = null;
+        if (!activeTarget || activeTarget !== target) return;
+        if (!isPointerOverTooltipOrTarget()) return;
+        showTooltip(target, lastPointer.x, lastPointer.y);
+      }, showDelay);
+    }
+    function scheduleHide() {
+      cancelHide();
+      hideTimer = setTimeout(() => {
+        if (!activeTarget) return;
+        if (isPointerOverTooltipOrTarget()) return;
+        hideTooltip();
+      }, 300);
+    }
+    function positionTooltip(x, y) {
+      const padding = 8;
+      const offset = 8;
+      const rect = tooltip.getBoundingClientRect();
+      let left = x + offset;
+      let top = y + offset;
+      if (left + rect.width > window.innerWidth - padding) {
+        left = x - rect.width - offset;
+      }
+      if (top + rect.height > window.innerHeight - padding) {
+        top = y - rect.height - offset;
+      }
+      left = Math.max(padding, Math.min(left, window.innerWidth - rect.width - padding));
+      top = Math.max(padding, Math.min(top, window.innerHeight - rect.height - padding));
+      tooltip.style.left = `${Math.round(left)}px`;
+      tooltip.style.top = `${Math.round(top)}px`;
+    }
+    function showTooltip(target, x, y) {
+      const text = target.dataset.tooltip;
+      if (!text) return;
+      buildTooltipContent(text);
+      tooltip.classList.add("visible");
+      tooltip.setAttribute("aria-hidden", "false");
+      positionTooltip(x, y);
+    }
+    function hideTooltip(keepTarget = false) {
+      cancelShow();
+      cancelHide();
+      tooltip.classList.remove("visible");
+      tooltip.setAttribute("aria-hidden", "true");
+      if (!keepTarget) {
+        activeTarget = null;
+      }
+    }
+    function resolveTooltipTarget(node) {
+      if (!node || node === tooltip || tooltip.contains(node)) return null;
+      const target = node.closest?.("[data-tooltip], [title]");
+      if (!target || !root.contains(target)) return null;
+      if (target.hasAttribute("title")) {
+        const title = normalizeTooltipText(target.getAttribute("title"));
+        target.removeAttribute("title");
+        if (title) {
+          target.dataset.tooltip = title;
+        }
+      }
+      if (!target.dataset.tooltip) return null;
+      return target;
+    }
+    prepareTooltips();
+    addDocListener("pointerover", (event) => {
+      updatePointer(event);
+      if (isInTooltip(event.target)) {
+        cancelHide();
+        cancelShow();
+        return;
+      }
+      const target = resolveTooltipTarget(event.target);
+      if (!target) {
+        cancelShow();
+        return;
+      }
+      cancelHide();
+      if (activeTarget !== target) {
+        activeTarget = target;
+        if (tooltip.classList.contains("visible")) {
+          hideTooltip(true);
+        }
+        scheduleShow(target);
+      } else if (!tooltip.classList.contains("visible")) {
+        scheduleShow(target);
+      }
+    }, true);
+    addDocListener("pointermove", (event) => {
+      if (!activeTarget) return;
+      updatePointer(event);
+      if (hideTimer && isPointerOverTooltipOrTarget()) {
+        cancelHide();
+      }
+    }, true);
+    addDocListener("pointerout", (event) => {
+      if (!activeTarget) return;
+      updatePointer(event);
+      cancelShow();
+      if (!isInActiveTarget(event.target) && !isInTooltip(event.target)) return;
+      const related = event.relatedTarget;
+      if (isInTooltip(related) || isInActiveTarget(related)) return;
+      scheduleHide();
+    }, true);
+    addDocListener("scroll", () => {
+      if (activeTarget) hideTooltip();
+    }, true);
+    addDocListener("keydown", () => {
+      if (activeTarget) hideTooltip();
+    }, true);
+    addWinListener("blur", () => {
+      if (activeTarget) hideTooltip();
+    });
+  }
+  function render(payload) {
+    if (!payload) return;
+    if (payload.state) {
+      PERF_DEBUG = payload.state.perfDebug ?? false;
+    }
+    perfMark("render-start");
+    const root = document.getElementById("ganttRoot");
+    if (!root) return;
+    applyCssVars(payload.state);
+    perfMark("innerHTML-start");
+    root.innerHTML = payload.html || "";
+    perfMark("innerHTML-end");
+    perfMeasure("innerHTML", "innerHTML-start", "innerHTML-end");
+    initializeGantt(payload.state);
+    perfMark("render-end");
+    perfMeasure("render", "render-start", "render-end");
+    logDomStats();
+  }
+  window.addEventListener("message", (event) => {
+    const message = event.data;
+    if (!message) return;
+    if (message.command === "render") {
+      render(message.payload);
+      return;
+    }
+    if (window.__ganttHandleExtensionMessage) {
+      window.__ganttHandleExtensionMessage(message);
+    }
+  });
+  var initialPayload = window.__GANTT_INITIAL_PAYLOAD__;
+  if (initialPayload) {
+    render(initialPayload);
+  }
+  vscode.postMessage({ command: "webviewReady" });
+  function initializeGantt(state) {
+    perfMark("initializeGantt-start");
+    if (!state) return;
+    const {
+      timelineWidth,
+      minDateMs,
+      maxDateMs,
+      totalDays,
+      extendedRelationTypes,
+      redmineBaseUrl,
+      minimapBarsData,
+      minimapHeight,
+      minimapBarHeight,
+      minimapTodayX,
+      extScrollLeft,
+      extScrollTop,
+      labelWidth,
+      leftExtrasWidth,
+      healthFilter,
+      sortBy,
+      sortOrder,
+      selectedCollapseKey,
+      barHeight,
+      todayX,
+      todayInRange,
+      isDraftMode,
+      draftQueueCount
+    } = state;
+    const dayWidth = timelineWidth / totalDays;
+    let currentDraftMode = isDraftMode;
+    const confirmBtn = document.getElementById("dragConfirmOk");
+    if (confirmBtn) {
+      confirmBtn.textContent = isDraftMode ? "Queue to Draft" : "Save to Redmine";
+    }
+    const draftBadge = document.getElementById("draftBadge");
+    if (draftBadge) {
+      if (isDraftMode) {
+        draftBadge.classList.remove("hidden");
+        const c = draftQueueCount ?? 0;
+        draftBadge.textContent = c;
+        draftBadge.dataset.tooltip = c === 1 ? "1 change queued - click to review" : c + " changes queued - click to review";
+      } else {
+        draftBadge.classList.add("hidden");
+      }
+      draftBadge.addEventListener("click", () => {
+        vscode.postMessage({ command: "openDraftReview" });
+      });
+    }
+    const draftModeToggle = document.getElementById("draftModeToggle");
+    if (draftModeToggle) {
+      draftModeToggle.addEventListener("click", () => {
+        vscode.postMessage({ command: "toggleDraftMode" });
+      });
+    }
+    if (window._ganttCleanup) {
+      window._ganttCleanup();
+    }
+    const docListeners = [];
+    const winListeners = [];
+    function addDocListener(type, handler, options) {
+      document.addEventListener(type, handler, options);
+      docListeners.push({ type, handler, options });
+    }
+    function addWinListener(type, handler, options) {
+      window.addEventListener(type, handler, options);
+      winListeners.push({ type, handler, options });
+    }
+    window._ganttCleanup = () => {
+      docListeners.forEach((l) => document.removeEventListener(l.type, l.handler, l.options));
+      winListeners.forEach((l) => window.removeEventListener(l.type, l.handler, l.options));
+      window.__ganttHandleExtensionMessage = null;
+    };
+    function closeOnOutsideClick(element) {
+      setTimeout(() => {
+        document.addEventListener("click", function closeHandler(e) {
+          if (!element.contains(e.target)) {
+            element.remove();
+            document.removeEventListener("click", closeHandler);
+          }
+        });
+      }, 0);
+    }
+    function snapToDay(x) {
+      return Math.round(x / dayWidth) * dayWidth;
+    }
+    function announce(message) {
+      const liveRegion = document.getElementById("liveRegion");
+      if (liveRegion) {
+        liveRegion.textContent = message;
+      }
+    }
+    const ganttScroll = document.getElementById("ganttScroll");
+    const ganttLeftHeader = document.getElementById("ganttLeftHeader");
+    const labelsColumn = document.getElementById("ganttLabels");
+    const timelineColumn = document.getElementById("ganttTimeline");
+    const menuUndo = document.getElementById("menuUndo");
+    const menuRedo = document.getElementById("menuRedo");
+    const minimapSvg = document.getElementById("minimapSvg");
+    const minimapViewport = document.getElementById("minimapViewport");
+    const { updateMinimapPosition, updateMinimapViewport } = setupMinimap({
+      timelineWidth,
+      minimapBarsData,
+      minimapHeight,
+      minimapBarHeight,
+      minimapTodayX,
+      ganttScroll,
+      minimapSvg,
+      minimapViewport,
+      addDocListener
+    });
+    const previousState = vscode.getState() || { undoStack: [], redoStack: [], labelWidth, scrollLeft: null, scrollTop: null, centerDateMs: null };
+    const undoStack = previousState.undoStack || [];
+    const redoStack = previousState.redoStack || [];
+    let savedScrollLeft = previousState.scrollLeft ?? (extScrollLeft > 0 ? extScrollLeft : null);
+    let savedScrollTop = previousState.scrollTop ?? (extScrollTop > 0 ? extScrollTop : null);
+    let savedCenterDateMs = previousState.centerDateMs;
+    function getCenterDateMs() {
+      if (!ganttScroll) return null;
+      const stickyLeft = document.querySelector(".gantt-body .gantt-sticky-left");
+      const stickyWidth = stickyLeft?.offsetWidth ?? 0;
+      const visibleTimelineWidth = ganttScroll.clientWidth - stickyWidth;
+      const centerX = ganttScroll.scrollLeft + visibleTimelineWidth / 2;
+      const ratio = centerX / timelineWidth;
+      return minDateMs + ratio * (maxDateMs - minDateMs);
+    }
+    function scrollToCenterDate(dateMs) {
+      if (!ganttScroll) return;
+      const ratio = (dateMs - minDateMs) / (maxDateMs - minDateMs);
+      const centerX = ratio * timelineWidth;
+      const stickyLeft = document.querySelector(".gantt-body .gantt-sticky-left");
+      const stickyWidth = stickyLeft?.offsetWidth ?? 0;
+      const visibleTimelineWidth = ganttScroll.clientWidth - stickyWidth;
+      ganttScroll.scrollLeft = Math.max(0, centerX - visibleTimelineWidth / 2);
+    }
+    function saveState() {
+      vscode.setState({
+        undoStack,
+        redoStack,
+        labelWidth: labelsColumn?.offsetWidth || labelWidth,
+        scrollLeft: null,
+        // Deprecated: use centerDateMs instead
+        scrollTop: ganttScroll?.scrollTop ?? null,
+        centerDateMs: getCenterDateMs()
+      });
+    }
+    const saveStateForZoom = saveState;
+    function updateUndoRedoButtons() {
+      if (menuUndo) menuUndo.toggleAttribute("disabled", undoStack.length === 0);
+      if (menuRedo) menuRedo.toggleAttribute("disabled", redoStack.length === 0);
+      saveState();
+    }
+    if (previousState.labelWidth && ganttLeftHeader && labelsColumn) {
+      ganttLeftHeader.style.width = previousState.labelWidth + "px";
+      labelsColumn.style.width = previousState.labelWidth + "px";
+      const capacityLabel = document.querySelector(".capacity-ribbon-label");
+      if (capacityLabel) {
+        capacityLabel.style.width = previousState.labelWidth + leftExtrasWidth + "px";
+      }
+    }
+    let restoringScroll = true;
+    let allowScrollChange = false;
+    const setAllowScrollChange = (value) => {
+      allowScrollChange = value;
+    };
+    let deferredScrollUpdate = null;
+    if (ganttScroll) {
+      ganttScroll.addEventListener("scroll", () => {
+        cancelAnimationFrame(deferredScrollUpdate);
+        deferredScrollUpdate = requestAnimationFrame(() => {
+          updateMinimapViewport();
+          if (!restoringScroll) saveState();
+        });
+      }, { passive: true });
+    }
+    requestAnimationFrame(() => updateUndoRedoButtons());
+    window.__ganttHandleExtensionMessage = (message) => {
+      if (message.command === "setHeatmapState") {
+        const heatmapLayer = document.querySelector(".heatmap-layer");
+        const weekendLayer = document.querySelector(".weekend-layer");
+        const menuHeatmap = document.getElementById("menuHeatmap");
+        if (message.enabled) {
+          if (heatmapLayer) heatmapLayer.classList.remove("hidden");
+          if (weekendLayer) weekendLayer.classList.add("hidden");
+          if (menuHeatmap) menuHeatmap.classList.add("active");
+        } else {
+          if (heatmapLayer) heatmapLayer.classList.add("hidden");
+          if (weekendLayer) weekendLayer.classList.remove("hidden");
+          if (menuHeatmap) menuHeatmap.classList.remove("active");
+        }
+      } else if (message.command === "setDependenciesState") {
+        const dependencyLayer = document.querySelector(".dependency-layer");
+        const menuDeps = document.getElementById("menuDeps");
+        if (message.enabled) {
+          if (dependencyLayer) dependencyLayer.classList.remove("hidden");
+          if (menuDeps) menuDeps.classList.add("active");
+        } else {
+          if (dependencyLayer) dependencyLayer.classList.add("hidden");
+          if (menuDeps) menuDeps.classList.remove("active");
+        }
+      } else if (message.command === "setBadgesState") {
+        const ganttContainer2 = document.querySelector(".gantt-container");
+        const menuBadges = document.getElementById("menuBadges");
+        if (message.enabled) {
+          if (ganttContainer2) ganttContainer2.classList.remove("hide-badges");
+          if (menuBadges) menuBadges.classList.add("active");
+        } else {
+          if (ganttContainer2) ganttContainer2.classList.add("hide-badges");
+          if (menuBadges) menuBadges.classList.remove("active");
+        }
+      } else if (message.command === "setCapacityRibbonState") {
+        const capacityRibbon = document.querySelector(".capacity-ribbon");
+        const menuCapacity = document.getElementById("menuCapacity");
+        if (message.enabled) {
+          if (capacityRibbon) capacityRibbon.classList.remove("hidden");
+          if (menuCapacity) menuCapacity.classList.add("active");
+        } else {
+          if (capacityRibbon) capacityRibbon.classList.add("hidden");
+          if (menuCapacity) menuCapacity.classList.remove("active");
+        }
+      } else if (message.command === "setIntensityState") {
+        const ganttContainer2 = document.querySelector(".gantt-container");
+        const menuIntensity = document.getElementById("menuIntensity");
+        if (message.enabled) {
+          ganttContainer2?.classList.add("intensity-enabled");
+          if (menuIntensity) menuIntensity.classList.add("active");
+        } else {
+          ganttContainer2?.classList.remove("intensity-enabled");
+          if (menuIntensity) menuIntensity.classList.remove("active");
+        }
+      } else if (message.command === "setDraftModeState") {
+        currentDraftMode = message.enabled;
+        const confirmBtn2 = document.getElementById("dragConfirmOk");
+        if (confirmBtn2) {
+          confirmBtn2.textContent = message.enabled ? "Queue to Draft" : "Save to Redmine";
+        }
+        const toggleBtn = document.getElementById("draftModeToggle");
+        if (toggleBtn) {
+          toggleBtn.classList.toggle("active", message.enabled);
+          toggleBtn.textContent = message.enabled ? "Disable Draft Mode" : "Enable Draft Mode";
+        }
+        const draftBadge2 = document.getElementById("draftBadge");
+        if (draftBadge2) {
+          if (message.enabled) {
+            draftBadge2.classList.remove("hidden");
+            const c = message.queueCount ?? 0;
+            draftBadge2.textContent = c;
+            draftBadge2.dataset.tooltip = c === 1 ? "1 change queued - click to review" : c + " changes queued - click to review";
+          } else {
+            draftBadge2.classList.add("hidden");
+          }
+        }
+      } else if (message.command === "setDraftQueueCount") {
+        const draftBadge2 = document.getElementById("draftBadge");
+        if (draftBadge2) {
+          const c = message.count;
+          draftBadge2.textContent = c;
+          draftBadge2.dataset.tooltip = c === 1 ? "1 change queued - click to review" : c + " changes queued - click to review";
+        }
+      } else if (message.command === "pushUndoAction") {
+        undoStack.push(message.action);
+        redoStack.length = 0;
+        updateUndoRedoButtons();
+        saveState();
+      } else if (message.command === "updateRelationId") {
+        const stack = message.stack === "undo" ? undoStack : redoStack;
+        if (stack.length > 0) {
+          const lastAction = stack[stack.length - 1];
+          if (lastAction.type === "relation") {
+            lastAction.relationId = message.newRelationId;
+            saveState();
+          }
+        }
+      } else if (message.command === "scrollToIssue") {
+        const issueId = message.issueId;
+        const label = document.querySelector('.issue-label[data-issue-id="' + issueId + '"]');
+        const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
+        const scrollContainer = document.getElementById("ganttScroll");
+        const headerRow = document.querySelector(".gantt-header-row");
+        const headerHeight = headerRow?.getBoundingClientRect().height || 60;
+        if (!scrollContainer) return;
+        let targetScrollTop = scrollContainer.scrollTop;
+        let targetScrollLeft = scrollContainer.scrollLeft;
+        if (label) {
+          const labelRow = label.closest(".gantt-row");
+          if (labelRow) {
+            const rowTop = labelRow.offsetTop;
+            const rowHeight = labelRow.getBoundingClientRect().height;
+            const viewportHeight = scrollContainer.clientHeight - headerHeight;
+            targetScrollTop = Math.max(0, rowTop - headerHeight - (viewportHeight - rowHeight) / 2);
+          }
+          label.focus();
+          label.classList.add("highlighted");
+          setTimeout(() => label.classList.remove("highlighted"), 2e3);
+        }
+        if (bar) {
+          const startX = parseFloat(bar.getAttribute("data-start-x") || "0");
+          const endX = parseFloat(bar.getAttribute("data-end-x") || "0");
+          const barWidth = endX - startX;
+          const viewportWidth = scrollContainer.clientWidth;
+          const stickyLeftWidth = document.querySelector(".gantt-sticky-left")?.getBoundingClientRect().width || 0;
+          const availableWidth = viewportWidth - stickyLeftWidth;
+          if (barWidth <= availableWidth - 100) {
+            targetScrollLeft = startX - (availableWidth - barWidth) / 2;
+          } else {
+            targetScrollLeft = startX - 50;
+          }
+          targetScrollLeft = Math.max(0, targetScrollLeft);
+          bar.classList.add("highlighted");
+          setTimeout(() => bar.classList.remove("highlighted"), 2e3);
+        }
+        scrollContainer.scrollTo({ left: targetScrollLeft, top: targetScrollTop, behavior: "smooth" });
+      }
+    };
+    document.getElementById("lookbackSelect")?.addEventListener("change", (e) => {
+      vscode.postMessage({ command: "setLookback", years: e.target.value });
+    });
+    document.getElementById("zoomSelect")?.addEventListener("change", (e) => {
+      saveStateForZoom();
+      vscode.postMessage({ command: "setZoom", zoomLevel: e.target.value });
+    });
+    document.getElementById("viewFocusSelect")?.addEventListener("change", (e) => {
+      vscode.postMessage({ command: "setViewFocus", focus: e.target.value });
+    });
+    const projectSelector = document.getElementById("projectSelector");
+    projectSelector?.addEventListener("change", (e) => {
+      const value = e.target.value;
+      const projectId = value ? parseInt(value, 10) : null;
+      vscode.postMessage({ command: "setSelectedProject", projectId });
+    });
+    const focusSelector = document.getElementById("focusSelector");
+    focusSelector?.addEventListener("change", (e) => {
+      const value = e.target.value;
+      vscode.postMessage({
+        command: "setSelectedAssignee",
+        assignee: value || null
+      });
+    });
+    document.getElementById("filterAssignee")?.addEventListener("change", (e) => {
+      const value = e.target.value;
+      vscode.postMessage({ command: "setFilter", filter: { assignee: value } });
+    });
+    document.getElementById("filterStatus")?.addEventListener("change", (e) => {
+      const value = e.target.value;
+      vscode.postMessage({ command: "setFilter", filter: { status: value } });
+    });
+    document.getElementById("menuFilterHealth")?.addEventListener("click", () => {
+      const options = ["all", "critical", "warning", "healthy"];
+      const currentHealth = healthFilter;
+      const currentIdx = options.indexOf(currentHealth);
+      const nextIdx = (currentIdx + 1) % options.length;
+      vscode.postMessage({ command: "setHealthFilter", health: options[nextIdx] });
+    });
+    document.querySelectorAll(".gantt-col-header.sortable").forEach((header) => {
+      header.addEventListener("click", () => {
+        const sortField = header.dataset.sort;
+        const currentSort = sortBy;
+        const currentOrder = sortOrder;
+        if (sortField === currentSort) {
+          if (currentOrder === "asc") {
+            vscode.postMessage({ command: "setSort", sortOrder: "desc" });
+          } else {
+            vscode.postMessage({ command: "setSort", sortBy: null });
+          }
+        } else {
+          vscode.postMessage({ command: "setSort", sortBy: sortField, sortOrder: "asc" });
+        }
+      });
+    });
+    document.getElementById("menuHeatmap")?.addEventListener("click", () => {
+      if (document.getElementById("menuHeatmap")?.hasAttribute("disabled")) return;
+      saveState();
+      vscode.postMessage({ command: "toggleWorkloadHeatmap" });
+    });
+    document.getElementById("menuCapacity")?.addEventListener("click", () => {
+      if (document.getElementById("menuCapacity")?.hasAttribute("disabled")) return;
+      saveState();
+      vscode.postMessage({ command: "toggleCapacityRibbon" });
+    });
+    document.getElementById("menuIntensity")?.addEventListener("click", () => {
+      if (document.getElementById("menuIntensity")?.hasAttribute("disabled")) return;
+      saveState();
+      vscode.postMessage({ command: "toggleIntensity" });
+    });
+    document.getElementById("overloadBadge")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const badge = e.currentTarget;
+      const firstOverloadMs = parseInt(badge.dataset.firstOverloadMs || "0", 10);
+      if (firstOverloadMs > 0) {
+        scrollToCenterDate(firstOverloadMs);
+        saveState();
+      }
+    });
+    document.querySelectorAll(".capacity-day-bar-group").forEach((group) => {
+      group.addEventListener("click", (e) => {
+        const dateMs = parseInt(e.currentTarget.dataset.dateMs || "0", 10);
+        if (dateMs > 0) {
+          scrollToCenterDate(dateMs);
+          saveState();
+        }
+      });
+    });
+    document.getElementById("menuDeps")?.addEventListener("click", () => {
+      saveState();
+      vscode.postMessage({ command: "toggleDependencies" });
+    });
+    document.getElementById("menuBadges")?.addEventListener("click", () => {
+      saveState();
+      vscode.postMessage({ command: "toggleBadges" });
+    });
+    const ganttContainer = document.querySelector(".gantt-container");
+    function buildBlockingGraph() {
+      const graph = /* @__PURE__ */ new Map();
+      const reverseGraph = /* @__PURE__ */ new Map();
+      document.querySelectorAll(".dependency-arrow").forEach((arrow) => {
+        const relType = arrow.classList.contains("rel-blocks") || arrow.classList.contains("rel-precedes");
+        if (!relType) return;
+        const fromId = arrow.dataset.from;
+        const toId = arrow.dataset.to;
+        if (!graph.has(fromId)) graph.set(fromId, []);
+        graph.get(fromId).push(toId);
+        if (!reverseGraph.has(toId)) reverseGraph.set(toId, []);
+        reverseGraph.get(toId).push(fromId);
+      });
+      return { graph, reverseGraph };
+    }
+    let focusedIssueId = null;
+    function getAllConnected(issueId, graph, reverseGraph) {
+      const connected = /* @__PURE__ */ new Set([issueId]);
+      const queue = [issueId];
+      while (queue.length > 0) {
+        const current = queue.shift();
+        const downstream = graph.get(current) || [];
+        for (const dep of downstream) {
+          if (!connected.has(dep)) {
+            connected.add(dep);
+            queue.push(dep);
+          }
+        }
+      }
+      const upQueue = [issueId];
+      while (upQueue.length > 0) {
+        const current = upQueue.shift();
+        const upstream = reverseGraph.get(current) || [];
+        for (const dep of upstream) {
+          if (!connected.has(dep)) {
+            connected.add(dep);
+            upQueue.push(dep);
+          }
+        }
+      }
+      return connected;
+    }
+    function focusOnDependencyChain(issueId) {
+      clearFocus();
+      if (!issueId) return;
+      focusedIssueId = issueId;
+      const { graph, reverseGraph } = buildBlockingGraph();
+      const connected = getAllConnected(issueId, graph, reverseGraph);
+      ganttContainer.classList.add("focus-mode");
+      document.querySelectorAll(".issue-bar").forEach((bar) => {
+        if (connected.has(bar.dataset.issueId)) {
+          bar.classList.add("focus-highlighted");
+        }
+      });
+      document.querySelectorAll(".issue-label").forEach((label) => {
+        if (connected.has(label.dataset.issueId)) {
+          label.classList.add("focus-highlighted");
+        }
+      });
+      document.querySelectorAll(".dependency-arrow").forEach((arrow) => {
+        if (connected.has(arrow.dataset.from) && connected.has(arrow.dataset.to)) {
+          arrow.classList.add("focus-highlighted");
+        }
+      });
+      announce(`Focus: ${connected.size} issue${connected.size !== 1 ? "s" : ""} in dependency chain`);
+    }
+    function clearFocus() {
+      focusedIssueId = null;
+      ganttContainer.classList.remove("focus-mode");
+      document.querySelectorAll(".focus-highlighted").forEach((el) => el.classList.remove("focus-highlighted"));
+    }
+    const getFocusedIssueId = () => focusedIssueId;
+    const selectedIssues = /* @__PURE__ */ new Set();
+    let lastClickedIssueId = null;
+    const selectionCountEl = document.getElementById("selectionCount");
+    const allIssueBars = Array.from(document.querySelectorAll(".issue-bar"));
+    const barsByIssueId = /* @__PURE__ */ new Map();
+    allIssueBars.forEach((bar) => {
+      const id = bar.dataset.issueId;
+      if (id) {
+        if (!barsByIssueId.has(id)) barsByIssueId.set(id, []);
+        barsByIssueId.get(id).push(bar);
+      }
+    });
+    function updateSelectionForIds(changedIds) {
+      changedIds.forEach((issueId) => {
+        const bars = barsByIssueId.get(issueId);
+        if (bars) {
+          bars.forEach((bar) => bar.classList.toggle("selected", selectedIssues.has(issueId)));
+        }
+      });
+      if (selectedIssues.size > 0) {
+        selectionCountEl.textContent = `${selectedIssues.size} selected`;
+        selectionCountEl.classList.remove("hidden");
+        ganttContainer.classList.add("multi-select-mode");
+      } else {
+        selectionCountEl.classList.add("hidden");
+        ganttContainer.classList.remove("multi-select-mode");
+      }
+    }
+    function updateSelectionUI() {
+      allIssueBars.forEach((bar) => {
+        bar.classList.toggle("selected", selectedIssues.has(bar.dataset.issueId));
+      });
+      if (selectedIssues.size > 0) {
+        selectionCountEl.textContent = `${selectedIssues.size} selected`;
+        selectionCountEl.classList.remove("hidden");
+        ganttContainer.classList.add("multi-select-mode");
+      } else {
+        selectionCountEl.classList.add("hidden");
+        ganttContainer.classList.remove("multi-select-mode");
+      }
+    }
+    function clearSelection() {
+      const changedIds = [...selectedIssues];
+      selectedIssues.clear();
+      lastClickedIssueId = null;
+      updateSelectionForIds(changedIds);
+    }
+    function toggleSelection(issueId) {
+      if (selectedIssues.has(issueId)) {
+        selectedIssues.delete(issueId);
+      } else {
+        selectedIssues.add(issueId);
+      }
+      lastClickedIssueId = issueId;
+      updateSelectionForIds([issueId]);
+    }
+    function selectRange(fromId, toId) {
+      const fromIndex = allIssueBars.findIndex((b) => b.dataset.issueId === fromId);
+      const toIndex = allIssueBars.findIndex((b) => b.dataset.issueId === toId);
+      if (fromIndex === -1 || toIndex === -1) return;
+      const start = Math.min(fromIndex, toIndex);
+      const end = Math.max(fromIndex, toIndex);
+      const changedIds = [];
+      for (let i = start; i <= end; i++) {
+        const id = allIssueBars[i].dataset.issueId;
+        if (!selectedIssues.has(id)) {
+          selectedIssues.add(id);
+          changedIds.push(id);
+        }
+      }
+      updateSelectionForIds(changedIds);
+    }
+    function selectAll() {
+      allIssueBars.forEach((bar) => selectedIssues.add(bar.dataset.issueId));
+      updateSelectionUI();
+      announce(`Selected all ${selectedIssues.size} issues`);
+    }
+    allIssueBars.forEach((bar) => {
+      bar.addEventListener("mousedown", (e) => {
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey) return;
+        if (e.target.classList.contains("drag-handle") || e.target.classList.contains("link-handle")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const issueId = bar.dataset.issueId;
+        if (e.shiftKey && lastClickedIssueId) {
+          selectRange(lastClickedIssueId, issueId);
+        } else {
+          toggleSelection(issueId);
+        }
+      });
+    });
+    addDocListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "a") {
+        e.preventDefault();
+        selectAll();
+      }
+      if (e.key === "Escape" && selectedIssues.size > 0) {
+        e.stopImmediatePropagation();
+        clearSelection();
+        announce("Selection cleared");
+      }
+    });
+    document.getElementById("refreshBtn")?.addEventListener("click", () => {
+      document.getElementById("loadingOverlay")?.classList.add("visible");
+      vscode.postMessage({ command: "refresh" });
+    });
+    document.getElementById("draftBadge")?.addEventListener("click", () => {
+      vscode.postMessage({ command: "openDraftReview" });
+    });
+    function showDeletePicker(x, y, relationId, fromId, toId, relationType) {
+      document.querySelector(".relation-picker")?.remove();
+      const picker = document.createElement("div");
+      picker.className = "relation-picker";
+      const pickerWidth = 150;
+      const pickerHeight = 120;
+      const clampedX = Math.min(x, window.innerWidth - pickerWidth - 10);
+      const clampedY = Math.min(y, window.innerHeight - pickerHeight - 10);
+      picker.style.left = Math.max(10, clampedX) + "px";
+      picker.style.top = Math.max(10, clampedY) + "px";
+      const label = document.createElement("div");
+      label.style.padding = "6px 12px";
+      label.style.fontSize = "11px";
+      label.style.opacity = "0.7";
+      label.textContent = `#${fromId} \u2192 #${toId}`;
+      picker.appendChild(label);
+      if (relationType === "precedes" || relationType === "follows") {
+        const delayBtn = document.createElement("button");
+        delayBtn.textContent = "Update delay...";
+        delayBtn.addEventListener("click", () => {
+          picker.remove();
+          vscode.postMessage({ command: "updateRelationDelay", relationId, fromId, toId });
+        });
+        picker.appendChild(delayBtn);
+      }
+      const deleteBtn = document.createElement("button");
+      deleteBtn.textContent = "Delete relation";
+      deleteBtn.addEventListener("click", () => {
+        saveState();
+        vscode.postMessage({ command: "deleteRelation", relationId });
+        picker.remove();
+      });
+      picker.appendChild(deleteBtn);
+      document.body.appendChild(picker);
+      closeOnOutsideClick(picker);
+    }
+    const issueBarsByIssueId = /* @__PURE__ */ new Map();
+    const issueLabelsByIssueId = /* @__PURE__ */ new Map();
+    const arrowsByIssueId = /* @__PURE__ */ new Map();
+    const projectLabelsByKey = /* @__PURE__ */ new Map();
+    const aggregateBarsByKey = /* @__PURE__ */ new Map();
+    let mapsReady = false;
+    function buildLookupMaps() {
+      document.querySelectorAll(".issue-bar").forEach((bar) => {
+        const id = bar.dataset.issueId;
+        if (id) {
+          if (!issueBarsByIssueId.has(id)) issueBarsByIssueId.set(id, []);
+          issueBarsByIssueId.get(id).push(bar);
+        }
+      });
+      document.querySelectorAll(".issue-label").forEach((label) => {
+        const id = label.dataset.issueId;
+        if (id) {
+          if (!issueLabelsByIssueId.has(id)) issueLabelsByIssueId.set(id, []);
+          issueLabelsByIssueId.get(id).push(label);
+        }
+      });
+      document.querySelectorAll(".dependency-arrow").forEach((arrow) => {
+        const fromId = arrow.dataset.from;
+        const toId = arrow.dataset.to;
+        if (fromId) {
+          if (!arrowsByIssueId.has(fromId)) arrowsByIssueId.set(fromId, []);
+          arrowsByIssueId.get(fromId).push(arrow);
+        }
+        if (toId) {
+          if (!arrowsByIssueId.has(toId)) arrowsByIssueId.set(toId, []);
+          arrowsByIssueId.get(toId).push(arrow);
+        }
+      });
+      document.querySelectorAll(".project-label").forEach((label) => {
+        const key = label.dataset.collapseKey;
+        if (key) {
+          if (!projectLabelsByKey.has(key)) projectLabelsByKey.set(key, []);
+          projectLabelsByKey.get(key).push(label);
+        }
+      });
+      document.querySelectorAll(".aggregate-bars").forEach((bars) => {
+        const key = bars.dataset.collapseKey;
+        if (key) {
+          if (!aggregateBarsByKey.has(key)) aggregateBarsByKey.set(key, []);
+          aggregateBarsByKey.get(key).push(bars);
+        }
+      });
+      mapsReady = true;
+    }
+    if (typeof requestIdleCallback !== "undefined") {
+      requestIdleCallback(() => buildLookupMaps(), { timeout: 100 });
+    } else {
+      setTimeout(buildLookupMaps, 0);
+    }
+    let highlightedElements = [];
+    function clearHoverHighlight() {
+      document.body.classList.remove("hover-focus", "dependency-hover");
+      highlightedElements.forEach((el) => el.classList.remove("hover-highlighted", "hover-source"));
+      highlightedElements = [];
+    }
+    function highlightIssue(issueId) {
+      document.body.classList.add("hover-focus");
+      const bars = mapsReady ? issueBarsByIssueId.get(issueId) || [] : document.querySelectorAll('.issue-bar[data-issue-id="' + issueId + '"]');
+      const labels = mapsReady ? issueLabelsByIssueId.get(issueId) || [] : document.querySelectorAll('.issue-label[data-issue-id="' + issueId + '"]');
+      const arrows = mapsReady ? arrowsByIssueId.get(issueId) || [] : document.querySelectorAll('.dependency-arrow[data-from="' + issueId + '"], .dependency-arrow[data-to="' + issueId + '"]');
+      bars.forEach((el) => {
+        el.classList.add("hover-highlighted");
+        highlightedElements.push(el);
+      });
+      labels.forEach((el) => {
+        el.classList.add("hover-highlighted");
+        highlightedElements.push(el);
+      });
+      arrows.forEach((el) => {
+        el.classList.add("hover-highlighted");
+        highlightedElements.push(el);
+      });
+    }
+    function highlightProject(collapseKey) {
+      document.body.classList.add("hover-focus");
+      const labels = mapsReady ? projectLabelsByKey.get(collapseKey) || [] : document.querySelectorAll('.project-label[data-collapse-key="' + collapseKey + '"]');
+      const bars = mapsReady ? aggregateBarsByKey.get(collapseKey) || [] : document.querySelectorAll('.aggregate-bars[data-collapse-key="' + collapseKey + '"]');
+      labels.forEach((el) => {
+        el.classList.add("hover-highlighted");
+        highlightedElements.push(el);
+      });
+      bars.forEach((el) => {
+        el.classList.add("hover-highlighted");
+        highlightedElements.push(el);
+      });
+    }
+    const timelineSvg = document.querySelector(".gantt-timeline svg");
+    const labelsSvg = document.querySelector(".gantt-labels svg");
+    if (timelineSvg) {
+      timelineSvg.addEventListener("mouseenter", (e) => {
+        const bar = e.target.closest(".issue-bar");
+        const aggBar = e.target.closest(".aggregate-bars");
+        const arrow = e.target.closest(".dependency-arrow");
+        if (bar) {
+          const issueId = bar.dataset.issueId;
+          if (issueId) highlightIssue(issueId);
+        } else if (aggBar) {
+          const key = aggBar.dataset.collapseKey;
+          if (key) highlightProject(key);
+        } else if (arrow) {
+          const fromId = arrow.dataset.from;
+          const toId = arrow.dataset.to;
+          document.body.classList.add("dependency-hover");
+          arrow.classList.add("hover-source");
+          highlightedElements.push(arrow);
+          if (fromId) highlightIssue(fromId);
+          if (toId) highlightIssue(toId);
+        }
+      }, true);
+      timelineSvg.addEventListener("mouseleave", (e) => {
+        const bar = e.target.closest(".issue-bar");
+        const aggBar = e.target.closest(".aggregate-bars");
+        const arrow = e.target.closest(".dependency-arrow");
+        if (bar || aggBar || arrow) {
+          clearHoverHighlight();
+        }
+      }, true);
+    }
+    if (labelsSvg) {
+      labelsSvg.addEventListener("mouseenter", (e) => {
+        const label = e.target.closest(".issue-label");
+        const projectLabel = e.target.closest(".project-label");
+        if (label) {
+          const issueId = label.dataset.issueId;
+          if (issueId) highlightIssue(issueId);
+        } else if (projectLabel) {
+          const key = projectLabel.dataset.collapseKey;
+          if (key) highlightProject(key);
+        }
+      }, true);
+      labelsSvg.addEventListener("mouseleave", (e) => {
+        const label = e.target.closest(".issue-label");
+        const projectLabel = e.target.closest(".project-label");
+        if (label || projectLabel) {
+          clearHoverHighlight();
+        }
+      }, true);
+    }
+    if (timelineSvg) {
+      let clearArrowSelection2 = function() {
+        document.querySelectorAll(".dependency-arrow.selected").forEach((a) => a.classList.remove("selected"));
+        document.body.classList.remove("arrow-selection-mode");
+        document.querySelectorAll(".arrow-connected").forEach((el) => el.classList.remove("arrow-connected"));
+        selectedArrow = null;
+      };
+      var clearArrowSelection = clearArrowSelection2;
+      timelineSvg.addEventListener("mousedown", (e) => {
+        if (e.button !== 2) return;
+        const arrow = e.target.closest(".dependency-arrow");
+        if (!arrow) return;
+        const title = arrow.querySelector("title");
+        if (title) title.remove();
+      });
+      timelineSvg.addEventListener("contextmenu", (e) => {
+        const arrow = e.target.closest(".dependency-arrow");
+        if (!arrow) return;
+        e.preventDefault();
+        const relationId = parseInt(arrow.dataset.relationId);
+        const fromId = arrow.dataset.from;
+        const toId = arrow.dataset.to;
+        const relTypeClass = [...arrow.classList].find((c) => c.startsWith("rel-"));
+        const relationType = relTypeClass ? relTypeClass.replace("rel-", "") : null;
+        showDeletePicker(e.clientX, e.clientY, relationId, fromId, toId, relationType);
+      });
+      let selectedArrow = null;
+      timelineSvg.addEventListener("click", (e) => {
+        const arrow = e.target.closest(".dependency-arrow");
+        if (selectedArrow) {
+          selectedArrow.classList.remove("selected");
+          document.body.classList.remove("arrow-selection-mode");
+          document.querySelectorAll(".arrow-connected").forEach((el) => el.classList.remove("arrow-connected"));
+          selectedArrow = null;
+        }
+        if (!arrow) return;
+        e.stopPropagation();
+        selectedArrow = arrow;
+        arrow.classList.add("selected");
+        document.body.classList.add("arrow-selection-mode");
+        const fromId = arrow.dataset.from;
+        const toId = arrow.dataset.to;
+        document.querySelectorAll(`.issue-bar[data-issue-id="${fromId}"], .issue-bar[data-issue-id="${toId}"]`).forEach((bar) => bar.classList.add("arrow-connected"));
+        document.querySelectorAll(`.issue-label[data-issue-id="${fromId}"], .issue-label[data-issue-id="${toId}"]`).forEach((label) => label.classList.add("arrow-connected"));
+        announce(`Selected relation from #${fromId} to #${toId}`);
+      });
+      if (window._ganttArrowClickHandler) {
+        document.removeEventListener("click", window._ganttArrowClickHandler);
+      }
+      window._ganttArrowClickHandler = (e) => {
+        const hasSelection = selectedArrow || document.querySelector(".dependency-arrow.selected");
+        if (hasSelection && !e.target.closest(".dependency-arrow") && !e.target.closest(".blocks-badge-group") && !e.target.closest(".blocker-badge")) {
+          clearArrowSelection2();
+        }
+      };
+      document.addEventListener("click", window._ganttArrowClickHandler);
+      if (window._ganttArrowKeyHandler) {
+        document.removeEventListener("keydown", window._ganttArrowKeyHandler);
+      }
+      window._ganttArrowKeyHandler = (e) => {
+        const hasSelection = selectedArrow || document.querySelector(".dependency-arrow.selected");
+        if (e.key === "Escape" && hasSelection) {
+          e.stopImmediatePropagation();
+          clearArrowSelection2();
+        }
+      };
+      document.addEventListener("keydown", window._ganttArrowKeyHandler);
+    }
+    setupDrag({
+      vscode,
+      menuUndo,
+      menuRedo,
+      addDocListener,
+      closeOnOutsideClick,
+      announce,
+      saveState,
+      updateUndoRedoButtons,
+      undoStack,
+      redoStack,
+      selectedIssues,
+      clearSelection,
+      allIssueBars,
+      redmineBaseUrl,
+      extendedRelationTypes,
+      minDateMs,
+      maxDateMs,
+      timelineWidth,
+      dayWidth,
+      barHeight,
+      ganttScroll,
+      snapToDay,
+      focusOnDependencyChain,
+      clearFocus,
+      getFocusedIssueId,
+      scrollToAndHighlight,
+      setAllowScrollChange,
+      isDraftModeEnabled: () => currentDraftMode,
+      isPerfDebugEnabled: () => PERF_DEBUG
+    });
+    setupCollapse({
+      vscode,
+      addDocListener,
+      addWinListener,
+      announce,
+      barHeight,
+      selectedCollapseKey
+    });
+    function scrollToToday() {
+      if (!todayInRange) {
+        vscode.postMessage({ command: "todayOutOfRange" });
+        return;
+      }
+      if (ganttScroll) {
+        const stickyLeft = document.querySelector(".gantt-body .gantt-sticky-left");
+        const stickyWidth = stickyLeft?.offsetWidth ?? 0;
+        const visibleTimelineWidth = ganttScroll.clientWidth - stickyWidth;
+        ganttScroll.scrollLeft = Math.max(0, todayX - visibleTimelineWidth / 2);
+      }
+    }
+    function scrollToAndHighlight(issueId) {
+      if (!issueId) return;
+      allowScrollChange = true;
+      const label = document.querySelector('.issue-label[data-issue-id="' + issueId + '"]');
+      const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
+      if (label) {
+        label.scrollIntoView({ behavior: "smooth", block: "center" });
+        label.classList.add("highlighted");
+        setTimeout(() => label.classList.remove("highlighted"), 1500);
+      }
+      if (bar && ganttScroll) {
+        const barRect = bar.getBoundingClientRect();
+        const scrollRect = ganttScroll.getBoundingClientRect();
+        const scrollLeft = ganttScroll.scrollLeft + barRect.left - scrollRect.left - 100;
+        ganttScroll.scrollTo({ left: Math.max(0, scrollLeft), behavior: "smooth" });
+        bar.classList.add("highlighted");
+        setTimeout(() => bar.classList.remove("highlighted"), 1500);
+      }
+    }
+    setupKeyboard({
+      vscode,
+      addDocListener,
+      menuUndo,
+      menuRedo,
+      undoStack,
+      redoStack,
+      saveState,
+      updateUndoRedoButtons,
+      announce,
+      scrollToAndHighlight,
+      scrollToToday
+    });
+    setupTooltips({
+      addDocListener,
+      addWinListener,
+      ganttScroll
+    });
+    requestAnimationFrame(() => {
+      if (savedCenterDateMs !== null && ganttScroll) {
+        const clampedDateMs = Math.max(minDateMs, Math.min(maxDateMs, savedCenterDateMs));
+        scrollToCenterDate(clampedDateMs);
+        if (savedScrollTop !== null) {
+          ganttScroll.scrollTop = savedScrollTop;
+        }
+        savedCenterDateMs = null;
+        savedScrollTop = null;
+      } else if (savedScrollLeft !== null && ganttScroll) {
+        ganttScroll.scrollLeft = savedScrollLeft;
+        if (savedScrollTop !== null) {
+          ganttScroll.scrollTop = savedScrollTop;
+        }
+        savedScrollLeft = null;
+        savedScrollTop = null;
+      } else {
+        scrollToToday();
+      }
+      updateMinimapViewport();
+      restoringScroll = false;
+    });
+    document.getElementById("todayBtn")?.addEventListener("click", scrollToToday);
+    const resizeHandle = document.getElementById("resizeHandle");
+    const resizeHandleHeader = document.getElementById("resizeHandleHeader");
+    let isResizing = false;
+    let resizeStartX = 0;
+    let resizeStartWidth = 0;
+    let activeResizeHandle = null;
+    function startResize(e, handle) {
+      isResizing = true;
+      activeResizeHandle = handle;
+      resizeStartX = e.clientX;
+      resizeStartWidth = labelsColumn.offsetWidth;
+      handle.classList.add("dragging");
+      document.body.classList.add("cursor-col-resize", "user-select-none");
+      e.preventDefault();
+    }
+    resizeHandle?.addEventListener("mousedown", (e) => startResize(e, resizeHandle));
+    resizeHandleHeader?.addEventListener("mousedown", (e) => startResize(e, resizeHandleHeader));
+    let resizeRafPending = false;
+    let lastResizeEvent = null;
+    addDocListener("mousemove", (e) => {
+      if (!isResizing) return;
+      lastResizeEvent = e;
+      if (resizeRafPending) return;
+      resizeRafPending = true;
+      requestAnimationFrame(() => {
+        resizeRafPending = false;
+        if (!lastResizeEvent) return;
+        const delta = lastResizeEvent.clientX - resizeStartX;
+        const newWidth = Math.min(600, Math.max(120, resizeStartWidth + delta));
+        if (ganttLeftHeader) ganttLeftHeader.style.width = newWidth + "px";
+        if (labelsColumn) {
+          labelsColumn.style.width = newWidth + "px";
+          const labelsSvg2 = labelsColumn.querySelector("svg");
+          if (labelsSvg2) labelsSvg2.setAttribute("width", String(newWidth));
+        }
+        const capacityLabel = document.querySelector(".capacity-ribbon-label");
+        if (capacityLabel) {
+          capacityLabel.style.width = newWidth + leftExtrasWidth + "px";
+        }
+        updateMinimapPosition();
+      });
+    });
+    addDocListener("mouseup", () => {
+      if (isResizing) {
+        isResizing = false;
+        activeResizeHandle?.classList.remove("dragging");
+        activeResizeHandle = null;
+        document.body.classList.remove("cursor-col-resize", "user-select-none");
+        saveState();
+      }
+    });
+    requestAnimationFrame(() => {
+      document.getElementById("loadingOverlay")?.classList.remove("visible");
+    });
+    perfMark("initializeGantt-end");
+    perfMeasure("initializeGantt", "initializeGantt-start", "initializeGantt-end");
+  }
+})();
+//# sourceMappingURL=gantt.js.map

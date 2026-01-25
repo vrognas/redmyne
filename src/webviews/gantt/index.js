@@ -634,6 +634,17 @@ function initializeGantt(state) {
           if (dependencyLayer) dependencyLayer.classList.add('hidden');
           if (menuDeps) menuDeps.classList.remove('active');
         }
+      } else if (message.command === 'setBadgesState') {
+        const ganttContainer = document.querySelector('.gantt-container');
+        const menuBadges = document.getElementById('menuBadges');
+
+        if (message.enabled) {
+          if (ganttContainer) ganttContainer.classList.remove('hide-badges');
+          if (menuBadges) menuBadges.classList.add('active');
+        } else {
+          if (ganttContainer) ganttContainer.classList.add('hide-badges');
+          if (menuBadges) menuBadges.classList.remove('active');
+        }
       } else if (message.command === 'setCapacityRibbonState') {
         const capacityRibbon = document.querySelector('.capacity-ribbon');
         const menuCapacity = document.getElementById('menuCapacity');
@@ -884,6 +895,12 @@ function initializeGantt(state) {
     document.getElementById('menuDeps')?.addEventListener('click', () => {
       saveState();
       vscode.postMessage({ command: 'toggleDependencies' });
+    });
+
+    // Badges toggle handler (menu item)
+    document.getElementById('menuBadges')?.addEventListener('click', () => {
+      saveState();
+      vscode.postMessage({ command: 'toggleBadges' });
     });
 
     const ganttContainer = document.querySelector('.gantt-container');

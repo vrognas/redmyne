@@ -1178,19 +1178,25 @@ svg {
 }
 
 .dependency-arrow .arrow-line {
-  transition: stroke-width 0.15s, filter 0.15s;
+  transition: stroke-width 0.15s, filter 0.15s, opacity 0.15s;
+  opacity: 0.7;
 }
 
 .dependency-arrow .arrow-head {
-  transition: filter 0.15s;
+  transition: filter 0.15s, opacity 0.15s;
+  opacity: 0.7;
 }
 
-.dependency-arrow:hover .arrow-line {
+.dependency-arrow:hover .arrow-line,
+.dependency-arrow:hover .arrow-head {
   stroke-width: 3 !important;
+  opacity: 1;
 }
 
-.dependency-arrow.selected .arrow-line {
+.dependency-arrow.selected .arrow-line,
+.dependency-arrow.selected .arrow-head {
   stroke-width: 4 !important;
+  opacity: 1;
 }
 
 .arrow-selection-mode .issue-bar {
@@ -1825,6 +1831,12 @@ svg .gantt-row-hidden,
 
 /* Utility classes for CSP compliance */
 .hidden {
+  display: none;
+}
+
+/* Badge toggle via container class (O(1) toggle) */
+.hide-badges .blocker-badge,
+.hide-badges .blocks-badge-group {
   display: none;
 }
 

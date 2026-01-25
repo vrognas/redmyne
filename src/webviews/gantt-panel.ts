@@ -396,6 +396,7 @@ export class GanttPanel {
   private _schedule: WeeklySchedule = DEFAULT_WEEKLY_SCHEDULE;
   private _showWorkloadHeatmap: boolean = false;
   private _showDependencies: boolean = true;
+  private _showBadges: boolean = true;
   private _showIntensity: boolean = false;
   private _scrollPosition: { left: number; top: number } = { left: 0, top: 0 };
   private _visibleRelationTypes: Set<string> = new Set(["blocks", "precedes"]);
@@ -1453,6 +1454,13 @@ export class GanttPanel {
         this._panel.webview.postMessage({
           command: "setDependenciesState",
           enabled: this._showDependencies,
+        });
+        break;
+      case "toggleBadges":
+        this._showBadges = !this._showBadges;
+        this._panel.webview.postMessage({
+          command: "setBadgesState",
+          enabled: this._showBadges,
         });
         break;
       case "toggleCapacityRibbon":
@@ -3988,6 +3996,11 @@ export class GanttPanel {
               <span class="icon">⤤</span>
               <span>Relations</span>
               <span class="shortcut">D</span>
+            </div>
+            <div class="toolbar-dropdown-item${this._showBadges ? " active" : ""}" id="menuBadges">
+              <span class="icon">⏳</span>
+              <span>Badges</span>
+              <span class="shortcut">B</span>
             </div>
             <div class="toolbar-dropdown-item${this._showWorkloadHeatmap && this._viewFocus === "person" ? " active" : ""}" id="menuHeatmap"${this._viewFocus !== "person" ? " disabled" : ""}>
               <span class="icon">▦</span>

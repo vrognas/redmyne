@@ -46,23 +46,8 @@ export function setupKeyboard(ctx) {
       e.preventDefault();
       document.getElementById('menuFilterHealth')?.click();
     }
-    // Jump to next blocked issue (B)
-    else if (e.key.toLowerCase() === 'b') {
-      e.preventDefault();
-      const blockedBars = Array.from(document.querySelectorAll('.issue-bar[data-issue-id]'))
-        .filter(bar => bar.querySelector('.blocker-badge'));
-      if (blockedBars.length === 0) {
-        announce('No blocked issues');
-        return;
-      }
-      const focusedBar = document.activeElement?.closest('.issue-bar');
-      const currentIdx = focusedBar ? blockedBars.indexOf(focusedBar) : -1;
-      const nextIdx = (currentIdx + 1) % blockedBars.length;
-      const nextBar = blockedBars[nextIdx];
-      scrollToAndHighlight(nextBar.dataset.issueId);
-      nextBar.focus();
-      announce('Blocked issue ' + (nextIdx + 1) + ' of ' + blockedBars.length);
-    }
+    // Toggle badges (B)
+    else if (e.key.toLowerCase() === 'b') { document.getElementById('menuBadges')?.click(); }
     // Arrow key date nudging for focused issue bars
     else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       const focusedBar = document.activeElement?.closest('.issue-bar:not(.parent-bar)');
