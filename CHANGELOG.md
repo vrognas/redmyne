@@ -2,6 +2,23 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.12.1]
+
+### Improved
+
+- **Gantt dependency badges** - redesigned with intuitive emoji icons
+  - ⏳ (hourglass) at bar start: "waiting on X issues"
+  - ⛔ (stop) at bar end: "blocking X issues"
+  - Yellow for 1 dependency, red for 2+
+  - Link anchors now use theme colors
+
+### Fixed
+
+- **TypeScript errors** - fixed type definitions for Gantt panel
+  - Added `removeDraft` to webview message types
+  - Added extended scheduling relation types (SS, SF, FF, FS)
+  - Made `start_date` nullable in Issue/FlexibilityIssue types
+
 ## [Unreleased]
 
 ### Added
