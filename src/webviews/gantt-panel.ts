@@ -85,7 +85,6 @@ interface GanttRenderState {
   extScrollTop: number;
   labelWidth: number;
   leftExtrasWidth: number;
-  healthFilter: "all" | "healthy" | "warning" | "critical";
   sortBy: "id" | "assignee" | "start" | "due" | "status" | null;
   sortOrder: "asc" | "desc";
   selectedCollapseKey: string | null;
@@ -286,7 +285,6 @@ const SELECTED_PROJECT_KEY = "redmyne.gantt.selectedProject";
 const SELECTED_ASSIGNEE_KEY = "redmyne.gantt.selectedAssignee";
 const FILTER_ASSIGNEE_KEY = "redmyne.gantt.filterAssignee";
 const FILTER_STATUS_KEY = "redmyne.gantt.filterStatus";
-const FILTER_HEALTH_KEY = "redmyne.gantt.filterHealth";
 const LOOKBACK_YEARS_KEY = "redmyne.gantt.lookbackYears";
 
 export class GanttPanel {
@@ -342,7 +340,6 @@ export class GanttPanel {
   private _versionsLoading = false; // Prevent duplicate version fetches
   private _supplementalLoadId = 0; // Monotonic id to ignore stale async loads
   private _currentFilter: IssueFilter = { ...DEFAULT_ISSUE_FILTER };
-  private _healthFilter: "all" | "healthy" | "warning" | "critical" = "all";
   private _filterChangeCallback?: (filter: IssueFilter) => void;
   private _viewMode: GanttViewMode = "projects";
   private _viewFocus: "project" | "person" = "project"; // Toggle: view by project or person
@@ -399,7 +396,6 @@ export class GanttPanel {
       const savedStatus = GanttPanel._globalState.get<"open" | "closed" | "any">(FILTER_STATUS_KEY);
       if (savedAssignee) this._currentFilter.assignee = savedAssignee;
       if (savedStatus) this._currentFilter.status = savedStatus;
-      this._healthFilter = GanttPanel._globalState.get<"all" | "healthy" | "warning" | "critical">(FILTER_HEALTH_KEY, "all");
       this._lookbackYears = GanttPanel._globalState.get<2 | 5 | 10 | null>(LOOKBACK_YEARS_KEY, 2);
     }
 
@@ -778,7 +774,6 @@ export class GanttPanel {
       extScrollTop: this._scrollPosition.top,
       labelWidth,
       leftExtrasWidth: resizeHandleWidth + extraColumnsWidth,
-      healthFilter: this._healthFilter,
       sortBy: this._sortBy,
       sortOrder: this._sortOrder,
       selectedCollapseKey: this._selectedCollapseKey,
@@ -1571,13 +1566,6 @@ export class GanttPanel {
           }
         }
         break;
-      case "setHealthFilter":
-        if (message.health) {
-          this._healthFilter = message.health as "all" | "healthy" | "warning" | "critical";
-          GanttPanel._globalState?.update(FILTER_HEALTH_KEY, this._healthFilter);
-          this._updateContent();
-        }
-        break;
       case "setSelectedKey":
         // Preserve keyboard selection across re-renders
         this._selectedCollapseKey = message.collapseKey ?? null;
@@ -2205,7 +2193,6 @@ export class GanttPanel {
     // Filter visible rows ONCE upfront (avoid multiple .filter() calls)
     // Also apply health filter if set (issues only - projects/time-groups always pass)
     // In per-project view, skip the top-level project row (show issues directly)
-    const healthFilter = this._healthFilter;
     const skipTopProjectRow = this._viewFocus === "project";
     // Find the top-level project's collapseKey to clear parent references
     const topProjectKey = skipTopProjectRow ? rows.find(r => r.type === "project" && r.depth === 0)?.collapseKey : null;
@@ -2215,17 +2202,7 @@ export class GanttPanel {
     const filteredRows = rows.filter(r => {
       // Skip top-level project row in per-project view
       if (skipTopProjectRow && r.type === "project" && r.depth === 0) return false;
-      if (healthFilter === "all") return true;
-      // Non-issue rows (projects, time-groups) pass through
-      if (r.type !== "issue" || !r.issue) return true;
-      // Map filter values to FlexibilityScore status values
-      const status = r.issue.status;
-      switch (healthFilter) {
-        case "critical": return status === "overbooked";
-        case "warning": return status === "at-risk";
-        case "healthy": return status === "on-track" || status === "completed";
-        default: return true;
-      }
+      return true;
     }).map(r => {
       // Adjust depth and parentKey when top project row is skipped
       if (skipTopProjectRow && topProjectKey) {
@@ -3887,12 +3864,6 @@ export class GanttPanel {
         <button class="toggle-btn text-btn">⋮</button>
         <div class="toolbar-dropdown-menu">
           <div class="toolbar-dropdown-menu-inner">
-            <div class="toolbar-dropdown-item" id="menuFilterHealth">
-              <span class="icon">🏥</span>
-              <span>Health: ${this._healthFilter === "all" ? "All" : this._healthFilter}</span>
-              <span class="shortcut">F</span>
-            </div>
-            <div class="toolbar-dropdown-divider"></div>
             <div class="toolbar-dropdown-item${this._showDependencies ? " active" : ""}" id="menuDeps">
               <span class="icon">⤤</span>
               <span>Relations</span>
@@ -4116,7 +4087,6 @@ export class GanttPanel {
       extScrollTop: this._scrollPosition.top,
       labelWidth,
       leftExtrasWidth: resizeHandleWidth + extraColumnsWidth,
-      healthFilter: this._healthFilter,
       sortBy: this._sortBy,
       sortOrder: this._sortOrder,
       selectedCollapseKey: this._selectedCollapseKey,

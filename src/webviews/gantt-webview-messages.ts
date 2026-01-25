@@ -46,7 +46,6 @@ export type GanttWebviewMessage =
   | { command: "toggleAdHoc"; issueId: number }
   | { command: "togglePrecedence"; issueId: number }
   | { command: "setFilter"; filter?: { assignee?: string; status?: string } }
-  | { command: "setHealthFilter"; health?: string }
   | { command: "setSelectedKey"; collapseKey?: string | null }
   | { command: "setSort"; sortBy?: "id" | "assignee" | "start" | "due" | "status" | null; sortOrder?: "asc" | "desc" }
   | { command: "showStatus"; message?: string }

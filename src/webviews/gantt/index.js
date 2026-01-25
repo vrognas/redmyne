@@ -410,7 +410,6 @@ function initializeGantt(state) {
     extScrollTop,
     labelWidth,
     leftExtrasWidth,
-    healthFilter,
     sortBy,
     sortOrder,
     selectedCollapseKey,
@@ -803,14 +802,6 @@ function initializeGantt(state) {
     document.getElementById('filterStatus')?.addEventListener('change', (e) => {
       const value = e.target.value;
       vscode.postMessage({ command: 'setFilter', filter: { status: value } });
-    });
-    // Health filter menu item (cycles through options)
-    document.getElementById('menuFilterHealth')?.addEventListener('click', () => {
-      const options = ['all', 'critical', 'warning', 'healthy'];
-      const currentHealth = healthFilter;
-      const currentIdx = options.indexOf(currentHealth);
-      const nextIdx = (currentIdx + 1) % options.length;
-      vscode.postMessage({ command: 'setHealthFilter', health: options[nextIdx] });
     });
 
     // Sortable column header handlers (cycle: asc → desc → none)

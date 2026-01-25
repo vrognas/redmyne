@@ -40,11 +40,6 @@ export function setupKeyboard(ctx) {
     else if (e.key.toLowerCase() === 't') { scrollToToday(); }
     else if (e.key.toLowerCase() === 'e') { document.getElementById('menuExpand')?.click(); }
     else if (e.key.toLowerCase() === 'c' && !modKey) { document.getElementById('menuCollapse')?.click(); }
-    // Health filter shortcut (F cycles through health filters, skip if Ctrl/Cmd held)
-    else if (e.key.toLowerCase() === 'f' && !modKey) {
-      e.preventDefault();
-      document.getElementById('menuFilterHealth')?.click();
-    }
     // Toggle badges (B)
     else if (e.key.toLowerCase() === 'b') { document.getElementById('menuBadges')?.click(); }
     // Arrow key date nudging for focused issue bars
@@ -188,9 +183,8 @@ export function setupKeyboard(ctx) {
             <div><kbd>T</kbd> Today</div>
           </div>
           <div class="shortcut-section">
-            <h4>Health & Other</h4>
-            <div><kbd>F</kbd> Cycle health filter</div>
-            <div><kbd>B</kbd> Next blocked issue</div>
+            <h4>Other</h4>
+            <div><kbd>B</kbd> Badges</div>
             <div><kbd>/</kbd> Quick search</div>
             <div><kbd>S</kbd> Cycle sort</div>
             <div><kbd>R</kbd> Refresh</div>
