@@ -847,6 +847,11 @@ body {
   cursor: default;
 }
 
+/* Desaturate assignee badges in dark themes for subtler appearance */
+.vscode-dark .assignee-badge circle {
+  filter: saturate(0.6);
+}
+
 .assignee-badge.current-user circle {
   stroke: var(--vscode-focusBorder);
   stroke-width: 2;
