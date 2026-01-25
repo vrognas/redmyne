@@ -847,8 +847,11 @@ body {
   cursor: default;
 }
 
-/* Desaturate assignee badges in dark themes for subtler appearance */
-.vscode-dark .assignee-badge circle {
+/* Desaturate colors in dark themes for subtler appearance */
+.vscode-dark .assignee-badge circle,
+.vscode-dark .capacity-day-bar,
+.vscode-dark .issue-bar .bar-main,
+.vscode-dark .minimap-bar {
   filter: saturate(0.6);
 }
 
