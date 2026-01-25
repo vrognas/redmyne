@@ -18,11 +18,11 @@
 
   0%,
   100% {
-    opacity: 0.3;
+    opacity: 0.4;
   }
 
   50% {
-    opacity: 0.7;
+    opacity: 0.6;
   }
 }
 
@@ -292,6 +292,7 @@ body {
   align-items: center;
   gap: 8px;
   margin-right: 6px;
+  font-size: 11px;
 }
 
 .capacity-label {
@@ -574,7 +575,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .help-section+.help-section {
@@ -845,7 +846,36 @@ body {
 
 .assignee-badge circle {
   cursor: default;
+  stroke-width: 2;
 }
+
+/* Avatar fill colors (12 theme colors) */
+circle.avatar-fill-0 { fill: var(--vscode-charts-blue, #3794ff); }
+circle.avatar-fill-1 { fill: var(--vscode-charts-green, #89d185); }
+circle.avatar-fill-2 { fill: var(--vscode-charts-orange, #d18616); }
+circle.avatar-fill-3 { fill: var(--vscode-charts-purple, #b180d7); }
+circle.avatar-fill-4 { fill: var(--vscode-charts-red, #f14c4c); }
+circle.avatar-fill-5 { fill: var(--vscode-charts-yellow, #cca700); }
+circle.avatar-fill-6 { fill: var(--vscode-terminal-ansiCyan, #4dc9b0); }
+circle.avatar-fill-7 { fill: var(--vscode-terminal-ansiMagenta, #c586c0); }
+circle.avatar-fill-8 { fill: var(--vscode-terminal-ansiBrightBlue, #569cd6); }
+circle.avatar-fill-9 { fill: var(--vscode-terminal-ansiBrightGreen, #6a9955); }
+circle.avatar-fill-10 { fill: var(--vscode-terminal-ansiBrightRed, #ce9178); }
+circle.avatar-fill-11 { fill: var(--vscode-terminal-ansiBrightYellow, #dcdcaa); }
+
+/* Avatar stroke colors (12 theme colors) */
+circle.avatar-stroke-0 { stroke: var(--vscode-charts-blue, #3794ff); }
+circle.avatar-stroke-1 { stroke: var(--vscode-charts-green, #89d185); }
+circle.avatar-stroke-2 { stroke: var(--vscode-charts-orange, #d18616); }
+circle.avatar-stroke-3 { stroke: var(--vscode-charts-purple, #b180d7); }
+circle.avatar-stroke-4 { stroke: var(--vscode-charts-red, #f14c4c); }
+circle.avatar-stroke-5 { stroke: var(--vscode-charts-yellow, #cca700); }
+circle.avatar-stroke-6 { stroke: var(--vscode-terminal-ansiCyan, #4dc9b0); }
+circle.avatar-stroke-7 { stroke: var(--vscode-terminal-ansiMagenta, #c586c0); }
+circle.avatar-stroke-8 { stroke: var(--vscode-terminal-ansiBrightBlue, #569cd6); }
+circle.avatar-stroke-9 { stroke: var(--vscode-terminal-ansiBrightGreen, #6a9955); }
+circle.avatar-stroke-10 { stroke: var(--vscode-terminal-ansiBrightRed, #ce9178); }
+circle.avatar-stroke-11 { stroke: var(--vscode-terminal-ansiBrightYellow, #dcdcaa); }
 
 /* Desaturate colors in dark themes for subtler appearance */
 .vscode-dark .assignee-badge circle,
@@ -905,6 +935,11 @@ body {
   background: var(--vscode-focusBorder);
 }
 
+.gantt-resize-handle:active,
+.gantt-resize-handle-header:active {
+  box-shadow: 0 0 8px var(--vscode-focusBorder);
+}
+
 .gantt-timeline {
   flex-shrink: 0;
 }
@@ -937,11 +972,11 @@ svg {
 }
 
 .issue-bar.bar-past {
-  filter: saturate(0.4) opacity(0.7);
+  filter: saturate(0.5) opacity(0.75);
 }
 
 .issue-bar.bar-past:hover {
-  filter: saturate(0.6) opacity(0.85);
+  filter: saturate(0.65) opacity(0.9);
 }
 
 .issue-bar.bar-open-ended .bar-outline {
@@ -1099,7 +1134,7 @@ svg {
 
 /* Show grip dots on bar hover (subtle) */
 .issue-bar:hover .drag-grip {
-  opacity: 0.4;
+  opacity: 0.6;
 }
 
 /* Brighter grip dots on handle hover */
@@ -1618,6 +1653,7 @@ button:focus {
 .collapse-toggle {
   cursor: pointer;
   opacity: 0.7;
+  transition: transform 0.15s ease, opacity 0.15s ease;
 }
 
 .collapse-toggle:hover {

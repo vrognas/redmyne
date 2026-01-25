@@ -4,7 +4,7 @@ import { Issue, IssueRelation } from "../redmine/models/issue";
 import { Version } from "../redmine/models/version";
 import { RedmineServer } from "../redmine/redmine-server";
 import { RedmineProject } from "../redmine/redmine-project";
-import { FlexibilityScore, WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE, calculateFlexibility, ContributionData } from "../utilities/flexibility-calculator";
+import { FlexibilityScore, WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE, calculateFlexibility, scaleScheduleByFte, ContributionData } from "../utilities/flexibility-calculator";
 import { calculateContributions, parseTargetIssueId } from "../utilities/contribution-calculator";
 import { adHocTracker } from "../utilities/adhoc-tracker";
 import { showStatusBarMessage } from "../utilities/status-bar";
@@ -127,23 +127,25 @@ function getInitials(name: string): string {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 }
 
-/** Theme-adaptive chart colors for avatar badges */
-const AVATAR_COLORS = [
-  "var(--vscode-charts-blue)",
-  "var(--vscode-charts-green)",
-  "var(--vscode-charts-orange)",
-  "var(--vscode-charts-purple)",
-  "var(--vscode-charts-red)",
-  "var(--vscode-charts-yellow)",
-];
+/** Avatar color indices for fill and stroke (12 colors = 144 combinations) */
+const AVATAR_COLOR_COUNT = 12;
 
-/** Generate consistent color index from string (for avatar badges) */
-function getAvatarColor(name: string): string {
-  let hash = 0;
+/** Generate consistent fill + stroke color indices from name (144 unique combos) */
+function getAvatarColorIndices(name: string): { fill: number; stroke: number } {
+  // Hash 1: standard djb2 for fill
+  let hash1 = 0;
   for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    hash1 = name.charCodeAt(i) + ((hash1 << 5) - hash1);
   }
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+  // Hash 2: reversed string with different multiplier for stroke
+  let hash2 = 0;
+  for (let i = name.length - 1; i >= 0; i--) {
+    hash2 = name.charCodeAt(i) + ((hash2 << 7) - hash2);
+  }
+  const fill = Math.abs(hash1) % AVATAR_COLOR_COUNT;
+  // Offset stroke by 6 (half palette) to maximize contrast with fill
+  const stroke = (Math.abs(hash2) + 6) % AVATAR_COLOR_COUNT;
+  return { fill, stroke };
 }
 
 function formatDateWithWeekday(dateStr: string | null): string {
@@ -314,6 +316,7 @@ export class GanttPanel {
   private _projects: RedmineProject[] = [];
   private _versions: Version[] = []; // Milestones across all projects
   private _flexibilityCache: Map<number, FlexibilityScore | null> = new Map();
+  private _userFteCache: Map<number, number> = new Map(); // FTE percentages per user
   private _getServerFn: (() => RedmineServer | undefined) | undefined;
   private _getDraftModeManagerFn: (() => DraftModeManager | undefined) | undefined;
 
@@ -1022,7 +1025,21 @@ export class GanttPanel {
       this._contributionSources = contributions.contributionSources;
       this._donationTargets = contributions.donationTargets;
 
+      // Fetch FTE values for unique assignees (for flexibility calculation)
+      const uniqueAssigneeIds = [...new Set(
+        this._issues
+          .map(i => i.assigned_to?.id)
+          .filter((id): id is number => id !== undefined && id !== this._currentUserId)
+      )];
+      if (uniqueAssigneeIds.length > 0 && this._server) {
+        const fteMap = await this._server.getUserFteBatch(uniqueAssigneeIds);
+        for (const [id, fte] of fteMap) {
+          this._userFteCache.set(id, fte);
+        }
+      }
+
       // Rebuild flexibility cache with contributions
+      // Uses user's custom schedule for their tasks, FTE-scaled default for others
       for (const issue of this._issues) {
         const spentHours = issue.spent_hours ?? 0;
         let effectiveSpent: number | undefined;
@@ -1040,6 +1057,21 @@ export class GanttPanel {
         }
 
         if (effectiveSpent !== undefined) {
+          // Determine schedule based on assignee
+          const assigneeId = issue.assigned_to?.id;
+          const isCurrentUserTask = assigneeId === this._currentUserId;
+          let effectiveSchedule: WeeklySchedule;
+          if (isCurrentUserTask) {
+            // Current user's tasks: use their custom schedule
+            effectiveSchedule = this._schedule;
+          } else if (assigneeId && this._userFteCache.has(assigneeId)) {
+            // Other user's tasks: scale default by their FTE
+            effectiveSchedule = scaleScheduleByFte(DEFAULT_WEEKLY_SCHEDULE, this._userFteCache.get(assigneeId)!);
+          } else {
+            // No FTE data: use default schedule
+            effectiveSchedule = DEFAULT_WEEKLY_SCHEDULE;
+          }
+
           const newFlexibility = calculateFlexibility(
             {
               start_date: issue.start_date || "",
@@ -1048,7 +1080,7 @@ export class GanttPanel {
               spent_hours: issue.spent_hours,
               done_ratio: issue.done_ratio,
             },
-            this._schedule,
+            effectiveSchedule,
             effectiveSpent
           );
           this._flexibilityCache.set(issue.id, newFlexibility);
@@ -2715,14 +2747,14 @@ export class GanttPanel {
         const issue = row.issue!;
         if (!issue.assignee) return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}><text class="gantt-col-cell" x="${assigneeColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">—</text></g>`;
         const initials = getInitials(issue.assignee);
-        const bgColor = getAvatarColor(issue.assignee);
+        const colors = getAvatarColorIndices(issue.assignee);
         const isCurrentUser = issue.assigneeId === this._currentUserId;
         const radius = 9; // Fits in 22px row height
         const cx = assigneeColumnWidth / 2;
         const cy = barHeight / 2;
         return `<g class="gantt-row assignee-badge${isCurrentUser ? " current-user" : ""}${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}>
           <title>${escapeAttr(issue.assignee)}</title>
-          <circle cx="${cx}" cy="${cy}" r="${radius}" fill="${bgColor}"/>
+          <circle class="avatar-fill-${colors.fill} avatar-stroke-${colors.stroke}" cx="${cx}" cy="${cy}" r="${radius}"/>
           <text x="${cx}" y="${cy + 3}" text-anchor="middle" fill="var(--vscode-editor-background)" font-size="9" font-weight="600">${escapeHtml(initials)}</text>
         </g>`;
       })
@@ -3078,7 +3110,7 @@ export class GanttPanel {
               <!-- Status badge for parent (adaptive positioning) -->
               ${(() => {
                 const badgeW = doneRatio === 100 ? 32 : doneRatio >= 10 ? 28 : 22;
-                const onLeft = endX + badgeW + 16 > timelineWidth;
+                const onLeft = false; // Always show badges on right side
                 const labelX = onLeft ? startX - 8 : endX + 8;
                 const badgeCenterX = onLeft ? labelX - badgeW / 2 : labelX + badgeW / 2;
                 const parentProgressTip = `Aggregated progress: ${doneRatio}%\n(weighted average of subtasks)`;
@@ -3231,7 +3263,7 @@ export class GanttPanel {
               const assigneeW = issue.assignee ? 90 : 0;
               // Total width: progress + flex + blocks + assignee + spacing (blocker is now at start)
               const totalLabelW = progressBadgeW + flexBadgeW + impactBadgeW + assigneeW + 24;
-              const onLeft = endX + totalLabelW > timelineWidth;
+              const onLeft = false; // Always show badges on right side
               const labelX = onLeft ? startX - 8 : endX + 16;
 
               // For closed issues, show checkmark with simple tooltip
@@ -4048,8 +4080,8 @@ export class GanttPanel {
             </defs>
             ${zebraStripes}
             ${dateMarkers.body}
-            ${bars}
             <g class="dependency-layer${this._showDependencies ? "" : " hidden"}">${dependencyArrows}</g>
+            ${bars}
             <g class="milestone-layer">${milestoneMarkers}</g>
             ${dateMarkers.todayMarker}
           </svg>

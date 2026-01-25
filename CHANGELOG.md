@@ -2,18 +2,27 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.12.5]
+
+### Added
+
+- **FTE-aware flexibility** - users' FTE% custom field (id=18) scales capacity for flexibility calculations
+  - Current user tasks: use your custom schedule settings
+  - Other users' tasks: scale default schedule by their FTE%
+  - Unknown/missing FTE: defaults to 100%
+
+### Improved
+
+- **Assignee badges** - expanded to 12 colors with fill+stroke combos (144 unique combinations)
+- **Past bars** - slightly brighter saturation (50% vs 40%) for better visibility
+- **Resize handle** - glow effect on active drag
+
 ## [4.12.4]
 
 ### Fixed
 
 - **Draft mode button** - now adapts to VS Code theme colors
 - **Assignee badges** - use theme-adaptive chart colors (6 distinct colors per person)
-
-## [4.12.3]
-
-### Fixed
-
-- **Draft mode button** - now adapts to VS Code theme colors
 
 ## [4.12.2]
 
@@ -39,53 +48,6 @@ All notable changes to the "Redmyne" extension will be documented in this file.
   - Added `removeDraft` to webview message types
   - Added extended scheduling relation types (SS, SF, FF, FS)
   - Made `start_date` nullable in Issue/FlexibilityIssue types
-
-## [Unreleased]
-
-### Added
-
-- **24h per day validation** - time sheet prevents entering hours that exceed 24h/day
-- **Gantt precedes delay support** - when creating `precedes` relations, set delay
-  - Same day (delay=-1): successor can start same day predecessor ends
-  - +1 day (delay=0): successor starts day after predecessor (Redmine default)
-  - Custom delay: enter any value for flexible scheduling
-
-### Improved
-
-- **Hybrid today intensity** - today shows actuals + fills remaining capacity with predictions
-  - Past: actuals only (truth)
-  - Today: actuals logged + predicted work for remaining capacity
-  - Future: predictions only
-  - Previously, today showed 0 until you logged time
-
-- **Blocking badges show hidden issues** - blocks/blocked badges now show count even when
-  referenced issue is filtered out (e.g., viewing "My Issues" but blocking someone else's task)
-  - Badge shows full count including hidden/external issues
-  - Tooltip shows `#ID` placeholder for hidden issues
-
-- **Smart capacity scheduling** - 75% default with 100% for tight deadlines
-  - Normal tasks use 75% capacity (buffer for meetings/interruptions)
-  - Tasks that can't fit at 75% automatically get 100% (overplanning)
-  - Flexibility indicator shows yellow/red when schedule is tight
-  - Example: 24h task in 4 days × 6.4h/day = needs 100%, flexibility turns yellow
-
-- **Blocked tasks show forecasted intensity** - blocked issues now show intensity forecast
-  - Previously: blocked tasks showed 0 intensity until blocker "completed" in simulation
-  - Now: assumes blockers complete on time for forecasting purposes
-  - Blocked task shows intensity starting on its start_date (after blocker's due_date)
-  - Example: #7741 (Jan 26-29) blocks #7742 (Jan 30-Feb 5) → #7742 shows forecast from Jan 30
-
-- **Smarter scheduling heuristics** - three new priority factors for better forecasting
-  - **Continuity bonus (500pts)**: finish started tasks before new ones (minimize context switching)
-  - **Start date pull (200pts)**: prioritize tasks on their start_date (surface blockers early)
-  - **Small task bonus (150pts)**: quick wins for tasks < 8h (only if >= 2 days slack)
-  - Combined with existing: precedence tag, external blocks, due date urgency, downstream impact
-
-### Fixed
-
-- **Gantt draft mode support** - Gantt now correctly uses DraftModeServer for write operations
-  - Date drag, relation create/delete now queue to draft instead of calling server directly
-  - Uses getter function pattern (like TimeSheet) for late-binding server reference
 
 ## [4.10.1]
 

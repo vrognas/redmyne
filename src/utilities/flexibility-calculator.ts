@@ -51,6 +51,7 @@ export interface FlexibilityIssue {
   done_ratio?: number;
   closed_on?: string | null;
   status?: { is_closed?: boolean };
+  assigned_to?: { id?: number } | null;
 }
 
 // Memoization cache for working days calculation
@@ -280,15 +281,34 @@ export interface ContributionData {
 }
 
 /**
+ * Scale a weekly schedule by FTE percentage
+ * FTE 100 = full schedule, FTE 80 = 80% of hours, etc.
+ */
+export function scaleScheduleByFte(schedule: WeeklySchedule, ftePercent: number): WeeklySchedule {
+  const scale = ftePercent / 100;
+  return {
+    Mon: schedule.Mon * scale,
+    Tue: schedule.Tue * scale,
+    Wed: schedule.Wed * scale,
+    Thu: schedule.Thu * scale,
+    Fri: schedule.Fri * scale,
+    Sat: schedule.Sat * scale,
+    Sun: schedule.Sun * scale,
+  };
+}
+
+/**
  * Build flexibility cache for a set of issues
  * Common pattern used by tree providers
- * @param contributions Optional contribution data for ad-hoc budget calculations
+ * Uses user's custom schedule for their own tasks, FTE-scaled default for others
  */
 export function buildFlexibilityCache(
   issues: FlexibilityIssue[],
   cache: Map<number, FlexibilityScore | null>,
   schedule: WeeklySchedule,
-  contributions?: ContributionData
+  contributions?: ContributionData,
+  currentUserId?: number,
+  userFteMap?: Map<number, number>
 ): void {
   cache.clear();
   for (const issue of issues) {
@@ -300,6 +320,23 @@ export function buildFlexibilityCache(
     if (issue.status?.is_closed === true) {
       cache.set(issueId, null);
       continue;
+    }
+
+    // Determine effective schedule based on assignee
+    const assigneeId = issue.assigned_to?.id;
+    const isCurrentUserTask = currentUserId !== undefined && assigneeId === currentUserId;
+
+    let effectiveSchedule: WeeklySchedule;
+    if (isCurrentUserTask) {
+      // Current user's tasks: use their custom schedule settings
+      effectiveSchedule = schedule;
+    } else if (assigneeId && userFteMap?.has(assigneeId)) {
+      // Other user's tasks: scale default schedule by their FTE
+      const fte = userFteMap.get(assigneeId)!;
+      effectiveSchedule = scaleScheduleByFte(DEFAULT_WEEKLY_SCHEDULE, fte);
+    } else {
+      // Unknown assignee or no FTE data: use default schedule
+      effectiveSchedule = DEFAULT_WEEKLY_SCHEDULE;
     }
 
     // Calculate effective spent hours if contributions provided
@@ -317,7 +354,7 @@ export function buildFlexibilityCache(
       }
     }
 
-    cache.set(issueId, calculateFlexibility(issue, schedule, effectiveSpent));
+    cache.set(issueId, calculateFlexibility(issue, effectiveSchedule, effectiveSpent));
   }
 }
 

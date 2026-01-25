@@ -1019,6 +1019,71 @@ export class RedmineServer {
     }
   }
 
+  /** Cache for user FTE percentages */
+  private userFteCache = new Map<number, number>();
+
+  /**
+   * Get FTE percentage for a user (100 = full-time, 80 = 80%, etc.)
+   * Returns 100 if not found or on error
+   */
+  async getUserFte(userId: number): Promise<number> {
+    // Check cache first
+    if (this.userFteCache.has(userId)) {
+      return this.userFteCache.get(userId)!;
+    }
+
+    try {
+      const response = await this.doRequest<{
+        user: {
+          id: number;
+          custom_fields?: { id: number; name: string; value: string }[];
+        };
+      }>(`/users/${userId}.json`, "GET");
+
+      const fteField = response?.user?.custom_fields?.find(
+        (f) => f.name === "FTE percent" || f.id === 18
+      );
+      const fte = fteField?.value ? parseInt(fteField.value, 10) : 100;
+      const validFte = isNaN(fte) || fte <= 0 ? 100 : fte;
+
+      this.userFteCache.set(userId, validFte);
+      return validFte;
+    } catch {
+      // Default to 100% FTE on error
+      this.userFteCache.set(userId, 100);
+      return 100;
+    }
+  }
+
+  /**
+   * Get FTE percentages for multiple users (batched for efficiency)
+   */
+  async getUserFteBatch(userIds: number[]): Promise<Map<number, number>> {
+    const result = new Map<number, number>();
+    const uncached = userIds.filter((id) => !this.userFteCache.has(id));
+
+    // Get cached values
+    for (const id of userIds) {
+      if (this.userFteCache.has(id)) {
+        result.set(id, this.userFteCache.get(id)!);
+      }
+    }
+
+    // Fetch uncached values in parallel (limit concurrency)
+    const batchSize = 5;
+    for (let i = 0; i < uncached.length; i += batchSize) {
+      const batch = uncached.slice(i, i + batchSize);
+      await Promise.all(batch.map((id) => this.getUserFte(id)));
+    }
+
+    // Add newly fetched values
+    for (const id of uncached) {
+      result.set(id, this.userFteCache.get(id) ?? 100);
+    }
+
+    return result;
+  }
+
   /**
    * Get custom fields (requires admin or appropriate permissions)
    */
