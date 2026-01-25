@@ -4072,7 +4072,7 @@ export class GanttPanel {
               <span class="help-item"><kbd>T</kbd> Today</span>
               <span class="help-item"><kbd>E</kbd> Expand</span>
               <span class="help-item"><kbd>C</kbd> Collapse</span>
-              <span class="help-item"><kbd>B</kbd> Blocked</span>
+              <span class="help-item"><kbd>B</kbd> Badges</span>
             </div>
         </div>
       </div>
