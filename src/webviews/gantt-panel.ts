@@ -32,6 +32,12 @@ import { parseLocalDate, getLocalToday, formatLocalDate } from "../utilities/dat
 import { GanttWebviewMessage, parseLookbackYears } from "./gantt-webview-messages";
 import { escapeAttr, escapeHtml } from "./gantt-html-escape";
 import { CreatableRelationType, GanttIssue, GanttRow, nodeToGanttRow } from "./gantt-model";
+import {
+  getInitials,
+  getAvatarColorIndices,
+  formatHoursAsTime,
+  formatShortName,
+} from "./gantt/gantt-html-generator";
 import { deriveAssigneeState, filterIssuesForView } from "./gantt-view-filter";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
 
@@ -120,33 +126,8 @@ const ZOOM_PIXELS_PER_DAY: Record<ZoomLevel, number> = {
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
-/** Extract initials from full name (e.g., "Viktor Rognås" → "VR") */
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
-}
-
-/** Avatar color indices for fill and stroke (12 colors = 144 combinations) */
-const AVATAR_COLOR_COUNT = 12;
-
-/** Generate consistent fill + stroke color indices from name (144 unique combos) */
-function getAvatarColorIndices(name: string): { fill: number; stroke: number } {
-  // Hash 1: standard djb2 for fill
-  let hash1 = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash1 = name.charCodeAt(i) + ((hash1 << 5) - hash1);
-  }
-  // Hash 2: reversed string with different multiplier for stroke
-  let hash2 = 0;
-  for (let i = name.length - 1; i >= 0; i--) {
-    hash2 = name.charCodeAt(i) + ((hash2 << 7) - hash2);
-  }
-  const fill = Math.abs(hash1) % AVATAR_COLOR_COUNT;
-  // Offset stroke by 6 (half palette) to maximize contrast with fill
-  const stroke = (Math.abs(hash2) + 6) % AVATAR_COLOR_COUNT;
-  return { fill, stroke };
-}
+// Helper functions (getInitials, getAvatarColorIndices, formatHoursAsTime, formatShortName)
+// are imported from ./gantt/gantt-html-generator
 
 function formatDateWithWeekday(dateStr: string | null): string {
   if (!dateStr) return "—";
@@ -165,27 +146,6 @@ function getWeekNumber(date: Date): number {
   return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 }
 
-/**
- * Format decimal hours as HH:MM (rounded up to nearest minute)
- */
-function formatHoursAsTime(hours: number | null): string {
-  if (hours === null) return "—";
-  const totalMinutes = Math.ceil(hours * 60);
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return `${h}:${m.toString().padStart(2, "0")}`;
-}
-
-/**
- * Format name as "Firstname L." for compact display
- */
-function formatShortName(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return name;
-  const firstName = parts[0];
-  const lastInitial = parts[parts.length - 1][0];
-  return `${firstName} ${lastInitial}.`;
-}
 
 /**
  * Get day name key for WeeklySchedule lookup (uses local day)
@@ -3260,9 +3220,6 @@ export class GanttPanel {
               const blockerBadgeStartX = startX - blockerBadgeW - 16;
               const blockerBadgeCenterXLeft = blockerBadgeStartX + blockerBadgeW / 2;
               const blockerColor = blockerCount >= 2 ? "var(--vscode-charts-red)" : "var(--vscode-charts-yellow)";
-              const assigneeW = issue.assignee ? 90 : 0;
-              // Total width: progress + flex + blocks + assignee + spacing (blocker is now at start)
-              const totalLabelW = progressBadgeW + flexBadgeW + impactBadgeW + assigneeW + 24;
               const onLeft = false; // Always show badges on right side
               const labelX = onLeft ? startX - 8 : endX + 16;
 
