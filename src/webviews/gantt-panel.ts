@@ -3931,7 +3931,6 @@ export class GanttPanel {
               <div class="help-title">Shortcuts</div>
               <span class="help-item"><kbd>1-5</kbd> Zoom</span>
               <span class="help-item"><kbd>V</kbd> View</span>
-              <span class="help-item"><kbd>F</kbd> Filter</span>
               <span class="help-item"><kbd>D</kbd> Relations</span>
               <span class="help-item"><kbd>Y</kbd> Capacity</span>
               <span class="help-item"><kbd>R</kbd> Refresh</span>
