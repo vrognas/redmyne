@@ -1845,9 +1845,6 @@
         document.getElementById("menuExpand")?.click();
       } else if (e.key.toLowerCase() === "c" && !modKey) {
         document.getElementById("menuCollapse")?.click();
-      } else if (e.key.toLowerCase() === "f" && !modKey) {
-        e.preventDefault();
-        document.getElementById("menuFilterHealth")?.click();
       } else if (e.key.toLowerCase() === "b") {
         document.getElementById("menuBadges")?.click();
       } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
@@ -1974,9 +1971,8 @@
             <div><kbd>T</kbd> Today</div>
           </div>
           <div class="shortcut-section">
-            <h4>Health & Other</h4>
-            <div><kbd>F</kbd> Cycle health filter</div>
-            <div><kbd>B</kbd> Next blocked issue</div>
+            <h4>Other</h4>
+            <div><kbd>B</kbd> Badges</div>
             <div><kbd>/</kbd> Quick search</div>
             <div><kbd>S</kbd> Cycle sort</div>
             <div><kbd>R</kbd> Refresh</div>
@@ -2357,7 +2353,6 @@
       extScrollTop,
       labelWidth,
       leftExtrasWidth,
-      healthFilter,
       sortBy,
       sortOrder,
       selectedCollapseKey,
@@ -2670,13 +2665,6 @@
     document.getElementById("filterStatus")?.addEventListener("change", (e) => {
       const value = e.target.value;
       vscode.postMessage({ command: "setFilter", filter: { status: value } });
-    });
-    document.getElementById("menuFilterHealth")?.addEventListener("click", () => {
-      const options = ["all", "critical", "warning", "healthy"];
-      const currentHealth = healthFilter;
-      const currentIdx = options.indexOf(currentHealth);
-      const nextIdx = (currentIdx + 1) % options.length;
-      vscode.postMessage({ command: "setHealthFilter", health: options[nextIdx] });
     });
     document.querySelectorAll(".gantt-col-header.sortable").forEach((header) => {
       header.addEventListener("click", () => {
