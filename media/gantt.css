@@ -389,37 +389,37 @@ body {
   display: none;
 }
 
-/* Draft mode toggle button - native VS Code button style */
+/* Draft mode toggle button - visible background using input colors */
 .gantt-actions .draft-mode-toggle {
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
-  border: none;
-  padding: 4px 10px;
-  border-radius: 2px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-panel-border, var(--vscode-input-background));
+  padding: 3px 10px;
+  border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
-  transition: background 0.1s ease;
   transform: none !important;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
-.gantt-actions .draft-mode-toggle:hover:not(:disabled) {
-  background: var(--vscode-button-secondaryHoverBackground);
-  transform: none;
+.gantt-actions .draft-mode-toggle:hover:not(:disabled):not(.active) {
+  border-color: var(--vscode-focusBorder);
 }
 
 .gantt-actions .draft-mode-toggle:focus {
   outline: 1px solid var(--vscode-focusBorder);
-  outline-offset: 1px;
+  outline-offset: -1px;
 }
 
 .gantt-actions .draft-mode-toggle.active {
   background: var(--vscode-button-background);
   color: var(--vscode-button-foreground);
+  border-color: var(--vscode-button-background);
 }
 
 .gantt-actions .draft-mode-toggle.active:hover:not(:disabled) {
   background: var(--vscode-button-hoverBackground);
-  transform: none;
+  border-color: var(--vscode-button-hoverBackground);
 }
 
 .gantt-actions .draft-mode-toggle:disabled {
