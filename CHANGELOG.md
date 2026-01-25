@@ -2,6 +2,13 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.12.4]
+
+### Fixed
+
+- **Draft mode button** - now adapts to VS Code theme colors
+- **Assignee badges** - use theme-adaptive chart colors (6 distinct colors per person)
+
 ## [4.12.3]
 
 ### Fixed
