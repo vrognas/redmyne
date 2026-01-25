@@ -2,6 +2,12 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.12.3]
+
+### Fixed
+
+- **Draft mode button** - now adapts to VS Code theme colors
+
 ## [4.12.2]
 
 ### Changed
