@@ -1836,7 +1836,10 @@ svg .gantt-row-hidden,
 
 /* Badge toggle via container class (O(1) toggle) */
 .hide-badges .blocker-badge,
-.hide-badges .blocks-badge-group {
+.hide-badges .blocks-badge-group,
+.hide-badges .progress-badge-group,
+.hide-badges .flex-badge-group,
+.hide-badges .bar-assignee-group {
   display: none;
 }
 
