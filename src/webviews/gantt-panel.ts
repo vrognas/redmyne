@@ -127,14 +127,23 @@ function getInitials(name: string): string {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 }
 
-/** Generate consistent HSL color from string (for avatar badges) */
+/** Theme-adaptive chart colors for avatar badges */
+const AVATAR_COLORS = [
+  "var(--vscode-charts-blue)",
+  "var(--vscode-charts-green)",
+  "var(--vscode-charts-orange)",
+  "var(--vscode-charts-purple)",
+  "var(--vscode-charts-red)",
+  "var(--vscode-charts-yellow)",
+];
+
+/** Generate consistent color index from string (for avatar badges) */
 function getAvatarColor(name: string): string {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
-  const hue = Math.abs(hash) % 360;
-  return `hsl(${hue}, 65%, 45%)`;
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
 function formatDateWithWeekday(dateStr: string | null): string {
@@ -2714,7 +2723,7 @@ export class GanttPanel {
         return `<g class="gantt-row assignee-badge${isCurrentUser ? " current-user" : ""}${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}>
           <title>${escapeAttr(issue.assignee)}</title>
           <circle cx="${cx}" cy="${cy}" r="${radius}" fill="${bgColor}"/>
-          <text x="${cx}" y="${cy + 3}" text-anchor="middle" fill="white" font-size="9" font-weight="600">${escapeHtml(initials)}</text>
+          <text x="${cx}" y="${cy + 3}" text-anchor="middle" fill="var(--vscode-editor-background)" font-size="9" font-weight="600">${escapeHtml(initials)}</text>
         </g>`;
       })
       .join("");
