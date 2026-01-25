@@ -16,7 +16,6 @@ export type GanttWebviewMessage =
   | { command: "deleteRelation"; relationId: number }
   | { command: "updateRelationDelay"; relationId: number; fromId: string; toId: string }
   | { command: "createRelation"; issueId: number; targetIssueId: number; relationType: string; delay?: number }
-  | { command: "toggleWorkloadHeatmap" }
   | { command: "toggleDependencies" }
   | { command: "toggleBadges" }
   | { command: "toggleCapacityRibbon" }

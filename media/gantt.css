@@ -1934,22 +1934,6 @@ svg .gantt-row-hidden,
   width: 80%;
 }
 
-.heatmap-color-green {
-  background: var(--vscode-charts-green);
-}
-
-.heatmap-color-yellow {
-  background: var(--vscode-charts-yellow);
-}
-
-.heatmap-color-orange {
-  background: var(--vscode-charts-orange);
-}
-
-.heatmap-color-red {
-  background: var(--vscode-charts-red);
-}
-
 /* Relation legend line colors - 3 semantic categories */
 .rel-line-blocks {
   background: var(--vscode-charts-red);

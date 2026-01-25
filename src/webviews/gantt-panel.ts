@@ -277,80 +277,6 @@ function getScheduledIntensity(
 }
 
 /**
- * Calculate aggregate daily workload across all issues
- * Returns map of date string (YYYY-MM-DD) to total intensity (hours used / hours available)
- */
-function calculateAggregateWorkload(
-  issues: { start_date?: string | null; due_date?: string | null; estimated_hours?: number | null; children?: unknown[] }[],
-  schedule: WeeklySchedule,
-  minDate: Date,
-  maxDate: Date
-): Map<string, number> {
-  const workloadMap = new Map<string, number>();
-
-  // Initialize all days with 0
-  const current = new Date(minDate);
-  while (current <= maxDate) {
-    workloadMap.set(current.toISOString().slice(0, 10), 0);
-    current.setUTCDate(current.getUTCDate() + 1);
-  }
-
-  // Filter to leaf issues only (no children) to avoid double-counting
-  const leafIssues = issues.filter(i => !i.children || i.children.length === 0);
-
-  // For each issue, distribute its estimated hours across its date range
-  for (const issue of leafIssues) {
-    if (!issue.start_date || !issue.due_date || !issue.estimated_hours) {
-      continue;
-    }
-
-    const start = parseLocalDate(issue.start_date);
-    const end = parseLocalDate(issue.due_date);
-    const estimatedHours = issue.estimated_hours;
-
-    // Calculate total available hours in the issue's range
-    let totalAvailable = 0;
-    const temp = new Date(start);
-    while (temp <= end) {
-      totalAvailable += schedule[getDayKey(temp)];
-      temp.setUTCDate(temp.getUTCDate() + 1);
-    }
-
-    if (totalAvailable === 0) continue;
-
-    // Distribute hours proportionally across each day
-    temp.setTime(start.getTime());
-    while (temp <= end) {
-      const dateKey = temp.toISOString().slice(0, 10);
-      const dayHours = schedule[getDayKey(temp)];
-      if (dayHours > 0) {
-        // Intensity = (allocated hours) / (available hours)
-        // Allocated = estimatedHours * (dayHours / totalAvailable)
-        const allocated = estimatedHours * (dayHours / totalAvailable);
-        const intensity = allocated / dayHours;
-        const curr = workloadMap.get(dateKey) ?? 0;
-        workloadMap.set(dateKey, curr + intensity);
-      }
-      temp.setUTCDate(temp.getUTCDate() + 1);
-    }
-  }
-
-  return workloadMap;
-}
-
-/**
- * Get heatmap color based on utilization level
- * Green < 80%, Yellow 80-100%, Orange 100-120%, Red > 120%
- */
-function getHeatmapColor(utilization: number): string {
-  if (utilization <= 0) return "transparent";
-  if (utilization <= 0.8) return "var(--vscode-charts-green)";
-  if (utilization <= 1.0) return "var(--vscode-charts-yellow)";
-  if (utilization <= 1.2) return "var(--vscode-charts-orange)";
-  return "var(--vscode-charts-red)";
-}
-
-/**
  * Gantt timeline webview panel
  * Shows issues as horizontal bars on a timeline
  */
@@ -394,7 +320,6 @@ export class GanttPanel {
   }
   private _zoomLevel: ZoomLevel = "month";
   private _schedule: WeeklySchedule = DEFAULT_WEEKLY_SCHEDULE;
-  private _showWorkloadHeatmap: boolean = false;
   private _showDependencies: boolean = true;
   private _showBadges: boolean = true;
   private _showIntensity: boolean = false;
@@ -406,7 +331,6 @@ export class GanttPanel {
   private _collapseState = new CollapseStateManager(); // Gantt-specific collapse state (independent from tree view)
   private _renderKey = 0; // Incremented on each render to force SVG re-creation
   // Performance cache for expensive computations (invalidated on data/settings change)
-  private _workloadCache?: { key: string; data: Map<string, number> };
   private _capacityCache?: { key: string; data: PeriodCapacity[] };
   private _dataRevision = 0; // Incremented on any data mutation to invalidate caches
   private _disposed = false; // Set on dispose to prevent late webview access
@@ -1316,7 +1240,6 @@ export class GanttPanel {
   /** Bump revision counter and clear caches (call on any data mutation) */
   private _bumpRevision(): void {
     this._dataRevision++;
-    this._workloadCache = undefined;
     this._capacityCache = undefined;
     this._cachedHierarchy = undefined;
   }
@@ -1440,14 +1363,6 @@ export class GanttPanel {
         if (message.issueId && message.targetIssueId && message.relationType && this._server) {
           this._createRelation(message.issueId, message.targetIssueId, message.relationType as CreatableRelationType, message.delay);
         }
-        break;
-      case "toggleWorkloadHeatmap":
-        this._showWorkloadHeatmap = !this._showWorkloadHeatmap;
-        // Send message to webview to toggle visibility without full re-render
-        this._panel.webview.postMessage({
-          command: "setHeatmapState",
-          enabled: this._showWorkloadHeatmap,
-        });
         break;
       case "toggleDependencies":
         this._showDependencies = !this._showDependencies;
@@ -3747,21 +3662,9 @@ export class GanttPanel {
         const color = this._getStatusColor(minimapEffectiveStatus);
         return { startPct, endPct, classes, color };
       });
-    // Calculate aggregate workload with caching (for heatmap)
-    // Key includes revision counter + filter to invalidate on data/filter changes
-    const filterKey = `${this._currentFilter.assignee}-${this._currentFilter.status}`;
-    const workloadCacheKey = `${this._dataRevision}-${this._viewFocus}-${this._selectedAssignee}-${filterKey}-${minDateStr}-${maxDateStr}-${JSON.stringify(this._schedule)}`;
-    let workloadMap: Map<string, number>;
-    if (this._workloadCache?.key === workloadCacheKey) {
-      workloadMap = this._workloadCache.data;
-    } else {
-      perfStart("calculateAggregateWorkload");
-      workloadMap = calculateAggregateWorkload(this._issues, this._schedule, minDate, maxDate);
-      perfEnd("calculateAggregateWorkload");
-      this._workloadCache = { key: workloadCacheKey, data: workloadMap };
-    }
 
     // Calculate capacity ribbon data (Person view only) with caching
+    const filterKey = `${this._currentFilter.assignee}-${this._currentFilter.status}`;
     const capacityZoomLevel = this._zoomLevel as CapacityZoomLevel;
     let capacityData: PeriodCapacity[] = [];
     if (this._viewFocus === "person") {
@@ -3878,9 +3781,7 @@ export class GanttPanel {
       maxDate,
       timelineWidth,
       0,
-      this._zoomLevel,
-      workloadMap,
-      this._showWorkloadHeatmap
+      this._zoomLevel
     );
     perfEnd("_generateDateMarkers");
 
@@ -4002,11 +3903,6 @@ export class GanttPanel {
               <span>Badges</span>
               <span class="shortcut">B</span>
             </div>
-            <div class="toolbar-dropdown-item${this._showWorkloadHeatmap && this._viewFocus === "person" ? " active" : ""}" id="menuHeatmap"${this._viewFocus !== "person" ? " disabled" : ""}>
-              <span class="icon">▦</span>
-              <span>Heatmap</span>
-              <span class="shortcut">H</span>
-            </div>
             <div class="toolbar-dropdown-item${this._showCapacityRibbon && this._viewFocus === "person" ? " active" : ""}" id="menuCapacity"${this._viewFocus !== "person" ? " disabled" : ""}>
               <span class="icon">▤</span>
               <span>Capacity</span>
@@ -4066,7 +3962,6 @@ export class GanttPanel {
               <span class="help-item"><kbd>V</kbd> View</span>
               <span class="help-item"><kbd>F</kbd> Filter</span>
               <span class="help-item"><kbd>D</kbd> Relations</span>
-              <span class="help-item"><kbd>H</kbd> Heatmap</span>
               <span class="help-item"><kbd>Y</kbd> Capacity</span>
               <span class="help-item"><kbd>R</kbd> Refresh</span>
               <span class="help-item"><kbd>T</kbd> Today</span>
@@ -4313,12 +4208,9 @@ export class GanttPanel {
     maxDate: Date,
     svgWidth: number,
     leftMargin: number,
-    zoomLevel: ZoomLevel = "day",
-    workloadMap: Map<string, number>,
-    showHeatmap: boolean
+    zoomLevel: ZoomLevel = "day"
   ): { header: string; body: string; todayMarker: string } {
     const headerContent: string[] = [];
-    const heatmapBackgrounds: string[] = [];
     const weekendBackgrounds: string[] = [];
     const bodyGridLines: string[] = [];
     const bodyMarkers: string[] = [];
@@ -4395,17 +4287,7 @@ export class GanttPanel {
       const year = current.getUTCFullYear();
       const quarter = Math.floor(month / 3) + 1;
 
-      // Always generate heatmap backgrounds (toggle via CSS)
-      const dateKey = current.toISOString().slice(0, 10);
-      const utilization = workloadMap.get(dateKey) ?? 0;
-      const color = getHeatmapColor(utilization);
-      if (color !== "transparent") {
-        heatmapBackgrounds.push(`
-          <rect x="${x}" y="0" width="${dayWidth}" height="100%" fill="${color}" opacity="0.15"/>
-        `);
-      }
-
-      // Always generate weekend backgrounds for day/week zoom (toggle via CSS)
+      // Generate weekend backgrounds for day/week zoom
       if ((zoomLevel === "day" || zoomLevel === "week") && (dayOfWeek === 0 || dayOfWeek === 6)) {
         weekendBackgrounds.push(`
           <rect x="${x}" y="0" width="${dayWidth}" height="100%" class="weekend-bg"/>
@@ -4544,13 +4426,11 @@ export class GanttPanel {
       current.setUTCDate(current.getUTCDate() + 1);
     }
 
-    // Wrap backgrounds in groups for CSS-based visibility toggle
-    const heatmapGroup = `<g class="heatmap-layer${showHeatmap ? "" : " hidden"}">${heatmapBackgrounds.join("")}</g>`;
-    const weekendGroup = `<g class="weekend-layer${showHeatmap ? " hidden" : ""}">${weekendBackgrounds.join("")}</g>`;
+    const weekendGroup = `<g class="weekend-layer">${weekendBackgrounds.join("")}</g>`;
 
     return {
       header: currentPeriodHighlight + headerContent.join(""),
-      body: heatmapGroup + weekendGroup + bodyGridLines.join("") + bodyMarkers.join(""),
+      body: weekendGroup + bodyGridLines.join("") + bodyMarkers.join(""),
       todayMarker: todayMarkerSvg,
     };
   }

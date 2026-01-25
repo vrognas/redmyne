@@ -609,21 +609,7 @@ function initializeGantt(state) {
 
     // Handle messages from extension (for state updates without full re-render)
     window.__ganttHandleExtensionMessage = (message) => {
-      if (message.command === 'setHeatmapState') {
-        const heatmapLayer = document.querySelector('.heatmap-layer');
-        const weekendLayer = document.querySelector('.weekend-layer');
-        const menuHeatmap = document.getElementById('menuHeatmap');
-
-        if (message.enabled) {
-          if (heatmapLayer) heatmapLayer.classList.remove('hidden');
-          if (weekendLayer) weekendLayer.classList.add('hidden');
-          if (menuHeatmap) menuHeatmap.classList.add('active');
-        } else {
-          if (heatmapLayer) heatmapLayer.classList.add('hidden');
-          if (weekendLayer) weekendLayer.classList.remove('hidden');
-          if (menuHeatmap) menuHeatmap.classList.remove('active');
-        }
-      } else if (message.command === 'setDependenciesState') {
+      if (message.command === 'setDependenciesState') {
         const dependencyLayer = document.querySelector('.dependency-layer');
         const menuDeps = document.getElementById('menuDeps');
 
@@ -846,13 +832,6 @@ function initializeGantt(state) {
           vscode.postMessage({ command: 'setSort', sortBy: sortField, sortOrder: 'asc' });
         }
       });
-    });
-
-    // Heatmap toggle handler (menu item)
-    document.getElementById('menuHeatmap')?.addEventListener('click', () => {
-      if (document.getElementById('menuHeatmap')?.hasAttribute('disabled')) return;
-      saveState();
-      vscode.postMessage({ command: 'toggleWorkloadHeatmap' });
     });
 
     // Capacity ribbon toggle handler (menu item)

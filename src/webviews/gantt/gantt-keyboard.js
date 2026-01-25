@@ -26,7 +26,6 @@ export function setupKeyboard(ctx) {
       zoomSelect.dispatchEvent(new Event('change'));
     }
     // Toggle shortcuts (trigger menu items)
-    else if (e.key.toLowerCase() === 'h') { document.getElementById('menuHeatmap')?.click(); }
     else if (e.key.toLowerCase() === 'y') { document.getElementById('menuCapacity')?.click(); }
     else if (e.key.toLowerCase() === 'i') { document.getElementById('menuIntensity')?.click(); }
     else if (e.key.toLowerCase() === 'd') { document.getElementById('menuDeps')?.click(); }
@@ -184,7 +183,6 @@ export function setupKeyboard(ctx) {
           <div class="shortcut-section">
             <h4>View</h4>
             <div><kbd>1-5</kbd> Zoom levels</div>
-            <div><kbd>H</kbd> Heatmap</div>
             <div><kbd>D</kbd> Dependencies</div>
             <div><kbd>C</kbd> Critical path</div>
             <div><kbd>T</kbd> Today</div>
