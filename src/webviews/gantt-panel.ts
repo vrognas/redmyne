@@ -44,6 +44,7 @@ import {
   generateIssueBar,
 } from "./gantt/gantt-html-generator";
 import type { GanttRenderContext } from "./gantt/gantt-render-types";
+import { generateHeader, type GanttToolbarContext } from "./gantt/gantt-toolbar-generator";
 import { deriveAssigneeState, filterIssuesForView } from "./gantt-view-filter";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
 
@@ -2862,178 +2863,32 @@ export class GanttPanel {
     // Body height matches visible content (no hidden project checkboxes at bottom)
     const bodyHeight = contentHeight;
 
+    // Build toolbar context
+    const toolbarCtx: GanttToolbarContext = {
+      viewFocus: this._viewFocus,
+      selectedProjectId: this._selectedProjectId,
+      selectedAssignee: this._selectedAssignee,
+      currentUserName: this._currentUserName,
+      uniqueAssignees: this._uniqueAssignees,
+      projects: this._projects,
+      lookbackYears: this._lookbackYears,
+      zoomLevel: this._zoomLevel,
+      currentFilter: this._currentFilter,
+      showDependencies: this._showDependencies,
+      showBadges: this._showBadges,
+      showCapacityRibbon: this._showCapacityRibbon,
+      showIntensity: this._showIntensity,
+      sortBy: this._sortBy,
+      sortOrder: this._sortOrder,
+      todayInRange,
+      draftModeEnabled: this._draftModeManager?.isEnabled ?? false,
+      draftQueueCount: this._draftModeManager?.queue?.count ?? 0,
+    };
+
     const html = `
 <div id="loadingOverlay" class="loading-overlay${this._isRefreshing ? " visible" : ""}"><div class="loading-spinner"></div></div>
   <div id="liveRegion" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
-    <div class="gantt-header">
-    ${(() => {
-      // Build title for per-project view: "Client: Project"
-      if (this._viewFocus === "project" && this._selectedProjectId) {
-        const project = this._projects.find(p => p.id === this._selectedProjectId);
-        if (project) {
-          const clientName = project.parent?.name;
-          if (clientName) {
-            return `<div class="gantt-title"><span class="client-name">${escapeHtml(clientName)}:</span> ${escapeHtml(project.name)}</div>`;
-          }
-          return `<div class="gantt-title">${escapeHtml(project.name)}</div>`;
-        }
-      }
-      return '<div class="gantt-title"></div>';
-    })()}
-    <div class="gantt-actions" role="toolbar" aria-label="Gantt chart controls">
-      <!-- Draft mode badge and toggle -->
-      <span id="draftBadge" class="draft-count-badge${this._draftModeManager?.isEnabled ? "" : " hidden"}" data-toolbar-tooltip="${(() => { const c = this._draftModeManager?.queue?.count ?? 0; return c === 1 ? "1 change queued - click to review" : `${c} changes queued - click to review`; })()}">${this._draftModeManager?.queue?.count ?? 0}</span>
-      <button id="draftModeToggle" class="draft-mode-toggle${this._draftModeManager?.isEnabled ? " active" : ""}">${this._draftModeManager?.isEnabled ? "Disable Draft Mode" : "Enable Draft Mode"}</button>
-      <div class="toolbar-separator"></div>
-      <!-- Lookback period -->
-      <select id="lookbackSelect" class="toolbar-select" data-toolbar-tooltip="Data lookback period">
-        <option value="2"${this._lookbackYears === 2 ? " selected" : ""}>2 Years</option>
-        <option value="5"${this._lookbackYears === 5 ? " selected" : ""}>5 Years</option>
-        <option value="10"${this._lookbackYears === 10 ? " selected" : ""}>10 Years</option>
-        <option value=""${this._lookbackYears === null ? " selected" : ""}>All Time</option>
-      </select>
-      <!-- Zoom -->
-      <select id="zoomSelect" class="toolbar-select" data-toolbar-tooltip="Zoom level">
-        <option value="day"${this._zoomLevel === "day" ? " selected" : ""}>Day</option>
-        <option value="week"${this._zoomLevel === "week" ? " selected" : ""}>Week</option>
-        <option value="month"${this._zoomLevel === "month" ? " selected" : ""}>Month</option>
-        <option value="quarter"${this._zoomLevel === "quarter" ? " selected" : ""}>Quarter</option>
-        <option value="year"${this._zoomLevel === "year" ? " selected" : ""}>Year</option>
-      </select>
-      <!-- View -->
-      <select id="viewFocusSelect" class="toolbar-select" data-toolbar-tooltip="View by (V)">
-        <option value="project"${this._viewFocus === "project" ? " selected" : ""}>By Project</option>
-        <option value="person"${this._viewFocus === "person" ? " selected" : ""}>By Person</option>
-      </select>
-      <!-- Context selector -->
-      ${this._viewFocus === "project" ? `
-      <select id="projectSelector" class="toolbar-select" data-toolbar-tooltip="Select project">
-        <option value=""${this._selectedProjectId === null ? " selected" : ""}>All Projects</option>
-        ${(() => {
-          const childrenMap = new Map<number, typeof this._projects>();
-          for (const p of this._projects) {
-            if (p.parent?.id) {
-              if (!childrenMap.has(p.parent.id)) childrenMap.set(p.parent.id, []);
-              childrenMap.get(p.parent.id)!.push(p);
-            }
-          }
-          const rootProjects = this._projects.filter(p => !p.parent).sort((a, b) => a.name.localeCompare(b.name));
-          const renderProject = (p: typeof this._projects[0], depth = 0): string => {
-            const children = (childrenMap.get(p.id) ?? []).sort((a, b) => a.name.localeCompare(b.name));
-            const isSelected = p.id === this._selectedProjectId;
-            const indent = "\u00A0\u00A0".repeat(depth);
-            const option = `<option value="${p.id}"${isSelected ? " selected" : ""}>${indent}${escapeHtml(p.name)}</option>`;
-            return option + children.map(c => renderProject(c, depth + 1)).join("");
-          };
-          return rootProjects.map(p => renderProject(p)).join("");
-        })()}
-      </select>` : `
-      <select id="focusSelector" class="toolbar-select" data-toolbar-tooltip="Select person">
-        ${this._uniqueAssignees.map(name => {
-          const isMe = name === this._currentUserName;
-          return `<option value="${escapeHtml(name)}"${this._selectedAssignee === name ? " selected" : ""}>${escapeHtml(name)}${isMe ? " (me)" : ""}</option>`;
-        }).join("")}
-      </select>`}
-      <div class="toolbar-separator"></div>
-      <!-- Filters (assignee filter only in project view) -->
-      ${this._viewFocus === "project" ? `
-      <select id="filterAssignee" class="toolbar-select" data-toolbar-tooltip="Filter by assignee">
-        <option value="me"${this._currentFilter.assignee === "me" ? " selected" : ""}>My issues</option>
-        <option value="any"${this._currentFilter.assignee === "any" ? " selected" : ""}>All assignees</option>
-      </select>` : ""}
-      <select id="filterStatus" class="toolbar-select" data-toolbar-tooltip="Filter by status">
-        <option value="open"${this._currentFilter.status === "open" ? " selected" : ""}>Open</option>
-        <option value="closed"${this._currentFilter.status === "closed" ? " selected" : ""}>Closed</option>
-        <option value="any"${this._currentFilter.status === "any" ? " selected" : ""}>Any status</option>
-      </select>
-      <!-- Primary actions -->
-      <button id="refreshBtn" class="toggle-btn text-btn" data-toolbar-tooltip="Refresh (R)">↻</button>
-      <button id="todayBtn" class="toggle-btn text-btn" data-toolbar-tooltip="${todayInRange ? "Today (T)" : "Today is outside timeline range"}"${todayInRange ? "" : " disabled"}>T</button>
-      <!-- Overflow menu -->
-      <div class="toolbar-dropdown">
-        <button class="toggle-btn text-btn">⋮</button>
-        <div class="toolbar-dropdown-menu">
-          <div class="toolbar-dropdown-menu-inner">
-            <div class="toolbar-dropdown-item${this._showDependencies ? " active" : ""}" id="menuDeps">
-              <span class="icon">⤤</span>
-              <span>Relations</span>
-              <span class="shortcut">D</span>
-            </div>
-            <div class="toolbar-dropdown-item${this._showBadges ? " active" : ""}" id="menuBadges">
-              <span class="icon">⏳</span>
-              <span>Badges</span>
-              <span class="shortcut">B</span>
-            </div>
-            <div class="toolbar-dropdown-item${this._showCapacityRibbon && this._viewFocus === "person" ? " active" : ""}" id="menuCapacity"${this._viewFocus !== "person" ? " disabled" : ""}>
-              <span class="icon">▤</span>
-              <span>Capacity</span>
-              <span class="shortcut">Y</span>
-            </div>
-            <div class="toolbar-dropdown-item${this._showIntensity && this._viewFocus === "person" ? " active" : ""}" id="menuIntensity"${this._viewFocus !== "person" ? " disabled" : ""}>
-              <span class="icon">▥</span>
-              <span>Intensity</span>
-              <span class="shortcut">I</span>
-            </div>
-            <div class="toolbar-dropdown-divider"></div>
-            <div class="toolbar-dropdown-item" id="menuUndo" disabled>
-              <span class="icon">↩</span>
-              <span>Undo</span>
-              <span class="shortcut">⌘Z</span>
-            </div>
-            <div class="toolbar-dropdown-item" id="menuRedo" disabled>
-              <span class="icon">↪</span>
-              <span>Redo</span>
-              <span class="shortcut">⌘Y</span>
-            </div>
-            <div class="toolbar-dropdown-divider"></div>
-            <div class="toolbar-dropdown-item" id="menuExpand">
-              <span class="icon">+</span>
-              <span>Expand all</span>
-              <span class="shortcut">E</span>
-            </div>
-            <div class="toolbar-dropdown-item" id="menuCollapse">
-              <span class="icon">−</span>
-              <span>Collapse all</span>
-              <span class="shortcut">C</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="toolbar-separator"></div>
-      <div class="help-dropdown">
-        <button class="toggle-btn text-btn">?</button>
-        <div class="help-tooltip">
-            <div class="help-section">
-              <div class="help-title">Bar Badges</div>
-              <span class="help-item"><span style="color:var(--vscode-charts-green)">+Nd</span> days of slack</span>
-              <span class="help-item"><span style="color:var(--vscode-charts-red)">-Nd</span> days late</span>
-              <span class="help-item">🚧N blocked by this</span>
-              <span class="help-item"><span style="color:var(--vscode-charts-red)">⛔N</span> blockers</span>
-              <span class="help-item"><span style="color:var(--vscode-charts-purple)">◆</span> milestone</span>
-            </div>
-            <div class="help-section">
-              <div class="help-title">Relations</div>
-              <span class="help-item"><span class="relation-legend-line rel-line-blocks"></span>blocking</span>
-              <span class="help-item"><span class="relation-legend-line rel-line-scheduling"></span>scheduling</span>
-              <span class="help-item"><span class="relation-legend-line rel-line-informational"></span>informational</span>
-            </div>
-            <div class="help-section">
-              <div class="help-title">Shortcuts</div>
-              <span class="help-item"><kbd>1-5</kbd> Zoom</span>
-              <span class="help-item"><kbd>V</kbd> View</span>
-              <span class="help-item"><kbd>D</kbd> Relations</span>
-              <span class="help-item"><kbd>Y</kbd> Capacity</span>
-              <span class="help-item"><kbd>R</kbd> Refresh</span>
-              <span class="help-item"><kbd>T</kbd> Today</span>
-              <span class="help-item"><kbd>E</kbd> Expand</span>
-              <span class="help-item"><kbd>C</kbd> Collapse</span>
-              <span class="help-item"><kbd>B</kbd> Badges</span>
-            </div>
-        </div>
-      </div>
-      <span id="selectionCount" class="selection-count hidden"></span>
-    </div>
-  </div>
+    ${generateHeader(toolbarCtx)}
     <div class="gantt-container${this._showIntensity ? " intensity-enabled" : ""}">
     <!-- Wrapper clips horizontal scrollbar -->
     <div class="gantt-scroll-wrapper">
