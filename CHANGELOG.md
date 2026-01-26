@@ -19,8 +19,9 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 ### Internal
 
-- **Gantt maintainability** - extracted ~800 LOC to stateless generator module
+- **Gantt maintainability** - extracted ~800 LOC to stateless generator modules
   - Labels, cells, bars delegated to `gantt-html-generator.ts`
+  - Toolbar delegated to `gantt-toolbar-generator.ts` (~145 LOC)
   - Fixed O(n²) `collectProjectIds` algorithm
   - Added timeline right padding (220px) for badge overflow
 

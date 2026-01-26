@@ -51,6 +51,10 @@ src/
 - Dependency arrows, workload heatmap
 - Multi-select, minimap, critical path
 - Undo/redo, keyboard navigation
+- Modular HTML generation (`src/webviews/gantt/`):
+  - `gantt-html-generator.ts`: labels, cells, bars
+  - `gantt-toolbar-generator.ts`: toolbar controls
+  - `gantt-render-types.ts`: shared interfaces
 
 ### Timer (`src/timer/`)
 - State machine: idle → working → paused → logging → break
