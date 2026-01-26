@@ -2,6 +2,12 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.12.6]
+
+### Fixed
+
+- **Toolbar tooltips** - hide when dropdown is open (native dropdowns render above CSS)
+
 ## [4.12.5]
 
 ### Added
