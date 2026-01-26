@@ -691,6 +691,7 @@ function generateRegularBar(
   ctx: GanttRenderContext
 ): string {
   const escapedSubject = escapeHtml(issue.subject);
+  const escapedProject = escapeHtml(issue.project);
   const doneRatio = issue.done_ratio;
 
   // Calculate visual progress
@@ -719,17 +720,67 @@ function generateRegularBar(
   const flexPct = issue.flexibilityPercent;
   const isCriticalPath = flexPct !== null && flexPct <= 0 && !issue.isClosed;
 
-  // Build bar tooltip
+  // Context-sensitive info from callbacks
+  const issueInternalEstimate = ctx.getInternalEstimate(issue.id);
+  const isManualDone = !ctx.isAutoUpdateEnabled(issue.id);
+  const issuePrecedence = ctx.hasPrecedence(issue.id);
+
+  // Build bar tooltip with full details
   const barTooltip = [
+    issuePrecedence ? "⏫ PRECEDENCE PRIORITY" : null,
     issue.isAdHoc ? "🎲 AD-HOC BUDGET POOL" : null,
     issue.isExternal ? "⚡ EXTERNAL DEPENDENCY" : null,
-    isCriticalPath ? "🔶 CRITICAL PATH" : null,
+    isCriticalPath ? "🔶 CRITICAL PATH - no schedule flexibility" : null,
     statusDesc,
     `#${issue.id} ${escapedSubject}`,
-    `Progress: ${doneRatio}%${isFallbackProgress ? ` (~${visualDoneRatio}% from time)` : ""}`,
+    `Project: ${escapedProject}`,
+    issue.isExternal ? `Assigned to: ${issue.assignee ?? "Unassigned"}` : null,
+    `Start: ${formatDateWithWeekday(issue.start_date)}`,
+    `Due: ${hasOnlyStart ? "(no due date)" : formatDateWithWeekday(issue.due_date)}`,
+    `───`,
+    `Progress: ${doneRatio}%${isFallbackProgress ? ` (~${visualDoneRatio}% from time)` : ""}${isManualDone && doneRatio > 0 ? " (manual)" : ""}`,
     `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
-    `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
+    issueInternalEstimate ? `Remaining: ${formatHoursAsTime(issueInternalEstimate.hoursRemaining)} (internal estimate)` : null,
+    contributedHours > 0
+      ? `Spent: ${formatHoursAsTime(issue.spent_hours)} + ${formatHoursAsTime(contributedHours)} contributed = ${formatHoursAsTime(effectiveSpentHours)}`
+      : `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
   ].filter(Boolean).join("\n");
+
+  // Progress badge tooltip
+  const progressTooltip = [
+    `Progress: ${doneRatio}%${isFallbackProgress ? ` (~${visualDoneRatio}% from time)` : ""}${isManualDone && doneRatio > 0 ? " (manual)" : ""}`,
+    `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
+    issueInternalEstimate ? `Remaining: ${formatHoursAsTime(issueInternalEstimate.hoursRemaining)} (internal)` : null,
+    contributedHours > 0
+      ? `Spent: ${formatHoursAsTime(issue.spent_hours)} + ${formatHoursAsTime(contributedHours)} contributed`
+      : `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
+  ].filter(Boolean).join("\n");
+
+  // Flexibility tooltip
+  const flexTooltip = flexPct === null ? ""
+    : flexPct > 0 ? `Flexibility: +${flexPct}%`
+    : flexPct === 0 ? `Flexibility: 0% (no buffer)`
+    : `Flexibility: ${flexPct}%`;
+
+  // Blocks tooltip (issues blocked by this one)
+  const blocksTooltip = issue.blocks.length > 0
+    ? `⛔ Blocking ${issue.blocks.length}:\n` + issue.blocks.slice(0, 5).map(b => {
+        const assigneeText = b.assignee ? ` (${b.assignee})` : "";
+        const noMetadata = b.subject === `#${b.id}`;
+        const subjectText = noMetadata ? "(not in view)" : (b.subject.length > 30 ? b.subject.substring(0, 29) + "…" : b.subject);
+        return `#${b.id} ${subjectText}${assigneeText}`;
+      }).join("\n") + (issue.blocks.length > 5 ? `\n... and ${issue.blocks.length - 5} more` : "") + "\n\nClick to highlight dependencies"
+    : "";
+
+  // Blockers tooltip (issues this one is waiting on)
+  const blockerTooltip = issue.blockedBy.length > 0
+    ? `⏳ Waiting on ${issue.blockedBy.length}:\n` + issue.blockedBy.slice(0, 5).map(b => {
+        const assigneeText = b.assignee ? ` (${b.assignee})` : "";
+        const noMetadata = b.subject === `#${b.id}`;
+        const subjectText = noMetadata ? "(not in view)" : (b.subject.length > 30 ? b.subject.substring(0, 29) + "…" : b.subject);
+        return `#${b.id} ${subjectText}${assigneeText}`;
+      }).join("\n") + (issue.blockedBy.length > 5 ? `\n... and ${issue.blockedBy.length - 5} more` : "") + "\n\nClick to highlight and jump"
+    : "";
 
   // Intensity data
   const canShowIntensity = ctx.viewFocus === "person";
@@ -768,6 +819,9 @@ function generateRegularBar(
       : issue.subject;
     return `<text class="bar-subject" x="${startX + padding}" y="${barY + ctx.barContentHeight / 2 + 3}" fill="${textColor}" font-size="9" font-weight="500" pointer-events="none">${escapeHtml(displaySubject)}</text>`;
   })();
+
+  // Generate badges
+  const badges = generateBarBadges(issue, startX, endX, barY, flexPct, visualDoneRatio, isFallbackProgress, progressTooltip, flexTooltip, blocksTooltip, blockerTooltip, ctx);
 
   return `
     <g class="issue-bar gantt-row${hiddenClass}${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${issue.isAdHoc ? " bar-adhoc" : ""}${isCriticalPath ? " bar-critical" : ""}" data-issue-id="${issue.id}"
@@ -828,8 +882,141 @@ function generateRegularBar(
         <circle cx="${endX + 8}" cy="${barY + ctx.barContentHeight / 2}" r="12" fill="transparent" pointer-events="all"/>
         <circle class="link-handle-visual" cx="${endX + 8}" cy="${barY + ctx.barContentHeight / 2}" r="4" fill="var(--vscode-button-background)" stroke="var(--vscode-button-foreground)" stroke-width="1" pointer-events="none"/>
       </g>
+      ${badges}
     </g>
   `;
+}
+
+/** Generate bar badges (progress, flex, blocks, blocker, assignee) */
+function generateBarBadges(
+  issue: GanttIssue,
+  startX: number,
+  endX: number,
+  barY: number,
+  flexPct: number | null,
+  visualDoneRatio: number,
+  isFallbackProgress: boolean,
+  progressTooltip: string,
+  flexTooltip: string,
+  blocksTooltip: string,
+  blockerTooltip: string,
+  ctx: GanttRenderContext
+): string {
+  // Progress badge width (varies by digit count)
+  const progressBadgeW = visualDoneRatio === 100 ? 32 : visualDoneRatio >= 10 ? 28 : 22;
+
+  // Flexibility badge
+  const showFlex = flexPct !== null && !issue.isClosed;
+  const flexLabel = showFlex ? (flexPct > 0 ? `+${flexPct}%` : `${flexPct}%`) : "";
+  const flexBadgeW = showFlex ? (Math.abs(flexPct) >= 100 ? 38 : Math.abs(flexPct) >= 10 ? 32 : 26) : 0;
+  const flexColor = showFlex
+    ? (flexPct >= 50 ? "var(--vscode-charts-green)"
+      : flexPct > 0 ? "var(--vscode-charts-yellow)"
+      : "var(--vscode-charts-red)")
+    : "";
+
+  // Blocks badge (downstream - at END of bar)
+  const blocksCount = issue.blocks.length;
+  const showBlocks = blocksCount > 0 && !issue.isClosed;
+  const impactBadgeW = showBlocks ? 28 : 0;
+  const impactLabel = showBlocks ? `⛔${blocksCount}` : "";
+  const impactColor = showBlocks
+    ? (blocksCount >= 5 ? "var(--vscode-charts-red)"
+      : blocksCount >= 2 ? "var(--vscode-charts-orange)"
+      : "var(--vscode-descriptionForeground)")
+    : "";
+
+  // Blocker badge (upstream - at START of bar)
+  const blockerCount = issue.blockedBy.length;
+  const showBlocker = blockerCount > 0 && !issue.isClosed;
+  const blockerBadgeW = showBlocker ? 28 : 0;
+  const blockerLabel = showBlocker ? `⏳${blockerCount}` : "";
+  const firstBlockerId = showBlocker ? issue.blockedBy[0].id : null;
+  const blockerBadgeStartX = startX - blockerBadgeW - 16;
+  const blockerBadgeCenterX = blockerBadgeStartX + blockerBadgeW / 2;
+  const blockerColor = blockerCount >= 2 ? "var(--vscode-charts-red)" : "var(--vscode-charts-yellow)";
+
+  const labelX = endX + 16;
+
+  // For closed issues, show checkmark
+  if (issue.isClosed) {
+    const checkBadgeW = 20;
+    const checkCenterX = labelX + checkBadgeW / 2;
+    const assigneeX = labelX + checkBadgeW + 4;
+    return `<g class="bar-labels">
+      <g class="progress-badge-group">
+        <title>Closed</title>
+        <rect class="status-badge-bg" x="${labelX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${checkBadgeW}" height="12" rx="2"
+              fill="var(--vscode-charts-green)" opacity="0.15"/>
+        <rect x="${labelX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${checkBadgeW}" height="12" fill="transparent"/>
+        <text class="status-badge" x="${checkCenterX}" y="${ctx.barHeight / 2 + 4}"
+              text-anchor="middle" fill="var(--vscode-charts-green)" font-size="12">✓</text>
+      </g>
+      ${issue.assignee ? `<g class="bar-assignee-group">
+        <title>${escapeAttr(issue.assignee)}</title>
+        <text class="bar-assignee${issue.assigneeId === ctx.currentUserId ? " current-user" : ""}" x="${assigneeX}" y="${ctx.barHeight / 2 + 4}"
+              text-anchor="start" fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(formatShortName(issue.assignee))}</text>
+      </g>` : ""}
+    </g>`;
+  }
+
+  // Progress badge position
+  const progressCenterX = labelX + progressBadgeW / 2;
+
+  // Flex badge position
+  const flexBadgeX = labelX + progressBadgeW + 4;
+  const flexBadgeCenterX = flexBadgeX + flexBadgeW / 2;
+
+  // Impact badge position
+  const afterProgressX = showFlex ? flexBadgeX : labelX;
+  const afterProgressW = showFlex ? flexBadgeW : progressBadgeW;
+  const impactBadgeX = afterProgressX + afterProgressW + 4;
+  const impactBadgeCenterX = impactBadgeX + impactBadgeW / 2;
+
+  // Assignee position
+  const afterImpactX = showBlocks ? impactBadgeX : afterProgressX;
+  const afterImpactW = showBlocks ? impactBadgeW : afterProgressW;
+  const assigneeX = afterImpactX + afterImpactW + 4;
+
+  return `<g class="bar-labels">
+    <g class="progress-badge-group">
+      <title>${escapeAttr(progressTooltip)}</title>
+      <rect class="status-badge-bg" x="${labelX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${progressBadgeW}" height="12" rx="2"
+            fill="var(--vscode-badge-background)" opacity="0.9"/>
+      <rect x="${labelX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${progressBadgeW}" height="12" fill="transparent"/>
+      <text class="status-badge" x="${progressCenterX}" y="${ctx.barHeight / 2 + 4}"
+            text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${isFallbackProgress ? "~" : ""}${visualDoneRatio}%</text>
+    </g>
+    ${showFlex ? `<g class="flex-badge-group">
+      <title>${escapeAttr(flexTooltip)}</title>
+      <rect class="flex-badge-bg" x="${flexBadgeX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${flexBadgeW}" height="12" rx="2"
+            fill="${flexColor}" opacity="0.15"/>
+      <rect x="${flexBadgeX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${flexBadgeW}" height="12" fill="transparent"/>
+      <text class="flex-badge" x="${flexBadgeCenterX}" y="${ctx.barHeight / 2 + 4}"
+            text-anchor="middle" fill="${flexColor}" font-size="10" font-weight="500">${flexLabel}</text>
+    </g>` : ""}
+    ${showBlocks ? `<g class="blocks-badge-group" style="cursor: pointer;">
+      <title>${escapeAttr(blocksTooltip)}</title>
+      <rect class="blocks-badge-bg" x="${impactBadgeX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${impactBadgeW}" height="12" rx="2"
+            fill="${impactColor}" opacity="0.15"/>
+      <rect x="${impactBadgeX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${impactBadgeW}" height="12" fill="transparent"/>
+      <text class="blocks-badge" x="${impactBadgeCenterX}" y="${ctx.barHeight / 2 + 4}"
+            text-anchor="middle" fill="${impactColor}" font-size="10" font-weight="500">${impactLabel}</text>
+    </g>` : ""}
+    ${issue.assignee ? `<g class="bar-assignee-group">
+      <title>${escapeAttr(issue.assignee)}</title>
+      <text class="bar-assignee${issue.assigneeId === ctx.currentUserId ? " current-user" : ""}" x="${assigneeX}" y="${ctx.barHeight / 2 + 4}"
+            text-anchor="start" fill="var(--vscode-descriptionForeground)" font-size="11">${escapeHtml(formatShortName(issue.assignee))}</text>
+    </g>` : ""}
+  </g>
+  ${showBlocker ? `<g class="blocker-badge" data-blocker-id="${firstBlockerId}" style="cursor: pointer;">
+    <title>${escapeAttr(blockerTooltip)}</title>
+    <rect x="${blockerBadgeStartX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${blockerBadgeW}" height="12" rx="2"
+          fill="${blockerColor}" opacity="0.15"/>
+    <rect x="${blockerBadgeStartX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${blockerBadgeW}" height="12" fill="transparent"/>
+    <text x="${blockerBadgeCenterX}" y="${ctx.barHeight / 2 + 4}"
+          text-anchor="middle" fill="${blockerColor}" font-size="10" font-weight="600">${blockerLabel}</text>
+  </g>` : ""}`;
 }
 
 // ============================================================================
