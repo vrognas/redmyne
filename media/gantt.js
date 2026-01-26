@@ -2073,6 +2073,17 @@
         delete el.dataset.toolbarTooltip;
         if (text) {
           el.dataset.tooltip = text;
+          // For select elements, hide tooltip when dropdown is open
+          if (el.tagName === "SELECT") {
+            el.addEventListener("mousedown", () => {
+              delete el.dataset.tooltip;
+              // Also hide the tooltip element immediately
+              tooltip?.classList.remove("visible");
+            });
+            el.addEventListener("blur", () => {
+              el.dataset.tooltip = text;
+            });
+          }
         }
       });
     }
