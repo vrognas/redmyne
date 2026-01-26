@@ -6,7 +6,6 @@ import {
   formatShortName,
   generateIssueLabel,
   generateProjectLabel,
-  generateIdCell,
   generateIssueBar,
 } from "../src/webviews/gantt/gantt-html-generator";
 import type { GanttRow } from "../src/webviews/gantt-model";
