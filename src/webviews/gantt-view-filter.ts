@@ -99,16 +99,32 @@ export function filterIssuesForView(options: {
 }
 
 function collectProjectIds(projects: RedmineProject[], rootId: number): Set<number> {
-  const projectIds = new Set<number>();
-  const addDescendants = (projectId: number) => {
-    if (projectIds.has(projectId)) return;
-    projectIds.add(projectId);
-    for (const project of projects) {
-      if (project.parent?.id === projectId) {
-        addDescendants(project.id);
+  // Build parent-to-children map once: O(n)
+  const childrenMap = new Map<number, number[]>();
+  for (const project of projects) {
+    const parentId = project.parent?.id;
+    if (parentId !== undefined) {
+      const children = childrenMap.get(parentId);
+      if (children) {
+        children.push(project.id);
+      } else {
+        childrenMap.set(parentId, [project.id]);
       }
     }
-  };
-  addDescendants(rootId);
+  }
+
+  // Traverse using map: O(n) total
+  const projectIds = new Set<number>();
+  const stack = [rootId];
+  while (stack.length > 0) {
+    const id = stack.pop()!;
+    if (projectIds.has(id)) continue;
+    projectIds.add(id);
+    const children = childrenMap.get(id);
+    if (children) {
+      stack.push(...children);
+    }
+  }
+
   return projectIds;
 }
