@@ -33,11 +33,18 @@ import { GanttWebviewMessage, parseLookbackYears } from "./gantt-webview-message
 import { escapeAttr, escapeHtml } from "./gantt-html-escape";
 import { CreatableRelationType, GanttIssue, GanttRow, nodeToGanttRow } from "./gantt-model";
 import {
-  getInitials,
-  getAvatarColorIndices,
   formatHoursAsTime,
   formatShortName,
+  generateIdCell,
+  generateStartDateCell,
+  generateStatusCell,
+  generateDueDateCell,
+  generateAssigneeCell,
+  generateProjectLabel,
+  generateTimeGroupLabel,
+  generateIssueLabel,
 } from "./gantt/gantt-html-generator";
+import type { GanttRenderContext } from "./gantt/gantt-render-types";
 import { deriveAssigneeState, filterIssuesForView } from "./gantt-view-filter";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
 
@@ -2414,312 +2421,82 @@ export class GanttPanel {
       ? `<g class="indent-guides-layer">${continuousIndentLines.join("")}</g>`
       : "";
 
+    // Build render context for label/cell/bar generation
+    const renderContext = {
+      barHeight,
+      barPadding,
+      barContentHeight,
+      indentSize,
+      chevronWidth,
+      timelineWidth,
+      labelWidth,
+      idColumnWidth,
+      startDateColumnWidth,
+      statusColumnWidth,
+      dueDateColumnWidth,
+      assigneeColumnWidth,
+      minDate,
+      maxDate,
+      today,
+      todayStr: getTodayStr(),
+      rows,
+      filteredRows,
+      visibleRows,
+      initialYPositions,
+      filteredRowYPositions,
+      rowYPositions,
+      rowHeights,
+      viewFocus: this._viewFocus,
+      showIntensity: this._showIntensity,
+      showDependencies: this._showDependencies,
+      showBadges: this._showBadges,
+      currentUserId: this._currentUserId,
+      schedule: this._schedule,
+      issueScheduleMap,
+      contributionSources: this._contributionSources,
+      donationTargets: this._donationTargets,
+      adHocIssues: this._contributionData?.adHocIssues,
+      getStatusColor: (status: string) => this._getStatusColor(status as FlexibilityScore["status"] | null),
+      getStatusTextColor: (status: string) => this._getStatusTextColor(status as FlexibilityScore["status"] | null),
+      getStatusOpacity: (status: string) => this._getStatusOpacity(status as FlexibilityScore["status"] | null),
+      getStatusDescription: (status: string) => this._getStatusDescription(status as FlexibilityScore["status"] | null),
+      buildProjectTooltip: (row: GanttRow) => this.buildProjectTooltip(row),
+      getHealthDot: (status: string) => this.getHealthDot(status as "green" | "yellow" | "red" | "grey"),
+      getInternalEstimate: (issueId: number) => GanttPanel._globalState ? getInternalEstimate(GanttPanel._globalState, issueId) : null,
+      hasPrecedence: (issueId: number) => GanttPanel._globalState ? hasPrecedence(GanttPanel._globalState, issueId) : false,
+      isAutoUpdateEnabled: (issueId: number) => autoUpdateTracker.isEnabled(issueId),
+    } as GanttRenderContext;
+
+    // Generate labels using delegated functions
     const labels = filteredRows
       .map((row, idx) => {
         const y = initialYPositions[idx];
         const originalY = filteredRowYPositions[idx];
-        const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
-        const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
-        const indent = row.depth * indentSize;
-
-        // VS Code-style chevron: right-pointing arrow that rotates 90deg when expanded
-        // Includes larger invisible hit area for easier clicking
-        const chevronX = 10 + indent;
-        const chevronY = barHeight / 2;
-        const hitAreaSize = 18;
-        const chevron = row.hasChildren
-          ? `<g class="collapse-toggle user-select-none${row.isExpanded ? " expanded" : ""}" transform-origin="${chevronX} ${chevronY}"><rect x="${chevronX - hitAreaSize / 2}" y="${chevronY - hitAreaSize / 2}" width="${hitAreaSize}" height="${hitAreaSize}" fill="transparent" class="chevron-hit-area"/><path d="M${chevronX - 3},${chevronY - 4} L${chevronX + 2},${chevronY} L${chevronX - 3},${chevronY + 4}" fill="none" stroke="var(--vscode-foreground)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></g>`
-          : "";
-        // Always reserve space for chevron to align text regardless of hasChildren
-        const textOffset = chevronWidth;
-
-        if (row.type === "project") {
-          // Project header row with health indicators
-          const health = row.health;
-          const healthDot = health ? this.getHealthDot(health.status) : "";
-          const labelX = 10 + indent + textOffset;
-
-          // Build counts string: "12 open · 2 blocked · 1 overdue"
-          let countsStr = "";
-          if (health && health.counts.total > 0) {
-            const parts: string[] = [`${health.counts.open} open`];
-            if (health.counts.blocked > 0) parts.push(`${health.counts.blocked} blocked`);
-            if (health.counts.overdue > 0) parts.push(`${health.counts.overdue} overdue`);
-            countsStr = parts.join(" · ");
-          }
-
-          // Progress bar (thin inline)
-          const progressBarWidth = 40;
-          const progressBarHeight = 4;
-          const progressBarX = labelX + escapeHtml(row.label).length * 7 + 24; // After label + health dot
-          const progressBarY = barHeight / 2 - progressBarHeight / 2;
-          const progressFillWidth = health ? (health.progress / 100) * progressBarWidth : 0;
-          const progressBar = health && health.counts.total > 0 ? `
-            <rect x="${progressBarX}" y="${progressBarY}" width="${progressBarWidth}" height="${progressBarHeight}" rx="2" fill="var(--vscode-progressBar-background)" opacity="0.3"/>
-            <rect x="${progressBarX}" y="${progressBarY}" width="${progressFillWidth}" height="${progressBarHeight}" rx="2" fill="var(--vscode-progressBar-foreground)"/>
-            <text x="${progressBarX + progressBarWidth + 4}" y="${barHeight / 2 + 4}" fill="var(--vscode-descriptionForeground)" font-size="10">${health.progress}%</text>
-          ` : "";
-
-          // Counts text position (after progress bar)
-          const countsX = progressBarX + progressBarWidth + 30;
-          const countsText = countsStr ? `<text x="${countsX}" y="${barHeight / 2 + 4}" fill="var(--vscode-descriptionForeground)" font-size="10">${countsStr}</text>` : "";
-
-          // Tooltip: project details aligned with tree view
-          const tooltip = this.buildProjectTooltip(row);
-
-          // De-emphasized project headers: regular weight, muted color
-          // Projects are containers, not content - issues should be primary focus
-          return `
-            <g class="project-label gantt-row cursor-pointer${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${originalY}" data-tooltip="${escapeAttr(tooltip)}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}' transform="translate(0, ${y})"${hiddenAttr} tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
-              <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent" pointer-events="all"/>
-              ${chevron}
-              <text x="${labelX}" y="${barHeight / 2 + 5}" fill="var(--vscode-descriptionForeground)" font-size="13" pointer-events="none">
-                ${healthDot}${escapeHtml(row.label)}
-              </text>
-              ${progressBar}
-              ${countsText}
-            </g>
-          `;
-        }
-
-        if (row.type === "time-group") {
-          // Time group header row (Overdue, Due This Week, etc.)
-          const timeGroupClass = `time-group-${row.timeGroup}`;
-          const countBadge = row.childCount ? ` (${row.childCount})` : "";
-          return `
-            <g class="time-group-label gantt-row ${timeGroupClass}${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-time-group="${row.timeGroup}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${originalY}" data-tooltip="${escapeAttr(row.label)}" transform="translate(0, ${y})"${hiddenAttr} tabindex="0" role="button" aria-label="Toggle ${escapeHtml(row.label)}">
-              <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent" pointer-events="all"/>
-              ${chevron}
-              <text x="${10 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="13" font-weight="bold" pointer-events="none">
-                ${row.icon || ""} ${escapeHtml(row.label)}${countBadge}
-              </text>
-            </g>
-          `;
-        }
-
-        // Issue row
-        const issue = row.issue!;
-        const escapedSubject = escapeHtml(issue.subject);
-        const escapedProject = escapeHtml(issue.project);
-
-        // Get status description and flexibility for consolidated tooltip
-        // Closed issues always show as "completed" regardless of calculated flexibility
-        const leftEffectiveStatus = issue.isClosed ? "completed" : issue.status;
-        const leftStatusDesc = this._getStatusDescription(leftEffectiveStatus);
-        const leftFlexPct = issue.flexibilityPercent;
-        const leftFlexText = leftFlexPct === null ? null
-          : leftFlexPct > 0 ? `Flexibility: +${leftFlexPct}%`
-          : leftFlexPct === 0 ? `Flexibility: 0% (no buffer)`
-          : `Flexibility: ${leftFlexPct}%`;
-
-        // Build consolidated tooltip with all info
-        const tooltipLines = [
-          issue.isAdHoc ? "🎲 AD-HOC BUDGET POOL" : null,
-          issue.isExternal ? "⚡ EXTERNAL DEPENDENCY" : null,
-          leftStatusDesc,
-          `#${issue.id} ${escapedSubject}`,
-          `Project: ${escapedProject}`,
-          issue.isExternal ? `Assigned to: ${issue.assignee ?? "Unassigned"}` : null,
-          `Start: ${formatDateWithWeekday(issue.start_date)}`,
-          `Due: ${formatDateWithWeekday(issue.due_date)}`,
-          `Progress: ${issue.done_ratio ?? 0}%`,
-          `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
-        ];
-
-        // Check for contributions
-        const isAdHoc = this._contributionData?.adHocIssues.has(issue.id);
-        const donated = this._donationTargets?.get(issue.id);
-        const received = this._contributionSources?.get(issue.id);
-
-        if (isAdHoc && donated && donated.length > 0) {
-          // Ad-hoc issue: show donations
-          const donatedDetails = donated.map(d => `  → #${d.toIssueId}: ${formatHoursAsTime(d.hours)}`).join("\n");
-          const totalDonated = donated.reduce((sum, d) => sum + d.hours, 0);
-          tooltipLines.push(`Spent: ${formatHoursAsTime(issue.spent_hours)}`);
-          tooltipLines.push(`Donated: ${formatHoursAsTime(totalDonated)}`);
-          tooltipLines.push(donatedDetails);
-        } else if (received && received.length > 0) {
-          // Normal issue receiving contributions
-          const receivedDetails = received.map(r => `  ← #${r.fromIssueId}: ${formatHoursAsTime(r.hours)}`).join("\n");
-          const totalReceived = received.reduce((sum, r) => sum + r.hours, 0);
-          const directSpent = issue.spent_hours ?? 0;
-          tooltipLines.push(`Direct: ${formatHoursAsTime(directSpent)}`);
-          tooltipLines.push(`Contributed: +${formatHoursAsTime(totalReceived)}`);
-          tooltipLines.push(receivedDetails);
-          tooltipLines.push(`Total: ${formatHoursAsTime(directSpent + totalReceived)}`);
-        } else {
-          tooltipLines.push(`Spent: ${formatHoursAsTime(issue.spent_hours)}`);
-        }
-
-        // Add flexibility
-        if (leftFlexText) {
-          tooltipLines.push(leftFlexText);
-        }
-
-        // Add blocks info
-        if (issue.blocks.length > 0) {
-          tooltipLines.push(`🚧 BLOCKS ${issue.blocks.length} TASK${issue.blocks.length > 1 ? "S" : ""}:`);
-          for (const b of issue.blocks.slice(0, 3)) {
-            const assigneeText = b.assignee ? ` (${b.assignee})` : "";
-            tooltipLines.push(`  → #${b.id} ${b.subject.length > 25 ? b.subject.substring(0, 24) + "…" : b.subject}${assigneeText}`);
-          }
-          if (issue.blocks.length > 3) {
-            tooltipLines.push(`  ... and ${issue.blocks.length - 3} more`);
-          }
-        }
-
-        // Add blocked-by info
-        if (issue.blockedBy.length > 0) {
-          tooltipLines.push(`⛔ BLOCKED BY:`);
-          for (const b of issue.blockedBy.slice(0, 3)) {
-            const assigneeText = b.assignee ? ` (${b.assignee})` : "";
-            tooltipLines.push(`  • #${b.id} ${b.subject.length > 25 ? b.subject.substring(0, 24) + "…" : b.subject}${assigneeText}`);
-          }
-          if (issue.blockedBy.length > 3) {
-            tooltipLines.push(`  ... and ${issue.blockedBy.length - 3} more`);
-          }
-        }
-
-        const tooltip = tooltipLines.filter(Boolean).join("\n");
-
-        // In My Work view, show project badge and external indicator
-        const projectBadge = this._viewFocus === "person" && row.projectName
-          ? `<tspan fill="var(--vscode-descriptionForeground)" font-size="10">[${escapeHtml(row.projectName)}]</tspan> `
-          : "";
-        const externalBadge = issue.isExternal
-          ? `<tspan fill="var(--vscode-charts-yellow)" font-size="10">(dep)</tspan> `
-          : "";
-
-        // Dim closed issues in task column
-        const taskOpacity = issue.isClosed ? "0.5" : "1";
-
-        return `
-          <g class="issue-label gantt-row cursor-pointer${hiddenClass}" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${originalY}" data-tooltip="${escapeAttr(tooltip)}" data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}' transform="translate(0, ${y})"${hiddenAttr} tabindex="0" role="button" aria-label="Open issue #${issue.id}">
-            <rect class="row-hit-area" x="0" y="-1" width="100%" height="${barHeight + 2}" fill="transparent" pointer-events="all"/>
-            ${chevron}
-            <text class="issue-text" x="${10 + indent + textOffset}" y="${barHeight / 2 + 5}" fill="${issue.isExternal ? "var(--vscode-descriptionForeground)" : "var(--vscode-foreground)"}" font-size="13" opacity="${taskOpacity}">
-              ${externalBadge}${projectBadge}${escapedSubject}
-            </text>
-          </g>
-        `;
+        if (row.type === "project") return generateProjectLabel(row, idx, y, originalY, renderContext);
+        if (row.type === "time-group") return generateTimeGroupLabel(row, idx, y, originalY, renderContext);
+        return generateIssueLabel(row, idx, y, originalY, renderContext);
       })
       .join("");
 
-    // ID column cells
+    // Column cells - delegate to generator functions
     const idCells = filteredRows
-      .map((row, idx) => {
-        const y = initialYPositions[idx];
-        const originalY = filteredRowYPositions[idx];
-        const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
-        const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
-        if (row.type !== "issue") return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
-        const issue = row.issue!;
-        return `<g class="gantt-row cursor-pointer${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr} data-vscode-context='{"webviewSection":"issueIdColumn","issueId":${issue.id},"preventDefaultContextMenuItems":true}'>
-          <text class="gantt-col-cell" x="${idColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">#${issue.id}</text>
-        </g>`;
-      })
+      .map((row, idx) => generateIdCell(row, initialYPositions[idx], filteredRowYPositions[idx], renderContext))
       .join("");
 
-    // Start date column cells
     const startDateCells = filteredRows
-      .map((row, idx) => {
-        const y = initialYPositions[idx];
-        const originalY = filteredRowYPositions[idx];
-        const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
-        const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
-        if (row.type !== "issue") return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
-        const issue = row.issue!;
-        if (!issue.start_date) return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}><text class="gantt-col-cell" x="4" y="${barHeight / 2 + 4}" text-anchor="start">—</text></g>`;
-        const startDate = parseLocalDate(issue.start_date);
-        const displayDate = startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}>
-          <title>${escapeAttr(issue.start_date)}</title>
-          <text class="gantt-col-cell" x="4" y="${barHeight / 2 + 4}" text-anchor="start">${displayDate}</text>
-        </g>`;
-      })
+      .map((row, idx) => generateStartDateCell(row, initialYPositions[idx], filteredRowYPositions[idx], renderContext))
       .join("");
 
-    // Status column cells - colored dots
     const statusCells = filteredRows
-      .map((row, idx) => {
-        const y = initialYPositions[idx];
-        const originalY = filteredRowYPositions[idx];
-        const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
-        const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
-        if (row.type !== "issue") return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
-        const issue = row.issue!;
-        const statusName = issue.statusName ?? "Unknown";
-        // Determine dot color: green=closed (from server is_closed), blue=in progress, gray=not started
-        let dotColor = "var(--vscode-descriptionForeground)"; // gray for new/not started
-        if (issue.done_ratio === 100 || issue.isClosed) {
-          dotColor = "var(--vscode-charts-green)";
-        } else if (issue.done_ratio > 0) {
-          dotColor = "var(--vscode-charts-blue)";
-        }
-        const cx = statusColumnWidth / 2;
-        const cy = barHeight / 2;
-        return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}>
-          <title>${escapeAttr(statusName)}</title>
-          <circle cx="${cx}" cy="${cy}" r="5" fill="${dotColor}"/>
-        </g>`;
-      })
+      .map((row, idx) => generateStatusCell(row, initialYPositions[idx], filteredRowYPositions[idx], renderContext))
       .join("");
 
-    // Due date column cells
     const dueCells = filteredRows
-      .map((row, idx) => {
-        const y = initialYPositions[idx];
-        const originalY = filteredRowYPositions[idx];
-        const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
-        const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
-        if (row.type !== "issue") return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
-        const issue = row.issue!;
-        if (!issue.due_date) return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}><text class="gantt-col-cell" x="4" y="${barHeight / 2 + 4}" text-anchor="start">—</text></g>`;
-        // Format date as MMM DD (e.g., "Jan 15")
-        const dueDate = parseLocalDate(issue.due_date);
-        const today = getLocalToday();
-        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        const displayDate = `${monthNames[dueDate.getMonth()]} ${dueDate.getDate()}`;
-        // Determine if overdue or due soon (closed issues are never overdue)
-        const daysUntilDue = Math.floor((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        let dueClass = "";
-        let dueTooltip = issue.due_date;
-        if (!issue.isClosed && issue.done_ratio < 100 && daysUntilDue < 0) {
-          dueClass = "due-overdue";
-          dueTooltip = `${issue.due_date} (Overdue by ${Math.abs(daysUntilDue)} day${Math.abs(daysUntilDue) === 1 ? "" : "s"})`;
-        } else if (!issue.isClosed && issue.done_ratio < 100 && daysUntilDue <= 3) {
-          dueClass = "due-soon";
-          dueTooltip = daysUntilDue === 0 ? `${issue.due_date} (Due today)` : `${issue.due_date} (Due in ${daysUntilDue} day${daysUntilDue === 1 ? "" : "s"})`;
-        }
-        return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}>
-          <title>${escapeAttr(dueTooltip)}</title>
-          <text class="gantt-col-cell ${dueClass}" x="4" y="${barHeight / 2 + 4}" text-anchor="start">${displayDate}</text>
-        </g>`;
-      })
+      .map((row, idx) => generateDueDateCell(row, initialYPositions[idx], filteredRowYPositions[idx], renderContext))
       .join("");
 
-    // Assignee column cells - circular avatar badges with initials
     const assigneeCells = filteredRows
-      .map((row, idx) => {
-        const y = initialYPositions[idx];
-        const originalY = filteredRowYPositions[idx];
-        const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
-        const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
-        if (row.type !== "issue") return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
-        const issue = row.issue!;
-        if (!issue.assignee) return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}><text class="gantt-col-cell" x="${assigneeColumnWidth / 2}" y="${barHeight / 2 + 4}" text-anchor="middle">—</text></g>`;
-        const initials = getInitials(issue.assignee);
-        const colors = getAvatarColorIndices(issue.assignee);
-        const isCurrentUser = issue.assigneeId === this._currentUserId;
-        const radius = 9; // Fits in 22px row height
-        const cx = assigneeColumnWidth / 2;
-        const cy = barHeight / 2;
-        return `<g class="gantt-row assignee-badge${isCurrentUser ? " current-user" : ""}${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}>
-          <title>${escapeAttr(issue.assignee)}</title>
-          <circle class="avatar-fill-${colors.fill} avatar-stroke-${colors.stroke}" cx="${cx}" cy="${cy}" r="${radius}"/>
-          <text x="${cx}" y="${cy + 3}" text-anchor="middle" fill="var(--vscode-editor-background)" font-size="9" font-weight="600">${escapeHtml(initials)}</text>
-        </g>`;
-      })
+      .map((row, idx) => generateAssigneeCell(row, initialYPositions[idx], filteredRowYPositions[idx], renderContext))
       .join("");
 
     // Right bars (scrollable timeline) - render all rows for instant toggle
