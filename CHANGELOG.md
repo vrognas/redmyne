@@ -17,6 +17,13 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Past bars** - slightly brighter saturation (50% vs 40%) for better visibility
 - **Resize handle** - glow effect on active drag
 
+### Internal
+
+- **Gantt maintainability** - extracted ~800 LOC to stateless generator module
+  - Labels, cells, bars delegated to `gantt-html-generator.ts`
+  - Fixed O(n²) `collectProjectIds` algorithm
+  - Added timeline right padding (220px) for badge overflow
+
 ## [4.12.4]
 
 ### Fixed
