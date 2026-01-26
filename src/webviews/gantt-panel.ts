@@ -125,6 +125,8 @@ const ZOOM_PIXELS_PER_DAY: Record<ZoomLevel, number> = {
 };
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const WEEKDAYS_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+// Right padding for bar badges (progress + flex + blocks + spacing + assignee name)
+const TIMELINE_RIGHT_PADDING = 220;
 
 // Helper functions (getInitials, getAvatarColorIndices, formatHoursAsTime, formatShortName)
 // are imported from ./gantt/gantt-html-generator
@@ -635,7 +637,7 @@ export class GanttPanel {
             </div>
           </div>
           <div class="gantt-timeline" id="ganttTimeline">
-            <svg width="${timelineWidth + 50}" height="${bodyHeight}">
+            <svg width="${timelineWidth + TIMELINE_RIGHT_PADDING}" height="${bodyHeight}">
               ${zebraStripes}
               ${barsSvg}
             </svg>
@@ -4026,7 +4028,7 @@ export class GanttPanel {
           </div>
         </div>
         <div class="gantt-timeline" id="ganttTimeline">
-          <svg width="${timelineWidth + 50}" height="${bodyHeight}" data-render-key="${this._renderKey}">
+          <svg width="${timelineWidth + TIMELINE_RIGHT_PADDING}" height="${bodyHeight}" data-render-key="${this._renderKey}">
             <defs>
               <pattern id="past-stripes" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
                 <line x1="0" y1="0" x2="0" y2="6" stroke="var(--vscode-charts-red)" stroke-width="2" stroke-opacity="0.4"/>
