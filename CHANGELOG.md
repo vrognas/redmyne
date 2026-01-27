@@ -9,6 +9,7 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 - **Test coverage** - increased from 60% to 63% lines
   - Added tests for `validation.ts`, `collection-utils.ts`, `issue-sorting.ts`
   - Updated coverage thresholds: lines 63%, functions 60%, branches 55%
+- **CI fix** - use real blocked relations in tests (mock incompatible with isolate:false on macOS)
 
 ## [4.12.8]
 
