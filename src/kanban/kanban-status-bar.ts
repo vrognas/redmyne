@@ -122,8 +122,8 @@ export class KanbanStatusBar {
   }
 
   private buildProgressBar(secondsLeft: number, totalSeconds: number): string {
-    const width = this.globalState.get<number>("redmyne.timer.progressBarWidth", 50);
-    const clampedWidth = Math.max(3, Math.min(500, width));
+    const width = this.globalState.get<number>("redmyne.timer.progressBarWidth", 45);
+    const clampedWidth = Math.max(3, Math.min(100, width));
     const elapsed = totalSeconds - secondsLeft;
     const progress = Math.max(0, Math.min(1, elapsed / totalSeconds));
     // Don't fill last bar until timer completes

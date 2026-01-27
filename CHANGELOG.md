@@ -6,8 +6,8 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 ### Added
 
-- **Timer progress bar** - visual ▰▱ progress bar in statusbar (default 50 segments)
-- **Progress bar settings** - configurable width from 3-500 segments
+- **Timer progress bar** - visual ▰▱ progress bar in statusbar
+- **Progress bar settings** - configurable width 3-100 segments (default 45)
 
 ### Improved
 
