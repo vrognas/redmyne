@@ -62,16 +62,22 @@ export class KanbanStatusBar {
       this.statusBarItem.tooltip = this.buildBreakTooltip(doneCount, tasks.length, totalLoggedHours);
       this.statusBarItem.command = "redmyne.kanban.skipBreak";
     } else if (activeTask) {
-      // Show active timer
-      const timeStr = this.formatSecondsAsMmSs(activeTask.timerSecondsLeft ?? 0);
+      // Show active timer with progress bar
+      const secondsLeft = activeTask.timerSecondsLeft ?? 0;
+      const totalSeconds = this.controller.getWorkDurationSeconds();
+      const timeStr = this.formatSecondsAsMmSs(secondsLeft);
+      const progressBar = this.buildProgressBar(secondsLeft, totalSeconds);
       const deferredStr = deferredMinutes > 0 ? ` +${deferredMinutes}m` : "";
-      this.statusBarItem.text = `$(pulse) ${timeStr} ${this.truncate(activeTask.title, 100)}${deferredStr}`;
+      this.statusBarItem.text = `$(pulse) ${timeStr} ${progressBar} ${this.truncate(activeTask.title, 100)}${deferredStr}`;
       this.statusBarItem.tooltip = this.buildWorkingTooltip(activeTask, doneCount, tasks.length, totalLoggedHours);
       this.statusBarItem.command = "redmyne.kanban.toggleTimer";
     } else if (pausedTask) {
-      // Show paused timer
-      const timeStr = this.formatSecondsAsMmSs(pausedTask.timerSecondsLeft ?? 0);
-      this.statusBarItem.text = `$(debug-pause) ${timeStr} ${this.truncate(pausedTask.title, 100)}`;
+      // Show paused timer with progress bar
+      const secondsLeft = pausedTask.timerSecondsLeft ?? 0;
+      const totalSeconds = this.controller.getWorkDurationSeconds();
+      const timeStr = this.formatSecondsAsMmSs(secondsLeft);
+      const progressBar = this.buildProgressBar(secondsLeft, totalSeconds);
+      this.statusBarItem.text = `$(debug-pause) ${timeStr} ${progressBar} ${this.truncate(pausedTask.title, 100)}`;
       this.statusBarItem.tooltip = this.buildPausedTooltip(pausedTask, doneCount, tasks.length, totalLoggedHours);
       this.statusBarItem.command = "redmyne.kanban.toggleTimer";
     } else if (doingCount > 0) {
@@ -105,6 +111,14 @@ export class KanbanStatusBar {
 
   private truncate(text: string, maxLen: number): string {
     return text.length > maxLen ? text.slice(0, maxLen - 1) + "…" : text;
+  }
+
+  private buildProgressBar(secondsLeft: number, totalSeconds: number, width = 12): string {
+    const elapsed = totalSeconds - secondsLeft;
+    const progress = Math.max(0, Math.min(1, elapsed / totalSeconds));
+    const filled = Math.round(progress * width);
+    const empty = width - filled;
+    return "▰".repeat(filled) + "▱".repeat(empty);
   }
 
   private buildBreakTooltip(done: number, total: number, hours: number): vscode.MarkdownString {
