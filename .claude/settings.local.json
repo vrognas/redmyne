@@ -48,7 +48,8 @@
       "Bash(git push:*)",
       "Bash(npm run bundle:*)",
       "Bash(npm run:*)",
-      "Bash(/c/Users/viktor.rognas/scoop/shims/gh run list:*)"
+      "Bash(/c/Users/viktor.rognas/scoop/shims/gh run list:*)",
+      "Bash(git show:*)"
     ],
     "deny": [],
     "ask": []
