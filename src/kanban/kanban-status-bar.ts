@@ -19,6 +19,7 @@ export class KanbanStatusBar {
       vscode.StatusBarAlignment.Left,
       0
     );
+    this.statusBarItem.name = "Redmyne Kanban Timer";
     this.statusBarItem.command = "redmyne.kanban.toggleTimer";
 
     // Subscribe to state changes
