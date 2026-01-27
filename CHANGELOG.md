@@ -2,6 +2,19 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.12.8]
+
+### Added
+
+- **Timer progress bar** - visual ▰▱ progress bar in statusbar (default 50 segments)
+- **Progress bar settings** - configurable width from 3-500 segments
+
+### Improved
+
+- **Timer completion modal** - cleaner "Log & complete" / "Log & continue" options
+- **Timer settings** - apply immediately without restart
+- **Ready state** - shows timer info instead of just "Ready (X/Y)"
+
 ## [4.12.7]
 
 ### Improved
