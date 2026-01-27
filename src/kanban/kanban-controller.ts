@@ -33,7 +33,7 @@ export class KanbanController {
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private breakIntervalId: ReturnType<typeof setInterval> | null = null;
   private disposed = false;
-  private readonly workDurationSeconds: number;
+  private workDurationSeconds: number;
   private readonly breakDurationSeconds: number;
   private breakSecondsLeft: number = 0;
   private deferredMinutes: number = 0;
@@ -98,6 +98,13 @@ export class KanbanController {
    */
   getWorkDurationSeconds(): number {
     return this.workDurationSeconds;
+  }
+
+  /**
+   * Update work duration (for settings changes)
+   */
+  setWorkDurationSeconds(seconds: number): void {
+    this.workDurationSeconds = seconds;
   }
 
   /**

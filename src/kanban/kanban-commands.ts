@@ -634,6 +634,7 @@ export function registerKanbanCommands(
         const newBreak = parseInt(input, 10);
         const newWork = currentUnit - newBreak;
         await context.globalState.update("redmyne.timer.workDuration", newWork);
+        controller.setWorkDurationSeconds(newWork * 60);
         showStatusBarMessage(`$(check) Break set to ${newBreak}min (work: ${newWork}min)`, 2000);
         return;
       }
@@ -662,10 +663,12 @@ export function registerKanbanCommands(
         // Adjust work duration if needed
         if (currentWork > value) {
           await context.globalState.update("redmyne.timer.workDuration", value);
+          controller.setWorkDurationSeconds(value * 60);
         }
         showStatusBarMessage(`$(check) Unit duration set to ${value}min`, 2000);
       } else {
         await context.globalState.update("redmyne.timer.workDuration", value);
+        controller.setWorkDurationSeconds(value * 60);
         showStatusBarMessage(`$(check) Work duration set to ${value}min`, 2000);
       }
     })
