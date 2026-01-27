@@ -2,6 +2,14 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.12.7]
+
+### Improved
+
+- **Kanban timer** - status bar shows task comment instead of issue ID
+- **Timer position** - moved to rightmost left-aligned position (closer to center)
+- **Tooltip icons** - theme icons now render properly in all tooltips
+
 ## [4.12.6]
 
 ### Fixed
