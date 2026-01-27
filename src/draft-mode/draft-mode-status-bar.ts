@@ -48,17 +48,21 @@ export class DraftModeStatusBar implements vscode.Disposable {
     const count = this.queue.count;
 
     if (count === 0) {
-      this.statusBar.tooltip = new vscode.MarkdownString(
+      const md = new vscode.MarkdownString(
         "**Draft Mode Active**\n\n" +
         "Changes will be queued locally.\n\n" +
         "_Click to review_"
       );
+      md.supportThemeIcons = true;
+      this.statusBar.tooltip = md;
     } else {
-      this.statusBar.tooltip = new vscode.MarkdownString(
+      const md = new vscode.MarkdownString(
         `**Draft Mode Active**\n\n` +
         `**${count}** pending change${count === 1 ? "" : "s"}\n\n` +
         `_Click to review and apply_`
       );
+      md.supportThemeIcons = true;
+      this.statusBar.tooltip = md;
     }
 
     this.statusBar.show();

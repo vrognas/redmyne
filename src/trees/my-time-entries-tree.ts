@@ -778,6 +778,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       );
       tooltip.isTrusted = true;
       tooltip.supportHtml = false;
+      tooltip.supportThemeIcons = true;
 
       // Format: "#1234 comment" with "HH:MM [activity] issue_subject [user]" as description
       const hours = formatHoursAsHHMM(parseFloat(entry.hours));

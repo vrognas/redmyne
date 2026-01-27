@@ -14,7 +14,7 @@ export class KanbanStatusBar {
   constructor(private controller: KanbanController) {
     this.statusBarItem = vscode.window.createStatusBarItem(
       vscode.StatusBarAlignment.Left,
-      49
+      0
     );
     this.statusBarItem.command = "redmyne.kanban.toggleTimer";
 
@@ -65,13 +65,13 @@ export class KanbanStatusBar {
       // Show active timer
       const timeStr = this.formatSecondsAsMmSs(activeTask.timerSecondsLeft ?? 0);
       const deferredStr = deferredMinutes > 0 ? ` +${deferredMinutes}m` : "";
-      this.statusBarItem.text = `$(pulse) ${timeStr} #${activeTask.linkedIssueId}${deferredStr}`;
+      this.statusBarItem.text = `$(pulse) ${timeStr} ${this.truncate(activeTask.title, 100)}${deferredStr}`;
       this.statusBarItem.tooltip = this.buildWorkingTooltip(activeTask, doneCount, tasks.length, totalLoggedHours);
       this.statusBarItem.command = "redmyne.kanban.toggleTimer";
     } else if (pausedTask) {
       // Show paused timer
       const timeStr = this.formatSecondsAsMmSs(pausedTask.timerSecondsLeft ?? 0);
-      this.statusBarItem.text = `$(debug-pause) ${timeStr} #${pausedTask.linkedIssueId}`;
+      this.statusBarItem.text = `$(debug-pause) ${timeStr} ${this.truncate(pausedTask.title, 100)}`;
       this.statusBarItem.tooltip = this.buildPausedTooltip(pausedTask, doneCount, tasks.length, totalLoggedHours);
       this.statusBarItem.command = "redmyne.kanban.toggleTimer";
     } else if (doingCount > 0) {
@@ -103,8 +103,13 @@ export class KanbanStatusBar {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   }
 
+  private truncate(text: string, maxLen: number): string {
+    return text.length > maxLen ? text.slice(0, maxLen - 1) + "…" : text;
+  }
+
   private buildBreakTooltip(done: number, total: number, hours: number): vscode.MarkdownString {
     const md = new vscode.MarkdownString();
+    md.supportThemeIcons = true;
     md.appendMarkdown("**Break time** $(coffee)\n\n");
     md.appendMarkdown("Take a moment to rest.\n\n");
     md.appendMarkdown("---\n\n");
@@ -121,6 +126,7 @@ export class KanbanStatusBar {
     hours: number
   ): vscode.MarkdownString {
     const md = new vscode.MarkdownString();
+    md.supportThemeIcons = true;
     md.appendMarkdown("**Working** $(pulse)\n\n");
     md.appendMarkdown(`#${task.linkedIssueId} - ${task.linkedIssueSubject}\n\n`);
     if (task.activityName) {
@@ -140,6 +146,7 @@ export class KanbanStatusBar {
     hours: number
   ): vscode.MarkdownString {
     const md = new vscode.MarkdownString();
+    md.supportThemeIcons = true;
     md.appendMarkdown("**Paused** $(debug-pause)\n\n");
     md.appendMarkdown(`#${task.linkedIssueId} - ${task.linkedIssueSubject}\n\n`);
     md.appendMarkdown(`Remaining: ${this.formatSecondsAsMmSs(task.timerSecondsLeft ?? 0)}\n\n`);
@@ -157,6 +164,7 @@ export class KanbanStatusBar {
     hours: number
   ): vscode.MarkdownString {
     const md = new vscode.MarkdownString();
+    md.supportThemeIcons = true;
     md.appendMarkdown("**Ready to start**\n\n");
     if (task) {
       md.appendMarkdown(`Next: #${task.linkedIssueId} - ${task.linkedIssueSubject}\n\n`);
@@ -170,6 +178,7 @@ export class KanbanStatusBar {
 
   private buildDoneTooltip(done: number, total: number, hours: number): vscode.MarkdownString {
     const md = new vscode.MarkdownString();
+    md.supportThemeIcons = true;
     if (done === total && total > 0) {
       md.appendMarkdown("**All done!** $(check)\n\n");
     } else {

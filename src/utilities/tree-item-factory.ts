@@ -127,6 +127,7 @@ function createFlexibilityTooltip(
   const md = new vscode.MarkdownString();
   md.isTrusted = true;
   md.supportHtml = true;
+  md.supportThemeIcons = true;
 
   const subject = issue.subject?.trim() || "Unknown";
 
@@ -193,6 +194,7 @@ function createBasicTooltip(
   const md = new vscode.MarkdownString();
   md.isTrusted = true;
   md.supportHtml = true;
+  md.supportThemeIcons = true;
 
   const subject = issue.subject?.trim() || "Unknown";
 
@@ -297,6 +299,7 @@ export function createProjectTooltip(
   const md = new vscode.MarkdownString();
   md.isTrusted = true;
   md.supportHtml = true;
+  md.supportThemeIcons = true;
 
   md.appendMarkdown("**");
   md.appendText(`#${project.id} ${project.name}`);

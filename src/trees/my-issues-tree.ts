@@ -106,6 +106,7 @@ export class MyIssuesTree extends BaseTreeProvider<TreeItem> {
 
     // Tooltip with aggregated hours
     const md = new vscode.MarkdownString();
+    md.supportThemeIcons = true;
     md.appendMarkdown(`**#${container.id}: ${container.subject}**\n\n`);
     md.appendMarkdown(`**Sub-issues:** ${container.childCount}\n\n`);
     md.appendMarkdown(

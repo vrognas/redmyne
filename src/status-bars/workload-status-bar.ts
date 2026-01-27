@@ -77,6 +77,7 @@ export class WorkloadStatusBar implements vscode.Disposable {
 
     const tooltip = new vscode.MarkdownString();
     tooltip.isTrusted = true;
+    tooltip.supportThemeIcons = true;
     tooltip.appendMarkdown("**Workload Overview**\n\n");
     tooltip.appendMarkdown(`**Remaining work:** ${workload.remaining}h\n\n`);
     tooltip.appendMarkdown(`**Available this week:** ${workload.availableThisWeek}h\n\n`);

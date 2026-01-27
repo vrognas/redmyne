@@ -172,6 +172,7 @@ export class KanbanTreeProvider
         title: "Skip Break",
       };
       const md = new vscode.MarkdownString();
+      md.supportThemeIcons = true;
       md.appendMarkdown("**Break time**\n\n");
       md.appendMarkdown(`${timeStr} remaining\n\n`);
       md.appendMarkdown("*Click to skip break*");
@@ -286,6 +287,7 @@ export class KanbanTreeProvider
 
     // Tooltip
     const md = new vscode.MarkdownString();
+    md.supportThemeIcons = true;
     md.appendMarkdown(`**${task.title}**\n\n`);
     md.appendMarkdown(
       `Linked to: #${task.linkedIssueId} ${task.linkedIssueSubject}\n\n`
