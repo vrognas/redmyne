@@ -21,6 +21,7 @@ import { RedmineSecretManager } from "./utilities/secret-manager";
 import { setApiKey } from "./commands/set-api-key";
 import { MonthlyScheduleOverrides, loadMonthlySchedules } from "./utilities/monthly-schedule";
 import { disposeStatusBar, showStatusBarMessage } from "./utilities/status-bar";
+import { formatHoursAsHHMM } from "./utilities/time-input";
 import { playCompletionSound } from "./utilities/completion-sound";
 import { KanbanController } from "./kanban/kanban-controller";
 import { KanbanStatusBar } from "./kanban/kanban-status-bar";
@@ -212,7 +213,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   cleanupResources.kanbanController = kanbanController;
 
   // Kanban status bar (always shown)
-  const kanbanStatusBar = new KanbanStatusBar(kanbanController);
+  const kanbanStatusBar = new KanbanStatusBar(kanbanController, context.globalState);
   cleanupResources.kanbanStatusBar = kanbanStatusBar;
   context.subscriptions.push({ dispose: () => kanbanStatusBar.dispose() });
 
@@ -228,53 +229,57 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         playCompletionSound();
       }
 
-      // Calculate hours with deferred time
-      const baseHours = workDuration / 60;
-      const deferredMinutes = kanbanController.getDeferredMinutes();
-      const deferredHours = deferredMinutes / 60;
-      const totalHours = baseHours + deferredHours;
-      const deferredInfo = deferredMinutes > 0 ? ` (+${deferredMinutes}min)` : "";
+      // Calculate hours
+      const baseMinutes = kanbanController.getWorkDurationSeconds() / 60;
+      const totalHours = baseMinutes / 60;
+      const formattedTime = formatHoursAsHHMM(totalHours);
 
-      // Show completion dialog to log time
+      // Show completion dialog
       const action = await vscode.window.showWarningMessage(
-        `Timer complete: ${task.title}${deferredInfo}`,
+        `Timer complete: ${task.title} (${formattedTime})`,
         { modal: true },
-        `Log ${totalHours}h`,
-        "Defer",
-        "Skip"
+        "Log & complete",
+        "Log & continue"
       );
 
-      if (action?.startsWith("Log")) {
+      if (action === "Log & complete") {
+        // Log time, mark done, start break
         try {
-          kanbanController.consumeDeferredMinutes(); // Clear deferred time
           await server.addTimeEntry(
             task.linkedIssueId,
             task.activityId ?? 0,
             totalHours.toString(),
-            task.title // Comment
+            task.title
           );
           await kanbanController.addLoggedHours(task.id, totalHours);
-          await kanbanController.stopTimer(task.id);
-          showStatusBarMessage(`$(check) Logged ${totalHours}h to #${task.linkedIssueId}`, 2000);
+          await kanbanController.markDone(task.id);
+          showStatusBarMessage(`$(check) Logged ${formattedTime} to #${task.linkedIssueId}`, 2000);
           myTimeEntriesTree.refresh();
-          // Refresh Gantt if open
           vscode.commands.executeCommand("redmyne.refreshGanttData");
-          // Start break timer
           kanbanController.startBreak();
         } catch (error) {
           vscode.window.showErrorMessage(`Failed to log time: ${error}`);
         }
-      } else if (action === "Defer") {
-        // Add work duration to deferred pool
-        kanbanController.addDeferredMinutes(workDuration);
-        await kanbanController.stopTimer(task.id);
-        showStatusBarMessage(`$(clock) Deferred ${workDuration}min to next task`, 2000);
-        // Start break timer
-        kanbanController.startBreak();
-      } else {
-        // Just stop the timer without logging
-        await kanbanController.stopTimer(task.id);
+      } else if (action === "Log & continue") {
+        // Log time, restart timer, start break
+        try {
+          await server.addTimeEntry(
+            task.linkedIssueId,
+            task.activityId ?? 0,
+            totalHours.toString(),
+            task.title
+          );
+          await kanbanController.addLoggedHours(task.id, totalHours);
+          await kanbanController.resetTimer(task.id);
+          showStatusBarMessage(`$(check) Logged ${formattedTime}, timer reset`, 2000);
+          myTimeEntriesTree.refresh();
+          vscode.commands.executeCommand("redmyne.refreshGanttData");
+          kanbanController.startBreak();
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to log time: ${error}`);
+        }
       }
+      // Cancel/close - do nothing, timer stays completed
     })
   );
 

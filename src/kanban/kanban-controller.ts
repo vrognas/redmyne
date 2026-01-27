@@ -502,6 +502,24 @@ export class KanbanController {
     this._onTasksChange.fire();
   }
 
+  /**
+   * Reset timer to full duration (for continuing same task)
+   */
+  async resetTimer(id: string): Promise<void> {
+    const index = this.tasks.findIndex((t) => t.id === id);
+    if (index === -1) return;
+
+    this.tasks[index] = {
+      ...this.tasks[index],
+      timerSecondsLeft: this.workDurationSeconds,
+      timerPhase: "pending",
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.persist();
+    this._onTasksChange.fire();
+  }
+
   // --- Timer Internals ---
 
   private startInterval(): void {

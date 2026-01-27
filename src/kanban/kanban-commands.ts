@@ -584,6 +584,7 @@ export function registerKanbanCommands(
       const currentWork = context.globalState.get<number>("redmyne.timer.workDuration", 45);
       const currentBreak = currentUnit - currentWork;
       const currentSound = context.globalState.get<boolean>("redmyne.timer.soundEnabled", true);
+      const currentBarWidth = context.globalState.get<number>("redmyne.timer.progressBarWidth", 50);
 
       const choice = await vscode.window.showQuickPick(
         [
@@ -607,6 +608,11 @@ export function registerKanbanCommands(
             description: "Play sound when timer completes",
             setting: "sound",
           },
+          {
+            label: `$(symbol-number) Progress Bar: ${currentBarWidth} segments`,
+            description: "Number of segments in progress bar (3-500)",
+            setting: "progressBar",
+          },
         ],
         { placeHolder: "Configure timer" }
       );
@@ -616,6 +622,24 @@ export function registerKanbanCommands(
       if (choice.setting === "sound") {
         await context.globalState.update("redmyne.timer.soundEnabled", !currentSound);
         showStatusBarMessage(`$(check) Sound ${!currentSound ? "enabled" : "disabled"}`, 2000);
+        return;
+      }
+
+      if (choice.setting === "progressBar") {
+        const input = await vscode.window.showInputBox({
+          prompt: "Enter number of progress bar segments (3-500):",
+          value: currentBarWidth.toString(),
+          validateInput: (v) => {
+            const n = parseInt(v, 10);
+            if (isNaN(n) || n < 3) return "Minimum 3 segments";
+            if (n > 500) return "Maximum 500 segments";
+            return null;
+          },
+        });
+        if (!input) return;
+        const value = parseInt(input, 10);
+        await context.globalState.update("redmyne.timer.progressBarWidth", value);
+        showStatusBarMessage(`$(check) Progress bar set to ${value} segments`, 2000);
         return;
       }
 

@@ -11,7 +11,10 @@ export class KanbanStatusBar {
   private statusBarItem: vscode.StatusBarItem;
   private disposables: vscode.Disposable[] = [];
 
-  constructor(private controller: KanbanController) {
+  constructor(
+    private controller: KanbanController,
+    private globalState: vscode.Memento
+  ) {
     this.statusBarItem = vscode.window.createStatusBarItem(
       vscode.StatusBarAlignment.Left,
       0
@@ -83,7 +86,12 @@ export class KanbanStatusBar {
     } else if (doingCount > 0) {
       // Show "ready to start" with first doing task
       const doingTask = tasks.find((t) => getTaskStatus(t) === "doing");
-      this.statusBarItem.text = `$(play) Ready (${doneCount}/${tasks.length})`;
+      const totalSeconds = this.controller.getWorkDurationSeconds();
+      const timeStr = this.formatSecondsAsMmSs(totalSeconds);
+      const progressBar = this.buildProgressBar(totalSeconds, totalSeconds); // Full time left = empty bar
+      this.statusBarItem.text = doingTask
+        ? `$(play) ${timeStr} ${progressBar} ${this.truncate(doingTask.title, 100)}`
+        : `$(play) Ready (${doneCount}/${tasks.length})`;
       this.statusBarItem.tooltip = this.buildIdleTooltip(doingTask, doneCount, tasks.length, totalLoggedHours);
       this.statusBarItem.command = doingTask ? {
         title: "Start Timer",
@@ -113,11 +121,15 @@ export class KanbanStatusBar {
     return text.length > maxLen ? text.slice(0, maxLen - 1) + "…" : text;
   }
 
-  private buildProgressBar(secondsLeft: number, totalSeconds: number, width = 12): string {
+  private buildProgressBar(secondsLeft: number, totalSeconds: number): string {
+    const width = this.globalState.get<number>("redmyne.timer.progressBarWidth", 50);
+    const clampedWidth = Math.max(3, Math.min(500, width));
     const elapsed = totalSeconds - secondsLeft;
     const progress = Math.max(0, Math.min(1, elapsed / totalSeconds));
-    const filled = Math.round(progress * width);
-    const empty = width - filled;
+    // Don't fill last bar until timer completes
+    const maxFilled = secondsLeft > 0 ? clampedWidth - 1 : clampedWidth;
+    const filled = Math.min(Math.round(progress * clampedWidth), maxFilled);
+    const empty = clampedWidth - filled;
     return "▰".repeat(filled) + "▱".repeat(empty);
   }
 
