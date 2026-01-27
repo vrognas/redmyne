@@ -43,17 +43,14 @@ export default defineConfig({
         "src/utilities/auto-update-tracker.ts", // VS Code globalState - requires mocking
         "src/utilities/collapse-state.ts", // VS Code globalState - requires mocking
         "src/utilities/hierarchy-builder.ts", // Complex tree building - needs dedicated tests
-        "src/utilities/issue-sorting.ts", // Simple sorting - low priority
-        "src/utilities/collection-utils.ts", // Simple utils - low priority
-        "src/utilities/validation.ts", // Simple validation - low priority
         "src/utilities/date-picker.ts", // VS Code QuickPick - requires mocking
         "src/redmine/models/**/*.ts", // Type definitions only
         "src/definitions/**/*.ts", // Type definitions only
       ],
       thresholds: {
-        lines: 60, // Realistic target for testable code
-        functions: 59.5,
-        branches: 54, // Lowered to accommodate existing coverage
+        lines: 63,
+        functions: 60,
+        branches: 55,
         statements: 60,
       },
     },
