@@ -1,11 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { sortIssuesByRisk, sortIssuesByField } from "../../../src/utilities/issue-sorting";
-import { Issue } from "../../../src/redmine/models/issue";
+import { Issue, IssueRelation } from "../../../src/redmine/models/issue";
 import { FlexibilityScore } from "../../../src/utilities/flexibility-calculator";
-
-vi.mock("../../../src/utilities/tree-item-factory", () => ({
-  isBlocked: vi.fn((issue: Issue) => issue.id === 999), // ID 999 = blocked
-}));
 
 function makeIssue(id: number, overrides: Partial<Issue> = {}): Issue {
   return {
@@ -35,12 +31,18 @@ function makeFlex(status: FlexibilityScore["status"], remaining: number): Flexib
 }
 
 describe("sortIssuesByRisk", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it("blocked issues sink to bottom", () => {
-    const issues = [makeIssue(999), makeIssue(1), makeIssue(2)];
+    const blockedRelation: IssueRelation = {
+      id: 1,
+      issue_id: 999,
+      issue_to_id: 1,
+      relation_type: "blocked",
+    };
+    const issues = [
+      makeIssue(999, { relations: [blockedRelation] }),
+      makeIssue(1),
+      makeIssue(2),
+    ];
     const cache = new Map<number, FlexibilityScore | null>();
 
     const sorted = sortIssuesByRisk(issues, cache);
