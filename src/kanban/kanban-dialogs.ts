@@ -210,6 +210,8 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
     quickPick.placeholder = "Type to search, or select from list";
     quickPick.items = items;
     quickPick.matchOnDescription = true;
+    // Preserve our custom sort order (don't let VSCode sort alphabetically)
+    (quickPick as unknown as { sortByLabel: boolean }).sortByLabel = false;
 
     let resolved = false;
     let searchVersion = 0;
@@ -252,11 +254,35 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
 
         // Parallel: exact ID lookup + text search + project issues
         const projectIssueResults: Issue[] = [];
-        const [exactIssue, searchResults] = await Promise.all([
-          isNumericQuery
-            ? server.getIssueById(possibleId).then(r => r.issue).catch(() => null)
-            : Promise.resolve(null),
-          server.searchIssues(query, 25),
+        const textSearchResults: Issue[] = [];
+        let exactIssue: Issue | null = null;
+        let exactMatchError: string | null = null;
+
+        await Promise.all([
+          // Exact ID lookup
+          (async () => {
+            if (isNumericQuery) {
+              try {
+                const result = await server.getIssueById(possibleId);
+                exactIssue = result.issue;
+              } catch (error: unknown) {
+                if (error instanceof Error) {
+                  exactMatchError = error.message.includes("403") ? "no access" :
+                                   error.message.includes("404") ? "not found" : null;
+                }
+              }
+            }
+          })(),
+          // Search each token separately for multi-word queries
+          ...(queryTokens.length > 1
+            ? queryTokens.map(async (token) => {
+                const results = await server.searchIssues(token, 15);
+                textSearchResults.push(...results);
+              })
+            : [(async () => {
+                const results = await server.searchIssues(query, 25);
+                textSearchResults.push(...results);
+              })()]),
           // Fetch issues from matching projects (include subprojects + closed)
           ...matchingProjectIds.slice(0, 8).map(async (projectId) => {
             try {
@@ -269,7 +295,7 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
         if (thisSearchVersion !== searchVersion || resolved) return;
 
         // Combine and rank results: mine+open > mine+closed > other+open > other+closed
-        const allResults = [...searchResults, ...projectIssueResults];
+        const allResults = [...textSearchResults, ...projectIssueResults];
         allResults.sort((a, b) => {
           const aIsMine = myIssueIds.has(a.id) ? 0 : 1;
           const bIsMine = myIssueIds.has(b.id) ? 0 : 1;
@@ -295,10 +321,19 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
             issue: exactIssue,
           });
           seenIds.add(exactIssue.id);
+        } else if (isNumericQuery && !exactIssue && exactMatchError) {
+          // Show feedback for inaccessible issues
+          resultItems.push({
+            label: `$(warning) #${possibleId}`,
+            description: exactMatchError === "no access" ? "You don't have access to this issue" : "Issue not found",
+            disabled: true,
+          });
         }
 
-        // Add search results with labels
+        // Add search results with labels (limit to 50 to avoid performance issues)
+        const maxResults = 50;
         for (const issue of allResults) {
+          if (resultItems.length >= maxResults) break;
           if (!seenIds.has(issue.id)) {
             const isMine = myIssueIds.has(issue.id);
             const isClosed = issue.status?.is_closed ?? false;
