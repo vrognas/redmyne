@@ -314,10 +314,7 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
           const isClosed = exactIssue.status?.is_closed ?? false;
           const isMine = myIssueIds.has(exactIssue.id);
           const icon = isClosed ? "$(archive)" : isMine ? "$(account)" : "$(search)";
-          const tags: string[] = [];
-          if (!isMine) tags.push("not mine");
-          if (isClosed) tags.push("closed");
-          const tagStr = tags.length > 0 ? ` (${tags.join(", ")})` : "";
+          const tagStr = isClosed ? " (closed)" : "";
           resultItems.push({
             label: `${icon} #${exactIssue.id} ${exactIssue.subject}`,
             description: `${exactIssue.assigned_to?.name ?? "Unassigned"}${tagStr}`,

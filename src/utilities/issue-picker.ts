@@ -685,11 +685,7 @@ export async function pickIssueWithSearch(
           const isClosed = issue.status?.is_closed ?? false;
           // Icon: mine+open > others+open > mine+closed > others+closed
           const icon = isClosed ? "$(archive)" : isMine ? "$(account)" : "$(search)";
-          // Tags for clarity
-          const tags: string[] = [];
-          if (!isMine) tags.push("not mine");
-          if (isClosed) tags.push("closed");
-          const tagStr = tags.length > 0 ? ` (${tags.join(", ")})` : "";
+          const tagStr = isClosed ? " (closed)" : "";
           resultItems.push({
             label: `${icon} #${issue.id} ${issue.subject}`,
             description: `${issue.assigned_to?.name ?? "Unassigned"}${tagStr}`,
