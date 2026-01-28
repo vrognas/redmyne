@@ -21,7 +21,7 @@ let projectPathCache: ProjectPathCache | null = null;
 /**
  * Get or build project path map with caching
  */
-async function getProjectPathMap(server: RedmineServer): Promise<Map<number, string>> {
+export async function getProjectPathMap(server: RedmineServer): Promise<Map<number, string>> {
   const now = Date.now();
   const serverAddress = server.options.address;
 
@@ -176,7 +176,7 @@ const FUSE_OPTIONS: IFuseOptions<SearchableIssue> = {
 /**
  * Build map of projectId → full ancestor path (e.g., "Nuvalent > Subproject")
  */
-function buildProjectPathMap(projects: RedmineProject[]): Map<number, string> {
+export function buildProjectPathMap(projects: RedmineProject[]): Map<number, string> {
   const projectMap = new Map<number, RedmineProject>();
   for (const p of projects) {
     projectMap.set(p.id, p);

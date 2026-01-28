@@ -2,42 +2,10 @@ import * as vscode from "vscode";
 import { RedmineServer } from "../redmine/redmine-server";
 import { KanbanTask, TaskPriority } from "./kanban-state";
 import { Issue } from "../redmine/models/issue";
-import { RedmineProject } from "../redmine/redmine-project";
 import { debounce } from "../utilities/debounce";
+import { getProjectPathMap } from "../utilities/issue-picker";
 
 const SEARCH_DEBOUNCE_MS = 300;
-
-/**
- * Build map of projectId → full ancestor path (e.g., "Client > Project")
- */
-function buildProjectPathMap(projects: RedmineProject[]): Map<number, string> {
-  const projectMap = new Map<number, RedmineProject>();
-  for (const p of projects) {
-    projectMap.set(p.id, p);
-  }
-
-  const pathCache = new Map<number, string>();
-
-  function getPath(projectId: number): string {
-    if (pathCache.has(projectId)) return pathCache.get(projectId)!;
-
-    const project = projectMap.get(projectId);
-    if (!project) return "";
-
-    let path = project.name;
-    if (project.parent?.id) {
-      const parentPath = getPath(project.parent.id);
-      if (parentPath) path = `${parentPath} ${project.name}`;
-    }
-    pathCache.set(projectId, path);
-    return path;
-  }
-
-  for (const p of projects) {
-    getPath(p.id);
-  }
-  return pathCache;
-}
 
 interface IssueQuickPickItem extends vscode.QuickPickItem {
   issue?: Issue;
@@ -200,19 +168,19 @@ export async function showEditTaskDialog(
  * Pick an issue for linking to a task (without activity selection)
  */
 async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefined> {
-  // Fetch my issues + project map in parallel
+  // Fetch my issues + project map in parallel (uses cached project map)
   let myOpenIssues: Issue[];
   let myClosedIssues: Issue[];
   let projectPathMap: Map<number, string>;
   try {
-    const [openResult, closedResult, projects] = await Promise.all([
+    const [openResult, closedResult, pathMap] = await Promise.all([
       server.getFilteredIssues({ assignee: "me", status: "open" }),
       server.getFilteredIssues({ assignee: "me", status: "closed" }),
-      server.getProjects(),
+      getProjectPathMap(server),
     ]);
     myOpenIssues = openResult.issues;
     myClosedIssues = closedResult.issues;
-    projectPathMap = buildProjectPathMap(projects);
+    projectPathMap = pathMap;
   } catch (error) {
     vscode.window.showErrorMessage(`Failed to fetch issues: ${error}`);
     return undefined;
