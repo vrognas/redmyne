@@ -258,24 +258,24 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
         // Parallel: exact ID lookup + text search + project issues
         const projectIssueResults: Issue[] = [];
         const textSearchResults: Issue[] = [];
+
+        // Exact ID lookup
         let exactIssue: Issue | null = null;
         let exactMatchError: string | null = null;
-
-        await Promise.all([
-          // Exact ID lookup
-          (async () => {
-            if (isNumericQuery) {
-              try {
-                const result = await server.getIssueById(possibleId);
-                exactIssue = result.issue;
-              } catch (error: unknown) {
-                if (error instanceof Error) {
-                  exactMatchError = error.message.includes("403") ? "no access" :
-                                   error.message.includes("404") ? "not found" : null;
-                }
-              }
+        if (isNumericQuery) {
+          try {
+            const result = await server.getIssueById(possibleId);
+            exactIssue = result.issue;
+          } catch (error: unknown) {
+            if (error instanceof Error) {
+              exactMatchError = error.message.includes("403") ? "no access" :
+                               error.message.includes("404") ? "not found" : null;
             }
-          })(),
+          }
+        }
+
+        // Parallel: text search + project issues
+        await Promise.all([
           // Search each token separately for multi-word queries
           ...(queryTokens.length > 1
             ? queryTokens.map(async (token) => {
