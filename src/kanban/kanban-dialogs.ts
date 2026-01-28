@@ -188,16 +188,16 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
   const issues = [...myOpenIssues, ...myClosedIssues];
   const myIssueIds = new Set(issues.map(i => i.id));
 
-  // Build items with status labels
+  // Build items with status labels (use full project path for parent matching)
   const items: IssueQuickPickItem[] = [
     ...myOpenIssues.map((issue) => ({
       label: `#${issue.id} ${issue.subject}`,
-      description: issue.project?.name,
+      description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
       issue,
     })),
     ...myClosedIssues.slice(0, 20).map((issue) => ({
       label: `$(archive) #${issue.id} ${issue.subject}`,
-      description: `${issue.project?.name} (closed)`,
+      description: `${projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name} (closed)`,
       issue,
     })),
   ];
@@ -256,9 +256,9 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
             : Promise.resolve(null),
           server.searchIssues(query, 25),
           // Fetch issues from matching projects (include subprojects + closed)
-          ...matchingProjectIds.slice(0, 5).map(async (projectId) => {
+          ...matchingProjectIds.slice(0, 8).map(async (projectId) => {
             try {
-              const result = await server.getOpenIssuesForProject(projectId, true, 20, false);
+              const result = await server.getOpenIssuesForProject(projectId, true, 30, false);
               projectIssueResults.push(...result.issues);
             } catch { /* ignore */ }
           }),
@@ -266,8 +266,15 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
 
         if (thisSearchVersion !== searchVersion || resolved) return;
 
-        // Combine all results
+        // Combine and rank results: mine+open > mine+closed > other+open > other+closed
         const allResults = [...searchResults, ...projectIssueResults];
+        allResults.sort((a, b) => {
+          const aIsMine = myIssueIds.has(a.id) ? 0 : 1;
+          const bIsMine = myIssueIds.has(b.id) ? 0 : 1;
+          const aIsClosed = (a.status?.is_closed ?? false) ? 0.5 : 0;
+          const bIsClosed = (b.status?.is_closed ?? false) ? 0.5 : 0;
+          return (aIsMine + aIsClosed) - (bIsMine + bIsClosed);
+        });
         const seenIds = new Set(issues.map((i) => i.id));
         const resultItems: IssueQuickPickItem[] = [];
 
@@ -282,7 +289,7 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
           const tagStr = tags.length > 0 ? ` (${tags.join(", ")})` : "";
           resultItems.push({
             label: `${icon} #${exactIssue.id} ${exactIssue.subject}`,
-            description: `${exactIssue.project?.name}${tagStr}`,
+            description: `${projectPathMap.get(exactIssue.project?.id ?? 0) ?? exactIssue.project?.name}${tagStr}`,
             issue: exactIssue,
           });
           seenIds.add(exactIssue.id);
@@ -300,7 +307,7 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
             const tagStr = tags.length > 0 ? ` (${tags.join(", ")})` : "";
             resultItems.push({
               label: `${icon} #${issue.id} ${issue.subject}`,
-              description: `${issue.project?.name}${tagStr}`,
+              description: `${projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name}${tagStr}`,
               issue,
             });
             seenIds.add(issue.id);
