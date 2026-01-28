@@ -484,7 +484,7 @@
       },
       {
         "command": "redmyne.kanban.cleanup",
-        "title": "Cleanup Corrupted Tasks",
+        "title": "Redmyne: Cleanup Corrupted Kanban Tasks",
         "icon": "$(trash)"
       },
       {
