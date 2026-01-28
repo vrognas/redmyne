@@ -1443,7 +1443,7 @@ export class RedmineServer {
   ): Promise<{ issues: Issue[] }> {
     const statusFilter = openOnly ? "status_id=open" : "status_id=*";
     const baseEndpoint = include_subproject
-      ? `/issues.json?${statusFilter}&project_id=${project_id}`
+      ? `/issues.json?${statusFilter}&project_id=${project_id}&subproject_id=*`
       : `/issues.json?${statusFilter}&project_id=${project_id}&subproject_id=!*`;
 
     if (limit !== undefined) {
