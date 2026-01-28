@@ -185,8 +185,8 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
     vscode.window.showErrorMessage(`Failed to fetch issues: ${error}`);
     return undefined;
   }
-  const issues = [...myOpenIssues, ...myClosedIssues];
-  const myIssueIds = new Set(issues.map(i => i.id));
+  const myIssueIds = new Set([...myOpenIssues, ...myClosedIssues].map(i => i.id));
+  const displayedClosedIssues = myClosedIssues.slice(0, 20);
 
   // Build items with status labels (use full project path for parent matching)
   const items: IssueQuickPickItem[] = [
@@ -195,12 +195,14 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
       description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
       issue,
     })),
-    ...myClosedIssues.slice(0, 20).map((issue) => ({
+    ...displayedClosedIssues.map((issue) => ({
       label: `$(archive) #${issue.id} ${issue.subject}`,
       description: `${projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name} (closed)`,
       issue,
     })),
   ];
+  // IDs actually shown in items (for dedup in search results)
+  const displayedIssueIds = new Set([...myOpenIssues, ...displayedClosedIssues].map(i => i.id));
 
   const selectedIssue = await new Promise<Issue | undefined>((resolve) => {
     const quickPick = vscode.window.createQuickPick<IssueQuickPickItem>();
@@ -275,7 +277,7 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
           const bIsClosed = (b.status?.is_closed ?? false) ? 0.5 : 0;
           return (aIsMine + aIsClosed) - (bIsMine + bIsClosed);
         });
-        const seenIds = new Set(issues.map((i) => i.id));
+        const seenIds = new Set(displayedIssueIds);
         const resultItems: IssueQuickPickItem[] = [];
 
         // Add exact match first if found
