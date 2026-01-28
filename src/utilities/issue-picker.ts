@@ -506,7 +506,8 @@ export async function pickIssueWithSearch(
     for (const issue of recentOpen) {
       baseItems.push({
         label: `$(history) #${issue.id} ${issue.subject}`,
-        description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
+        description: issue.assigned_to?.name ?? "Unassigned",
+        detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
         issue,
         disabled: false,
       });
@@ -519,7 +520,8 @@ export async function pickIssueWithSearch(
     for (const issue of otherOpen) {
       baseItems.push({
         label: `#${issue.id} ${issue.subject}`,
-        description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
+        description: issue.assigned_to?.name ?? "Unassigned",
+        detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
         issue,
         disabled: false,
       });
@@ -532,7 +534,8 @@ export async function pickIssueWithSearch(
     for (const issue of trackableClosedIssues.slice(0, 20)) {
       baseItems.push({
         label: `$(archive) #${issue.id} ${issue.subject}`,
-        description: `${projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name} · ${issue.status?.name ?? "closed"}`,
+        description: `${issue.assigned_to?.name ?? "Unassigned"} · ${issue.status?.name ?? "closed"}`,
+        detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
         issue,
         disabled: false,
       });
@@ -545,7 +548,8 @@ export async function pickIssueWithSearch(
     for (const issue of nonTrackableIssues) {
       baseItems.push({
         label: `$(circle-slash) #${issue.id} ${issue.subject}`,
-        description: `${projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name ?? "Unknown"}`,
+        description: issue.assigned_to?.name ?? "Unassigned",
+        detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name ?? "Unknown",
         issue,
         disabled: true,
       });
@@ -568,6 +572,7 @@ export async function pickIssueWithSearch(
     (quickPick as unknown as { sortByLabel: boolean }).sortByLabel = false;  // Preserve our custom sort order
     quickPick.items = baseItems;
     quickPick.matchOnDescription = true;
+    quickPick.matchOnDetail = true;
 
     let resolved = false;
     let searchVersion = 0;
@@ -685,12 +690,10 @@ export async function pickIssueWithSearch(
           if (!isMine) tags.push("not mine");
           if (isClosed) tags.push("closed");
           const tagStr = tags.length > 0 ? ` (${tags.join(", ")})` : "";
-          // Use full project path for description (enables fuzzy match on parent projects)
-          const projectPath = projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name ?? "";
           resultItems.push({
             label: `${icon} #${issue.id} ${issue.subject}`,
-            description: `${projectPath}${tagStr}`,
-            detail: issue.status?.name,
+            description: `${issue.assigned_to?.name ?? "Unassigned"}${tagStr}`,
+            detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name ?? "",
             issue,
             alwaysShow: true,  // Bypass VSCode's built-in filter
           });
@@ -873,7 +876,8 @@ export async function pickIssue(
       for (const issue of recentIssues) {
         baseItems.push({
           label: `$(history) #${issue.id} ${issue.subject}`,
-          description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
+          description: issue.assigned_to?.name ?? "Unassigned",
+          detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
           issue,
           disabled: false,
         });
@@ -884,7 +888,8 @@ export async function pickIssue(
       for (const issue of otherIssues) {
         baseItems.push({
           label: `#${issue.id} ${issue.subject}`,
-          description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
+          description: issue.assigned_to?.name ?? "Unassigned",
+          detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
           issue,
           disabled: false,
         });
@@ -909,7 +914,8 @@ export async function pickIssue(
       for (const issue of recentTrackable) {
         baseItems.push({
           label: `$(history) #${issue.id} ${issue.subject}`,
-          description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
+          description: issue.assigned_to?.name ?? "Unassigned",
+          detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
           issue,
           disabled: false,
         });
@@ -920,7 +926,8 @@ export async function pickIssue(
       for (const issue of otherTrackable) {
         baseItems.push({
           label: `#${issue.id} ${issue.subject}`,
-          description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
+          description: issue.assigned_to?.name ?? "Unassigned",
+          detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
           issue,
           disabled: false,
         });
@@ -931,7 +938,8 @@ export async function pickIssue(
       for (const issue of nonTrackableIssues) {
         baseItems.push({
           label: `$(circle-slash) #${issue.id} ${issue.subject}`,
-          description: `${projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name ?? "Unknown"}`,
+          description: issue.assigned_to?.name ?? "Unassigned",
+          detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name ?? "Unknown",
           issue,
           disabled: true,
         });
@@ -947,6 +955,7 @@ export async function pickIssue(
     (quickPick as unknown as { sortByLabel: boolean }).sortByLabel = false;  // Preserve our custom sort order
     quickPick.items = baseItems;
     quickPick.matchOnDescription = true;
+    quickPick.matchOnDetail = true;
 
     let resolved = false;
     let searchVersion = 0;
@@ -1014,13 +1023,12 @@ export async function pickIssue(
               const isAssigned = assignedIds.has(issue.id);
               const projectId = issue.project?.id;
               const hasTimeTracking = skipTimeTrackingCheck || (projectId ? timeTrackingByProject.get(projectId) : false);
-              // Use full project path for description (enables fuzzy match on parent projects)
               const projectPath = projectPathMap.get(projectId ?? 0) ?? issue.project?.name ?? "";
               if (!hasTimeTracking) {
                 return {
                   label: `$(circle-slash) #${issue.id} ${issue.subject}`,
-                  description: `${projectPath} (no time tracking)`,
-                  detail: issue.status?.name,
+                  description: `${issue.assigned_to?.name ?? "Unassigned"} (no time tracking)`,
+                  detail: projectPath,
                   issue,
                   disabled: true,
                   alwaysShow: true,
@@ -1029,8 +1037,8 @@ export async function pickIssue(
               const icon = isAssigned ? "$(account)" : "$(search)";
               return {
                 label: `${icon} #${issue.id} ${issue.subject}`,
-                description: `${projectPath}${isAssigned ? " (assigned)" : ""}`,
-                detail: issue.status?.name,
+                description: `${issue.assigned_to?.name ?? "Unassigned"}${isAssigned ? " (assigned)" : ""}`,
+                detail: projectPath,
                 issue,
                 alwaysShow: true,  // Bypass VSCode's built-in filter
               };
