@@ -2,6 +2,13 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.13.1]
+
+### Fixed
+
+- **Gantt "Add to Kanban"** - now fetches issue data instead of creating empty folder
+- **Corrupted tasks** - added cleanup command for tasks with missing data
+
 ## [4.13.0]
 
 ### Added
