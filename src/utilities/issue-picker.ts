@@ -184,6 +184,12 @@ export function buildProjectPathMap(projects: RedmineProject[]): Map<number, str
 
   const pathCache = new Map<number, string>();
 
+  // Check if project is a root (client) - has no parent
+  function isRoot(projectId: number): boolean {
+    const project = projectMap.get(projectId);
+    return !project?.parent?.id;
+  }
+
   function getPath(projectId: number): string {
     if (pathCache.has(projectId)) return pathCache.get(projectId)!;
 
@@ -193,7 +199,11 @@ export function buildProjectPathMap(projects: RedmineProject[]): Map<number, str
     let path = project.name;
     if (project.parent?.id) {
       const parentPath = getPath(project.parent.id);
-      if (parentPath) path = `${parentPath} ${project.name}`;
+      if (parentPath) {
+        // Use ": " after client (root), " / " for deeper levels
+        const separator = isRoot(project.parent.id) ? ": " : " / ";
+        path = `${parentPath}${separator}${project.name}`;
+      }
     }
     pathCache.set(projectId, path);
     return path;
