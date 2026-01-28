@@ -193,11 +193,13 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
     ...myOpenIssues.map((issue) => ({
       label: `#${issue.id} ${issue.subject}`,
       description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
+      detail: `#${issue.id} · ${issue.subject} · ${projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name} · ${issue.assigned_to?.name ?? "Unassigned"}`,
       issue,
     })),
     ...displayedClosedIssues.map((issue) => ({
       label: `$(archive) #${issue.id} ${issue.subject}`,
       description: `${projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name} (closed)`,
+      detail: `#${issue.id} · ${issue.subject} · ${projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name} · ${issue.assigned_to?.name ?? "Unassigned"}`,
       issue,
     })),
   ];
@@ -315,9 +317,11 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
           if (!isMine) tags.push("not mine");
           if (isClosed) tags.push("closed");
           const tagStr = tags.length > 0 ? ` (${tags.join(", ")})` : "";
+          const projectPath = projectPathMap.get(exactIssue.project?.id ?? 0) ?? exactIssue.project?.name;
           resultItems.push({
             label: `${icon} #${exactIssue.id} ${exactIssue.subject}`,
-            description: `${projectPathMap.get(exactIssue.project?.id ?? 0) ?? exactIssue.project?.name}${tagStr}`,
+            description: `${projectPath}${tagStr}`,
+            detail: `#${exactIssue.id} · ${exactIssue.subject} · ${projectPath} · ${exactIssue.assigned_to?.name ?? "Unassigned"}`,
             issue: exactIssue,
           });
           seenIds.add(exactIssue.id);
@@ -342,9 +346,11 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
             if (!isMine) tags.push("not mine");
             if (isClosed) tags.push("closed");
             const tagStr = tags.length > 0 ? ` (${tags.join(", ")})` : "";
+            const projectPath = projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name;
             resultItems.push({
               label: `${icon} #${issue.id} ${issue.subject}`,
-              description: `${projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name}${tagStr}`,
+              description: `${projectPath}${tagStr}`,
+              detail: `#${issue.id} · ${issue.subject} · ${projectPath} · ${issue.assigned_to?.name ?? "Unassigned"}`,
               issue,
             });
             seenIds.add(issue.id);
