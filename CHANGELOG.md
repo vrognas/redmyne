@@ -2,6 +2,27 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.13.0]
+
+### Added
+
+- **Project/client search** - search issues by parent project name (e.g., "marea" finds all Marea Therapeutics issues)
+- **Inaccessible issue feedback** - shows warning when searching for issue IDs you can't access (403/404)
+
+### Improved
+
+- **Issue picker display** - consistent format across all pickers:
+  - Row 1: #id subject | assignee
+  - Row 2: project path (detail)
+- **Project hierarchy** - clearer display with "Client: Project / Subproject" format
+- **Search ranking** - results ranked: mine+open > mine+closed > other+open > other+closed
+- **Multi-word search** - searches each word separately for better results
+- **Hidden closed issues** - closed issues beyond top 20 now findable via search
+
+### Internal
+
+- **DRY refactor** - shared project path map between kanban and time entry pickers
+
 ## [4.12.9]
 
 ### Internal
