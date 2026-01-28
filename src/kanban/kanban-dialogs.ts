@@ -2,9 +2,42 @@ import * as vscode from "vscode";
 import { RedmineServer } from "../redmine/redmine-server";
 import { KanbanTask, TaskPriority } from "./kanban-state";
 import { Issue } from "../redmine/models/issue";
+import { RedmineProject } from "../redmine/redmine-project";
 import { debounce } from "../utilities/debounce";
 
 const SEARCH_DEBOUNCE_MS = 300;
+
+/**
+ * Build map of projectId → full ancestor path (e.g., "Client > Project")
+ */
+function buildProjectPathMap(projects: RedmineProject[]): Map<number, string> {
+  const projectMap = new Map<number, RedmineProject>();
+  for (const p of projects) {
+    projectMap.set(p.id, p);
+  }
+
+  const pathCache = new Map<number, string>();
+
+  function getPath(projectId: number): string {
+    if (pathCache.has(projectId)) return pathCache.get(projectId)!;
+
+    const project = projectMap.get(projectId);
+    if (!project) return "";
+
+    let path = project.name;
+    if (project.parent?.id) {
+      const parentPath = getPath(project.parent.id);
+      if (parentPath) path = `${parentPath} ${project.name}`;
+    }
+    pathCache.set(projectId, path);
+    return path;
+  }
+
+  for (const p of projects) {
+    getPath(p.id);
+  }
+  return pathCache;
+}
 
 interface IssueQuickPickItem extends vscode.QuickPickItem {
   issue?: Issue;
@@ -167,20 +200,39 @@ export async function showEditTaskDialog(
  * Pick an issue for linking to a task (without activity selection)
  */
 async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefined> {
-  let issues: Issue[];
+  // Fetch my issues + project map in parallel
+  let myOpenIssues: Issue[];
+  let myClosedIssues: Issue[];
+  let projectPathMap: Map<number, string>;
   try {
-    const result = await server.getIssuesAssignedToMe();
-    issues = result.issues;
+    const [openResult, closedResult, projects] = await Promise.all([
+      server.getFilteredIssues({ assignee: "me", status: "open" }),
+      server.getFilteredIssues({ assignee: "me", status: "closed" }),
+      server.getProjects(),
+    ]);
+    myOpenIssues = openResult.issues;
+    myClosedIssues = closedResult.issues;
+    projectPathMap = buildProjectPathMap(projects);
   } catch (error) {
     vscode.window.showErrorMessage(`Failed to fetch issues: ${error}`);
     return undefined;
   }
+  const issues = [...myOpenIssues, ...myClosedIssues];
+  const myIssueIds = new Set(issues.map(i => i.id));
 
-  const items: IssueQuickPickItem[] = issues.map((issue) => ({
-    label: `#${issue.id} ${issue.subject}`,
-    description: issue.project?.name,
-    issue,
-  }));
+  // Build items with status labels
+  const items: IssueQuickPickItem[] = [
+    ...myOpenIssues.map((issue) => ({
+      label: `#${issue.id} ${issue.subject}`,
+      description: issue.project?.name,
+      issue,
+    })),
+    ...myClosedIssues.slice(0, 20).map((issue) => ({
+      label: `$(archive) #${issue.id} ${issue.subject}`,
+      description: `${issue.project?.name} (closed)`,
+      issue,
+    })),
+  ];
 
   const selectedIssue = await new Promise<Issue | undefined>((resolve) => {
     const quickPick = vscode.window.createQuickPick<IssueQuickPickItem>();
@@ -211,19 +263,79 @@ async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefine
       quickPick.busy = true;
 
       try {
-        const searchResults = await server.searchIssues(query, 10);
+        // Check if query is a numeric ID
+        const cleanQuery = query.replace(/^#/, "");
+        const possibleId = parseInt(cleanQuery, 10);
+        const isNumericQuery = !isNaN(possibleId) && cleanQuery === String(possibleId);
+
+        // Find projects matching query tokens (for project-name search)
+        const queryTokens = query.trim().split(/\s+/).filter(t => t.length >= 2);
+        const matchingProjectIds: number[] = [];
+        for (const token of queryTokens) {
+          const lowerToken = token.toLowerCase();
+          for (const [projectId, path] of projectPathMap.entries()) {
+            if (path.toLowerCase().includes(lowerToken) && !matchingProjectIds.includes(projectId)) {
+              matchingProjectIds.push(projectId);
+            }
+          }
+        }
+
+        // Parallel: exact ID lookup + text search + project issues
+        const projectIssueResults: Issue[] = [];
+        const [exactIssue, searchResults] = await Promise.all([
+          isNumericQuery
+            ? server.getIssueById(possibleId).then(r => r.issue).catch(() => null)
+            : Promise.resolve(null),
+          server.searchIssues(query, 25),
+          // Fetch issues from matching projects (include subprojects + closed)
+          ...matchingProjectIds.slice(0, 5).map(async (projectId) => {
+            try {
+              const result = await server.getOpenIssuesForProject(projectId, true, 20, false);
+              projectIssueResults.push(...result.issues);
+            } catch { /* ignore */ }
+          }),
+        ]);
+
         if (thisSearchVersion !== searchVersion || resolved) return;
 
+        // Combine all results
+        const allResults = [...searchResults, ...projectIssueResults];
         const seenIds = new Set(issues.map((i) => i.id));
         const resultItems: IssueQuickPickItem[] = [];
 
-        for (const issue of searchResults) {
+        // Add exact match first if found
+        if (exactIssue && !seenIds.has(exactIssue.id)) {
+          const isClosed = exactIssue.status?.is_closed ?? false;
+          const isMine = myIssueIds.has(exactIssue.id);
+          const icon = isClosed ? "$(archive)" : isMine ? "$(account)" : "$(search)";
+          const tags: string[] = [];
+          if (!isMine) tags.push("not mine");
+          if (isClosed) tags.push("closed");
+          const tagStr = tags.length > 0 ? ` (${tags.join(", ")})` : "";
+          resultItems.push({
+            label: `${icon} #${exactIssue.id} ${exactIssue.subject}`,
+            description: `${exactIssue.project?.name}${tagStr}`,
+            issue: exactIssue,
+          });
+          seenIds.add(exactIssue.id);
+        }
+
+        // Add search results with labels
+        for (const issue of allResults) {
           if (!seenIds.has(issue.id)) {
+            const isMine = myIssueIds.has(issue.id);
+            const isClosed = issue.status?.is_closed ?? false;
+            const icon = isClosed ? "$(archive)" : isMine ? "$(account)" : "$(search)";
+            const tags: string[] = [];
+            if (!isMine) tags.push("not mine");
+            if (isClosed) tags.push("closed");
+            const tagStr = tags.length > 0 ? ` (${tags.join(", ")})` : "";
             resultItems.push({
-              label: `$(search) #${issue.id} ${issue.subject}`,
-              description: issue.project?.name,
+              label: `${icon} #${issue.id} ${issue.subject}`,
+              description: `${issue.project?.name}${tagStr}`,
               issue,
             });
+            seenIds.add(issue.id);
           }
         }
 

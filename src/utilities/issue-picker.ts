@@ -114,10 +114,10 @@ async function searchIssuesWithFuzzy(
           const results = await server.searchIssues(query, 10);
           serverResults.push(...results);
         })()]),
-    // Fetch issues from projects matching search tokens (include closed issues)
-    ...matchingProjectIds.slice(0, 5).map(async (projectId) => {
+    // Fetch issues from projects matching search tokens (include subprojects + closed)
+    ...matchingProjectIds.slice(0, 8).map(async (projectId) => {
       try {
-        const result = await server.getOpenIssuesForProject(projectId, true, 10, false);
+        const result = await server.getOpenIssuesForProject(projectId, true, 30, false);
         serverResults.push(...result.issues);
       } catch { /* ignore - project may not be accessible */ }
     }),
@@ -434,15 +434,22 @@ export async function pickIssueWithSearch(
 ): Promise<PickedIssueAndActivity | "skip" | undefined> {
   const allowSkip = options?.allowSkip ?? false;
 
-  // Get assigned issues
-  let issues: Issue[];
+  // Get my issues (both open and closed)
+  let myOpenIssues: Issue[];
+  let myClosedIssues: Issue[];
   try {
-    const result = await server.getIssuesAssignedToMe();
-    issues = result.issues;
+    const [openResult, closedResult] = await Promise.all([
+      server.getFilteredIssues({ assignee: "me", status: "open" }),
+      server.getFilteredIssues({ assignee: "me", status: "closed" }),
+    ]);
+    myOpenIssues = openResult.issues;
+    myClosedIssues = closedResult.issues;
   } catch (error) {
     vscode.window.showErrorMessage(`Failed to fetch issues: ${error}`);
     return undefined;
   }
+  const issues = [...myOpenIssues, ...myClosedIssues];
+  const myIssueIds = new Set(issues.map(i => i.id));
 
   // Fetch project path map (cached) + check time_tracking in parallel
   const projectIds = [...new Set(issues.map(i => i.project?.id).filter(Boolean))] as number[];
@@ -461,14 +468,17 @@ export async function pickIssueWithSearch(
   const recentIds = new Set(getRecentIssueIds());
 
   // Build issue list: trackable issues first, then non-trackable (disabled)
-  const trackableIssues = issues.filter(
+  const trackableOpenIssues = myOpenIssues.filter(
+    (issue) => issue.project?.id && timeTrackingByProject.get(issue.project.id)
+  );
+  const trackableClosedIssues = myClosedIssues.filter(
     (issue) => issue.project?.id && timeTrackingByProject.get(issue.project.id)
   );
   const nonTrackableIssues = issues.filter(
     (issue) => !issue.project?.id || !timeTrackingByProject.get(issue.project.id)
   );
 
-  // Sort trackable issues: recent first
+  // Sort by recency
   const sortByRecency = (a: Issue, b: Issue): number => {
     const recentIssueIdsList = getRecentIssueIds();
     const aRecent = recentIssueIdsList.indexOf(a.id);
@@ -481,18 +491,19 @@ export async function pickIssueWithSearch(
     return 0;
   };
 
-  trackableIssues.sort(sortByRecency);
+  trackableOpenIssues.sort(sortByRecency);
+  trackableClosedIssues.sort(sortByRecency);
 
-  // Build base items from assigned issues with visual grouping
-  const recentTrackable = trackableIssues.filter(i => recentIds.has(i.id));
-  const otherTrackable = trackableIssues.filter(i => !recentIds.has(i.id));
+  // Build base items with visual grouping
+  const recentOpen = trackableOpenIssues.filter(i => recentIds.has(i.id));
+  const otherOpen = trackableOpenIssues.filter(i => !recentIds.has(i.id));
 
   const baseItems: IssueQuickPickItem[] = [];
 
-  // Recent issues section
-  if (recentTrackable.length > 0) {
+  // Recent open issues section
+  if (recentOpen.length > 0) {
     baseItems.push({ label: "Recent", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
-    for (const issue of recentTrackable) {
+    for (const issue of recentOpen) {
       baseItems.push({
         label: `$(history) #${issue.id} ${issue.subject}`,
         description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
@@ -502,13 +513,26 @@ export async function pickIssueWithSearch(
     }
   }
 
-  // Other assigned issues
-  if (otherTrackable.length > 0) {
-    baseItems.push({ label: "Assigned", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
-    for (const issue of otherTrackable) {
+  // Other open assigned issues
+  if (otherOpen.length > 0) {
+    baseItems.push({ label: "My Open", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
+    for (const issue of otherOpen) {
       baseItems.push({
         label: `#${issue.id} ${issue.subject}`,
         description: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
+        issue,
+        disabled: false,
+      });
+    }
+  }
+
+  // My closed issues (limit to 20 most recent)
+  if (trackableClosedIssues.length > 0) {
+    baseItems.push({ label: "My Closed", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
+    for (const issue of trackableClosedIssues.slice(0, 20)) {
+      baseItems.push({
+        label: `$(archive) #${issue.id} ${issue.subject}`,
+        description: `${projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name} · ${issue.status?.name ?? "closed"}`,
         issue,
         disabled: false,
       });
@@ -621,7 +645,6 @@ export async function pickIssueWithSearch(
         }
 
         // 5. Filter to trackable issues
-        const assignedIds = new Set(issues.map(i => i.id));
         const trackableResults = allResults.filter((issue) => {
           const projectId = issue.project?.id;
           return projectId !== null && projectId !== undefined && timeTrackingByProject.get(projectId) === true;
@@ -653,14 +676,20 @@ export async function pickIssueWithSearch(
         }
 
         for (const issue of limitedResults) {
-          const isAssigned = assignedIds.has(issue.id);
-          const icon = isAssigned ? "$(account)" : "$(search)";
-          const assignedTag = isAssigned ? " (assigned)" : "";
+          const isMine = myIssueIds.has(issue.id);
+          const isClosed = issue.status?.is_closed ?? false;
+          // Icon: mine+open > others+open > mine+closed > others+closed
+          const icon = isClosed ? "$(archive)" : isMine ? "$(account)" : "$(search)";
+          // Tags for clarity
+          const tags: string[] = [];
+          if (!isMine) tags.push("not mine");
+          if (isClosed) tags.push("closed");
+          const tagStr = tags.length > 0 ? ` (${tags.join(", ")})` : "";
           // Use full project path for description (enables fuzzy match on parent projects)
           const projectPath = projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name ?? "";
           resultItems.push({
             label: `${icon} #${issue.id} ${issue.subject}`,
-            description: `${projectPath}${assignedTag}`,
+            description: `${projectPath}${tagStr}`,
             detail: issue.status?.name,
             issue,
             alwaysShow: true,  // Bypass VSCode's built-in filter
