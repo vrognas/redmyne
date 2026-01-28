@@ -201,12 +201,14 @@ export function setupDrag(ctx) {
       const jogDir = fromStart ? -1 : 1;
       // Target approach direction (unused for nearlyVertical)
       const approachDir = toEnd ? 1 : -1;
+      // Minimum horizontal room needed for simple jog path
+      const minJogRoom = 8 + r; // jogX + r
 
       // Determine which path case we're in
       let pathCase;
       if (!isScheduling) pathCase = 'non-scheduling';
       else if (sameRow && goingRight) pathCase = 'sameRow-right';
-      else if (!sameRow && nearlyVertical && (fromStart === goingRight)) pathCase = 'nearlyVertical';
+      else if (!sameRow && nearlyVertical && (fromStart === goingRight || horizontalDist < minJogRoom)) pathCase = 'nearlyVertical';
       else if (goingRight) pathCase = 'diffRow-right';
       else if (sameRow) pathCase = 'sameRow-left';
       else pathCase = 'diffRow-left';
@@ -258,9 +260,10 @@ export function setupDrag(ctx) {
           ' H ' + (x2 + approachDir * 12 - approachDir * r) +
           ' q ' + (approachDir * -r) + ' 0 ' + (approachDir * -r) + ' ' + r +
           ' V ' + y2 + ' H ' + x2;
-      } else if (!sameRow && nearlyVertical && (fromStart === goingRight)) {
-        // Nearly vertical with direction conflict: S-curve with 90° turns
-        // Only use S-curve when jog direction conflicts with target direction
+      } else if (!sameRow && nearlyVertical && (fromStart === goingRight || horizontalDist < minJogRoom)) {
+        // Nearly vertical: S-curve with 90° turns when:
+        // 1. Direction conflict (jog opposite to target direction), OR
+        // 2. Not enough horizontal room for simple jog path (< 12px)
         // jogDir: which way to jog from source (-1=left, +1=right)
         // approachDir: which side to approach target from (-1=left, +1=right)
         const jogX = 8;

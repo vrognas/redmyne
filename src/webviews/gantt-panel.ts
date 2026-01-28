@@ -2535,6 +2535,7 @@ export class GanttPanel {
           const nearlyVertical = horizontalDist < 30;
           const jogDir = fromStart ? -1 : 1;
           const approachDir = toEnd ? 1 : -1;
+          const minJogRoom = 8 + r; // jogX + r = minimum room for simple jog path
 
           if (!isScheduling) {
             // Path already computed above
@@ -2549,11 +2550,10 @@ export class GanttPanel {
               ` H ${x2 + approachDir * 12 - approachDir * r}` +
               ` q ${approachDir * -r} 0 ${approachDir * -r} ${r}` +
               ` V ${y2} H ${x2}`;
-          } else if (!sameRow && nearlyVertical && (fromStart === goingRight)) {
-            // Nearly vertical with direction conflict: S-curve with 90° turns
-            // Only use S-curve when jog direction conflicts with target direction:
-            // - fromStart=true (jog left) + goingRight=true (target right) → conflict
-            // - fromStart=false (jog right) + goingRight=false (target left) → conflict
+          } else if (!sameRow && nearlyVertical && (fromStart === goingRight || horizontalDist < minJogRoom)) {
+            // Nearly vertical: S-curve with 90° turns when:
+            // 1. Direction conflict (jog opposite to target direction), OR
+            // 2. Not enough horizontal room for simple jog path (< 12px)
             // jogDir: which way to jog from source (-1=left, +1=right)
             // approachDir: which side to approach target from (-1=left, +1=right)
             const jogX = 8;
@@ -2638,7 +2638,7 @@ export class GanttPanel {
           // Debug logging for arrow paths (when perfDebug enabled)
           if (isPerfDebugEnabled()) {
             const pathCase = sameRow && goingRight ? "sameRow-right"
-              : !sameRow && nearlyVertical && (fromStart === goingRight) ? "nearlyVertical"
+              : !sameRow && nearlyVertical && (fromStart === goingRight || horizontalDist < minJogRoom) ? "nearlyVertical"
               : goingRight ? "diffRow-right"
               : sameRow ? "sameRow-left"
               : "diffRow-left";
