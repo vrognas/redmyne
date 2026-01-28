@@ -2549,8 +2549,11 @@ export class GanttPanel {
               ` H ${x2 + approachDir * 12 - approachDir * r}` +
               ` q ${approachDir * -r} 0 ${approachDir * -r} ${r}` +
               ` V ${y2} H ${x2}`;
-          } else if (!sameRow && nearlyVertical) {
-            // Nearly vertical: S-curve with 90° turns (slightly rounded)
+          } else if (!sameRow && nearlyVertical && (fromStart === goingRight)) {
+            // Nearly vertical with direction conflict: S-curve with 90° turns
+            // Only use S-curve when jog direction conflicts with target direction:
+            // - fromStart=true (jog left) + goingRight=true (target right) → conflict
+            // - fromStart=false (jog right) + goingRight=false (target left) → conflict
             // jogDir: which way to jog from source (-1=left, +1=right)
             // approachDir: which side to approach target from (-1=left, +1=right)
             const jogX = 8;
@@ -2635,7 +2638,7 @@ export class GanttPanel {
           // Debug logging for arrow paths (when perfDebug enabled)
           if (isPerfDebugEnabled()) {
             const pathCase = sameRow && goingRight ? "sameRow-right"
-              : !sameRow && nearlyVertical ? "nearlyVertical"
+              : !sameRow && nearlyVertical && (fromStart === goingRight) ? "nearlyVertical"
               : goingRight ? "diffRow-right"
               : sameRow ? "sameRow-left"
               : "diffRow-left";
