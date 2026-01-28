@@ -483,6 +483,11 @@
         "icon": "$(gear)"
       },
       {
+        "command": "redmyne.kanban.cleanup",
+        "title": "Cleanup Corrupted Tasks",
+        "icon": "$(trash)"
+      },
+      {
         "command": "redmyne.kanban.filterAll",
         "title": "All Priorities"
       },

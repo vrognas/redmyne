@@ -237,7 +237,7 @@ export function registerKanbanCommands(
   disposables.push(
     vscode.commands.registerCommand(
       "redmyne.addIssueToKanban",
-      async (issue: { id: number; subject: string; project?: { id: number; name: string } }) => {
+      async (issue: { id: number; subject?: string; project?: { id: number; name: string } }) => {
         if (!issue?.id) {
           vscode.window.showErrorMessage("No issue selected");
           return;
@@ -245,10 +245,31 @@ export function registerKanbanCommands(
 
         const server = getServer();
 
+        // Fetch issue data if subject or project is missing (e.g., from Gantt context menu)
+        let subject = issue.subject;
+        let projectId = issue.project?.id;
+        let projectName = issue.project?.name;
+
+        if ((!subject || !projectId) && server) {
+          try {
+            const { issue: fullIssue } = await server.getIssueById(issue.id);
+            subject = subject ?? fullIssue.subject;
+            projectId = projectId ?? fullIssue.project?.id;
+            projectName = projectName ?? fullIssue.project?.name;
+          } catch (error) {
+            vscode.window.showErrorMessage(`Failed to fetch issue #${issue.id}: ${error}`);
+            return;
+          }
+        }
+
+        if (!subject) {
+          vscode.window.showErrorMessage("Could not determine issue subject");
+          return;
+        }
+
         // Look up parent project from cached projects
         let linkedParentProjectId: number | undefined;
         let linkedParentProjectName: string | undefined;
-        const projectId = issue.project?.id;
         if (projectId && server) {
           try {
             const projects = await server.getProjects();
@@ -263,11 +284,11 @@ export function registerKanbanCommands(
         }
 
         await controller.addTask(
-          issue.subject,
+          subject,
           issue.id,
-          issue.subject,
-          issue.project?.id ?? 0,
-          issue.project?.name ?? "",
+          subject,
+          projectId ?? 0,
+          projectName ?? "",
           {
             linkedParentProjectId,
             linkedParentProjectName,
@@ -575,6 +596,36 @@ export function registerKanbanCommands(
         );
       }
     )
+  );
+
+  // Cleanup corrupted tasks
+  disposables.push(
+    vscode.commands.registerCommand("redmyne.kanban.cleanup", async () => {
+      const tasks = controller.getTasks();
+      const corruptedTasks = tasks.filter(
+        (t) => !t.title || !t.linkedIssueId || !t.linkedProjectName
+      );
+
+      if (corruptedTasks.length === 0) {
+        vscode.window.showInformationMessage("No corrupted tasks found");
+        return;
+      }
+
+      const confirm = await vscode.window.showWarningMessage(
+        `Found ${corruptedTasks.length} corrupted task(s). Delete them?`,
+        { modal: true },
+        "Delete"
+      );
+      if (confirm !== "Delete") return;
+
+      for (const task of corruptedTasks) {
+        await controller.deleteTask(task.id);
+      }
+
+      vscode.window.showInformationMessage(
+        `Deleted ${corruptedTasks.length} corrupted task(s)`
+      );
+    })
   );
 
   // Configure Timer Settings
