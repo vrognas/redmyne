@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "4.13.2",
+  "version": "4.13.3",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",

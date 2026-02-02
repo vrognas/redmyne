@@ -2,6 +2,12 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.13.3]
+
+### Fixed
+
+- **Flaky test** - time entries tree test used hardcoded future dates causing CI failures early in month
+
 ## [4.13.2]
 
 ### Performance
