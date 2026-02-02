@@ -28,8 +28,13 @@ export function setupDrag(ctx) {
       scrollToAndHighlight,
       setAllowScrollChange,
       isDraftModeEnabled,
-      isPerfDebugEnabled
+      isPerfDebugEnabled,
+      getLookupMaps
     } = ctx;
+
+    // Track highlighted elements for fast clearing (avoid DOM queries)
+    let highlightedArrows = [];
+    let highlightedConnected = [];
     function showIssueContextMenu(x, y, issueId) {
       document.querySelector('.relation-picker')?.remove();
 
@@ -849,9 +854,11 @@ export function setupDrag(ctx) {
 
     // Helper to highlight multiple arrows and their connected issues
     function highlightArrows(arrows, issueId) {
-      // Clear any previous arrow selection
-      document.querySelectorAll('.dependency-arrow.selected').forEach(a => a.classList.remove('selected'));
-      document.querySelectorAll('.arrow-connected').forEach(el => el.classList.remove('arrow-connected'));
+      // Clear any previous arrow selection (use tracked elements, avoid DOM queries)
+      highlightedArrows.forEach(a => a.classList.remove('selected'));
+      highlightedArrows = [];
+      highlightedConnected.forEach(el => el.classList.remove('arrow-connected'));
+      highlightedConnected = [];
 
       if (arrows.length === 0) return;
 
@@ -860,14 +867,23 @@ export function setupDrag(ctx) {
       const connectedIds = new Set();
       arrows.forEach(arrow => {
         arrow.classList.add('selected');
+        highlightedArrows.push(arrow);
         connectedIds.add(arrow.dataset.from);
         connectedIds.add(arrow.dataset.to);
       });
 
-      // Highlight connected bars and labels
+      // Highlight connected bars and labels (use lookup maps if available)
+      const maps = getLookupMaps ? getLookupMaps() : null;
       connectedIds.forEach(id => {
-        document.querySelectorAll(`.issue-bar[data-issue-id="${id}"], .issue-label[data-issue-id="${id}"]`)
-          .forEach(el => el.classList.add('arrow-connected'));
+        if (maps?.mapsReady) {
+          const bars = maps.issueBarsByIssueId.get(id) || [];
+          const labels = maps.issueLabelsByIssueId.get(id) || [];
+          bars.forEach(el => { el.classList.add('arrow-connected'); highlightedConnected.push(el); });
+          labels.forEach(el => { el.classList.add('arrow-connected'); highlightedConnected.push(el); });
+        } else {
+          document.querySelectorAll(`.issue-bar[data-issue-id="${id}"], .issue-label[data-issue-id="${id}"]`)
+            .forEach(el => { el.classList.add('arrow-connected'); highlightedConnected.push(el); });
+        }
       });
 
       announce(`Highlighted ${arrows.length} dependency arrow(s) for #${issueId}`);

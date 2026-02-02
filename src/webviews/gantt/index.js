@@ -1325,6 +1325,8 @@ function initializeGantt(state) {
 
       // Dependency arrow click to select/highlight
       let selectedArrow = null;
+      const selectedArrowElements = []; // Track selected arrows for fast clearing
+      const arrowConnectedElements = []; // Track connected bars/labels for fast clearing
       timelineSvg.addEventListener('click', (e) => {
         const arrow = e.target.closest('.dependency-arrow');
 
@@ -1342,24 +1344,32 @@ function initializeGantt(state) {
         e.stopPropagation();
         selectedArrow = arrow;
         arrow.classList.add('selected');
+        selectedArrowElements.push(arrow);
         document.body.classList.add('arrow-selection-mode');
 
-        // Highlight connected bars and labels
+        // Highlight connected bars and labels (use lookup maps if ready)
         const fromId = arrow.dataset.from;
         const toId = arrow.dataset.to;
-        document.querySelectorAll(`.issue-bar[data-issue-id="${fromId}"], .issue-bar[data-issue-id="${toId}"]`)
-          .forEach(bar => bar.classList.add('arrow-connected'));
-        document.querySelectorAll(`.issue-label[data-issue-id="${fromId}"], .issue-label[data-issue-id="${toId}"]`)
-          .forEach(label => label.classList.add('arrow-connected'));
+        const connectedBars = mapsReady
+          ? [...(issueBarsByIssueId.get(fromId) || []), ...(issueBarsByIssueId.get(toId) || [])]
+          : document.querySelectorAll(`.issue-bar[data-issue-id="${fromId}"], .issue-bar[data-issue-id="${toId}"]`);
+        const connectedLabels = mapsReady
+          ? [...(issueLabelsByIssueId.get(fromId) || []), ...(issueLabelsByIssueId.get(toId) || [])]
+          : document.querySelectorAll(`.issue-label[data-issue-id="${fromId}"], .issue-label[data-issue-id="${toId}"]`);
+        connectedBars.forEach(bar => { bar.classList.add('arrow-connected'); arrowConnectedElements.push(bar); });
+        connectedLabels.forEach(label => { label.classList.add('arrow-connected'); arrowConnectedElements.push(label); });
 
         announce(`Selected relation from #${fromId} to #${toId}`);
       });
 
       // Helper to clear all arrow selections (single or multi-select)
+      // Uses tracked elements instead of DOM queries for O(1) clear
       function clearArrowSelection() {
-        document.querySelectorAll('.dependency-arrow.selected').forEach(a => a.classList.remove('selected'));
+        selectedArrowElements.forEach(a => a.classList.remove('selected'));
+        selectedArrowElements.length = 0;
         document.body.classList.remove('arrow-selection-mode');
-        document.querySelectorAll('.arrow-connected').forEach(el => el.classList.remove('arrow-connected'));
+        arrowConnectedElements.forEach(el => el.classList.remove('arrow-connected'));
+        arrowConnectedElements.length = 0;
         selectedArrow = null;
       }
 
@@ -1418,7 +1428,9 @@ function initializeGantt(state) {
       scrollToAndHighlight,
       setAllowScrollChange,
       isDraftModeEnabled: () => currentDraftMode,
-      isPerfDebugEnabled: () => PERF_DEBUG
+      isPerfDebugEnabled: () => PERF_DEBUG,
+      // Lookup maps for O(1) element access
+      getLookupMaps: () => ({ mapsReady, issueBarsByIssueId, issueLabelsByIssueId })
     });
 
     setupCollapse({

@@ -132,8 +132,11 @@
       scrollToAndHighlight,
       setAllowScrollChange,
       isDraftModeEnabled,
-      isPerfDebugEnabled
+      isPerfDebugEnabled,
+      getLookupMaps
     } = ctx;
+    let highlightedArrows = [];
+    let highlightedConnected = [];
     function showIssueContextMenu(x, y, issueId) {
       document.querySelector(".relation-picker")?.remove();
       const isBulkMode = selectedIssues.size > 1 && selectedIssues.has(issueId);
@@ -804,18 +807,38 @@
       });
     });
     function highlightArrows(arrows, issueId) {
-      document.querySelectorAll(".dependency-arrow.selected").forEach((a) => a.classList.remove("selected"));
-      document.querySelectorAll(".arrow-connected").forEach((el) => el.classList.remove("arrow-connected"));
+      highlightedArrows.forEach((a) => a.classList.remove("selected"));
+      highlightedArrows = [];
+      highlightedConnected.forEach((el) => el.classList.remove("arrow-connected"));
+      highlightedConnected = [];
       if (arrows.length === 0) return;
       document.body.classList.add("arrow-selection-mode");
       const connectedIds = /* @__PURE__ */ new Set();
       arrows.forEach((arrow) => {
         arrow.classList.add("selected");
+        highlightedArrows.push(arrow);
         connectedIds.add(arrow.dataset.from);
         connectedIds.add(arrow.dataset.to);
       });
+      const maps = getLookupMaps ? getLookupMaps() : null;
       connectedIds.forEach((id) => {
-        document.querySelectorAll(`.issue-bar[data-issue-id="${id}"], .issue-label[data-issue-id="${id}"]`).forEach((el) => el.classList.add("arrow-connected"));
+        if (maps?.mapsReady) {
+          const bars = maps.issueBarsByIssueId.get(id) || [];
+          const labels = maps.issueLabelsByIssueId.get(id) || [];
+          bars.forEach((el) => {
+            el.classList.add("arrow-connected");
+            highlightedConnected.push(el);
+          });
+          labels.forEach((el) => {
+            el.classList.add("arrow-connected");
+            highlightedConnected.push(el);
+          });
+        } else {
+          document.querySelectorAll(`.issue-bar[data-issue-id="${id}"], .issue-label[data-issue-id="${id}"]`).forEach((el) => {
+            el.classList.add("arrow-connected");
+            highlightedConnected.push(el);
+          });
+        }
       });
       announce(`Highlighted ${arrows.length} dependency arrow(s) for #${issueId}`);
     }
@@ -3131,9 +3154,11 @@
     }
     if (timelineSvg) {
       let clearArrowSelection2 = function() {
-        document.querySelectorAll(".dependency-arrow.selected").forEach((a) => a.classList.remove("selected"));
+        selectedArrowElements.forEach((a) => a.classList.remove("selected"));
+        selectedArrowElements.length = 0;
         document.body.classList.remove("arrow-selection-mode");
-        document.querySelectorAll(".arrow-connected").forEach((el) => el.classList.remove("arrow-connected"));
+        arrowConnectedElements.forEach((el) => el.classList.remove("arrow-connected"));
+        arrowConnectedElements.length = 0;
         selectedArrow = null;
       };
       var clearArrowSelection = clearArrowSelection2;
@@ -3156,6 +3181,8 @@
         showDeletePicker(e.clientX, e.clientY, relationId, fromId, toId, relationType);
       });
       let selectedArrow = null;
+      const selectedArrowElements = [];
+      const arrowConnectedElements = [];
       timelineSvg.addEventListener("click", (e) => {
         const arrow = e.target.closest(".dependency-arrow");
         if (selectedArrow) {
@@ -3168,11 +3195,20 @@
         e.stopPropagation();
         selectedArrow = arrow;
         arrow.classList.add("selected");
+        selectedArrowElements.push(arrow);
         document.body.classList.add("arrow-selection-mode");
         const fromId = arrow.dataset.from;
         const toId = arrow.dataset.to;
-        document.querySelectorAll(`.issue-bar[data-issue-id="${fromId}"], .issue-bar[data-issue-id="${toId}"]`).forEach((bar) => bar.classList.add("arrow-connected"));
-        document.querySelectorAll(`.issue-label[data-issue-id="${fromId}"], .issue-label[data-issue-id="${toId}"]`).forEach((label) => label.classList.add("arrow-connected"));
+        const connectedBars = mapsReady ? [...issueBarsByIssueId.get(fromId) || [], ...issueBarsByIssueId.get(toId) || []] : document.querySelectorAll(`.issue-bar[data-issue-id="${fromId}"], .issue-bar[data-issue-id="${toId}"]`);
+        const connectedLabels = mapsReady ? [...issueLabelsByIssueId.get(fromId) || [], ...issueLabelsByIssueId.get(toId) || []] : document.querySelectorAll(`.issue-label[data-issue-id="${fromId}"], .issue-label[data-issue-id="${toId}"]`);
+        connectedBars.forEach((bar) => {
+          bar.classList.add("arrow-connected");
+          arrowConnectedElements.push(bar);
+        });
+        connectedLabels.forEach((label) => {
+          label.classList.add("arrow-connected");
+          arrowConnectedElements.push(label);
+        });
         announce(`Selected relation from #${fromId} to #${toId}`);
       });
       if (window._ganttArrowClickHandler) {
@@ -3226,7 +3262,9 @@
       scrollToAndHighlight,
       setAllowScrollChange,
       isDraftModeEnabled: () => currentDraftMode,
-      isPerfDebugEnabled: () => PERF_DEBUG
+      isPerfDebugEnabled: () => PERF_DEBUG,
+      // Lookup maps for O(1) element access
+      getLookupMaps: () => ({ mapsReady, issueBarsByIssueId, issueLabelsByIssueId })
     });
     setupCollapse({
       vscode,
