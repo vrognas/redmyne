@@ -1308,6 +1308,41 @@
     });
   }
 
+  // src/webviews/gantt/collapse-utils.js
+  function findDescendants(parentKey, childrenCache) {
+    const result = [];
+    const queue = [parentKey];
+    while (queue.length > 0) {
+      const current = queue.shift();
+      const children = childrenCache.get(current);
+      if (children) {
+        for (const child of children) {
+          result.push(child);
+          queue.push(child);
+        }
+      }
+    }
+    return result;
+  }
+  function findVisibleDescendants(parentKey, childrenCache, expandedStateCache) {
+    const result = [];
+    const queue = [parentKey];
+    while (queue.length > 0) {
+      const current = queue.shift();
+      const children = childrenCache.get(current);
+      if (children) {
+        for (const child of children) {
+          result.push(child);
+          const isExpanded = expandedStateCache.get(child);
+          if (isExpanded) {
+            queue.push(child);
+          }
+        }
+      }
+    }
+    return result;
+  }
+
   // src/webviews/gantt/gantt-collapse.js
   function setupCollapse(ctx) {
     const { vscode: vscode2, addDocListener, addWinListener, announce, barHeight, selectedCollapseKey } = ctx;
@@ -1452,38 +1487,11 @@
         el.classList.remove("gantt-row-hidden");
       }
     }
-    function findDescendants(parentKey) {
-      const result = [];
-      const queue = [parentKey];
-      while (queue.length > 0) {
-        const current = queue.shift();
-        const children = childrenCache.get(current);
-        if (children) {
-          for (const child of children) {
-            result.push(child);
-            queue.push(child);
-          }
-        }
-      }
-      return result;
+    function findDescendants2(parentKey) {
+      return findDescendants(parentKey, childrenCache);
     }
-    function findVisibleDescendants(parentKey) {
-      const result = [];
-      const queue = [parentKey];
-      while (queue.length > 0) {
-        const current = queue.shift();
-        const children = childrenCache.get(current);
-        if (children) {
-          for (const child of children) {
-            result.push(child);
-            const isExpanded = expandedStateCache.get(child);
-            if (isExpanded) {
-              queue.push(child);
-            }
-          }
-        }
-      }
-      return result;
+    function findVisibleDescendants2(parentKey) {
+      return findVisibleDescendants(parentKey, childrenCache, expandedStateCache);
     }
     function toggleCollapseClientSide(collapseKey, action) {
       const parentLabel = document.querySelector('[data-collapse-key="' + collapseKey + '"].project-label, [data-collapse-key="' + collapseKey + '"].time-group-label, [data-collapse-key="' + collapseKey + '"].issue-label');
@@ -1499,8 +1507,8 @@
       expandedStateCache.set(collapseKey, shouldExpand);
       const chevron = parentLabel.querySelector(".collapse-toggle");
       if (chevron) chevron.classList.toggle("expanded", shouldExpand);
-      const allDescendants = findDescendants(collapseKey);
-      const visibleDescendants = shouldExpand ? findVisibleDescendants(collapseKey) : [];
+      const allDescendants = findDescendants2(collapseKey);
+      const visibleDescendants = shouldExpand ? findVisibleDescendants2(collapseKey) : [];
       if (allDescendants.length === 0) {
         vscode2.postMessage({ command: "collapseStateSync", collapseKey, isExpanded: shouldExpand });
         return;
@@ -1512,7 +1520,7 @@
       const countedKeys = /* @__PURE__ */ new Set();
       let actualDelta = 0;
       let parentStripeY = 0;
-      const currentlyVisibleDescendants = shouldExpand ? visibleDescendants : findVisibleDescendants(collapseKey);
+      const currentlyVisibleDescendants = shouldExpand ? visibleDescendants : findVisibleDescendants2(collapseKey);
       const deltaDescendants = currentlyVisibleDescendants;
       const deltaSet = new Set(deltaDescendants);
       document.querySelectorAll(".zebra-stripe").forEach((stripe) => {

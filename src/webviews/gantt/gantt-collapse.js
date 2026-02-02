@@ -1,3 +1,8 @@
+import {
+  findDescendants as findDescendantsUtil,
+  findVisibleDescendants as findVisibleDescendantsUtil,
+} from './collapse-utils.js';
+
 export function setupCollapse(ctx) {
   const { vscode, addDocListener, addWinListener, announce, barHeight, selectedCollapseKey } = ctx;
 
@@ -184,44 +189,13 @@ export function setupCollapse(ctx) {
     }
   }
 
-  // Find all descendants of a collapse key using BFS (O(descendants) instead of O(all nodes))
+  // Wrapper functions that pass module caches to utilities
   function findDescendants(parentKey) {
-    const result = [];
-    const queue = [parentKey];
-    while (queue.length > 0) {
-      const current = queue.shift();
-      const children = childrenCache.get(current);
-      if (children) {
-        for (const child of children) {
-          result.push(child);
-          queue.push(child); // Continue BFS to find nested descendants
-        }
-      }
-    }
-    return result;
+    return findDescendantsUtil(parentKey, childrenCache);
   }
 
-  // Find descendants that should be VISIBLE when expanding parentKey
-  // Only includes descendants whose entire ancestor chain (up to parentKey) is expanded
-  // Uses BFS with early termination - doesn't traverse into collapsed subtrees
   function findVisibleDescendants(parentKey) {
-    const result = [];
-    const queue = [parentKey];
-    while (queue.length > 0) {
-      const current = queue.shift();
-      const children = childrenCache.get(current);
-      if (children) {
-        for (const child of children) {
-          result.push(child);
-          // Only continue into this subtree if the child is expanded (use cache, no DOM query)
-          const isExpanded = expandedStateCache.get(child);
-          if (isExpanded) {
-            queue.push(child);
-          }
-        }
-      }
-    }
-    return result;
+    return findVisibleDescendantsUtil(parentKey, childrenCache, expandedStateCache);
   }
 
   // Client-side collapse/expand toggle for instant response
