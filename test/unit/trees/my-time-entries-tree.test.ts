@@ -583,11 +583,12 @@ describe("MyTimeEntriesTreeDataProvider", () => {
   });
 
   it("lazy-loads month entries and groups by week then day", async () => {
-    // Use current month entries for simpler test setup
+    // Use past month entries to avoid date-sensitivity issues
     const now = new Date();
-    const _currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-    const weekday1 = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-08`;
-    const weekday2 = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-09`;
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 15);
+    const lastMonthStr = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, "0")}`;
+    const weekday1 = `${lastMonthStr}-10`;
+    const weekday2 = `${lastMonthStr}-11`;
 
     const monthEntries: TimeEntry[] = [
       {
@@ -617,20 +618,20 @@ describe("MyTimeEntriesTreeDataProvider", () => {
 
     const groups = await getLoadedGroups();
 
-    // Find the current month node (first month node after Today and This Week)
-    const currentMonth = groups[2];
-    expect(currentMonth.type).toBe("month-group");
-    expect(currentMonth._monthYear).toBeDefined();
+    // Find the previous month node (second month after Today and This Week)
+    const targetMonth = groups[3];
+    expect(targetMonth.type).toBe("month-group");
+    expect(targetMonth._monthYear).toBeDefined();
 
     // First expansion triggers lazy load (returns loading state)
-    const loadingState = await provider.getChildren(currentMonth);
+    const loadingState = await provider.getChildren(targetMonth);
     expect(loadingState[0].label).toBe("Loading...");
 
     // Wait for lazy load to complete
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     // Second expansion returns loaded data
-    const weekGroups = await provider.getChildren(currentMonth);
+    const weekGroups = await provider.getChildren(targetMonth);
     expect(weekGroups.length).toBeGreaterThanOrEqual(1);
     expect(weekGroups[0].type).toBe("week-subgroup");
 
