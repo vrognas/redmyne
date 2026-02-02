@@ -2,6 +2,17 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.13.2]
+
+### Performance
+
+- **Gantt collapse** - O(n²) → O(k) for finding descendants via BFS with caches
+- **Quick search** - 50ms debounce + pre-cached labels (was iterating all labels per keystroke)
+- **Drag operations** - cache grip circles at drag start (was querySelectorAll per frame)
+- **Zebra stripes** - single query reused 3x per collapse (was 3 separate queries)
+- **Lookup maps** - combined into single querySelectorAll (was 5 separate queries)
+- **Arrow selection** - track elements for O(1) clearing (was querySelectorAll)
+
 ## [4.13.1]
 
 ### Fixed
