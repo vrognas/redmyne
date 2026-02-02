@@ -546,11 +546,15 @@ export function setupDrag(ctx) {
           barMain,
           leftHandle,
           rightHandle,
+          // Cache grip circles to avoid querySelectorAll per frame
+          leftGripCircles: leftHandle ? Array.from(leftHandle.querySelectorAll('.drag-grip circle')) : [],
+          rightGripCircles: rightHandle ? Array.from(rightHandle.querySelectorAll('.drag-grip circle')) : [],
           bar,
           barLabels,
           labelsOnLeft,
           connectedArrows,
-          linkHandle
+          linkHandle,
+          linkHandleCircles: linkHandle ? Array.from(linkHandle.querySelectorAll('circle')) : []
         };
 
         // Show drag date tooltip
@@ -584,23 +588,33 @@ export function setupDrag(ctx) {
           ? allIssueBars.filter(b => selectedIssues.has(b.dataset.issueId))
           : [bar];
 
-        // Collect data for all bars to move
-        const bulkBars = barsToMove.map(b => ({
-          issueId: b.dataset.issueId,
-          startX: parseFloat(b.dataset.startX),
-          endX: parseFloat(b.dataset.endX),
-          oldStartDate: b.dataset.startDate || null,
-          oldDueDate: b.dataset.dueDate || null,
-          barOutline: b.querySelector('.bar-outline'),
-          barMain: b.querySelector('.bar-main'),
-          leftHandle: b.querySelector('.drag-left'),
-          rightHandle: b.querySelector('.drag-right'),
-          bar: b,
-          barLabels: b.querySelector('.bar-labels'),
-          labelsOnLeft: b.querySelector('.bar-labels')?.classList.contains('labels-left'),
-          connectedArrows: getConnectedArrows(b.dataset.issueId),
-          linkHandle: b.querySelector('.link-handle')
-        }));
+        // Collect data for all bars to move (cache DOM refs to avoid per-frame queries)
+        const bulkBars = barsToMove.map(b => {
+          const leftHandle = b.querySelector('.drag-left');
+          const rightHandle = b.querySelector('.drag-right');
+          return {
+            issueId: b.dataset.issueId,
+            startX: parseFloat(b.dataset.startX),
+            endX: parseFloat(b.dataset.endX),
+            oldStartDate: b.dataset.startDate || null,
+            oldDueDate: b.dataset.dueDate || null,
+            barOutline: b.querySelector('.bar-outline'),
+            barMain: b.querySelector('.bar-main'),
+            leftHandle,
+            rightHandle,
+            // Cache grip circles to avoid querySelectorAll per frame
+            leftGripCircles: leftHandle ? Array.from(leftHandle.querySelectorAll('.drag-grip circle')) : [],
+            rightGripCircles: rightHandle ? Array.from(rightHandle.querySelectorAll('.drag-grip circle')) : [],
+            leftHandleRect: leftHandle?.querySelector('rect'),
+            rightHandleRect: rightHandle?.querySelector('rect'),
+            bar: b,
+            barLabels: b.querySelector('.bar-labels'),
+            labelsOnLeft: b.querySelector('.bar-labels')?.classList.contains('labels-left'),
+            connectedArrows: getConnectedArrows(b.dataset.issueId),
+            linkHandle: b.querySelector('.link-handle'),
+            linkHandleCircles: b.querySelector('.link-handle') ? Array.from(b.querySelector('.link-handle').querySelectorAll('circle')) : []
+          };
+        });
 
         bulkBars.forEach(b => b.bar.classList.add('dragging'));
 
@@ -608,6 +622,9 @@ export function setupDrag(ctx) {
         const singleLabelsOnLeft = singleBarLabels?.classList.contains('labels-left');
         const connectedArrows = getConnectedArrows(issueId);
         const singleLinkHandle = bar.querySelector('.link-handle');
+
+        const singleLeftHandle = bar.querySelector('.drag-left');
+        const singleRightHandle = bar.querySelector('.drag-right');
 
         logArrowDebug('dragStart (move)', {
           issueId,
@@ -633,13 +650,17 @@ export function setupDrag(ctx) {
           oldDueDate: bar.dataset.dueDate || null,
           barOutline: outline,
           barMain: bar.querySelector('.bar-main'),
-          leftHandle: bar.querySelector('.drag-left'),
-          rightHandle: bar.querySelector('.drag-right'),
+          leftHandle: singleLeftHandle,
+          rightHandle: singleRightHandle,
+          // Cache grip circles to avoid querySelectorAll per frame
+          leftGripCircles: singleLeftHandle ? Array.from(singleLeftHandle.querySelectorAll('.drag-grip circle')) : [],
+          rightGripCircles: singleRightHandle ? Array.from(singleRightHandle.querySelectorAll('.drag-grip circle')) : [],
           bar,
           barLabels: singleBarLabels,
           labelsOnLeft: singleLabelsOnLeft,
           connectedArrows,
-          linkHandle: singleLinkHandle
+          linkHandle: singleLinkHandle,
+          linkHandleCircles: singleLinkHandle ? Array.from(singleLinkHandle.querySelectorAll('circle')) : []
         };
 
         // Show drag date tooltip for single bar move (not bulk)
@@ -1034,14 +1055,12 @@ export function setupDrag(ctx) {
               b.barMain.setAttribute('x', newStartX);
               b.barMain.setAttribute('width', width);
             }
-            // Handles are now <g> groups - update via transform
-            const leftRect = b.leftHandle.querySelector('rect');
-            const rightRect = b.rightHandle.querySelector('rect');
-            if (leftRect) leftRect.setAttribute('x', newStartX);
-            if (rightRect) rightRect.setAttribute('x', newEndX - 14);
-            // Update grip dot positions
-            b.leftHandle.querySelectorAll('.drag-grip circle').forEach((c, i) => c.setAttribute('cx', newStartX + 9));
-            b.rightHandle.querySelectorAll('.drag-grip circle').forEach((c, i) => c.setAttribute('cx', newEndX - 9));
+            // Handles - use cached rect refs
+            if (b.leftHandleRect) b.leftHandleRect.setAttribute('x', newStartX);
+            if (b.rightHandleRect) b.rightHandleRect.setAttribute('x', newEndX - 14);
+            // Update grip dot positions - use cached circle refs
+            b.leftGripCircles.forEach(c => c.setAttribute('cx', newStartX + 9));
+            b.rightGripCircles.forEach(c => c.setAttribute('cx', newEndX - 9));
             b.newStartX = newStartX;
             b.newEndX = newEndX;
             // Update badge position
@@ -1053,10 +1072,8 @@ export function setupDrag(ctx) {
             if (b.connectedArrows) {
               updateArrowPositions(b.connectedArrows, b.issueId, newStartX, newEndX);
             }
-            // Update link handle position
-            if (b.linkHandle) {
-              b.linkHandle.querySelectorAll('circle').forEach(c => c.setAttribute('cx', String(newEndX + 8)));
-            }
+            // Update link handle position - use cached circle refs
+            b.linkHandleCircles.forEach(c => c.setAttribute('cx', String(newEndX + 8)));
           });
           dragState.snappedDelta = snappedDelta;
         } else {
@@ -1087,9 +1104,9 @@ export function setupDrag(ctx) {
           const rightRect = dragState.rightHandle.querySelector('rect');
           if (leftRect) leftRect.setAttribute('x', newStartX);
           if (rightRect) rightRect.setAttribute('x', newEndX - 14);
-          // Update grip dot positions
-          dragState.leftHandle.querySelectorAll('.drag-grip circle').forEach(c => c.setAttribute('cx', newStartX + 9));
-          dragState.rightHandle.querySelectorAll('.drag-grip circle').forEach(c => c.setAttribute('cx', newEndX - 9));
+          // Update grip dot positions - use cached circle refs
+          dragState.leftGripCircles.forEach(c => c.setAttribute('cx', newStartX + 9));
+          dragState.rightGripCircles.forEach(c => c.setAttribute('cx', newEndX - 9));
           dragState.newStartX = newStartX;
           dragState.newEndX = newEndX;
 
@@ -1104,10 +1121,8 @@ export function setupDrag(ctx) {
             updateArrowPositions(dragState.connectedArrows, dragState.issueId, newStartX, newEndX);
           }
 
-          // Update link handle position
-          if (dragState.linkHandle) {
-            dragState.linkHandle.querySelectorAll('circle').forEach(c => c.setAttribute('cx', String(newEndX + 8)));
-          }
+          // Update link handle position - use cached circle refs
+          dragState.linkHandleCircles.forEach(c => c.setAttribute('cx', String(newEndX + 8)));
 
           // Update drag date tooltip
           if (dragState.isMove && !dragState.isBulkDrag) {

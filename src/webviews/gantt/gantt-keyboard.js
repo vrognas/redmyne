@@ -112,13 +112,22 @@ export function setupKeyboard(ctx) {
     input.focus();
 
     const labels = Array.from(document.querySelectorAll('.issue-label'));
+    // Pre-cache aria-labels to avoid repeated getAttribute calls
+    const labelData = labels.map(label => ({
+      el: label,
+      text: (label.getAttribute('aria-label') || '').toLowerCase()
+    }));
+    let searchTimeout = null;
     input.addEventListener('input', () => {
-      const query = input.value.toLowerCase();
-      labels.forEach(label => {
-        const text = label.getAttribute('aria-label')?.toLowerCase() || '';
-        const match = query && text.includes(query);
-        label.classList.toggle('search-match', match);
-      });
+      // Debounce search to avoid CPU spikes on rapid typing
+      if (searchTimeout) clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        const query = input.value.toLowerCase();
+        labelData.forEach(({ el, text }) => {
+          const match = query && text.includes(query);
+          el.classList.toggle('search-match', match);
+        });
+      }, 50); // 50ms debounce - fast enough to feel responsive
     });
 
     input.addEventListener('keydown', (e) => {
