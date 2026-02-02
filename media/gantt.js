@@ -1537,7 +1537,8 @@
       const currentlyVisibleDescendants = shouldExpand ? visibleDescendants : findVisibleDescendants2(collapseKey);
       const deltaDescendants = currentlyVisibleDescendants;
       const deltaSet = new Set(deltaDescendants);
-      document.querySelectorAll(".zebra-stripe").forEach((stripe) => {
+      const allStripes = document.querySelectorAll(".zebra-stripe");
+      allStripes.forEach((stripe) => {
         const contributions = getStripeContributions(stripe);
         if (collapseKey in contributions && parentStripeY === 0) {
           parentStripeY = parseFloat(stripe.dataset.originalY || "0");
@@ -1628,13 +1629,12 @@
         timelineSvg.setAttribute("height", newHeight);
       }
       const collapsedKeys = /* @__PURE__ */ new Set();
-      document.querySelectorAll('.project-label[data-has-children="true"], .time-group-label[data-has-children="true"], .issue-label[data-has-children="true"]').forEach((lbl) => {
-        if (lbl.dataset.expanded === "false") {
-          collapsedKeys.add(lbl.dataset.collapseKey);
+      expandedStateCache.forEach((isExpanded, key) => {
+        if (!isExpanded) {
+          collapsedKeys.add(key);
         }
       });
       const stripeActions = /* @__PURE__ */ new Map();
-      const allStripes = document.querySelectorAll(".zebra-stripe");
       allStripes.forEach((stripe) => {
         const originalY = parseFloat(stripe.dataset.originalY || "0");
         if (stripeActions.has(originalY)) return;
@@ -1687,7 +1687,7 @@
             break;
         }
       });
-      const visibleStripes = Array.from(document.querySelectorAll(".zebra-stripe")).filter((s) => s.getAttribute("visibility") !== "hidden");
+      const visibleStripes = Array.from(allStripes).filter((s) => s.getAttribute("visibility") !== "hidden");
       const stripesByY = /* @__PURE__ */ new Map();
       visibleStripes.forEach((stripe) => {
         const y = parseFloat(stripe.getAttribute("y") || "0");
@@ -2994,44 +2994,43 @@
     const aggregateBarsByKey = /* @__PURE__ */ new Map();
     let mapsReady = false;
     function buildLookupMaps() {
-      document.querySelectorAll(".issue-bar").forEach((bar) => {
-        const id = bar.dataset.issueId;
-        if (id) {
-          if (!issueBarsByIssueId.has(id)) issueBarsByIssueId.set(id, []);
-          issueBarsByIssueId.get(id).push(bar);
-        }
-      });
-      document.querySelectorAll(".issue-label").forEach((label) => {
-        const id = label.dataset.issueId;
-        if (id) {
-          if (!issueLabelsByIssueId.has(id)) issueLabelsByIssueId.set(id, []);
-          issueLabelsByIssueId.get(id).push(label);
-        }
-      });
-      document.querySelectorAll(".dependency-arrow").forEach((arrow) => {
-        const fromId = arrow.dataset.from;
-        const toId = arrow.dataset.to;
-        if (fromId) {
-          if (!arrowsByIssueId.has(fromId)) arrowsByIssueId.set(fromId, []);
-          arrowsByIssueId.get(fromId).push(arrow);
-        }
-        if (toId) {
-          if (!arrowsByIssueId.has(toId)) arrowsByIssueId.set(toId, []);
-          arrowsByIssueId.get(toId).push(arrow);
-        }
-      });
-      document.querySelectorAll(".project-label").forEach((label) => {
-        const key = label.dataset.collapseKey;
-        if (key) {
-          if (!projectLabelsByKey.has(key)) projectLabelsByKey.set(key, []);
-          projectLabelsByKey.get(key).push(label);
-        }
-      });
-      document.querySelectorAll(".aggregate-bars").forEach((bars) => {
-        const key = bars.dataset.collapseKey;
-        if (key) {
-          if (!aggregateBarsByKey.has(key)) aggregateBarsByKey.set(key, []);
-          aggregateBarsByKey.get(key).push(bars);
+      document.querySelectorAll(".issue-bar, .issue-label, .dependency-arrow, .project-label, .aggregate-bars").forEach((el) => {
+        const classList = el.classList;
+        if (classList.contains("issue-bar")) {
+          const id = el.dataset.issueId;
+          if (id) {
+            if (!issueBarsByIssueId.has(id)) issueBarsByIssueId.set(id, []);
+            issueBarsByIssueId.get(id).push(el);
+          }
+        } else if (classList.contains("issue-label")) {
+          const id = el.dataset.issueId;
+          if (id) {
+            if (!issueLabelsByIssueId.has(id)) issueLabelsByIssueId.set(id, []);
+            issueLabelsByIssueId.get(id).push(el);
+          }
+        } else if (classList.contains("dependency-arrow")) {
+          const fromId = el.dataset.from;
+          const toId = el.dataset.to;
+          if (fromId) {
+            if (!arrowsByIssueId.has(fromId)) arrowsByIssueId.set(fromId, []);
+            arrowsByIssueId.get(fromId).push(el);
+          }
+          if (toId) {
+            if (!arrowsByIssueId.has(toId)) arrowsByIssueId.set(toId, []);
+            arrowsByIssueId.get(toId).push(el);
+          }
+        } else if (classList.contains("project-label")) {
+          const key = el.dataset.collapseKey;
+          if (key) {
+            if (!projectLabelsByKey.has(key)) projectLabelsByKey.set(key, []);
+            projectLabelsByKey.get(key).push(el);
+          }
+        } else if (classList.contains("aggregate-bars")) {
+          const key = el.dataset.collapseKey;
+          if (key) {
+            if (!aggregateBarsByKey.has(key)) aggregateBarsByKey.set(key, []);
+            aggregateBarsByKey.get(key).push(el);
+          }
         }
       });
       mapsReady = true;

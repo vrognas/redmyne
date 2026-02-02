@@ -1157,44 +1157,44 @@ function initializeGantt(state) {
     let mapsReady = false;
 
     function buildLookupMaps() {
-      document.querySelectorAll('.issue-bar').forEach(bar => {
-        const id = bar.dataset.issueId;
-        if (id) {
-          if (!issueBarsByIssueId.has(id)) issueBarsByIssueId.set(id, []);
-          issueBarsByIssueId.get(id).push(bar);
-        }
-      });
-      document.querySelectorAll('.issue-label').forEach(label => {
-        const id = label.dataset.issueId;
-        if (id) {
-          if (!issueLabelsByIssueId.has(id)) issueLabelsByIssueId.set(id, []);
-          issueLabelsByIssueId.get(id).push(label);
-        }
-      });
-      document.querySelectorAll('.dependency-arrow').forEach(arrow => {
-        const fromId = arrow.dataset.from;
-        const toId = arrow.dataset.to;
-        if (fromId) {
-          if (!arrowsByIssueId.has(fromId)) arrowsByIssueId.set(fromId, []);
-          arrowsByIssueId.get(fromId).push(arrow);
-        }
-        if (toId) {
-          if (!arrowsByIssueId.has(toId)) arrowsByIssueId.set(toId, []);
-          arrowsByIssueId.get(toId).push(arrow);
-        }
-      });
-      document.querySelectorAll('.project-label').forEach(label => {
-        const key = label.dataset.collapseKey;
-        if (key) {
-          if (!projectLabelsByKey.has(key)) projectLabelsByKey.set(key, []);
-          projectLabelsByKey.get(key).push(label);
-        }
-      });
-      document.querySelectorAll('.aggregate-bars').forEach(bars => {
-        const key = bars.dataset.collapseKey;
-        if (key) {
-          if (!aggregateBarsByKey.has(key)) aggregateBarsByKey.set(key, []);
-          aggregateBarsByKey.get(key).push(bars);
+      // Single query for all indexable elements (reduces DOM traversals from 5 to 1)
+      document.querySelectorAll('.issue-bar, .issue-label, .dependency-arrow, .project-label, .aggregate-bars').forEach(el => {
+        const classList = el.classList;
+        if (classList.contains('issue-bar')) {
+          const id = el.dataset.issueId;
+          if (id) {
+            if (!issueBarsByIssueId.has(id)) issueBarsByIssueId.set(id, []);
+            issueBarsByIssueId.get(id).push(el);
+          }
+        } else if (classList.contains('issue-label')) {
+          const id = el.dataset.issueId;
+          if (id) {
+            if (!issueLabelsByIssueId.has(id)) issueLabelsByIssueId.set(id, []);
+            issueLabelsByIssueId.get(id).push(el);
+          }
+        } else if (classList.contains('dependency-arrow')) {
+          const fromId = el.dataset.from;
+          const toId = el.dataset.to;
+          if (fromId) {
+            if (!arrowsByIssueId.has(fromId)) arrowsByIssueId.set(fromId, []);
+            arrowsByIssueId.get(fromId).push(el);
+          }
+          if (toId) {
+            if (!arrowsByIssueId.has(toId)) arrowsByIssueId.set(toId, []);
+            arrowsByIssueId.get(toId).push(el);
+          }
+        } else if (classList.contains('project-label')) {
+          const key = el.dataset.collapseKey;
+          if (key) {
+            if (!projectLabelsByKey.has(key)) projectLabelsByKey.set(key, []);
+            projectLabelsByKey.get(key).push(el);
+          }
+        } else if (classList.contains('aggregate-bars')) {
+          const key = el.dataset.collapseKey;
+          if (key) {
+            if (!aggregateBarsByKey.has(key)) aggregateBarsByKey.set(key, []);
+            aggregateBarsByKey.get(key).push(el);
+          }
         }
       });
       mapsReady = true;

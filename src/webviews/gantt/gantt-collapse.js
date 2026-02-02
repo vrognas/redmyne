@@ -247,7 +247,9 @@ export function setupCollapse(ctx) {
     const currentlyVisibleDescendants = shouldExpand ? visibleDescendants : findVisibleDescendants(collapseKey);
     const deltaDescendants = currentlyVisibleDescendants;
     const deltaSet = new Set(deltaDescendants);
-    document.querySelectorAll('.zebra-stripe').forEach(stripe => {
+    // Cache zebra-stripe query once (reused 3x in this function)
+    const allStripes = document.querySelectorAll('.zebra-stripe');
+    allStripes.forEach(stripe => {
       const contributions = getStripeContributions(stripe);
       // Find parent's stripe Y (stripe containing the collapseKey)
       if (collapseKey in contributions && parentStripeY === 0) {
@@ -360,18 +362,18 @@ export function setupCollapse(ctx) {
       timelineSvg.setAttribute('height', newHeight);
     }
 
-    // Build set of collapsed parents for visibility checks
+    // Build set of collapsed parents for visibility checks (use cache instead of DOM query)
     const collapsedKeys = new Set();
-    document.querySelectorAll('.project-label[data-has-children="true"], .time-group-label[data-has-children="true"], .issue-label[data-has-children="true"]').forEach(lbl => {
-      if (lbl.dataset.expanded === 'false') {
-        collapsedKeys.add(lbl.dataset.collapseKey);
+    expandedStateCache.forEach((isExpanded, key) => {
+      if (!isExpanded) {
+        collapsedKeys.add(key);
       }
     });
 
     // Handle zebra stripes: hide stripes covering descendants, shift stripes below
     // First pass: calculate actions for each unique stripe (by originalY)
     const stripeActions = new Map(); // originalY -> { action, newHeight?, newY? }
-    const allStripes = document.querySelectorAll('.zebra-stripe');
+    // Reuse allStripes from earlier query
     allStripes.forEach((stripe) => {
       const originalY = parseFloat(stripe.dataset.originalY || '0');
       if (stripeActions.has(originalY)) return; // Skip duplicates
@@ -437,7 +439,8 @@ export function setupCollapse(ctx) {
 
     // Re-alternate visible stripes by Y position
     // Group stripes by Y to handle multiple columns having stripes at same Y
-    const visibleStripes = Array.from(document.querySelectorAll('.zebra-stripe'))
+    // Reuse allStripes from earlier query
+    const visibleStripes = Array.from(allStripes)
       .filter(s => s.getAttribute('visibility') !== 'hidden');
 
     const stripesByY = new Map();
