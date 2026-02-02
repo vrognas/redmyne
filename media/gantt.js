@@ -1389,6 +1389,8 @@
     });
     const rowIndex = /* @__PURE__ */ new Map();
     const ancestorCache = /* @__PURE__ */ new Map();
+    const childrenCache = /* @__PURE__ */ new Map();
+    const expandedStateCache = /* @__PURE__ */ new Map();
     const stripeContributionsCache = /* @__PURE__ */ new Map();
     function getStripeContributions(stripe) {
       const originalY = stripe.dataset.originalY;
@@ -1413,9 +1415,18 @@
     }
     function buildAncestorCache() {
       ancestorCache.clear();
+      childrenCache.clear();
+      expandedStateCache.clear();
       const elements = document.querySelectorAll("[data-collapse-key][data-parent-key]");
       elements.forEach((el) => {
         const key = el.dataset.collapseKey;
+        const immediateParent = el.dataset.parentKey;
+        if (immediateParent) {
+          if (!childrenCache.has(immediateParent)) {
+            childrenCache.set(immediateParent, /* @__PURE__ */ new Set());
+          }
+          childrenCache.get(immediateParent).add(key);
+        }
         if (ancestorCache.has(key)) return;
         const ancestors = [];
         let parentKey = el.dataset.parentKey;
@@ -1425,6 +1436,9 @@
           parentKey = parentEl?.dataset.parentKey || null;
         }
         ancestorCache.set(key, ancestors);
+      });
+      document.querySelectorAll("[data-collapse-key][data-expanded]").forEach((el) => {
+        expandedStateCache.set(el.dataset.collapseKey, el.dataset.expanded === "true");
       });
     }
     buildRowIndex();
@@ -1440,29 +1454,35 @@
     }
     function findDescendants(parentKey) {
       const result = [];
-      ancestorCache.forEach((ancestors, key) => {
-        if (ancestors.includes(parentKey)) result.push(key);
-      });
+      const queue = [parentKey];
+      while (queue.length > 0) {
+        const current = queue.shift();
+        const children = childrenCache.get(current);
+        if (children) {
+          for (const child of children) {
+            result.push(child);
+            queue.push(child);
+          }
+        }
+      }
       return result;
     }
     function findVisibleDescendants(parentKey) {
       const result = [];
-      ancestorCache.forEach((ancestors, key) => {
-        const idx = ancestors.indexOf(parentKey);
-        if (idx === -1) return;
-        let allAncestorsExpanded = true;
-        for (let i = 0; i < idx; i++) {
-          const ancestorKey = ancestors[i];
-          const ancestorLabel = document.querySelector('[data-collapse-key="' + ancestorKey + '"].project-label, [data-collapse-key="' + ancestorKey + '"].issue-label, [data-collapse-key="' + ancestorKey + '"].time-group-label');
-          if (!ancestorLabel || ancestorLabel.dataset.expanded !== "true") {
-            allAncestorsExpanded = false;
-            break;
+      const queue = [parentKey];
+      while (queue.length > 0) {
+        const current = queue.shift();
+        const children = childrenCache.get(current);
+        if (children) {
+          for (const child of children) {
+            result.push(child);
+            const isExpanded = expandedStateCache.get(child);
+            if (isExpanded) {
+              queue.push(child);
+            }
           }
         }
-        if (allAncestorsExpanded) {
-          result.push(key);
-        }
-      });
+      }
       return result;
     }
     function toggleCollapseClientSide(collapseKey, action) {
@@ -1476,6 +1496,7 @@
         return;
       }
       parentLabel.dataset.expanded = shouldExpand ? "true" : "false";
+      expandedStateCache.set(collapseKey, shouldExpand);
       const chevron = parentLabel.querySelector(".collapse-toggle");
       if (chevron) chevron.classList.toggle("expanded", shouldExpand);
       const allDescendants = findDescendants(collapseKey);

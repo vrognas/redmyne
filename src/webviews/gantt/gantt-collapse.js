@@ -107,6 +107,8 @@ export function setupCollapse(ctx) {
   // Row index for O(1) lookups during collapse
   const rowIndex = new Map(); // collapseKey → { originalY, elements: [] }
   const ancestorCache = new Map(); // collapseKey → [parentKey, grandparentKey, ...]
+  const childrenCache = new Map(); // parentKey → Set of direct child keys (for O(1) descendant lookup)
+  const expandedStateCache = new Map(); // collapseKey → boolean (avoids DOM queries)
   const stripeContributionsCache = new Map(); // stripe originalY → parsed contributions object
 
   // Parse stripe contributions with caching (avoids repeated JSON.parse)
@@ -135,10 +137,22 @@ export function setupCollapse(ctx) {
 
   function buildAncestorCache() {
     ancestorCache.clear();
+    childrenCache.clear();
+    expandedStateCache.clear();
     const elements = document.querySelectorAll('[data-collapse-key][data-parent-key]');
     elements.forEach(el => {
       const key = el.dataset.collapseKey;
-      if (ancestorCache.has(key)) return; // Already built for this key
+      const immediateParent = el.dataset.parentKey;
+
+      // Build children cache (parent → direct children)
+      if (immediateParent) {
+        if (!childrenCache.has(immediateParent)) {
+          childrenCache.set(immediateParent, new Set());
+        }
+        childrenCache.get(immediateParent).add(key);
+      }
+
+      if (ancestorCache.has(key)) return; // Already built ancestors for this key
       const ancestors = [];
       let parentKey = el.dataset.parentKey;
       while (parentKey) {
@@ -147,6 +161,11 @@ export function setupCollapse(ctx) {
         parentKey = parentEl?.dataset.parentKey || null;
       }
       ancestorCache.set(key, ancestors);
+    });
+
+    // Build expanded state cache from DOM (once at init)
+    document.querySelectorAll('[data-collapse-key][data-expanded]').forEach(el => {
+      expandedStateCache.set(el.dataset.collapseKey, el.dataset.expanded === 'true');
     });
   }
 
@@ -165,39 +184,43 @@ export function setupCollapse(ctx) {
     }
   }
 
-  // Find all descendants of a collapse key
+  // Find all descendants of a collapse key using BFS (O(descendants) instead of O(all nodes))
   function findDescendants(parentKey) {
     const result = [];
-    ancestorCache.forEach((ancestors, key) => {
-      if (ancestors.includes(parentKey)) result.push(key);
-    });
+    const queue = [parentKey];
+    while (queue.length > 0) {
+      const current = queue.shift();
+      const children = childrenCache.get(current);
+      if (children) {
+        for (const child of children) {
+          result.push(child);
+          queue.push(child); // Continue BFS to find nested descendants
+        }
+      }
+    }
     return result;
   }
 
   // Find descendants that should be VISIBLE when expanding parentKey
   // Only includes descendants whose entire ancestor chain (up to parentKey) is expanded
+  // Uses BFS with early termination - doesn't traverse into collapsed subtrees
   function findVisibleDescendants(parentKey) {
     const result = [];
-    ancestorCache.forEach((ancestors, key) => {
-      const idx = ancestors.indexOf(parentKey);
-      if (idx === -1) return; // Not a descendant of parentKey
-
-      // Check all ancestors between this node and parentKey
-      // ancestors[0] is immediate parent, ancestors[idx] is parentKey
-      // All ancestors from 0 to idx-1 must be expanded for this node to be visible
-      let allAncestorsExpanded = true;
-      for (let i = 0; i < idx; i++) {
-        const ancestorKey = ancestors[i];
-        const ancestorLabel = document.querySelector('[data-collapse-key="' + ancestorKey + '"].project-label, [data-collapse-key="' + ancestorKey + '"].issue-label, [data-collapse-key="' + ancestorKey + '"].time-group-label');
-        if (!ancestorLabel || ancestorLabel.dataset.expanded !== 'true') {
-          allAncestorsExpanded = false;
-          break;
+    const queue = [parentKey];
+    while (queue.length > 0) {
+      const current = queue.shift();
+      const children = childrenCache.get(current);
+      if (children) {
+        for (const child of children) {
+          result.push(child);
+          // Only continue into this subtree if the child is expanded (use cache, no DOM query)
+          const isExpanded = expandedStateCache.get(child);
+          if (isExpanded) {
+            queue.push(child);
+          }
         }
       }
-      if (allAncestorsExpanded) {
-        result.push(key);
-      }
-    });
+    }
     return result;
   }
 
@@ -219,6 +242,7 @@ export function setupCollapse(ctx) {
 
     // Update chevron state FIRST (before findVisibleDescendants checks it)
     parentLabel.dataset.expanded = shouldExpand ? 'true' : 'false';
+    expandedStateCache.set(collapseKey, shouldExpand); // Keep cache in sync
     const chevron = parentLabel.querySelector('.collapse-toggle');
     if (chevron) chevron.classList.toggle('expanded', shouldExpand);
 
