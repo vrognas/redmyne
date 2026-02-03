@@ -128,7 +128,7 @@ describe("DraftModeManager", () => {
   });
 
   describe("dispose", () => {
-    it("cleans up listeners", async () => {
+    it("cleans up listeners via subscription", async () => {
       const handler = vi.fn();
       const subscription = manager.onDidChangeEnabled(handler);
 
@@ -136,6 +136,31 @@ describe("DraftModeManager", () => {
       await manager.enable();
 
       expect(handler).not.toHaveBeenCalled();
+    });
+
+    it("clears all handlers when dispose called on manager", async () => {
+      const handler1 = vi.fn();
+      const handler2 = vi.fn();
+      manager.onDidChangeEnabled(handler1);
+      manager.onDidChangeEnabled(handler2);
+
+      manager.dispose();
+      await manager.enable();
+
+      expect(handler1).not.toHaveBeenCalled();
+      expect(handler2).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("queue management", () => {
+    it("returns undefined queue initially", () => {
+      expect(manager.queue).toBeUndefined();
+    });
+
+    it("stores queue via setQueue", () => {
+      const mockQueue = { count: 5 } as unknown as import("../../../src/draft-mode/draft-queue").DraftQueue;
+      manager.setQueue(mockQueue);
+      expect(manager.queue).toBe(mockQueue);
     });
   });
 });

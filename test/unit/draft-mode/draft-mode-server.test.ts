@@ -225,4 +225,244 @@ describe("DraftModeServer", () => {
       expect(queue.add).not.toHaveBeenCalled();
     });
   });
+
+  describe("additional write methods when draft ON", () => {
+    it("queues setIssuePriority", async () => {
+      const manager = createMockManager(true);
+      const server = new DraftModeServer(innerServer, queue, manager);
+
+      await server.setIssuePriority(123, 3);
+
+      expect(innerServer.setIssuePriority).not.toHaveBeenCalled();
+      expect(queue.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "setIssuePriority",
+          issueId: 123,
+          resourceKey: "issue:123:priority",
+        })
+      );
+    });
+
+    it("queues updateTimeEntry", async () => {
+      const manager = createMockManager(true);
+      const server = new DraftModeServer(innerServer, queue, manager);
+
+      await server.updateTimeEntry(456, { hours: 3, comments: "Updated" });
+
+      expect(innerServer.updateTimeEntry).not.toHaveBeenCalled();
+      expect(queue.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "updateTimeEntry",
+          resourceId: 456,
+          resourceKey: "timeentry:456:update",
+        })
+      );
+    });
+
+    it("queues deleteTimeEntry", async () => {
+      const manager = createMockManager(true);
+      const server = new DraftModeServer(innerServer, queue, manager);
+
+      await server.deleteTimeEntry(456);
+
+      expect(innerServer.deleteTimeEntry).not.toHaveBeenCalled();
+      expect(queue.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "deleteTimeEntry",
+          resourceId: 456,
+          resourceKey: "timeentry:456:delete",
+        })
+      );
+    });
+
+    it("queues createVersion with temp ID", async () => {
+      const manager = createMockManager(true);
+      const server = new DraftModeServer(innerServer, queue, manager);
+
+      const result = await server.createVersion(1, { name: "v1.0" });
+
+      expect(innerServer.createVersion).not.toHaveBeenCalled();
+      expect(queue.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "createVersion",
+        })
+      );
+      expect(result.id).toBeLessThan(0); // temp ID
+      expect(result.name).toBe("v1.0");
+    });
+
+    it("queues updateVersion", async () => {
+      const manager = createMockManager(true);
+      const server = new DraftModeServer(innerServer, queue, manager);
+
+      await server.updateVersion(789, { status: "closed" });
+
+      expect(innerServer.updateVersion).not.toHaveBeenCalled();
+      expect(queue.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "updateVersion",
+          resourceId: 789,
+          resourceKey: "version:789:update",
+        })
+      );
+    });
+
+    it("queues deleteVersion", async () => {
+      const manager = createMockManager(true);
+      const server = new DraftModeServer(innerServer, queue, manager);
+
+      await server.deleteVersion(789);
+
+      expect(innerServer.deleteVersion).not.toHaveBeenCalled();
+      expect(queue.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "deleteVersion",
+          resourceId: 789,
+          resourceKey: "version:789:delete",
+        })
+      );
+    });
+
+    it("queues createRelation with delay", async () => {
+      const manager = createMockManager(true);
+      const server = new DraftModeServer(innerServer, queue, manager);
+
+      const result = await server.createRelation(100, 200, "precedes", 5);
+
+      expect(innerServer.createRelation).not.toHaveBeenCalled();
+      expect(queue.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "createRelation",
+          issueId: 100,
+          description: expect.stringContaining("delay: 5"),
+        })
+      );
+      expect(result.relation.id).toBeLessThan(0);
+      expect(result.relation.delay).toBe(5);
+    });
+
+    it("queues createRelation without delay for non-precedes", async () => {
+      const manager = createMockManager(true);
+      const server = new DraftModeServer(innerServer, queue, manager);
+
+      const result = await server.createRelation(100, 200, "blocks");
+
+      expect(queue.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "createRelation",
+          description: expect.not.stringContaining("delay"),
+        })
+      );
+      expect(result.relation.relation_type).toBe("blocks");
+    });
+
+    it("queues deleteRelation", async () => {
+      const manager = createMockManager(true);
+      const server = new DraftModeServer(innerServer, queue, manager);
+
+      await server.deleteRelation(111);
+
+      expect(innerServer.deleteRelation).not.toHaveBeenCalled();
+      expect(queue.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "deleteRelation",
+          resourceId: 111,
+          resourceKey: "relation:111:delete",
+        })
+      );
+    });
+  });
+
+  describe("applyQuickUpdate", () => {
+    it("splits into multiple operations when draft ON", async () => {
+      const manager = createMockManager(true);
+      const server = new DraftModeServer(innerServer, queue, manager);
+
+      await server.applyQuickUpdate({
+        issueId: 123,
+        status: { statusId: 2, name: "In Progress" },
+        assignee: { id: 5, name: "John" },
+        message: "Note text",
+        startDate: "2026-01-01",
+        dueDate: "2026-01-31",
+      });
+
+      expect(innerServer.applyQuickUpdate).not.toHaveBeenCalled();
+      // Should create 4 operations: status, assignee, note, dates
+      expect(queue.add).toHaveBeenCalledTimes(4);
+      expect(queue.add).toHaveBeenCalledWith(expect.objectContaining({ type: "setIssueStatus" }));
+      expect(queue.add).toHaveBeenCalledWith(expect.objectContaining({ type: "setIssueAssignee" }));
+      expect(queue.add).toHaveBeenCalledWith(expect.objectContaining({ type: "addIssueNote" }));
+      expect(queue.add).toHaveBeenCalledWith(expect.objectContaining({ type: "setIssueDates" }));
+    });
+
+    it("skips note operation when no message", async () => {
+      const manager = createMockManager(true);
+      const server = new DraftModeServer(innerServer, queue, manager);
+
+      await server.applyQuickUpdate({
+        issueId: 123,
+        status: { statusId: 2, name: "In Progress" },
+        assignee: { id: 5, name: "John" },
+      });
+
+      // Should create 2 operations: status, assignee (no note, no dates)
+      expect(queue.add).toHaveBeenCalledTimes(2);
+    });
+
+    it("passes through when draft OFF", async () => {
+      const manager = createMockManager(false);
+      const server = new DraftModeServer(innerServer, queue, manager);
+
+      await server.applyQuickUpdate({
+        issueId: 123,
+        status: { statusId: 2, name: "In Progress" },
+        assignee: { id: 5, name: "John" },
+      });
+
+      expect(innerServer.applyQuickUpdate).toHaveBeenCalled();
+      expect(queue.add).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("options passthrough", () => {
+    it("returns inner server options", () => {
+      const manager = createMockManager(true);
+      const server = new DraftModeServer(innerServer, queue, manager);
+
+      expect(server.options).toEqual(innerServer.options);
+    });
+  });
+
+  describe("generic HTTP passthroughs", () => {
+    it("post passes through", async () => {
+      const manager = createMockManager(true);
+      const server = new DraftModeServer(innerServer, queue, manager);
+      (innerServer as unknown as { post: ReturnType<typeof vi.fn> }).post = vi.fn().mockResolvedValue({ data: "ok" });
+
+      await server.post("/path", { key: "value" });
+
+      expect((innerServer as unknown as { post: ReturnType<typeof vi.fn> }).post).toHaveBeenCalledWith("/path", { key: "value" });
+    });
+
+    it("put passes through", async () => {
+      const manager = createMockManager(true);
+      const server = new DraftModeServer(innerServer, queue, manager);
+      (innerServer as unknown as { put: ReturnType<typeof vi.fn> }).put = vi.fn().mockResolvedValue({ data: "ok" });
+
+      await server.put("/path", { key: "value" });
+
+      expect((innerServer as unknown as { put: ReturnType<typeof vi.fn> }).put).toHaveBeenCalledWith("/path", { key: "value" });
+    });
+
+    it("delete passes through", async () => {
+      const manager = createMockManager(true);
+      const server = new DraftModeServer(innerServer, queue, manager);
+      (innerServer as unknown as { delete: ReturnType<typeof vi.fn> }).delete = vi.fn().mockResolvedValue(null);
+
+      await server.delete("/path");
+
+      expect((innerServer as unknown as { delete: ReturnType<typeof vi.fn> }).delete).toHaveBeenCalledWith("/path");
+    });
+  });
 });

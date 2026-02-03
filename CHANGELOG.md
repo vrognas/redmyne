@@ -2,6 +2,12 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.13.4]
+
+### Internal
+
+- **Draft-mode test coverage** - improved from 42% to 78% statements, added tests for all untested utilities and edge cases
+
 ## [4.13.3]
 
 ### Fixed

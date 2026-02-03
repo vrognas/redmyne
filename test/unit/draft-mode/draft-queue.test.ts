@@ -317,4 +317,158 @@ describe("DraftQueue", () => {
       expect(ops.every(o => o.issueId === 123)).toBe(true);
     });
   });
+
+  describe("removeByKey", () => {
+    beforeEach(async () => {
+      await queue.load(serverIdentity);
+    });
+
+    it("removes operation matching resourceKey", async () => {
+      await queue.add(createOp({ id: "1", resourceKey: "issue:123:status" }));
+      await queue.add(createOp({ id: "2", resourceKey: "issue:123:dates" }));
+
+      await queue.removeByKey("issue:123:status");
+
+      expect(queue.getAll()).toHaveLength(1);
+      expect(queue.getAll()[0].id).toBe("2");
+    });
+
+    it("does nothing for non-existent key", async () => {
+      await queue.add(createOp({ resourceKey: "issue:123:status" }));
+      await queue.removeByKey("non-existent");
+
+      expect(queue.getAll()).toHaveLength(1);
+    });
+
+    it("emits change event on removal", async () => {
+      await queue.add(createOp({ resourceKey: "issue:123:status" }));
+
+      const handler = vi.fn();
+      queue.onDidChange(handler);
+      await queue.removeByKey("issue:123:status");
+
+      expect(handler).toHaveBeenCalled();
+    });
+  });
+
+  describe("removeByTempIdPrefix", () => {
+    beforeEach(async () => {
+      await queue.load(serverIdentity);
+    });
+
+    it("removes operations matching tempId prefix", async () => {
+      await queue.add(createOp({ id: "1", resourceKey: "a", tempId: "draft-issue-abc" }));
+      await queue.add(createOp({ id: "2", resourceKey: "b", tempId: "draft-version-xyz" }));
+      await queue.add(createOp({ id: "3", resourceKey: "c", tempId: "draft-issue-def" }));
+
+      await queue.removeByTempIdPrefix("draft-issue-");
+
+      expect(queue.getAll()).toHaveLength(1);
+      expect(queue.getAll()[0].tempId).toBe("draft-version-xyz");
+    });
+
+    it("does nothing when no match", async () => {
+      await queue.add(createOp({ resourceKey: "a", tempId: "draft-version-xyz" }));
+      await queue.removeByTempIdPrefix("draft-issue-");
+
+      expect(queue.getAll()).toHaveLength(1);
+    });
+
+    it("handles operations without tempId", async () => {
+      await queue.add(createOp({ resourceKey: "a" })); // no tempId
+      await queue.removeByTempIdPrefix("draft-issue-");
+
+      expect(queue.getAll()).toHaveLength(1);
+    });
+  });
+
+  describe("getByKeyPrefix", () => {
+    beforeEach(async () => {
+      await queue.load(serverIdentity);
+    });
+
+    it("returns operations matching key prefix", async () => {
+      await queue.add(createOp({ resourceKey: "issue:123:status" }));
+      await queue.add(createOp({ resourceKey: "issue:123:dates" }));
+      await queue.add(createOp({ resourceKey: "timeentry:456:update" }));
+
+      const ops = queue.getByKeyPrefix("issue:123");
+
+      expect(ops).toHaveLength(2);
+      expect(ops.every(o => o.resourceKey.startsWith("issue:123"))).toBe(true);
+    });
+
+    it("returns empty array when no match", async () => {
+      await queue.add(createOp({ resourceKey: "issue:123:status" }));
+
+      const ops = queue.getByKeyPrefix("version:");
+
+      expect(ops).toHaveLength(0);
+    });
+  });
+
+  describe("dispose", () => {
+    beforeEach(async () => {
+      await queue.load(serverIdentity);
+    });
+
+    it("clears all change handlers", async () => {
+      const handler1 = vi.fn();
+      const handler2 = vi.fn();
+      queue.onDidChange(handler1);
+      queue.onDidChange(handler2);
+
+      queue.dispose();
+      await queue.add(createOp());
+
+      expect(handler1).not.toHaveBeenCalled();
+      expect(handler2).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("load edge cases", () => {
+    it("ignores file with version !== 1", async () => {
+      mockFileData = new TextEncoder().encode(JSON.stringify({
+        version: 2, // future version
+        serverIdentity,
+        operations: [createOp()],
+      }));
+
+      await queue.load(serverIdentity);
+
+      expect(queue.getAll()).toHaveLength(0);
+    });
+
+    it("emits change event on successful load", async () => {
+      mockFileData = new TextEncoder().encode(JSON.stringify({
+        version: 1,
+        serverIdentity,
+        operations: [createOp()],
+      }));
+
+      const handler = vi.fn();
+      queue.onDidChange(handler);
+      await queue.load(serverIdentity);
+
+      expect(handler).toHaveBeenCalled();
+    });
+  });
+
+  describe("change handler error isolation", () => {
+    beforeEach(async () => {
+      await queue.load(serverIdentity);
+    });
+
+    it("continues calling handlers even if one throws", async () => {
+      const handler1 = vi.fn().mockImplementation(() => { throw new Error("oops"); });
+      const handler2 = vi.fn();
+
+      queue.onDidChange(handler1);
+      queue.onDidChange(handler2);
+      await queue.add(createOp());
+
+      expect(handler1).toHaveBeenCalled();
+      expect(handler2).toHaveBeenCalled();
+    });
+  });
 });
