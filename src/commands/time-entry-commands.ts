@@ -32,6 +32,7 @@ interface TimeEntryNode {
     spent_on?: string;
     issue_id?: number;
     issue?: { id: number; subject: string };
+    custom_fields?: Array<{ id: number; name: string; value: unknown }>;
   };
 }
 
@@ -47,6 +48,7 @@ interface DayGroupNode {
     hours: string;
     comments: string;
     spent_on?: string;
+    custom_fields?: Array<{ id: number; name: string; value: unknown }>;
   }>;
 }
 
@@ -62,6 +64,7 @@ interface WeekGroupNode {
     hours: string;
     comments: string;
     spent_on?: string;
+    custom_fields?: Array<{ id: number; name: string; value: unknown }>;
   }>;
 }
 
@@ -309,6 +312,10 @@ export function registerTimeEntryCommands(
         activity_id: entry.activity?.id ?? 0,
         hours: entry.hours,
         comments: entry.comments || "",
+        custom_fields: entry.custom_fields?.map((cf) => ({
+          id: cf.id,
+          value: cf.value as string | string[],
+        })),
       };
 
       setClipboard({
@@ -344,6 +351,10 @@ export function registerTimeEntryCommands(
           activity_id: e.activity_id ?? e.activity?.id ?? 0,
           hours: e.hours,
           comments: e.comments || "",
+          custom_fields: e.custom_fields?.map((cf) => ({
+            id: cf.id,
+            value: cf.value as string | string[],
+          })),
         }));
 
       setClipboard({
@@ -397,6 +408,10 @@ export function registerTimeEntryCommands(
             activity_id: e.activity_id ?? e.activity?.id ?? 0,
             hours: e.hours,
             comments: e.comments || "",
+            custom_fields: e.custom_fields?.map((cf) => ({
+              id: cf.id,
+              value: cf.value as string | string[],
+            })),
           };
           allEntries.push(clipEntry);
 
@@ -543,7 +558,8 @@ export function registerTimeEntryCommands(
                     entry.activity_id,
                     entry.hours,
                     entry.comments,
-                    date
+                    date,
+                    entry.custom_fields
                   );
                   created++;
                   progress.report({
