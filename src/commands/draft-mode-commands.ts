@@ -355,6 +355,7 @@ async function executeOperation(
         entry.hours,
         entry.comments,
         entry.spent_on,
+        undefined,
         { _bypassDraft: true }
       );
       break;
