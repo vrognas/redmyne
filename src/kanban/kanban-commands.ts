@@ -6,6 +6,7 @@ import { RedmineServer } from "../redmine/redmine-server";
 import { pickActivityForProject } from "../utilities/issue-picker";
 import { showActionableError } from "../utilities/error-feedback";
 import { showStatusBarMessage } from "../utilities/status-bar";
+import { promptForRequiredCustomFields, TimeEntryCustomFieldValue } from "../utilities/custom-field-picker";
 import { KanbanTreeProvider } from "./kanban-tree-provider";
 
 interface TaskTreeItem {
@@ -453,6 +454,11 @@ export function registerKanbanCommands(
           return;
         }
 
+        // Prompt for required custom fields first
+        const { values: customFieldValues, cancelled, prompted } =
+          await promptForRequiredCustomFields(() => server.getTimeEntryCustomFields());
+        if (cancelled) return;
+
         const roundedHours = Math.round(hours * 100) / 100;
         const confirm = await vscode.window.showWarningMessage(
           `Log ${roundedHours}h for #${task.linkedIssueId}?`,
@@ -466,13 +472,22 @@ export function registerKanbanCommands(
             task.linkedIssueId,
             task.activityId ?? 0,
             roundedHours.toString(),
-            task.title
+            task.title,
+            undefined,
+            customFieldValues
           );
           await controller.addLoggedHours(task.id, roundedHours);
           await controller.stopTimer(task.id);
           vscode.window.showInformationMessage(`Logged ${roundedHours}h`);
         } catch (error) {
-          vscode.window.showErrorMessage(`Failed to log time: ${error}`);
+          const errorMsg = String(error);
+          if (/custom.?field/i.test(errorMsg) && !prompted) {
+            vscode.window.showErrorMessage(
+              `${errorMsg} - Custom fields API requires admin access.`
+            );
+          } else {
+            vscode.window.showErrorMessage(`Failed to log time: ${error}`);
+          }
         }
       }
     )
@@ -536,6 +551,11 @@ export function registerKanbanCommands(
           return;
         }
 
+        // Prompt for required custom fields first
+        const { values: customFieldValues, cancelled, prompted } =
+          await promptForRequiredCustomFields(() => server.getTimeEntryCustomFields());
+        if (cancelled) return;
+
         const workDuration = controller.getWorkDurationSeconds();
         const hours = workDuration / 3600;
         const roundedHours = Math.round(hours * 100) / 100;
@@ -545,14 +565,23 @@ export function registerKanbanCommands(
             task.linkedIssueId,
             task.activityId ?? 0,
             roundedHours.toString(),
-            task.title
+            task.title,
+            undefined,
+            customFieldValues
           );
           await controller.addLoggedHours(task.id, roundedHours);
           // Reset timer to full duration and keep running
           await controller.startTimer(task.id, task.activityId ?? 0, task.activityName ?? "");
           vscode.window.showInformationMessage(`Logged ${roundedHours}h, timer restarted`);
         } catch (error) {
-          vscode.window.showErrorMessage(`Failed to log time: ${error}`);
+          const errorMsg = String(error);
+          if (/custom.?field/i.test(errorMsg) && !prompted) {
+            vscode.window.showErrorMessage(
+              `${errorMsg} - Custom fields API requires admin access.`
+            );
+          } else {
+            vscode.window.showErrorMessage(`Failed to log time: ${error}`);
+          }
         }
       }
     )

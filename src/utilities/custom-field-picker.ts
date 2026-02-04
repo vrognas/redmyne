@@ -227,3 +227,39 @@ async function pickStringField(
     },
   });
 }
+
+/**
+ * Result from promptForRequiredCustomFields
+ */
+export interface CustomFieldPromptResult {
+  values: TimeEntryCustomFieldValue[] | undefined;
+  cancelled: boolean;
+  prompted: boolean; // True if user was prompted (for error handling)
+}
+
+/**
+ * High-level utility to fetch and prompt for required custom fields.
+ * Handles API errors gracefully (non-admin users).
+ *
+ * @param getCustomFields - Function to fetch custom field definitions (e.g., server.getTimeEntryCustomFields)
+ * @returns values (undefined if no required fields), cancelled flag, and prompted flag
+ */
+export async function promptForRequiredCustomFields(
+  getCustomFields: () => Promise<CustomFieldDefinition[]>
+): Promise<CustomFieldPromptResult> {
+  try {
+    const customFieldDefs = await getCustomFields();
+    const required = customFieldDefs.filter((f) => f.is_required);
+    if (required.length === 0) {
+      return { values: undefined, cancelled: false, prompted: false };
+    }
+    const { values, cancelled } = await pickRequiredCustomFields(required);
+    if (cancelled) {
+      return { values: undefined, cancelled: true, prompted: true };
+    }
+    return { values, cancelled: false, prompted: true };
+  } catch {
+    // Custom fields API not accessible (non-admin) - continue without
+    return { values: undefined, cancelled: false, prompted: false };
+  }
+}

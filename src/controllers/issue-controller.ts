@@ -7,6 +7,7 @@ import { errorToString } from "../utilities/error-feedback";
 import { parseTimeInput, validateTimeInput, formatHoursAsHHMM } from "../utilities/time-input";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { pickOptionalDate } from "../utilities/date-picker";
+import { promptForRequiredCustomFields } from "../utilities/custom-field-picker";
 
 interface TimeEntryActivityItem extends vscode.QuickPickItem {
   activity: TimeEntryActivity;
@@ -64,12 +65,20 @@ export class IssueController {
 
     if (comment === undefined) return; // User cancelled
 
+    // Prompt for required custom fields
+    const customFieldResult = await promptForRequiredCustomFields(
+      () => this.redmine.getTimeEntryCustomFields()
+    );
+    if (customFieldResult.cancelled) return;
+
     try {
       await this.redmine.addTimeEntry(
         this.issue.id,
         activity.activity.id,
         hours.toString(),
-        comment || ""
+        comment || "",
+        undefined,
+        customFieldResult.values
       );
 
       // Refresh time entries tree

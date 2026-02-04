@@ -48,6 +48,7 @@ import { toggleAdHoc, contributeToIssue, removeContribution } from "./commands/a
 import { togglePrecedence, setPrecedence, clearPrecedence } from "./utilities/precedence-tracker";
 import { debounce, DebouncedFunction } from "./utilities/debounce";
 import { runMigration } from "./utilities/migration";
+import { promptForRequiredCustomFields } from "./utilities/custom-field-picker";
 import { initRecentIssues } from "./utilities/recent-issues";
 import { DraftQueue } from "./draft-mode/draft-queue";
 import { DraftModeManager } from "./draft-mode/draft-mode-manager";
@@ -234,6 +235,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const totalHours = baseMinutes / 60;
       const formattedTime = formatHoursAsHHMM(totalHours);
 
+      // Prompt for custom fields BEFORE showing confirmation dialog
+      const customFieldResult = await promptForRequiredCustomFields(
+        () => server.getTimeEntryCustomFields()
+      );
+      if (customFieldResult.cancelled) {
+        return; // User cancelled custom fields
+      }
+
       // Show completion dialog
       const action = await vscode.window.showWarningMessage(
         `Timer complete: ${task.title} (${formattedTime})`,
@@ -249,7 +258,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             task.linkedIssueId,
             task.activityId ?? 0,
             totalHours.toString(),
-            task.title
+            task.title,
+            undefined,
+            customFieldResult.values
           );
           await kanbanController.addLoggedHours(task.id, totalHours);
           await kanbanController.markDone(task.id);
@@ -267,7 +278,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             task.linkedIssueId,
             task.activityId ?? 0,
             totalHours.toString(),
-            task.title
+            task.title,
+            undefined,
+            customFieldResult.values
           );
           await kanbanController.addLoggedHours(task.id, totalHours);
           await kanbanController.resetTimer(task.id);
