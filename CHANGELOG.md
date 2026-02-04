@@ -2,6 +2,17 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.14.2]
+
+### Fixed
+
+- **Custom fields for all time entry paths** - fixed missing custom field prompts (#63)
+  - Issue left-click → Add Time Entry
+  - Kanban → Log Early / Log and Continue
+  - Timer completion dialog
+  - Apply drafts now passes stored custom fields
+  - Copy/paste now preserves custom field values
+
 ## [4.14.1]
 
 ### Internal
