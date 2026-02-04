@@ -1,6 +1,15 @@
 # Redmyne
 
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/vrognas/redmyne/ci.yml)
+![Visual Studio Marketplace Downloads](https://img.shields.io/visual-studio-marketplace/d/vrognas.redmyne)
+![GitHub License](https://img.shields.io/github/license/vrognas/redmyne)
+
 **Personal workload management for Redmine** — log time, track capacity, stay in flow.
+
+> [!NOTE]
+> This extension is currently in active development.
+> While stable for daily use, expect occasional breaking changes.
+> Please report any issues to help improve the extension.
 
 ## Quick Start
 
