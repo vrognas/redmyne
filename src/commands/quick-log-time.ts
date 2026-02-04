@@ -5,6 +5,7 @@ import { showStatusBarMessage } from "../utilities/status-bar";
 import { pickIssueWithSearch, pickActivityForProject } from "../utilities/issue-picker";
 import { pickDate } from "../utilities/date-picker";
 import { errorToString } from "../utilities/error-feedback";
+import { pickRequiredCustomFields, TimeEntryCustomFieldValue } from "../utilities/custom-field-picker";
 
 interface RecentTimeLog {
   issueId: number;
@@ -127,19 +128,34 @@ export async function quickLogTime(
 
     if (comment === undefined) return; // User cancelled
 
-    // 7. Post time entry (always pass date for draft mode compatibility)
+    // 7. Check for required custom fields
+    let customFieldValues: TimeEntryCustomFieldValue[] | undefined;
+    try {
+      const customFieldDefs = await props.server.getTimeEntryCustomFields();
+      const required = customFieldDefs.filter((f) => f.is_required);
+      if (required.length > 0) {
+        const { values, cancelled } = await pickRequiredCustomFields(required);
+        if (cancelled) return;
+        customFieldValues = values;
+      }
+    } catch {
+      // Custom fields API may not be accessible (non-admin) - continue without
+    }
+
+    // 8. Post time entry (always pass date for draft mode compatibility)
     await props.server.addTimeEntry(
       selection.issueId,
       selection.activityId,
       hoursStr,
       comment || "",
-      selectedDate
+      selectedDate,
+      customFieldValues
     );
 
-    // 8. Refresh time entries tree
+    // 9. Refresh time entries tree
     vscode.commands.executeCommand("redmyne.refreshTimeEntries");
 
-    // 9. Update cache
+    // 10. Update cache
     await context.globalState.update("lastTimeLog", {
       issueId: selection.issueId,
       issueSubject: selection.issueSubject,
@@ -148,7 +164,7 @@ export async function quickLogTime(
       lastLogged: new Date(),
     });
 
-    // 10. Confirm with status bar flash (NOT notification)
+    // 11. Confirm with status bar flash (NOT notification)
     const dateConfirmation = selectedDate === today ? "" : ` on ${selectedDate}`;
     showStatusBarMessage(
       `$(check) Logged ${formatHoursAsHHMM(hours)} to #${selection.issueId}${dateConfirmation}`

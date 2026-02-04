@@ -2,6 +2,17 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.14.0]
+
+### Added
+
+- **Custom fields for time entries** - supports required and optional custom fields when logging time (#63)
+  - Prompts for required fields during Quick Log Time
+  - "Edit Custom Fields" option in time entry edit menu
+  - Handles all field types: list, bool, int, float, date, string, text
+  - Multi-select support for list fields
+  - Graceful fallback when admin-only API is inaccessible
+
 ## [4.13.4]
 
 ### Internal

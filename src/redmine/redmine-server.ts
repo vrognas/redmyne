@@ -14,6 +14,7 @@ import { Issue } from "./models/issue";
 import { Version } from "./models/version";
 import { IssueStatus as RedmineIssueStatus, IssuePriority } from "./models/common";
 import { Membership as RedmineMembership } from "./models/membership";
+import { CustomFieldDefinition, TimeEntryCustomFieldValue } from "./models/custom-field-definition";
 
 type HttpMethods = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
@@ -71,6 +72,7 @@ export class RedmineServer {
   options: RedmineServerOptions = {} as RedmineServerOptions;
 
   private timeEntryActivities: TimeEntryActivity[] | null = null;
+  private timeEntryCustomFieldsCache: CustomFieldDefinition[] | null = null;
   private cachedProjects: RedmineProject[] | null = null;
   private cachedCurrentUser: {
     id: number;
@@ -498,6 +500,30 @@ export class RedmineServer {
   }
 
   /**
+   * Get custom field definitions for time entries
+   * Requires admin permissions - returns empty array if not accessible
+   * Results are cached per server instance
+   */
+  async getTimeEntryCustomFields(): Promise<CustomFieldDefinition[]> {
+    if (this.timeEntryCustomFieldsCache !== null) {
+      return this.timeEntryCustomFieldsCache;
+    }
+    try {
+      const response = await this.doRequest<{ custom_fields: CustomFieldDefinition[] }>(
+        "/custom_fields.json",
+        "GET"
+      );
+      this.timeEntryCustomFieldsCache = (response?.custom_fields || [])
+        .filter((f) => f.customized_type === "time_entry");
+      return this.timeEntryCustomFieldsCache;
+    } catch {
+      // Admin-only endpoint - return empty, user will see validation error if fields required
+      this.timeEntryCustomFieldsCache = [];
+      return [];
+    }
+  }
+
+  /**
    * Get versions (milestones) for a project
    * Includes shared versions from parent/related projects
    */
@@ -633,7 +659,8 @@ export class RedmineServer {
     activityId: number,
     hours: string,
     message: string,
-    spentOn?: string // YYYY-MM-DD format, defaults to today
+    spentOn?: string, // YYYY-MM-DD format, defaults to today
+    customFields?: TimeEntryCustomFieldValue[]
   ): Promise<{ time_entry: TimeEntry }> {
     const entry: Record<string, unknown> = {
       issue_id: issueId,
@@ -643,6 +670,9 @@ export class RedmineServer {
     };
     if (spentOn) {
       entry.spent_on = spentOn;
+    }
+    if (customFields && customFields.length > 0) {
+      entry.custom_fields = customFields;
     }
     const result = await this.doRequest<{ time_entry: TimeEntry }>(
       `/time_entries.json`,
@@ -736,6 +766,21 @@ export class RedmineServer {
   }
 
   /**
+   * Returns a single time entry by ID
+   * @param id Time entry ID
+   */
+  async getTimeEntryById(id: number): Promise<{ time_entry: TimeEntry }> {
+    const result = await this.doRequest<{ time_entry: TimeEntry }>(
+      `/time_entries/${id}.json`,
+      "GET"
+    );
+    if (!result) {
+      throw new Error(`Time entry ${id} not found`);
+    }
+    return result;
+  }
+
+  /**
    * Returns all time entries for a project (all users, all time)
    * Used for ad-hoc budget contribution calculation
    * @param projectId Project ID or identifier
@@ -794,7 +839,7 @@ export class RedmineServer {
   /**
    * Update an existing time entry
    * @param id Time entry ID
-   * @param updates Fields to update (hours, comments, activity_id, spent_on, issue_id)
+   * @param updates Fields to update (hours, comments, activity_id, spent_on, issue_id, custom_fields)
    */
   async updateTimeEntry(
     id: number,
@@ -804,6 +849,7 @@ export class RedmineServer {
       activity_id?: number;
       spent_on?: string;
       issue_id?: number;
+      custom_fields?: TimeEntryCustomFieldValue[];
     }
   ): Promise<void> {
     await this.doRequest(

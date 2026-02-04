@@ -38,6 +38,8 @@ function createMockServer(): RedmineServer {
     getTimeEntriesForIssues: vi.fn().mockResolvedValue([]),
     getTimeEntryActivities: vi.fn().mockResolvedValue({ time_entry_activities: [] }),
     getProjectTimeEntryActivities: vi.fn().mockResolvedValue([]),
+    getTimeEntryCustomFields: vi.fn().mockResolvedValue([]),
+    getTimeEntryById: vi.fn().mockResolvedValue({ time_entry: { id: 456 } }),
     getProjectVersions: vi.fn().mockResolvedValue([]),
     getVersionsForProjects: vi.fn().mockResolvedValue(new Map()),
     getIssueStatuses: vi.fn().mockResolvedValue({ issue_statuses: [] }),
@@ -184,6 +186,29 @@ describe("DraftModeServer", () => {
       expect(result.time_entry.id).toBeLessThan(0);
     });
 
+    it("queues addTimeEntry with custom fields", async () => {
+      const manager = createMockManager(true);
+      const server = new DraftModeServer(innerServer, queue, manager);
+      const customFields = [{ id: 1, value: "billing-code" }];
+
+      const result = await server.addTimeEntry(123, 1, "2.5", "Work", "2026-01-18", customFields);
+
+      expect(innerServer.addTimeEntry).not.toHaveBeenCalled();
+      expect(queue.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "createTimeEntry",
+          http: expect.objectContaining({
+            data: expect.objectContaining({
+              time_entry: expect.objectContaining({
+                custom_fields: customFields,
+              }),
+            }),
+          }),
+        })
+      );
+      expect(result.time_entry.custom_fields).toEqual(customFields);
+    });
+
     it("queues createIssue with temp ID", async () => {
       const manager = createMockManager(true);
       const server = new DraftModeServer(innerServer, queue, manager);
@@ -247,7 +272,7 @@ describe("DraftModeServer", () => {
       const manager = createMockManager(true);
       const server = new DraftModeServer(innerServer, queue, manager);
 
-      await server.updateTimeEntry(456, { hours: 3, comments: "Updated" });
+      await server.updateTimeEntry(456, { hours: "3", comments: "Updated" });
 
       expect(innerServer.updateTimeEntry).not.toHaveBeenCalled();
       expect(queue.add).toHaveBeenCalledWith(
@@ -255,6 +280,28 @@ describe("DraftModeServer", () => {
           type: "updateTimeEntry",
           resourceId: 456,
           resourceKey: "timeentry:456:update",
+        })
+      );
+    });
+
+    it("queues updateTimeEntry with custom fields", async () => {
+      const manager = createMockManager(true);
+      const server = new DraftModeServer(innerServer, queue, manager);
+      const customFields = [{ id: 1, value: "updated-code" }];
+
+      await server.updateTimeEntry(456, { custom_fields: customFields });
+
+      expect(innerServer.updateTimeEntry).not.toHaveBeenCalled();
+      expect(queue.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "updateTimeEntry",
+          http: expect.objectContaining({
+            data: expect.objectContaining({
+              time_entry: expect.objectContaining({
+                custom_fields: customFields,
+              }),
+            }),
+          }),
         })
       );
     });

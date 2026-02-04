@@ -20,6 +20,7 @@ import {
 import { parseLocalDate, getWeekStart, formatLocalDate } from "../utilities/date-utils";
 import { DEFAULT_WEEKLY_SCHEDULE, WeeklySchedule } from "../utilities/flexibility-calculator";
 import { MonthlyScheduleOverrides } from "../utilities/monthly-schedule";
+import { pickCustomFields, TimeEntryCustomFieldValue } from "../utilities/custom-field-picker";
 
 /** Time entry node from tree view */
 interface TimeEntryNode {
@@ -136,13 +137,24 @@ export function registerTimeEntryCommands(
       // Show what to edit
       const hoursDisplay = formatHoursAsHHMM(parseFloat(entry.hours));
       const issueDisplay = entry.issue ? `#${entry.issue.id} ${entry.issue.subject || ""}`.trim() : `#${entry.issue_id || "?"}`;
-      const options = [
-        { label: `Issue: ${issueDisplay}`, field: "issue" as const },
-        { label: `Hours: ${hoursDisplay}`, field: "hours" as const },
-        { label: `Comment: ${entry.comments || "(none)"}`, field: "comments" as const },
-        { label: `Activity: ${entry.activity?.name || "Unknown"}`, field: "activity" as const },
-        { label: `Date: ${entry.spent_on || "Unknown"}`, field: "date" as const },
+
+      // Fetch custom fields to determine if option should be shown
+      const customFieldDefs = await server.getTimeEntryCustomFields();
+
+      const options: Array<{ label: string; field: "issue" | "hours" | "comments" | "activity" | "date" | "customFields" }> = [
+        { label: `Issue: ${issueDisplay}`, field: "issue" },
+        { label: `Hours: ${hoursDisplay}`, field: "hours" },
+        { label: `Comment: ${entry.comments || "(none)"}`, field: "comments" },
+        { label: `Activity: ${entry.activity?.name || "Unknown"}`, field: "activity" },
+        { label: `Date: ${entry.spent_on || "Unknown"}`, field: "date" },
       ];
+
+      // Only show Custom Fields option if there are custom fields configured
+      // and entry is not a draft (drafts have negative IDs and can't be fetched)
+      const isDraft = (entry.id ?? 0) < 0;
+      if (customFieldDefs.length > 0 && !isDraft) {
+        options.push({ label: "$(symbol-field) Custom Fields", field: "customFields" });
+      }
 
       const choice = await vscode.window.showQuickPick(options, {
         title: `Edit Time Entry #${entry.id}`,
@@ -207,6 +219,15 @@ export function registerTimeEntryCommands(
           });
           if (input === undefined) return;
           await server.updateTimeEntry(entry.id, { spent_on: input });
+        } else if (choice.field === "customFields") {
+          // Fetch full entry to get existing custom field values
+          const fullEntry = await server.getTimeEntryById(entry.id);
+          const existing = (fullEntry.time_entry.custom_fields as TimeEntryCustomFieldValue[] | undefined)?.map(
+            (f) => ({ id: f.id, value: f.value })
+          );
+          const { values, cancelled } = await pickCustomFields(customFieldDefs, existing);
+          if (cancelled) return;
+          await server.updateTimeEntry(entry.id, { custom_fields: values });
         }
 
         showStatusBarMessage("$(check) Time entry updated", 2000);

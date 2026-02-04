@@ -1,4 +1,5 @@
-import { TimeEntryActivity, NamedEntity } from "./common";
+import { TimeEntryActivity, NamedEntity, CustomField } from "./common";
+import { TimeEntryCustomFieldValue } from "./custom-field-definition";
 
 export interface TimeEntry {
   id?: number; // Present in GET responses
@@ -13,4 +14,5 @@ export interface TimeEntry {
   user?: NamedEntity; // Present in GET responses
   created_on?: string; // ISO date string, present in GET responses
   updated_on?: string; // ISO date string, present in GET responses
+  custom_fields?: CustomField[] | TimeEntryCustomFieldValue[]; // Present in GET responses or POST/PUT body
 }

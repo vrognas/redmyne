@@ -12,6 +12,7 @@ import type { DraftQueue } from "./draft-queue";
 import type { DraftModeManager } from "./draft-mode-manager";
 import type { DraftOperation, DraftOperationType, HttpMethod } from "./draft-operation";
 import { generateDraftId, generateTempId, generateNumericTempId } from "./draft-operation";
+import type { TimeEntryCustomFieldValue } from "../redmine/models/custom-field-definition";
 
 export interface DraftBypassOptions {
   _bypassDraft?: boolean;
@@ -40,6 +41,8 @@ export class DraftModeServer {
   getTimeEntriesForIssues!: RedmineServer["getTimeEntriesForIssues"];
   getTimeEntryActivities!: RedmineServer["getTimeEntryActivities"];
   getProjectTimeEntryActivities!: RedmineServer["getProjectTimeEntryActivities"];
+  getTimeEntryCustomFields!: RedmineServer["getTimeEntryCustomFields"];
+  getTimeEntryById!: RedmineServer["getTimeEntryById"];
   getProjectVersions!: RedmineServer["getProjectVersions"];
   getVersionsForProjects!: RedmineServer["getVersionsForProjects"];
   getIssueStatuses!: RedmineServer["getIssueStatuses"];
@@ -79,6 +82,8 @@ export class DraftModeServer {
     this.getTimeEntriesForIssues = inner.getTimeEntriesForIssues.bind(inner);
     this.getTimeEntryActivities = inner.getTimeEntryActivities.bind(inner);
     this.getProjectTimeEntryActivities = inner.getProjectTimeEntryActivities.bind(inner);
+    this.getTimeEntryCustomFields = inner.getTimeEntryCustomFields.bind(inner);
+    this.getTimeEntryById = inner.getTimeEntryById.bind(inner);
     this.getProjectVersions = inner.getProjectVersions.bind(inner);
     this.getVersionsForProjects = inner.getVersionsForProjects.bind(inner);
     this.getIssueStatuses = inner.getIssueStatuses.bind(inner);
@@ -362,10 +367,11 @@ export class DraftModeServer {
     hours: string,
     message: string,
     spentOn?: string,
+    customFields?: TimeEntryCustomFieldValue[],
     options?: DraftBypassOptions
   ): Promise<{ time_entry: TimeEntry }> {
     if (!this.shouldIntercept(options)) {
-      return this.inner.addTimeEntry(issueId, activityId, hours, message, spentOn);
+      return this.inner.addTimeEntry(issueId, activityId, hours, message, spentOn, customFields);
     }
 
     const tempId = generateNumericTempId();
@@ -373,6 +379,17 @@ export class DraftModeServer {
 
     // Default spentOn to today if not provided (needed for tree filtering)
     const effectiveSpentOn = spentOn ?? new Date().toISOString().split("T")[0];
+
+    const entryData: Record<string, unknown> = {
+      issue_id: issueId,
+      activity_id: activityId,
+      hours,
+      comments: message,
+      spent_on: effectiveSpentOn,
+    };
+    if (customFields && customFields.length > 0) {
+      entryData.custom_fields = customFields;
+    }
 
     await this.queue.add(
       this.createOperation(
@@ -382,15 +399,7 @@ export class DraftModeServer {
         {
           method: "POST",
           path: "/time_entries.json",
-          data: {
-            time_entry: {
-              issue_id: issueId,
-              activity_id: activityId,
-              hours,
-              comments: message,
-              spent_on: effectiveSpentOn,
-            },
-          },
+          data: { time_entry: entryData },
         },
         { issueId, tempId: tempIdStr }
       )
@@ -407,6 +416,7 @@ export class DraftModeServer {
         spent_on: effectiveSpentOn,
         activity: { id: activityId, name: "" },
         issue: { id: issueId },
+        custom_fields: customFields,
         created_on: new Date().toISOString(),
         updated_on: new Date().toISOString(),
       } as TimeEntry,

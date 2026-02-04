@@ -49,6 +49,7 @@ describe("quickLogTime", () => {
       }),
       addTimeEntry: vi.fn().mockResolvedValue({}),
       isTimeTrackingEnabled: vi.fn().mockResolvedValue(true),
+      getTimeEntryCustomFields: vi.fn().mockResolvedValue([]), // No required custom fields
     };
 
     props = { server: mockServer, config: {} };
@@ -199,7 +200,7 @@ describe("quickLogTime", () => {
 
     // Verify API called with correct params (always includes date for draft mode)
     const today = new Date().toISOString().split("T")[0];
-    expect(mockServer.addTimeEntry).toHaveBeenCalledWith(123, 9, "2.5", "", today);
+    expect(mockServer.addTimeEntry).toHaveBeenCalledWith(123, 9, "2.5", "", today, undefined);
 
     // Verify cache updated
     expect(mockContext.globalState.update).toHaveBeenCalledWith(
@@ -252,7 +253,8 @@ describe("quickLogTime", () => {
       9,
       "8",
       "Worked late",
-      expectedDate
+      expectedDate,
+      undefined
     );
   });
 
@@ -293,7 +295,8 @@ describe("quickLogTime", () => {
       9,
       "4",
       "Custom date work",
-      "2025-12-15"
+      "2025-12-15",
+      undefined
     );
   });
 });
