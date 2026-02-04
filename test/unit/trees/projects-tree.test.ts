@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ProjectsTree } from "../../../src/trees/projects-tree";
+import { ProjectsTree, ProjectsViewStyle } from "../../../src/trees/projects-tree";
 import { Issue } from "../../../src/redmine/models/issue";
 import { RedmineProject } from "../../../src/redmine/redmine-project";
 
@@ -123,6 +123,112 @@ describe("ProjectsTree", () => {
       const treeItem = tree.getTreeItem(projectNode);
 
       expect(treeItem.description).toBe("(1)");
+    });
+  });
+
+  describe("sortProjectNodes filtering", () => {
+    it("should hide empty projects when showEmptyProjects is false (default)", () => {
+      const tree = new ProjectsTree();
+      tree.viewStyle = ProjectsViewStyle.LIST;
+
+      const emptyProject = new RedmineProject({
+        id: 1,
+        name: "Empty Project",
+        identifier: "empty-proj",
+      });
+      const projectWithIssues = new RedmineProject({
+        id: 2,
+        name: "Active Project",
+        identifier: "active-proj",
+      });
+
+      // Access private method via casting for testing
+      const nodes = [
+        { project: emptyProject, assignedIssues: [], hasAssignedIssues: false, totalIssuesWithSubprojects: 0 },
+        { project: projectWithIssues, assignedIssues: [{} as Issue], hasAssignedIssues: true, totalIssuesWithSubprojects: 1 },
+      ];
+
+      // Set filter without showEmptyProjects (default: false)
+      tree.setFilter({ assignee: "me", status: "open" });
+
+      // Use the internal method via type casting
+      const sorted = (tree as unknown as { sortProjectNodes: (nodes: typeof nodes) => typeof nodes }).sortProjectNodes(nodes);
+
+      expect(sorted).toHaveLength(1);
+      expect(sorted[0].project.name).toBe("Active Project");
+    });
+
+    it("should show all projects when showEmptyProjects is true", () => {
+      const tree = new ProjectsTree();
+      tree.viewStyle = ProjectsViewStyle.LIST;
+
+      const emptyProject = new RedmineProject({
+        id: 1,
+        name: "Empty Project",
+        identifier: "empty-proj",
+      });
+      const projectWithIssues = new RedmineProject({
+        id: 2,
+        name: "Active Project",
+        identifier: "active-proj",
+      });
+
+      const nodes = [
+        { project: emptyProject, assignedIssues: [], hasAssignedIssues: false, totalIssuesWithSubprojects: 0 },
+        { project: projectWithIssues, assignedIssues: [{} as Issue], hasAssignedIssues: true, totalIssuesWithSubprojects: 1 },
+      ];
+
+      // Set filter with showEmptyProjects: true
+      tree.setFilter({ assignee: "any", status: "any", showEmptyProjects: true });
+
+      const sorted = (tree as unknown as { sortProjectNodes: (nodes: typeof nodes) => typeof nodes }).sortProjectNodes(nodes);
+
+      expect(sorted).toHaveLength(2);
+    });
+
+    it("should show parent project with issues only in subprojects when showEmptyProjects is false", () => {
+      const tree = new ProjectsTree();
+      tree.viewStyle = ProjectsViewStyle.LIST;
+
+      // Parent has no direct issues but subprojects have issues
+      const parentProject = new RedmineProject({
+        id: 1,
+        name: "Parent Project",
+        identifier: "parent-proj",
+      });
+
+      const nodes = [
+        { project: parentProject, assignedIssues: [], hasAssignedIssues: false, totalIssuesWithSubprojects: 3 },
+      ];
+
+      tree.setFilter({ assignee: "me", status: "open" });
+
+      const sorted = (tree as unknown as { sortProjectNodes: (nodes: typeof nodes) => typeof nodes }).sortProjectNodes(nodes);
+
+      // Should still show because totalIssuesWithSubprojects > 0
+      expect(sorted).toHaveLength(1);
+    });
+  });
+
+  describe("filter presets", () => {
+    it("should set My Issues filter (assignee: me, status: any)", () => {
+      const tree = new ProjectsTree();
+      tree.setFilter({ assignee: "me", status: "any" });
+
+      const filter = tree.getFilter();
+      expect(filter.assignee).toBe("me");
+      expect(filter.status).toBe("any");
+      expect(filter.showEmptyProjects).toBeUndefined();
+    });
+
+    it("should set No Filter (assignee: any, status: any, showEmptyProjects: true)", () => {
+      const tree = new ProjectsTree();
+      tree.setFilter({ assignee: "any", status: "any", showEmptyProjects: true });
+
+      const filter = tree.getFilter();
+      expect(filter.assignee).toBe("any");
+      expect(filter.status).toBe("any");
+      expect(filter.showEmptyProjects).toBe(true);
     });
   });
 });

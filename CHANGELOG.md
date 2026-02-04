@@ -2,6 +2,16 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.15.0]
+
+### Added
+
+- **Hide empty projects when filter active** - projects with no matching issues are now hidden (#64)
+  - Default: "No Filter" shows all projects (persisted across sessions)
+  - New "My Issues" filter: shows open + closed issues assigned to me
+  - Existing filters (My Open, All Open, etc.) now hide empty projects
+  - Parent projects with issues only in subprojects remain visible
+
 ## [4.14.2]
 
 ### Fixed

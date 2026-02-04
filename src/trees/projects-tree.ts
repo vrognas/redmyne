@@ -85,7 +85,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
     if (globalState) {
       const savedFilter = globalState.get<IssueFilter>(FILTER_KEY);
       if (savedFilter) {
-        this.issueFilter = { ...DEFAULT_ISSUE_FILTER, ...savedFilter };
+        this.issueFilter = savedFilter;
       }
       const savedSort = globalState.get<SortConfig<IssueSortField>>(SORT_KEY);
       if (savedSort) {
@@ -355,16 +355,22 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   }
 
   /**
-   * Sort project nodes alphabetically
+   * Sort project nodes alphabetically, optionally filtering empty projects
    */
   private sortProjectNodes(nodes: ProjectNode[]): ProjectNode[] {
-    // Apply tree view filtering if needed
     let filtered = nodes;
+
+    // Apply tree view filtering if needed
     if (this.viewStyle === ProjectsViewStyle.TREE) {
       const projectIdSet = new Set((this.projects ?? []).map((project) => project.id));
-      filtered = nodes.filter(
+      filtered = filtered.filter(
         (n) => !n.project.parent || !projectIdSet.has(n.project.parent.id)
       );
+    }
+
+    // Hide empty projects unless showEmptyProjects is true
+    if (!this.issueFilter.showEmptyProjects) {
+      filtered = filtered.filter((n) => n.totalIssuesWithSubprojects > 0);
     }
 
     return filtered.sort((a, b) =>

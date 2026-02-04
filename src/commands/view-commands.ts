@@ -93,6 +93,16 @@ export function registerViewCommands(
       showStatusBarMessage("$(list-flat) All Issues", 2000);
     }),
 
+    vscode.commands.registerCommand("redmyne.filterMyIssues", () => {
+      deps.projectsTree.setFilter({ assignee: "me", status: "any" });
+      showStatusBarMessage("$(account) My Issues", 2000);
+    }),
+
+    vscode.commands.registerCommand("redmyne.filterNone", () => {
+      deps.projectsTree.setFilter({ assignee: "any", status: "any", showEmptyProjects: true });
+      showStatusBarMessage("$(eye-closed) No Filter", 2000);
+    }),
+
     // Time entries filter commands
     vscode.commands.registerCommand("redmyne.timeFilterMy", () => {
       deps.timeEntriesTree.setShowAllUsers(false);

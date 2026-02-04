@@ -37,14 +37,16 @@ export interface IssueFilter {
   assignee: "me" | "any";
   status: "open" | "closed" | "any";
   priority?: number | "any";
+  showEmptyProjects?: boolean;
 }
 
 /**
- * Default filter: my open issues
+ * Default filter: no filter (show all projects including empty)
  */
 export const DEFAULT_ISSUE_FILTER: IssueFilter = {
-  assignee: "me",
-  status: "open",
+  assignee: "any",
+  status: "any",
+  showEmptyProjects: true,
 };
 
 /**
