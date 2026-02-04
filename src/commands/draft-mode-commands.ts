@@ -348,6 +348,7 @@ async function executeOperation(
         hours: string;
         comments: string;
         spent_on?: string;
+        custom_fields?: Array<{ id: number; value: string | string[] }>;
       } }).time_entry;
       await server.addTimeEntry(
         entry.issue_id,
@@ -355,7 +356,7 @@ async function executeOperation(
         entry.hours,
         entry.comments,
         entry.spent_on,
-        undefined,
+        entry.custom_fields,
         { _bypassDraft: true }
       );
       break;
