@@ -41,4 +41,38 @@ describe("RedmineSecretManager", () => {
 
     expect(context.secrets.delete).toHaveBeenCalledWith("redmyne:global:apiKey:v2");
   });
+
+  it("should return undefined and show error when getApiKey fails", async () => {
+    vi.mocked(context.secrets.get).mockRejectedValue(new Error("Secret storage error"));
+
+    const key = await manager.getApiKey();
+
+    expect(key).toBeUndefined();
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to retrieve API key")
+    );
+  });
+
+  it("should subscribe to secret changes", () => {
+    const callback = vi.fn();
+    const mockDisposable = { dispose: vi.fn() };
+    let changeHandler: (event: { key: string }) => void;
+
+    vi.mocked(context.secrets.onDidChange).mockImplementation((handler) => {
+      changeHandler = handler;
+      return mockDisposable;
+    });
+
+    const disposable = manager.onSecretChanged(callback);
+
+    // Trigger change for the API key
+    changeHandler!({ key: "redmyne:global:apiKey:v2" });
+    expect(callback).toHaveBeenCalledTimes(1);
+
+    // Trigger change for unrelated key - should not call callback
+    changeHandler!({ key: "other:key" });
+    expect(callback).toHaveBeenCalledTimes(1);
+
+    expect(disposable).toBe(mockDisposable);
+  });
 });

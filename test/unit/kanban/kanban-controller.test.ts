@@ -198,4 +198,166 @@ describe("KanbanController", () => {
       expect(controller.getTasks()[0].title).toBe("Not done");
     });
   });
+
+  describe("timer operations", () => {
+    it("starts timer on a task", async () => {
+      const task = await controller.addTask("Task", 1, "Issue", 1, "P");
+
+      await controller.startTimer(task.id, 10, "Development");
+
+      const updated = controller.getTaskById(task.id);
+      expect(updated?.timerPhase).toBe("working");
+      expect(updated?.activityId).toBe(10);
+      expect(updated?.activityName).toBe("Development");
+      expect(updated?.timerSecondsLeft).toBeDefined();
+    });
+
+    it("pauses timer on a working task", async () => {
+      const task = await controller.addTask("Task", 1, "Issue", 1, "P");
+      await controller.startTimer(task.id, 10, "Development");
+
+      await controller.pauseTimer(task.id);
+
+      const updated = controller.getTaskById(task.id);
+      expect(updated?.timerPhase).toBe("paused");
+    });
+
+    it("resumes paused timer", async () => {
+      const task = await controller.addTask("Task", 1, "Issue", 1, "P");
+      await controller.startTimer(task.id, 10, "Development");
+      await controller.pauseTimer(task.id);
+
+      await controller.resumeTimer(task.id);
+
+      const updated = controller.getTaskById(task.id);
+      expect(updated?.timerPhase).toBe("working");
+    });
+
+    it("stops timer and clears state", async () => {
+      const task = await controller.addTask("Task", 1, "Issue", 1, "P");
+      await controller.startTimer(task.id, 10, "Development");
+
+      await controller.stopTimer(task.id);
+
+      const updated = controller.getTaskById(task.id);
+      expect(updated?.timerPhase).toBeUndefined();
+      expect(updated?.timerSecondsLeft).toBeUndefined();
+    });
+
+    it("auto-pauses other task when starting new timer", async () => {
+      const task1 = await controller.addTask("Task 1", 1, "I1", 1, "P");
+      const task2 = await controller.addTask("Task 2", 2, "I2", 1, "P");
+
+      await controller.startTimer(task1.id, 10, "Dev");
+      await controller.startTimer(task2.id, 10, "Dev");
+
+      const updated1 = controller.getTaskById(task1.id);
+      const updated2 = controller.getTaskById(task2.id);
+      expect(updated1?.timerPhase).toBe("paused");
+      expect(updated2?.timerPhase).toBe("working");
+    });
+
+    it("getActiveTask returns working task", async () => {
+      const task = await controller.addTask("Task", 1, "Issue", 1, "P");
+      await controller.startTimer(task.id, 10, "Dev");
+
+      expect(controller.getActiveTask()?.id).toBe(task.id);
+    });
+  });
+
+  describe("deferred minutes", () => {
+    it("tracks deferred minutes", () => {
+      expect(controller.getDeferredMinutes()).toBe(0);
+
+      controller.addDeferredMinutes(15);
+      expect(controller.getDeferredMinutes()).toBe(15);
+
+      controller.addDeferredMinutes(10);
+      expect(controller.getDeferredMinutes()).toBe(25);
+    });
+
+    it("consumes deferred minutes", () => {
+      controller.addDeferredMinutes(20);
+
+      const consumed = controller.consumeDeferredMinutes();
+
+      expect(consumed).toBe(20);
+      expect(controller.getDeferredMinutes()).toBe(0);
+    });
+  });
+
+  describe("work duration", () => {
+    it("returns default work duration", () => {
+      expect(controller.getWorkDurationSeconds()).toBe(45 * 60);
+    });
+
+    it("allows updating work duration", () => {
+      controller.setWorkDurationSeconds(30 * 60);
+      expect(controller.getWorkDurationSeconds()).toBe(30 * 60);
+    });
+  });
+
+  describe("parent project update", () => {
+    it("updates parent project info", async () => {
+      const task = await controller.addTask("Task", 1, "Issue", 1, "Project");
+
+      await controller.updateParentProject(task.id, 10, "Parent Project");
+
+      const updated = controller.getTaskById(task.id);
+      expect(updated?.linkedParentProjectId).toBe(10);
+      expect(updated?.linkedParentProjectName).toBe("Parent Project");
+    });
+  });
+
+  describe("reorder operations", () => {
+    it("moves task up in column", async () => {
+      const task1 = await controller.addTask("Task 1", 1, "I1", 1, "P");
+      const task2 = await controller.addTask("Task 2", 2, "I2", 1, "P");
+
+      // Both are in todo column
+      await controller.moveUp(task2.id);
+
+      const updated1 = controller.getTaskById(task1.id);
+      const updated2 = controller.getTaskById(task2.id);
+
+      // task2 should now have lower sortOrder (higher position)
+      expect(updated2?.sortOrder).toBeLessThan(updated1?.sortOrder ?? Infinity);
+    });
+
+    it("moves task down in column", async () => {
+      const task1 = await controller.addTask("Task 1", 1, "I1", 1, "P");
+      const task2 = await controller.addTask("Task 2", 2, "I2", 1, "P");
+
+      await controller.moveDown(task1.id);
+
+      const updated1 = controller.getTaskById(task1.id);
+      const updated2 = controller.getTaskById(task2.id);
+
+      // task1 should now have higher sortOrder (lower position)
+      expect(updated1?.sortOrder).toBeGreaterThan(updated2?.sortOrder ?? -Infinity);
+    });
+  });
+
+  describe("addLoggedHours", () => {
+    it("rejects non-positive hours", async () => {
+      const task = await controller.addTask("Task", 1, "Issue", 1, "P");
+
+      await controller.addLoggedHours(task.id, 0);
+      await controller.addLoggedHours(task.id, -1);
+
+      const updated = controller.getTaskById(task.id);
+      expect(updated?.loggedHours).toBe(0);
+    });
+  });
+
+  describe("dispose", () => {
+    it("cleans up resources", async () => {
+      const task = await controller.addTask("Task", 1, "Issue", 1, "P");
+      await controller.startTimer(task.id, 10, "Dev");
+
+      controller.dispose();
+
+      // Should complete without error
+    });
+  });
 });

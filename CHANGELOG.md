@@ -2,6 +2,20 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.14.1]
+
+### Internal
+
+- **Test coverage improvements** - raised coverage thresholds to industry standards (72% statements, 75% lines, 76% functions, 63% branches)
+  - Added tests for migration.ts (0%→97%)
+  - Added tests for recent-issues.ts (15%→100%)
+  - Added tests for kanban-status-bar.ts (0%→98%)
+  - Added tests for precedence-tracker.ts (0%→100%)
+  - Added tests for secret-manager.ts (54%→100%)
+  - Expanded kanban-state.ts tests (61%→100%)
+  - Expanded kanban-controller.ts tests (60%→81%)
+  - Excluded completion-sound.ts from coverage (platform-specific audio)
+
 ## [4.14.0]
 
 ### Added

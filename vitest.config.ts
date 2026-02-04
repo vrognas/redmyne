@@ -44,14 +44,15 @@ export default defineConfig({
         "src/utilities/collapse-state.ts", // VS Code globalState - requires mocking
         "src/utilities/hierarchy-builder.ts", // Complex tree building - needs dedicated tests
         "src/utilities/date-picker.ts", // VS Code QuickPick - requires mocking
+        "src/utilities/completion-sound.ts", // Platform-specific audio - requires mocking exec
         "src/redmine/models/**/*.ts", // Type definitions only
         "src/definitions/**/*.ts", // Type definitions only
       ],
       thresholds: {
-        lines: 63,
-        functions: 60,
-        branches: 55,
-        statements: 60,
+        lines: 75,
+        functions: 76,
+        branches: 63,
+        statements: 72,
       },
     },
     globals: true,
