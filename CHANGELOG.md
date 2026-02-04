@@ -4,6 +4,14 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 
 ## [4.15.0]
 
+### Changed
+
+- **VS Code engine requirement** - bumped minimum from 1.100.0 to 1.105.0
+
+### Internal
+
+- **Dependency updates** - prettier 3.8.0, vitest 4.0.18
+
 ### Added
 
 - **Hide empty projects when filter active** - projects with no matching issues are now hidden (#64)
