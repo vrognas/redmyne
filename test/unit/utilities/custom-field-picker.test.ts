@@ -1,13 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import * as vscode from "vscode";
-import {
-  pickRequiredCustomFields,
-  pickCustomFields,
+import type {
   TimeEntryCustomFieldValue,
   CustomFieldDefinition,
-} from "../../../src/utilities/custom-field-picker";
+} from "../../../src/redmine/models/custom-field-definition";
 
-// Mock vscode
+// Mock vscode before any imports that use it
 vi.mock("vscode", () => ({
   window: {
     showQuickPick: vi.fn(),
@@ -18,10 +15,12 @@ vi.mock("vscode", () => ({
 describe("custom-field-picker", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.resetModules();
   });
 
   describe("pickRequiredCustomFields", () => {
     it("returns empty values when no required fields", async () => {
+      const { pickRequiredCustomFields } = await import("../../../src/utilities/custom-field-picker");
       const fields: CustomFieldDefinition[] = [
         { id: 1, name: "Optional", field_format: "string", is_required: false, customized_type: "time_entry" },
       ];
@@ -33,6 +32,9 @@ describe("custom-field-picker", () => {
     });
 
     it("prompts for list field with QuickPick", async () => {
+      const vscode = await import("vscode");
+      const { pickRequiredCustomFields } = await import("../../../src/utilities/custom-field-picker");
+
       const fields: CustomFieldDefinition[] = [
         {
           id: 1,
@@ -50,7 +52,7 @@ describe("custom-field-picker", () => {
       vi.mocked(vscode.window.showQuickPick).mockResolvedValue({
         label: "Client",
         value: "client",
-      } as unknown as vscode.QuickPickItem);
+      } as unknown as ReturnType<typeof vscode.window.showQuickPick>);
 
       const result = await pickRequiredCustomFields(fields);
 
@@ -60,6 +62,9 @@ describe("custom-field-picker", () => {
     });
 
     it("returns cancelled when user cancels list picker", async () => {
+      const vscode = await import("vscode");
+      const { pickRequiredCustomFields } = await import("../../../src/utilities/custom-field-picker");
+
       const fields: CustomFieldDefinition[] = [
         {
           id: 1,
@@ -79,6 +84,9 @@ describe("custom-field-picker", () => {
     });
 
     it("prompts for bool field with Yes/No picker", async () => {
+      const vscode = await import("vscode");
+      const { pickRequiredCustomFields } = await import("../../../src/utilities/custom-field-picker");
+
       const fields: CustomFieldDefinition[] = [
         { id: 2, name: "Billable", field_format: "bool", is_required: true, customized_type: "time_entry" },
       ];
@@ -86,7 +94,7 @@ describe("custom-field-picker", () => {
       vi.mocked(vscode.window.showQuickPick).mockResolvedValue({
         label: "Yes",
         value: "1",
-      } as unknown as vscode.QuickPickItem);
+      } as unknown as ReturnType<typeof vscode.window.showQuickPick>);
 
       const result = await pickRequiredCustomFields(fields);
 
@@ -101,6 +109,9 @@ describe("custom-field-picker", () => {
     });
 
     it("prompts for string field with InputBox", async () => {
+      const vscode = await import("vscode");
+      const { pickRequiredCustomFields } = await import("../../../src/utilities/custom-field-picker");
+
       const fields: CustomFieldDefinition[] = [
         { id: 3, name: "Task Code", field_format: "string", is_required: true, customized_type: "time_entry" },
       ];
@@ -114,6 +125,9 @@ describe("custom-field-picker", () => {
     });
 
     it("prompts for int field with validation", async () => {
+      const vscode = await import("vscode");
+      const { pickRequiredCustomFields } = await import("../../../src/utilities/custom-field-picker");
+
       const fields: CustomFieldDefinition[] = [
         { id: 4, name: "Units", field_format: "int", is_required: true, customized_type: "time_entry" },
       ];
@@ -127,6 +141,9 @@ describe("custom-field-picker", () => {
     });
 
     it("prompts for float field with validation", async () => {
+      const vscode = await import("vscode");
+      const { pickRequiredCustomFields } = await import("../../../src/utilities/custom-field-picker");
+
       const fields: CustomFieldDefinition[] = [
         { id: 5, name: "Rate", field_format: "float", is_required: true, customized_type: "time_entry" },
       ];
@@ -139,6 +156,9 @@ describe("custom-field-picker", () => {
     });
 
     it("prompts for date field", async () => {
+      const vscode = await import("vscode");
+      const { pickRequiredCustomFields } = await import("../../../src/utilities/custom-field-picker");
+
       const fields: CustomFieldDefinition[] = [
         { id: 6, name: "Invoice Date", field_format: "date", is_required: true, customized_type: "time_entry" },
       ];
@@ -151,6 +171,9 @@ describe("custom-field-picker", () => {
     });
 
     it("handles multiple required fields in sequence", async () => {
+      const vscode = await import("vscode");
+      const { pickRequiredCustomFields } = await import("../../../src/utilities/custom-field-picker");
+
       const fields: CustomFieldDefinition[] = [
         { id: 1, name: "Code", field_format: "string", is_required: true, customized_type: "time_entry" },
         { id: 2, name: "Billable", field_format: "bool", is_required: true, customized_type: "time_entry" },
@@ -160,7 +183,7 @@ describe("custom-field-picker", () => {
       vi.mocked(vscode.window.showQuickPick).mockResolvedValue({
         label: "No",
         value: "0",
-      } as unknown as vscode.QuickPickItem);
+      } as unknown as ReturnType<typeof vscode.window.showQuickPick>);
 
       const result = await pickRequiredCustomFields(fields);
 
@@ -171,6 +194,9 @@ describe("custom-field-picker", () => {
     });
 
     it("handles multi-select list field", async () => {
+      const vscode = await import("vscode");
+      const { pickRequiredCustomFields } = await import("../../../src/utilities/custom-field-picker");
+
       const fields: CustomFieldDefinition[] = [
         {
           id: 7,
@@ -190,7 +216,7 @@ describe("custom-field-picker", () => {
       vi.mocked(vscode.window.showQuickPick).mockResolvedValue([
         { label: "dev", value: "dev" },
         { label: "test", value: "test" },
-      ] as unknown as vscode.QuickPickItem[]);
+      ] as unknown as ReturnType<typeof vscode.window.showQuickPick>);
 
       const result = await pickRequiredCustomFields(fields);
 
@@ -204,6 +230,9 @@ describe("custom-field-picker", () => {
 
   describe("pickCustomFields", () => {
     it("shows all fields including optional", async () => {
+      const vscode = await import("vscode");
+      const { pickCustomFields } = await import("../../../src/utilities/custom-field-picker");
+
       const fields: CustomFieldDefinition[] = [
         { id: 1, name: "Required", field_format: "string", is_required: true, customized_type: "time_entry" },
         { id: 2, name: "Optional", field_format: "string", is_required: false, customized_type: "time_entry" },
@@ -223,6 +252,9 @@ describe("custom-field-picker", () => {
     });
 
     it("uses existing values as defaults", async () => {
+      const vscode = await import("vscode");
+      const { pickCustomFields } = await import("../../../src/utilities/custom-field-picker");
+
       const fields: CustomFieldDefinition[] = [
         { id: 1, name: "Code", field_format: "string", is_required: true, customized_type: "time_entry" },
       ];
