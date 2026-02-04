@@ -25,6 +25,7 @@ export async function quickLogTime(
   presetDate?: string, // Optional pre-selected date (YYYY-MM-DD)
   presetIssueId?: number // Optional pre-selected issue ID (from context menu)
 ): Promise<void> {
+  let promptedForCustomFields = false;
   try {
     // 1. Get recent log from cache
     const recent = context.globalState.get<RecentTimeLog>("lastTimeLog");
@@ -134,12 +135,13 @@ export async function quickLogTime(
       const customFieldDefs = await props.server.getTimeEntryCustomFields();
       const required = customFieldDefs.filter((f) => f.is_required);
       if (required.length > 0) {
+        promptedForCustomFields = true;
         const { values, cancelled } = await pickRequiredCustomFields(required);
         if (cancelled) return;
         customFieldValues = values;
       }
     } catch {
-      // Custom fields API may not be accessible (non-admin) - continue without
+      // Custom fields API not accessible (non-admin) - continue without
     }
 
     // 8. Post time entry (always pass date for draft mode compatibility)
@@ -170,9 +172,27 @@ export async function quickLogTime(
       `$(check) Logged ${formatHoursAsHHMM(hours)} to #${selection.issueId}${dateConfirmation}`
     );
   } catch (error) {
-    vscode.window.showErrorMessage(
-      `Failed to log time: ${errorToString(error)}`
-    );
+    const errorMsg = errorToString(error);
+    // Detect custom field validation errors (e.g., "Custom field 'X' cannot be blank")
+    const isCustomFieldError = /custom.?field/i.test(errorMsg);
+
+    if (isCustomFieldError && !promptedForCustomFields) {
+      // Server requires custom fields but we didn't prompt - likely non-admin user
+      vscode.window.showErrorMessage(
+        `${errorMsg} - The custom fields API requires admin access. ` +
+        "Log time via Redmine web interface or contact your administrator.",
+        "Open Redmine"
+      ).then((choice) => {
+        if (choice === "Open Redmine") {
+          const url = props.config.serverUrl;
+          if (url) {
+            vscode.env.openExternal(vscode.Uri.parse(`${url}/time_entries/new`));
+          }
+        }
+      });
+    } else {
+      vscode.window.showErrorMessage(`Failed to log time: ${errorMsg}`);
+    }
   }
 }
 
