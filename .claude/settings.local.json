@@ -3,7 +3,6 @@
     "allow": [
       "Bash(npm install:*)",
       "Bash(npm run compile:*)",
-      "Bash(gh:*)",
       "Bash(~/.local/bin/gh:*)",
       "Bash(ghcli:*)",
       "Bash(git add:*)",
