@@ -2,7 +2,7 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
-## [4.15.0]
+## [4.15.1]
 
 ### Changed
 
@@ -11,6 +11,8 @@ All notable changes to the "Redmyne" extension will be documented in this file.
 ### Internal
 
 - **Dependency updates** - prettier 3.8.0, vitest 4.0.18
+
+## [4.15.0]
 
 ### Added
 
