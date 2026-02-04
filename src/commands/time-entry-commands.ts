@@ -64,7 +64,7 @@ interface WeekGroupNode {
     hours: string;
     comments: string;
     spent_on?: string;
-    custom_fields?: Array<{ id: number; name: string; value: unknown }>;
+    custom_fields?: Array<{ id: number; name?: string; value: unknown }>;
   }>;
 }
 

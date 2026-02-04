@@ -6,7 +6,7 @@ import { RedmineServer } from "../redmine/redmine-server";
 import { pickActivityForProject } from "../utilities/issue-picker";
 import { showActionableError } from "../utilities/error-feedback";
 import { showStatusBarMessage } from "../utilities/status-bar";
-import { promptForRequiredCustomFields, TimeEntryCustomFieldValue } from "../utilities/custom-field-picker";
+import { promptForRequiredCustomFields } from "../utilities/custom-field-picker";
 import { KanbanTreeProvider } from "./kanban-tree-provider";
 
 interface TaskTreeItem {
