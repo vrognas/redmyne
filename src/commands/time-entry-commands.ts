@@ -21,6 +21,7 @@ import { parseLocalDate, getWeekStart, formatLocalDate } from "../utilities/date
 import { DEFAULT_WEEKLY_SCHEDULE, WeeklySchedule } from "../utilities/flexibility-calculator";
 import { MonthlyScheduleOverrides } from "../utilities/monthly-schedule";
 import { pickCustomFields, TimeEntryCustomFieldValue } from "../utilities/custom-field-picker";
+import { confirmLogTimeOnClosedIssues } from "../utilities/closed-issue-guard";
 
 /** Time entry node from tree view */
 interface TimeEntryNode {
@@ -528,6 +529,11 @@ export function registerTimeEntryCommands(
           vscode.window.showInformationMessage("No entries to paste");
           return;
         }
+
+        // Check for closed issues in batch
+        const issueIds = clipboard.entries.map((e) => e.issue_id);
+        const closedConfirmed = await confirmLogTimeOnClosedIssues(server, issueIds);
+        if (!closedConfirmed) return;
 
         // Confirmation
         const confirm = await vscode.window.showInformationMessage(

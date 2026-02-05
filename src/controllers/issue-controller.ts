@@ -8,6 +8,7 @@ import { parseTimeInput, validateTimeInput, formatHoursAsHHMM } from "../utiliti
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { pickOptionalDate } from "../utilities/date-picker";
 import { promptForRequiredCustomFields } from "../utilities/custom-field-picker";
+import { confirmLogTimeOnClosedIssue } from "../utilities/closed-issue-guard";
 
 interface TimeEntryActivityItem extends vscode.QuickPickItem {
   activity: TimeEntryActivity;
@@ -21,6 +22,14 @@ export class IssueController {
   ) {}
 
   async chooseTimeEntryType(activities: TimeEntryActivity[]) {
+    // Confirm if issue is closed
+    const confirmed = await confirmLogTimeOnClosedIssue(
+      this.redmine,
+      this.issue.id,
+      this.issue
+    );
+    if (!confirmed) return;
+
     const act = await vscode.window.showQuickPick(
       activities.map((activity) => ({
         label: activity.name,

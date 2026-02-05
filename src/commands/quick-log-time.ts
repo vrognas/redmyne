@@ -6,6 +6,7 @@ import { pickIssueWithSearch, pickActivityForProject } from "../utilities/issue-
 import { pickDate } from "../utilities/date-picker";
 import { errorToString } from "../utilities/error-feedback";
 import { pickRequiredCustomFields, TimeEntryCustomFieldValue } from "../utilities/custom-field-picker";
+import { confirmLogTimeOnClosedIssue } from "../utilities/closed-issue-guard";
 
 interface RecentTimeLog {
   issueId: number;
@@ -39,9 +40,11 @@ export async function quickLogTime(
     };
 
     // If issue pre-selected (from context menu), fetch it and pick activity only
+    let fetchedIssue: Pick<import("../redmine/models/issue").Issue, "id" | "status"> | undefined;
     if (presetIssueId) {
       const issueResult = await props.server.getIssueById(presetIssueId);
       const issue = issueResult.issue;
+      fetchedIssue = issue;
       if (!issue.project?.id) {
         vscode.window.showErrorMessage("Issue has no associated project");
         return;
@@ -90,6 +93,10 @@ export async function quickLogTime(
       if (!picked || picked === "skip") return;
       selection = picked;
     }
+
+    // 2b. Confirm if issue is closed (reuse fetched issue to avoid duplicate API call)
+    const confirmed = await confirmLogTimeOnClosedIssue(props.server, selection.issueId, fetchedIssue);
+    if (!confirmed) return;
 
     // 3. Pick date (skip if presetDate provided)
     const selectedDate = presetDate ?? (await pickDate());

@@ -2,6 +2,14 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.16.0]
+
+### Added
+
+- **Closed issue warning** - confirmation dialog before logging time on closed issues
+  - Applies to: Quick Log Time, context menu, timer completion, paste entries, kanban
+  - Batch paste shows single dialog for all closed issues
+
 ## [4.15.1]
 
 ### Changed

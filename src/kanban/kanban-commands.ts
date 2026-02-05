@@ -7,6 +7,7 @@ import { pickActivityForProject } from "../utilities/issue-picker";
 import { showActionableError } from "../utilities/error-feedback";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { promptForRequiredCustomFields } from "../utilities/custom-field-picker";
+import { confirmLogTimeOnClosedIssue } from "../utilities/closed-issue-guard";
 import { KanbanTreeProvider } from "./kanban-tree-provider";
 
 interface TaskTreeItem {
@@ -459,6 +460,10 @@ export function registerKanbanCommands(
           await promptForRequiredCustomFields(() => server.getTimeEntryCustomFields());
         if (cancelled) return;
 
+        // Confirm if issue is closed
+        const closedConfirmed = await confirmLogTimeOnClosedIssue(server, task.linkedIssueId);
+        if (!closedConfirmed) return;
+
         const roundedHours = Math.round(hours * 100) / 100;
         const confirm = await vscode.window.showWarningMessage(
           `Log ${roundedHours}h for #${task.linkedIssueId}?`,
@@ -555,6 +560,10 @@ export function registerKanbanCommands(
         const { values: customFieldValues, cancelled, prompted } =
           await promptForRequiredCustomFields(() => server.getTimeEntryCustomFields());
         if (cancelled) return;
+
+        // Confirm if issue is closed
+        const closedConfirmed = await confirmLogTimeOnClosedIssue(server, task.linkedIssueId);
+        if (!closedConfirmed) return;
 
         const workDuration = controller.getWorkDurationSeconds();
         const hours = workDuration / 3600;

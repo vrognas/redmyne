@@ -50,6 +50,7 @@ import { debounce, DebouncedFunction } from "./utilities/debounce";
 import { runMigration } from "./utilities/migration";
 import { promptForRequiredCustomFields } from "./utilities/custom-field-picker";
 import { initRecentIssues } from "./utilities/recent-issues";
+import { confirmLogTimeOnClosedIssue } from "./utilities/closed-issue-guard";
 import { DraftQueue } from "./draft-mode/draft-queue";
 import { DraftModeManager } from "./draft-mode/draft-mode-manager";
 import { DraftModeServer } from "./draft-mode/draft-mode-server";
@@ -242,6 +243,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (customFieldResult.cancelled) {
         return; // User cancelled custom fields
       }
+
+      // Confirm if issue is closed
+      const closedConfirmed = await confirmLogTimeOnClosedIssue(server, task.linkedIssueId);
+      if (!closedConfirmed) return;
 
       // Show completion dialog
       const action = await vscode.window.showWarningMessage(
