@@ -2,6 +2,13 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.16.2]
+
+### Internal
+
+- **Command validation and URL helpers** - centralized shared guards and URL builders to reduce duplication and tighten typed validation across command handlers
+- **Command test coverage expansion** - added focused unit tests for command guard/url helpers and refactored command modules to preserve behavior during ongoing cleanup
+
 ## [4.16.1]
 
 ### Internal
