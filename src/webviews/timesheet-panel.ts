@@ -16,6 +16,12 @@ import { parseLocalDate, getLocalToday } from "../utilities/date-utils";
 import { pickIssue } from "../utilities/issue-picker";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import {
+  isValidTimesheetDayIndex,
+  parseAggregatedRowKey,
+  parseAggregatedTempId,
+  parseRowDayTempId,
+} from "../utilities/timesheet-id-parser";
+import {
   setClipboard,
   getClipboard,
   ClipboardEntry,
@@ -790,20 +796,13 @@ export class TimeSheetPanel {
         // 3. Normal: "rowId:dayIndex"
 
         if (op.tempId.startsWith("agg-")) {
-          // Aggregated row format uses :: as delimiter for issueId/activityId/comments
-          // Format: agg-{issueId}::{activityId}::{comments}:{dayIndex}
-          const aggMatch = op.tempId.match(/^agg-(.+?)::(.+?)::(.*)$/);
-          if (!aggMatch) continue;
-          const [, issueIdStr, activityIdStr, rest] = aggMatch;
-          // rest = "comments:dayIndex" - dayIndex is last segment after :
-          const lastColonIdx = rest.lastIndexOf(":");
-          const dayIndex = lastColonIdx >= 0 ? parseInt(rest.slice(lastColonIdx + 1), 10) : NaN;
-          const issueId = issueIdStr === "null" ? null : parseInt(issueIdStr, 10);
-          const activityId = activityIdStr === "null" ? null : parseInt(activityIdStr, 10);
+          const parsedAggregatedTempId = parseAggregatedTempId(op.tempId);
+          if (!parsedAggregatedTempId || !isValidTimesheetDayIndex(parsedAggregatedTempId.dayIndex)) continue;
+          const { issueId, activityId, dayIndex } = parsedAggregatedTempId;
 
           // Find source row with matching issueId and activityId
           const row = this._rows.find((r) => r.issueId === issueId && r.activityId === activityId);
-          if (row && !isNaN(dayIndex) && dayIndex >= 0 && dayIndex < 7) {
+          if (row) {
             const hours = extractHoursFromDraftOp(op.http.data);
             const cell = row.days[dayIndex] || { hours: 0, originalHours: 0, entryId: null, isDirty: false };
             row.days[dayIndex] = { ...cell, hours, isDirty: true };
@@ -866,12 +865,11 @@ export class TimeSheetPanel {
           row.weekTotal = Object.values(row.days).reduce((sum, c) => sum + c.hours, 0);
         } else {
           // Normal row format: "rowId:dayIndex"
-          const lastColonIdx = op.tempId.lastIndexOf(":");
-          if (lastColonIdx < 0) continue;
-          const rowId = op.tempId.slice(0, lastColonIdx);
-          const dayIndex = parseInt(op.tempId.slice(lastColonIdx + 1), 10);
+          const parsedRowTempId = parseRowDayTempId(op.tempId);
+          if (!parsedRowTempId || !isValidTimesheetDayIndex(parsedRowTempId.dayIndex)) continue;
+          const { rowId, dayIndex } = parsedRowTempId;
           const row = this._rows.find((r) => r.id === rowId);
-          if (row && !isNaN(dayIndex) && dayIndex >= 0 && dayIndex < 7) {
+          if (row) {
             const hours = extractHoursFromDraftOp(op.http.data);
             const cell = row.days[dayIndex] || { hours: 0, originalHours: 0, entryId: null, isDirty: false };
             row.days[dayIndex] = { ...cell, hours, isDirty: true };
@@ -1027,13 +1025,9 @@ export class TimeSheetPanel {
   private async _deleteAggregatedRow(aggRowId: string): Promise<void> {
     if (!this._draftQueue || !this._draftModeManager?.isEnabled) return;
 
-    // Parse key from aggRowId: agg-{issueId}:{activityId}:{comments}
-    const keyMatch = aggRowId.match(/^agg-(.+?)::(.+?)::(.*)$/);
-    if (!keyMatch) return;
-
-    const issueId = keyMatch[1] === "null" ? null : parseInt(keyMatch[1], 10);
-    const activityId = keyMatch[2] === "null" ? null : parseInt(keyMatch[2], 10);
-    const comments = keyMatch[3] || null;
+    const parsedAggRowKey = parseAggregatedRowKey(aggRowId);
+    if (!parsedAggRowKey) return;
+    const { issueId, activityId, comments } = parsedAggRowKey;
 
     // Find all source rows that match this aggregation key
     const sourceRows = this._rows.filter(r =>
@@ -1089,13 +1083,9 @@ export class TimeSheetPanel {
     const totalHoursPerDay: number[] = [0, 0, 0, 0, 0, 0, 0];
 
     if (isAggregated) {
-      // Parse key from aggRowId: agg-{issueId}:{activityId}:{comments}
-      const keyMatch = rowId.match(/^agg-(.+?)::(.+?)::(.*)$/);
-      if (!keyMatch) return;
-
-      const issueId = keyMatch[1] === "null" ? null : parseInt(keyMatch[1], 10);
-      const activityId = keyMatch[2] === "null" ? null : parseInt(keyMatch[2], 10);
-      const comments = keyMatch[3] || null;
+      const parsedAggRowKey = parseAggregatedRowKey(rowId);
+      if (!parsedAggRowKey) return;
+      const { issueId, activityId, comments } = parsedAggRowKey;
 
       // Find all source rows that match this aggregation key
       const sourceRows = this._rows.filter(r =>
@@ -1799,14 +1789,9 @@ export class TimeSheetPanel {
 
     const date = this._currentWeek.dayDates[dayIndex];
 
-    // Parse issueId, activityId, comments from aggRowId
-    // Format: agg-{issueId}:{activityId}:{comments}
-    const keyMatch = aggRowId.match(/^agg-(.+?)::(.+?)::(.*)$/);
-    if (!keyMatch) return;
-
-    const issueId = keyMatch[1] === "null" ? null : parseInt(keyMatch[1], 10);
-    const activityId = keyMatch[2] === "null" ? null : parseInt(keyMatch[2], 10);
-    const comments = keyMatch[3] || null;
+    const parsedAggRowKey = parseAggregatedRowKey(aggRowId);
+    if (!parsedAggRowKey) return;
+    const { issueId, activityId, comments } = parsedAggRowKey;
 
     if (!issueId || !activityId) return;
 
