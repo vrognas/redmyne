@@ -7,6 +7,7 @@ describe("applyDraftsWithTracking", () => {
   let mockServer: {
     setIssueStatus: ReturnType<typeof vi.fn>;
     put: ReturnType<typeof vi.fn>;
+    updateTimeEntry: ReturnType<typeof vi.fn>;
   };
 
   let mockQueue: {
@@ -33,6 +34,7 @@ describe("applyDraftsWithTracking", () => {
     mockServer = {
       setIssueStatus: vi.fn().mockResolvedValue({}),
       put: vi.fn().mockResolvedValue({}),
+      updateTimeEntry: vi.fn().mockResolvedValue({}),
     };
     mockQueue = {
       remove: vi.fn().mockResolvedValue(undefined),
@@ -139,5 +141,52 @@ describe("applyDraftsWithTracking", () => {
     expect(mockQueue.remove).toHaveBeenCalledTimes(2);
     expect(mockQueue.remove).toHaveBeenNthCalledWith(1, "1", DRAFT_COMMAND_SOURCE);
     expect(mockQueue.remove).toHaveBeenNthCalledWith(2, "2", DRAFT_COMMAND_SOURCE);
+  });
+
+  it("fails operation when issueId is missing for issue-based drafts", async () => {
+    const opWithoutIssueId: DraftOperation = {
+      ...createOp("missing-issue", "Op missing issueId"),
+      issueId: undefined,
+    };
+
+    const result = await applyDraftsWithTracking(
+      mockServer as never,
+      mockQueue as never,
+      [opWithoutIssueId],
+      () => true
+    );
+
+    expect(result.succeeded).toHaveLength(0);
+    expect(result.failed).toHaveLength(1);
+    expect(result.failed[0].error).toContain("missing issueId");
+    expect(mockServer.setIssueStatus).not.toHaveBeenCalled();
+  });
+
+  it("fails operation when resourceId is missing for resource-based drafts", async () => {
+    const opWithoutResourceId: DraftOperation = {
+      id: "missing-resource",
+      type: "updateTimeEntry",
+      timestamp: Date.now(),
+      description: "Update entry without resourceId",
+      resourceKey: "timeentry:missing-resource",
+      http: {
+        method: "PUT",
+        path: "/time_entries/123.json",
+        data: { time_entry: { hours: "1.0" } },
+      },
+      resourceId: undefined,
+    };
+
+    const result = await applyDraftsWithTracking(
+      mockServer as never,
+      mockQueue as never,
+      [opWithoutResourceId],
+      () => true
+    );
+
+    expect(result.succeeded).toHaveLength(0);
+    expect(result.failed).toHaveLength(1);
+    expect(result.failed[0].error).toContain("missing resourceId");
+    expect(mockServer.updateTimeEntry).not.toHaveBeenCalled();
   });
 });

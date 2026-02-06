@@ -22,6 +22,12 @@ import { DEFAULT_WEEKLY_SCHEDULE, WeeklySchedule } from "../utilities/flexibilit
 import { MonthlyScheduleOverrides } from "../utilities/monthly-schedule";
 import { pickCustomFields, TimeEntryCustomFieldValue } from "../utilities/custom-field-picker";
 import { confirmLogTimeOnClosedIssues } from "../utilities/closed-issue-guard";
+import {
+  getConfiguredServerUrlOrShowError,
+  getIssueIdOrShowError,
+  getServerOrShowError,
+} from "./command-guards";
+import { buildIssueUrl } from "./command-urls";
 
 /** Time entry node from tree view */
 interface TimeEntryNode {
@@ -75,6 +81,28 @@ export interface TimeEntryCommandDeps {
   getMonthlySchedules?: () => MonthlyScheduleOverrides;
 }
 
+function getTimeEntryOrShowError(
+  node: TimeEntryNode | undefined
+): NonNullable<TimeEntryNode["_entry"]> | undefined {
+  const entry = node?._entry;
+  if (!entry) {
+    vscode.window.showErrorMessage("No time entry selected");
+    return undefined;
+  }
+  return entry;
+}
+
+function getTimeEntryWithIdOrShowError(
+  node: TimeEntryNode | undefined
+): (NonNullable<TimeEntryNode["_entry"]> & { id: number }) | undefined {
+  const entry = getTimeEntryOrShowError(node);
+  if (!entry?.id) {
+    vscode.window.showErrorMessage("No time entry selected");
+    return undefined;
+  }
+  return entry as NonNullable<TimeEntryNode["_entry"]> & { id: number };
+}
+
 export function registerTimeEntryCommands(
   context: vscode.ExtensionContext,
   deps: TimeEntryCommandDeps
@@ -106,37 +134,24 @@ export function registerTimeEntryCommands(
         }
       }
 
-      if (!issueId) {
-        vscode.window.showErrorMessage("Could not determine issue ID");
-        return;
-      }
+      const resolvedIssueId = getIssueIdOrShowError({ id: issueId });
+      if (!resolvedIssueId) return;
 
-      // Get URL from config
-      const config = vscode.workspace.getConfiguration("redmyne");
-      const url = config.get<string>("serverUrl");
-      if (!url) {
-        vscode.window.showErrorMessage("Redmine URL not configured");
-        return;
-      }
+      const url = getConfiguredServerUrlOrShowError("Redmine URL not configured");
+      if (!url) return;
 
-      await vscode.env.openExternal(vscode.Uri.parse(`${url}/issues/${issueId}`));
+      await vscode.env.openExternal(vscode.Uri.parse(buildIssueUrl(url, resolvedIssueId)));
     })
   );
 
   // Edit time entry
   context.subscriptions.push(
     vscode.commands.registerCommand("redmyne.editTimeEntry", async (node: TimeEntryNode) => {
-      const entry = node?._entry;
-      if (!entry?.id) {
-        vscode.window.showErrorMessage("No time entry selected");
-        return;
-      }
+      const entry = getTimeEntryWithIdOrShowError(node);
+      if (!entry) return;
 
-      const server = deps.getServer();
-      if (!server) {
-        vscode.window.showErrorMessage("No Redmine server configured");
-        return;
-      }
+      const server = getServerOrShowError(deps.getServer);
+      if (!server) return;
 
       // Show what to edit
       const hoursDisplay = formatHoursAsHHMM(parseFloat(entry.hours));
@@ -245,17 +260,11 @@ export function registerTimeEntryCommands(
   // Delete time entry
   context.subscriptions.push(
     vscode.commands.registerCommand("redmyne.deleteTimeEntry", async (node: TimeEntryNode) => {
-      const entry = node?._entry;
-      if (!entry?.id) {
-        vscode.window.showErrorMessage("No time entry selected");
-        return;
-      }
+      const entry = getTimeEntryWithIdOrShowError(node);
+      if (!entry) return;
 
-      const server = deps.getServer();
-      if (!server) {
-        vscode.window.showErrorMessage("No Redmine server configured");
-        return;
-      }
+      const server = getServerOrShowError(deps.getServer);
+      if (!server) return;
 
       const hoursDisplay = formatHoursAsHHMM(parseFloat(entry.hours));
       const issueInfo = entry.issue ? `#${entry.issue.id} ${entry.issue.subject || ""}`.trim() : "Unknown issue";
@@ -281,11 +290,8 @@ export function registerTimeEntryCommands(
   // Add time entry for a specific date (context menu on day-group)
   context.subscriptions.push(
     vscode.commands.registerCommand("redmyne.addTimeEntryForDate", async (node: DayGroupNode) => {
-      const server = deps.getServer();
-      if (!server) {
-        vscode.window.showErrorMessage("No Redmine server configured");
-        return;
-      }
+      const server = getServerOrShowError(deps.getServer);
+      if (!server) return;
 
       const config = vscode.workspace.getConfiguration("redmyne");
       const url = config.get<string>("serverUrl") || "";
@@ -302,11 +308,8 @@ export function registerTimeEntryCommands(
   // Copy single time entry
   context.subscriptions.push(
     vscode.commands.registerCommand("redmyne.copyTimeEntry", (node: TimeEntryNode) => {
-      const entry = node?._entry;
-      if (!entry) {
-        vscode.window.showErrorMessage("No time entry selected");
-        return;
-      }
+      const entry = getTimeEntryOrShowError(node);
+      if (!entry) return;
 
       const clipEntry: ClipboardEntry = {
         issue_id: entry.issue_id ?? entry.issue?.id ?? 0,
@@ -377,11 +380,8 @@ export function registerTimeEntryCommands(
 
       // If no node (toolbar invocation), fetch current week from server
       if (!weekStart) {
-        const server = deps.getServer();
-        if (!server) {
-          vscode.window.showErrorMessage("No Redmine server configured");
-          return;
-        }
+        const server = getServerOrShowError(deps.getServer);
+        if (!server) return;
         weekStart = getWeekStart();
         const today = formatLocalDate(new Date());
         try {
@@ -460,11 +460,8 @@ export function registerTimeEntryCommands(
           return;
         }
 
-        const server = deps.getServer();
-        if (!server) {
-          vscode.window.showErrorMessage("No Redmine server configured");
-          return;
-        }
+        const server = getServerOrShowError(deps.getServer);
+        if (!server) return;
 
         // Determine target type and date
         const isDayTarget = node && "_date" in node && !!node._date;
@@ -512,12 +509,27 @@ export function registerTimeEntryCommands(
           return;
         }
 
+        const isWeekToWeekPaste =
+          clipboard.kind === "week" && targetKind === "week" && Boolean(clipboard.weekMap);
+        let targetWeekStartForPaste = "";
+        if (isWeekToWeekPaste) {
+          if (!targetWeekStart) {
+            vscode.window.showErrorMessage("Could not determine target week");
+            return;
+          }
+          targetWeekStartForPaste = targetWeekStart;
+        }
+
         // Calculate total entries to create
         let totalEntries = 0;
-        if (clipboard.kind === "week" && targetKind === "week" && clipboard.weekMap) {
+        if (isWeekToWeekPaste) {
           // Week→Week: entries per mapped day
           for (const date of targetDates) {
-            const dayEntries = getEntriesForTargetDate(clipboard, date, targetWeekStart!);
+            const dayEntries = getEntriesForTargetDate(
+              clipboard,
+              date,
+              targetWeekStartForPaste
+            );
             totalEntries += dayEntries.length;
           }
         } else {
@@ -553,8 +565,8 @@ export function registerTimeEntryCommands(
             for (const date of targetDates) {
               // Get entries for this date
               const entriesToCreate =
-                clipboard.kind === "week" && targetKind === "week"
-                  ? getEntriesForTargetDate(clipboard, date, targetWeekStart!)
+                isWeekToWeekPaste
+                  ? getEntriesForTargetDate(clipboard, date, targetWeekStartForPaste)
                   : clipboard.entries;
 
               for (const entry of entriesToCreate) {

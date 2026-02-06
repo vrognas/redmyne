@@ -69,6 +69,32 @@ describe("registerContextProxyCommands", () => {
     });
   });
 
+  it("copies project URL from gantt context when server URL exists", () => {
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+      get: vi.fn().mockReturnValue("https://redmine.example.test"),
+      update: vi.fn(),
+    } as unknown as vscode.WorkspaceConfiguration);
+    registerContextProxyCommands();
+
+    handlers.get("redmyne.gantt.copyProjectUrl")?.({ projectIdentifier: "ops" });
+
+    expect(vscode.env.clipboard.writeText).toHaveBeenCalledWith(
+      "https://redmine.example.test/projects/ops"
+    );
+  });
+
+  it("does not copy project URL when server URL is missing", () => {
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+      get: vi.fn().mockReturnValue(undefined),
+      update: vi.fn(),
+    } as unknown as vscode.WorkspaceConfiguration);
+    registerContextProxyCommands();
+
+    handlers.get("redmyne.gantt.copyProjectUrl")?.({ projectIdentifier: "ops" });
+
+    expect(vscode.env.clipboard.writeText).not.toHaveBeenCalled();
+  });
+
   it("does not execute when required context is missing", () => {
     registerContextProxyCommands();
 

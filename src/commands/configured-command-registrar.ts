@@ -4,6 +4,7 @@ import type {
   RedmineServer,
   RedmineServerConnectionOptions,
 } from "../redmine/redmine-server";
+import { getConfiguredServerUrlOrShowError } from "./command-guards";
 
 export interface RegisterConfiguredCommandDeps {
   context: vscode.ExtensionContext;
@@ -31,6 +32,8 @@ export type RegisterConfiguredCommand = (
 export function createConfiguredCommandRegistrar(
   deps: RegisterConfiguredCommandDeps
 ): RegisterConfiguredCommand {
+  const configureServerHint = 'Run "Configure Redmine Server"';
+
   const parseConfiguration = async (
     withPick: unknown = true,
     props?: ActionProperties,
@@ -43,7 +46,7 @@ export function createConfiguredCommandRegistrar(
     // Preserve it in args if it's an object (not a boolean).
     let contextArgs: unknown[] = [];
     if (typeof withPick === "object" && withPick !== null) {
-      contextArgs = [withPick, props, ...args];
+      contextArgs = [withPick, ...(props === undefined ? [] : [props]), ...args];
     }
 
     if (withPick === false) {
@@ -54,12 +57,10 @@ export function createConfiguredCommandRegistrar(
     }
 
     const config = vscode.workspace.getConfiguration("redmyne");
-    const url = config.get<string>("serverUrl");
-
+    const url = getConfiguredServerUrlOrShowError(
+      `No Redmine URL configured. ${configureServerHint}`
+    );
     if (!url) {
-      vscode.window.showErrorMessage(
-        'No Redmine URL configured. Run "Configure Redmine Server"'
-      );
       return { props: undefined, args: [] };
     }
 
@@ -67,7 +68,7 @@ export function createConfiguredCommandRegistrar(
 
     if (!apiKey) {
       vscode.window.showErrorMessage(
-        'No API key configured. Run "Configure Redmine Server"'
+        `No API key configured. ${configureServerHint}`
       );
       return { props: undefined, args: [] };
     }
@@ -117,17 +118,23 @@ export function createConfiguredCommandRegistrar(
     deps.context.subscriptions.push(
       vscode.commands.registerCommand(
         `redmyne.${name}`,
-        (withPick?: boolean, props?: ActionProperties, ...args: unknown[]) => {
-          parseConfiguration(withPick, props, ...args).then(
-            ({ props: parsedProps, args: parsedArgs }) => {
-              // `props` should be set when `withPick` is `false`.
-              // Otherwise `parseConfiguration` will take care of getting ActionProperties.
-              // It's used mainly by trees that always pass props argument.
-              if (parsedProps) {
-                action(parsedProps, ...parsedArgs);
-              }
+        async (withPick?: boolean, props?: ActionProperties, ...args: unknown[]) => {
+          try {
+            const { props: parsedProps, args: parsedArgs } = await parseConfiguration(
+              withPick,
+              props,
+              ...args
+            );
+            // `props` should be set when `withPick` is `false`.
+            // Otherwise `parseConfiguration` will take care of getting ActionProperties.
+            // It's used mainly by trees that always pass props argument.
+            if (parsedProps) {
+              await action(parsedProps, ...parsedArgs);
             }
-          );
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Command failed: ${msg}`);
+          }
         }
       )
     );

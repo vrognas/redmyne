@@ -1,8 +1,16 @@
 import * as vscode from "vscode";
 import type { ActionProperties } from "./action-properties";
 import { showStatusBarMessage } from "../utilities/status-bar";
-import { wizardPick, wizardInput, isBack, WizardPickItem } from "../utilities/wizard";
+import { wizardPick, wizardInput, isBack } from "../utilities/wizard";
 import { errorToString } from "../utilities/error-feedback";
+import {
+  findProjectByIdAsLabeledId,
+  mapNamedItemsToWizardPickItems,
+  mapProjectsToWizardPickItems,
+  requireNonEmptyStringOrShowError,
+  requireValueOrShowError,
+  validateOptionalIsoDate,
+} from "./quick-create-helpers";
 
 interface CreatedIssue {
   id: number;
@@ -14,13 +22,6 @@ const validateHours = (v: string): string | null => {
   if (!v) return null; // empty is valid (optional field)
   const num = Number(v); // Number() returns NaN for "5abc", unlike parseFloat
   return !isNaN(num) && num >= 0 ? null : "Must be positive number";
-};
-
-const validateDate = (v: string): string | null => {
-  if (!v) return null;
-  return /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v).getTime())
-    ? null
-    : "Use YYYY-MM-DD format";
 };
 
 /**
@@ -56,9 +57,9 @@ export async function quickCreateIssue(
 
     // Pre-fill project if provided
     if (preselectedProjectId) {
-      const project = projects.find(p => p.id === preselectedProjectId);
+      const project = findProjectByIdAsLabeledId(projects, preselectedProjectId);
       if (project) {
-        state.project = { label: project.name, id: project.id };
+        state.project = project;
         step = 2; // Skip project selection
       }
     }
@@ -68,10 +69,7 @@ export async function quickCreateIssue(
 
       switch (step) {
         case 1: {
-          const items: WizardPickItem<{ label: string; id: number }>[] = projects.map((p) => {
-            const item = p.toQuickPickItem();
-            return { label: item.label, description: item.description, data: { label: item.label, id: p.id } };
-          });
+          const items = mapProjectsToWizardPickItems(projects);
           const result = await wizardPick(items, {
             title: "Create Issue (1/7) - Project",
             placeHolder: "Select project",
@@ -85,10 +83,7 @@ export async function quickCreateIssue(
         }
 
         case 2: {
-          const items: WizardPickItem<{ label: string; id: number }>[] = trackers.map((t) => ({
-            label: t.name,
-            data: { label: t.name, id: t.id },
-          }));
+          const items = mapNamedItemsToWizardPickItems(trackers);
           const result = await wizardPick(items, {
             title: "Create Issue (2/7) - Tracker",
             placeHolder: "Select tracker",
@@ -102,10 +97,7 @@ export async function quickCreateIssue(
         }
 
         case 3: {
-          const items: WizardPickItem<{ label: string; id: number }>[] = priorities.map((p) => ({
-            label: p.name,
-            data: { label: p.name, id: p.id },
-          }));
+          const items = mapNamedItemsToWizardPickItems(priorities);
           const result = await wizardPick(items, {
             title: "Create Issue (3/7) - Priority",
             placeHolder: "Select priority",
@@ -170,7 +162,7 @@ export async function quickCreateIssue(
             title: "Create Issue (7/7) - Due Date",
             prompt: "Due date (optional, Enter to skip)",
             placeHolder: "YYYY-MM-DD",
-            validateInput: validateDate,
+            validateInput: validateOptionalIsoDate,
             value: state.dueDate,
           }, showBack);
 
@@ -183,12 +175,18 @@ export async function quickCreateIssue(
       }
     }
 
+    const project = requireValueOrShowError(state.project, "Could not determine project");
+    const tracker = requireValueOrShowError(state.tracker, "Could not determine tracker");
+    const priority = requireValueOrShowError(state.priority, "Could not determine priority");
+    const subject = requireNonEmptyStringOrShowError(state.subject, "Could not determine subject");
+    if (!project || !tracker || !priority || !subject) return undefined;
+
     // All steps completed - create issue
     const response = await props.server.createIssue({
-      project_id: state.project!.id,
-      tracker_id: state.tracker!.id,
-      priority_id: state.priority!.id,
-      subject: state.subject!,
+      project_id: project.id,
+      tracker_id: tracker.id,
+      priority_id: priority.id,
+      subject,
       description: state.description,
       estimated_hours: state.hours ? parseFloat(state.hours) : undefined,
       due_date: state.dueDate,
@@ -240,10 +238,7 @@ export async function quickCreateSubIssue(
 
       switch (step) {
         case 1: {
-          const items: WizardPickItem<{ label: string; id: number }>[] = priorities.map((p) => ({
-            label: p.name,
-            data: { label: p.name, id: p.id },
-          }));
+          const items = mapNamedItemsToWizardPickItems(priorities);
           const result = await wizardPick(items, {
             title: `${prefix} (1/5) - Priority`,
             placeHolder: "Select priority",
@@ -308,7 +303,7 @@ export async function quickCreateSubIssue(
             title: `${prefix} (5/5) - Due Date`,
             prompt: "Due date (optional, Enter to skip)",
             placeHolder: "YYYY-MM-DD",
-            validateInput: validateDate,
+            validateInput: validateOptionalIsoDate,
             value: state.dueDate,
           }, showBack);
 
@@ -321,11 +316,15 @@ export async function quickCreateSubIssue(
       }
     }
 
+    const priority = requireValueOrShowError(state.priority, "Could not determine priority");
+    const subject = requireNonEmptyStringOrShowError(state.subject, "Could not determine subject");
+    if (!priority || !subject) return undefined;
+
     const response = await props.server.createIssue({
       project_id: parent.project.id,
       tracker_id: parent.tracker.id,
-      priority_id: state.priority!.id,
-      subject: state.subject!,
+      priority_id: priority.id,
+      subject,
       parent_issue_id: parentIssueId,
       description: state.description,
       estimated_hours: state.hours ? parseFloat(state.hours) : undefined,

@@ -9,6 +9,14 @@ import { showStatusBarMessage } from "../utilities/status-bar";
 import { setInternalEstimate } from "../utilities/internal-estimates";
 import { parseTimeInput } from "../utilities/time-input";
 import { GanttPanel } from "../webviews/gantt-panel";
+import { buildProjectUrl } from "./command-urls";
+import {
+  ensureIssueId,
+  getConfiguredServerUrlOrShowError,
+  getNestedProjectIdOrShowError,
+  getNestedProjectIdentifierOrShowError,
+  getServerOrShowError,
+} from "./command-guards";
 
 const DONE_RATIO_OPTIONS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
@@ -24,6 +32,10 @@ export interface IssueContextCommandsDeps {
   refreshTimeEntries: () => void;
 }
 
+function refreshGanttData(): Thenable<unknown> {
+  return vscode.commands.executeCommand("redmyne.refreshGanttData");
+}
+
 export function registerIssueContextCommands(
   deps: IssueContextCommandsDeps
 ): vscode.Disposable[] {
@@ -34,15 +46,11 @@ export function registerIssueContextCommands(
     vscode.commands.registerCommand(
       "redmyne.setDoneRatio",
       async (issue: { id: number; done_ratio?: number; percentage?: number } | undefined) => {
-        if (!issue?.id) {
-          vscode.window.showErrorMessage("Could not determine issue ID");
-          return;
-        }
-        const server = deps.getProjectsServer();
-        if (!server) {
-          vscode.window.showErrorMessage("No Redmine server configured");
-          return;
-        }
+        if (!ensureIssueId(issue)) return;
+        const issueId = issue.id;
+
+        const server = getServerOrShowError(deps.getProjectsServer);
+        if (!server) return;
 
         let selectedValue: number;
 
@@ -56,7 +64,7 @@ export function registerIssueContextCommands(
           }));
 
           const selected = await vscode.window.showQuickPick(options, {
-            placeHolder: `Set % Done for #${issue.id}`,
+            placeHolder: `Set % Done for #${issueId}`,
           });
 
           if (selected === undefined) return;
@@ -64,11 +72,11 @@ export function registerIssueContextCommands(
         }
 
         try {
-          await server.updateDoneRatio(issue.id, selectedValue);
-          autoUpdateTracker.disable(issue.id);
+          await server.updateDoneRatio(issueId, selectedValue);
+          autoUpdateTracker.disable(issueId);
 
           const hoursInput = await vscode.window.showInputBox({
-            title: `Internal Estimate: #${issue.id}`,
+            title: `Internal Estimate: #${issueId}`,
             prompt: "Hours remaining until 100% done (e.g., 5, 2.5, 1:30, 2h 30min)",
             placeHolder: "Leave blank to skip",
             validateInput: (value) => {
@@ -83,18 +91,18 @@ export function registerIssueContextCommands(
           if (hoursInput && hoursInput.trim()) {
             const hours = parseTimeInput(hoursInput);
             if (hours !== null) {
-              await setInternalEstimate(deps.globalState, issue.id, hours);
+              await setInternalEstimate(deps.globalState, issueId, hours);
               showStatusBarMessage(
-                `$(check) #${issue.id} set to ${selectedValue}% with ${hours}h remaining`,
+                `$(check) #${issueId} set to ${selectedValue}% with ${hours}h remaining`,
                 2000
               );
             }
           } else {
-            showStatusBarMessage(`$(check) #${issue.id} set to ${selectedValue}%`, 2000);
+            showStatusBarMessage(`$(check) #${issueId} set to ${selectedValue}%`, 2000);
           }
 
-          GanttPanel.currentPanel?.updateIssueDoneRatio(issue.id, selectedValue);
-          vscode.commands.executeCommand("redmyne.refreshGanttData");
+          GanttPanel.currentPanel?.updateIssueDoneRatio(issueId, selectedValue);
+          refreshGanttData();
         } catch (error) {
           vscode.window.showErrorMessage(`Failed to update: ${error}`);
         }
@@ -105,15 +113,11 @@ export function registerIssueContextCommands(
     vscode.commands.registerCommand(
       "redmyne.setStatus",
       async (issue: { id: number; status?: { id: number; name: string } } | undefined) => {
-        if (!issue?.id) {
-          vscode.window.showErrorMessage("Could not determine issue ID");
-          return;
-        }
-        const server = deps.getProjectsServer();
-        if (!server) {
-          vscode.window.showErrorMessage("No Redmine server configured");
-          return;
-        }
+        if (!ensureIssueId(issue)) return;
+        const issueId = issue.id;
+
+        const server = getServerOrShowError(deps.getProjectsServer);
+        if (!server) return;
 
         try {
           const statuses = await server.getIssueStatusesTyped();
@@ -124,16 +128,16 @@ export function registerIssueContextCommands(
           }));
 
           const selected = await vscode.window.showQuickPick(options, {
-            placeHolder: `Set status for #${issue.id}`,
+            placeHolder: `Set status for #${issueId}`,
           });
 
           if (selected === undefined) return;
 
-          await server.setIssueStatus({ id: issue.id }, selected.value);
-          showStatusBarMessage(`$(check) #${issue.id} set to ${selected.label}`, 2000);
+          await server.setIssueStatus({ id: issueId }, selected.value);
+          showStatusBarMessage(`$(check) #${issueId} set to ${selected.label}`, 2000);
 
           deps.refreshProjectsTree();
-          vscode.commands.executeCommand("redmyne.refreshGanttData");
+          refreshGanttData();
         } catch (error) {
           vscode.window.showErrorMessage(`Failed to update: ${error}`);
         }
@@ -146,11 +150,8 @@ export function registerIssueContextCommands(
         vscode.window.showErrorMessage("No issues selected");
         return;
       }
-      const server = deps.getProjectsServer();
-      if (!server) {
-        vscode.window.showErrorMessage("No Redmine server configured");
-        return;
-      }
+      const server = getServerOrShowError(deps.getProjectsServer);
+      if (!server) return;
 
       const options = DONE_RATIO_OPTIONS.map((pct) => ({
         label: `${pct}%`,
@@ -194,7 +195,7 @@ export function registerIssueContextCommands(
         }
 
         issueIds.forEach((id) => GanttPanel.currentPanel?.updateIssueDoneRatio(id, selected.value));
-        vscode.commands.executeCommand("redmyne.refreshGanttData");
+        refreshGanttData();
       } catch (error) {
         vscode.window.showErrorMessage(`Failed to update: ${error}`);
       }
@@ -204,15 +205,11 @@ export function registerIssueContextCommands(
     vscode.commands.registerCommand(
       "redmyne.setIssueStatus",
       async (issue: { id: number; statusPattern?: "new" | "in_progress" | "closed" } | undefined) => {
-        if (!issue?.id) {
-          vscode.window.showErrorMessage("Could not determine issue ID");
-          return;
-        }
-        const server = deps.getProjectsServer();
-        if (!server) {
-          vscode.window.showErrorMessage("No Redmine server configured");
-          return;
-        }
+        if (!ensureIssueId(issue)) return;
+        const issueId = issue.id;
+
+        const server = getServerOrShowError(deps.getProjectsServer);
+        if (!server) return;
 
         try {
           const statuses = (await server.getIssueStatuses()).issue_statuses;
@@ -243,16 +240,16 @@ export function registerIssueContextCommands(
             }));
 
             const selected = await vscode.window.showQuickPick(options, {
-              placeHolder: `Set status for #${issue.id}`,
+              placeHolder: `Set status for #${issueId}`,
             });
 
             if (!selected) return;
             targetStatus = selected.status;
           }
 
-          await server.setIssueStatus({ id: issue.id }, targetStatus.id);
-          showStatusBarMessage(`$(check) #${issue.id} set to ${targetStatus.name}`, 2000);
-          vscode.commands.executeCommand("redmyne.refreshGanttData");
+          await server.setIssueStatus({ id: issueId }, targetStatus.id);
+          showStatusBarMessage(`$(check) #${issueId} set to ${targetStatus.name}`, 2000);
+          refreshGanttData();
         } catch (error) {
           vscode.window.showErrorMessage(`Failed to update status: ${error}`);
         }
@@ -261,26 +258,17 @@ export function registerIssueContextCommands(
 
     // Open project in browser
     vscode.commands.registerCommand("redmyne.openProjectInBrowser", async (node: { project?: { identifier?: string } } | undefined) => {
-      const identifier = node?.project?.identifier;
-      if (!identifier) {
-        vscode.window.showErrorMessage("Could not determine project identifier");
-        return;
-      }
-      const url = vscode.workspace.getConfiguration("redmyne").get<string>("serverUrl");
-      if (!url) {
-        vscode.window.showErrorMessage("No Redmine URL configured");
-        return;
-      }
-      await vscode.env.openExternal(vscode.Uri.parse(`${url}/projects/${identifier}`));
+      const identifier = getNestedProjectIdentifierOrShowError(node);
+      if (!identifier) return;
+      const url = getConfiguredServerUrlOrShowError();
+      if (!url) return;
+      await vscode.env.openExternal(vscode.Uri.parse(buildProjectUrl(url, identifier)));
     }),
 
     // Show project in Gantt
     vscode.commands.registerCommand("redmyne.showProjectInGantt", async (node: { project?: { id?: number }; id?: number } | undefined) => {
-      const projectId = node?.project?.id ?? node?.id;
-      if (!projectId) {
-        vscode.window.showErrorMessage("Could not determine project ID");
-        return;
-      }
+      const projectId = getNestedProjectIdOrShowError(node);
+      if (!projectId) return;
       await vscode.commands.executeCommand("redmyne.showGantt");
       GanttPanel.currentPanel?.showProject(projectId);
     }),
@@ -312,15 +300,14 @@ export function registerIssueContextCommands(
 
     // Toggle auto-update %done
     vscode.commands.registerCommand("redmyne.toggleAutoUpdateDoneRatio", async (issue: { id: number } | undefined) => {
-      if (!issue?.id) {
-        vscode.window.showErrorMessage("Could not determine issue ID");
-        return;
-      }
-      const nowEnabled = autoUpdateTracker.toggle(issue.id);
+      if (!ensureIssueId(issue)) return;
+      const issueId = issue.id;
+
+      const nowEnabled = autoUpdateTracker.toggle(issueId);
       showStatusBarMessage(
         nowEnabled
-          ? `$(check) Auto-update %done enabled for #${issue.id}`
-          : `$(x) Auto-update %done disabled for #${issue.id}`,
+          ? `$(check) Auto-update %done enabled for #${issueId}`
+          : `$(x) Auto-update %done disabled for #${issueId}`,
         2000
       );
     }),
@@ -332,7 +319,7 @@ export function registerIssueContextCommands(
     vscode.commands.registerCommand("redmyne.contributeToIssue", (item) =>
       contributeToIssue(item, deps.getTimeEntriesServer(), () => {
         deps.refreshTimeEntries();
-        vscode.commands.executeCommand("redmyne.refreshGanttData");
+        refreshGanttData();
       })
     ),
 
@@ -340,37 +327,32 @@ export function registerIssueContextCommands(
     vscode.commands.registerCommand("redmyne.removeContribution", (item) =>
       removeContribution(item, deps.getTimeEntriesServer(), () => {
         deps.refreshTimeEntries();
-        vscode.commands.executeCommand("redmyne.refreshGanttData");
+        refreshGanttData();
       })
     ),
 
     // Toggle precedence priority
     vscode.commands.registerCommand("redmyne.togglePrecedence", async (issue: { id: number } | undefined) => {
-      if (!issue?.id) {
-        vscode.window.showErrorMessage("Could not determine issue ID");
-        return;
-      }
-      const isNow = await togglePrecedence(deps.globalState, issue.id);
+      if (!ensureIssueId(issue)) return;
+      const issueId = issue.id;
+
+      const isNow = await togglePrecedence(deps.globalState, issueId);
       showStatusBarMessage(
-        isNow ? `$(check) #${issue.id} tagged with precedence` : `$(check) #${issue.id} precedence removed`,
+        isNow ? `$(check) #${issueId} tagged with precedence` : `$(check) #${issueId} precedence removed`,
         2000
       );
-      vscode.commands.executeCommand("redmyne.refreshGanttData");
+      refreshGanttData();
     }),
 
     // Set issue priority (pattern-based or picker)
     vscode.commands.registerCommand(
       "redmyne.setIssuePriority",
       async (issue: { id: number; priorityPattern?: string } | undefined) => {
-        if (!issue?.id) {
-          vscode.window.showErrorMessage("Could not determine issue ID");
-          return;
-        }
-        const server = deps.getProjectsServer();
-        if (!server) {
-          vscode.window.showErrorMessage("No Redmine server configured");
-          return;
-        }
+        if (!ensureIssueId(issue)) return;
+        const issueId = issue.id;
+
+        const server = getServerOrShowError(deps.getProjectsServer);
+        if (!server) return;
 
         try {
           const { issue_priorities: priorities } = await server.getIssuePriorities();
@@ -388,15 +370,15 @@ export function registerIssueContextCommands(
           } else {
             const options = priorities.map((p) => ({ label: p.name, priority: p }));
             const selected = await vscode.window.showQuickPick(options, {
-              placeHolder: `Set priority for #${issue.id}`,
+              placeHolder: `Set priority for #${issueId}`,
             });
             if (!selected) return;
             targetPriority = selected.priority;
           }
 
-          await server.setIssuePriority(issue.id, targetPriority.id);
-          showStatusBarMessage(`$(check) #${issue.id} priority set to ${targetPriority.name}`, 2000);
-          vscode.commands.executeCommand("redmyne.refreshGanttData");
+          await server.setIssuePriority(issueId, targetPriority.id);
+          showStatusBarMessage(`$(check) #${issueId} priority set to ${targetPriority.name}`, 2000);
+          refreshGanttData();
         } catch (error) {
           vscode.window.showErrorMessage(`Failed to update priority: ${error}`);
         }
@@ -407,16 +389,15 @@ export function registerIssueContextCommands(
     vscode.commands.registerCommand(
       "redmyne.setAutoUpdateDoneRatio",
       async (issue: { id: number; value: boolean } | undefined) => {
-        if (!issue?.id) {
-          vscode.window.showErrorMessage("Could not determine issue ID");
-          return;
-        }
+        if (!ensureIssueId(issue)) return;
+        const issueId = issue.id;
+
         if (issue.value) {
-          autoUpdateTracker.enable(issue.id);
-          showStatusBarMessage(`$(check) Auto-update %done enabled for #${issue.id}`, 2000);
+          autoUpdateTracker.enable(issueId);
+          showStatusBarMessage(`$(check) Auto-update %done enabled for #${issueId}`, 2000);
         } else {
-          autoUpdateTracker.disable(issue.id);
-          showStatusBarMessage(`$(x) Auto-update %done disabled for #${issue.id}`, 2000);
+          autoUpdateTracker.disable(issueId);
+          showStatusBarMessage(`$(x) Auto-update %done disabled for #${issueId}`, 2000);
         }
       }
     ),
@@ -425,18 +406,17 @@ export function registerIssueContextCommands(
     vscode.commands.registerCommand(
       "redmyne.setAdHoc",
       async (issue: { id: number; value: boolean } | undefined) => {
-        if (!issue?.id) {
-          vscode.window.showErrorMessage("Could not determine issue ID");
-          return;
-        }
+        if (!ensureIssueId(issue)) return;
+        const issueId = issue.id;
+
         if (issue.value) {
-          adHocTracker.tag(issue.id);
-          showStatusBarMessage(`$(check) #${issue.id} tagged as ad-hoc budget`, 2000);
+          adHocTracker.tag(issueId);
+          showStatusBarMessage(`$(check) #${issueId} tagged as ad-hoc budget`, 2000);
         } else {
-          adHocTracker.untag(issue.id);
-          showStatusBarMessage(`$(check) #${issue.id} ad-hoc budget removed`, 2000);
+          adHocTracker.untag(issueId);
+          showStatusBarMessage(`$(check) #${issueId} ad-hoc budget removed`, 2000);
         }
-        vscode.commands.executeCommand("redmyne.refreshGanttData");
+        refreshGanttData();
       }
     ),
 
@@ -444,18 +424,17 @@ export function registerIssueContextCommands(
     vscode.commands.registerCommand(
       "redmyne.setPrecedence",
       async (issue: { id: number; value: boolean } | undefined) => {
-        if (!issue?.id) {
-          vscode.window.showErrorMessage("Could not determine issue ID");
-          return;
-        }
+        if (!ensureIssueId(issue)) return;
+        const issueId = issue.id;
+
         if (issue.value) {
-          await setPrecedence(deps.globalState, issue.id);
-          showStatusBarMessage(`$(check) #${issue.id} tagged with precedence`, 2000);
+          await setPrecedence(deps.globalState, issueId);
+          showStatusBarMessage(`$(check) #${issueId} tagged with precedence`, 2000);
         } else {
-          await clearPrecedence(deps.globalState, issue.id);
-          showStatusBarMessage(`$(check) #${issue.id} precedence removed`, 2000);
+          await clearPrecedence(deps.globalState, issueId);
+          showStatusBarMessage(`$(check) #${issueId} precedence removed`, 2000);
         }
-        vscode.commands.executeCommand("redmyne.refreshGanttData");
+        refreshGanttData();
       }
     )
   );

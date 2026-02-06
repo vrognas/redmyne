@@ -130,6 +130,100 @@ describe("createConfiguredCommandRegistrar", () => {
     );
   });
 
+  it("shows error and skips action when API key is missing", async () => {
+    const context = { subscriptions: [] } as unknown as vscode.ExtensionContext;
+    const action = vi.fn();
+    const createServer = vi.fn();
+    const disposeServer = vi.fn();
+    const bucket = { servers: [] as RedmineServer[] };
+
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(
+      makeConfig({ serverUrl: "https://redmine.example.com" })
+    );
+
+    const register = createConfiguredCommandRegistrar({
+      context,
+      secretManager: { getApiKey: vi.fn().mockResolvedValue(undefined) },
+      createServer,
+      bucket,
+      maxServerCacheSize: 3,
+      disposeServer,
+    });
+
+    register("sample", action);
+    registeredHandler?.();
+    await flushAsyncWork();
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      'No API key configured. Run "Configure Redmine Server"'
+    );
+    expect(action).not.toHaveBeenCalled();
+    expect(createServer).not.toHaveBeenCalled();
+  });
+
+  it("shows command failure when api key lookup throws", async () => {
+    const context = { subscriptions: [] } as unknown as vscode.ExtensionContext;
+    const action = vi.fn();
+    const createServer = vi.fn();
+    const disposeServer = vi.fn();
+    const bucket = { servers: [] as RedmineServer[] };
+
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(
+      makeConfig({ serverUrl: "https://redmine.example.com" })
+    );
+
+    const register = createConfiguredCommandRegistrar({
+      context,
+      secretManager: { getApiKey: vi.fn().mockRejectedValue(new Error("secret lookup failed")) },
+      createServer,
+      bucket,
+      maxServerCacheSize: 3,
+      disposeServer,
+    });
+
+    register("sample", action);
+    registeredHandler?.();
+    await flushAsyncWork();
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      "Command failed: secret lookup failed"
+    );
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it("shows command failure when action throws", async () => {
+    const context = { subscriptions: [] } as unknown as vscode.ExtensionContext;
+    const action = vi.fn().mockRejectedValue(new Error("action failed"));
+    const newServer = makeServer(false);
+    const disposeServer = vi.fn();
+    const bucket = { servers: [] as RedmineServer[] };
+
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(
+      makeConfig({
+        serverUrl: "https://redmine.example.com",
+        additionalHeaders: undefined,
+      })
+    );
+
+    const register = createConfiguredCommandRegistrar({
+      context,
+      secretManager: { getApiKey: vi.fn().mockResolvedValue("apikey") },
+      createServer: vi.fn().mockReturnValue(newServer),
+      bucket,
+      maxServerCacheSize: 3,
+      disposeServer,
+    });
+
+    register("sample", action);
+    registeredHandler?.();
+    await flushAsyncWork();
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      "Command failed: action failed"
+    );
+    expect(action).toHaveBeenCalledTimes(1);
+  });
+
   it("reuses matching server and keeps it as most recently used", async () => {
     const context = { subscriptions: [] } as unknown as vscode.ExtensionContext;
     const action = vi.fn();
@@ -169,5 +263,40 @@ describe("createConfiguredCommandRegistrar", () => {
     );
     expect(contextArg).toEqual({ id: 42 });
     expect(trailingArg).toBeUndefined();
+    expect(action.mock.calls[0]).toHaveLength(2);
+  });
+
+  it("preserves additional context-menu args when provided", async () => {
+    const context = { subscriptions: [] } as unknown as vscode.ExtensionContext;
+    const action = vi.fn();
+    const newServer = makeServer(false);
+    const bucket = { servers: [] as RedmineServer[] };
+
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(
+      makeConfig({
+        serverUrl: "https://redmine.example.com",
+        additionalHeaders: undefined,
+      })
+    );
+
+    const register = createConfiguredCommandRegistrar({
+      context,
+      secretManager: { getApiKey: vi.fn().mockResolvedValue("apikey") },
+      createServer: vi.fn().mockReturnValue(newServer),
+      bucket,
+      maxServerCacheSize: 3,
+      disposeServer: vi.fn(),
+    });
+
+    register("sample", action);
+    registeredHandler?.({ id: 42 }, "extra", 7);
+    await flushAsyncWork();
+
+    expect(action).toHaveBeenCalledWith(
+      expect.objectContaining({ server: newServer }),
+      { id: 42 },
+      "extra",
+      7
+    );
   });
 });

@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { showStatusBarMessage } from "../utilities/status-bar";
+import { buildProjectUrl } from "./command-urls";
 
 const DONE_RATIO_PRESETS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
@@ -178,8 +179,7 @@ export function registerContextProxyCommands(): vscode.Disposable[] {
       }
       const url = vscode.workspace.getConfiguration("redmyne").get<string>("serverUrl");
       if (url) {
-        const projectUrl = `${url}/projects/${ctx.projectIdentifier}`;
-        vscode.env.clipboard.writeText(projectUrl);
+        vscode.env.clipboard.writeText(buildProjectUrl(url, ctx.projectIdentifier));
         showStatusBarMessage("$(check) Copied project URL", 2000);
       }
     }),

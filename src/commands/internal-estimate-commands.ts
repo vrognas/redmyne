@@ -10,6 +10,7 @@ import {
   clearInternalEstimate,
   getInternalEstimate,
 } from "../utilities/internal-estimates";
+import { ensureIssueId } from "./command-guards";
 
 export function registerInternalEstimateCommands(
   context: vscode.ExtensionContext
@@ -19,10 +20,7 @@ export function registerInternalEstimateCommands(
     vscode.commands.registerCommand(
       "redmyne.setInternalEstimate",
       async (issue: { id: number; subject: string; estimated_hours?: number | null } | undefined) => {
-        if (!issue?.id) {
-          vscode.window.showErrorMessage("Could not determine issue ID");
-          return;
-        }
+        if (!ensureIssueId(issue)) return;
 
         // Get current value for placeholder
         const current = getInternalEstimate(context.globalState, issue.id);
@@ -60,10 +58,7 @@ export function registerInternalEstimateCommands(
     vscode.commands.registerCommand(
       "redmyne.clearInternalEstimate",
       async (issue: { id: number; subject: string } | undefined) => {
-        if (!issue?.id) {
-          vscode.window.showErrorMessage("Could not determine issue ID");
-          return;
-        }
+        if (!ensureIssueId(issue)) return;
 
         const current = getInternalEstimate(context.globalState, issue.id);
         if (!current) {

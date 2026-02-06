@@ -11,6 +11,7 @@ import { RedmineServer } from "../redmine/redmine-server";
 import { RedmineProject } from "../redmine/redmine-project";
 import { IssueFilter } from "../redmine/models/common";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
+import { getIssueIdOrShowError } from "./command-guards";
 
 export interface GanttCommandDeps {
   getServer: () => RedmineServer | undefined;
@@ -68,10 +69,8 @@ export function registerGanttCommands(
 
     // Open specific issue in Gantt (context menu)
     vscode.commands.registerCommand("redmyne.openIssueInGantt", async (issue: { id: number; project?: { id: number } } | undefined) => {
-      if (!issue?.id) {
-        vscode.window.showErrorMessage("Could not determine issue ID");
-        return;
-      }
+      const issueId = getIssueIdOrShowError(issue);
+      if (!issueId) return;
 
       // Ensure Gantt is open and has data
       const issues = await deps.fetchIssuesIfNeeded();
@@ -90,14 +89,14 @@ export function registerGanttCommands(
       panel.setFilterChangeCallback((filter) => deps.setFilter(filter));
 
       // Find the issue's project and switch to it so the issue is visible
-      const targetIssue = issues.find(i => i.id === issue.id);
-      const projectId = issue.project?.id ?? targetIssue?.project?.id;
+      const targetIssue = issues.find(i => i.id === issueId);
+      const projectId = issue?.project?.id ?? targetIssue?.project?.id;
       if (projectId) {
         panel.showProject(projectId);
       }
 
       // Wait for webview to render, then scroll to issue
-      setTimeout(() => panel.scrollToIssue(issue.id), 150);
+      setTimeout(() => panel.scrollToIssue(issueId), 150);
     })
   );
 }

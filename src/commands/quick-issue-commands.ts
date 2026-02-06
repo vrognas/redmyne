@@ -15,28 +15,38 @@ export interface QuickIssueCommandsDeps {
   getWorkloadStatusBar: () => WorkloadStatusBar | undefined;
 }
 
+function getNumericId(value: unknown): number | undefined {
+  return typeof value === "number" ? value : undefined;
+}
+
+function getIssueIdFromArg(value: unknown): number | undefined {
+  if (value && typeof value === "object" && "id" in value) {
+    return getNumericId((value as { id?: unknown }).id);
+  }
+  return getNumericId(value);
+}
+
+function getProjectIdFromArg(value: unknown): number | undefined {
+  if (value && typeof value === "object" && "project" in value) {
+    const project = (value as { project?: { id?: unknown } }).project;
+    return getNumericId(project?.id);
+  }
+  return getNumericId(value);
+}
+
 export function registerQuickIssueCommands(deps: QuickIssueCommandsDeps): void {
   const registerCommand = deps.registerConfiguredCommand;
 
   registerCommand("quickLogTime", (props, ...args) => {
-    // Extract issue ID from tree node (Issue) or Gantt context ({ id: number })
-    let issueId: number | undefined;
-    const arg = args[0] as Record<string, unknown> | undefined;
-    if (arg && typeof arg === "object" && typeof arg.id === "number") {
-      issueId = arg.id;
-    }
+    // Extract issue ID from tree node (Issue) or Gantt context ({ id: number }).
+    const issueId = getIssueIdFromArg(args[0]);
     return quickLogTime(props, deps.context, undefined, issueId);
   });
 
   registerCommand("quickCreateIssue", async (props, ...args) => {
-    // Extract project ID from tree node if invoked from context menu
-    // ProjectNode has project.id, not direct id
-    let projectId: number | undefined;
-    if (args[0] && typeof args[0] === "object" && "project" in args[0]) {
-      projectId = (args[0] as { project: { id: number } }).project.id;
-    } else if (typeof args[0] === "number") {
-      projectId = args[0];
-    }
+    // Extract project ID from tree node if invoked from context menu.
+    // ProjectNode has project.id, not direct id.
+    const projectId = getProjectIdFromArg(args[0]);
     const created = await quickCreateIssue(props, projectId);
     if (created) {
       deps.projectsTree.clearProjects();
@@ -46,13 +56,12 @@ export function registerQuickIssueCommands(deps: QuickIssueCommandsDeps): void {
 
   registerCommand("quickCreateSubIssue", async (props, ...args) => {
     // Extract parent issue ID from tree node or command argument
-    let parentId: number | undefined;
-    if (args[0] && typeof args[0] === "object" && "id" in args[0]) {
-      parentId = (args[0] as { id: number }).id;
-    } else if (typeof args[0] === "number") {
-      parentId = args[0];
-    } else if (typeof args[0] === "string") {
-      parentId = parseInt(args[0], 10);
+    let parentId = getIssueIdFromArg(args[0]);
+    if (parentId === undefined && typeof args[0] === "string") {
+      const parsed = parseInt(args[0], 10);
+      if (!isNaN(parsed)) {
+        parentId = parsed;
+      }
     }
 
     if (!parentId) {
@@ -73,14 +82,9 @@ export function registerQuickIssueCommands(deps: QuickIssueCommandsDeps): void {
   });
 
   registerCommand("quickCreateVersion", async (props, ...args) => {
-    // Extract project ID from tree node if invoked from context menu
-    // ProjectNode has project.id, not direct id
-    let projectId: number | undefined;
-    if (args[0] && typeof args[0] === "object" && "project" in args[0]) {
-      projectId = (args[0] as { project: { id: number } }).project.id;
-    } else if (typeof args[0] === "number") {
-      projectId = args[0];
-    }
+    // Extract project ID from tree node if invoked from context menu.
+    // ProjectNode has project.id, not direct id.
+    const projectId = getProjectIdFromArg(args[0]);
     const created = await quickCreateVersion(props, projectId);
     if (created) {
       // Refresh Gantt if open to show new milestone

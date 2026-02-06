@@ -202,6 +202,45 @@ describe("quickCreateIssue", () => {
     expect(mockServer.createIssue).not.toHaveBeenCalled();
   });
 
+  it("shows error and aborts when subject is blank", async () => {
+    vi.spyOn(vscode.window, "showQuickPick")
+      .mockResolvedValueOnce({ label: "Project Alpha", data: { label: "Project Alpha", id: 1 } } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "Tasks", data: { label: "Tasks", id: 2 } } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "Normal", data: { label: "Normal", id: 2 } } as unknown as vscode.QuickPickItem);
+
+    let createQuickPickCallCount = 0;
+    const inputValues = ["   ", "", "", ""]; // subject, description, hours, due date
+    vi.spyOn(vscode.window, "createQuickPick").mockImplementation(() => {
+      const value = inputValues[createQuickPickCallCount++];
+      let onAcceptHandler: (() => void) | undefined;
+      const qp = {
+        title: "",
+        placeholder: "",
+        items: [],
+        selectedItems: [] as { label: string }[],
+        canSelectMany: false,
+        value: "",
+        onDidChangeValue: () => ({ dispose: vi.fn() }),
+        onDidAccept: (handler: () => void) => { onAcceptHandler = handler; return { dispose: vi.fn() }; },
+        onDidHide: () => ({ dispose: vi.fn() }),
+        show: vi.fn(() => {
+          qp.value = value;
+          qp.selectedItems = [{ label: `$(check) Accept: "${value}"` }];
+          if (onAcceptHandler) onAcceptHandler();
+        }),
+        hide: vi.fn(),
+        dispose: vi.fn(),
+      };
+      return qp as unknown as vscode.QuickPick<vscode.QuickPickItem>;
+    });
+
+    const result = await quickCreateIssue(props);
+
+    expect(result).toBeUndefined();
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Could not determine subject");
+    expect(mockServer.createIssue).not.toHaveBeenCalled();
+  });
+
   it("validates estimated hours input", () => {
     // Test validators directly - they're pure functions
     const validateHours = (v: string): string | null => {

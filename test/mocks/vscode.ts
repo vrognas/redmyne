@@ -100,6 +100,13 @@ export const commands = {
   executeCommand: vi.fn(),
 };
 
+export const env = {
+  openExternal: vi.fn(),
+  clipboard: {
+    writeText: vi.fn(),
+  },
+};
+
 export const Uri = {
   parse: (url: string) => ({ toString: () => url }),
 };

@@ -10,6 +10,41 @@ interface IssueItem {
   id: number;
 }
 
+type EntryAndServer = {
+  entry: NonNullable<TimeEntryNode["_entry"]> & { id: number };
+  server: RedmineServer;
+};
+
+function getEntryAndServerOrShowError(
+  item: TimeEntryNode,
+  server: RedmineServer | undefined
+): EntryAndServer | undefined {
+  const entry = item?._entry;
+  if (!entry) {
+    vscode.window.showErrorMessage("No time entry selected");
+    return undefined;
+  }
+
+  const entryId = entry.id;
+  if (typeof entryId !== "number") {
+    vscode.window.showErrorMessage("Could not determine time entry ID");
+    return undefined;
+  }
+
+  if (!server) {
+    vscode.window.showErrorMessage("Not connected to Redmyne");
+    return undefined;
+  }
+
+  return { entry: { ...entry, id: entryId }, server };
+}
+
+function showUpdateTimeEntryError(error: unknown): void {
+  vscode.window.showErrorMessage(
+    `Failed to update time entry: ${error instanceof Error ? error.message : String(error)}`
+  );
+}
+
 /**
  * Toggle ad-hoc budget tag on an issue
  */
@@ -36,17 +71,10 @@ export async function contributeToIssue(
   server: RedmineServer | undefined,
   refreshCallback: () => void
 ): Promise<void> {
-  if (!item?._entry) {
-    vscode.window.showErrorMessage("No time entry selected");
-    return;
-  }
+  const context = getEntryAndServerOrShowError(item, server);
+  if (!context) return;
 
-  if (!server) {
-    vscode.window.showErrorMessage("Not connected to Redmyne");
-    return;
-  }
-
-  const entry = item._entry;
+  const { entry, server: resolvedServer } = context;
   const issueId = entry.issue?.id ?? entry.issue_id;
 
   // Verify entry is on an ad-hoc issue
@@ -58,7 +86,7 @@ export async function contributeToIssue(
   // Get project ID from entry's issue
   let projectId: number | undefined;
   try {
-    const { issue } = await server.getIssueById(issueId);
+    const { issue } = await resolvedServer.getIssueById(issueId);
     projectId = issue.project?.id;
   } catch {
     vscode.window.showErrorMessage("Could not fetch issue details");
@@ -71,7 +99,7 @@ export async function contributeToIssue(
   }
 
   // Pick target issue using search (skip time tracking - we're linking, not logging)
-  const targetIssue = await pickIssue(server, "Contribute Time To...", {
+  const targetIssue = await pickIssue(resolvedServer, "Contribute Time To...", {
     skipTimeTrackingCheck: true,
   });
   if (!targetIssue) return;
@@ -109,15 +137,13 @@ export async function contributeToIssue(
   }
 
   try {
-    await server.updateTimeEntry(entry.id!, { comments: newComment });
+    await resolvedServer.updateTimeEntry(entry.id, { comments: newComment });
     vscode.window.showInformationMessage(
       `Time entry now contributes to issue #${targetId}`
     );
     refreshCallback();
   } catch (error) {
-    vscode.window.showErrorMessage(
-      `Failed to update time entry: ${error instanceof Error ? error.message : String(error)}`
-    );
+    showUpdateTimeEntryError(error);
   }
 }
 
@@ -129,17 +155,10 @@ export async function removeContribution(
   server: RedmineServer | undefined,
   refreshCallback: () => void
 ): Promise<void> {
-  if (!item?._entry) {
-    vscode.window.showErrorMessage("No time entry selected");
-    return;
-  }
+  const context = getEntryAndServerOrShowError(item, server);
+  if (!context) return;
 
-  if (!server) {
-    vscode.window.showErrorMessage("Not connected to Redmyne");
-    return;
-  }
-
-  const entry = item._entry;
+  const { entry, server: resolvedServer } = context;
   const currentComment = entry.comments || "";
   const targetId = parseTargetIssueId(currentComment);
 
@@ -152,14 +171,12 @@ export async function removeContribution(
   const newComment = currentComment.replace(/#\d+.*$/, "").trim();
 
   try {
-    await server.updateTimeEntry(entry.id!, { comments: newComment });
+    await resolvedServer.updateTimeEntry(entry.id, { comments: newComment });
     vscode.window.showInformationMessage(
       `Removed contribution to issue #${targetId}`
     );
     refreshCallback();
   } catch (error) {
-    vscode.window.showErrorMessage(
-      `Failed to update time entry: ${error instanceof Error ? error.message : String(error)}`
-    );
+    showUpdateTimeEntryError(error);
   }
 }

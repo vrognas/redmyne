@@ -9,6 +9,7 @@ import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
 import type { DraftModeServer } from "../draft-mode/draft-mode-server";
 import type { DraftOperation } from "../draft-mode/draft-operation";
 import { DRAFT_COMMAND_SOURCE } from "../draft-mode/draft-change-sources";
+import { getServerOrShowError } from "./command-guards";
 
 export interface DraftModeCommandDeps {
   queue: DraftQueue;
@@ -162,11 +163,8 @@ export function registerDraftModeCommands(
   const applyDrafts = vscode.commands.registerCommand(
     "redmyne.applyDrafts",
     async () => {
-      const server = deps.getServer();
-      if (!server) {
-        vscode.window.showErrorMessage("No Redmine server configured");
-        return;
-      }
+      const server = getServerOrShowError(deps.getServer);
+      if (!server) return;
 
       const operations = queue.getAll();
       if (operations.length === 0) {
@@ -274,11 +272,8 @@ Skipped (not attempted): ${skippedNames}`;
   const applySingleDraft = vscode.commands.registerCommand(
     "redmyne.applySingleDraft",
     async (draftId: string) => {
-      const server = deps.getServer();
-      if (!server) {
-        vscode.window.showErrorMessage("No Redmine server configured");
-        return;
-      }
+      const server = getServerOrShowError(deps.getServer);
+      if (!server) return;
 
       const operations = queue.getAll();
       const op = operations.find(o => o.id === draftId);
@@ -312,46 +307,60 @@ Skipped (not attempted): ${skippedNames}`;
 }
 
 // Execute a draft operation by calling the inner server directly
+function requireOperationIssueId(op: DraftOperation): number {
+  if (!op.issueId) {
+    throw new Error(`Draft operation ${op.id} (${op.type}) is missing issueId`);
+  }
+  return op.issueId;
+}
+
+function requireOperationResourceId(op: DraftOperation): number {
+  if (!op.resourceId) {
+    throw new Error(`Draft operation ${op.id} (${op.type}) is missing resourceId`);
+  }
+  return op.resourceId;
+}
+
 async function executeOperation(
   server: DraftModeServer,
-  op: import("../draft-mode/draft-operation").DraftOperation
+  op: DraftOperation
 ): Promise<void> {
   const { http } = op;
 
   // Route based on operation type and HTTP path
   switch (op.type) {
     case "setIssueStatus": {
-      const issueId = op.issueId!;
+      const issueId = requireOperationIssueId(op);
       const statusId = (http.data as { issue: { status_id: number } }).issue.status_id;
       await server.setIssueStatus({ id: issueId }, statusId, { _bypassDraft: true });
       break;
     }
     case "setIssueDates": {
-      const issueId = op.issueId!;
+      const issueId = requireOperationIssueId(op);
       const data = (http.data as { issue: { start_date?: string; due_date?: string } }).issue;
       await server.updateIssueDates(issueId, data.start_date ?? null, data.due_date ?? null, { _bypassDraft: true });
       break;
     }
     case "setIssueDoneRatio": {
-      const issueId = op.issueId!;
+      const issueId = requireOperationIssueId(op);
       const doneRatio = (http.data as { issue: { done_ratio: number } }).issue.done_ratio;
       await server.updateDoneRatio(issueId, doneRatio, { _bypassDraft: true });
       break;
     }
     case "setIssuePriority": {
-      const issueId = op.issueId!;
+      const issueId = requireOperationIssueId(op);
       const priorityId = (http.data as { issue: { priority_id: number } }).issue.priority_id;
       await server.setIssuePriority(issueId, priorityId, { _bypassDraft: true });
       break;
     }
     case "setIssueAssignee": {
-      const issueId = op.issueId!;
+      const issueId = requireOperationIssueId(op);
       const assignedToId = (http.data as { issue: { assigned_to_id: number } }).issue.assigned_to_id;
       await server.put(`/issues/${issueId}.json`, { issue: { assigned_to_id: assignedToId } });
       break;
     }
     case "addIssueNote": {
-      const issueId = op.issueId!;
+      const issueId = requireOperationIssueId(op);
       const notes = (http.data as { issue: { notes: string } }).issue.notes;
       await server.put(`/issues/${issueId}.json`, { issue: { notes } });
       break;
@@ -382,13 +391,13 @@ async function executeOperation(
       break;
     }
     case "updateTimeEntry": {
-      const id = op.resourceId!;
+      const id = requireOperationResourceId(op);
       const updates = (http.data as { time_entry: Parameters<typeof server.updateTimeEntry>[1] }).time_entry;
       await server.updateTimeEntry(id, updates, { _bypassDraft: true });
       break;
     }
     case "deleteTimeEntry": {
-      const id = op.resourceId!;
+      const id = requireOperationResourceId(op);
       await server.deleteTimeEntry(id, { _bypassDraft: true });
       break;
     }
@@ -401,13 +410,13 @@ async function executeOperation(
       break;
     }
     case "updateVersion": {
-      const id = op.resourceId!;
+      const id = requireOperationResourceId(op);
       const versionData = (http.data as { version: Parameters<typeof server.updateVersion>[1] }).version;
       await server.updateVersion(id, versionData, { _bypassDraft: true });
       break;
     }
     case "deleteVersion": {
-      const id = op.resourceId!;
+      const id = requireOperationResourceId(op);
       await server.deleteVersion(id, { _bypassDraft: true });
       break;
     }
@@ -426,7 +435,7 @@ async function executeOperation(
       break;
     }
     case "deleteRelation": {
-      const id = op.resourceId!;
+      const id = requireOperationResourceId(op);
       await server.deleteRelation(id, { _bypassDraft: true });
       break;
     }

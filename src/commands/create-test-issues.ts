@@ -6,6 +6,7 @@
 import * as vscode from "vscode";
 import { RedmineServer } from "../redmine/redmine-server";
 import { formatDateISO } from "../utilities/date-utils";
+import { getServerOrShowError } from "./command-guards";
 
 export interface CreateTestIssuesDeps {
   getServer: () => RedmineServer | undefined;
@@ -18,11 +19,11 @@ export function registerCreateTestIssuesCommand(
 ): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("redmyne.createTestIssues", async () => {
-      const server = deps.getServer();
-      if (!server) {
-        vscode.window.showErrorMessage("Redmine not configured. Run 'Redmine: Configure' first.");
-        return;
-      }
+      const server = getServerOrShowError(
+        deps.getServer,
+        "Redmine not configured. Run 'Redmine: Configure' first."
+      );
+      if (!server) return;
 
       const confirm = await vscode.window.showWarningMessage(
         "Create test issues for integration testing?",

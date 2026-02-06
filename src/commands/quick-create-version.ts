@@ -3,18 +3,18 @@ import type { ActionProperties } from "./action-properties";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { wizardPick, wizardInput, isBack, WizardPickItem } from "../utilities/wizard";
 import { errorToString } from "../utilities/error-feedback";
+import {
+  findProjectByIdAsLabeledId,
+  mapProjectsToWizardPickItems,
+  requireNonEmptyStringOrShowError,
+  requireValueOrShowError,
+  validateOptionalIsoDate,
+} from "./quick-create-helpers";
 
 interface CreatedVersion {
   id: number;
   name: string;
 }
-
-const validateDate = (v: string): string | null => {
-  if (!v) return null;
-  return /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(new Date(v).getTime())
-    ? null
-    : "Use YYYY-MM-DD format";
-};
 
 /**
  * Quick create version wizard
@@ -41,9 +41,9 @@ export async function quickCreateVersion(
 
     // Pre-fill project if provided
     if (preselectedProjectId) {
-      const project = projects.find(p => p.id === preselectedProjectId);
+      const project = findProjectByIdAsLabeledId(projects, preselectedProjectId);
       if (project) {
-        state.project = { label: project.name, id: project.id };
+        state.project = project;
         step = 2;
       }
     }
@@ -53,10 +53,7 @@ export async function quickCreateVersion(
 
       switch (step) {
         case 1: {
-          const items: WizardPickItem<{ label: string; id: number }>[] = projects.map((p) => {
-            const item = p.toQuickPickItem();
-            return { label: item.label, description: item.description, data: { label: item.label, id: p.id } };
-          });
+          const items = mapProjectsToWizardPickItems(projects);
           const result = await wizardPick(items, {
             title: "Create Version (1/5) - Project",
             placeHolder: "Select project",
@@ -89,7 +86,7 @@ export async function quickCreateVersion(
             title: "Create Version (3/5) - Due Date",
             prompt: "Due date (YYYY-MM-DD, optional)",
             value: state.dueDate,
-            validateInput: validateDate,
+            validateInput: validateOptionalIsoDate,
           }, showBack);
 
           if (result === undefined) return undefined;
@@ -133,9 +130,13 @@ export async function quickCreateVersion(
       }
     }
 
+    const project = requireValueOrShowError(state.project, "Could not determine project");
+    const name = requireNonEmptyStringOrShowError(state.name, "Could not determine version name");
+    if (!project || !name) return undefined;
+
     // Create the version
-    const version = await props.server.createVersion(state.project!.id, {
-      name: state.name!,
+    const version = await props.server.createVersion(project.id, {
+      name,
       description: state.description,
       due_date: state.dueDate,
       status: state.status,

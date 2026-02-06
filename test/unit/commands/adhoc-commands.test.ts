@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as vscode from "vscode";
-import { contributeToIssue } from "../../../src/commands/adhoc-commands";
+import { contributeToIssue, removeContribution } from "../../../src/commands/adhoc-commands";
 import { TimeEntryNode } from "../../../src/trees/my-time-entries-tree";
 import { adHocTracker } from "../../../src/utilities/adhoc-tracker";
 import * as issuePicker from "../../../src/utilities/issue-picker";
@@ -116,5 +116,37 @@ describe("contributeToIssue", () => {
       "Cancel"
     );
     expect(mockServer.updateTimeEntry).toHaveBeenCalled();
+  });
+
+  it("shows error when time entry id is missing", async () => {
+    const item = {
+      _entry: { issue: { id: 100 }, issue_id: 100, comments: "" },
+    } as unknown as TimeEntryNode;
+
+    await contributeToIssue(item, mockServer as any, refreshCallback);
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      "Could not determine time entry ID"
+    );
+    expect(mockServer.updateTimeEntry).not.toHaveBeenCalled();
+  });
+});
+
+describe("removeContribution", () => {
+  it("shows error when time entry id is missing", async () => {
+    const item = {
+      _entry: { issue: { id: 100 }, issue_id: 100, comments: "#123 Target" },
+    } as unknown as TimeEntryNode;
+
+    const mockServer = {
+      updateTimeEntry: vi.fn().mockResolvedValue({}),
+    };
+
+    await removeContribution(item, mockServer as any, vi.fn());
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      "Could not determine time entry ID"
+    );
+    expect(mockServer.updateTimeEntry).not.toHaveBeenCalled();
   });
 });
