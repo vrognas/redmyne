@@ -67,6 +67,8 @@ interface IssueCacheEntry {
 
 /** Default issue cache TTL in milliseconds (60 seconds) */
 const ISSUE_CACHE_TTL = 60_000;
+const ISSUE_CACHE_PRUNE_INTERVAL_MS = 60_000;
+const USER_FTE_CACHE_MAX_ENTRIES = 1000;
 
 export class RedmineServer {
   options: RedmineServerOptions = {} as RedmineServerOptions;
@@ -85,6 +87,7 @@ export class RedmineServer {
     custom_fields?: { id: number; name: string; value: string }[];
   } | null = null;
   private issueCache = new Map<number, IssueCacheEntry>();
+  private lastIssueCachePruneMs = 0;
 
   // Request queue to prevent server overload
   private activeRequests = 0;
@@ -251,12 +254,15 @@ export class RedmineServer {
     }
 
     return new Promise((resolve, reject) => {
-      let incomingBuffer = Buffer.from("");
+      const incomingChunks: Buffer[] = [];
       const handleData = (_: http.IncomingMessage) => (incoming: Buffer) => {
-        incomingBuffer = Buffer.concat([incomingBuffer, incoming]);
+        incomingChunks.push(incoming);
       };
 
       const handleEnd = (clientResponse: http.IncomingMessage) => () => {
+        const incomingBuffer = incomingChunks.length > 0
+          ? Buffer.concat(incomingChunks)
+          : Buffer.alloc(0);
         const { statusCode, statusMessage } = clientResponse;
         const contentType = clientResponse.headers?.["content-type"];
 
@@ -873,9 +879,12 @@ export class RedmineServer {
    * @param issueId ID of issue
    */
   async getIssueById(issueId: number): Promise<{ issue: Issue }> {
+    this.maybePruneIssueCache();
+
     // Check cache with TTL
+    const now = Date.now();
     const cached = this.issueCache.get(issueId);
-    if (cached && Date.now() - cached.timestamp < ISSUE_CACHE_TTL) {
+    if (cached && now - cached.timestamp < ISSUE_CACHE_TTL) {
       return { issue: cached.issue };
     }
 
@@ -890,6 +899,19 @@ export class RedmineServer {
     }
 
     return result;
+  }
+
+  private maybePruneIssueCache(now: number = Date.now()): void {
+    if (now - this.lastIssueCachePruneMs < ISSUE_CACHE_PRUNE_INTERVAL_MS) {
+      return;
+    }
+    this.lastIssueCachePruneMs = now;
+
+    for (const [id, entry] of this.issueCache.entries()) {
+      if (now - entry.timestamp >= ISSUE_CACHE_TTL) {
+        this.issueCache.delete(id);
+      }
+    }
   }
 
   /**
@@ -1068,14 +1090,32 @@ export class RedmineServer {
   /** Cache for user FTE percentages */
   private userFteCache = new Map<number, number>();
 
+  private setUserFteCache(userId: number, fte: number): void {
+    // Maintain recency ordering for deterministic eviction.
+    if (this.userFteCache.has(userId)) {
+      this.userFteCache.delete(userId);
+    }
+    this.userFteCache.set(userId, fte);
+
+    if (this.userFteCache.size > USER_FTE_CACHE_MAX_ENTRIES) {
+      const oldestKey = this.userFteCache.keys().next().value as number | undefined;
+      if (oldestKey !== undefined) {
+        this.userFteCache.delete(oldestKey);
+      }
+    }
+  }
+
   /**
    * Get FTE percentage for a user (100 = full-time, 80 = 80%, etc.)
    * Returns 100 if not found or on error
    */
   async getUserFte(userId: number): Promise<number> {
     // Check cache first
-    if (this.userFteCache.has(userId)) {
-      return this.userFteCache.get(userId)!;
+    const cachedFte = this.userFteCache.get(userId);
+    if (cachedFte !== undefined) {
+      // Refresh recency order for LRU-like eviction.
+      this.setUserFteCache(userId, cachedFte);
+      return cachedFte;
     }
 
     try {
@@ -1092,11 +1132,11 @@ export class RedmineServer {
       const fte = fteField?.value ? parseInt(fteField.value, 10) : 100;
       const validFte = isNaN(fte) || fte <= 0 ? 100 : fte;
 
-      this.userFteCache.set(userId, validFte);
+      this.setUserFteCache(userId, validFte);
       return validFte;
     } catch {
       // Default to 100% FTE on error
-      this.userFteCache.set(userId, 100);
+      this.setUserFteCache(userId, 100);
       return 100;
     }
   }

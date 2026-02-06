@@ -47,6 +47,7 @@ import type { GanttRenderContext } from "./gantt/gantt-render-types";
 import { generateHeader, type GanttToolbarContext } from "./gantt/gantt-toolbar-generator";
 import { deriveAssigneeState, filterIssuesForView } from "./gantt-view-filter";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
+import { DRAFT_COMMAND_SOURCE } from "../draft-mode/draft-change-sources";
 
 // Performance instrumentation (gated behind redmyne.gantt.perfDebug config)
 const perfTimers: Map<string, number> = new Map();
@@ -294,9 +295,11 @@ export class GanttPanel {
           queueCount: this._draftModeManager?.queue?.count ?? 0,
         });
       }),
-      queue.onDidChange(() => {
+      queue.onDidChange((source) => {
         // Skip if we're the ones making the change (already handled in _updateIssueDates)
         if (this._isUpdatingDates) return;
+        // Command-driven bulk changes trigger a single explicit refresh at command end.
+        if (source === DRAFT_COMMAND_SOURCE) return;
         // External change (e.g., Draft Review discard) - refresh to sync
         this._panel.webview.postMessage({
           command: "setDraftQueueCount",
@@ -3497,7 +3500,6 @@ export class GanttPanel {
 function getNonce(): string {
   return crypto.randomBytes(16).toString("base64");
 }
-
 
 
 

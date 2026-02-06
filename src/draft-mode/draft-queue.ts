@@ -143,6 +143,19 @@ export class DraftQueue {
     }
   }
 
+  async removeMany(ids: string[], source?: string): Promise<void> {
+    if (ids.length === 0) return;
+
+    const idSet = new Set(ids);
+    const initialLength = this.operations.length;
+    this.operations = this.operations.filter(op => !idSet.has(op.id));
+
+    if (this.operations.length !== initialLength) {
+      await this.persist();
+      this.emitChange(source);
+    }
+  }
+
   async removeByKey(resourceKey: string, source?: string): Promise<void> {
     const initialLength = this.operations.length;
     this.operations = this.operations.filter(op => op.resourceKey !== resourceKey);

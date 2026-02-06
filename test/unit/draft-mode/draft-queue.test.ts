@@ -237,6 +237,48 @@ describe("DraftQueue", () => {
     });
   });
 
+  describe("removeMany", () => {
+    beforeEach(async () => {
+      await queue.load(serverIdentity);
+    });
+
+    it("removes all operations whose ids are listed", async () => {
+      await queue.add(createOp({ id: "1", resourceKey: "a" }));
+      await queue.add(createOp({ id: "2", resourceKey: "b" }));
+      await queue.add(createOp({ id: "3", resourceKey: "c" }));
+
+      await queue.removeMany(["1", "3"]);
+
+      const all = queue.getAll();
+      expect(all).toHaveLength(1);
+      expect(all[0].id).toBe("2");
+    });
+
+    it("emits a single change event for batch removal", async () => {
+      await queue.add(createOp({ id: "1", resourceKey: "a" }));
+      await queue.add(createOp({ id: "2", resourceKey: "b" }));
+
+      const handler = vi.fn();
+      queue.onDidChange(handler);
+
+      await queue.removeMany(["1", "2"]);
+
+      expect(handler).toHaveBeenCalledTimes(1);
+    });
+
+    it("does nothing for empty id list", async () => {
+      await queue.add(createOp({ id: "1", resourceKey: "a" }));
+
+      const handler = vi.fn();
+      queue.onDidChange(handler);
+
+      await queue.removeMany([]);
+
+      expect(queue.getAll()).toHaveLength(1);
+      expect(handler).not.toHaveBeenCalled();
+    });
+  });
+
   describe("getAll", () => {
     beforeEach(async () => {
       await queue.load(serverIdentity);

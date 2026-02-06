@@ -2518,9 +2518,17 @@
       minimapViewport,
       addDocListener
     });
+    const MAX_HISTORY_ACTIONS = 200;
     const previousState = vscode.getState() || { undoStack: [], redoStack: [], labelWidth, scrollLeft: null, scrollTop: null, centerDateMs: null };
     const undoStack = previousState.undoStack || [];
     const redoStack = previousState.redoStack || [];
+    function trimHistoryStack(stack) {
+      if (stack.length > MAX_HISTORY_ACTIONS) {
+        stack.splice(0, stack.length - MAX_HISTORY_ACTIONS);
+      }
+    }
+    trimHistoryStack(undoStack);
+    trimHistoryStack(redoStack);
     let savedScrollLeft = previousState.scrollLeft ?? (extScrollLeft > 0 ? extScrollLeft : null);
     let savedScrollTop = previousState.scrollTop ?? (extScrollTop > 0 ? extScrollTop : null);
     let savedCenterDateMs = previousState.centerDateMs;
@@ -2543,6 +2551,8 @@
       ganttScroll.scrollLeft = Math.max(0, centerX - visibleTimelineWidth / 2);
     }
     function saveState() {
+      trimHistoryStack(undoStack);
+      trimHistoryStack(redoStack);
       vscode.setState({
         undoStack,
         redoStack,
@@ -2655,6 +2665,7 @@
         }
       } else if (message.command === "pushUndoAction") {
         undoStack.push(message.action);
+        trimHistoryStack(undoStack);
         redoStack.length = 0;
         updateUndoRedoButtons();
         saveState();

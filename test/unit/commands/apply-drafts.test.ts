@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { applyDraftsWithTracking } from "../../../src/commands/draft-mode-commands";
 import type { DraftOperation } from "../../../src/draft-mode/draft-operation";
+import { DRAFT_COMMAND_SOURCE } from "../../../src/draft-mode/draft-change-sources";
 
 describe("applyDraftsWithTracking", () => {
   let mockServer: {
@@ -10,6 +11,7 @@ describe("applyDraftsWithTracking", () => {
 
   let mockQueue: {
     remove: ReturnType<typeof vi.fn>;
+    removeMany?: ReturnType<typeof vi.fn>;
   };
 
   const createOp = (id: string, description: string): DraftOperation => ({
@@ -34,6 +36,7 @@ describe("applyDraftsWithTracking", () => {
     };
     mockQueue = {
       remove: vi.fn().mockResolvedValue(undefined),
+      removeMany: vi.fn().mockResolvedValue(undefined),
     };
   });
 
@@ -103,7 +106,8 @@ describe("applyDraftsWithTracking", () => {
       () => true
     );
 
-    expect(mockQueue.remove).toHaveBeenCalledWith("1");
+    expect(mockQueue.removeMany).toHaveBeenCalledWith(["1"], DRAFT_COMMAND_SOURCE);
+    expect(mockQueue.remove).not.toHaveBeenCalled();
   });
 
   it("does not remove failed operations from queue", async () => {
@@ -117,6 +121,23 @@ describe("applyDraftsWithTracking", () => {
       () => true
     );
 
+    expect(mockQueue.removeMany).not.toHaveBeenCalled();
     expect(mockQueue.remove).not.toHaveBeenCalled();
+  });
+
+  it("falls back to remove when removeMany is unavailable", async () => {
+    const ops = [createOp("1", "Op 1"), createOp("2", "Op 2")];
+    delete mockQueue.removeMany;
+
+    await applyDraftsWithTracking(
+      mockServer as never,
+      mockQueue as never,
+      ops,
+      () => true
+    );
+
+    expect(mockQueue.remove).toHaveBeenCalledTimes(2);
+    expect(mockQueue.remove).toHaveBeenNthCalledWith(1, "1", DRAFT_COMMAND_SOURCE);
+    expect(mockQueue.remove).toHaveBeenNthCalledWith(2, "2", DRAFT_COMMAND_SOURCE);
   });
 });

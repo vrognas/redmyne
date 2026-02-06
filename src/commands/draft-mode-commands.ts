@@ -8,6 +8,7 @@ import type { DraftQueue } from "../draft-mode/draft-queue";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
 import type { DraftModeServer } from "../draft-mode/draft-mode-server";
 import type { DraftOperation } from "../draft-mode/draft-operation";
+import { DRAFT_COMMAND_SOURCE } from "../draft-mode/draft-change-sources";
 
 export interface DraftModeCommandDeps {
   queue: DraftQueue;
@@ -30,7 +31,7 @@ export interface ApplyDraftsResult {
  */
 export async function applyDraftsWithTracking(
   server: DraftModeServer,
-  queue: Pick<DraftQueue, "remove">,
+  queue: Pick<DraftQueue, "remove"> & Partial<Pick<DraftQueue, "removeMany">>,
   operations: DraftOperation[],
   onError: (op: DraftOperation, error: string) => boolean | Promise<boolean>,
   onProgress?: (current: number, total: number, description: string) => void
@@ -41,14 +42,16 @@ export async function applyDraftsWithTracking(
     skipped: [],
   };
 
+  const successfulOperationIds: string[] = [];
+
   for (let i = 0; i < operations.length; i++) {
     const op = operations[i];
     onProgress?.(i + 1, operations.length, op.description);
 
     try {
       await executeOperation(server, op);
-      await queue.remove(op.id);
       result.succeeded.push(op);
+      successfulOperationIds.push(op.id);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       result.failed.push({ operation: op, error: msg });
@@ -59,6 +62,23 @@ export async function applyDraftsWithTracking(
           result.skipped.push(operations[j]);
         }
         break;
+      }
+    }
+  }
+
+  if (successfulOperationIds.length > 0) {
+    if (queue.removeMany) {
+      try {
+        await queue.removeMany(successfulOperationIds, DRAFT_COMMAND_SOURCE);
+      } catch {
+        // Fallback to per-item removal if batch persistence fails.
+        for (const id of successfulOperationIds) {
+          await queue.remove(id, DRAFT_COMMAND_SOURCE);
+        }
+      }
+    } else {
+      for (const id of successfulOperationIds) {
+        await queue.remove(id, DRAFT_COMMAND_SOURCE);
       }
     }
   }
@@ -237,7 +257,7 @@ Skipped (not attempted): ${skippedNames}`;
 
       if (confirm !== "Discard All") return;
 
-      await queue.clear();
+      await queue.clear(DRAFT_COMMAND_SOURCE);
       refreshTrees(); // Refresh all views after discard
       vscode.window.showInformationMessage(`Discarded ${count} draft${count === 1 ? "" : "s"}`);
     }
@@ -246,7 +266,7 @@ Skipped (not attempted): ${skippedNames}`;
   const removeDraft = vscode.commands.registerCommand(
     "redmyne.removeDraft",
     async (draftId: string) => {
-      await queue.remove(draftId);
+      await queue.remove(draftId, DRAFT_COMMAND_SOURCE);
       refreshTrees(); // Refresh all views after remove
     }
   );
@@ -269,7 +289,7 @@ Skipped (not attempted): ${skippedNames}`;
 
       try {
         await executeOperation(server, op);
-        await queue.remove(op.id);
+        await queue.remove(op.id, DRAFT_COMMAND_SOURCE);
         refreshTrees();
         vscode.window.showInformationMessage(`Applied: ${op.description}`);
       } catch (error) {

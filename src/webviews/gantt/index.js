@@ -521,9 +521,19 @@ function initializeGantt(state) {
     });
 
     // Restore state from previous session (use extension-stored position as fallback)
+    const MAX_HISTORY_ACTIONS = 200;
     const previousState = vscode.getState() || { undoStack: [], redoStack: [], labelWidth, scrollLeft: null, scrollTop: null, centerDateMs: null };
     const undoStack = previousState.undoStack || [];
     const redoStack = previousState.redoStack || [];
+
+    function trimHistoryStack(stack) {
+      if (stack.length > MAX_HISTORY_ACTIONS) {
+        stack.splice(0, stack.length - MAX_HISTORY_ACTIONS);
+      }
+    }
+
+    trimHistoryStack(undoStack);
+    trimHistoryStack(redoStack);
     // Use webview state if available, otherwise use extension-stored position
     let savedScrollLeft = previousState.scrollLeft ?? (extScrollLeft > 0 ? extScrollLeft : null);
     let savedScrollTop = previousState.scrollTop ?? (extScrollTop > 0 ? extScrollTop : null);
@@ -553,6 +563,8 @@ function initializeGantt(state) {
     }
 
     function saveState() {
+      trimHistoryStack(undoStack);
+      trimHistoryStack(redoStack);
       // Always save centerDateMs for date-based scroll restoration
       // This ensures correct position when date range changes (e.g., visibility toggle)
       vscode.setState({
@@ -690,6 +702,7 @@ function initializeGantt(state) {
       } else if (message.command === 'pushUndoAction') {
         // Push relation action to undo stack
         undoStack.push(message.action);
+        trimHistoryStack(undoStack);
         redoStack.length = 0;
         updateUndoRedoButtons();
         saveState();

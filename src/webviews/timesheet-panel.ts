@@ -10,6 +10,7 @@ import { Issue } from "../redmine/models/issue";
 import { DraftQueue } from "../draft-mode/draft-queue";
 import { DraftModeManager } from "../draft-mode/draft-mode-manager";
 import { generateTempId, generateDraftId } from "../draft-mode/draft-operation";
+import { DRAFT_COMMAND_SOURCE } from "../draft-mode/draft-change-sources";
 import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "../utilities/flexibility-calculator";
 import { parseLocalDate, getLocalToday } from "../utilities/date-utils";
 import { pickIssue } from "../utilities/issue-picker";
@@ -257,6 +258,8 @@ export class TimeSheetPanel {
         this._draftQueue.onDidChange((source) => {
           // Skip reload if the change came from this panel
           if (source === TIMESHEET_SOURCE) return;
+          // Command-driven bulk changes trigger one explicit timesheet refresh.
+          if (source === DRAFT_COMMAND_SOURCE) return;
           if (this._panel.visible) {
             void this._loadWeek(this._currentWeek);
           }
