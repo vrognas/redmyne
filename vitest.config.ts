@@ -25,6 +25,9 @@ export default defineConfig({
         "src/commands/commons/**/*.ts", // VS Code UI heavy
         "src/commands/configure-command.ts", // VS Code UI heavy
         "src/commands/create-test-issues.ts", // VS Code UI heavy
+        "src/commands/context-proxy-commands.ts", // Extracted from extension.ts (context command wiring)
+        "src/commands/issue-context-commands.ts", // Extracted from extension.ts (UI and command wiring)
+        "src/commands/navigation-clipboard-commands.ts", // Extracted from extension.ts (command wiring)
         "src/commands/gantt-commands.ts", // VS Code UI heavy
         "src/commands/time-entry-commands.ts", // VS Code UI heavy
         "src/commands/view-commands.ts", // VS Code UI heavy
