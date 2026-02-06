@@ -14,6 +14,32 @@ interface TaskTreeItem {
   task?: KanbanTask;
 }
 
+interface IntegerRangeValidatorOptions {
+  min: number;
+  max: number;
+  minMessage: string;
+  maxMessage: string;
+  maxInclusive?: boolean;
+}
+
+function createIntegerRangeValidator({
+  min,
+  max,
+  minMessage,
+  maxMessage,
+  maxInclusive = true,
+}: IntegerRangeValidatorOptions): (value: string) => string | null {
+  return (value: string): string | null => {
+    const parsed = parseInt(value, 10);
+    if (isNaN(parsed) || parsed < min) return minMessage;
+
+    const exceedsMax = maxInclusive ? parsed > max : parsed >= max;
+    if (exceedsMax) return maxMessage;
+
+    return null;
+  };
+}
+
 /**
  * Register all kanban commands
  */
@@ -718,12 +744,12 @@ export function registerKanbanCommands(
         const input = await vscode.window.showInputBox({
           prompt: "Enter number of progress bar segments (3-100):",
           value: currentBarWidth.toString(),
-          validateInput: (v) => {
-            const n = parseInt(v, 10);
-            if (isNaN(n) || n < 3) return "Minimum 3 segments";
-            if (n > 100) return "Maximum 100 segments";
-            return null;
-          },
+          validateInput: createIntegerRangeValidator({
+            min: 3,
+            max: 100,
+            minMessage: "Minimum 3 segments",
+            maxMessage: "Maximum 100 segments",
+          }),
         });
         if (!input) return;
         const value = parseInt(input, 10);
@@ -736,12 +762,13 @@ export function registerKanbanCommands(
         const input = await vscode.window.showInputBox({
           prompt: `Break = Unit (${currentUnit}min) - Work. Enter new break duration:`,
           value: currentBreak.toString(),
-          validateInput: (v) => {
-            const n = parseInt(v, 10);
-            if (isNaN(n) || n < 0) return "Minimum 0 minutes";
-            if (n >= currentUnit) return `Must be less than unit duration (${currentUnit}min)`;
-            return null;
-          },
+          validateInput: createIntegerRangeValidator({
+            min: 0,
+            max: currentUnit,
+            minMessage: "Minimum 0 minutes",
+            maxMessage: `Must be less than unit duration (${currentUnit}min)`,
+            maxInclusive: false,
+          }),
         });
         if (!input) return;
         const newBreak = parseInt(input, 10);
@@ -761,12 +788,12 @@ export function registerKanbanCommands(
       const input = await vscode.window.showInputBox({
         prompt,
         value: current.toString(),
-        validateInput: (v) => {
-          const n = parseInt(v, 10);
-          if (isNaN(n) || n < 1) return "Minimum 1 minute";
-          if (n > max) return `Maximum ${max} minutes`;
-          return null;
-        },
+        validateInput: createIntegerRangeValidator({
+          min: 1,
+          max,
+          minMessage: "Minimum 1 minute",
+          maxMessage: `Maximum ${max} minutes`,
+        }),
       });
       if (!input) return;
 

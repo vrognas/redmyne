@@ -10,6 +10,20 @@ import { recordRecentIssue, getRecentIssueIds } from "./recent-issues";
 const SEARCH_DEBOUNCE_MS = 150;
 const PROJECT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+function isNonZeroNumber(value: number | null | undefined): value is number {
+  return typeof value === "number" && value !== 0 && !Number.isNaN(value);
+}
+
+type QuickPickWithSortByLabel<T extends vscode.QuickPickItem> = vscode.QuickPick<T> & {
+  sortByLabel: boolean;
+};
+
+function hasSortByLabel<T extends vscode.QuickPickItem>(
+  quickPick: vscode.QuickPick<T>
+): quickPick is QuickPickWithSortByLabel<T> {
+  return "sortByLabel" in quickPick;
+}
+
 // Project path cache (module-level, shared across picker invocations)
 interface ProjectPathCache {
   map: Map<number, string>;
@@ -462,7 +476,7 @@ export async function pickIssueWithSearch(
   const myIssueIds = new Set(issues.map(i => i.id));
 
   // Fetch project path map (cached) + check time_tracking in parallel
-  const projectIds = [...new Set(issues.map(i => i.project?.id).filter(Boolean))] as number[];
+  const projectIds = [...new Set(issues.map(i => i.project?.id).filter(isNonZeroNumber))];
   const timeTrackingByProject = new Map<number, boolean>();
 
   const [projectPathMap] = await Promise.all([
@@ -579,7 +593,9 @@ export async function pickIssueWithSearch(
     const quickPick = vscode.window.createQuickPick<IssueQuickPickItem>();
     quickPick.title = title;
     quickPick.placeholder = "Type to search, or select from list";
-    (quickPick as unknown as { sortByLabel: boolean }).sortByLabel = false;  // Preserve our custom sort order
+    if (hasSortByLabel(quickPick)) {
+      quickPick.sortByLabel = false; // Preserve our custom sort order
+    }
     quickPick.items = baseItems;
     quickPick.matchOnDescription = true;
     quickPick.matchOnDetail = true;
@@ -843,7 +859,7 @@ export async function pickIssue(
 
   // Fetch project path map (cached) + check time_tracking in parallel
   const timeTrackingByProject = new Map<number, boolean>();
-  const projectIds = [...new Set(issues.map(i => i.project?.id).filter(Boolean))] as number[];
+  const projectIds = [...new Set(issues.map(i => i.project?.id).filter(isNonZeroNumber))];
 
   const [projectPathMap] = await Promise.all([
     getProjectPathMap(server),
@@ -958,7 +974,9 @@ export async function pickIssue(
     const quickPick = vscode.window.createQuickPick<IssueQuickPickItem>();
     quickPick.title = title;
     quickPick.placeholder = "Type to search, or select from list";
-    (quickPick as unknown as { sortByLabel: boolean }).sortByLabel = false;  // Preserve our custom sort order
+    if (hasSortByLabel(quickPick)) {
+      quickPick.sortByLabel = false; // Preserve our custom sort order
+    }
     quickPick.items = baseItems;
     quickPick.matchOnDescription = true;
     quickPick.matchOnDetail = true;
