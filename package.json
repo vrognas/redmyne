@@ -2246,7 +2246,7 @@
     "watch": "node esbuild.cjs --watch",
     "dev": "npm run watch",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf out/ coverage/",
+    "clean": "node -e \"require('node:fs').rmSync('out',{recursive:true,force:true});require('node:fs').rmSync('coverage',{recursive:true,force:true});\"",
     "lint": "eslint .",
     "package": "npx @vscode/vsce package",
     "test": "vitest run",

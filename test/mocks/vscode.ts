@@ -18,6 +18,11 @@ export const window = {
     hide: vi.fn(),
     dispose: vi.fn(),
   })),
+  createTreeView: vi.fn(() => ({
+    dispose: vi.fn(),
+    onDidExpandElement: vi.fn(() => ({ dispose: vi.fn() })),
+    onDidCollapseElement: vi.fn(() => ({ dispose: vi.fn() })),
+  })),
   createQuickPick: vi.fn(() => {
     const value = _nextQuickPickValue;
     _nextQuickPickValue = undefined;

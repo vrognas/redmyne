@@ -311,8 +311,12 @@ describe("KanbanController", () => {
 
   describe("reorder operations", () => {
     it("moves task up in column", async () => {
-      const task1 = await controller.addTask("Task 1", 1, "I1", 1, "P");
-      const task2 = await controller.addTask("Task 2", 2, "I2", 1, "P");
+      const task1 = await controller.addTask("Task 1", 1, "I1", 1, "P", {
+        priority: "high",
+      });
+      const task2 = await controller.addTask("Task 2", 2, "I2", 1, "P", {
+        priority: "low",
+      });
 
       // Both are in todo column
       await controller.moveUp(task2.id);
@@ -320,19 +324,27 @@ describe("KanbanController", () => {
       const updated1 = controller.getTaskById(task1.id);
       const updated2 = controller.getTaskById(task2.id);
 
+      expect(updated1?.sortOrder).toBeTypeOf("number");
+      expect(updated2?.sortOrder).toBeTypeOf("number");
       // task2 should now have lower sortOrder (higher position)
       expect(updated2?.sortOrder).toBeLessThan(updated1?.sortOrder ?? Infinity);
     });
 
     it("moves task down in column", async () => {
-      const task1 = await controller.addTask("Task 1", 1, "I1", 1, "P");
-      const task2 = await controller.addTask("Task 2", 2, "I2", 1, "P");
+      const task1 = await controller.addTask("Task 1", 1, "I1", 1, "P", {
+        priority: "high",
+      });
+      const task2 = await controller.addTask("Task 2", 2, "I2", 1, "P", {
+        priority: "low",
+      });
 
       await controller.moveDown(task1.id);
 
       const updated1 = controller.getTaskById(task1.id);
       const updated2 = controller.getTaskById(task2.id);
 
+      expect(updated1?.sortOrder).toBeTypeOf("number");
+      expect(updated2?.sortOrder).toBeTypeOf("number");
       // task1 should now have higher sortOrder (lower position)
       expect(updated1?.sortOrder).toBeGreaterThan(updated2?.sortOrder ?? -Infinity);
     });

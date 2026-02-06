@@ -4,7 +4,7 @@
 
 **Breaking**: All extension identifiers renamed from `redmine.*` to `redmyne.*`:
 
-- Settings: `redmine.url` → `redmyne.url`, etc.
+- Settings: `redmine.url` → `redmyne.serverUrl`, etc.
 - Commands: `redmine.configure` → `redmyne.configure`, etc.
 - Views: `redmine-explorer-*` → `redmyne-explorer-*`
 - Context keys: `redmine:configured` → `redmyne:configured`
@@ -35,7 +35,7 @@ If settings.json has explicit `redmine.*` keys, rename to `redmyne.*`.
 1. Update VS Code to 1.106.0+
 2. Update extension via Extensions view
 3. Get API key from Redmine `/my/account`
-4. Run command: `Redmine: Set API Key`
+4. Run command: `Redmyne: Set API Key`
 5. Paste key when prompted
 
 Old `redmine.apiKey` settings are deprecated and can be removed.
@@ -44,7 +44,7 @@ Old `redmine.apiKey` settings are deprecated and can be removed.
 
 | Issue               | Solution                   |
 | ------------------- | -------------------------- |
-| "API key not found" | Run `Redmine: Set API Key` |
+| "API key not found" | Run `Redmyne: Set API Key` |
 | Key disappeared     | Verify VS Code 1.106+      |
 
 ## What Changed

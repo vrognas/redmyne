@@ -186,7 +186,7 @@ When server configured or refresh clicked:
 code --disable-extensions && code --install-extension ./positron-redmine-*.vsix
 
 # Profile network calls
-# Enable: redmine.logging.enabled = true
+# Enable: redmyne.logging.enabled = true
 # View: Output panel → "Redmine API"
 
 # Measure tree render time

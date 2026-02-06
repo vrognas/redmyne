@@ -162,9 +162,9 @@ Stage tasks before timing them.
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| `redmine.url` | Redmine server URL (HTTPS required) | — |
-| `redmine.identifier` | Default project identifier | `""` |
-| `redmine.additionalHeaders` | Custom HTTP headers for auth proxies | `{}` |
+| `redmyne.serverUrl` | Redmine server URL (HTTPS required) | — |
+| `redmyne.logging.enabled` | Log API requests to output channel for debugging | `true` |
+| `redmyne.maxConcurrentRequests` | Maximum concurrent API requests | `2` |
 
 API keys stored via `Redmyne: Set API Key` command (encrypted keychain).
 
@@ -172,31 +172,31 @@ API keys stored via `Redmyne: Set API Key` command (encrypted keychain).
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| `redmine.workingHours.weeklySchedule` | Hours per day for capacity calculations | 8h Mon-Fri |
+| `redmyne.workingHours.weeklySchedule` | Hours per day for capacity calculations | 8h Mon-Fri |
 
 ```json
-"redmine.workingHours.weeklySchedule": {
+"redmyne.workingHours.weeklySchedule": {
   "Mon": 8, "Tue": 8, "Wed": 8, "Thu": 8, "Fri": 8,
   "Sat": 0, "Sun": 0
 }
 ```
 
-**Monthly overrides:** `Redmine: Edit Monthly Working Hours` for varying FTE per month.
+**Monthly overrides:** `Redmyne: Edit Monthly Working Hours` for varying FTE per month.
 
 ### Status Bar
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| `redmine.statusBar.showWorkload` | Show workload summary ("25h left, +8h buffer") | `false` |
-| `redmine.timer.showInStatusBar` | Show timer countdown | `true` |
+| `redmyne.statusBar.showWorkload` | Show workload summary ("25h left, +8h buffer") | `false` |
 
 ### Behavior
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| `redmine.autoUpdateDoneRatio` | Auto-update % Done when logging time (caps at 99%) | `true` |
-| `redmine.logging.enabled` | Log API requests to output channel for debugging | `true` |
-| `redmine.gantt.extendedRelationTypes` | Enable Gantt plugin relation types (FS/SS/FF/SF) | `false` |
+| `redmyne.autoUpdateDonePercent` | Auto-update % Done when logging time (caps at 99%) | `false` |
+| `redmyne.showCalculatedPriority` | Show calculated priority score in Gantt tooltips | `false` |
+| `redmyne.gantt.visibleRelationTypes` | Relation types shown as dependency arrows in Gantt | `["blocks","precedes"]` |
+| `redmyne.gantt.perfDebug` | Enable performance debug logging for Gantt | `false` |
 
 ## Requirements
 

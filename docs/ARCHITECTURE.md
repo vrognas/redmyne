@@ -1,8 +1,8 @@
 # Architecture
 
-VS Code/Positron extension for Redmine workload management. TypeScript 5.9+, zero runtime deps.
+VS Code/Positron extension for Redmine workload management. TypeScript 5.9+.
 
-**v4.4.0** | VS Code ≥1.105.0 | Node ≥20
+**v4.16.0** | VS Code ≥1.105.0 | Node ≥20
 
 ## Core Pattern
 
@@ -75,7 +75,7 @@ src/
 ## Data Flow
 
 ```
-Config (redmine.url) + SecretManager (API key)
+Config (`redmyne.serverUrl`) + SecretManager (API key)
     ↓
 RedmineServer instance (LRU cache, max 3)
     ↓

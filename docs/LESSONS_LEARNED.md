@@ -392,7 +392,7 @@ async fetchIssuesIfNeeded(): Promise<Issue[]> {
 
 **Problem**: Tree "blinks" when toggling status bar config
 
-**Root Cause**: `event.affectsConfiguration("redmine")` matches ALL `redmine.*` changes, triggering unnecessary server reinit
+**Root Cause**: `event.affectsConfiguration("redmyne")` matches ALL `redmyne.*` changes, triggering unnecessary server reinit
 
 **Solution**: Filter out UI-only configs (statusBar, workingHours) from triggering server reinit
 - Only server-related changes (url, apiKey, headers) need reinit
