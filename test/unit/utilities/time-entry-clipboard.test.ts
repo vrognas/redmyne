@@ -13,13 +13,7 @@ import {
 } from "../../../src/utilities/time-entry-clipboard";
 import { WeeklySchedule } from "../../../src/utilities/flexibility-calculator";
 import { MonthlyScheduleOverrides } from "../../../src/utilities/monthly-schedule";
-
-// Mock vscode
-vi.mock("vscode", () => ({
-  commands: {
-    executeCommand: vi.fn(),
-  },
-}));
+import { commands } from "vscode";
 
 describe("time-entry-clipboard", () => {
   const defaultSchedule: WeeklySchedule = {
@@ -42,6 +36,7 @@ describe("time-entry-clipboard", () => {
 
   beforeEach(() => {
     clearClipboard();
+    vi.clearAllMocks();
   });
 
   describe("clipboard state management", () => {
@@ -87,10 +82,9 @@ describe("time-entry-clipboard", () => {
       expect(getClipboard()).toBeNull();
     });
 
-    it("updateClipboardContext sets vscode context key", async () => {
-      const vscodeApi = await import("vscode");
+    it("updateClipboardContext sets vscode context key", () => {
       updateClipboardContext();
-      expect(vscodeApi.commands.executeCommand).toHaveBeenCalledWith(
+      expect(commands.executeCommand).toHaveBeenLastCalledWith(
         "setContext",
         "redmyne:timeEntryClipboardType",
         ""
@@ -98,7 +92,7 @@ describe("time-entry-clipboard", () => {
 
       setClipboard({ kind: "day", entries: [entry1], sourceDate: "2025-01-15" });
       updateClipboardContext();
-      expect(vscodeApi.commands.executeCommand).toHaveBeenCalledWith(
+      expect(commands.executeCommand).toHaveBeenLastCalledWith(
         "setContext",
         "redmyne:timeEntryClipboardType",
         "day"
