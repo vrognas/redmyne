@@ -2,6 +2,12 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.16.4]
+
+### Internal
+
+- **Panel public-flow test coverage** - added integration-style tests for `GanttPanel` + `TimeSheetPanel` public flows (`createOrShow`, `restore`, message dispatch, deferred render) using stable webview/panel spies
+
 ## [4.16.3]
 
 ### Fixed
