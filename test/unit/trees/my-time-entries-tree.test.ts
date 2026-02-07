@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MyTimeEntriesTreeDataProvider } from "../../../src/trees/my-time-entries-tree";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { MyTimeEntriesTreeDataProvider, TimeEntryNode } from "../../../src/trees/my-time-entries-tree";
 import { TimeEntry } from "../../../src/redmine/models/time-entry";
 import * as vscode from "vscode";
 
@@ -46,19 +46,38 @@ describe("MyTimeEntriesTreeDataProvider", () => {
   };
   let provider: MyTimeEntriesTreeDataProvider;
 
-  // Helper to wait for async loading to complete
+  // Helper to flush pending async work without wall-clock timers
   const waitForLoad = async () => {
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    for (let i = 0; i < 10; i++) {
+      await Promise.resolve();
+    }
+  };
+
+  const isLoadingNode = (nodes: TimeEntryNode[]) =>
+    nodes.length === 1 && nodes[0].type === "loading";
+
+  const waitUntilLoaded = async <T extends TimeEntryNode[]>(
+    fetch: () => Promise<T>,
+    context: string
+  ): Promise<T> => {
+    for (let i = 0; i < 50; i++) {
+      const nodes = await fetch();
+      if (!isLoadingNode(nodes)) {
+        return nodes;
+      }
+      await waitForLoad();
+    }
+    throw new Error(`Timeout waiting for ${context}`);
   };
 
   // Helper to get loaded groups
   const getLoadedGroups = async () => {
     await provider.getChildren(); // Trigger load
-    await waitForLoad(); // Wait for background fetch
-    return provider.getChildren(); // Get cached result
+    return waitUntilLoaded(() => provider.getChildren(), "root groups");
   };
 
   beforeEach(() => {
+    vi.useRealTimers();
     vi.resetModules();
     mockServer = {
       getTimeEntries: vi.fn(),
@@ -100,6 +119,10 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     provider.setServer(mockServer as unknown as never);
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("returns loading state on first call then actual data", async () => {
     const todayEntries: TimeEntry[] = [
       {
@@ -127,11 +150,8 @@ describe("MyTimeEntriesTreeDataProvider", () => {
       new vscode.ThemeIcon("loading~spin")
     );
 
-    // Wait for background load to complete
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
     // Second call returns actual data (cached)
-    const secondResult = await provider.getChildren();
+    const secondResult = await getLoadedGroups();
     // New structure: Today, This Week, 3 month nodes, Load Earlier = 6 items
     expect(secondResult).toHaveLength(6);
     expect(secondResult[0].label).toContain("Today");
@@ -175,11 +195,8 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     // First call returns loading state
     await provider.getChildren();
 
-    // Wait for background load
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
     // Get root groups (cached)
-    const groups = await provider.getChildren();
+    const groups = await getLoadedGroups();
 
     // New structure: Today, This Week, 3 month nodes, Load Earlier = 6 items
     expect(groups).toHaveLength(6);
@@ -315,8 +332,7 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     provider.onDidChangeTreeData(eventSpy);
 
     provider.refresh();
-    // Wait for async loadTimeEntries to complete
-    await waitForLoad();
+    await getLoadedGroups();
 
     expect(eventSpy).toHaveBeenCalledWith(undefined);
   });
@@ -627,11 +643,11 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     const loadingState = await provider.getChildren(targetMonth);
     expect(loadingState[0].label).toBe("Loading...");
 
-    // Wait for lazy load to complete
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
     // Second expansion returns loaded data
-    const weekGroups = await provider.getChildren(targetMonth);
+    const weekGroups = await waitUntilLoaded(
+      () => provider.getChildren(targetMonth),
+      "month group load"
+    );
     expect(weekGroups.length).toBeGreaterThanOrEqual(1);
     expect(weekGroups[0].type).toBe("week-subgroup");
 
@@ -651,11 +667,127 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     // Call loadEarlierMonths
     provider.loadEarlierMonths();
 
-    // Wait for refresh
-    await waitForLoad();
-
     const newGroups = await provider.getChildren();
     // Now: Today, This Week, 6 months, Load Earlier = 9 items
     expect(newGroups).toHaveLength(9);
+  });
+
+  it("maps draft create/update entries with draft-specific context values", async () => {
+    const today = getTodayStr();
+    const baseEntry: TimeEntry = {
+      id: 99,
+      issue_id: 123,
+      activity_id: 9,
+      activity: { id: 9, name: "Development" },
+      hours: "1.0",
+      comments: "server",
+      spent_on: today,
+    };
+
+    mockServer.getTimeEntries.mockResolvedValueOnce({ time_entries: [baseEntry] });
+    const queue = {
+      getAll: vi.fn(() => [
+        {
+          id: "draft-create-1",
+          type: "createTimeEntry",
+          resourceId: undefined,
+          http: { data: { time_entry: { issue_id: 321, activity_id: 7, hours: "2.5", comments: "draft", spent_on: today } } },
+        },
+        {
+          id: "draft-update-1",
+          type: "updateTimeEntry",
+          resourceId: 99,
+          http: { data: { time_entry: { comments: "updated in draft", hours: "1.5" } } },
+        },
+      ]),
+      onDidChange: vi.fn(() => ({ dispose: vi.fn() })),
+    };
+    provider.setDraftQueue(queue as never);
+
+    const groups = await getLoadedGroups();
+    const todayEntries = await provider.getChildren(groups[0]);
+    const contexts = todayEntries.map((node) => node.contextValue);
+
+    expect(contexts).toContain("time-entry-draft");
+    expect(contexts).toContain("time-entry-modified");
+  });
+
+  it("toggles show-all-users and includes user name in entry description", async () => {
+    const refreshSpy = vi.spyOn(provider, "refresh");
+    provider.setShowAllUsers(false); // no-op path
+    expect(refreshSpy).not.toHaveBeenCalled();
+
+    provider.setShowAllUsers(true);
+    expect(provider.getShowAllUsers()).toBe(true);
+    expect(refreshSpy).toHaveBeenCalled();
+
+    const todayEntries: TimeEntry[] = [
+      {
+        id: 1,
+        issue_id: 123,
+        activity_id: 9,
+        activity: { id: 9, name: "Development" },
+        hours: "1.0",
+        comments: "user test",
+        spent_on: getTodayStr(),
+        user: { id: 1, name: "Alice" },
+      },
+    ];
+    const children = await provider.getChildren({
+      id: "group-today",
+      label: "Today",
+      collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
+      type: "group",
+      _cachedEntries: todayEntries,
+      _date: getTodayStr(),
+    });
+    expect(children[0].description).toContain("Alice");
+  });
+
+  it("sorts by id, subject, comment, and user with direction toggle", () => {
+    const entries: TimeEntry[] = [
+      { issue_id: 2, hours: "1", comments: "b", activity_id: 1, user: { id: 1, name: "Zed" } },
+      { issue_id: 1, hours: "1", comments: "a", activity_id: 1, user: { id: 2, name: "Amy" } },
+    ];
+    (provider as unknown as { issueCache: Map<number, { subject: string }> }).issueCache.set(1, { subject: "Alpha" });
+    (provider as unknown as { issueCache: Map<number, { subject: string }> }).issueCache.set(2, { subject: "Beta" });
+
+    provider.setSort("id");
+    let sorted = (provider as unknown as { sortEntries: (rows: TimeEntry[]) => TimeEntry[] }).sortEntries(entries);
+    expect(sorted.map((e) => e.issue_id)).toEqual([1, 2]);
+    provider.setSort("id"); // toggle to desc
+    sorted = (provider as unknown as { sortEntries: (rows: TimeEntry[]) => TimeEntry[] }).sortEntries(entries);
+    expect(sorted.map((e) => e.issue_id)).toEqual([2, 1]);
+
+    (provider as unknown as { entrySort: { field: string; direction: "asc" | "desc" } }).entrySort = {
+      field: "subject",
+      direction: "asc",
+    };
+    (provider as unknown as { issueCache: Map<number, { subject: string }> }).issueCache.set(1, { subject: "Alpha" });
+    (provider as unknown as { issueCache: Map<number, { subject: string }> }).issueCache.set(2, { subject: "Beta" });
+    sorted = (provider as unknown as { sortEntries: (rows: TimeEntry[]) => TimeEntry[] }).sortEntries(entries);
+    expect(sorted.map((e) => e.issue_id)).toEqual([1, 2]);
+
+    (provider as unknown as { entrySort: { field: string; direction: "asc" | "desc" } }).entrySort = {
+      field: "comment",
+      direction: "asc",
+    };
+    sorted = (provider as unknown as { sortEntries: (rows: TimeEntry[]) => TimeEntry[] }).sortEntries(entries);
+    expect(sorted.map((e) => e.comments)).toEqual(["a", "b"]);
+
+    provider.setSort("user");
+    sorted = (provider as unknown as { sortEntries: (rows: TimeEntry[]) => TimeEntry[] }).sortEntries(entries);
+    expect(sorted.map((e) => e.user?.name)).toEqual(["Amy", "Zed"]);
+    expect(provider.getSort()).toEqual({ field: "user", direction: "asc" });
+  });
+
+  it("assigns command for load-earlier tree item", () => {
+    const item = provider.getTreeItem({
+      id: "load-earlier",
+      label: "Load another 3 months",
+      collapsibleState: vscode.TreeItemCollapsibleState.None,
+      type: "load-earlier",
+    });
+    expect(item.command?.command).toBe("redmyne.loadEarlierTimeEntries");
   });
 });
