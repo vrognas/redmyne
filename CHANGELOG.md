@@ -2,6 +2,12 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.16.5]
+
+### Fixed
+
+- **macOS CI timeout flake in tree tests** - hardened `my-time-entries-tree` tests to avoid timer leakage under `isolate:false` by forcing real timers and using deterministic async polling
+
 ## [4.16.4]
 
 ### Internal
