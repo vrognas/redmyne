@@ -76,7 +76,7 @@ export async function quickCreateIssue(
           }, showBack);
 
           if (result === undefined) return undefined;
-          if (isBack(result)) { step--; continue; }
+          if (isBack(result)) return undefined;
           state.project = result;
           step++;
           break;
@@ -245,7 +245,7 @@ export async function quickCreateSubIssue(
           }, showBack);
 
           if (result === undefined) return undefined;
-          if (isBack(result)) { step--; continue; }
+          if (isBack(result)) return undefined;
           state.priority = result;
           step++;
           break;

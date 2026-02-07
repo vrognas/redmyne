@@ -3,8 +3,11 @@ import {
   setClipboard,
   getClipboard,
   clearClipboard,
+  updateClipboardContext,
+  getISODayOfWeek,
   getWorkingDaysInWeek,
   calculatePasteTargetDates,
+  getEntriesForTargetDate,
   ClipboardEntry,
   TimeEntryClipboard,
 } from "../../../src/utilities/time-entry-clipboard";
@@ -82,6 +85,31 @@ describe("time-entry-clipboard", () => {
       expect(getClipboard()).not.toBeNull();
       clearClipboard();
       expect(getClipboard()).toBeNull();
+    });
+
+    it("updateClipboardContext sets vscode context key", async () => {
+      const vscodeApi = await import("vscode");
+      updateClipboardContext();
+      expect(vscodeApi.commands.executeCommand).toHaveBeenCalledWith(
+        "setContext",
+        "redmyne:timeEntryClipboardType",
+        ""
+      );
+
+      setClipboard({ kind: "day", entries: [entry1], sourceDate: "2025-01-15" });
+      updateClipboardContext();
+      expect(vscodeApi.commands.executeCommand).toHaveBeenCalledWith(
+        "setContext",
+        "redmyne:timeEntryClipboardType",
+        "day"
+      );
+    });
+  });
+
+  describe("date helpers", () => {
+    it("getISODayOfWeek converts JS day index to ISO Monday-first", () => {
+      expect(getISODayOfWeek(new Date("2025-01-13"))).toBe(0); // Monday
+      expect(getISODayOfWeek(new Date("2025-01-19"))).toBe(6); // Sunday
     });
   });
 
@@ -250,6 +278,51 @@ describe("time-entry-clipboard", () => {
         {}
       );
       expect(dates).toBeNull();
+    });
+
+    it("returns empty array when target parameters are missing", () => {
+      const clip: TimeEntryClipboard = {
+        kind: "entry",
+        entries: [entry1],
+        sourceDate: "2025-01-15",
+      };
+      const dates = calculatePasteTargetDates(
+        clip,
+        "week",
+        undefined,
+        undefined,
+        defaultSchedule,
+        {}
+      );
+      expect(dates).toEqual([]);
+    });
+  });
+
+  describe("getEntriesForTargetDate", () => {
+    it("returns clipboard.entries for non-week clipboard", () => {
+      const clip: TimeEntryClipboard = {
+        kind: "day",
+        entries: [entry1, entry2],
+        sourceDate: "2025-01-15",
+      };
+
+      expect(getEntriesForTargetDate(clip, "2025-01-20", "2025-01-20")).toEqual([entry1, entry2]);
+    });
+
+    it("returns mapped entries for week clipboard and empty array for missing day", () => {
+      const weekMap = new Map<number, ClipboardEntry[]>();
+      weekMap.set(0, [entry1]); // Monday
+      weekMap.set(2, [entry2]); // Wednesday
+      const clip: TimeEntryClipboard = {
+        kind: "week",
+        entries: [entry1, entry2],
+        weekMap,
+        sourceWeekStart: "2025-01-13",
+      };
+
+      expect(getEntriesForTargetDate(clip, "2025-01-20", "2025-01-20")).toEqual([entry1]); // Mon
+      expect(getEntriesForTargetDate(clip, "2025-01-22", "2025-01-20")).toEqual([entry2]); // Wed
+      expect(getEntriesForTargetDate(clip, "2025-01-24", "2025-01-20")).toEqual([]); // Fri
     });
   });
 });

@@ -1166,3 +1166,12 @@ export async function pickActivityForProject(
     activityName: activity.name,
   };
 }
+
+// Test-only surface for internal logic with high branch complexity.
+export const __testIssuePicker = {
+  hasSortByLabel,
+  parseSearchOperators,
+  fuzzyFilterIssues,
+  searchIssuesWithFuzzy,
+  showActivityPicker,
+};

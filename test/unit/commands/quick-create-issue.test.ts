@@ -56,6 +56,51 @@ describe("quickCreateIssue", () => {
     props = { server: mockServer, config: {} };
   });
 
+  function mockWizardInputActions(
+    actions: Array<{ type: "value" | "back" | "cancel" | "invalidThenCancel"; value?: string }>
+  ): void {
+    let createQuickPickCallCount = 0;
+    vi.spyOn(vscode.window, "createQuickPick").mockImplementation(() => {
+      const action = actions[createQuickPickCallCount++] ?? { type: "cancel" as const };
+      let onAcceptHandler: (() => void) | undefined;
+      let onHideHandler: (() => void) | undefined;
+      const qp = {
+        title: "",
+        placeholder: "",
+        items: [] as vscode.QuickPickItem[],
+        selectedItems: [] as { label: string }[],
+        canSelectMany: false,
+        value: "",
+        onDidChangeValue: () => ({ dispose: vi.fn() }),
+        onDidAccept: (handler: () => void) => { onAcceptHandler = handler; return { dispose: vi.fn() }; },
+        onDidHide: (handler: () => void) => { onHideHandler = handler; return { dispose: vi.fn() }; },
+        show: vi.fn(() => {
+          if (action.type === "cancel") {
+            if (onHideHandler) onHideHandler();
+            return;
+          }
+          if (action.type === "invalidThenCancel") {
+            qp.value = action.value ?? "";
+            qp.selectedItems = [{ label: `$(check) Accept: "${qp.value}"` }];
+            if (onAcceptHandler) onAcceptHandler();
+            if (onHideHandler) onHideHandler();
+            return;
+          }
+          if (action.type === "back") {
+            qp.selectedItems = [{ label: "$(arrow-left) Back" }];
+          } else {
+            qp.value = action.value ?? "";
+            qp.selectedItems = [{ label: `$(check) Accept: "${qp.value}"` }];
+          }
+          if (onAcceptHandler) onAcceptHandler();
+        }),
+        hide: vi.fn(() => { if (onHideHandler) onHideHandler(); }),
+        dispose: vi.fn(),
+      };
+      return qp as unknown as vscode.QuickPick<vscode.QuickPickItem>;
+    });
+  }
+
   it("creates issue with full wizard flow", async () => {
     // Mock wizard steps - wizardPick returns item.data
     vi.spyOn(vscode.window, "showQuickPick")
@@ -168,6 +213,39 @@ describe("quickCreateIssue", () => {
     expect(mockServer.createIssue).not.toHaveBeenCalled();
   });
 
+  it("returns undefined when unexpected back is selected at project step", async () => {
+    const { WIZARD_BACK } = await import("../../../src/utilities/wizard");
+    vi.spyOn(vscode.window, "showQuickPick").mockResolvedValueOnce({
+      label: "$(arrow-left) Back",
+      data: WIZARD_BACK,
+    } as unknown as vscode.QuickPickItem);
+
+    const result = await quickCreateIssue(props);
+
+    expect(result).toBeUndefined();
+    expect(mockServer.createIssue).not.toHaveBeenCalled();
+  });
+
+  it("supports preselected project and cancel on tracker step", async () => {
+    vi.spyOn(vscode.window, "showQuickPick").mockResolvedValueOnce(undefined);
+
+    const result = await quickCreateIssue(props, 1);
+
+    expect(result).toBeUndefined();
+    expect(mockServer.createIssue).not.toHaveBeenCalled();
+    expect(vscode.window.showQuickPick).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to project picker when preselected project is not found", async () => {
+    vi.spyOn(vscode.window, "showQuickPick").mockResolvedValueOnce(undefined);
+
+    const result = await quickCreateIssue(props, 99999);
+
+    expect(result).toBeUndefined();
+    expect(vscode.window.showQuickPick).toHaveBeenCalledTimes(1);
+    expect(mockServer.createIssue).not.toHaveBeenCalled();
+  });
+
   it("returns undefined when user cancels at subject input", async () => {
     vi.spyOn(vscode.window, "showQuickPick")
       .mockResolvedValueOnce({ label: "Project Alpha", data: { label: "Project Alpha", id: 1 } } as unknown as vscode.QuickPickItem)
@@ -241,6 +319,189 @@ describe("quickCreateIssue", () => {
     expect(mockServer.createIssue).not.toHaveBeenCalled();
   });
 
+  it("handles back navigation across description/hours/due steps and still creates", async () => {
+    vi.spyOn(vscode.window, "showQuickPick")
+      .mockResolvedValueOnce({ label: "Tasks", data: { label: "Tasks", id: 2 } } as unknown as vscode.QuickPickItem) // tracker (preselected project skips step 1)
+      .mockResolvedValueOnce({ label: "High", data: { label: "High", id: 3 } } as unknown as vscode.QuickPickItem); // priority
+
+    mockWizardInputActions([
+      { type: "value", value: "Initial subject" }, // step 4
+      { type: "back" }, // step 5 -> back to step 4
+      { type: "value", value: "Final subject" }, // step 4 again
+      { type: "value", value: "Desc A" }, // step 5
+      { type: "back" }, // step 6 -> back to step 5
+      { type: "value", value: "Desc B" }, // step 5 again
+      { type: "value", value: "6" }, // step 6
+      { type: "back" }, // step 7 -> back to step 6
+      { type: "value", value: "7" }, // step 6 again
+      { type: "value", value: "2026-12-31" }, // step 7 final
+    ]);
+
+    const result = await quickCreateIssue(props, 1);
+
+    expect(result).toEqual({ id: 999, subject: "New Issue" });
+    expect(mockServer.createIssue).toHaveBeenCalledWith({
+      project_id: 1,
+      tracker_id: 2,
+      subject: "Final subject",
+      description: "Desc B",
+      priority_id: 3,
+      estimated_hours: 7,
+      due_date: "2026-12-31",
+    });
+  });
+
+  it("returns undefined when user cancels at due date step", async () => {
+    vi.spyOn(vscode.window, "showQuickPick")
+      .mockResolvedValueOnce({ label: "Project Alpha", data: { label: "Project Alpha", id: 1 } } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "Tasks", data: { label: "Tasks", id: 2 } } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "Normal", data: { label: "Normal", id: 2 } } as unknown as vscode.QuickPickItem);
+    mockWizardInputActions([
+      { type: "value", value: "Subject" },
+      { type: "value", value: "Desc" },
+      { type: "value", value: "3" },
+      { type: "cancel" },
+    ]);
+
+    const result = await quickCreateIssue(props);
+
+    expect(result).toBeUndefined();
+    expect(mockServer.createIssue).not.toHaveBeenCalled();
+  });
+
+  it("returns undefined when user cancels at priority step", async () => {
+    vi.spyOn(vscode.window, "showQuickPick")
+      .mockResolvedValueOnce({ label: "Project Alpha", data: { label: "Project Alpha", id: 1 } } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "Tasks", data: { label: "Tasks", id: 2 } } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce(undefined);
+
+    const result = await quickCreateIssue(props);
+
+    expect(result).toBeUndefined();
+    expect(mockServer.createIssue).not.toHaveBeenCalled();
+  });
+
+  it("supports back navigation from tracker and subject steps", async () => {
+    const { WIZARD_BACK } = await import("../../../src/utilities/wizard");
+    vi.spyOn(vscode.window, "showQuickPick")
+      .mockResolvedValueOnce({ label: "Project Alpha", data: { label: "Project Alpha", id: 1 } } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "$(arrow-left) Back", data: WIZARD_BACK } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "Project Alpha", data: { label: "Project Alpha", id: 1 } } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "Tasks", data: { label: "Tasks", id: 2 } } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "Normal", data: { label: "Normal", id: 2 } } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "High", data: { label: "High", id: 3 } } as unknown as vscode.QuickPickItem);
+
+    mockWizardInputActions([
+      { type: "back" },
+      { type: "value", value: "Final subject" },
+      { type: "value", value: "Desc" },
+      { type: "value", value: "4" },
+      { type: "value", value: "2026-11-01" },
+    ]);
+
+    const result = await quickCreateIssue(props);
+
+    expect(result).toEqual({ id: 999, subject: "New Issue" });
+    expect(mockServer.createIssue).toHaveBeenCalledWith({
+      project_id: 1,
+      tracker_id: 2,
+      priority_id: 3,
+      subject: "Final subject",
+      description: "Desc",
+      estimated_hours: 4,
+      due_date: "2026-11-01",
+    });
+  });
+
+  it("supports back navigation from priority step", async () => {
+    const { WIZARD_BACK } = await import("../../../src/utilities/wizard");
+    vi.spyOn(vscode.window, "showQuickPick")
+      .mockResolvedValueOnce({ label: "Project Alpha", data: { label: "Project Alpha", id: 1 } } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "Tasks", data: { label: "Tasks", id: 2 } } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "$(arrow-left) Back", data: WIZARD_BACK } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "Tasks", data: { label: "Tasks", id: 2 } } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "Normal", data: { label: "Normal", id: 2 } } as unknown as vscode.QuickPickItem);
+
+    mockWizardInputActions([
+      { type: "value", value: "Subject" },
+      { type: "value", value: "Desc" },
+      { type: "value", value: "2" },
+      { type: "value", value: "" },
+    ]);
+
+    const result = await quickCreateIssue(props);
+
+    expect(result).toEqual({ id: 999, subject: "New Issue" });
+    expect(mockServer.createIssue).toHaveBeenCalledWith({
+      project_id: 1,
+      tracker_id: 2,
+      priority_id: 2,
+      subject: "Subject",
+      description: "Desc",
+      estimated_hours: 2,
+    });
+  });
+
+  it("returns undefined when description is canceled", async () => {
+    vi.spyOn(vscode.window, "showQuickPick")
+      .mockResolvedValueOnce({ label: "Project Alpha", data: { label: "Project Alpha", id: 1 } } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "Tasks", data: { label: "Tasks", id: 2 } } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "Normal", data: { label: "Normal", id: 2 } } as unknown as vscode.QuickPickItem);
+
+    mockWizardInputActions([
+      { type: "value", value: "Subject" },
+      { type: "cancel" },
+    ]);
+
+    const result = await quickCreateIssue(props);
+
+    expect(result).toBeUndefined();
+    expect(mockServer.createIssue).not.toHaveBeenCalled();
+  });
+
+  it("returns undefined when estimated hours is invalid then canceled", async () => {
+    vi.spyOn(vscode.window, "showQuickPick")
+      .mockResolvedValueOnce({ label: "Project Alpha", data: { label: "Project Alpha", id: 1 } } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "Tasks", data: { label: "Tasks", id: 2 } } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "Normal", data: { label: "Normal", id: 2 } } as unknown as vscode.QuickPickItem);
+
+    mockWizardInputActions([
+      { type: "value", value: "Subject" },
+      { type: "value", value: "Desc" },
+      { type: "invalidThenCancel", value: "-5" },
+    ]);
+
+    const result = await quickCreateIssue(props);
+
+    expect(result).toBeUndefined();
+    expect(mockServer.createIssue).not.toHaveBeenCalled();
+  });
+
+  it("returns undefined when subject is empty then canceled", async () => {
+    vi.spyOn(vscode.window, "showQuickPick")
+      .mockResolvedValueOnce({ label: "Project Alpha", data: { label: "Project Alpha", id: 1 } } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "Tasks", data: { label: "Tasks", id: 2 } } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "Normal", data: { label: "Normal", id: 2 } } as unknown as vscode.QuickPickItem);
+
+    mockWizardInputActions([{ type: "invalidThenCancel", value: "" }]);
+
+    const result = await quickCreateIssue(props);
+
+    expect(result).toBeUndefined();
+    expect(mockServer.createIssue).not.toHaveBeenCalled();
+  });
+
+  it("shows error when metadata loading fails", async () => {
+    mockServer.getProjects.mockRejectedValueOnce(new Error("offline"));
+
+    const result = await quickCreateIssue(props);
+
+    expect(result).toBeUndefined();
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      "Failed to create issue: offline"
+    );
+  });
+
   it("validates estimated hours input", () => {
     // Test validators directly - they're pure functions
     const validateHours = (v: string): string | null => {
@@ -312,6 +573,51 @@ describe("quickCreateSubIssue", () => {
 
     props = { server: mockServer, config: {} };
   });
+
+  function mockWizardInputActions(
+    actions: Array<{ type: "value" | "back" | "cancel" | "invalidThenCancel"; value?: string }>
+  ): void {
+    let createQuickPickCallCount = 0;
+    vi.spyOn(vscode.window, "createQuickPick").mockImplementation(() => {
+      const action = actions[createQuickPickCallCount++] ?? { type: "cancel" as const };
+      let onAcceptHandler: (() => void) | undefined;
+      let onHideHandler: (() => void) | undefined;
+      const qp = {
+        title: "",
+        placeholder: "",
+        items: [] as vscode.QuickPickItem[],
+        selectedItems: [] as { label: string }[],
+        canSelectMany: false,
+        value: "",
+        onDidChangeValue: () => ({ dispose: vi.fn() }),
+        onDidAccept: (handler: () => void) => { onAcceptHandler = handler; return { dispose: vi.fn() }; },
+        onDidHide: (handler: () => void) => { onHideHandler = handler; return { dispose: vi.fn() }; },
+        show: vi.fn(() => {
+          if (action.type === "cancel") {
+            if (onHideHandler) onHideHandler();
+            return;
+          }
+          if (action.type === "invalidThenCancel") {
+            qp.value = action.value ?? "";
+            qp.selectedItems = [{ label: `$(check) Accept: "${qp.value}"` }];
+            if (onAcceptHandler) onAcceptHandler();
+            if (onHideHandler) onHideHandler();
+            return;
+          }
+          if (action.type === "back") {
+            qp.selectedItems = [{ label: "$(arrow-left) Back" }];
+          } else {
+            qp.value = action.value ?? "";
+            qp.selectedItems = [{ label: `$(check) Accept: "${qp.value}"` }];
+          }
+          if (onAcceptHandler) onAcceptHandler();
+        }),
+        hide: vi.fn(() => { if (onHideHandler) onHideHandler(); }),
+        dispose: vi.fn(),
+      };
+      return qp as unknown as vscode.QuickPick<vscode.QuickPickItem>;
+    });
+  }
 
   it("creates sub-issue inheriting parent project and tracker", async () => {
     // Priority pick with data property
@@ -418,5 +724,175 @@ describe("quickCreateSubIssue", () => {
 
     // First createQuickPick is for subject - title should contain parent info
     expect(capturedTitles[0]).toContain("123"); // parent ID in title
+  });
+
+  it("returns undefined when user cancels priority selection", async () => {
+    vi.spyOn(vscode.window, "showQuickPick").mockResolvedValueOnce(undefined);
+
+    const result = await quickCreateSubIssue(props, 123);
+
+    expect(result).toBeUndefined();
+    expect(mockServer.createIssue).not.toHaveBeenCalled();
+  });
+
+  it("returns undefined when unexpected back is selected at sub-issue priority step", async () => {
+    const { WIZARD_BACK } = await import("../../../src/utilities/wizard");
+    vi.spyOn(vscode.window, "showQuickPick").mockResolvedValueOnce({
+      label: "$(arrow-left) Back",
+      data: WIZARD_BACK,
+    } as unknown as vscode.QuickPickItem);
+
+    const result = await quickCreateSubIssue(props, 123);
+
+    expect(result).toBeUndefined();
+    expect(mockServer.createIssue).not.toHaveBeenCalled();
+  });
+
+  it("returns undefined when sub-issue subject is canceled", async () => {
+    vi.spyOn(vscode.window, "showQuickPick")
+      .mockResolvedValueOnce({ label: "Normal", data: { label: "Normal", id: 2 } } as unknown as vscode.QuickPickItem);
+    mockWizardInputActions([{ type: "cancel" }]);
+
+    const result = await quickCreateSubIssue(props, 123);
+
+    expect(result).toBeUndefined();
+    expect(mockServer.createIssue).not.toHaveBeenCalled();
+  });
+
+  it("supports back navigation from sub-issue subject step", async () => {
+    vi.spyOn(vscode.window, "showQuickPick")
+      .mockResolvedValueOnce({ label: "Normal", data: { label: "Normal", id: 2 } } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "High", data: { label: "High", id: 3 } } as unknown as vscode.QuickPickItem);
+    mockWizardInputActions([
+      { type: "back" },
+      { type: "value", value: "Child task final" },
+      { type: "value", value: "" },
+      { type: "value", value: "" },
+      { type: "value", value: "" },
+    ]);
+
+    const result = await quickCreateSubIssue(props, 123);
+
+    expect(result).toEqual({ id: 1000, subject: "Sub Issue" });
+    expect(mockServer.createIssue).toHaveBeenCalledWith({
+      project_id: 1,
+      tracker_id: 2,
+      priority_id: 3,
+      parent_issue_id: 123,
+      subject: "Child task final",
+    });
+  });
+
+  it("returns undefined when sub-issue description/hours/due steps are canceled", async () => {
+    vi.spyOn(vscode.window, "showQuickPick")
+      .mockResolvedValue({ label: "Normal", data: { label: "Normal", id: 2 } } as unknown as vscode.QuickPickItem);
+
+    mockWizardInputActions([
+      { type: "value", value: "Child one" },
+      { type: "cancel" },
+    ]);
+    expect(await quickCreateSubIssue(props, 123)).toBeUndefined();
+
+    mockWizardInputActions([
+      { type: "value", value: "Child two" },
+      { type: "value", value: "Desc" },
+      { type: "cancel" },
+    ]);
+    expect(await quickCreateSubIssue(props, 123)).toBeUndefined();
+
+    mockWizardInputActions([
+      { type: "value", value: "Child three" },
+      { type: "value", value: "Desc" },
+      { type: "value", value: "2" },
+      { type: "cancel" },
+    ]);
+    expect(await quickCreateSubIssue(props, 123)).toBeUndefined();
+
+    expect(mockServer.createIssue).not.toHaveBeenCalled();
+  });
+
+  it("shows subject error when sub-issue subject is blank spaces", async () => {
+    vi.spyOn(vscode.window, "showQuickPick")
+      .mockResolvedValueOnce({ label: "Normal", data: { label: "Normal", id: 2 } } as unknown as vscode.QuickPickItem);
+    mockWizardInputActions([
+      { type: "value", value: "   " },
+      { type: "value", value: "" },
+      { type: "value", value: "" },
+      { type: "value", value: "" },
+    ]);
+
+    const result = await quickCreateSubIssue(props, 123);
+
+    expect(result).toBeUndefined();
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Could not determine subject");
+  });
+
+  it("returns undefined when sub-issue subject is empty then canceled", async () => {
+    vi.spyOn(vscode.window, "showQuickPick")
+      .mockResolvedValueOnce({ label: "Normal", data: { label: "Normal", id: 2 } } as unknown as vscode.QuickPickItem);
+    mockWizardInputActions([{ type: "invalidThenCancel", value: "" }]);
+
+    const result = await quickCreateSubIssue(props, 123);
+
+    expect(result).toBeUndefined();
+    expect(mockServer.createIssue).not.toHaveBeenCalled();
+  });
+
+  it("supports back navigation in sub-issue wizard and catches create errors", async () => {
+    vi.spyOn(vscode.window, "showQuickPick")
+      .mockResolvedValueOnce({ label: "Normal", data: { label: "Normal", id: 2 } } as unknown as vscode.QuickPickItem);
+    let createQuickPickCallCount = 0;
+    const actions = [
+      { type: "value", value: "Child A" },
+      { type: "back" },
+      { type: "value", value: "Child B" },
+      { type: "value", value: "Desc" },
+      { type: "back" },
+      { type: "value", value: "Desc 2" },
+      { type: "value", value: "4" },
+      { type: "back" },
+      { type: "value", value: "5" },
+      { type: "value", value: "2026-11-01" },
+    ] as const;
+    vi.spyOn(vscode.window, "createQuickPick").mockImplementation(() => {
+      const action = actions[createQuickPickCallCount++] ?? { type: "cancel" as const };
+      let onAcceptHandler: (() => void) | undefined;
+      let onHideHandler: (() => void) | undefined;
+      const qp = {
+        title: "",
+        placeholder: "",
+        items: [] as vscode.QuickPickItem[],
+        selectedItems: [] as { label: string }[],
+        canSelectMany: false,
+        value: "",
+        onDidChangeValue: () => ({ dispose: vi.fn() }),
+        onDidAccept: (handler: () => void) => { onAcceptHandler = handler; return { dispose: vi.fn() }; },
+        onDidHide: (handler: () => void) => { onHideHandler = handler; return { dispose: vi.fn() }; },
+        show: vi.fn(() => {
+          if (action.type === "cancel") {
+            if (onHideHandler) onHideHandler();
+            return;
+          }
+          if (action.type === "back") {
+            qp.selectedItems = [{ label: "$(arrow-left) Back" }];
+          } else {
+            qp.value = action.value;
+            qp.selectedItems = [{ label: `$(check) Accept: "${action.value}"` }];
+          }
+          if (onAcceptHandler) onAcceptHandler();
+        }),
+        hide: vi.fn(() => { if (onHideHandler) onHideHandler(); }),
+        dispose: vi.fn(),
+      };
+      return qp as unknown as vscode.QuickPick<vscode.QuickPickItem>;
+    });
+
+    mockServer.createIssue.mockRejectedValueOnce(new Error("create failed"));
+    const result = await quickCreateSubIssue(props, 123);
+
+    expect(result).toBeUndefined();
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      "Failed to create sub-issue: create failed"
+    );
   });
 });

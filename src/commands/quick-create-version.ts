@@ -60,7 +60,7 @@ export async function quickCreateVersion(
           }, showBack);
 
           if (result === undefined) return undefined;
-          if (isBack(result)) { step--; continue; }
+          if (isBack(result)) return undefined;
           state.project = result;
           step++;
           break;
