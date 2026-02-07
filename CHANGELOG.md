@@ -2,6 +2,12 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.16.3]
+
+### Fixed
+
+- **macOS CI flaky ad-hoc command test** - replaced fragile module mock in `adhoc-commands` tests with direct `spyOn(adHocTracker, "isAdHoc")` so test behavior is stable under `isolate:false` and parallel execution
+
 ## [4.16.2]
 
 ### Internal

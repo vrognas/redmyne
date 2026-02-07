@@ -11,6 +11,13 @@ Quick reference of key patterns. Details in sections below.
 
 ---
 
+## v4.16.3 CI Stability (2026-02-07)
+
+### Testing
+
+- With `vitest` config `isolate: false`, avoid module-level singleton mocks in command tests.
+- Prefer `vi.spyOn(realSingleton, "method")` in each test setup for stable behavior across parallel files.
+
 ## Code Quality Assessment (2025-11-24)
 
 ### Error Handling

@@ -5,12 +5,6 @@ import { TimeEntryNode } from "../../../src/trees/my-time-entries-tree";
 import { adHocTracker } from "../../../src/utilities/adhoc-tracker";
 import * as issuePicker from "../../../src/utilities/issue-picker";
 
-vi.mock("../../../src/utilities/adhoc-tracker", () => ({
-  adHocTracker: {
-    isAdHoc: vi.fn(),
-  },
-}));
-
 describe("contributeToIssue", () => {
   let mockServer: {
     getIssueById: ReturnType<typeof vi.fn>;
@@ -22,7 +16,7 @@ describe("contributeToIssue", () => {
   let refreshCallback: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
 
     mockServer = {
       getIssueById: vi.fn(),
@@ -33,7 +27,7 @@ describe("contributeToIssue", () => {
     };
 
     refreshCallback = vi.fn();
-    (adHocTracker.isAdHoc as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    vi.spyOn(adHocTracker, "isAdHoc").mockReturnValue(true);
   });
 
   it("uses pickIssue to select target issue", async () => {

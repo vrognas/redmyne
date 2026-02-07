@@ -98,6 +98,7 @@ Commands execute actions → API calls → refresh trees
 
 - **Bundler**: esbuild → CJS (external: vscode)
 - **Tests**: Vitest, 60% coverage target
+- **Test isolation**: `isolate: false` + parallel files; avoid brittle cross-file singleton module mocks
 - **HTTP mocking**: DI via `requestFn` (no module mocks)
 - **Scripts**: `npm run compile`, `test`, `lint`, `ci`
 
