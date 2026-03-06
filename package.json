@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "4.16.5",
+  "version": "4.17.0",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -2182,6 +2182,11 @@
           "maximum": 20,
           "scope": "application",
           "markdownDescription": "**Maximum concurrent API requests**\n\nLimits how many requests run simultaneously to prevent server overload.\n\n- **2** (default): Safe for most servers\n- **5-10**: For faster servers\n- **20**: Maximum, use if server handles high load\n\nReduce if you see 503 errors. Increase for faster data loading."
+        },
+        "redmyne.caFile": {
+          "type": "string",
+          "scope": "machine",
+          "markdownDescription": "**Advanced: Custom CA certificate file**\n\nAbsolute path to a PEM/CRT file for TLS certificate validation when the OS or container trust store does not include the Redmine server's issuing CA.\n\nIn Positron remote or devcontainer mode this must be a **Linux path inside the container**, not a Windows host path.\n\n**This is a fallback.** The recommended fix is adding the CA to the machine/container trust store."
         }
       }
     },

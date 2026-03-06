@@ -2,6 +2,20 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.17.0]
+
+### Added
+
+- **Custom CA certificate setting** - `redmyne.caFile` for environments where the OS/container trust store lacks the Redmine server's issuing CA (advanced fallback)
+
+### Fixed
+
+- **TLS error message accuracy** - certificate validation errors now say "The machine or container may not trust the issuing CA" instead of referencing a removed `rejectUnauthorized` setting
+
+### Security
+
+- TLS validation remains always enabled (`rejectUnauthorized: true`); no insecure bypass
+
 ## [4.16.5]
 
 ### Fixed

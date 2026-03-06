@@ -48,6 +48,7 @@ export function createConfiguredContextUpdater(
           address: serverUrl!,
           key: apiKey!,
           additionalHeaders: config.get("additionalHeaders"),
+          caFile: config.get<string>("caFile"),
         });
 
         // Wrap with draft mode server.

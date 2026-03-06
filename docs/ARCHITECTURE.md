@@ -2,7 +2,7 @@
 
 VS Code/Positron extension for Redmine workload management. TypeScript 5.9+.
 
-**v4.16.0** | VS Code ≥1.105.0 | Node ≥20
+**v4.17.0** | VS Code ≥1.105.0 | Node ≥20
 
 ## Core Pattern
 
@@ -112,7 +112,8 @@ Commands execute actions → API calls → refresh trees
 ## Security
 
 - API keys in encrypted platform keychain
-- HTTPS enforced, TLS validation enabled
+- HTTPS enforced, TLS validation enabled (`rejectUnauthorized: true`)
+- Optional `caFile` setting for custom CA trust (advanced fallback)
 - Sensitive data redacted in logs
 - CSP with crypto nonces in webviews
 

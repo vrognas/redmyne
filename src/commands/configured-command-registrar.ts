@@ -77,6 +77,7 @@ export function createConfiguredCommandRegistrar(
       address: url,
       key: apiKey,
       additionalHeaders: config.get("additionalHeaders"),
+      caFile: config.get<string>("caFile"),
     });
 
     const fromBucket = deps.bucket.servers.find((server) =>

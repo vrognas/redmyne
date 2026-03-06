@@ -15,4 +15,9 @@ export interface RedmineConfig extends WorkspaceConfiguration {
    * Additional headers
    */
   additionalHeaders?: { [key: string]: string };
+  /**
+   * Absolute path to a PEM/CRT file for custom CA trust.
+   * Must be a path on the extension-host machine (Linux path inside containers).
+   */
+  caFile?: string;
 }

@@ -1,3 +1,4 @@
+import * as fs from "fs";
 import * as http from "http";
 import * as https from "https";
 import { RedmineProject } from "./redmine-project";
@@ -46,6 +47,11 @@ export interface RedmineServerConnectionOptions {
    * Prevents server overload by queuing excess requests
    */
   maxConcurrentRequests?: number;
+  /**
+   * Path to a PEM/CRT file for custom CA trust.
+   * Advanced fallback when the OS/container trust store lacks the issuing CA.
+   */
+  caFile?: string;
 }
 
 interface RedmineServerOptions extends RedmineServerConnectionOptions {
@@ -88,6 +94,7 @@ export class RedmineServer {
   } | null = null;
   private issueCache = new Map<number, IssueCacheEntry>();
   private lastIssueCachePruneMs = 0;
+  private cachedCaBuffer: Buffer | undefined;
 
   // Request queue to prevent server overload
   private activeRequests = 0;
@@ -133,6 +140,19 @@ export class RedmineServer {
       this.options.additionalHeaders === undefined
     ) {
       this.options.additionalHeaders = {};
+    }
+  }
+
+  private loadCa(): Buffer | undefined {
+    if (this.cachedCaBuffer !== undefined) return this.cachedCaBuffer;
+    const caFile = this.options.caFile;
+    if (!caFile) return undefined;
+    try {
+      this.cachedCaBuffer = fs.readFileSync(caFile);
+      return this.cachedCaBuffer;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`redmyne.caFile: cannot read "${caFile}" — ${msg}`);
     }
   }
 
@@ -236,6 +256,7 @@ export class RedmineServer {
     // Call hook after slot acquired, before HTTP request
     this.onRequestStart(path, method, data, requestId);
 
+    const ca = this.loadCa();
     const options: https.RequestOptions = {
       hostname: url.hostname,
       port: url.port ? parseInt(url.port, 10) : undefined,
@@ -244,6 +265,7 @@ export class RedmineServer {
         ...additionalHeaders,
       },
       rejectUnauthorized: true, // Always validate TLS certificates
+      ...(ca ? { ca } : {}),
       path: `${url.pathname}${path}`,
       method,
     };
@@ -365,7 +387,7 @@ export class RedmineServer {
           case "CERT_HAS_EXPIRED":
           case "UNABLE_TO_VERIFY_LEAF_SIGNATURE":
           case "DEPTH_ZERO_SELF_SIGNED_CERT":
-            message = "SSL certificate error - check rejectUnauthorized setting";
+            message = "TLS certificate validation failed. The machine or container may not trust the issuing CA.";
             break;
           default:
             message = `Network error: ${error.message}`;

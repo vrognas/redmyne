@@ -895,7 +895,7 @@ describe("RedmineServer", () => {
       const certError = new Error("certificate expired") as Error & { code?: string };
       certError.code = "CERT_HAS_EXPIRED";
       await expect(createServer({ error: certError }).doRequest("/ssl.json", "GET")).rejects.toThrow(
-        "SSL certificate error - check rejectUnauthorized setting"
+        "TLS certificate validation failed. The machine or container may not trust the issuing CA."
       );
 
       const unknownNetworkError = new Error("socket hang up") as Error & { code?: string };
@@ -907,6 +907,98 @@ describe("RedmineServer", () => {
       await expect(
         createServer({ triggerTimeout: true }).doRequest("/timeout.json", "GET")
       ).rejects.toThrow("Request timeout after 30 seconds");
+    });
+
+    it("passes ca from caFile to request options", async () => {
+      const fs = await import("fs");
+      const os = await import("os");
+      const path = await import("path");
+      const tmpFile = path.join(os.tmpdir(), `redmyne-test-ca-${Date.now()}.pem`);
+      const fakePem = "-----BEGIN CERTIFICATE-----\nfake\n-----END CERTIFICATE-----";
+      fs.writeFileSync(tmpFile, fakePem);
+
+      let capturedOptions: Record<string, unknown> | undefined;
+      const mockRequestFn = vi.fn(
+        (options: Record<string, unknown>, callback: (response: NodeJS.EventEmitter & { statusCode: number; statusMessage: string }) => void) => {
+          capturedOptions = options;
+          const req = new EventEmitter() as NodeJS.EventEmitter & { end: () => void; setTimeout: (ms: number, cb: () => void) => void };
+          req.end = () => {
+            const resp = new EventEmitter() as NodeJS.EventEmitter & { statusCode: number; statusMessage: string };
+            resp.statusCode = 200;
+            resp.statusMessage = "OK";
+            callback(resp);
+            queueMicrotask(() => {
+              resp.emit("data", Buffer.from(JSON.stringify({ ok: true })));
+              resp.emit("end");
+            });
+          };
+          req.setTimeout = () => {};
+          return req;
+        }
+      ) as unknown as typeof http.request;
+
+      try {
+        const server = new RedmineServer({
+          address: "https://localhost:3000",
+          key: "test-api-key",
+          requestFn: mockRequestFn,
+          caFile: tmpFile,
+        });
+
+        await server.doRequest("/test.json", "GET");
+        expect(Buffer.isBuffer(capturedOptions?.ca)).toBe(true);
+        expect((capturedOptions?.ca as Buffer).toString()).toBe(fakePem);
+        expect(capturedOptions?.rejectUnauthorized).toBe(true);
+      } finally {
+        fs.unlinkSync(tmpFile);
+      }
+    });
+
+    it("omits ca when caFile not set", async () => {
+      let capturedOptions: Record<string, unknown> | undefined;
+      const mockRequestFn = vi.fn(
+        (options: Record<string, unknown>, callback: (response: NodeJS.EventEmitter & { statusCode: number; statusMessage: string }) => void) => {
+          capturedOptions = options;
+          const req = new EventEmitter() as NodeJS.EventEmitter & { end: () => void; setTimeout: (ms: number, cb: () => void) => void };
+          req.end = () => {
+            const resp = new EventEmitter() as NodeJS.EventEmitter & { statusCode: number; statusMessage: string };
+            resp.statusCode = 200;
+            resp.statusMessage = "OK";
+            callback(resp);
+            queueMicrotask(() => {
+              resp.emit("data", Buffer.from(JSON.stringify({ ok: true })));
+              resp.emit("end");
+            });
+          };
+          req.setTimeout = () => {};
+          return req;
+        }
+      ) as unknown as typeof http.request;
+
+      const server = new RedmineServer({
+        address: "https://localhost:3000",
+        key: "test-api-key",
+        requestFn: mockRequestFn,
+      });
+
+      await server.doRequest("/test.json", "GET");
+      expect(capturedOptions?.ca).toBeUndefined();
+      expect(capturedOptions?.rejectUnauthorized).toBe(true);
+    });
+
+    it("throws clear error when caFile is unreadable", async () => {
+      const mockRequestFn = vi.fn() as unknown as typeof http.request;
+
+      const server = new RedmineServer({
+        address: "https://localhost:3000",
+        key: "test-api-key",
+        requestFn: mockRequestFn,
+        caFile: "/nonexistent/path/ca.pem",
+      });
+
+      await expect(server.doRequest("/test.json", "GET")).rejects.toThrow(
+        'redmyne.caFile: cannot read "/nonexistent/path/ca.pem"'
+      );
     });
   });
 });
