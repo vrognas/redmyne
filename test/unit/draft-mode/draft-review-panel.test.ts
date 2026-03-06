@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import * as vscode from "vscode";
 import {
   DraftReviewPanel,
   escapeHtml,
@@ -207,6 +208,137 @@ describe("DraftReviewPanel", () => {
       commandTypes.forEach(cmd => {
         expect(typeof cmd).toBe("string");
       });
+    });
+  });
+
+  describe("panel lifecycle", () => {
+    function setupPanelHarness(operations = [{ id: "d1", type: "updateIssue", description: "Update #1", timestamp: Date.now() }]) {
+      let receiveMessageHandler: ((message: { command: string; id?: string }) => Promise<void>) | undefined;
+      let queueChangeHandler: (() => void) | undefined;
+      let panelDisposeHandler: (() => void) | undefined;
+
+      const webview = {
+        html: "",
+        cspSource: "vscode-test",
+        asWebviewUri: vi.fn((uri) => uri),
+        postMessage: vi.fn(),
+        onDidReceiveMessage: vi.fn((handler: typeof receiveMessageHandler) => {
+          receiveMessageHandler = handler as (message: { command: string; id?: string }) => Promise<void>;
+          return { dispose: vi.fn() };
+        }),
+      };
+      const panel = {
+        webview,
+        reveal: vi.fn(),
+        onDidDispose: vi.fn((handler: () => void) => {
+          panelDisposeHandler = handler;
+          return { dispose: vi.fn() };
+        }),
+        dispose: vi.fn(),
+      };
+      const queue = {
+        getAll: vi.fn(() => operations),
+        onDidChange: vi.fn((handler: () => void) => {
+          queueChangeHandler = handler;
+          return { dispose: vi.fn() };
+        }),
+      };
+
+      (vscode as unknown as { ViewColumn: { One: number } }).ViewColumn = { One: 1 };
+      (vscode.Uri as unknown as { joinPath: (...parts: unknown[]) => unknown }).joinPath = (...parts: unknown[]) =>
+        vscode.Uri.parse(parts.map((part) => String(part)).join("/"));
+      (
+        vscode.window as unknown as {
+          createWebviewPanel: ReturnType<typeof vi.fn>;
+        }
+      ).createWebviewPanel = vi
+        .fn()
+        .mockReturnValue(panel as unknown as vscode.WebviewPanel);
+
+      return {
+        extensionUri: vscode.Uri.parse("file:///extension"),
+        queue,
+        panel,
+        webview,
+        getReceiveMessageHandler: () => receiveMessageHandler,
+        fireQueueChange: () => queueChangeHandler?.(),
+        fireDispose: () => panelDisposeHandler?.(),
+      };
+    }
+
+    it("creates panel, renders html, and updates existing panel on re-open", () => {
+      const harness = setupPanelHarness();
+
+      const first = DraftReviewPanel.createOrShow(
+        harness.queue as unknown as never,
+        harness.extensionUri
+      );
+      const second = DraftReviewPanel.createOrShow(
+        harness.queue as unknown as never,
+        harness.extensionUri
+      );
+
+      expect(first).toBe(second);
+      expect(harness.panel.reveal).toHaveBeenCalledTimes(1);
+      expect(harness.webview.html).toContain("Pending Drafts");
+      expect(harness.webview.html).toContain("Update #1");
+      expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
+    });
+
+    it("handles webview commands and loading states", async () => {
+      const harness = setupPanelHarness();
+      DraftReviewPanel.createOrShow(harness.queue as unknown as never, harness.extensionUri);
+      const onMessage = harness.getReceiveMessageHandler();
+
+      await onMessage?.({ command: "applyAll" });
+      await onMessage?.({ command: "applyDraft", id: "d1" });
+      await onMessage?.({ command: "discardAll" });
+      await onMessage?.({ command: "removeDraft", id: "d1" });
+
+      expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.applyDrafts");
+      expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.applySingleDraft", "d1");
+      expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.discardDrafts");
+      expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.removeDraft", "d1");
+      expect(harness.webview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ command: "setLoading", loading: true })
+      );
+    });
+
+    it("sends incremental update on queue changes and clears singleton on dispose", () => {
+      const harness = setupPanelHarness([
+        { id: "d1", type: "updateIssue", description: "A", timestamp: Date.now() },
+        { id: "d2", type: "createIssue", description: "B", timestamp: Date.now() },
+      ]);
+      const panel = DraftReviewPanel.createOrShow(
+        harness.queue as unknown as never,
+        harness.extensionUri
+      );
+
+      harness.fireQueueChange();
+      expect(harness.webview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ command: "updateOperations", count: 2 })
+      );
+
+      panel.dispose();
+      expect(harness.panel.dispose).toHaveBeenCalledTimes(1);
+      expect(DraftReviewPanel.currentPanel).toBeUndefined();
+    });
+
+    it("restores panel and ignores command handling after disposal", async () => {
+      const harness = setupPanelHarness();
+      const restored = DraftReviewPanel.restore(
+        harness.panel as unknown as vscode.WebviewPanel,
+        harness.queue as unknown as never,
+        harness.extensionUri
+      );
+      const onMessage = harness.getReceiveMessageHandler();
+
+      restored.dispose();
+      await onMessage?.({ command: "applyAll" });
+      harness.fireDispose();
+
+      expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith("redmyne.applyDrafts");
+      expect(DraftReviewPanel.currentPanel).toBeUndefined();
     });
   });
 });

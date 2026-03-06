@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   isLoadingPlaceholder,
   createLoadingTreeItem,
+  createSkeletonPlaceholders,
+  createSkeletonTreeItem,
   LoadingPlaceholder,
 } from "../../../src/shared/loading-placeholder";
 import * as vscode from "vscode";
@@ -50,6 +52,22 @@ describe("loading-placeholder", () => {
       const item = createLoadingTreeItem();
       expect(item.iconPath).toBeInstanceOf(vscode.ThemeIcon);
       expect((item.iconPath as vscode.ThemeIcon).id).toBe("loading~spin");
+    });
+  });
+
+  describe("skeleton helpers", () => {
+    it("createSkeletonPlaceholders returns single loading placeholder", () => {
+      const placeholders = createSkeletonPlaceholders(5);
+      expect(placeholders).toEqual([{ isLoadingPlaceholder: true, message: "Loading..." }]);
+    });
+
+    it("createSkeletonTreeItem uses placeholder message fallback", () => {
+      const explicit = createSkeletonTreeItem({ isLoadingPlaceholder: true, message: "Please wait" });
+      expect(explicit.label).toBe("Please wait");
+
+      const fallback = createSkeletonTreeItem({ isLoadingPlaceholder: true });
+      expect(fallback.label).toBe("Loading...");
+      expect((fallback.iconPath as vscode.ThemeIcon).id).toBe("loading~spin");
     });
   });
 });
