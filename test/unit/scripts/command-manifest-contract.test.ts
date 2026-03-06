@@ -138,9 +138,10 @@ function getContributedCommandsFromManifest(): Set<string> {
 }
 
 describe("command manifest contract", () => {
+  const contributed = getContributedCommandsFromManifest();
+  const registered = getRegisteredCommandsFromSource();
+
   it("registers every contributed command in source", () => {
-    const contributed = getContributedCommandsFromManifest();
-    const registered = getRegisteredCommandsFromSource();
     const missing = [...contributed].filter((command) => !registered.has(command)).sort();
 
     if (missing.length > 0) {
@@ -151,8 +152,6 @@ describe("command manifest contract", () => {
   });
 
   it("documents every internal-only registered command", () => {
-    const contributed = getContributedCommandsFromManifest();
-    const registered = getRegisteredCommandsFromSource();
     const internalOnly = [...registered]
       .filter((command) => !contributed.has(command))
       .sort();
