@@ -6,7 +6,15 @@ import {
   formatShortName,
   generateIssueLabel,
   generateProjectLabel,
+  generateTimeGroupLabel,
+  generateIdCell,
+  generateStartDateCell,
+  generateStatusCell,
+  generateDueDateCell,
+  generateAssigneeCell,
   generateIssueBar,
+  generateZebraStripes,
+  generateIndentGuides,
 } from "../src/webviews/gantt/gantt-html-generator";
 import type { GanttRow } from "../src/webviews/gantt-model";
 
@@ -198,6 +206,266 @@ describe("gantt-html-generator", () => {
       expect(svg).toContain('data-due-date="2025-01-20"');
       expect(svg).toContain("bar-main"); // solid bar
       expect(svg).toContain("drag-handle"); // resize handles
+    });
+
+    it("generateIssueBar handles project and time-group aggregate bars", () => {
+      const ctx = {
+        barHeight: 22,
+        barPadding: 3,
+        barContentHeight: 16,
+        timelineWidth: 500,
+        minDate: new Date("2025-01-01"),
+        maxDate: new Date("2025-01-31"),
+        today: new Date("2025-01-15"),
+        buildProjectTooltip: () => "Project tooltip",
+      } as any;
+
+      const projectRow: GanttRow = {
+        type: "project",
+        id: 1,
+        label: "Proj",
+        depth: 0,
+        collapseKey: "project-1",
+        parentKey: "",
+        isVisible: true,
+        isExpanded: true,
+        hasChildren: true,
+        childDateRanges: [{ startDate: "2025-01-05", dueDate: "2025-01-10" }],
+      };
+      const projectBar = generateIssueBar(projectRow, 0, 0, 0, ctx);
+      expect(projectBar).toContain("aggregate-bars");
+      expect(projectBar).toContain("data-project-id=\"1\"");
+
+      const timeGroupRow: GanttRow = {
+        type: "time-group",
+        id: 2,
+        label: "Overdue",
+        depth: 0,
+        collapseKey: "group-overdue",
+        parentKey: "",
+        isVisible: true,
+        isExpanded: true,
+        hasChildren: true,
+        timeGroup: "overdue",
+        childDateRanges: [{ startDate: "2025-01-08", dueDate: "2025-01-09" }],
+      };
+      const timeGroupBar = generateIssueBar(timeGroupRow, 0, 0, 0, ctx);
+      expect(timeGroupBar).toContain("time-group-bars");
+      expect(timeGroupBar).toContain("var(--vscode-charts-red)");
+    });
+
+    it("generateIssueBar handles parent issue and no-date guards", () => {
+      const ctx = {
+        barHeight: 22,
+        barPadding: 3,
+        barContentHeight: 16,
+        timelineWidth: 1000,
+        minDate: new Date("2025-01-01"),
+        maxDate: new Date("2025-01-31"),
+        today: new Date("2025-01-15"),
+        viewFocus: "project" as const,
+        showIntensity: false,
+        currentUserId: null,
+        schedule: { Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0, Sun: 0 },
+        issueScheduleMap: new Map(),
+        getStatusColor: () => "blue",
+        getStatusTextColor: () => "white",
+        getStatusOpacity: () => 0.6,
+        getStatusDescription: () => "Status",
+        getInternalEstimate: () => null,
+        hasPrecedence: () => false,
+        isAutoUpdateEnabled: () => true,
+        contributionSources: new Map(),
+        donationTargets: new Map(),
+      };
+
+      const noDateRow: GanttRow = {
+        type: "issue",
+        id: 3,
+        label: "No date",
+        depth: 0,
+        collapseKey: "issue-3",
+        parentKey: "",
+        isVisible: true,
+        isExpanded: false,
+        hasChildren: false,
+        issue: {
+          id: 3,
+          subject: "No date",
+          project: "P",
+          projectId: 1,
+          parentId: null,
+          start_date: null,
+          due_date: null,
+          done_ratio: 0,
+          estimated_hours: 2,
+          spent_hours: 0,
+          status: "new",
+          statusName: "New",
+          isClosed: false,
+          isExternal: false,
+          isAdHoc: false,
+          assignee: null,
+          assigneeId: null,
+          flexibilityPercent: null,
+          relations: [],
+          blocks: [],
+          blockedBy: [],
+        },
+      };
+      expect(generateIssueBar(noDateRow, 0, 0, 0, ctx as any)).toBe("");
+
+      const parentRow: GanttRow = {
+        ...noDateRow,
+        id: 4,
+        collapseKey: "issue-4",
+        issue: {
+          ...noDateRow.issue!,
+          id: 4,
+          subject: "Parent",
+          start_date: "2025-01-05",
+          due_date: "2025-01-20",
+          done_ratio: 40,
+        },
+        isParent: true,
+      };
+      const parentBar = generateIssueBar(parentRow, 0, 0, 0, ctx as any);
+      expect(parentBar).toContain("parent-bar");
+      expect(parentBar).toContain("40%");
+    });
+  });
+
+  describe("column and group generation", () => {
+    const baseCtx = {
+      barHeight: 22,
+      indentSize: 8,
+      chevronWidth: 10,
+      idColumnWidth: 60,
+      statusColumnWidth: 70,
+      dueDateColumnWidth: 90,
+      assigneeColumnWidth: 100,
+      today: new Date("2025-01-15"),
+    } as any;
+
+    const baseIssueRow: GanttRow = {
+      type: "issue",
+      id: 10,
+      label: "Issue",
+      depth: 0,
+      collapseKey: "issue-10",
+      parentKey: "",
+      isVisible: true,
+      isExpanded: false,
+      hasChildren: false,
+      issue: {
+        id: 10,
+        subject: "Issue",
+        project: "P",
+        projectId: 1,
+        parentId: null,
+        start_date: "2025-01-10",
+        due_date: "2025-01-14",
+        done_ratio: 25,
+        estimated_hours: 8,
+        spent_hours: 1,
+        status: "new",
+        statusName: "New",
+        isClosed: false,
+        isExternal: false,
+        isAdHoc: false,
+        assignee: "Alice Cooper",
+        assigneeId: 5,
+        flexibilityPercent: 10,
+        relations: [],
+        blocks: [],
+        blockedBy: [],
+      },
+    };
+
+    it("renders time-group label and id/start/status/due/assignee cells", () => {
+      const timeGroupRow: GanttRow = {
+        type: "time-group",
+        id: 1,
+        label: "This Week",
+        depth: 1,
+        collapseKey: "group-week",
+        parentKey: "",
+        isVisible: true,
+        isExpanded: true,
+        hasChildren: true,
+        timeGroup: "this-week",
+        icon: "🗓️",
+        childCount: 3,
+      };
+      const timeGroupSvg = generateTimeGroupLabel(timeGroupRow, 0, 0, 0, baseCtx);
+      expect(timeGroupSvg).toContain("time-group-label");
+      expect(timeGroupSvg).toContain("(3)");
+
+      expect(generateIdCell(baseIssueRow, 0, 0, baseCtx)).toContain("#10");
+      expect(generateStartDateCell(baseIssueRow, 0, 0, baseCtx)).toContain("Jan 10");
+      expect(generateStatusCell(baseIssueRow, 0, 0, baseCtx)).toContain("var(--vscode-charts-blue)");
+      expect(generateDueDateCell(baseIssueRow, 0, 0, baseCtx)).toContain("due-overdue");
+
+      const assigneeSvg = generateAssigneeCell(baseIssueRow, 0, 0, {
+        ...baseCtx,
+        currentUserId: 5,
+      });
+      expect(assigneeSvg).toContain("current-user");
+      expect(assigneeSvg).toContain("AC");
+    });
+
+    it("renders non-issue placeholders and empty-value variants", () => {
+      const projectRow: GanttRow = {
+        type: "project",
+        id: 2,
+        label: "Project",
+        depth: 0,
+        collapseKey: "project-2",
+        parentKey: "",
+        isVisible: false,
+        isExpanded: false,
+        hasChildren: false,
+      };
+      expect(generateIdCell(projectRow, 0, 0, baseCtx)).toContain("gantt-row");
+      expect(generateStartDateCell(projectRow, 0, 0, baseCtx)).toContain("gantt-row");
+
+      const noDates = {
+        ...baseIssueRow,
+        issue: { ...baseIssueRow.issue!, start_date: null, due_date: null, assignee: null, isClosed: true, done_ratio: 100 },
+      };
+      expect(generateStartDateCell(noDates, 0, 0, baseCtx)).toContain("—");
+      expect(generateDueDateCell(noDates, 0, 0, { ...baseCtx, today: new Date("2025-01-01") })).toContain("—");
+      expect(generateStatusCell(noDates, 0, 0, baseCtx)).toContain("var(--vscode-charts-green)");
+      expect(generateAssigneeCell(noDates, 0, 0, baseCtx)).toContain("—");
+    });
+  });
+
+  describe("zebra and indent layers", () => {
+    it("generates zebra stripes and indent guides", () => {
+      const rows: GanttRow[] = [
+        { type: "project", id: 1, label: "P", depth: 0, collapseKey: "p1", parentKey: "", isVisible: true, isExpanded: true, hasChildren: true },
+        { type: "issue", id: 2, label: "C1", depth: 1, collapseKey: "c1", parentKey: "p1", isVisible: true, isExpanded: false, hasChildren: false, issue: {} as any },
+        { type: "issue", id: 3, label: "C2", depth: 1, collapseKey: "c2", parentKey: "p1", isVisible: true, isExpanded: false, hasChildren: false, issue: {} as any },
+      ];
+      const stripes = generateZebraStripes(
+        [{ startIdx: 0, endIdx: 2, groupIdx: 0 }],
+        rows,
+        [0, 24, 48],
+        [22, 22, 22]
+      );
+      expect(stripes).toContain("zebra-stripe");
+      expect(stripes).toContain("data-row-contributions");
+
+      const guides = generateIndentGuides(rows, [0, 24, 48], 22, 8);
+      expect(guides).toContain("indent-guides-layer");
+      expect(guides).toContain("data-for-parent=\"p1\"");
+    });
+
+    it("returns empty indent layer when no expandable hierarchy exists", () => {
+      const rows: GanttRow[] = [
+        { type: "issue", id: 1, label: "A", depth: 0, collapseKey: "a", parentKey: "", isVisible: true, isExpanded: false, hasChildren: false, issue: {} as any },
+      ];
+      expect(generateIndentGuides(rows, [0], 22, 8)).toBe("");
     });
   });
 });
