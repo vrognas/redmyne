@@ -1,5 +1,21 @@
-import { describe, it, expect } from "vitest";
-import { parseLocalDate, getLocalToday, formatLocalDate } from "../../../src/utilities/date-utils";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import {
+  parseLocalDate,
+  getLocalToday,
+  formatLocalDate,
+  formatDateISO,
+  getWeekStart,
+  getMonthStart,
+  getLastMonthRange,
+  getDateRange,
+  getISOWeekNumber,
+  getISOWeekYear,
+  getWeekDateRange,
+} from "../../../src/utilities/date-utils";
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("parseLocalDate", () => {
   it("parses YYYY-MM-DD as local date", () => {
@@ -68,5 +84,45 @@ describe("formatLocalDate", () => {
     const parsed = parseLocalDate(original);
     const formatted = formatLocalDate(parsed);
     expect(formatted).toBe(original);
+  });
+});
+
+describe("other date utility branches", () => {
+  it("formats ISO alias, range helpers, and month/week starts", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-02-18T10:00:00Z"));
+
+    const date = new Date(2026, 1, 18);
+    expect(formatDateISO(date)).toBe("2026-02-18");
+    expect(getWeekStart()).toBe("2026-02-16");
+    expect(getMonthStart()).toBe("2026-02-01");
+
+    const lastMonth = getLastMonthRange();
+    expect(lastMonth).toEqual({
+      start: "2026-01-01",
+      end: "2026-01-31",
+      name: "Jan",
+    });
+  });
+
+  it("returns inclusive date ranges and ISO week values", () => {
+    expect(getDateRange("2026-02-01", "2026-02-03")).toEqual([
+      "2026-02-01",
+      "2026-02-02",
+      "2026-02-03",
+    ]);
+    expect(getISOWeekNumber(new Date("2026-01-01T12:00:00Z"))).toBe(1);
+    expect(getISOWeekYear(new Date("2026-01-01T12:00:00Z"))).toBe(2026);
+  });
+
+  it("builds ISO week date ranges", () => {
+    expect(getWeekDateRange(1, 2026)).toEqual({
+      start: "2025-12-29",
+      end: "2026-01-04",
+    });
+    expect(getWeekDateRange(10, 2026)).toEqual({
+      start: "2026-03-02",
+      end: "2026-03-08",
+    });
   });
 });

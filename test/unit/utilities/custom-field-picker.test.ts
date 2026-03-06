@@ -268,5 +268,160 @@ describe("custom-field-picker", () => {
         expect.objectContaining({ value: "OLD-123" })
       );
     });
+
+    it("joins existing multi-select array defaults", async () => {
+      const vscode = await import("vscode");
+      const { pickCustomFields } = await import("../../../src/utilities/custom-field-picker");
+
+      const fields: CustomFieldDefinition[] = [
+        { id: 9, name: "Tags", field_format: "string", is_required: false, customized_type: "time_entry" },
+      ];
+      const existing: TimeEntryCustomFieldValue[] = [{ id: 9, value: ["one", "two"] }];
+
+      vi.mocked(vscode.window.showInputBox).mockResolvedValue("one, two, three");
+
+      await pickCustomFields(fields, existing);
+
+      expect(vscode.window.showInputBox).toHaveBeenCalledWith(
+        expect.objectContaining({ value: "one, two" })
+      );
+    });
+
+    it("marks bool defaults as picked for true and false", async () => {
+      const vscode = await import("vscode");
+      const { pickCustomFields } = await import("../../../src/utilities/custom-field-picker");
+
+      const field: CustomFieldDefinition = {
+        id: 11,
+        name: "Billable",
+        field_format: "bool",
+        is_required: false,
+        customized_type: "time_entry",
+      };
+
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValue({ label: "Yes", value: "1" } as never);
+      await pickCustomFields([field], [{ id: 11, value: "true" }]);
+      const yesOptions = vi.mocked(vscode.window.showQuickPick).mock.calls[0]?.[0] as Array<{
+        label: string;
+        value: string;
+        picked?: boolean;
+      }>;
+      expect(yesOptions[0].picked).toBe(true);
+
+      vi.mocked(vscode.window.showQuickPick).mockClear();
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValue({ label: "No", value: "0" } as never);
+      await pickCustomFields([field], [{ id: 11, value: "false" }]);
+      const noOptions = vi.mocked(vscode.window.showQuickPick).mock.calls[0]?.[0] as Array<{
+        label: string;
+        value: string;
+        picked?: boolean;
+      }>;
+      expect(noOptions[1].picked).toBe(true);
+    });
+
+    it("validates numeric, date and string constraints", async () => {
+      const vscode = await import("vscode");
+      const { pickCustomFields } = await import("../../../src/utilities/custom-field-picker");
+
+      vi.mocked(vscode.window.showInputBox).mockImplementation(async (options) => {
+        if (!options) return undefined;
+        const title = String(options.title ?? "");
+        if (title.includes("Count")) {
+          expect(options.validateInput?.("abc")).toBe("Must be an integer");
+          expect(options.validateInput?.("42")).toBeNull();
+          return "42";
+        }
+        if (title.includes("Ratio")) {
+          expect(options.validateInput?.("bad")).toBe("Must be a number");
+          expect(options.validateInput?.("3.14")).toBeNull();
+          return "3.14";
+        }
+        if (title.includes("Due")) {
+          expect(options.validateInput?.("2026/01/01")).toBe("Format: YYYY-MM-DD");
+          expect(options.validateInput?.("2026-01-01")).toBeNull();
+          return "2026-01-01";
+        }
+        if (title.includes("Code")) {
+          expect(options.validateInput?.("")).toBe("Code is required");
+          expect(options.validateInput?.("A")).toBe("Minimum 2 characters");
+          expect(options.validateInput?.("ABCD")).toBe("Maximum 3 characters");
+          expect(options.validateInput?.("AB!")).toBe("Must match pattern: ^[A-Z]+$");
+          expect(options.validateInput?.("ABC")).toBeNull();
+          return "ABC";
+        }
+        return undefined;
+      });
+
+      const result = await pickCustomFields([
+        { id: 1, name: "Count", field_format: "int", is_required: true, customized_type: "time_entry" },
+        { id: 2, name: "Ratio", field_format: "float", is_required: true, customized_type: "time_entry" },
+        { id: 3, name: "Due", field_format: "date", is_required: true, customized_type: "time_entry" },
+        {
+          id: 4,
+          name: "Code",
+          field_format: "string",
+          is_required: true,
+          customized_type: "time_entry",
+          min_length: 2,
+          max_length: 3,
+          regexp: "^[A-Z]+$",
+        },
+      ]);
+
+      expect(result.cancelled).toBe(false);
+      expect(result.values).toEqual([
+        { id: 1, value: "42" },
+        { id: 2, value: "3.14" },
+        { id: 3, value: "2026-01-01" },
+        { id: 4, value: "ABC" },
+      ]);
+    });
+  });
+
+  describe("promptForRequiredCustomFields", () => {
+    it("returns prompted false when no required fields", async () => {
+      const { promptForRequiredCustomFields } = await import("../../../src/utilities/custom-field-picker");
+
+      const result = await promptForRequiredCustomFields(async () => [
+        { id: 20, name: "Optional", field_format: "text", is_required: false, customized_type: "time_entry" },
+      ]);
+
+      expect(result).toEqual({
+        values: undefined,
+        cancelled: false,
+        prompted: false,
+      });
+    });
+
+    it("returns cancelled true when picker cancels", async () => {
+      const vscode = await import("vscode");
+      const { promptForRequiredCustomFields } = await import("../../../src/utilities/custom-field-picker");
+
+      vi.mocked(vscode.window.showInputBox).mockResolvedValue(undefined);
+
+      const result = await promptForRequiredCustomFields(async () => [
+        { id: 21, name: "Req", field_format: "link", is_required: true, customized_type: "time_entry" },
+      ]);
+
+      expect(result).toEqual({
+        values: undefined,
+        cancelled: true,
+        prompted: true,
+      });
+    });
+
+    it("returns non-prompted fallback when api fetch throws", async () => {
+      const { promptForRequiredCustomFields } = await import("../../../src/utilities/custom-field-picker");
+
+      const result = await promptForRequiredCustomFields(async () => {
+        throw new Error("forbidden");
+      });
+
+      expect(result).toEqual({
+        values: undefined,
+        cancelled: false,
+        prompted: false,
+      });
+    });
   });
 });
