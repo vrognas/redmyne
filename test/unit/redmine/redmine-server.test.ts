@@ -164,6 +164,103 @@ const createMockRequest = () =>
       }
     ) as unknown as typeof http.request;
 
+interface RouteMockResult {
+  statusCode?: number;
+  statusMessage?: string;
+  headers?: Record<string, string>;
+  body?: unknown;
+  rawBody?: string;
+  noBody?: boolean;
+  error?: Error & { code?: string };
+  triggerTimeout?: boolean;
+}
+
+const createRouteMockRequest = (
+  resolveRoute: (
+    options: { path?: string; method?: string },
+    requestBody?: Buffer
+  ) => RouteMockResult
+) =>
+  vi.fn(
+    (
+      options: { path?: string; method?: string },
+      callback: (
+        response: NodeJS.EventEmitter & {
+          statusCode: number;
+          statusMessage: string;
+          headers: Record<string, string>;
+        }
+      ) => void
+    ) => {
+      const request = new EventEmitter() as NodeJS.EventEmitter & {
+        end: (data?: Buffer) => void;
+        on: (event: string, handler: (...args: unknown[]) => void) => unknown;
+        setTimeout: (ms: number, cb: () => void) => void;
+        destroy: () => void;
+      };
+
+      let timeoutHandler: (() => void) | undefined;
+      let errorHandler: ((error: Error & { code?: string }) => void) | undefined;
+
+      request.on = function (event: string, handler: (...args: unknown[]) => void) {
+        if (event === "error") {
+          errorHandler = handler as (error: Error & { code?: string }) => void;
+        }
+        EventEmitter.prototype.on.call(this, event, handler);
+        return this;
+      };
+
+      request.setTimeout = (_ms: number, cb: () => void) => {
+        timeoutHandler = cb;
+      };
+
+      request.destroy = () => {
+        // No-op in tests.
+      };
+
+      request.end = (data?: Buffer) => {
+        const result = resolveRoute(options, data);
+
+        if (result.triggerTimeout) {
+          queueMicrotask(() => {
+            timeoutHandler?.();
+          });
+          return;
+        }
+
+        if (result.error) {
+          queueMicrotask(() => {
+            errorHandler?.(result.error as Error & { code?: string });
+          });
+          return;
+        }
+
+        const response = new EventEmitter() as NodeJS.EventEmitter & {
+          statusCode: number;
+          statusMessage: string;
+          headers: Record<string, string>;
+        };
+        response.statusCode = result.statusCode ?? 200;
+        response.statusMessage = result.statusMessage ?? "OK";
+        response.headers = result.headers ?? { "content-type": "application/json" };
+
+        callback(response);
+
+        queueMicrotask(() => {
+          if (!result.noBody) {
+            const raw = result.rawBody ?? JSON.stringify(result.body ?? {});
+            if (raw.length > 0) {
+              response.emit("data", Buffer.from(raw, "utf8"));
+            }
+          }
+          response.emit("end");
+        });
+      };
+
+      return request;
+    }
+  ) as unknown as typeof http.request;
+
 describe("RedmineServer", () => {
   let server: RedmineServer;
 
@@ -463,6 +560,353 @@ describe("RedmineServer", () => {
       });
 
       expect((server as unknown as { maxConcurrentRequests: number }).maxConcurrentRequests).toBe(5);
+    });
+  });
+
+  describe("additional redmine-server branch coverage", () => {
+    it("covers pagination batches, filters, limits and generic wrappers", async () => {
+      const capturedRequests: { method: string; path: string; body?: string }[] = [];
+
+      const requestFn = createRouteMockRequest((options, requestBody) => {
+        const path = options.path || "/";
+        const method = options.method || "GET";
+        capturedRequests.push({
+          method,
+          path,
+          body: requestBody?.toString("utf8"),
+        });
+
+        if (method === "GET" && path.includes("/projects.json")) {
+          const parsed = new URL(`https://redmine.local${path}`);
+          const offset = Number(parsed.searchParams.get("offset") || "0");
+          const count = offset === 200 ? 5 : 100;
+          return {
+            body: {
+              projects: Array.from({ length: count }, (_, i) => {
+                const id = offset + i + 1;
+                return {
+                  id,
+                  name: `Project ${id}`,
+                  identifier: `project-${id}`,
+                };
+              }),
+              total_count: 205,
+            },
+          };
+        }
+
+        if (method === "GET" && path.includes("/time_entries.json")) {
+          const parsed = new URL(`https://redmine.local${path}`);
+          const issueId = parsed.searchParams.get("issue_id");
+          return {
+            body: {
+              time_entries: [
+                {
+                  id: issueId ? Number(issueId) : 1,
+                  comments: "entry",
+                },
+              ],
+              total_count: 1,
+            },
+          };
+        }
+
+        if (method === "GET" && path.includes("/issues.json")) {
+          return {
+            body: {
+              issues: [
+                {
+                  id: 900,
+                  subject: "Filtered issue",
+                  status: { id: 1, name: "New" },
+                  tracker: { id: 1, name: "Bug" },
+                  author: { id: 1, name: "John Doe" },
+                  project: { id: 1, name: "Test Project" },
+                },
+              ],
+              total_count: 1,
+            },
+          };
+        }
+
+        if (method === "POST" && path.endsWith("/post.json")) {
+          return { body: { ok: "post" } };
+        }
+        if (method === "PUT" && path.endsWith("/put.json")) {
+          return { body: { ok: "put" } };
+        }
+        if (method === "DELETE" && path.endsWith("/delete.json")) {
+          return { statusCode: 204, statusMessage: "No Content", noBody: true };
+        }
+
+        return { body: { ok: true } };
+      });
+
+      const serverWithRoutes = new RedmineServer({
+        address: "https://localhost:3000",
+        key: "test-api-key",
+        requestFn,
+        maxConcurrentRequests: 2,
+      });
+
+      const projects = await serverWithRoutes.getProjects();
+      expect(projects).toHaveLength(205);
+      expect(capturedRequests.some((r) => r.path.includes("offset=100"))).toBe(true);
+      expect(capturedRequests.some((r) => r.path.includes("offset=200"))).toBe(true);
+
+      const beforeAllUsersCall = capturedRequests.length;
+      await serverWithRoutes.getTimeEntries({ allUsers: true });
+      const allUsersPath = capturedRequests
+        .slice(beforeAllUsersCall)
+        .find((r) => r.path.includes("/time_entries.json"))?.path;
+      expect(allUsersPath?.includes("user_id=me")).toBe(false);
+
+      await serverWithRoutes.getTimeEntries({ from: "2026-01-01", to: "2026-01-31" });
+      expect(
+        capturedRequests.some(
+          (r) =>
+            r.path.includes("user_id=me") &&
+            r.path.includes("from=2026-01-01") &&
+            r.path.includes("to=2026-01-31")
+        )
+      ).toBe(true);
+
+      expect(await serverWithRoutes.getTimeEntriesForIssues([])).toEqual([]);
+      const issueEntries = await serverWithRoutes.getTimeEntriesForIssues(
+        [11, 12, 13],
+        {
+          userId: 7,
+          from: "2026-02-01",
+          to: "2026-02-28",
+        }
+      );
+      expect(issueEntries).toHaveLength(3);
+      const issueRequestPaths = capturedRequests
+        .filter((r) => r.path.includes("issue_id="))
+        .map((r) => decodeURIComponent(r.path));
+      expect(issueRequestPaths.every((p) => p.includes("user_id=7"))).toBe(true);
+      expect(issueRequestPaths.every((p) => p.includes("from=2026-02-01"))).toBe(true);
+      expect(issueRequestPaths.every((p) => p.includes("to=2026-02-28"))).toBe(true);
+
+      await serverWithRoutes.getFilteredIssues({
+        assignee: "any",
+        status: "closed",
+        priority: 3,
+      });
+      const closedPath = decodeURIComponent(
+        capturedRequests[capturedRequests.length - 1].path
+      );
+      expect(closedPath.includes("status_id=closed")).toBe(true);
+      expect(closedPath.includes("priority_id=3")).toBe(true);
+
+      await serverWithRoutes.getFilteredIssues({
+        assignee: "any",
+        status: "any",
+      });
+      const anyPath = decodeURIComponent(
+        capturedRequests[capturedRequests.length - 1].path
+      );
+      expect(anyPath.includes("status_id=*")).toBe(true);
+      expect(anyPath.includes("assigned_to_id=me")).toBe(false);
+
+      await serverWithRoutes.getAllOpenIssues();
+      await serverWithRoutes.getOpenIssuesForProject(7, false, 2, false);
+      const limitPath = decodeURIComponent(
+        capturedRequests[capturedRequests.length - 1].path
+      );
+      expect(limitPath.includes("status_id=*")).toBe(true);
+      expect(limitPath.includes("subproject_id=!*")).toBe(true);
+      expect(limitPath.includes("limit=2")).toBe(true);
+
+      await expect(serverWithRoutes.post("/post.json", { foo: "bar" })).resolves.toEqual({
+        ok: "post",
+      });
+      await expect(serverWithRoutes.put("/put.json", { foo: "bar" })).resolves.toEqual({
+        ok: "put",
+      });
+      await expect(serverWithRoutes.delete("/delete.json")).resolves.toBeNull();
+    });
+
+    it("covers fallback/cache branches for custom fields, modules, activities and versions", async () => {
+      let customFieldCalls = 0;
+
+      const requestFn = createRouteMockRequest((options) => {
+        const path = options.path || "/";
+        const method = options.method || "GET";
+
+        if (method === "GET" && path.includes("/custom_fields.json")) {
+          customFieldCalls++;
+          return {
+            body: {
+              custom_fields: [
+                {
+                  id: 1,
+                  name: "Time CF",
+                  customized_type: "time_entry",
+                  field_format: "string",
+                },
+                {
+                  id: 2,
+                  name: "Issue CF",
+                  customized_type: "issue",
+                  field_format: "string",
+                },
+              ],
+            },
+          };
+        }
+
+        if (method === "GET" && path.includes("/projects/1.json?include=enabled_modules")) {
+          return { body: { project: { enabled_modules: [{ name: "time_tracking" }] } } };
+        }
+        if (method === "GET" && path.includes("/projects/2.json?include=enabled_modules")) {
+          return { body: { project: { enabled_modules: [{ name: "wiki" }] } } };
+        }
+        if (method === "GET" && path.includes("/projects/3.json?include=enabled_modules")) {
+          const error = new Error("modules unavailable") as Error & { code?: string };
+          error.code = "ECONNRESET";
+          return { error };
+        }
+
+        if (method === "GET" && path.includes("/projects/10.json?include=time_entry_activities")) {
+          return {
+            body: { project: { time_entry_activities: [{ id: 2, name: "Project Activity" }] } },
+          };
+        }
+        if (method === "GET" && path.includes("/projects/11.json?include=time_entry_activities")) {
+          return { body: { project: { time_entry_activities: [] } } };
+        }
+        if (method === "GET" && path.includes("/projects/12.json?include=time_entry_activities")) {
+          const error = new Error("activities unavailable") as Error & { code?: string };
+          error.code = "ECONNREFUSED";
+          return { error };
+        }
+        if (method === "GET" && path.includes("/enumerations/time_entry_activities.json")) {
+          return { body: { time_entry_activities: [{ id: 99, name: "Global Activity" }] } };
+        }
+
+        if (method === "GET" && path.includes("/projects/5/versions.json")) {
+          return {
+            body: {
+              versions: [{ id: 5, name: "v5", project: { id: 1, name: "P" } }],
+            },
+          };
+        }
+        if (method === "GET" && path.includes("/projects/6/versions.json")) {
+          const error = new Error("version fetch failed") as Error & { code?: string };
+          error.code = "ENOTFOUND";
+          return { error };
+        }
+        if (method === "POST" && path.includes("/projects/5/versions.json")) {
+          return { body: {} };
+        }
+
+        return { body: {} };
+      });
+
+      const serverWithRoutes = new RedmineServer({
+        address: "https://localhost:3000",
+        key: "test-api-key",
+        requestFn,
+      });
+
+      const customFieldsFirst = await serverWithRoutes.getTimeEntryCustomFields();
+      expect(customFieldsFirst).toHaveLength(1);
+      expect(customFieldsFirst[0].customized_type).toBe("time_entry");
+
+      const customFieldsSecond = await serverWithRoutes.getTimeEntryCustomFields();
+      expect(customFieldsSecond).toHaveLength(1);
+      expect(customFieldCalls).toBe(1);
+
+      await expect(serverWithRoutes.isTimeTrackingEnabled(1)).resolves.toBe(true);
+      await expect(serverWithRoutes.isTimeTrackingEnabled(2)).resolves.toBe(false);
+      await expect(serverWithRoutes.isTimeTrackingEnabled(3)).resolves.toBe(true);
+
+      const projectActivities = await serverWithRoutes.getProjectTimeEntryActivities(10);
+      expect(projectActivities).toEqual([{ id: 2, name: "Project Activity" }]);
+
+      const fallbackActivities = await serverWithRoutes.getProjectTimeEntryActivities(11);
+      expect(fallbackActivities).toEqual([{ id: 99, name: "Global Activity" }]);
+
+      const fallbackAfterError = await serverWithRoutes.getProjectTimeEntryActivities(12);
+      expect(fallbackAfterError).toEqual([{ id: 99, name: "Global Activity" }]);
+
+      const versionsByProject = await serverWithRoutes.getVersionsForProjects([5, 6]);
+      expect(versionsByProject.get(5)?.length).toBe(1);
+      expect(versionsByProject.get(6)).toEqual([]);
+
+      await expect(serverWithRoutes.createVersion(5, { name: "Release X" })).rejects.toThrow(
+        "Failed to create version"
+      );
+
+      const failingFieldsServer = new RedmineServer({
+        address: "https://localhost:3000",
+        key: "test-api-key",
+        requestFn: createRouteMockRequest((options) => {
+          if ((options.path || "").includes("/custom_fields.json")) {
+            const error = new Error("forbidden") as Error & { code?: string };
+            error.code = "ECONNREFUSED";
+            return { error };
+          }
+          return { body: {} };
+        }),
+      });
+      await expect(failingFieldsServer.getTimeEntryCustomFields()).resolves.toEqual([]);
+    });
+
+    it("covers remaining executeRequest branches (parse/client/network/timeout)", async () => {
+      const createServer = (result: RouteMockResult) =>
+        new RedmineServer({
+          address: "https://localhost:3000",
+          key: "test-api-key",
+          requestFn: createRouteMockRequest(() => result),
+        });
+
+      await expect(
+        createServer({ statusCode: 204, statusMessage: "No Content", noBody: true }).doRequest(
+          "/empty.json",
+          "DELETE"
+        )
+      ).resolves.toBeNull();
+
+      await expect(
+        createServer({ rawBody: "not-json", statusCode: 200, statusMessage: "OK" }).doRequest(
+          "/bad-json.json",
+          "GET"
+        )
+      ).rejects.toThrow("Couldn't parse Redmine response as JSON...");
+
+      await expect(
+        createServer({
+          rawBody: "invalid-json",
+          statusCode: 422,
+          statusMessage: "Unprocessable Entity",
+        }).doRequest("/validation.json", "POST")
+      ).rejects.toThrow("Validation failed (422)");
+
+      await expect(
+        createServer({
+          body: { errors: ["conflict"] },
+          statusCode: 409,
+          statusMessage: "Conflict",
+        }).doRequest("/conflict.json", "GET")
+      ).rejects.toThrow("Client error (409 Conflict)");
+
+      const certError = new Error("certificate expired") as Error & { code?: string };
+      certError.code = "CERT_HAS_EXPIRED";
+      await expect(createServer({ error: certError }).doRequest("/ssl.json", "GET")).rejects.toThrow(
+        "SSL certificate error - check rejectUnauthorized setting"
+      );
+
+      const unknownNetworkError = new Error("socket hang up") as Error & { code?: string };
+      unknownNetworkError.code = "EPIPE";
+      await expect(
+        createServer({ error: unknownNetworkError }).doRequest("/network.json", "GET")
+      ).rejects.toThrow("Network error: socket hang up");
+
+      await expect(
+        createServer({ triggerTimeout: true }).doRequest("/timeout.json", "GET")
+      ).rejects.toThrow("Request timeout after 30 seconds");
     });
   });
 });

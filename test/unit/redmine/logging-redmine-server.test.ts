@@ -747,4 +747,80 @@ describe("LoggingRedmineServer", () => {
 
     server.dispose();
   });
+
+  it("cleans stale pending request metadata", () => {
+    vi.setSystemTime(new Date("2026-02-07T10:00:00Z"));
+    const server = new LoggingRedmineServer(
+      {
+        address: "https://localhost",
+        key: "test-key",
+        additionalHeaders: {},
+        requestFn: createMockRequestFn(),
+      },
+      mockChannel as unknown as vscode.OutputChannel,
+      { enabled: true }
+    ) as unknown as {
+      pendingByPath: Map<string, Array<{ startTime: number; displayId: number }>>;
+      pendingBySymbol: Map<symbol, { startTime: number; displayId: number }>;
+      cleanupStaleRequests: () => void;
+      dispose: () => void;
+      cleanupTimer?: NodeJS.Timeout;
+    };
+
+    const now = Date.now();
+    const staleTime = now - 70000;
+    const freshTime = now - 10000;
+    const oldSymbol = Symbol("old");
+    const freshSymbol = Symbol("fresh");
+
+    server.pendingByPath.set("GET:/stale", [{ startTime: staleTime, displayId: 1 }]);
+    server.pendingByPath.set("GET:/mixed", [
+      { startTime: staleTime, displayId: 2 },
+      { startTime: freshTime, displayId: 3 },
+    ]);
+    server.pendingBySymbol.set(oldSymbol, { startTime: staleTime, displayId: 4 });
+    server.pendingBySymbol.set(freshSymbol, { startTime: freshTime, displayId: 5 });
+
+    server.cleanupStaleRequests();
+
+    expect(server.pendingByPath.has("GET:/stale")).toBe(false);
+    expect(server.pendingByPath.get("GET:/mixed")).toEqual([
+      { startTime: freshTime, displayId: 3 },
+    ]);
+    expect(server.pendingBySymbol.has(oldSymbol)).toBe(false);
+    expect(server.pendingBySymbol.has(freshSymbol)).toBe(true);
+
+    server.dispose();
+    expect(server.pendingByPath.size).toBe(0);
+    expect(server.pendingBySymbol.size).toBe(0);
+    expect(server.cleanupTimer).toBeUndefined();
+  });
+
+  it("skips response hook logging when request id is not symbol", () => {
+    const server = new LoggingRedmineServer(
+      {
+        address: "https://localhost",
+        key: "test-key",
+        additionalHeaders: {},
+        requestFn: createMockRequestFn(),
+      },
+      mockChannel as unknown as vscode.OutputChannel,
+      { enabled: true }
+    ) as unknown as {
+      onRequestStart: (...args: unknown[]) => void;
+      onResponseSuccess: (...args: unknown[]) => void;
+      onResponseError: (...args: unknown[]) => void;
+      dispose: () => void;
+    };
+
+    server.onRequestStart("/issues.json", "GET");
+    const callCount = mockChannel.appendLine.mock.calls.length;
+    server.onResponseSuccess(200, "OK", "/issues.json", "GET", undefined, Buffer.from("{}"), "application/json", "not-symbol");
+    server.onResponseError(500, "Err", new Error("boom"), "/issues.json", "GET", undefined, Buffer.from("{}"), "application/json", 123);
+
+    // Request logged once; response hooks ignored for non-symbol ids
+    expect(mockChannel.appendLine.mock.calls.length).toBe(callCount);
+
+    server.dispose();
+  });
 });
