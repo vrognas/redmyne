@@ -154,6 +154,26 @@ export class TreeItem {
   }
 }
 
+export class Selection {
+  start: { line: number; character: number };
+  end: { line: number; character: number };
+  active: { line: number; character: number };
+  isEmpty: boolean;
+
+  constructor(
+    startLine: number,
+    startCharacter: number,
+    endLine: number,
+    endCharacter: number
+  ) {
+    this.start = { line: startLine, character: startCharacter };
+    this.end = { line: endLine, character: endCharacter };
+    this.active = this.end;
+    this.isEmpty =
+      startLine === endLine && startCharacter === endCharacter;
+  }
+}
+
 export class MarkdownString {
   value: string;
   isTrusted?: boolean;
