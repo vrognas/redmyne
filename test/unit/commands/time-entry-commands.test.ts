@@ -174,10 +174,10 @@ describe("registerTimeEntryCommands", () => {
     const { refreshTree } = registerCommands({
       getServer: () => mockServer,
     });
-    vi.mocked(vscode.window.showQuickPick).mockResolvedValue({
-      label: "Comment",
-      field: "comments",
-    } as unknown as vscode.QuickPickItem);
+    vi.mocked(vscode.window.showQuickPick).mockImplementation(async (items: unknown) => {
+      const arr = items as Array<{ label: string; field: string }>;
+      return arr.find((i) => i.field === "comments") as never;
+    });
     vi.mocked(vscode.window.showInputBox).mockResolvedValue("Updated comment");
 
     await handlers.get("redmyne.editTimeEntry")?.({
@@ -204,10 +204,10 @@ describe("registerTimeEntryCommands", () => {
     const { refreshTree } = registerCommands({
       getServer: () => mockServer,
     });
-    vi.mocked(vscode.window.showQuickPick).mockResolvedValue({
-      label: "Hours",
-      field: "hours",
-    } as unknown as vscode.QuickPickItem);
+    vi.mocked(vscode.window.showQuickPick).mockImplementation(async (items: unknown) => {
+      const arr = items as Array<{ label: string; field: string }>;
+      return arr.find((i) => i.field === "hours") as never;
+    });
     vi.mocked(vscode.window.showInputBox).mockResolvedValue("1:30");
 
     await handlers.get("redmyne.editTimeEntry")?.({
@@ -233,10 +233,10 @@ describe("registerTimeEntryCommands", () => {
     const { refreshTree } = registerCommands({
       getServer: () => mockServer,
     });
-    vi.mocked(vscode.window.showQuickPick).mockResolvedValue({
-      label: "Date",
-      field: "date",
-    } as unknown as vscode.QuickPickItem);
+    vi.mocked(vscode.window.showQuickPick).mockImplementation(async (items: unknown) => {
+      const arr = items as Array<{ label: string; field: string }>;
+      return arr.find((i) => i.field === "date") as never;
+    });
     vi.mocked(vscode.window.showInputBox).mockResolvedValue("2026-02-07");
 
     await handlers.get("redmyne.editTimeEntry")?.({
@@ -269,14 +269,14 @@ describe("registerTimeEntryCommands", () => {
       getServer: () => mockServer,
     });
     vi.mocked(vscode.window.showQuickPick)
-      .mockResolvedValueOnce({
-        label: "Activity",
-        field: "activity",
-      } as unknown as vscode.QuickPickItem)
-      .mockResolvedValueOnce({
-        label: "Development",
-        activityId: 5,
-      } as unknown as vscode.QuickPickItem);
+      .mockImplementationOnce(async (items: unknown) => {
+        const arr = items as Array<{ label: string; field: string }>;
+        return arr.find((i) => i.field === "activity") as never;
+      })
+      .mockImplementationOnce(async (items: unknown) => {
+        const arr = items as Array<{ label: string; activityId: number }>;
+        return arr.find((i) => i.activityId === 5) as never;
+      });
 
     await handlers.get("redmyne.editTimeEntry")?.({
       _entry: {
@@ -308,10 +308,10 @@ describe("registerTimeEntryCommands", () => {
       subject: "Other issue",
       project: { id: 7, name: "Project" },
     } as never);
-    vi.mocked(vscode.window.showQuickPick).mockResolvedValue({
-      label: "Issue",
-      field: "issue",
-    } as unknown as vscode.QuickPickItem);
+    vi.mocked(vscode.window.showQuickPick).mockImplementation(async (items: unknown) => {
+      const arr = items as Array<{ label: string; field: string }>;
+      return arr.find((i) => i.field === "issue") as never;
+    });
 
     await handlers.get("redmyne.editTimeEntry")?.({
       _entry: {
