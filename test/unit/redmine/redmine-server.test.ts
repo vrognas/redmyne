@@ -515,7 +515,7 @@ describe("RedmineServer", () => {
       ];
 
       // Wait for requests to be initiated
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Only 2 requests should have started (due to maxConcurrentRequests=2)
       expect(requestOrder).toEqual([1, 2]);
@@ -523,13 +523,13 @@ describe("RedmineServer", () => {
 
       // Complete first request - should trigger third
       requestCompletions[0]();
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       expect(requestOrder).toEqual([1, 2, 3]);
 
       // Complete second request - should trigger fourth
       requestCompletions[1]();
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       expect(requestOrder).toEqual([1, 2, 3, 4]);
 

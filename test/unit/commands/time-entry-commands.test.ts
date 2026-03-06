@@ -174,11 +174,11 @@ describe("registerTimeEntryCommands", () => {
     const { refreshTree } = registerCommands({
       getServer: () => mockServer,
     });
-    vi.mocked(vscode.window.showQuickPick).mockImplementation(async (items: unknown) => {
+    const pickSpy = vi.spyOn(vscode.window, "showQuickPick").mockImplementation(async (items: unknown) => {
       const arr = items as Array<{ label: string; field: string }>;
       return arr.find((i) => i.field === "comments") as never;
     });
-    vi.mocked(vscode.window.showInputBox).mockResolvedValue("Updated comment");
+    vi.spyOn(vscode.window, "showInputBox").mockResolvedValue("Updated comment");
 
     await handlers.get("redmyne.editTimeEntry")?.({
       _entry: {
@@ -189,6 +189,7 @@ describe("registerTimeEntryCommands", () => {
       },
     });
 
+    expect(pickSpy).toHaveBeenCalled();
     expect(mockServer.getTimeEntryCustomFields).toHaveBeenCalled();
     expect(mockServer.updateTimeEntry).toHaveBeenCalledWith(31, {
       comments: "Updated comment",
@@ -204,11 +205,11 @@ describe("registerTimeEntryCommands", () => {
     const { refreshTree } = registerCommands({
       getServer: () => mockServer,
     });
-    vi.mocked(vscode.window.showQuickPick).mockImplementation(async (items: unknown) => {
+    vi.spyOn(vscode.window, "showQuickPick").mockImplementation(async (items: unknown) => {
       const arr = items as Array<{ label: string; field: string }>;
       return arr.find((i) => i.field === "hours") as never;
     });
-    vi.mocked(vscode.window.showInputBox).mockResolvedValue("1:30");
+    vi.spyOn(vscode.window, "showInputBox").mockResolvedValue("1:30");
 
     await handlers.get("redmyne.editTimeEntry")?.({
       _entry: {
@@ -233,11 +234,11 @@ describe("registerTimeEntryCommands", () => {
     const { refreshTree } = registerCommands({
       getServer: () => mockServer,
     });
-    vi.mocked(vscode.window.showQuickPick).mockImplementation(async (items: unknown) => {
+    vi.spyOn(vscode.window, "showQuickPick").mockImplementation(async (items: unknown) => {
       const arr = items as Array<{ label: string; field: string }>;
       return arr.find((i) => i.field === "date") as never;
     });
-    vi.mocked(vscode.window.showInputBox).mockResolvedValue("2026-02-07");
+    vi.spyOn(vscode.window, "showInputBox").mockResolvedValue("2026-02-07");
 
     await handlers.get("redmyne.editTimeEntry")?.({
       _entry: {
@@ -268,7 +269,7 @@ describe("registerTimeEntryCommands", () => {
     const { refreshTree } = registerCommands({
       getServer: () => mockServer,
     });
-    vi.mocked(vscode.window.showQuickPick)
+    vi.spyOn(vscode.window, "showQuickPick")
       .mockImplementationOnce(async (items: unknown) => {
         const arr = items as Array<{ label: string; field: string }>;
         return arr.find((i) => i.field === "activity") as never;
@@ -308,7 +309,7 @@ describe("registerTimeEntryCommands", () => {
       subject: "Other issue",
       project: { id: 7, name: "Project" },
     } as never);
-    vi.mocked(vscode.window.showQuickPick).mockImplementation(async (items: unknown) => {
+    vi.spyOn(vscode.window, "showQuickPick").mockImplementation(async (items: unknown) => {
       const arr = items as Array<{ label: string; field: string }>;
       return arr.find((i) => i.field === "issue") as never;
     });
@@ -353,10 +354,10 @@ describe("registerTimeEntryCommands", () => {
       values: [{ id: 101, value: "new" }],
       cancelled: false,
     });
-    vi.mocked(vscode.window.showQuickPick).mockResolvedValue({
-      label: "Custom Fields",
-      field: "customFields",
-    } as unknown as vscode.QuickPickItem);
+    vi.spyOn(vscode.window, "showQuickPick").mockImplementation(async (items: unknown) => {
+      const arr = items as Array<{ label: string; field: string }>;
+      return arr.find((i) => i.field === "customFields") as never;
+    });
 
     await handlers.get("redmyne.editTimeEntry")?.({
       _entry: {
@@ -382,11 +383,11 @@ describe("registerTimeEntryCommands", () => {
     const { refreshTree } = registerCommands({
       getServer: () => mockServer,
     });
-    vi.mocked(vscode.window.showQuickPick).mockResolvedValue({
-      label: "Comment",
-      field: "comments",
-    } as unknown as vscode.QuickPickItem);
-    vi.mocked(vscode.window.showInputBox).mockResolvedValue("Updated comment");
+    vi.spyOn(vscode.window, "showQuickPick").mockImplementation(async (items: unknown) => {
+      const arr = items as Array<{ label: string; field: string }>;
+      return arr.find((i) => i.field === "comments") as never;
+    });
+    vi.spyOn(vscode.window, "showInputBox").mockResolvedValue("Updated comment");
 
     await handlers.get("redmyne.editTimeEntry")?.({
       _entry: {
