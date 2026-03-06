@@ -6,8 +6,19 @@ import { DRAFT_COMMAND_SOURCE } from "../../../src/draft-mode/draft-change-sourc
 describe("applyDraftsWithTracking", () => {
   let mockServer: {
     setIssueStatus: ReturnType<typeof vi.fn>;
+    updateIssueDates: ReturnType<typeof vi.fn>;
+    updateDoneRatio: ReturnType<typeof vi.fn>;
+    setIssuePriority: ReturnType<typeof vi.fn>;
     put: ReturnType<typeof vi.fn>;
+    createIssue: ReturnType<typeof vi.fn>;
+    addTimeEntry: ReturnType<typeof vi.fn>;
     updateTimeEntry: ReturnType<typeof vi.fn>;
+    deleteTimeEntry: ReturnType<typeof vi.fn>;
+    createVersion: ReturnType<typeof vi.fn>;
+    updateVersion: ReturnType<typeof vi.fn>;
+    deleteVersion: ReturnType<typeof vi.fn>;
+    createRelation: ReturnType<typeof vi.fn>;
+    deleteRelation: ReturnType<typeof vi.fn>;
   };
 
   let mockQueue: {
@@ -33,8 +44,19 @@ describe("applyDraftsWithTracking", () => {
     vi.clearAllMocks();
     mockServer = {
       setIssueStatus: vi.fn().mockResolvedValue({}),
+      updateIssueDates: vi.fn().mockResolvedValue({}),
+      updateDoneRatio: vi.fn().mockResolvedValue({}),
+      setIssuePriority: vi.fn().mockResolvedValue({}),
       put: vi.fn().mockResolvedValue({}),
+      createIssue: vi.fn().mockResolvedValue({}),
+      addTimeEntry: vi.fn().mockResolvedValue({}),
       updateTimeEntry: vi.fn().mockResolvedValue({}),
+      deleteTimeEntry: vi.fn().mockResolvedValue({}),
+      createVersion: vi.fn().mockResolvedValue({}),
+      updateVersion: vi.fn().mockResolvedValue({}),
+      deleteVersion: vi.fn().mockResolvedValue({}),
+      createRelation: vi.fn().mockResolvedValue({}),
+      deleteRelation: vi.fn().mockResolvedValue({}),
     };
     mockQueue = {
       remove: vi.fn().mockResolvedValue(undefined),
@@ -188,5 +210,155 @@ describe("applyDraftsWithTracking", () => {
     expect(result.failed).toHaveLength(1);
     expect(result.failed[0].error).toContain("missing resourceId");
     expect(mockServer.updateTimeEntry).not.toHaveBeenCalled();
+  });
+
+  it("routes supported operation types to server methods", async () => {
+    const ops: DraftOperation[] = [
+      createOp("status", "Set status"),
+      {
+        ...createOp("dates", "Set dates"),
+        type: "setIssueDates",
+        http: { method: "PUT", path: "/issues/123.json", data: { issue: { start_date: "2026-02-01", due_date: "2026-02-02" } } },
+      },
+      {
+        ...createOp("done", "Set done"),
+        type: "setIssueDoneRatio",
+        http: { method: "PUT", path: "/issues/123.json", data: { issue: { done_ratio: 60 } } },
+      },
+      {
+        ...createOp("priority", "Set priority"),
+        type: "setIssuePriority",
+        http: { method: "PUT", path: "/issues/123.json", data: { issue: { priority_id: 5 } } },
+      },
+      {
+        ...createOp("assignee", "Set assignee"),
+        type: "setIssueAssignee",
+        http: { method: "PUT", path: "/issues/123.json", data: { issue: { assigned_to_id: 11 } } },
+      },
+      {
+        ...createOp("note", "Add note"),
+        type: "addIssueNote",
+        http: { method: "PUT", path: "/issues/123.json", data: { issue: { notes: "hello" } } },
+      },
+      {
+        ...createOp("create-issue", "Create issue"),
+        type: "createIssue",
+        issueId: undefined,
+        http: { method: "POST", path: "/issues.json", data: { issue: { project_id: 1, subject: "X" } } },
+      },
+      {
+        ...createOp("create-entry", "Create entry"),
+        type: "createTimeEntry",
+        issueId: undefined,
+        http: {
+          method: "POST",
+          path: "/time_entries.json",
+          data: { time_entry: { issue_id: 123, activity_id: 9, hours: "1.5", comments: "work" } },
+        },
+      },
+      {
+        ...createOp("update-entry", "Update entry"),
+        type: "updateTimeEntry",
+        issueId: undefined,
+        resourceId: 77,
+        http: { method: "PUT", path: "/time_entries/77.json", data: { time_entry: { comments: "new" } } },
+      },
+      {
+        ...createOp("delete-entry", "Delete entry"),
+        type: "deleteTimeEntry",
+        issueId: undefined,
+        resourceId: 78,
+        http: { method: "DELETE", path: "/time_entries/78.json", data: {} },
+      },
+      {
+        ...createOp("create-version", "Create version"),
+        type: "createVersion",
+        issueId: undefined,
+        http: { method: "POST", path: "/projects/ops/versions.json", data: { version: { name: "v1" } } },
+      },
+      {
+        ...createOp("update-version", "Update version"),
+        type: "updateVersion",
+        issueId: undefined,
+        resourceId: 99,
+        http: { method: "PUT", path: "/versions/99.json", data: { version: { name: "v2" } } },
+      },
+      {
+        ...createOp("delete-version", "Delete version"),
+        type: "deleteVersion",
+        issueId: undefined,
+        resourceId: 100,
+        http: { method: "DELETE", path: "/versions/100.json", data: {} },
+      },
+      {
+        ...createOp("create-relation", "Create relation"),
+        type: "createRelation",
+        issueId: undefined,
+        http: {
+          method: "POST",
+          path: "/issues/123/relations.json",
+          data: { relation: { issue_to_id: 200, relation_type: "blocks", delay: 1 } },
+        },
+      },
+      {
+        ...createOp("delete-relation", "Delete relation"),
+        type: "deleteRelation",
+        issueId: undefined,
+        resourceId: 101,
+        http: { method: "DELETE", path: "/relations/101.json", data: {} },
+      },
+    ];
+
+    const result = await applyDraftsWithTracking(
+      mockServer as never,
+      mockQueue as never,
+      ops,
+      () => true
+    );
+
+    expect(result.failed).toHaveLength(0);
+    expect(result.succeeded).toHaveLength(ops.length);
+    expect(mockServer.updateIssueDates).toHaveBeenCalledWith(123, "2026-02-01", "2026-02-02", { _bypassDraft: true });
+    expect(mockServer.updateDoneRatio).toHaveBeenCalledWith(123, 60, { _bypassDraft: true });
+    expect(mockServer.setIssuePriority).toHaveBeenCalledWith(123, 5, { _bypassDraft: true });
+    expect(mockServer.createIssue).toHaveBeenCalled();
+    expect(mockServer.addTimeEntry).toHaveBeenCalled();
+    expect(mockServer.createVersion).toHaveBeenCalledWith("ops", { name: "v1" }, { _bypassDraft: true });
+    expect(mockServer.createRelation).toHaveBeenCalledWith(123, 200, "blocks", 1, { _bypassDraft: true });
+    expect(mockServer.deleteRelation).toHaveBeenCalledWith(101, { _bypassDraft: true });
+  });
+
+  it("falls back to per-item removal when removeMany throws", async () => {
+    const ops = [createOp("1", "Op 1"), createOp("2", "Op 2")];
+    mockQueue.removeMany = vi.fn().mockRejectedValue(new Error("persist fail"));
+
+    await applyDraftsWithTracking(
+      mockServer as never,
+      mockQueue as never,
+      ops,
+      () => true
+    );
+
+    expect(mockQueue.remove).toHaveBeenCalledTimes(2);
+    expect(mockQueue.remove).toHaveBeenNthCalledWith(1, "1", DRAFT_COMMAND_SOURCE);
+    expect(mockQueue.remove).toHaveBeenNthCalledWith(2, "2", DRAFT_COMMAND_SOURCE);
+  });
+
+  it("reports unknown operation type as failure", async () => {
+    const unknownOp = {
+      ...createOp("unknown", "Unknown op"),
+      type: "unknownOperation",
+    } as unknown as DraftOperation;
+
+    const result = await applyDraftsWithTracking(
+      mockServer as never,
+      mockQueue as never,
+      [unknownOp],
+      () => true
+    );
+
+    expect(result.succeeded).toHaveLength(0);
+    expect(result.failed).toHaveLength(1);
+    expect(result.failed[0].error).toContain("Unknown operation type");
   });
 });

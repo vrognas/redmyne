@@ -74,6 +74,37 @@ describe("registerInternalEstimateCommands", () => {
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.refreshGanttData");
   });
 
+  it("returns when set command input is cancelled", async () => {
+    registerInternalEstimateCommands(context);
+    vi.mocked(vscode.window.showInputBox).mockResolvedValue(undefined);
+
+    await handlers.get("redmyne.setInternalEstimate")?.({
+      id: 333,
+      subject: "Cancelled",
+    });
+
+    const stored = globalState._store.get(STORAGE_KEY) as Record<string, unknown> | undefined;
+    expect(stored?.["333"]).toBeUndefined();
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith("redmyne.refreshGanttData");
+  });
+
+  it("runs set command validators", async () => {
+    registerInternalEstimateCommands(context);
+    vi.mocked(vscode.window.showInputBox).mockImplementation(async (options) => {
+      const validateInput = options?.validateInput as (value: string) => string | null;
+      expect(validateInput("")).toBe("Please enter a number");
+      expect(validateInput("abc")).toBe("Please enter a valid number");
+      expect(validateInput("-1")).toBe("Hours cannot be negative");
+      expect(validateInput("2.5")).toBeNull();
+      return undefined;
+    });
+
+    await handlers.get("redmyne.setInternalEstimate")?.({
+      id: 123,
+      subject: "Validation",
+    });
+  });
+
   it("clears internal estimate and refreshes gantt data", async () => {
     globalState._store.set(STORAGE_KEY, {
       123: { hoursRemaining: 4, updatedAt: "2026-01-01T00:00:00.000Z" },
@@ -90,5 +121,29 @@ describe("registerInternalEstimateCommands", () => {
     expect(stored["123"]).toBeUndefined();
     expect(stored["999"]).toBeDefined();
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.refreshGanttData");
+  });
+
+  it("shows no-estimate message when clear command has nothing to clear", async () => {
+    registerInternalEstimateCommands(context);
+
+    await handlers.get("redmyne.clearInternalEstimate")?.({
+      id: 555,
+      subject: "Missing",
+    });
+
+    expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
+      "No internal estimate set for #555"
+    );
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith("redmyne.refreshGanttData");
+  });
+
+  it("shows issue id error for missing issue in clear command", async () => {
+    registerInternalEstimateCommands(context);
+
+    await handlers.get("redmyne.clearInternalEstimate")?.(undefined);
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      "Could not determine issue ID"
+    );
   });
 });

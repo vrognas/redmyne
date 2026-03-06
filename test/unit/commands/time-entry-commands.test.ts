@@ -3,6 +3,9 @@ import * as vscode from "vscode";
 import { registerTimeEntryCommands } from "../../../src/commands/time-entry-commands";
 import * as issuePicker from "../../../src/utilities/issue-picker";
 import * as customFieldPicker from "../../../src/utilities/custom-field-picker";
+import * as clipboard from "../../../src/utilities/time-entry-clipboard";
+import * as quickLogTimeModule from "../../../src/commands/quick-log-time";
+import * as closedIssueGuard from "../../../src/utilities/closed-issue-guard";
 
 type RegisteredHandler = (...args: unknown[]) => unknown;
 
@@ -398,5 +401,162 @@ describe("registerTimeEntryCommands", () => {
       expect.stringContaining("Failed to update:")
     );
     expect(refreshTree).not.toHaveBeenCalled();
+  });
+
+  it("adds time entry for specific date and refreshes tree", async () => {
+    const mockServer = {};
+    const quickLogSpy = vi.spyOn(quickLogTimeModule, "quickLogTime").mockResolvedValue(undefined);
+    const { refreshTree } = registerCommands({
+      getServer: () => mockServer,
+    });
+
+    await handlers.get("redmyne.addTimeEntryForDate")?.({
+      _date: "2026-02-06",
+    });
+
+    expect(quickLogSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ server: mockServer }),
+      expect.anything(),
+      "2026-02-06"
+    );
+    expect(refreshTree).toHaveBeenCalledTimes(1);
+  });
+
+  it("copies single and day entries into clipboard payloads", async () => {
+    const setClipboardSpy = vi.spyOn(clipboard, "setClipboard");
+    registerCommands();
+
+    await handlers.get("redmyne.copyTimeEntry")?.({
+      _entry: {
+        id: 1,
+        issue_id: 42,
+        activity: { id: 3, name: "Dev" },
+        hours: "1.5",
+        comments: "Work",
+        spent_on: "2026-02-04",
+        custom_fields: [{ id: 9, name: "CF", value: "A" }],
+      },
+    });
+    await handlers.get("redmyne.copyDayTimeEntries")?.({
+      _date: "2026-02-04",
+      _cachedEntries: [],
+    });
+
+    expect(setClipboardSpy).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        kind: "entry",
+        entries: [
+          expect.objectContaining({
+            issue_id: 42,
+            activity_id: 3,
+            hours: "1.5",
+          }),
+        ],
+      })
+    );
+    expect(setClipboardSpy).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        kind: "day",
+        entries: [],
+        sourceDate: "2026-02-04",
+      })
+    );
+  });
+
+  it("copies week entries, filtering drafts and grouping by day", async () => {
+    const setClipboardSpy = vi.spyOn(clipboard, "setClipboard");
+    registerCommands();
+
+    await handlers.get("redmyne.copyWeekTimeEntries")?.({
+      _weekStart: "2026-02-02",
+      _cachedEntries: [
+        {
+          id: 10,
+          issue_id: 1,
+          activity_id: 2,
+          hours: "2.0",
+          comments: "ok",
+          spent_on: "2026-02-03",
+        },
+        {
+          id: -1,
+          issue_id: 9,
+          activity_id: 2,
+          hours: "1.0",
+          comments: "draft",
+          spent_on: "2026-02-04",
+        },
+      ],
+    });
+
+    const payload = setClipboardSpy.mock.calls[0][0] as {
+      kind: string;
+      entries: Array<{ issue_id: number }>;
+      weekMap: Map<number, Array<{ issue_id: number }>>;
+    };
+    expect(payload.kind).toBe("week");
+    expect(payload.entries).toHaveLength(1);
+    expect(payload.entries[0].issue_id).toBe(1);
+    expect(payload.weekMap.get(1)).toHaveLength(1);
+  });
+
+  it("shows fetch error when toolbar week copy cannot load entries", async () => {
+    const mockServer = {
+      getTimeEntries: vi.fn().mockRejectedValue(new Error("fetch fail")),
+    };
+    registerCommands({ getServer: () => mockServer });
+
+    await handlers.get("redmyne.copyWeekTimeEntries")?.();
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Failed to fetch time entries");
+  });
+
+  it("stops paste flow for empty clipboard and invalid target dates", async () => {
+    const getClipboardSpy = vi.spyOn(clipboard, "getClipboard");
+    const calculateDatesSpy = vi.spyOn(clipboard, "calculatePasteTargetDates");
+    const mockServer = {
+      addTimeEntry: vi.fn().mockResolvedValue(undefined),
+    };
+    registerCommands({ getServer: () => mockServer });
+
+    getClipboardSpy.mockReturnValueOnce(undefined);
+    await handlers.get("redmyne.pasteTimeEntries")?.();
+    expect(vscode.window.showInformationMessage).toHaveBeenCalledWith("Clipboard is empty");
+
+    getClipboardSpy.mockReturnValueOnce({
+      kind: "week",
+      entries: [{ issue_id: 1, activity_id: 2, hours: "1", comments: "" }],
+      weekMap: new Map(),
+      sourceWeekStart: "2026-02-02",
+    });
+    calculateDatesSpy.mockReturnValueOnce(null);
+    await handlers.get("redmyne.pasteTimeEntries")?.({ _date: "2026-02-03" });
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Cannot paste week to a single day");
+  });
+
+  it("pastes entries, refreshes tree, and refreshes gantt", async () => {
+    const mockServer = {
+      addTimeEntry: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.spyOn(clipboard, "getClipboard").mockReturnValue({
+      kind: "day",
+      entries: [
+        { issue_id: 1, activity_id: 2, hours: "1.5", comments: "a" },
+        { issue_id: 2, activity_id: 2, hours: "0.5", comments: "b" },
+      ],
+      sourceDate: "2026-02-03",
+    });
+    vi.spyOn(clipboard, "calculatePasteTargetDates").mockReturnValue(["2026-02-05"]);
+    vi.spyOn(closedIssueGuard, "confirmLogTimeOnClosedIssues").mockResolvedValue(true);
+    vi.mocked(vscode.window.showInformationMessage).mockResolvedValue("Create" as never);
+
+    const { refreshTree } = registerCommands({ getServer: () => mockServer });
+    await handlers.get("redmyne.pasteTimeEntries")?.({ _date: "2026-02-05" });
+
+    expect(mockServer.addTimeEntry).toHaveBeenCalledTimes(2);
+    expect(refreshTree).toHaveBeenCalledTimes(1);
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.refreshGanttData");
   });
 });

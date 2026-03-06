@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as vscode from "vscode";
-import { contributeToIssue, removeContribution } from "../../../src/commands/adhoc-commands";
+import { contributeToIssue, removeContribution, toggleAdHoc } from "../../../src/commands/adhoc-commands";
 import { TimeEntryNode } from "../../../src/trees/my-time-entries-tree";
 import { adHocTracker } from "../../../src/utilities/adhoc-tracker";
 import * as issuePicker from "../../../src/utilities/issue-picker";
@@ -142,5 +142,169 @@ describe("removeContribution", () => {
       "Could not determine time entry ID"
     );
     expect(mockServer.updateTimeEntry).not.toHaveBeenCalled();
+  });
+});
+
+describe("toggleAdHoc", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("shows error when issue context missing", async () => {
+    await toggleAdHoc(undefined);
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("No issue selected");
+  });
+
+  it("shows add/remove messages based on tracker state", async () => {
+    vi.spyOn(adHocTracker, "toggle")
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(false);
+
+    await toggleAdHoc({ id: 42 });
+    await toggleAdHoc({ id: 42 });
+
+    expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
+      "Issue #42 tagged as ad-hoc budget"
+    );
+    expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
+      "Issue #42 ad-hoc tag removed"
+    );
+  });
+});
+
+describe("contributeToIssue additional branches", () => {
+  function createEntry(overrides: Record<string, unknown> = {}): TimeEntryNode {
+    return {
+      _entry: {
+        id: 1,
+        issue: { id: 100 },
+        issue_id: 100,
+        comments: "",
+        ...overrides,
+      },
+    } as unknown as TimeEntryNode;
+  }
+
+  it("shows error when no entry selected or server missing", async () => {
+    const refresh = vi.fn();
+    const server = { updateTimeEntry: vi.fn(), getIssueById: vi.fn() };
+
+    await contributeToIssue({ _entry: undefined } as unknown as TimeEntryNode, server as any, refresh);
+    await contributeToIssue(createEntry(), undefined, refresh);
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("No time entry selected");
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Not connected to Redmyne");
+  });
+
+  it("stops when source issue is not ad-hoc", async () => {
+    const refresh = vi.fn();
+    const server = { updateTimeEntry: vi.fn(), getIssueById: vi.fn() };
+    vi.spyOn(adHocTracker, "isAdHoc").mockReturnValue(false);
+
+    await contributeToIssue(createEntry(), server as any, refresh);
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Time entry is not on an ad-hoc issue");
+    expect(server.getIssueById).not.toHaveBeenCalled();
+  });
+
+  it("handles source issue fetch failure and missing project", async () => {
+    const refresh = vi.fn();
+    const server = {
+      updateTimeEntry: vi.fn(),
+      getIssueById: vi.fn(),
+    };
+    vi.spyOn(adHocTracker, "isAdHoc").mockReturnValue(true);
+
+    server.getIssueById.mockRejectedValueOnce(new Error("boom"));
+    await contributeToIssue(createEntry(), server as any, refresh);
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Could not fetch issue details");
+
+    server.getIssueById.mockResolvedValueOnce({ issue: { id: 100, project: undefined } });
+    await contributeToIssue(createEntry(), server as any, refresh);
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Could not determine project");
+  });
+
+  it("returns when picker cancelled or cross-project warning rejected", async () => {
+    const refresh = vi.fn();
+    const server = {
+      updateTimeEntry: vi.fn().mockResolvedValue({}),
+      getIssueById: vi.fn().mockResolvedValue({ issue: { id: 100, project: { id: 1 } } }),
+    };
+    vi.spyOn(adHocTracker, "isAdHoc").mockReturnValue(true);
+
+    vi.spyOn(issuePicker, "pickIssue").mockResolvedValueOnce(undefined);
+    await contributeToIssue(createEntry(), server as any, refresh);
+    expect(server.updateTimeEntry).not.toHaveBeenCalled();
+
+    vi.spyOn(issuePicker, "pickIssue").mockResolvedValueOnce({
+      id: 200,
+      subject: "Different",
+      project: { id: 2, name: "Other" },
+    });
+    vi.spyOn(vscode.window, "showWarningMessage").mockResolvedValueOnce("Cancel" as any);
+    await contributeToIssue(createEntry(), server as any, refresh);
+    expect(server.updateTimeEntry).not.toHaveBeenCalled();
+  });
+
+  it("replaces existing target and handles update failures", async () => {
+    const refresh = vi.fn();
+    const server = {
+      updateTimeEntry: vi.fn().mockRejectedValueOnce(new Error("denied")),
+      getIssueById: vi.fn().mockResolvedValue({ issue: { id: 100, project: { id: 1 } } }),
+    };
+    vi.spyOn(adHocTracker, "isAdHoc").mockReturnValue(true);
+    vi.spyOn(issuePicker, "pickIssue").mockResolvedValue({
+      id: 250,
+      subject: "Target",
+      project: { id: 1, name: "Same" },
+    });
+
+    await contributeToIssue(createEntry({ comments: "Work #123 Old Target" }), server as any, refresh);
+
+    expect(server.updateTimeEntry).toHaveBeenCalledWith(1, {
+      comments: "Work #250 Target",
+    });
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      "Failed to update time entry: denied"
+    );
+    expect(refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("removeContribution branches", () => {
+  it("removes target text and refreshes on success", async () => {
+    const refresh = vi.fn();
+    const server = { updateTimeEntry: vi.fn().mockResolvedValue({}) };
+    const entry = {
+      _entry: { id: 10, issue: { id: 1 }, issue_id: 1, comments: "Worked on #222 Feature" },
+    } as unknown as TimeEntryNode;
+
+    await removeContribution(entry, server as any, refresh);
+
+    expect(server.updateTimeEntry).toHaveBeenCalledWith(10, { comments: "Worked on" });
+    expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
+      "Removed contribution to issue #222"
+    );
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows error when target missing and handles update failure", async () => {
+    const refresh = vi.fn();
+    const server = { updateTimeEntry: vi.fn().mockRejectedValue(new Error("save failed")) };
+    const noTarget = {
+      _entry: { id: 11, issue: { id: 1 }, issue_id: 1, comments: "no target here" },
+    } as unknown as TimeEntryNode;
+    const withTarget = {
+      _entry: { id: 12, issue: { id: 1 }, issue_id: 1, comments: "ref #333 Target" },
+    } as unknown as TimeEntryNode;
+
+    await removeContribution(noTarget, server as any, refresh);
+    await removeContribution(withTarget, server as any, refresh);
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Time entry has no contribution target");
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      "Failed to update time entry: save failed"
+    );
+    expect(refresh).not.toHaveBeenCalled();
   });
 });

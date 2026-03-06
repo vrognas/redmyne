@@ -87,4 +87,50 @@ describe("registerNavigationClipboardCommands", () => {
     );
     expect(vscode.env.clipboard.writeText).not.toHaveBeenCalled();
   });
+
+  it("copies issue and project ids to clipboard", async () => {
+    setServerUrl("https://redmine.example.test");
+    registerNavigationClipboardCommands();
+
+    await handlers.get("redmyne.copyIssueId")?.({ id: 88 });
+    await handlers.get("redmyne.copyProjectId")?.({ id: 11 });
+
+    expect(vscode.env.clipboard.writeText).toHaveBeenCalledWith("#88");
+    expect(vscode.env.clipboard.writeText).toHaveBeenCalledWith("#11");
+  });
+
+  it("copies project url when identifier and server are configured", async () => {
+    setServerUrl("https://redmine.example.test");
+    registerNavigationClipboardCommands();
+
+    await handlers.get("redmyne.copyProjectUrl")?.({ id: 1, identifier: "platform" });
+
+    expect(vscode.env.clipboard.writeText).toHaveBeenCalledWith(
+      "https://redmine.example.test/projects/platform"
+    );
+  });
+
+  it("shows project identifier error when copy project url has no identifier", async () => {
+    setServerUrl("https://redmine.example.test");
+    registerNavigationClipboardCommands();
+
+    await handlers.get("redmyne.copyProjectUrl")?.({ id: 1 });
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      "Could not determine project identifier"
+    );
+    expect(vscode.env.clipboard.writeText).not.toHaveBeenCalled();
+  });
+
+  it("shows project id error when copy project id has no context", async () => {
+    setServerUrl("https://redmine.example.test");
+    registerNavigationClipboardCommands();
+
+    await handlers.get("redmyne.copyProjectId")?.(undefined);
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      "Could not determine project ID"
+    );
+    expect(vscode.env.clipboard.writeText).not.toHaveBeenCalled();
+  });
 });

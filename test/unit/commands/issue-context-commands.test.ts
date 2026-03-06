@@ -3,6 +3,10 @@ import * as vscode from "vscode";
 import { GanttPanel } from "../../../src/webviews/gantt-panel";
 import { registerIssueContextCommands } from "../../../src/commands/issue-context-commands";
 import { autoUpdateTracker } from "../../../src/utilities/auto-update-tracker";
+import { adHocTracker } from "../../../src/utilities/adhoc-tracker";
+import * as adhocCommands from "../../../src/commands/adhoc-commands";
+import * as precedenceTracker from "../../../src/utilities/precedence-tracker";
+import * as internalEstimates from "../../../src/utilities/internal-estimates";
 
 type RegisteredHandler = (...args: unknown[]) => unknown;
 
@@ -205,5 +209,240 @@ describe("registerIssueContextCommands", () => {
     expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
       "No Redmine server configured"
     );
+  });
+
+  it("bulk updates done ratio and internal estimates for selected issues", async () => {
+    const mockServer = {
+      updateDoneRatio: vi.fn().mockResolvedValue(undefined),
+    };
+    const disableSpy = vi.spyOn(autoUpdateTracker, "disable");
+    const estimateSpy = vi.spyOn(internalEstimates, "setInternalEstimate").mockResolvedValue(undefined);
+    const updateIssueDoneRatio = vi.fn();
+    (GanttPanel as unknown as { currentPanel: { updateIssueDoneRatio: ReturnType<typeof vi.fn> } }).currentPanel = {
+      updateIssueDoneRatio,
+    };
+    vi.mocked(vscode.window.showQuickPick).mockResolvedValue({
+      label: "80%",
+      value: 80,
+    } as unknown as vscode.QuickPickItem);
+    vi.mocked(vscode.window.showInputBox).mockResolvedValue("2.5");
+
+    registerCommands({ getProjectsServer: () => mockServer });
+    await handlers.get("redmyne.bulkSetDoneRatio")?.([11, 12]);
+
+    expect(mockServer.updateDoneRatio).toHaveBeenNthCalledWith(1, 11, 80);
+    expect(mockServer.updateDoneRatio).toHaveBeenNthCalledWith(2, 12, 80);
+    expect(disableSpy).toHaveBeenCalledWith(11);
+    expect(disableSpy).toHaveBeenCalledWith(12);
+    expect(estimateSpy).toHaveBeenCalledWith(expect.anything(), 11, 2.5);
+    expect(estimateSpy).toHaveBeenCalledWith(expect.anything(), 12, 2.5);
+    expect(updateIssueDoneRatio).toHaveBeenCalledWith(11, 80);
+    expect(updateIssueDoneRatio).toHaveBeenCalledWith(12, 80);
+  });
+
+  it("setIssueStatus uses pattern fallback and handles missing pattern matches", async () => {
+    const mockServer = {
+      getIssueStatuses: vi.fn()
+        .mockResolvedValueOnce({
+          issue_statuses: [
+            { id: 1, name: "New", is_closed: false },
+            { id: 2, name: "Work In Progress", is_closed: false },
+            { id: 3, name: "Closed", is_closed: true },
+          ],
+        })
+        .mockResolvedValueOnce({
+          issue_statuses: [{ id: 1, name: "Open", is_closed: false }],
+        }),
+      setIssueStatus: vi.fn().mockResolvedValue(undefined),
+    };
+
+    registerCommands({ getProjectsServer: () => mockServer });
+    await handlers.get("redmyne.setIssueStatus")?.({ id: 55, statusPattern: "in_progress" });
+    await handlers.get("redmyne.setIssueStatus")?.({ id: 56, statusPattern: "closed" });
+
+    expect(mockServer.setIssueStatus).toHaveBeenCalledWith({ id: 55 }, 2);
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      "No matching status found for pattern: closed"
+    );
+  });
+
+  it("reveals issue and project in tree when nodes exist", async () => {
+    const reveal = vi.fn().mockResolvedValue(undefined);
+    const getProjectsTreeView = () => ({
+      reveal,
+    }) as unknown as vscode.TreeView<unknown>;
+
+    registerCommands({
+      getAssignedIssues: () => [],
+      getDependencyIssues: () => [{ id: 77 } as never],
+      getProjectNodeById: (projectId: number) => (projectId === 99 ? { id: 99 } : undefined),
+      getProjectsTreeView,
+    });
+
+    await handlers.get("redmyne.revealIssueInTree")?.(77);
+    await handlers.get("redmyne.revealProjectInTree")?.(99);
+
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne-explorer-projects.focus");
+    expect(reveal).toHaveBeenCalledTimes(2);
+  });
+
+  it("routes explicit toggles to trackers and precedence helpers", async () => {
+    const enableSpy = vi.spyOn(autoUpdateTracker, "enable");
+    const disableSpy = vi.spyOn(autoUpdateTracker, "disable");
+    const tagSpy = vi.spyOn(adHocTracker, "tag");
+    const untagSpy = vi.spyOn(adHocTracker, "untag");
+    const setPrecedenceSpy = vi.spyOn(precedenceTracker, "setPrecedence").mockResolvedValue(undefined);
+    const clearPrecedenceSpy = vi.spyOn(precedenceTracker, "clearPrecedence").mockResolvedValue(undefined);
+    vi.spyOn(precedenceTracker, "togglePrecedence").mockResolvedValue(true);
+
+    registerCommands();
+
+    await handlers.get("redmyne.setAutoUpdateDoneRatio")?.({ id: 1, value: true });
+    await handlers.get("redmyne.setAutoUpdateDoneRatio")?.({ id: 1, value: false });
+    await handlers.get("redmyne.setAdHoc")?.({ id: 2, value: true });
+    await handlers.get("redmyne.setAdHoc")?.({ id: 2, value: false });
+    await handlers.get("redmyne.setPrecedence")?.({ id: 3, value: true });
+    await handlers.get("redmyne.setPrecedence")?.({ id: 3, value: false });
+    await handlers.get("redmyne.togglePrecedence")?.({ id: 3 });
+
+    expect(enableSpy).toHaveBeenCalledWith(1);
+    expect(disableSpy).toHaveBeenCalledWith(1);
+    expect(tagSpy).toHaveBeenCalledWith(2);
+    expect(untagSpy).toHaveBeenCalledWith(2);
+    expect(setPrecedenceSpy).toHaveBeenCalledWith(expect.anything(), 3);
+    expect(clearPrecedenceSpy).toHaveBeenCalledWith(expect.anything(), 3);
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.refreshGanttData");
+  });
+
+  it("handles no-selection and invalid-selection branches", async () => {
+    const mockServer = {
+      updateDoneRatio: vi.fn().mockResolvedValue(undefined),
+      getIssuePriorities: vi.fn().mockResolvedValue({
+        issue_priorities: [{ id: 1, name: "Normal" }],
+      }),
+      setIssuePriority: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.mocked(vscode.window.showQuickPick).mockResolvedValue(undefined);
+
+    registerCommands({ getProjectsServer: () => mockServer });
+    await handlers.get("redmyne.bulkSetDoneRatio")?.([]);
+    await handlers.get("redmyne.setDoneRatio")?.({ id: 9 });
+    await handlers.get("redmyne.setIssuePriority")?.({ id: 9 });
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("No issues selected");
+    expect(mockServer.updateDoneRatio).not.toHaveBeenCalled();
+    expect(mockServer.setIssuePriority).not.toHaveBeenCalled();
+  });
+
+  it("covers guard and cancel paths across issue-context handlers", async () => {
+    const mockServer = {
+      updateDoneRatio: vi.fn().mockResolvedValue(undefined),
+      getIssueStatusesTyped: vi.fn().mockResolvedValue([{ statusId: 1, name: "Open" }]),
+      setIssueStatus: vi.fn().mockResolvedValue(undefined),
+      getIssueStatuses: vi.fn().mockResolvedValue({
+        issue_statuses: [{ id: 1, name: "Open", is_closed: false }],
+      }),
+      getIssuePriorities: vi.fn().mockResolvedValue({
+        issue_priorities: [{ id: 1, name: "Normal" }],
+      }),
+      setIssuePriority: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.mocked(vscode.window.showQuickPick).mockResolvedValue(undefined);
+    vi.mocked(vscode.window.showInputBox).mockImplementation(async (options) => {
+      if (options?.validateInput) {
+        expect(options.validateInput("")).toBeNull();
+        expect(options.validateInput("bad-value")).toContain("Invalid format");
+      }
+      return "";
+    });
+
+    registerCommands({ getProjectsServer: () => mockServer });
+
+    await handlers.get("redmyne.setDoneRatio")?.(undefined);
+    await handlers.get("redmyne.setDoneRatio")?.({ id: 44 });
+    await handlers.get("redmyne.setStatus")?.({ id: 44 });
+    await handlers.get("redmyne.bulkSetDoneRatio")?.([44, 45]);
+    await handlers.get("redmyne.setIssueStatus")?.({ id: 44 });
+    await handlers.get("redmyne.setIssuePriority")?.({ id: 44 });
+    await handlers.get("redmyne.revealIssueInTree")?.(0);
+    await handlers.get("redmyne.revealProjectInTree")?.(-1);
+    await handlers.get("redmyne.toggleAutoUpdateDoneRatio")?.(undefined);
+    await handlers.get("redmyne.setAutoUpdateDoneRatio")?.(undefined);
+    await handlers.get("redmyne.setAdHoc")?.(undefined);
+    await handlers.get("redmyne.setPrecedence")?.(undefined);
+
+    registerCommands();
+    await handlers.get("redmyne.setDoneRatio")?.({ id: 99, percentage: 40 });
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("No Redmine server configured");
+  });
+
+  it("covers catch branches for done ratio, status, bulk, issue status, and priority", async () => {
+    const mockServer = {
+      updateDoneRatio: vi.fn().mockRejectedValue(new Error("done fail")),
+      getIssueStatusesTyped: vi.fn().mockRejectedValue(new Error("status fail")),
+      setIssueStatus: vi.fn().mockResolvedValue(undefined),
+      getIssueStatuses: vi.fn().mockRejectedValue(new Error("issue status fail")),
+      getIssuePriorities: vi.fn().mockRejectedValue(new Error("priority fail")),
+      setIssuePriority: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.mocked(vscode.window.showQuickPick)
+      .mockResolvedValueOnce({ label: "70%", value: 70 } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "Any", value: 1 } as unknown as vscode.QuickPickItem)
+      .mockResolvedValueOnce({ label: "50%", value: 50 } as unknown as vscode.QuickPickItem);
+    vi.mocked(vscode.window.showInputBox).mockResolvedValue("");
+
+    registerCommands({ getProjectsServer: () => mockServer });
+
+    await handlers.get("redmyne.setDoneRatio")?.({ id: 1 });
+    await handlers.get("redmyne.setStatus")?.({ id: 2 });
+    await handlers.get("redmyne.bulkSetDoneRatio")?.([3]);
+    await handlers.get("redmyne.setIssueStatus")?.({ id: 4 });
+    await handlers.get("redmyne.setIssuePriority")?.({ id: 5, priorityPattern: "high" });
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Failed to update: Error: done fail");
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Failed to update: Error: status fail");
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Failed to update: Error: done fail");
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Failed to update status: Error: issue status fail");
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Failed to update priority: Error: priority fail");
+  });
+
+  it("routes ad-hoc wrapper commands through callbacks and refreshes", async () => {
+    const toggleAdHocSpy = vi.spyOn(adhocCommands, "toggleAdHoc").mockResolvedValue(undefined as never);
+    const contributeSpy = vi.spyOn(adhocCommands, "contributeToIssue").mockImplementation(
+      (_item, _server, onDone) => {
+        onDone();
+      }
+    );
+    const removeSpy = vi.spyOn(adhocCommands, "removeContribution").mockImplementation(
+      (_item, _server, onDone) => {
+        onDone();
+      }
+    );
+    const refreshTimeEntries = vi.fn();
+    const mockTimeServer = { id: "time-server" };
+
+    registerCommands({
+      getTimeEntriesServer: () => mockTimeServer as never,
+      refreshTimeEntries,
+    });
+
+    await handlers.get("redmyne.toggleAdHoc")?.({ id: 10 });
+    await handlers.get("redmyne.contributeToIssue")?.({ entry_id: 100 });
+    await handlers.get("redmyne.removeContribution")?.({ entry_id: 101 });
+
+    expect(toggleAdHocSpy).toHaveBeenCalled();
+    expect(contributeSpy).toHaveBeenCalledWith(
+      { entry_id: 100 },
+      mockTimeServer,
+      expect.any(Function)
+    );
+    expect(removeSpy).toHaveBeenCalledWith(
+      { entry_id: 101 },
+      mockTimeServer,
+      expect.any(Function)
+    );
+    expect(refreshTimeEntries).toHaveBeenCalledTimes(2);
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.refreshGanttData");
   });
 });

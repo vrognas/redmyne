@@ -3,6 +3,8 @@ import * as vscode from "vscode";
 import { quickLogTime } from "../../../src/commands/quick-log-time";
 import { validateTimeInput } from "../../../src/utilities/time-input";
 import * as issuePicker from "../../../src/utilities/issue-picker";
+import * as closedIssueGuard from "../../../src/utilities/closed-issue-guard";
+import * as customFieldPicker from "../../../src/utilities/custom-field-picker";
 
 describe("quickLogTime", () => {
   let mockContext: vscode.ExtensionContext;
@@ -301,6 +303,163 @@ describe("quickLogTime", () => {
       "Custom date work",
       "2025-12-15",
       undefined
+    );
+  });
+
+  it("shows error when preset issue has no project", async () => {
+    mockServer.getIssueById.mockResolvedValueOnce({
+      issue: { id: 123, subject: "No Project", status: { is_closed: false }, project: undefined },
+    });
+
+    await quickLogTime(props, mockContext, undefined, 123);
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Issue has no associated project");
+    expect(mockServer.addTimeEntry).not.toHaveBeenCalled();
+  });
+
+  it("returns when preset issue activity picking is cancelled", async () => {
+    mockServer.getIssueById.mockResolvedValueOnce({
+      issue: {
+        id: 123,
+        subject: "With Project",
+        status: { is_closed: false },
+        project: { id: 1, name: "Test Project" },
+      },
+    });
+    vi.spyOn(issuePicker, "pickActivityForProject").mockResolvedValueOnce(undefined);
+
+    await quickLogTime(props, mockContext, undefined, 123);
+
+    expect(mockServer.addTimeEntry).not.toHaveBeenCalled();
+  });
+
+  it("stops before logging when closed issue is not confirmed", async () => {
+    mockContext.globalState.get = vi.fn().mockReturnValue(undefined);
+    vi.spyOn(issuePicker, "pickIssueWithSearch").mockResolvedValueOnce({
+      issueId: 123,
+      issueSubject: "Closed",
+      activityId: 9,
+      activityName: "Development",
+    });
+    vi.spyOn(closedIssueGuard, "confirmLogTimeOnClosedIssue").mockResolvedValueOnce(false);
+
+    await quickLogTime(props, mockContext);
+
+    expect(closedIssueGuard.confirmLogTimeOnClosedIssue).toHaveBeenCalled();
+    expect(mockServer.addTimeEntry).not.toHaveBeenCalled();
+  });
+
+  it("shows custom-field api guidance on server validation error", async () => {
+    mockContext.globalState.get = vi.fn().mockReturnValue(undefined);
+    vi.spyOn(issuePicker, "pickIssueWithSearch").mockResolvedValueOnce({
+      issueId: 123,
+      issueSubject: "Test Issue",
+      activityId: 9,
+      activityName: "Development",
+    });
+    vi.spyOn(closedIssueGuard, "confirmLogTimeOnClosedIssue").mockResolvedValue(true);
+
+    vi.spyOn(vscode.window, "showQuickPick").mockResolvedValueOnce({
+      label: "$(calendar) Today",
+      value: new Date().toISOString().split("T")[0],
+      action: "preset",
+    } as unknown as vscode.QuickPickItem);
+
+    (vscode.window.showInputBox as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce("1")
+      .mockResolvedValueOnce("note");
+
+    mockServer.getTimeEntryCustomFields = vi.fn().mockRejectedValue(new Error("forbidden"));
+    mockServer.addTimeEntry = vi.fn().mockRejectedValue(new Error("Custom field 'Billing' cannot be blank"));
+    props.config = { serverUrl: "https://redmine.example.test" };
+    vi.spyOn(vscode.window, "showErrorMessage").mockResolvedValue("Open Redmine" as any);
+
+    await quickLogTime(props, mockContext);
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      expect.stringContaining("Custom field 'Billing' cannot be blank"),
+      "Open Redmine"
+    );
+    expect(vscode.env.openExternal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toString: expect.any(Function),
+      })
+    );
+  });
+
+  it("passes required custom field values to addTimeEntry", async () => {
+    mockContext.globalState.get = vi.fn().mockReturnValue(undefined);
+    vi.spyOn(issuePicker, "pickIssueWithSearch").mockResolvedValueOnce({
+      issueId: 123,
+      issueSubject: "Test Issue",
+      activityId: 9,
+      activityName: "Development",
+    });
+    vi.spyOn(closedIssueGuard, "confirmLogTimeOnClosedIssue").mockResolvedValue(true);
+
+    vi.spyOn(vscode.window, "showQuickPick").mockResolvedValueOnce({
+      label: "$(calendar) Today",
+      value: new Date().toISOString().split("T")[0],
+      action: "preset",
+    } as unknown as vscode.QuickPickItem);
+
+    (vscode.window.showInputBox as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce("1.5")
+      .mockResolvedValueOnce("with custom fields");
+
+    mockServer.getTimeEntryCustomFields = vi.fn().mockResolvedValue([
+      {
+        id: 77,
+        name: "Billing",
+        field_format: "string",
+        is_required: true,
+        customized_type: "time_entry",
+      },
+    ]);
+    vi.spyOn(customFieldPicker, "pickRequiredCustomFields").mockResolvedValueOnce({
+      values: [{ id: 77, value: "client" }],
+      cancelled: false,
+    });
+
+    await quickLogTime(props, mockContext);
+
+    expect(mockServer.addTimeEntry).toHaveBeenCalledWith(
+      123,
+      9,
+      "1.5",
+      "with custom fields",
+      expect.any(String),
+      [{ id: 77, value: "client" }]
+    );
+  });
+
+  it("shows generic error for non-custom-field failures", async () => {
+    mockContext.globalState.get = vi.fn().mockReturnValue(undefined);
+    vi.spyOn(issuePicker, "pickIssueWithSearch").mockResolvedValueOnce({
+      issueId: 123,
+      issueSubject: "Test Issue",
+      activityId: 9,
+      activityName: "Development",
+    });
+    vi.spyOn(closedIssueGuard, "confirmLogTimeOnClosedIssue").mockResolvedValue(true);
+
+    vi.spyOn(vscode.window, "showQuickPick").mockResolvedValueOnce({
+      label: "$(calendar) Today",
+      value: new Date().toISOString().split("T")[0],
+      action: "preset",
+    } as unknown as vscode.QuickPickItem);
+
+    (vscode.window.showInputBox as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce("1")
+      .mockResolvedValueOnce("comment");
+
+    mockServer.getTimeEntryCustomFields = vi.fn().mockResolvedValue([]);
+    mockServer.addTimeEntry = vi.fn().mockRejectedValue(new Error("network down"));
+
+    await quickLogTime(props, mockContext);
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      "Failed to log time: network down"
     );
   });
 });
