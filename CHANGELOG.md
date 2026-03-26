@@ -2,6 +2,12 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.17.1]
+
+### Fixed
+
+- **Timesheet: delete/update draft entries in expanded dropdown** - deleting or zeroing a draft entry (not yet saved) in the expanded cell dropdown no longer sends `DELETE /time_entries/null.json` to the server; instead removes the pending CREATE from the draft queue
+
 ## [4.17.0]
 
 ### Added

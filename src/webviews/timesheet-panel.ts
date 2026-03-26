@@ -2166,8 +2166,8 @@ export class TimeSheetPanel {
    */
   private async _updateExpandedEntry(
     rowId: string,
-    entryId: number,
-    _dayIndex: number,
+    entryId: number | null,
+    dayIndex: number,
     newHours: number
   ): Promise<void> {
     if (!this._draftQueue || !this._draftModeManager?.isEnabled) return;
@@ -2175,6 +2175,40 @@ export class TimeSheetPanel {
     // Find the original row
     const row = this._rows.find(r => r.id === rowId);
     if (!row) return;
+
+    if (!entryId) {
+      // Draft entry (not yet saved to server)
+      const date = this._currentWeek.dayDates[dayIndex];
+      const resourceKey = `ts:timeentry:new:${row.issueId}:${row.activityId}:${date}`;
+      if (newHours > 0) {
+        await this._draftQueue.add({
+          id: generateDraftId(),
+          type: "createTimeEntry",
+          timestamp: Date.now(),
+          issueId: row.issueId!,
+          tempId: `${row.id}:${dayIndex}`,
+          description: `Log ${newHours}h to #${row.issueId} on ${date}`,
+          http: {
+            method: "POST",
+            path: "/time_entries.json",
+            data: {
+              time_entry: {
+                issue_id: row.issueId,
+                hours: newHours,
+                activity_id: row.activityId,
+                spent_on: date,
+                comments: row.comments ?? "",
+              },
+            },
+          },
+          resourceKey,
+        }, TIMESHEET_SOURCE);
+      } else {
+        await this._draftQueue.removeByKey(resourceKey, TIMESHEET_SOURCE);
+      }
+      await this._loadWeek(this._currentWeek);
+      return;
+    }
 
     if (newHours > 0) {
       // Update entry
@@ -2215,12 +2249,23 @@ export class TimeSheetPanel {
    * Delete individual entry from expanded cell dropdown
    */
   private async _deleteExpandedEntry(
-    _rowId: string,
-    entryId: number,
+    rowId: string,
+    entryId: number | null,
     _aggRowId: string,
-    _dayIndex: number
+    dayIndex: number
   ): Promise<void> {
     if (!this._draftQueue || !this._draftModeManager?.isEnabled) return;
+
+    if (!entryId) {
+      // Draft entry — remove pending CREATE instead of queueing DELETE
+      const row = this._rows.find(r => r.id === rowId);
+      if (!row) return;
+      const date = this._currentWeek.dayDates[dayIndex];
+      const resourceKey = `ts:timeentry:new:${row.issueId}:${row.activityId}:${date}`;
+      await this._draftQueue.removeByKey(resourceKey, TIMESHEET_SOURCE);
+      await this._loadWeek(this._currentWeek);
+      return;
+    }
 
     // Queue delete operation
     await this._draftQueue.add({

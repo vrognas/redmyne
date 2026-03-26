@@ -485,6 +485,41 @@ describe("timesheet panel private coverage", () => {
     await panel._deleteExpandedEntry("r1", 202, aggRowId, 0);
     expect(queue.add).toHaveBeenCalled();
 
+    // _deleteExpandedEntry with null entryId should remove pending CREATE, not queue DELETE
+    const draftRow = panel._createEmptyRow();
+    draftRow.id = "draft-r1";
+    draftRow.issueId = 5;
+    draftRow.activityId = 9;
+    panel._rows = [draftRow];
+    queue.add.mockClear();
+    queue.removeByKey.mockClear();
+    await panel._deleteExpandedEntry("draft-r1", null as unknown as number, aggRowId, 0);
+    expect(queue.removeByKey).toHaveBeenCalledWith(
+      expect.stringContaining("ts:timeentry:new:5:9:"),
+      "timesheet-panel"
+    );
+    // Must NOT queue a DELETE with null resourceId
+    expect(queue.add).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "deleteTimeEntry", resourceId: null }),
+      expect.anything()
+    );
+
+    // _updateExpandedEntry with null entryId + hours > 0 should queue CREATE
+    queue.add.mockClear();
+    await panel._updateExpandedEntry("draft-r1", null as unknown as number, 0, 3);
+    expect(queue.add).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "createTimeEntry", issueId: 5 }),
+      "timesheet-panel"
+    );
+
+    // _updateExpandedEntry with null entryId + hours = 0 should remove pending CREATE
+    queue.removeByKey.mockClear();
+    await panel._updateExpandedEntry("draft-r1", null as unknown as number, 0, 0);
+    expect(queue.removeByKey).toHaveBeenCalledWith(
+      expect.stringContaining("ts:timeentry:new:5:9:"),
+      "timesheet-panel"
+    );
+
     panel._getDraftModeManagerFn = () => ({ isEnabled: false, queue } as unknown as import("../../../src/draft-mode/draft-mode-manager").DraftModeManager);
     await panel._mergeEntries(aggRowId, 0, [
       { entryId: 1, hours: 1, rowId: "r1", issueId: 5, activityId: 9, comments: "", spentOn: "2026-02-02" },
