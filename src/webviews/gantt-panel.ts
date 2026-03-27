@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import * as crypto from "crypto";
 import { Issue, IssueRelation } from "../redmine/models/issue";
 import { Version } from "../redmine/models/version";
-import { RedmineServer } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { RedmineProject } from "../redmine/redmine-project";
 import { FlexibilityScore, WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE, calculateFlexibility, scaleScheduleByFte, ContributionData } from "../utilities/flexibility-calculator";
 import { calculateContributions, parseTargetIssueId } from "../utilities/contribution-calculator";
@@ -180,11 +180,11 @@ export class GanttPanel {
   private _versions: Version[] = []; // Milestones across all projects
   private _flexibilityCache: Map<number, FlexibilityScore | null> = new Map();
   private _userFteCache: Map<number, number> = new Map(); // FTE percentages per user
-  private _getServerFn: (() => RedmineServer | undefined) | undefined;
+  private _getServerFn: (() => IRedmineServer | undefined) | undefined;
   private _getDraftModeManagerFn: (() => DraftModeManager | undefined) | undefined;
 
   /** Get current server (called fresh each time to handle late connection) */
-  private get _server(): RedmineServer | undefined {
+  private get _server(): IRedmineServer | undefined {
     return this._getServerFn?.();
   }
   /** Get current draft mode manager */
@@ -246,7 +246,7 @@ export class GanttPanel {
   private constructor(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
-    getServer?: () => RedmineServer | undefined,
+    getServer?: () => IRedmineServer | undefined,
     getDraftModeManager?: () => DraftModeManager | undefined
   ) {
     this._panel = panel;
@@ -313,7 +313,7 @@ export class GanttPanel {
 
   public static createOrShow(
     extensionUri: vscode.Uri,
-    getServer?: () => RedmineServer | undefined,
+    getServer?: () => IRedmineServer | undefined,
     getDraftModeManager?: () => DraftModeManager | undefined
   ): GanttPanel {
     const column = vscode.ViewColumn.One;
@@ -364,7 +364,7 @@ export class GanttPanel {
   public static restore(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
-    getServer?: () => RedmineServer | undefined,
+    getServer?: () => IRedmineServer | undefined,
     getDraftModeManager?: () => DraftModeManager | undefined
   ): GanttPanel {
     GanttPanel.currentPanel = new GanttPanel(panel, extensionUri, getServer, getDraftModeManager);
@@ -679,7 +679,7 @@ export class GanttPanel {
     schedule?: WeeklySchedule,
     filter?: IssueFilter,
     dependencyIssues?: Issue[],
-    getServer?: () => RedmineServer | undefined
+    getServer?: () => IRedmineServer | undefined
   ): Promise<void> {
     // Update server getter if provided (for restored panels)
     if (getServer) {

@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { RedmineServer } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { KanbanTask, TaskPriority } from "./kanban-state";
 import { Issue } from "../redmine/models/issue";
 import { debounce } from "../utilities/debounce";
@@ -29,7 +29,7 @@ export interface CreateTaskResult {
  * Show dialog to create a new kanban task
  */
 export async function showCreateTaskDialog(
-  server: RedmineServer
+  server: IRedmineServer
 ): Promise<CreateTaskResult | undefined> {
   // 1. Pick linked issue (required)
   const selectedIssue = await pickIssueForTask(server);
@@ -167,7 +167,7 @@ export async function showEditTaskDialog(
 /**
  * Pick an issue for linking to a task (without activity selection)
  */
-async function pickIssueForTask(server: RedmineServer): Promise<Issue | undefined> {
+async function pickIssueForTask(server: IRedmineServer): Promise<Issue | undefined> {
   // Fetch my issues + project map in parallel (uses cached project map)
   let myOpenIssues: Issue[];
   let myClosedIssues: Issue[];

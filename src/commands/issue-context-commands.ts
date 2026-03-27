@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { Issue } from "../redmine/models/issue";
-import { RedmineServer } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { autoUpdateTracker } from "../utilities/auto-update-tracker";
 import { adHocTracker } from "../utilities/adhoc-tracker";
 import { toggleAdHoc, contributeToIssue, removeContribution } from "./adhoc-commands";
@@ -22,13 +22,13 @@ const DONE_RATIO_OPTIONS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
 export interface IssueContextCommandsDeps {
   globalState: vscode.Memento;
-  getProjectsServer: () => RedmineServer | undefined;
+  getProjectsServer: () => IRedmineServer | undefined;
   refreshProjectsTree: () => void;
   getAssignedIssues: () => Issue[];
   getDependencyIssues: () => Issue[];
   getProjectNodeById: (projectId: number) => unknown;
   getProjectsTreeView: () => vscode.TreeView<unknown> | undefined;
-  getTimeEntriesServer: () => RedmineServer | undefined;
+  getTimeEntriesServer: () => IRedmineServer | undefined;
   refreshTimeEntries: () => void;
 }
 

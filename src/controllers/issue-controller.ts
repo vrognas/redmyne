@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { QuickUpdate, Membership, IssueStatus } from "./domain";
-import { RedmineServer } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { Issue } from "../redmine/models/issue";
 import { IssueStatus as RedmineIssueStatus, IssuePriority, TimeEntryActivity } from "../redmine/models/common";
 import { errorToString } from "../utilities/error-feedback";
@@ -17,7 +17,7 @@ interface TimeEntryActivityItem extends vscode.QuickPickItem {
 export class IssueController {
   constructor(
     private issue: Issue,
-    private redmine: RedmineServer,
+    private redmine: IRedmineServer,
     private onIssueUpdated?: () => void
   ) {}
 

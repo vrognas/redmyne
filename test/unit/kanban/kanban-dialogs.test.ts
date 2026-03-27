@@ -6,7 +6,7 @@ import {
 } from "../../../src/kanban/kanban-dialogs";
 import type { KanbanTask } from "../../../src/kanban/kanban-state";
 import type { Issue } from "../../../src/redmine/models/issue";
-import type { RedmineServer } from "../../../src/redmine/redmine-server";
+import type { IRedmineServer } from "../../../src/redmine/redmine-server-interface";
 import * as issuePicker from "../../../src/utilities/issue-picker";
 
 type MockServer = {
@@ -196,7 +196,7 @@ describe("kanban-dialogs", () => {
       getFilteredIssues: vi.fn().mockRejectedValue(new Error("boom")),
     });
 
-    const result = await showCreateTaskDialog(server as unknown as RedmineServer);
+    const result = await showCreateTaskDialog(server as unknown as IRedmineServer);
 
     expect(result).toBeUndefined();
     expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
@@ -232,7 +232,7 @@ describe("kanban-dialogs", () => {
       priority: "high",
     } as never);
 
-    const result = await showCreateTaskDialog(server as unknown as RedmineServer);
+    const result = await showCreateTaskDialog(server as unknown as IRedmineServer);
 
     expect(result).toEqual({
       title: "Build tests",
@@ -270,7 +270,7 @@ describe("kanban-dialogs", () => {
       .mockResolvedValueOnce("");
     vi.mocked(vscode.window.showQuickPick).mockResolvedValue(undefined);
 
-    const result = await showCreateTaskDialog(server as unknown as RedmineServer);
+    const result = await showCreateTaskDialog(server as unknown as IRedmineServer);
 
     expect(result).toEqual({
       title: "Task title",
@@ -307,7 +307,7 @@ describe("kanban-dialogs", () => {
       .mockResolvedValueOnce("");
     vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce(undefined);
 
-    const result = await showCreateTaskDialog(server as unknown as RedmineServer);
+    const result = await showCreateTaskDialog(server as unknown as IRedmineServer);
     expect(result).toMatchObject({
       linkedProjectId: 0,
       linkedProjectName: "Unknown",
@@ -366,7 +366,7 @@ describe("kanban-dialogs", () => {
       .mockResolvedValueOnce("Valid title")
       .mockResolvedValueOnce("2");
     vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce(undefined);
-    await showCreateTaskDialog(server as unknown as RedmineServer);
+    await showCreateTaskDialog(server as unknown as IRedmineServer);
 
     const createTitleOptions = vi.mocked(vscode.window.showInputBox).mock.calls[0][0] as {
       validateInput?: (value: string) => string | undefined;
@@ -430,7 +430,7 @@ describe("kanban-dialogs", () => {
     );
     vi.mocked(vscode.window.showInputBox).mockResolvedValueOnce(undefined);
 
-    const result = await showCreateTaskDialog(server as unknown as RedmineServer);
+    const result = await showCreateTaskDialog(server as unknown as IRedmineServer);
 
     expect(result).toBeUndefined();
     expect(server.getIssueById).toHaveBeenCalledWith(321);
@@ -469,7 +469,7 @@ describe("kanban-dialogs", () => {
       }) as unknown as vscode.QuickPick<vscode.QuickPickItem>
     );
 
-    const result = await showCreateTaskDialog(server as unknown as RedmineServer);
+    const result = await showCreateTaskDialog(server as unknown as IRedmineServer);
 
     expect(result).toBeUndefined();
     expect(server.getIssueById).toHaveBeenCalledWith(999);
@@ -501,7 +501,7 @@ describe("kanban-dialogs", () => {
       }) as unknown as vscode.QuickPick<vscode.QuickPickItem>
     );
 
-    const result = await showCreateTaskDialog(server as unknown as RedmineServer);
+    const result = await showCreateTaskDialog(server as unknown as IRedmineServer);
     expect(result).toBeUndefined();
     expect(warningNotFoundSeen).toBe(true);
   });
@@ -526,7 +526,7 @@ describe("kanban-dialogs", () => {
       }) as unknown as vscode.QuickPick<vscode.QuickPickItem>
     );
 
-    const result = await showCreateTaskDialog(server as unknown as RedmineServer);
+    const result = await showCreateTaskDialog(server as unknown as IRedmineServer);
     expect(result).toBeUndefined();
   });
 
@@ -558,7 +558,7 @@ describe("kanban-dialogs", () => {
       }) as unknown as vscode.QuickPick<vscode.QuickPickItem>
     );
 
-    const result = await showCreateTaskDialog(server as unknown as RedmineServer);
+    const result = await showCreateTaskDialog(server as unknown as IRedmineServer);
     expect(result).toBeUndefined();
     expect(vscode.window.showInputBox).not.toHaveBeenCalled();
   });
@@ -608,7 +608,7 @@ describe("kanban-dialogs", () => {
     );
     vi.mocked(vscode.window.showInputBox).mockResolvedValueOnce(undefined);
 
-    await showCreateTaskDialog(server as unknown as RedmineServer);
+    await showCreateTaskDialog(server as unknown as IRedmineServer);
 
     expect(server.searchIssues).toHaveBeenCalledTimes(2);
     expect(server.searchIssues).toHaveBeenCalledWith("client", 15);
@@ -657,7 +657,7 @@ describe("kanban-dialogs", () => {
     );
     vi.mocked(vscode.window.showInputBox).mockResolvedValueOnce(undefined);
 
-    await showCreateTaskDialog(server as unknown as RedmineServer);
+    await showCreateTaskDialog(server as unknown as IRedmineServer);
     expect(resultItemsCount).toBe(50);
   });
 
@@ -700,7 +700,7 @@ describe("kanban-dialogs", () => {
     );
     vi.mocked(vscode.window.showInputBox).mockResolvedValueOnce(undefined);
 
-    await showCreateTaskDialog(server as unknown as RedmineServer);
+    await showCreateTaskDialog(server as unknown as IRedmineServer);
     expect(server.searchIssues).toHaveBeenCalledWith("alpha", 25);
     expect(server.searchIssues).toHaveBeenCalledWith("beta", 25);
   });
@@ -738,7 +738,7 @@ describe("kanban-dialogs", () => {
     );
     vi.mocked(vscode.window.showInputBox).mockResolvedValueOnce(undefined);
 
-    const result = await showCreateTaskDialog(server as unknown as RedmineServer);
+    const result = await showCreateTaskDialog(server as unknown as IRedmineServer);
     expect(result).toBeUndefined();
   });
 
@@ -773,7 +773,7 @@ describe("kanban-dialogs", () => {
     );
     vi.mocked(vscode.window.showInputBox).mockResolvedValueOnce(undefined);
 
-    await showCreateTaskDialog(server as unknown as RedmineServer);
+    await showCreateTaskDialog(server as unknown as IRedmineServer);
 
     expect(searchedCount).toBeGreaterThan(initialCount);
     expect(resetCount).toBe(initialCount);

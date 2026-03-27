@@ -4,7 +4,7 @@
  */
 
 import * as vscode from "vscode";
-import { RedmineServer } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { TimeEntry } from "../redmine/models/time-entry";
 import { Issue } from "../redmine/models/issue";
 import { DraftQueue } from "../draft-mode/draft-queue";
@@ -67,13 +67,13 @@ export class TimeSheetPanel {
   private readonly _panel: vscode.WebviewPanel;
   private readonly _extensionUri: vscode.Uri;
   private readonly _context: vscode.ExtensionContext;
-  private _getServerFn: (() => RedmineServer | undefined) | undefined;
+  private _getServerFn: (() => IRedmineServer | undefined) | undefined;
   private _getDraftQueueFn: (() => DraftQueue | undefined) | undefined;
   private _getDraftModeManagerFn: (() => DraftModeManager | undefined) | undefined;
   private _getCachedIssues: (() => Issue[]) | undefined;
 
   /** Get current server (called fresh each time to handle late connection) */
-  private get _server(): RedmineServer | undefined {
+  private get _server(): IRedmineServer | undefined {
     return this._getServerFn?.();
   }
 
@@ -106,7 +106,7 @@ export class TimeSheetPanel {
   public static createOrShow(
     extensionUri: vscode.Uri,
     context: vscode.ExtensionContext,
-    getServer: () => RedmineServer | undefined,
+    getServer: () => IRedmineServer | undefined,
     getDraftQueue: () => DraftQueue | undefined,
     getDraftModeManager: () => DraftModeManager | undefined,
     getCachedIssues?: () => Issue[]
@@ -164,7 +164,7 @@ export class TimeSheetPanel {
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
     context: vscode.ExtensionContext,
-    getServer: () => RedmineServer | undefined,
+    getServer: () => IRedmineServer | undefined,
     getDraftQueue: () => DraftQueue | undefined,
     getDraftModeManager: () => DraftModeManager | undefined,
     getCachedIssues?: () => Issue[]
@@ -185,7 +185,7 @@ export class TimeSheetPanel {
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
     context: vscode.ExtensionContext,
-    getServer: () => RedmineServer | undefined,
+    getServer: () => IRedmineServer | undefined,
     getDraftQueue: () => DraftQueue | undefined,
     getDraftModeManager: () => DraftModeManager | undefined,
     getCachedIssues?: () => Issue[]

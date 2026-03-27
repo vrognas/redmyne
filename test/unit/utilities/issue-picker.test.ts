@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as vscode from "vscode";
 import type { Issue } from "../../../src/redmine/models/issue";
 import type { TimeEntryActivity } from "../../../src/redmine/models/common";
-import type { RedmineServer } from "../../../src/redmine/redmine-server";
+import type { IRedmineServer } from "../../../src/redmine/redmine-server-interface";
 import { RedmineProject } from "../../../src/redmine/redmine-project";
 
 type MockServer = {
@@ -272,11 +272,11 @@ describe("issue-picker", () => {
       getProjects: vi.fn().mockResolvedValue(projects),
     });
 
-    const first = await getProjectPathMap(server as unknown as RedmineServer);
+    const first = await getProjectPathMap(server as unknown as IRedmineServer);
 
     nowSpy.mockReturnValue(1_300_001);
     server.getProjects.mockRejectedValueOnce(new Error("network fail"));
-    const second = await getProjectPathMap(server as unknown as RedmineServer);
+    const second = await getProjectPathMap(server as unknown as IRedmineServer);
 
     expect(server.getProjects).toHaveBeenCalledTimes(2);
     expect(second).toBe(first);
@@ -288,7 +288,7 @@ describe("issue-picker", () => {
     const seededServer = createMockServer({
       getProjects: vi.fn().mockResolvedValue([createProject(99, "Seed")]),
     });
-    const seeded = await moduleA.getProjectPathMap(seededServer as unknown as RedmineServer);
+    const seeded = await moduleA.getProjectPathMap(seededServer as unknown as IRedmineServer);
     expect(seeded.get(99)).toBe("Seed");
 
     vi.resetModules();
@@ -297,7 +297,7 @@ describe("issue-picker", () => {
       getProjects: vi.fn().mockRejectedValue(new Error("boom")),
     });
 
-    const fresh = await moduleB.getProjectPathMap(failingServer as unknown as RedmineServer);
+    const fresh = await moduleB.getProjectPathMap(failingServer as unknown as IRedmineServer);
     expect(fresh.size).toBe(0);
   });
 
@@ -325,7 +325,7 @@ describe("issue-picker", () => {
       createAutoSelectQuickPick(pickFirstEnabledIssue) as unknown as vscode.QuickPick<vscode.QuickPickItem>
     );
 
-    const result = await pickIssue(server as unknown as RedmineServer, "Pick issue");
+    const result = await pickIssue(server as unknown as IRedmineServer, "Pick issue");
 
     expect(result?.id).toBe(321);
     expect(server.isTimeTrackingEnabled).toHaveBeenCalledWith(55);
@@ -364,7 +364,7 @@ describe("issue-picker", () => {
       activity: selectedActivity,
     } as unknown as vscode.QuickPickItem);
 
-    const result = await pickIssueWithSearch(server as unknown as RedmineServer, "Pick issue/activity");
+    const result = await pickIssueWithSearch(server as unknown as IRedmineServer, "Pick issue/activity");
 
     expect(result).toEqual({
       issueId: 777,
@@ -424,7 +424,7 @@ describe("issue-picker", () => {
       isTimeTrackingEnabled: vi.fn(async (projectId: number) => projectId === 201),
     });
 
-    const pending = pickIssueWithSearch(server as unknown as RedmineServer, "Pick issue/activity");
+    const pending = pickIssueWithSearch(server as unknown as IRedmineServer, "Pick issue/activity");
     await flushMicrotasks();
 
     const labels = quickPick.items.map((i) => i.label);
@@ -444,7 +444,7 @@ describe("issue-picker", () => {
       getFilteredIssues: vi.fn().mockRejectedValue(new Error("issues down")),
     });
 
-    const result = await pickIssueWithSearch(server as unknown as RedmineServer, "Pick issue/activity");
+    const result = await pickIssueWithSearch(server as unknown as IRedmineServer, "Pick issue/activity");
 
     expect(result).toBeUndefined();
     expect(vscodeApi.window.showErrorMessage).toHaveBeenCalledWith(
@@ -467,7 +467,7 @@ describe("issue-picker", () => {
     } as unknown as vscode.QuickPickItem);
 
     const result = await pickActivityForProject(
-      server as unknown as RedmineServer,
+      server as unknown as IRedmineServer,
       123,
       "Pick activity",
       "#777"
@@ -498,7 +498,7 @@ describe("issue-picker", () => {
     );
 
     const result = await pickIssueWithSearch(
-      server as unknown as RedmineServer,
+      server as unknown as IRedmineServer,
       "Pick issue/activity",
       { allowSkip: true }
     );
@@ -530,7 +530,7 @@ describe("issue-picker", () => {
       createAutoSelectQuickPick(pickFirstEnabledIssue) as unknown as vscode.QuickPick<vscode.QuickPickItem>
     );
 
-    const result = await pickIssue(server as unknown as RedmineServer, "Pick issue", {
+    const result = await pickIssue(server as unknown as IRedmineServer, "Pick issue", {
       skipTimeTrackingCheck: true,
     });
 
@@ -545,7 +545,7 @@ describe("issue-picker", () => {
       getIssuesAssignedToMe: vi.fn().mockRejectedValue(new Error("assigned down")),
     });
 
-    const result = await pickIssue(server as unknown as RedmineServer, "Pick issue");
+    const result = await pickIssue(server as unknown as IRedmineServer, "Pick issue");
 
     expect(result).toBeUndefined();
     expect(vscodeApi.window.showErrorMessage).toHaveBeenCalledWith(
@@ -588,7 +588,7 @@ describe("issue-picker", () => {
       searchIssues: vi.fn().mockResolvedValue([]),
     });
 
-    const pending = pickIssue(server as unknown as RedmineServer, "Pick issue");
+    const pending = pickIssue(server as unknown as IRedmineServer, "Pick issue");
     await flushMicrotasks();
 
     const labels = quickPick.items.map((i) => i.label);
@@ -631,7 +631,7 @@ describe("issue-picker", () => {
       searchIssues: vi.fn().mockResolvedValue([nonTrackableIssue]),
     });
 
-    const pending = pickIssue(server as unknown as RedmineServer, "Pick issue");
+    const pending = pickIssue(server as unknown as IRedmineServer, "Pick issue");
     await flushMicrotasks();
 
     quickPick.triggerSelection((items) => items.find((item) => item.kind === vscodeApi.QuickPickItemKind.Separator));
@@ -672,7 +672,7 @@ describe("issue-picker", () => {
       searchIssues: vi.fn().mockResolvedValue([]),
     });
 
-    const pending = pickIssueWithSearch(server as unknown as RedmineServer, "Pick issue/activity");
+    const pending = pickIssueWithSearch(server as unknown as IRedmineServer, "Pick issue/activity");
     await flushMicrotasks();
     expect(quickPick.onDidChangeValue).toHaveBeenCalled();
 
@@ -713,7 +713,7 @@ describe("issue-picker", () => {
       searchIssues: vi.fn().mockResolvedValue([]),
     });
 
-    const pending = pickIssueWithSearch(server as unknown as RedmineServer, "Pick issue/activity");
+    const pending = pickIssueWithSearch(server as unknown as IRedmineServer, "Pick issue/activity");
     await flushMicrotasks();
     expect(quickPick.onDidChangeValue).toHaveBeenCalled();
 
@@ -784,7 +784,7 @@ describe("issue-picker", () => {
       })),
     });
 
-    const pending = pickIssueWithSearch(server as unknown as RedmineServer, "Pick issue/activity");
+    const pending = pickIssueWithSearch(server as unknown as IRedmineServer, "Pick issue/activity");
     await flushMicrotasks();
     expect(quickPick.onDidChangeValue).toHaveBeenCalled();
 
@@ -833,7 +833,7 @@ describe("issue-picker", () => {
       searchIssues: vi.fn().mockRejectedValue(new Error("search down")),
     });
 
-    const pending = pickIssue(server as unknown as RedmineServer, "Pick issue");
+    const pending = pickIssue(server as unknown as IRedmineServer, "Pick issue");
     await flushMicrotasks();
     expect(quickPick.onDidChangeValue).toHaveBeenCalled();
 
@@ -896,7 +896,7 @@ describe("issue-picker", () => {
       searchIssues: vi.fn().mockResolvedValue([nonTrackableIssue, noProjectIssue]),
     });
 
-    const pending = pickIssue(server as unknown as RedmineServer, "Pick issue");
+    const pending = pickIssue(server as unknown as IRedmineServer, "Pick issue");
     await flushMicrotasks();
 
     quickPick.triggerValue("auth");
@@ -948,7 +948,7 @@ describe("issue-picker", () => {
       isTimeTrackingEnabled: vi.fn(),
     });
 
-    const pending = pickIssue(server as unknown as RedmineServer, "Pick issue", {
+    const pending = pickIssue(server as unknown as IRedmineServer, "Pick issue", {
       skipTimeTrackingCheck: true,
     });
     await flushMicrotasks();
@@ -991,7 +991,7 @@ describe("issue-picker", () => {
       searchIssues: vi.fn().mockResolvedValue([]),
     });
 
-    const pending = pickIssue(server as unknown as RedmineServer, "Pick issue");
+    const pending = pickIssue(server as unknown as IRedmineServer, "Pick issue");
     await flushMicrotasks();
 
     quickPick.triggerValue("zz");
@@ -1039,7 +1039,7 @@ describe("issue-picker", () => {
       createAutoSelectQuickPick(pickFirstEnabledIssue) as unknown as vscode.QuickPick<vscode.QuickPickItem>
     );
 
-    const result = await pickIssueWithSearch(server as unknown as RedmineServer, "Pick issue/activity");
+    const result = await pickIssueWithSearch(server as unknown as IRedmineServer, "Pick issue/activity");
 
     expect(result).toBeUndefined();
     expect(vscodeApi.window.showErrorMessage).toHaveBeenCalledWith(
@@ -1076,7 +1076,7 @@ describe("issue-picker", () => {
       createAutoSelectQuickPick(pickFirstEnabledIssue) as unknown as vscode.QuickPick<vscode.QuickPickItem>
     );
 
-    const result = await pickIssueWithSearch(server as unknown as RedmineServer, "Pick issue/activity");
+    const result = await pickIssueWithSearch(server as unknown as IRedmineServer, "Pick issue/activity");
 
     expect(result).toBeUndefined();
     expect(vscodeApi.window.showErrorMessage).toHaveBeenCalledWith(
@@ -1111,7 +1111,7 @@ describe("issue-picker", () => {
       createAutoSelectQuickPick(pickFirstEnabledIssue) as unknown as vscode.QuickPick<vscode.QuickPickItem>
     );
 
-    const result = await pickIssueWithSearch(server as unknown as RedmineServer, "Pick issue/activity");
+    const result = await pickIssueWithSearch(server as unknown as IRedmineServer, "Pick issue/activity");
 
     expect(result).toBeUndefined();
     expect(vscodeApi.window.showErrorMessage).toHaveBeenCalledWith(
@@ -1151,7 +1151,7 @@ describe("issue-picker", () => {
       activity: selectedActivity,
     } as unknown as vscode.QuickPickItem);
 
-    const result = await pickIssueWithSearch(server as unknown as RedmineServer, "Pick issue/activity");
+    const result = await pickIssueWithSearch(server as unknown as IRedmineServer, "Pick issue/activity");
 
     expect(server.getIssueById).toHaveBeenCalledWith(814);
     expect(result).toEqual({
@@ -1188,7 +1188,7 @@ describe("issue-picker", () => {
       createAutoSelectQuickPick(pickFirstEnabledIssue) as unknown as vscode.QuickPick<vscode.QuickPickItem>
     );
 
-    const result = await pickIssueWithSearch(server as unknown as RedmineServer, "Pick issue/activity");
+    const result = await pickIssueWithSearch(server as unknown as IRedmineServer, "Pick issue/activity");
 
     expect(result).toBeUndefined();
     expect(vscodeApi.window.showErrorMessage).toHaveBeenCalledWith(
@@ -1221,7 +1221,7 @@ describe("issue-picker", () => {
       isTimeTrackingEnabled: vi.fn().mockResolvedValue(false),
     });
 
-    const pending = pickIssueWithSearch(server as unknown as RedmineServer, "Pick issue/activity");
+    const pending = pickIssueWithSearch(server as unknown as IRedmineServer, "Pick issue/activity");
     await flushMicrotasks();
     expect(
       quickPick.items.some((item) => {
@@ -1255,7 +1255,7 @@ describe("issue-picker", () => {
     });
 
     const result = await pickActivityForProject(
-      server as unknown as RedmineServer,
+      server as unknown as IRedmineServer,
       55,
       "Pick activity"
     );
@@ -1275,7 +1275,7 @@ describe("issue-picker", () => {
     });
 
     const result = await pickActivityForProject(
-      server as unknown as RedmineServer,
+      server as unknown as IRedmineServer,
       42,
       "Pick activity"
     );
@@ -1295,7 +1295,7 @@ describe("issue-picker", () => {
     });
 
     const result = await pickActivityForProject(
-      server as unknown as RedmineServer,
+      server as unknown as IRedmineServer,
       42,
       "Pick activity"
     );
@@ -1390,7 +1390,7 @@ describe("issue-picker", () => {
         return [];
       }),
       getOpenIssuesForProject: vi.fn().mockResolvedValue({ issues: [projectIssue] }),
-    } as unknown as RedmineServer;
+    } as unknown as IRedmineServer;
 
     const noAccess = await __testIssuePicker.searchIssuesWithFuzzy(
       server,
@@ -1437,7 +1437,7 @@ describe("issue-picker", () => {
         .mockRejectedValueOnce("string failure"),
       searchIssues: vi.fn().mockResolvedValue([]),
       getOpenIssuesForProject: vi.fn().mockResolvedValue({ issues: [] }),
-    } as unknown as RedmineServer;
+    } as unknown as IRedmineServer;
 
     const exact = await __testIssuePicker.searchIssuesWithFuzzy(
       server,

@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import Fuse, { IFuseOptions } from "fuse.js";
-import { RedmineServer } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { Issue } from "../redmine/models/issue";
 import { TimeEntryActivity } from "../redmine/models/common";
 import { RedmineProject } from "../redmine/redmine-project";
@@ -35,7 +35,7 @@ let projectPathCache: ProjectPathCache | null = null;
 /**
  * Get or build project path map with caching
  */
-export async function getProjectPathMap(server: RedmineServer): Promise<Map<number, string>> {
+export async function getProjectPathMap(server: IRedmineServer): Promise<Map<number, string>> {
   const now = Date.now();
   const serverAddress = server.options.address;
 
@@ -76,7 +76,7 @@ interface IssueSearchResult {
  * - Applies fuzzy matching to rank all candidates
  */
 async function searchIssuesWithFuzzy(
-  server: RedmineServer,
+  server: IRedmineServer,
   query: string,
   localIssues: Issue[],
   projectPathMap: Map<number, string>,
@@ -450,7 +450,7 @@ export interface PickedIssueAndActivity {
  * Shared between timer dialogs and quick-log-time
  */
 export async function pickIssueWithSearch(
-  server: RedmineServer,
+  server: IRedmineServer,
   title: string,
   options?: {
     allowSkip?: boolean; // Show "Skip" option (default: false)
@@ -841,7 +841,7 @@ export interface PickIssueOptions {
 }
 
 export async function pickIssue(
-  server: RedmineServer,
+  server: IRedmineServer,
   title: string,
   options: PickIssueOptions = {}
 ): Promise<Issue | undefined> {
@@ -1129,7 +1129,7 @@ export async function pickIssue(
  * Used when issue is already known (e.g., personal tasks)
  */
 export async function pickActivityForProject(
-  server: RedmineServer,
+  server: IRedmineServer,
   projectId: number,
   title: string,
   issueHint?: string

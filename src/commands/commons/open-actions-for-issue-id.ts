@@ -1,11 +1,11 @@
-import { RedmineServer } from "../../redmine/redmine-server";
+import type { IRedmineServer } from "../../redmine/redmine-server-interface";
 import * as vscode from "vscode";
 import { IssueController } from "../../controllers/issue-controller";
 import { errorToString } from "../../utilities/error-feedback";
 import { parseIssueId } from "../../utilities/validation";
 
 export default async (
-  server: RedmineServer,
+  server: IRedmineServer,
   issueId: string | null | undefined
 ) => {
   const parsedId = parseIssueId(issueId);

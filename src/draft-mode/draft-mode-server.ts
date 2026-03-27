@@ -4,6 +4,7 @@
  */
 
 import type { RedmineServer } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import type { Issue } from "../redmine/models/issue";
 import type { TimeEntry } from "../redmine/models/time-entry";
 import type { Version } from "../redmine/models/version";
@@ -19,7 +20,7 @@ export interface DraftBypassOptions {
 }
 
 
-export class DraftModeServer {
+export class DraftModeServer implements IRedmineServer {
   private inner: RedmineServer;
   private queue: DraftQueue;
   private manager: DraftModeManager;
@@ -54,6 +55,8 @@ export class DraftModeServer {
   getCustomFields!: RedmineServer["getCustomFields"];
   getMemberships!: RedmineServer["getMemberships"];
   isTimeTrackingEnabled!: RedmineServer["isTimeTrackingEnabled"];
+  getUserFte!: RedmineServer["getUserFte"];
+  getUserFteBatch!: RedmineServer["getUserFteBatch"];
   compare!: RedmineServer["compare"];
 
   constructor(
@@ -95,6 +98,8 @@ export class DraftModeServer {
     this.getCustomFields = inner.getCustomFields.bind(inner);
     this.getMemberships = inner.getMemberships.bind(inner);
     this.isTimeTrackingEnabled = inner.isTimeTrackingEnabled.bind(inner);
+    this.getUserFte = inner.getUserFte.bind(inner);
+    this.getUserFteBatch = inner.getUserFteBatch.bind(inner);
     this.compare = inner.compare.bind(inner);
   }
 

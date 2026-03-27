@@ -16,6 +16,7 @@ import { Version } from "./models/version";
 import { IssueStatus as RedmineIssueStatus, IssuePriority } from "./models/common";
 import { Membership as RedmineMembership } from "./models/membership";
 import { CustomFieldDefinition, TimeEntryCustomFieldValue } from "./models/custom-field-definition";
+import type { IRedmineServer } from "./redmine-server-interface";
 
 type HttpMethods = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
@@ -76,7 +77,7 @@ const ISSUE_CACHE_TTL = 60_000;
 const ISSUE_CACHE_PRUNE_INTERVAL_MS = 60_000;
 const USER_FTE_CACHE_MAX_ENTRIES = 1000;
 
-export class RedmineServer {
+export class RedmineServer implements IRedmineServer {
   options: RedmineServerOptions = {} as RedmineServerOptions;
 
   private timeEntryActivities: TimeEntryActivity[] | null = null;
@@ -1567,7 +1568,7 @@ export class RedmineServer {
     return { issues };
   }
 
-  compare(other: RedmineServer) {
+  compare(other: IRedmineServer) {
     return (
       this.options.address === other.options.address &&
       this.options.key === other.options.key &&

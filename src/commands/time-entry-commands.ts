@@ -4,7 +4,7 @@
  */
 
 import * as vscode from "vscode";
-import { RedmineServer } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { formatHoursAsHHMM, parseTimeInput } from "../utilities/time-input";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { validateDateInput } from "../utilities/date-picker";
@@ -76,7 +76,7 @@ interface WeekGroupNode {
 }
 
 export interface TimeEntryCommandDeps {
-  getServer: () => RedmineServer | undefined;
+  getServer: () => IRedmineServer | undefined;
   refreshTree: () => void;
   getMonthlySchedules?: () => MonthlyScheduleOverrides;
 }

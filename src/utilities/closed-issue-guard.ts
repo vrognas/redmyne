@@ -4,7 +4,7 @@
  */
 
 import * as vscode from "vscode";
-import type { RedmineServer } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import type { Issue } from "../redmine/models/issue";
 
 /**
@@ -15,7 +15,7 @@ import type { Issue } from "../redmine/models/issue";
  * @returns true to proceed, false to cancel
  */
 export async function confirmLogTimeOnClosedIssue(
-  server: RedmineServer,
+  server: IRedmineServer,
   issueId: number,
   issue?: Pick<Issue, "id" | "status">
 ): Promise<boolean> {
@@ -44,7 +44,7 @@ export async function confirmLogTimeOnClosedIssue(
  * @returns true to proceed, false to cancel
  */
 export async function confirmLogTimeOnClosedIssues(
-  server: RedmineServer,
+  server: IRedmineServer,
   issueIds: number[]
 ): Promise<boolean> {
   // Deduplicate

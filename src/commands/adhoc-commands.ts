@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { adHocTracker } from "../utilities/adhoc-tracker";
 import { parseTargetIssueId } from "../utilities/contribution-calculator";
 import { TimeEntryNode } from "../trees/my-time-entries-tree";
-import { RedmineServer } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { pickIssue } from "../utilities/issue-picker";
 
 /** Issue tree item passed from context menu */
@@ -12,12 +12,12 @@ interface IssueItem {
 
 type EntryAndServer = {
   entry: NonNullable<TimeEntryNode["_entry"]> & { id: number };
-  server: RedmineServer;
+  server: IRedmineServer;
 };
 
 function getEntryAndServerOrShowError(
   item: TimeEntryNode,
-  server: RedmineServer | undefined
+  server: IRedmineServer | undefined
 ): EntryAndServer | undefined {
   const entry = item?._entry;
   if (!entry) {
@@ -68,7 +68,7 @@ export async function toggleAdHoc(item: IssueItem | undefined): Promise<void> {
  */
 export async function contributeToIssue(
   item: TimeEntryNode,
-  server: RedmineServer | undefined,
+  server: IRedmineServer | undefined,
   refreshCallback: () => void
 ): Promise<void> {
   const context = getEntryAndServerOrShowError(item, server);
@@ -152,7 +152,7 @@ export async function contributeToIssue(
  */
 export async function removeContribution(
   item: TimeEntryNode,
-  server: RedmineServer | undefined,
+  server: IRedmineServer | undefined,
   refreshCallback: () => void
 ): Promise<void> {
   const context = getEntryAndServerOrShowError(item, server);

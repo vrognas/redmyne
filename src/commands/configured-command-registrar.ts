@@ -1,9 +1,7 @@
 import * as vscode from "vscode";
 import type { ActionProperties } from "./action-properties";
-import type {
-  RedmineServer,
-  RedmineServerConnectionOptions,
-} from "../redmine/redmine-server";
+import type { RedmineServerConnectionOptions } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { getConfiguredServerUrlOrShowError } from "./command-guards";
 
 export interface RegisterConfiguredCommandDeps {
@@ -11,12 +9,12 @@ export interface RegisterConfiguredCommandDeps {
   secretManager: {
     getApiKey: () => Promise<string | undefined>;
   };
-  createServer: (options: RedmineServerConnectionOptions) => RedmineServer;
+  createServer: (options: RedmineServerConnectionOptions) => IRedmineServer;
   bucket: {
-    servers: RedmineServer[];
+    servers: IRedmineServer[];
   };
   maxServerCacheSize: number;
-  disposeServer: (server: RedmineServer) => void;
+  disposeServer: (server: IRedmineServer) => void;
 }
 
 export type ConfiguredCommandAction = (

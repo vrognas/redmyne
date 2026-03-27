@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { RedmineServer } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { KanbanController } from "./kanban-controller";
 import { KanbanStatusBar } from "./kanban-status-bar";
 import type { KanbanTreeProvider } from "./kanban-tree-provider";
@@ -10,7 +10,7 @@ import { createKanbanTreeSetup } from "./kanban-tree-setup";
 
 export interface KanbanSetupDeps {
   context: vscode.ExtensionContext;
-  getServer: () => RedmineServer | undefined;
+  getServer: () => IRedmineServer | undefined;
   refreshAfterTimeLog: () => void;
 }
 

@@ -3,6 +3,7 @@ import {
   RedmineServer,
   RedmineServerConnectionOptions,
 } from "./redmine/redmine-server";
+import type { IRedmineServer } from "./redmine/redmine-server-interface";
 import { LoggingRedmineServer } from "./redmine/logging-redmine-server";
 import { RedmineProject } from "./redmine/redmine-project";
 import openActionsForIssue from "./commands/open-actions-for-issue";
@@ -67,7 +68,7 @@ let cleanupResources: {
   kanbanStatusBar?: KanbanStatusBar;
   kanbanTreeProvider?: KanbanTreeProvider;
   bucket?: {
-    servers: RedmineServer[];
+    servers: IRedmineServer[];
     projects: RedmineProject[];
   };
   userFte?: number;
@@ -120,7 +121,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(draftModeStatusBar);
 
   const bucket = {
-    servers: [] as RedmineServer[],
+    servers: [] as IRedmineServer[],
     projects: [] as RedmineProject[],
   };
   cleanupResources.bucket = bucket;

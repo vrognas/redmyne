@@ -7,14 +7,14 @@ import * as vscode from "vscode";
 import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE, FlexibilityScore } from "../utilities/flexibility-calculator";
 import { GanttPanel } from "../webviews/gantt-panel";
 import { Issue } from "../redmine/models/issue";
-import { RedmineServer } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { RedmineProject } from "../redmine/redmine-project";
 import { IssueFilter } from "../redmine/models/common";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
 import { getIssueIdOrShowError } from "./command-guards";
 
 export interface GanttCommandDeps {
-  getServer: () => RedmineServer | undefined;
+  getServer: () => IRedmineServer | undefined;
   fetchIssuesIfNeeded: () => Promise<Issue[]>;
   getDependencyIssues: () => Issue[];
   getFlexibilityCache: () => Map<number, FlexibilityScore | null>;

@@ -4,13 +4,13 @@
 
 import * as vscode from "vscode";
 import { TimeSheetPanel } from "../webviews/timesheet-panel";
-import { RedmineServer } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { DraftQueue } from "../draft-mode/draft-queue";
 import { DraftModeManager } from "../draft-mode/draft-mode-manager";
 import { Issue } from "../redmine/models/issue";
 
 export interface TimeSheetCommandsDeps {
-  getServer: () => RedmineServer | undefined;
+  getServer: () => IRedmineServer | undefined;
   getDraftQueue: () => DraftQueue | undefined;
   getDraftModeManager: () => DraftModeManager | undefined;
   getCachedIssues: () => Issue[];

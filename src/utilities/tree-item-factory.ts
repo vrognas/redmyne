@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { Issue, IssueRelation } from "../redmine/models/issue";
-import { RedmineServer } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { RedmineProject } from "../redmine/redmine-project";
 import { FlexibilityScore } from "./flexibility-calculator";
 import { formatHoursAsHHMM } from "./time-input";
@@ -13,7 +13,7 @@ import { formatCustomFieldValue } from "./custom-field-formatter";
  */
 export function createIssueTreeItem(
   issue: Issue,
-  server: RedmineServer | undefined,
+  server: IRedmineServer | undefined,
   commandName: string,
   showAssignee = false
 ): vscode.TreeItem {
@@ -61,7 +61,7 @@ export function isBlocked(issue: Issue): boolean {
 export function createEnhancedIssueTreeItem(
   issue: Issue,
   flexibility: FlexibilityScore | null,
-  server: RedmineServer | undefined,
+  server: IRedmineServer | undefined,
   commandName: string,
   showAssignee = false
 ): vscode.TreeItem {
@@ -117,7 +117,7 @@ export function createEnhancedIssueTreeItem(
 function createFlexibilityTooltip(
   issue: Issue,
   flexibility: FlexibilityScore,
-  server: RedmineServer | undefined
+  server: IRedmineServer | undefined
 ): vscode.MarkdownString {
   const statusText = STATUS_TEXT[flexibility.status];
   const spentHours = issue.spent_hours ?? 0;
@@ -186,7 +186,7 @@ function createFlexibilityTooltip(
  */
 function createBasicTooltip(
   issue: Issue,
-  server: RedmineServer | undefined
+  server: IRedmineServer | undefined
 ): vscode.MarkdownString {
   const spentHours = issue.spent_hours ?? 0;
   const estHours = issue.estimated_hours ?? 0;
@@ -294,7 +294,7 @@ function formatRelationsCompact(relations: IssueRelation[]): string {
  */
 export function createProjectTooltip(
   project: RedmineProject,
-  server: RedmineServer | undefined
+  server: IRedmineServer | undefined
 ): vscode.MarkdownString {
   const md = new vscode.MarkdownString();
   md.isTrusted = true;

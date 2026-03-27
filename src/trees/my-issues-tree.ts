@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { Issue } from "../redmine/models/issue";
-import { RedmineServer } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { createEnhancedIssueTreeItem } from "../utilities/tree-item-factory";
 import {
   clearFlexibilityCache,
@@ -39,7 +39,7 @@ type TreeItem = Issue | ParentContainer | LoadingPlaceholder;
 
 
 export class MyIssuesTree extends BaseTreeProvider<TreeItem> {
-  server?: RedmineServer;
+  server?: IRedmineServer;
   private isLoading = false;
   private pendingFetch: Promise<Issue[]> | null = null;
   private flexibilityCache = new Map<number, FlexibilityScore | null>();
@@ -266,7 +266,7 @@ export class MyIssuesTree extends BaseTreeProvider<TreeItem> {
     return this.pendingFetch;
   }
 
-  setServer(server: RedmineServer | undefined) {
+  setServer(server: IRedmineServer | undefined) {
     this.server = server;
     this.flexibilityCache.clear();
     this.cachedIssues = [];

@@ -4,12 +4,12 @@
  */
 
 import * as vscode from "vscode";
-import { RedmineServer } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { formatDateISO } from "../utilities/date-utils";
 import { getServerOrShowError } from "./command-guards";
 
 export interface CreateTestIssuesDeps {
-  getServer: () => RedmineServer | undefined;
+  getServer: () => IRedmineServer | undefined;
   refreshProjects: () => void;
 }
 

@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { RedmineServer } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { TimeEntry } from "../redmine/models/time-entry";
 import { formatHoursAsHHMM } from "../utilities/time-input";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
@@ -128,7 +128,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   private static readonly LOAD_BATCH_SIZE = 3;
 
   private isLoading = false;
-  server?: RedmineServer;
+  server?: IRedmineServer;
   private issueCache = new Map<number, { id: number; subject: string; projectId?: number; project: string; client?: string }>();
   private expandedIds = new Set<string>();
   private monthlySchedules: MonthlyScheduleOverrides = {};
@@ -198,7 +198,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       : vscode.TreeItemCollapsibleState.Collapsed;
   }
 
-  setServer(server: RedmineServer | undefined): void {
+  setServer(server: IRedmineServer | undefined): void {
     this.server = server;
     // Clear cache when server changes
     this.issueCache.clear();

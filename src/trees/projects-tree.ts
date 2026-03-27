@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { RedmineServer } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { RedmineProject } from "../redmine/redmine-project";
 import { Issue } from "../redmine/models/issue";
 import { IssueFilter, DEFAULT_ISSUE_FILTER, IssueSortField, SortConfig } from "../redmine/models/common";
@@ -61,7 +61,7 @@ const FILTER_KEY = "redmyne.issueFilter";
 const SORT_KEY = "redmyne.issueSort";
 
 export class ProjectsTree extends BaseTreeProvider<TreeItem> {
-  server?: RedmineServer;
+  server?: IRedmineServer;
   viewStyle: ProjectsViewStyle;
   projects: RedmineProject[] | null = null;
   private projectNodes: ProjectNode[] = [];
@@ -448,7 +448,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
     this.refresh();
   }
 
-  setServer(server: RedmineServer | undefined) {
+  setServer(server: IRedmineServer | undefined) {
     this.server = server;
     this.clearProjects();
   }

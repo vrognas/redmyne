@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { KanbanController } from "./kanban-controller";
 import { KanbanTask, TaskPriority, getTaskStatus } from "./kanban-state";
 import { showCreateTaskDialog, showEditTaskDialog } from "./kanban-dialogs";
-import { RedmineServer } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { pickActivityForProject } from "../utilities/issue-picker";
 import { showActionableError } from "../utilities/error-feedback";
 import { showStatusBarMessage } from "../utilities/status-bar";
@@ -46,7 +46,7 @@ function createIntegerRangeValidator({
 export function registerKanbanCommands(
   context: vscode.ExtensionContext,
   controller: KanbanController,
-  getServer: () => RedmineServer | undefined,
+  getServer: () => IRedmineServer | undefined,
   treeProvider?: KanbanTreeProvider
 ): vscode.Disposable[] {
   const disposables: vscode.Disposable[] = [];

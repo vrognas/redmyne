@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import { registerKanbanCommands } from "../../../src/kanban/kanban-commands";
 import type { KanbanController } from "../../../src/kanban/kanban-controller";
 import type { KanbanTask } from "../../../src/kanban/kanban-state";
-import type { RedmineServer } from "../../../src/redmine/redmine-server";
+import type { IRedmineServer } from "../../../src/redmine/redmine-server-interface";
 import * as kanbanDialogs from "../../../src/kanban/kanban-dialogs";
 import * as issuePicker from "../../../src/utilities/issue-picker";
 import * as errorFeedback from "../../../src/utilities/error-feedback";
@@ -65,7 +65,7 @@ function createServer(
     getTimeEntryCustomFields: ReturnType<typeof vi.fn>;
     addTimeEntry: ReturnType<typeof vi.fn>;
   }> = {}
-): RedmineServer {
+): IRedmineServer {
   return {
     options: { address: "https://redmine.example.test" },
     getIssueById: vi.fn(),
@@ -73,7 +73,7 @@ function createServer(
     getTimeEntryCustomFields: vi.fn(),
     addTimeEntry: vi.fn(),
     ...overrides,
-  } as unknown as RedmineServer;
+  } as unknown as IRedmineServer;
 }
 
 function createContext(
@@ -133,7 +133,7 @@ describe("registerKanbanCommands", () => {
   });
 
   function registerCommands(options?: {
-    server?: RedmineServer | undefined;
+    server?: IRedmineServer | undefined;
     tasks?: KanbanTask[];
     contextValues?: Partial<Record<string, unknown>>;
     treeProvider?: {

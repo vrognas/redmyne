@@ -4,7 +4,7 @@ import { playCompletionSound } from "../utilities/completion-sound";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { promptForRequiredCustomFields } from "../utilities/custom-field-picker";
 import { confirmLogTimeOnClosedIssue } from "../utilities/closed-issue-guard";
-import type { RedmineServer } from "../redmine/redmine-server";
+import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import type { KanbanTask } from "./kanban-state";
 
 type TimerCompletionTask = Pick<KanbanTask, "id" | "title" | "linkedIssueId" | "activityId">;
@@ -25,7 +25,7 @@ type TimerController = {
 
 export interface KanbanTimerHandlerDeps {
   controller: TimerController;
-  getServer: () => RedmineServer | undefined;
+  getServer: () => IRedmineServer | undefined;
   globalState: vscode.Memento;
   refreshAfterTimeLog: () => void;
 }

@@ -85,8 +85,8 @@ export function createConfiguredContextUpdater(
           }
         });
 
-        deps.projectsTree.setServer(server as unknown as RedmineServer);
-        deps.timeEntriesTree.setServer(server as unknown as RedmineServer);
+        deps.projectsTree.setServer(server);
+        deps.timeEntriesTree.setServer(server);
         deps.projectsTree.refresh();
         deps.timeEntriesTree.refresh();
 

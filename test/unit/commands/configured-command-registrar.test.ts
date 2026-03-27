@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as vscode from "vscode";
 import type { ActionProperties } from "../../../src/commands/action-properties";
 import { createConfiguredCommandRegistrar } from "../../../src/commands/configured-command-registrar";
-import type { RedmineServer } from "../../../src/redmine/redmine-server";
+import type { IRedmineServer } from "../../../src/redmine/redmine-server-interface";
 
 function makeConfig(values: Record<string, unknown>): vscode.WorkspaceConfiguration {
   return {
@@ -10,10 +10,10 @@ function makeConfig(values: Record<string, unknown>): vscode.WorkspaceConfigurat
   } as unknown as vscode.WorkspaceConfiguration;
 }
 
-function makeServer(compareResult = false): RedmineServer {
+function makeServer(compareResult = false): IRedmineServer {
   return {
     compare: vi.fn(() => compareResult),
-  } as unknown as RedmineServer;
+  } as unknown as IRedmineServer;
 }
 
 async function flushAsyncWork(): Promise<void> {
