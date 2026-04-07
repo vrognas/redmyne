@@ -936,6 +936,92 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     }
   });
 
+  it("week node IDs use zero-padded week numbers", async () => {
+    mockServer.getTimeEntries.mockResolvedValue({ time_entries: [] });
+
+    const groups = await getLoadedGroups();
+    // Use 2-months-ago to get a month with single-digit week numbers (e.g. Feb → weeks 5-9)
+    const targetMonth = groups[4];
+    expect(targetMonth.type).toBe("month-group");
+
+    await provider.getChildren(targetMonth);
+    const weekGroups = await waitUntilLoaded(
+      () => provider.getChildren(targetMonth),
+      "month weeks for ID check"
+    );
+
+    // All week node IDs should have zero-padded week numbers
+    for (const week of weekGroups) {
+      const match = week.id?.match(/week-(\d+)-(\d+)$/);
+      expect(match).toBeTruthy();
+      if (match) {
+        const weekNumStr = match[2];
+        expect(weekNumStr.length).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+
+  it("entries without spent_on are excluded from week grouping", async () => {
+    const now = new Date();
+    const lastMonthStr = `${new Date(now.getFullYear(), now.getMonth() - 1, 1).getFullYear()}-${String(new Date(now.getFullYear(), now.getMonth() - 1, 1).getMonth() + 1).padStart(2, "0")}`;
+
+    const monthEntries: TimeEntry[] = [
+      {
+        id: 1,
+        issue_id: 123,
+        activity_id: 9,
+        activity: { id: 9, name: "Development" },
+        hours: "4",
+        comments: "",
+        spent_on: `${lastMonthStr}-15`,
+      },
+      {
+        id: 2,
+        issue_id: 124,
+        activity_id: 9,
+        activity: { id: 9, name: "Development" },
+        hours: "2",
+        comments: "",
+        spent_on: undefined as unknown as string,
+      },
+    ];
+
+    mockServer.getTimeEntries
+      .mockResolvedValueOnce({ time_entries: [] })
+      .mockResolvedValue({ time_entries: monthEntries });
+
+    const groups = await getLoadedGroups();
+    const targetMonth = groups[3];
+
+    await provider.getChildren(targetMonth);
+    const weekGroups = await waitUntilLoaded(
+      () => provider.getChildren(targetMonth),
+      "month weeks with undefined spent_on"
+    );
+
+    // No week should have label "Week NaN"
+    expect(weekGroups.every((w) => !w.label?.includes("NaN"))).toBe(true);
+  });
+
+  it("getMonthDateRange caps at today using year/month comparison", async () => {
+    // Access private method via cast
+    const getRange = (provider as unknown as {
+      getMonthDateRange: (m: { year: number; month: number }) => { start: string; end: string };
+    }).getMonthDateRange.bind(provider);
+
+    const now = new Date();
+    const currentMonth = { year: now.getFullYear(), month: now.getMonth() };
+    const range = getRange(currentMonth);
+
+    // Current month should be capped at today
+    expect(range.end).toBe(formatLocalDate(now));
+
+    // Past month should NOT be capped
+    const pastMonth = { year: 2025, month: 0 }; // January 2025
+    const pastRange = getRange(pastMonth);
+    expect(pastRange.end).toBe("2025-01-31");
+  });
+
   it("assigns command for load-earlier tree item", () => {
     const item = provider.getTreeItem({
       id: "load-earlier",

@@ -276,8 +276,11 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     const start = new Date(monthYear.year, monthYear.month, 1);
     const end = new Date(monthYear.year, monthYear.month + 1, 0); // Last day of month
     const today = new Date();
-    // Cap end at today if current/future month
-    if (end > today) {
+    // Cap end at today if current or future month (compare year/month, not Date objects)
+    const isCurrentOrFuture =
+      monthYear.year > today.getFullYear() ||
+      (monthYear.year === today.getFullYear() && monthYear.month >= today.getMonth());
+    if (isCurrentOrFuture) {
       return { start: formatLocalDate(start), end: formatLocalDate(today) };
     }
     return { start: formatLocalDate(start), end: formatLocalDate(end) };
@@ -516,8 +519,10 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       if (!this.loadedMonthEntries.has(monthKey)) {
         // Start loading and show loading state
         this.loadMonthEntries(element._monthYear).then(() => {
-          // Refresh this node and its parent to update description
-          this._onDidChangeTreeData.fire(element);
+          // Refresh entire tree to update both month node and its children
+          this._onDidChangeTreeData.fire(undefined);
+        }).catch(() => {
+          // Ensure tree refreshes even on error so loading state clears
           this._onDidChangeTreeData.fire(undefined);
         });
         return [{
@@ -631,7 +636,8 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     // Group entries by ISO week number and year
     const byWeek = new Map<string, { weekNum: number; year: number; entries: TimeEntry[] }>();
     for (const entry of entries) {
-      const date = new Date((entry.spent_on || "unknown") + "T12:00:00");
+      if (!entry.spent_on) continue;
+      const date = new Date(entry.spent_on + "T12:00:00");
       const weekNum = getISOWeekNumber(date);
       const year = getISOWeekYear(date);
       const key = `${year}-W${String(weekNum).padStart(2, "0")}`;
@@ -691,7 +697,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       // Skip weeks with no working days and no entries (e.g. boundary week containing only weekends)
       if (available === 0 && weekEntries.length === 0) return null;
 
-      const nodeId = `${idPrefix}-week-${year}-${weekNum}`;
+      const nodeId = `${idPrefix}-week-${year}-${String(weekNum).padStart(2, "0")}`;
       // Show year suffix for cross-year weeks (Week 1 or 52/53 that span year boundaries)
       const weekSpansYears = weekRange.start.slice(0, 4) !== weekRange.end.slice(0, 4);
       const yearSuffix = weekSpansYears || year !== currentYear ? ` '${year % 100}` : "";
