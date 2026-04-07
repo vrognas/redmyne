@@ -3437,9 +3437,8 @@ export class GanttPanel {
       if (byRole.size > 0) {
         tooltip += "---\n\n";
         for (const [role, names] of byRole) {
-          tooltip += `${role}: ${names.join(", ")}\n`;
+          tooltip += `cf:${role}:${names.join(", ")}\n\n`;
         }
-        tooltip += "\n";
       }
     }
 

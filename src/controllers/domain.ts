@@ -7,6 +7,8 @@ export class Membership {
   ) {}
 }
 
+const ROLE_ORDER = ["Project Leader", "Analyst", "Peer Reviewer"];
+
 export function groupMembersByRole(members: Membership[]): Map<string, string[]> {
   const byRole = new Map<string, string[]>();
   for (const m of members.filter((m) => m.isUser)) {
@@ -15,7 +17,15 @@ export function groupMembersByRole(members: Membership[]): Map<string, string[]>
       byRole.get(role)!.push(m.name);
     }
   }
-  return byRole;
+  // Sort: known roles first in defined order, then alphabetical
+  const sorted = new Map<string, string[]>();
+  for (const role of ROLE_ORDER) {
+    if (byRole.has(role)) { sorted.set(role, byRole.get(role)!); byRole.delete(role); }
+  }
+  for (const [role, names] of [...byRole.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    sorted.set(role, names);
+  }
+  return sorted;
 }
 
 export class IssueStatus {

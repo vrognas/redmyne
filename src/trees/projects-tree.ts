@@ -136,20 +136,14 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
     return treeItem;
   }
 
-  async resolveTreeItem(item: vscode.TreeItem): Promise<vscode.TreeItem> {
+  async resolveTreeItem(item: vscode.TreeItem, element: TreeItem): Promise<vscode.TreeItem> {
     // Lazily add members to project tooltips on hover
-    const idStr = typeof item.id === "string" ? item.id : "";
-    const match = idStr.match(/^project-(\d+)$/);
-    if (match && this.server) {
-      const projectId = parseInt(match[1], 10);
-      const node = this.projectNodes.find((n) => n.project.id === projectId);
-      if (node) {
-        try {
-          const members = await this.server.getMemberships(projectId);
-          item.tooltip = createProjectTooltip(node.project, this.server, members);
-        } catch {
-          // Keep existing tooltip on error
-        }
+    if (isProjectNode(element) && this.server) {
+      try {
+        const members = await this.server.getMemberships(element.project.id);
+        item.tooltip = createProjectTooltip(element.project, this.server, members);
+      } catch {
+        // Keep existing tooltip on error
       }
     }
     return item;
