@@ -127,7 +127,7 @@ const createMockRequest = () =>
               path.match(/\/projects\/\d+\/memberships\.json/)
             ) {
               data = {
-                memberships: [{ user: { id: 1, name: "John Doe" } }],
+                memberships: [{ user: { id: 1, name: "John Doe" }, roles: [{ id: 1, name: "Analyst" }] }],
               };
             } else if (
               options.method === "POST" &&
@@ -325,11 +325,12 @@ describe("RedmineServer", () => {
     expect(result.time_entry_activities).toHaveLength(1);
   });
 
-  it("should fetch memberships", async () => {
+  it("should fetch memberships with roles", async () => {
     const memberships = await server.getMemberships(1);
     expect(memberships).toHaveLength(1);
     expect(memberships[0].name).toBe("John Doe");
     expect(memberships[0].isUser).toBe(true);
+    expect(memberships[0].roles).toEqual(["Analyst"]);
   });
 
   it("should fetch typed issue statuses", async () => {

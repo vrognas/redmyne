@@ -505,6 +505,7 @@ export class RedmineServer implements IRedmineServer {
    */
   clearProjectsCache(): void {
     this.cachedProjects = null;
+    this.membershipsCache.clear();
   }
 
   async getTimeEntryActivities(): Promise<{
@@ -1301,16 +1302,24 @@ export class RedmineServer implements IRedmineServer {
     this.invalidateIssueCache(issueId);
   }
 
+  private membershipsCache = new Map<number, Membership[]>();
+
   async getMemberships(projectId: number): Promise<Membership[]> {
+    const cached = this.membershipsCache.get(projectId);
+    if (cached) return cached;
+
     const membershipsResponse = await this.doRequest<{
       memberships: RedmineMembership[];
     }>(`/projects/${projectId}/memberships.json`, "GET");
 
-    return (membershipsResponse?.memberships || []).map((m) =>
-      "user" in m
-        ? new Membership(m.user.id, m.user.name)
-        : new Membership(m.group.id, m.group.name, false)
-    );
+    const members = (membershipsResponse?.memberships || []).map((m) => {
+      const roles = m.roles.map((r) => r.name);
+      return "user" in m
+        ? new Membership(m.user.id, m.user.name, true, roles)
+        : new Membership(m.group.id, m.group.name, false, roles);
+    });
+    this.membershipsCache.set(projectId, members);
+    return members;
   }
   async applyQuickUpdate(quickUpdate: QuickUpdate): Promise<QuickUpdateResult> {
     // Build issue payload with optional date fields

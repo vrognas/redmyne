@@ -2,7 +2,8 @@ export class Membership {
   constructor(
     public readonly id: number,
     public readonly name: string,
-    public readonly isUser = true
+    public readonly isUser = true,
+    public readonly roles: string[] = []
   ) {}
 }
 

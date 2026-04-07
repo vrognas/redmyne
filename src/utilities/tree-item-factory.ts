@@ -5,6 +5,7 @@ import { RedmineProject } from "../redmine/redmine-project";
 import { FlexibilityScore } from "./flexibility-calculator";
 import { formatHoursAsHHMM } from "./time-input";
 import { formatCustomFieldValue } from "./custom-field-formatter";
+import { Membership } from "../controllers/domain";
 
 /**
  * Creates a VS Code TreeItem for displaying a Redmine issue
@@ -294,7 +295,8 @@ function formatRelationsCompact(relations: IssueRelation[]): string {
  */
 export function createProjectTooltip(
   project: RedmineProject,
-  server: IRedmineServer | undefined
+  server: IRedmineServer | undefined,
+  members?: Membership[]
 ): vscode.MarkdownString {
   const md = new vscode.MarkdownString();
   md.isTrusted = true;
@@ -317,6 +319,16 @@ export function createProjectTooltip(
       md.appendText(`${cf.name}:`);
       md.appendMarkdown("** ");
       md.appendText(val);
+      md.appendMarkdown("\n\n");
+    }
+  }
+
+  // Members and roles
+  if (members && members.length > 0) {
+    md.appendMarkdown("---\n\n**Members:**\n\n");
+    for (const m of members.filter((m) => m.isUser)) {
+      const roles = m.roles.length > 0 ? ` — ${m.roles.join(", ")}` : "";
+      md.appendText(`${m.name}${roles}`);
       md.appendMarkdown("\n\n");
     }
   }

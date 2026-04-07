@@ -177,6 +177,7 @@ export class GanttPanel {
   private _dependencyIssues: Issue[] = []; // External scheduling dependencies
   private _issueById: Map<number, Issue> = new Map(); // O(1) lookup cache
   private _projects: RedmineProject[] = [];
+  private _membershipsCache = new Map<number, import("../controllers/domain").Membership[]>();
   private _versions: Version[] = []; // Milestones across all projects
   private _flexibilityCache: Map<number, FlexibilityScore | null> = new Map();
   private _userFteCache: Map<number, number> = new Map(); // FTE percentages per user
@@ -713,6 +714,19 @@ export class GanttPanel {
     this._issueById = new Map(allIssues.map(i => [i.id, i]));
     this._projects = projects.filter(p => p !== null);
     this._flexibilityCache = flexibilityCache;
+
+    // Pre-fetch memberships for all projects (uses server cache)
+    if (this._server) {
+      const server = this._server;
+      await Promise.all(
+        this._projects.map(async (p) => {
+          try {
+            const members = await server.getMemberships(p.id);
+            this._membershipsCache.set(p.id, members);
+          } catch { /* ignore per-project failures */ }
+        })
+      );
+    }
 
     // Invalidate caches when data changes
     this._bumpRevision();
@@ -3407,6 +3421,17 @@ export class GanttPanel {
         tooltip += "---\n\n";
       }
       tooltip += `${this.formatHealthTooltip(row.health)}\n\n`;
+    }
+
+    // Members and roles
+    const members = this._membershipsCache.get(row.id);
+    if (members && members.length > 0) {
+      tooltip += "---\n\nMembers:\n";
+      for (const m of members.filter((m) => m.isUser)) {
+        const roles = m.roles.length > 0 ? ` — ${m.roles.join(", ")}` : "";
+        tooltip += `${m.name}${roles}\n`;
+      }
+      tooltip += "\n";
     }
 
     if (this._server && row.identifier) {
