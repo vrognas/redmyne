@@ -474,7 +474,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
           id: "group-week",
           label: `This Week (${weekNum})`,
           description: formatHoursWithComparison(weekTotal, weekAvailable).short,
-          tooltip: formatHoursWithComparison(weekTotal, weekAvailable).full,
+          tooltip: `${formatWeekRange(weekStart, today)}; ${formatHoursWithComparison(weekTotal, weekAvailable).full}`,
           collapsibleState: this.getCollapsibleState("group-week", true),
           type: "week-group",
           contextValue: "week-group",
