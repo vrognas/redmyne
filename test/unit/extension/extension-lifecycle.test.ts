@@ -113,8 +113,6 @@ const hoisted = vi.hoisted(() => {
     configValues,
     runMigration: vi.fn(),
     initRecentIssues: vi.fn(),
-    autoUpdateInit: vi.fn(),
-    adHocInit: vi.fn(),
     updateClipboardContext: vi.fn(),
     loadMonthlySchedules: vi.fn().mockReturnValue({}),
     disposeStatusBar: vi.fn(),
@@ -337,14 +335,10 @@ vi.mock("../../../src/status-bars/workload-status-bar", () => ({
 }));
 
 vi.mock("../../../src/utilities/auto-update-tracker", () => ({
-  autoUpdateTracker: {
-    initialize: hoisted.autoUpdateInit,
-  },
+  autoUpdateTracker: {},
 }));
 vi.mock("../../../src/utilities/adhoc-tracker", () => ({
-  adHocTracker: {
-    initialize: hoisted.adHocInit,
-  },
+  adHocTracker: {},
 }));
 
 vi.mock("../../../src/utilities/debounce", () => ({

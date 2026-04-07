@@ -11,9 +11,6 @@ async function setIds(ids: number[]): Promise<void> {
 }
 
 class AdHocTracker {
-  /** @deprecated No-op, kept for migration compatibility */
-  initialize(_context: unknown): void { /* no-op */ }
-
   isAdHoc(issueId: number): boolean {
     return getIds().includes(issueId);
   }

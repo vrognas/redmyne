@@ -73,7 +73,7 @@ export function registerIssueContextCommands(
 
         try {
           await server.updateDoneRatio(issueId, selectedValue);
-          autoUpdateTracker.disable(issueId);
+          await autoUpdateTracker.disable(issueId);
 
           const hoursInput = await vscode.window.showInputBox({
             title: `Internal Estimate: #${issueId}`,
@@ -166,7 +166,7 @@ export function registerIssueContextCommands(
 
       try {
         await Promise.all(issueIds.map((id) => server.updateDoneRatio(id, selected.value)));
-        issueIds.forEach((id) => autoUpdateTracker.disable(id));
+        await Promise.all(issueIds.map((id) => autoUpdateTracker.disable(id)));
 
         const hoursInput = await vscode.window.showInputBox({
           title: `Internal Estimate for ${issueIds.length} issues`,
@@ -393,10 +393,10 @@ export function registerIssueContextCommands(
         const issueId = issue.id;
 
         if (issue.value) {
-          autoUpdateTracker.enable(issueId);
+          await autoUpdateTracker.enable(issueId);
           showStatusBarMessage(`$(check) Auto-update %done enabled for #${issueId}`, 2000);
         } else {
-          autoUpdateTracker.disable(issueId);
+          await autoUpdateTracker.disable(issueId);
           showStatusBarMessage(`$(x) Auto-update %done disabled for #${issueId}`, 2000);
         }
       }
@@ -410,10 +410,10 @@ export function registerIssueContextCommands(
         const issueId = issue.id;
 
         if (issue.value) {
-          adHocTracker.tag(issueId);
+          await adHocTracker.tag(issueId);
           showStatusBarMessage(`$(check) #${issueId} tagged as ad-hoc budget`, 2000);
         } else {
-          adHocTracker.untag(issueId);
+          await adHocTracker.untag(issueId);
           showStatusBarMessage(`$(check) #${issueId} ad-hoc budget removed`, 2000);
         }
         refreshGanttData();

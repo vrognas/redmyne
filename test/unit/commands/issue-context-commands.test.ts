@@ -135,7 +135,7 @@ describe("registerIssueContextCommands", () => {
     const mockServer = {
       updateDoneRatio: vi.fn().mockResolvedValue(undefined),
     };
-    const disableSpy = vi.spyOn(autoUpdateTracker, "disable");
+    const disableSpy = vi.spyOn(autoUpdateTracker, "disable").mockResolvedValue(undefined);
     vi.mocked(vscode.window.showInputBox).mockResolvedValue("");
     const updateIssueDoneRatio = vi.fn();
     (GanttPanel as unknown as { currentPanel: { updateIssueDoneRatio: ReturnType<typeof vi.fn> } }).currentPanel = {
@@ -215,7 +215,7 @@ describe("registerIssueContextCommands", () => {
     const mockServer = {
       updateDoneRatio: vi.fn().mockResolvedValue(undefined),
     };
-    const disableSpy = vi.spyOn(autoUpdateTracker, "disable");
+    const disableSpy = vi.spyOn(autoUpdateTracker, "disable").mockResolvedValue(undefined);
     const estimateSpy = vi.spyOn(internalEstimates, "setInternalEstimate").mockResolvedValue(undefined);
     const updateIssueDoneRatio = vi.fn();
     (GanttPanel as unknown as { currentPanel: { updateIssueDoneRatio: ReturnType<typeof vi.fn> } }).currentPanel = {
@@ -287,10 +287,10 @@ describe("registerIssueContextCommands", () => {
   });
 
   it("routes explicit toggles to trackers and precedence helpers", async () => {
-    const enableSpy = vi.spyOn(autoUpdateTracker, "enable");
-    const disableSpy = vi.spyOn(autoUpdateTracker, "disable");
-    const tagSpy = vi.spyOn(adHocTracker, "tag");
-    const untagSpy = vi.spyOn(adHocTracker, "untag");
+    const enableSpy = vi.spyOn(autoUpdateTracker, "enable").mockResolvedValue(undefined);
+    const disableSpy = vi.spyOn(autoUpdateTracker, "disable").mockResolvedValue(undefined);
+    const tagSpy = vi.spyOn(adHocTracker, "tag").mockResolvedValue(undefined);
+    const untagSpy = vi.spyOn(adHocTracker, "untag").mockResolvedValue(undefined);
     const setPrecedenceSpy = vi.spyOn(precedenceTracker, "setPrecedence").mockResolvedValue(undefined);
     const clearPrecedenceSpy = vi.spyOn(precedenceTracker, "clearPrecedence").mockResolvedValue(undefined);
     vi.spyOn(precedenceTracker, "togglePrecedence").mockResolvedValue(true);
