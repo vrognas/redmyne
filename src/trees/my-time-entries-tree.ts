@@ -688,6 +688,9 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         defaultSchedule
       );
 
+      // Skip weeks with no working days and no entries (e.g. boundary week containing only weekends)
+      if (available === 0 && weekEntries.length === 0) return null;
+
       const nodeId = `${idPrefix}-week-${year}-${weekNum}`;
       // Show year suffix for cross-year weeks (Week 1 or 52/53 that span year boundaries)
       const weekSpansYears = weekRange.start.slice(0, 4) !== weekRange.end.slice(0, 4);
@@ -704,7 +707,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         _dateRange: { start: rangeStart, end: rangeEnd },
         _weekStart: weekRange.start,
       };
-    });
+    }).filter((node): node is NonNullable<typeof node> => node !== null);
   }
 
   private async mapEntriesToNodes(entries: TimeEntry[], idPrefix = "entry"): Promise<TimeEntryNode[]> {
