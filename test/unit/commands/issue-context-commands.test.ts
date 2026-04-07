@@ -3,9 +3,7 @@ import * as vscode from "vscode";
 import { GanttPanel } from "../../../src/webviews/gantt-panel";
 import { registerIssueContextCommands } from "../../../src/commands/issue-context-commands";
 import { autoUpdateTracker } from "../../../src/utilities/auto-update-tracker";
-import { adHocTracker } from "../../../src/utilities/adhoc-tracker";
 import * as adhocCommands from "../../../src/commands/adhoc-commands";
-import * as precedenceTracker from "../../../src/utilities/precedence-tracker";
 import * as internalEstimates from "../../../src/utilities/internal-estimates";
 
 type RegisteredHandler = (...args: unknown[]) => unknown;
