@@ -1159,10 +1159,6 @@
           "when": "false"
         },
         {
-          "command": "redmyne.toggleAdHoc",
-          "when": "false"
-        },
-        {
           "command": "redmyne.contributeToIssue",
           "when": "false"
         },
