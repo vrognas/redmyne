@@ -48,7 +48,9 @@
       "Bash(npm run bundle:*)",
       "Bash(npm run:*)",
       "Bash(/c/Users/viktor.rognas/scoop/shims/gh run list:*)",
-      "Bash(git show:*)"
+      "Bash(git show:*)",
+      "Bash(gh api:*)",
+      "mcp__claude_ai_Context7__resolve-library-id"
     ],
     "deny": [],
     "ask": []
