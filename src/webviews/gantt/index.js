@@ -270,6 +270,13 @@ function setupTooltips({ addDocListener, addWinListener }) {
     tooltip.classList.add('visible');
     tooltip.setAttribute('aria-hidden', 'false');
     positionTooltip(x, y);
+
+    // Request lazy-loaded members for project tooltips
+    const projectId = target.dataset.projectId;
+    if (projectId && !target.dataset.membersRequested) {
+      target.dataset.membersRequested = '1';
+      vscode.postMessage({ command: 'requestProjectMembers', projectId: Number(projectId) });
+    }
   }
 
   function hideTooltip(keepTarget = false) {
@@ -379,6 +386,16 @@ window.addEventListener('message', event => {
   if (!message) return;
   if (message.command === 'render') {
     render(message.payload);
+    return;
+  }
+  if (message.command === 'appendProjectMembers' && message.projectId && message.memberLines?.length) {
+    // Append members to data-tooltip; shows on next hover
+    const el = document.querySelector(`[data-project-id="${message.projectId}"]`);
+    if (el) {
+      const existing = (el.dataset.tooltip || '').trimEnd();
+      const memberText = message.memberLines.join('\n');
+      el.dataset.tooltip = existing + '\n\n---\n\n' + memberText;
+    }
     return;
   }
   if (window.__ganttHandleExtensionMessage) {

@@ -716,21 +716,7 @@ export class GanttPanel {
     this._projects = projects.filter(p => p !== null);
     this._flexibilityCache = flexibilityCache;
 
-    // Pre-fetch memberships for all projects (uses server cache)
-    const config = vscode.workspace.getConfiguration("redmyne");
-    const showMembers = config.get<boolean>("showProjectMembers", true);
-    const excludeIds = config.get<number[]>("hideProjectMembersFor", []);
-    if (showMembers && this._server) {
-      const server = this._server;
-      await Promise.all(
-        this._projects.filter((p) => !excludeIds.includes(p.id)).map(async (p) => {
-          try {
-            const members = await server.getMemberships(p.id);
-            this._membershipsCache.set(p.id, members);
-          } catch { /* ignore per-project failures */ }
-        })
-      );
-    }
+    // Memberships loaded lazily on hover (see requestProjectMembers handler)
 
     // Invalidate caches when data changes
     this._bumpRevision();
@@ -1503,6 +1489,26 @@ export class GanttPanel {
         }
         this._cachedHierarchy = undefined; // Clear cache to rebuild with new sort
         this._updateContent();
+        break;
+      case "requestProjectMembers":
+        if (message.projectId && this._server) {
+          const pid = message.projectId as number;
+          const cfg = vscode.workspace.getConfiguration("redmyne");
+          const show = cfg.get<boolean>("showProjectMembers", true);
+          const exclude = cfg.get<number[]>("hideProjectMembersFor", []);
+          if (show && !exclude.includes(pid) && !this._membershipsCache.has(pid)) {
+            this._server.getMemberships(pid).then((members) => {
+              this._membershipsCache.set(pid, members);
+              // Send members back; webview appends to tooltip
+              const byRole = groupMembersByRole(members);
+              const lines: string[] = [];
+              for (const [role, names] of byRole) {
+                lines.push(`cf:${role}:${names.join(", ")}`);
+              }
+              this._panel.webview.postMessage({ command: "appendProjectMembers", projectId: pid, memberLines: lines });
+            }).catch(() => { /* ignore */ });
+          }
+        }
         break;
     }
   }
