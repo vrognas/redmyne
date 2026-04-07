@@ -24,7 +24,7 @@ async function main() {
     bundle: true,
     format: "iife",
     minify: production,
-    sourcemap: !production,
+    sourcemap: production ? false : "external",
     sourcesContent: false,
     platform: "browser",
     outfile: "media/gantt.js",
