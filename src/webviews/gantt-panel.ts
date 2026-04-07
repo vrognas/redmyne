@@ -4,6 +4,7 @@ import { Issue, IssueRelation } from "../redmine/models/issue";
 import { Version } from "../redmine/models/version";
 import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { RedmineProject } from "../redmine/redmine-project";
+import { Membership, groupMembersByRole } from "../controllers/domain";
 import { FlexibilityScore, WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE, calculateFlexibility, scaleScheduleByFte, ContributionData } from "../utilities/flexibility-calculator";
 import { calculateContributions, parseTargetIssueId } from "../utilities/contribution-calculator";
 import { adHocTracker } from "../utilities/adhoc-tracker";
@@ -177,7 +178,7 @@ export class GanttPanel {
   private _dependencyIssues: Issue[] = []; // External scheduling dependencies
   private _issueById: Map<number, Issue> = new Map(); // O(1) lookup cache
   private _projects: RedmineProject[] = [];
-  private _membershipsCache = new Map<number, import("../controllers/domain").Membership[]>();
+  private _membershipsCache = new Map<number, Membership[]>();
   private _versions: Version[] = []; // Milestones across all projects
   private _flexibilityCache: Map<number, FlexibilityScore | null> = new Map();
   private _userFteCache: Map<number, number> = new Map(); // FTE percentages per user
@@ -3432,14 +3433,7 @@ export class GanttPanel {
     // Members grouped by role
     const members = this._membershipsCache.get(row.id);
     if (members && members.length > 0) {
-      const users = members.filter((m) => m.isUser);
-      const byRole = new Map<string, string[]>();
-      for (const m of users) {
-        for (const role of m.roles.length > 0 ? m.roles : ["Other"]) {
-          if (!byRole.has(role)) byRole.set(role, []);
-          byRole.get(role)!.push(m.name);
-        }
-      }
+      const byRole = groupMembersByRole(members);
       if (byRole.size > 0) {
         tooltip += "---\n\n";
         for (const [role, names] of byRole) {

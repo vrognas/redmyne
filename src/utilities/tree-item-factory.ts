@@ -5,7 +5,7 @@ import { RedmineProject } from "../redmine/redmine-project";
 import { FlexibilityScore } from "./flexibility-calculator";
 import { formatHoursAsHHMM } from "./time-input";
 import { formatCustomFieldValue } from "./custom-field-formatter";
-import { Membership } from "../controllers/domain";
+import { Membership, groupMembersByRole } from "../controllers/domain";
 
 /**
  * Creates a VS Code TreeItem for displaying a Redmine issue
@@ -175,7 +175,8 @@ function createFlexibilityTooltip(
 
   // Browser link
   if (server) {
-    md.appendMarkdown(`[Open in Browser](${server.options.address}/issues/${issue.id})`);
+    const base = server.options.address.replace(/\/+$/, "");
+    md.appendMarkdown(`[Open in Browser](${base}/issues/${issue.id})`);
   }
 
   return md;
@@ -241,7 +242,8 @@ function createBasicTooltip(
 
   // Browser link
   if (server) {
-    md.appendMarkdown(`[Open in Browser](${server.options.address}/issues/${issue.id})`);
+    const base = server.options.address.replace(/\/+$/, "");
+    md.appendMarkdown(`[Open in Browser](${base}/issues/${issue.id})`);
   }
 
   return md;
@@ -325,14 +327,7 @@ export function createProjectTooltip(
 
   // Members grouped by role
   if (members && members.length > 0) {
-    const users = members.filter((m) => m.isUser);
-    const byRole = new Map<string, string[]>();
-    for (const m of users) {
-      for (const role of m.roles.length > 0 ? m.roles : ["Other"]) {
-        if (!byRole.has(role)) byRole.set(role, []);
-        byRole.get(role)!.push(m.name);
-      }
-    }
+    const byRole = groupMembersByRole(members);
     if (byRole.size > 0) {
       md.appendMarkdown("---\n\n");
       for (const [role, names] of byRole) {
@@ -346,7 +341,8 @@ export function createProjectTooltip(
   }
 
   if (server) {
-    md.appendMarkdown(`[Open in Browser](${server.options.address}/projects/${project.identifier})`);
+    const base = server.options.address.replace(/\/+$/, "");
+    md.appendMarkdown(`[Open in Browser](${base}/projects/${project.identifier})`);
   }
   return md;
 }

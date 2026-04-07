@@ -7,6 +7,17 @@ export class Membership {
   ) {}
 }
 
+export function groupMembersByRole(members: Membership[]): Map<string, string[]> {
+  const byRole = new Map<string, string[]>();
+  for (const m of members.filter((m) => m.isUser)) {
+    for (const role of m.roles.length > 0 ? m.roles : ["Other"]) {
+      if (!byRole.has(role)) byRole.set(role, []);
+      byRole.get(role)!.push(m.name);
+    }
+  }
+  return byRole;
+}
+
 export class IssueStatus {
   constructor(
     public readonly statusId: number,

@@ -458,12 +458,15 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         defaultSchedule
       );
 
+      const todayHours = formatHoursWithComparison(todayTotal, todayAvailable);
+      const weekHours = formatHoursWithComparison(weekTotal, weekAvailable);
+
       const nodes: TimeEntryNode[] = [
         {
           id: "group-today",
           label: `Today (${dayName} ${dayNum})`,
-          description: formatHoursWithComparison(todayTotal, todayAvailable).short,
-          tooltip: formatHoursWithComparison(todayTotal, todayAvailable).full,
+          description: todayHours.short,
+          tooltip: todayHours.full,
           collapsibleState: this.getCollapsibleState("group-today", todayWithDrafts.length > 0),
           type: "group",
           contextValue: "day-group",
@@ -473,8 +476,8 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         {
           id: "group-week",
           label: `This Week (${weekNum})`,
-          description: formatHoursWithComparison(weekTotal, weekAvailable).short,
-          tooltip: `${formatWeekRange(weekStart, today)}; ${formatHoursWithComparison(weekTotal, weekAvailable).full}`,
+          description: weekHours.short,
+          tooltip: `${formatWeekRange(weekStart, today)}; ${weekHours.full}`,
           collapsibleState: this.getCollapsibleState("group-week", true),
           type: "week-group",
           contextValue: "week-group",
