@@ -316,6 +316,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     const total = calculateTotal(entries);
 
     let description = "";
+    let tooltip: string | undefined;
     if (isLoaded) {
       const defaultSchedule = getWeeklySchedule();
       const { start, end } = this.getMonthDateRange({ year, month });
@@ -325,13 +326,16 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         this.monthlySchedules,
         defaultSchedule
       );
-      description = formatHoursWithComparison(total, available);
+      const hours = formatHoursWithComparison(total, available);
+      description = hours.short;
+      tooltip = hours.full;
     }
 
     return {
       id: nodeId,
       label,
       description,
+      tooltip,
       collapsibleState: this.getCollapsibleState(nodeId, true),
       type: "month-group",
       _monthYear: { year, month },
@@ -458,7 +462,8 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         {
           id: "group-today",
           label: `Today (${dayName} ${dayNum})`,
-          description: formatHoursWithComparison(todayTotal, todayAvailable),
+          description: formatHoursWithComparison(todayTotal, todayAvailable).short,
+          tooltip: formatHoursWithComparison(todayTotal, todayAvailable).full,
           collapsibleState: this.getCollapsibleState("group-today", true),
           type: "group",
           contextValue: "day-group",
@@ -468,8 +473,8 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         {
           id: "group-week",
           label: `This Week (${weekNum})`,
-          description: formatHoursWithComparison(weekTotal, weekAvailable),
-          tooltip: "Shows working days from Monday up to today",
+          description: formatHoursWithComparison(weekTotal, weekAvailable).short,
+          tooltip: formatHoursWithComparison(weekTotal, weekAvailable).full,
           collapsibleState: this.getCollapsibleState("group-week", true),
           type: "week-group",
           contextValue: "week-group",
@@ -623,10 +628,12 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const available = getHoursForDateMonthly(date, this.monthlySchedules, defaultSchedule);
 
       const nodeId = `${idPrefix}-day-${dateStr}`;
+      const hours = formatHoursWithComparison(total, available);
       return {
         id: nodeId,
         label: `${dayName} ${dayNum}`,
-        description: formatHoursWithComparison(total, available),
+        description: hours.short,
+        tooltip: hours.full,
         collapsibleState: this.getCollapsibleState(nodeId, dateEntries.length > 0),
         type: "day-group" as const,
         contextValue: "day-group",
@@ -705,11 +712,12 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       // Show year suffix for cross-year weeks (Week 1 or 52/53 that span year boundaries)
       const weekSpansYears = weekRange.start.slice(0, 4) !== weekRange.end.slice(0, 4);
       const yearSuffix = weekSpansYears || year !== currentYear ? ` '${year % 100}` : "";
+      const hours = formatHoursWithComparison(total, available);
       return {
         id: nodeId,
         label: `Week ${weekNum}${yearSuffix}`,
-        description: formatHoursWithComparison(total, available),
-        tooltip: `${rangeStart} to ${rangeEnd}`,
+        description: hours.short,
+        tooltip: `${rangeStart} to ${rangeEnd} — ${hours.full}`,
         collapsibleState: this.getCollapsibleState(nodeId, true),
         type: "week-subgroup" as const,
         contextValue: "week-group",
@@ -950,11 +958,14 @@ function calculateTotal(entries: TimeEntry[]): number {
 function formatHoursWithComparison(
   logged: number,
   available: number
-): string {
+): { short: string; full: string } {
   if (available === 0) {
-    return formatHoursAsHHMM(logged);
+    const text = formatHoursAsHHMM(logged);
+    return { short: text, full: text };
   }
 
   const percentage = Math.round((logged / available) * 100);
-  return `${formatHoursAsHHMM(logged)}/${formatHoursAsHHMM(available)} (${percentage}%)`;
+  const full = `${formatHoursAsHHMM(logged)}/${formatHoursAsHHMM(available)} (${percentage}%)`;
+  const short = `${formatHoursAsHHMM(logged)} (${percentage}%)`;
+  return { short, full };
 }
