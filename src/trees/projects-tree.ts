@@ -200,8 +200,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
       treeItem.contextValue = "project-empty";
     }
 
-    // Set tooltip with project details and custom fields
-    treeItem.tooltip = createProjectTooltip(project, this.server);
+    // Tooltip set lazily via resolveTreeItem (includes members)
 
     return treeItem;
   }
