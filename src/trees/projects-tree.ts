@@ -138,9 +138,12 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
 
   async resolveTreeItem(item: vscode.TreeItem, element: TreeItem): Promise<vscode.TreeItem> {
     if (isProjectNode(element) && this.server) {
-      const showMembers = vscode.workspace.getConfiguration("redmyne").get<boolean>("showProjectMembers", true);
+      const config = vscode.workspace.getConfiguration("redmyne");
+      const showMembers = config.get<boolean>("showProjectMembers", true);
+      const excludeIds = config.get<number[]>("hideProjectMembersFor", []);
+      const shouldFetch = showMembers && !excludeIds.includes(element.project.id);
       try {
-        const members = showMembers ? await this.server.getMemberships(element.project.id) : undefined;
+        const members = shouldFetch ? await this.server.getMemberships(element.project.id) : undefined;
         item.tooltip = createProjectTooltip(element.project, this.server, members);
       } catch {
         item.tooltip = createProjectTooltip(element.project, this.server);

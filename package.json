@@ -2200,6 +2200,12 @@
           "default": true,
           "markdownDescription": "**Show project members in tooltips**\n\nDisplay team members and their roles when hovering over projects in the Issues tree and Gantt view."
         },
+        "redmyne.hideProjectMembersFor": {
+          "type": "array",
+          "items": { "type": "number" },
+          "default": [],
+          "markdownDescription": "**Hide members for specific projects**\n\nList of project IDs to exclude from member display. Useful for large umbrella projects with many members.\n\nExample: `[464, 825]`"
+        },
         "redmyne.caFile": {
           "type": "string",
           "scope": "machine",

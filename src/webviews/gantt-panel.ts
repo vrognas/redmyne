@@ -717,11 +717,13 @@ export class GanttPanel {
     this._flexibilityCache = flexibilityCache;
 
     // Pre-fetch memberships for all projects (uses server cache)
-    const showMembers = vscode.workspace.getConfiguration("redmyne").get<boolean>("showProjectMembers", true);
+    const config = vscode.workspace.getConfiguration("redmyne");
+    const showMembers = config.get<boolean>("showProjectMembers", true);
+    const excludeIds = config.get<number[]>("hideProjectMembersFor", []);
     if (showMembers && this._server) {
       const server = this._server;
       await Promise.all(
-        this._projects.map(async (p) => {
+        this._projects.filter((p) => !excludeIds.includes(p.id)).map(async (p) => {
           try {
             const members = await server.getMemberships(p.id);
             this._membershipsCache.set(p.id, members);
