@@ -54,7 +54,7 @@ describe("registerIssueContextCommands", () => {
   it("registers issue context command surface", () => {
     const disposables = registerCommands();
 
-    expect(disposables).toHaveLength(17);
+    expect(disposables).toHaveLength(11);
     expect(Array.from(handlers.keys())).toEqual(
       expect.arrayContaining([
         "redmyne.setDoneRatio",
@@ -65,15 +65,9 @@ describe("registerIssueContextCommands", () => {
         "redmyne.showProjectInGantt",
         "redmyne.revealIssueInTree",
         "redmyne.revealProjectInTree",
-        "redmyne.toggleAutoUpdateDoneRatio",
-        "redmyne.toggleAdHoc",
         "redmyne.contributeToIssue",
         "redmyne.removeContribution",
-        "redmyne.togglePrecedence",
         "redmyne.setIssuePriority",
-        "redmyne.setAutoUpdateDoneRatio",
-        "redmyne.setAdHoc",
-        "redmyne.setPrecedence",
       ])
     );
   });
@@ -286,34 +280,6 @@ describe("registerIssueContextCommands", () => {
     expect(reveal).toHaveBeenCalledTimes(2);
   });
 
-  it("routes explicit toggles to trackers and precedence helpers", async () => {
-    const enableSpy = vi.spyOn(autoUpdateTracker, "enable").mockResolvedValue(undefined);
-    const disableSpy = vi.spyOn(autoUpdateTracker, "disable").mockResolvedValue(undefined);
-    const tagSpy = vi.spyOn(adHocTracker, "tag").mockResolvedValue(undefined);
-    const untagSpy = vi.spyOn(adHocTracker, "untag").mockResolvedValue(undefined);
-    const setPrecedenceSpy = vi.spyOn(precedenceTracker, "setPrecedence").mockResolvedValue(undefined);
-    const clearPrecedenceSpy = vi.spyOn(precedenceTracker, "clearPrecedence").mockResolvedValue(undefined);
-    vi.spyOn(precedenceTracker, "togglePrecedence").mockResolvedValue(true);
-
-    registerCommands();
-
-    await handlers.get("redmyne.setAutoUpdateDoneRatio")?.({ id: 1, value: true });
-    await handlers.get("redmyne.setAutoUpdateDoneRatio")?.({ id: 1, value: false });
-    await handlers.get("redmyne.setAdHoc")?.({ id: 2, value: true });
-    await handlers.get("redmyne.setAdHoc")?.({ id: 2, value: false });
-    await handlers.get("redmyne.setPrecedence")?.({ id: 3, value: true });
-    await handlers.get("redmyne.setPrecedence")?.({ id: 3, value: false });
-    await handlers.get("redmyne.togglePrecedence")?.({ id: 3 });
-
-    expect(enableSpy).toHaveBeenCalledWith(1);
-    expect(disableSpy).toHaveBeenCalledWith(1);
-    expect(tagSpy).toHaveBeenCalledWith(2);
-    expect(untagSpy).toHaveBeenCalledWith(2);
-    expect(setPrecedenceSpy).toHaveBeenCalledWith(3);
-    expect(clearPrecedenceSpy).toHaveBeenCalledWith(3);
-    expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.refreshGanttData");
-  });
-
   it("handles no-selection and invalid-selection branches", async () => {
     const mockServer = {
       updateDoneRatio: vi.fn().mockResolvedValue(undefined),
@@ -366,10 +332,6 @@ describe("registerIssueContextCommands", () => {
     await handlers.get("redmyne.setIssuePriority")?.({ id: 44 });
     await handlers.get("redmyne.revealIssueInTree")?.(0);
     await handlers.get("redmyne.revealProjectInTree")?.(-1);
-    await handlers.get("redmyne.toggleAutoUpdateDoneRatio")?.(undefined);
-    await handlers.get("redmyne.setAutoUpdateDoneRatio")?.(undefined);
-    await handlers.get("redmyne.setAdHoc")?.(undefined);
-    await handlers.get("redmyne.setPrecedence")?.(undefined);
 
     registerCommands();
     await handlers.get("redmyne.setDoneRatio")?.({ id: 99, percentage: 40 });
@@ -408,7 +370,6 @@ describe("registerIssueContextCommands", () => {
   });
 
   it("routes ad-hoc wrapper commands through callbacks and refreshes", async () => {
-    const toggleAdHocSpy = vi.spyOn(adhocCommands, "toggleAdHoc").mockResolvedValue(undefined as never);
     const contributeSpy = vi.spyOn(adhocCommands, "contributeToIssue").mockImplementation(
       (_item, _server, onDone) => {
         onDone();
@@ -427,11 +388,9 @@ describe("registerIssueContextCommands", () => {
       refreshTimeEntries,
     });
 
-    await handlers.get("redmyne.toggleAdHoc")?.({ id: 10 });
     await handlers.get("redmyne.contributeToIssue")?.({ entry_id: 100 });
     await handlers.get("redmyne.removeContribution")?.({ entry_id: 101 });
 
-    expect(toggleAdHocSpy).toHaveBeenCalled();
     expect(contributeSpy).toHaveBeenCalledWith(
       { entry_id: 100 },
       mockTimeServer,

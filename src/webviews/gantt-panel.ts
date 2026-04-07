@@ -1427,7 +1427,12 @@ export class GanttPanel {
         break;
       case "toggleAutoUpdate":
         if (message.issueId) {
-          vscode.commands.executeCommand("redmyne.toggleAutoUpdateDoneRatio", { id: message.issueId });
+          autoUpdateTracker.toggle(message.issueId).then((nowEnabled) => {
+            showStatusBarMessage(
+              nowEnabled ? `$(check) Auto-update %done enabled for #${message.issueId}` : `$(x) Auto-update %done disabled for #${message.issueId}`,
+              2000
+            );
+          });
         }
         break;
       case "toggleAdHoc":

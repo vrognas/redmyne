@@ -500,21 +500,6 @@
         "title": "Sort by Issue ID"
       },
       {
-        "command": "redmyne.toggleAutoUpdateDoneRatio",
-        "title": "Toggle Auto-update % Done",
-        "icon": "$(sync)"
-      },
-      {
-        "command": "redmyne.toggleAdHoc",
-        "title": "Toggle Ad-hoc Budget",
-        "icon": "$(package)"
-      },
-      {
-        "command": "redmyne.togglePrecedence",
-        "title": "Toggle Precedence Priority",
-        "icon": "$(arrow-up)"
-      },
-      {
         "command": "redmyne.gantt.updateIssue",
         "title": "Update Issue..."
       },
@@ -1171,10 +1156,6 @@
         },
         {
           "command": "redmyne.kanban.sortIssueId",
-          "when": "false"
-        },
-        {
-          "command": "redmyne.toggleAutoUpdateDoneRatio",
           "when": "false"
         },
         {

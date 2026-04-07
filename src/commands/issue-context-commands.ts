@@ -2,9 +2,7 @@ import * as vscode from "vscode";
 import { Issue } from "../redmine/models/issue";
 import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { autoUpdateTracker } from "../utilities/auto-update-tracker";
-import { adHocTracker } from "../utilities/adhoc-tracker";
-import { toggleAdHoc, contributeToIssue, removeContribution } from "./adhoc-commands";
-import { togglePrecedence, setPrecedence, clearPrecedence } from "../utilities/precedence-tracker";
+import { contributeToIssue, removeContribution } from "./adhoc-commands";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { setInternalEstimate } from "../utilities/internal-estimates";
 import { parseTimeInput } from "../utilities/time-input";
@@ -298,23 +296,6 @@ export function registerIssueContextCommands(
       }
     }),
 
-    // Toggle auto-update %done
-    vscode.commands.registerCommand("redmyne.toggleAutoUpdateDoneRatio", async (issue: { id: number } | undefined) => {
-      if (!ensureIssueId(issue)) return;
-      const issueId = issue.id;
-
-      const nowEnabled = await autoUpdateTracker.toggle(issueId);
-      showStatusBarMessage(
-        nowEnabled
-          ? `$(check) Auto-update %done enabled for #${issueId}`
-          : `$(x) Auto-update %done disabled for #${issueId}`,
-        2000
-      );
-    }),
-
-    // Toggle ad-hoc budget tag for issue
-    vscode.commands.registerCommand("redmyne.toggleAdHoc", toggleAdHoc),
-
     // Contribute time entry hours to another issue
     vscode.commands.registerCommand("redmyne.contributeToIssue", (item) =>
       contributeToIssue(item, deps.getTimeEntriesServer(), () => {
@@ -330,19 +311,6 @@ export function registerIssueContextCommands(
         refreshGanttData();
       })
     ),
-
-    // Toggle precedence priority
-    vscode.commands.registerCommand("redmyne.togglePrecedence", async (issue: { id: number } | undefined) => {
-      if (!ensureIssueId(issue)) return;
-      const issueId = issue.id;
-
-      const isNow = await togglePrecedence(issueId);
-      showStatusBarMessage(
-        isNow ? `$(check) #${issueId} tagged with precedence` : `$(check) #${issueId} precedence removed`,
-        2000
-      );
-      refreshGanttData();
-    }),
 
     // Set issue priority (pattern-based or picker)
     vscode.commands.registerCommand(
@@ -385,58 +353,6 @@ export function registerIssueContextCommands(
       }
     ),
 
-    // Set auto-update %done (explicit on/off)
-    vscode.commands.registerCommand(
-      "redmyne.setAutoUpdateDoneRatio",
-      async (issue: { id: number; value: boolean } | undefined) => {
-        if (!ensureIssueId(issue)) return;
-        const issueId = issue.id;
-
-        if (issue.value) {
-          await autoUpdateTracker.enable(issueId);
-          showStatusBarMessage(`$(check) Auto-update %done enabled for #${issueId}`, 2000);
-        } else {
-          await autoUpdateTracker.disable(issueId);
-          showStatusBarMessage(`$(x) Auto-update %done disabled for #${issueId}`, 2000);
-        }
-      }
-    ),
-
-    // Set ad-hoc budget (explicit on/off)
-    vscode.commands.registerCommand(
-      "redmyne.setAdHoc",
-      async (issue: { id: number; value: boolean } | undefined) => {
-        if (!ensureIssueId(issue)) return;
-        const issueId = issue.id;
-
-        if (issue.value) {
-          await adHocTracker.tag(issueId);
-          showStatusBarMessage(`$(check) #${issueId} tagged as ad-hoc budget`, 2000);
-        } else {
-          await adHocTracker.untag(issueId);
-          showStatusBarMessage(`$(check) #${issueId} ad-hoc budget removed`, 2000);
-        }
-        refreshGanttData();
-      }
-    ),
-
-    // Set precedence (explicit on/off)
-    vscode.commands.registerCommand(
-      "redmyne.setPrecedence",
-      async (issue: { id: number; value: boolean } | undefined) => {
-        if (!ensureIssueId(issue)) return;
-        const issueId = issue.id;
-
-        if (issue.value) {
-          await setPrecedence(issueId);
-          showStatusBarMessage(`$(check) #${issueId} tagged with precedence`, 2000);
-        } else {
-          await clearPrecedence(issueId);
-          showStatusBarMessage(`$(check) #${issueId} precedence removed`, 2000);
-        }
-        refreshGanttData();
-      }
-    )
   );
 
   return disposables;
