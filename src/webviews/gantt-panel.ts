@@ -3412,6 +3412,12 @@ export class GanttPanel {
 
     let tooltip = `#${row.id} ${row.label}\n\n`;
 
+    // Show parent project (client)
+    const project = this._projects.find((p) => p.id === row.id);
+    if (project?.parent?.name) {
+      tooltip += `Client: ${project.parent.name}\n\n`;
+    }
+
     if (baseDetails) {
       tooltip += `${baseDetails}\n\n`;
     }
@@ -3423,15 +3429,24 @@ export class GanttPanel {
       tooltip += `${this.formatHealthTooltip(row.health)}\n\n`;
     }
 
-    // Members and roles
+    // Members grouped by role
     const members = this._membershipsCache.get(row.id);
     if (members && members.length > 0) {
-      tooltip += "---\n\nMembers:\n";
-      for (const m of members.filter((m) => m.isUser)) {
-        const roles = m.roles.length > 0 ? ` — ${m.roles.join(", ")}` : "";
-        tooltip += `${m.name}${roles}\n`;
+      const users = members.filter((m) => m.isUser);
+      const byRole = new Map<string, string[]>();
+      for (const m of users) {
+        for (const role of m.roles.length > 0 ? m.roles : ["Other"]) {
+          if (!byRole.has(role)) byRole.set(role, []);
+          byRole.get(role)!.push(m.name);
+        }
       }
-      tooltip += "\n";
+      if (byRole.size > 0) {
+        tooltip += "---\n\n";
+        for (const [role, names] of byRole) {
+          tooltip += `${role}: ${names.join(", ")}\n`;
+        }
+        tooltip += "\n";
+      }
     }
 
     if (this._server && row.identifier) {

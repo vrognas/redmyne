@@ -323,13 +323,25 @@ export function createProjectTooltip(
     }
   }
 
-  // Members and roles
+  // Members grouped by role
   if (members && members.length > 0) {
-    md.appendMarkdown("---\n\n**Members:**\n\n");
-    for (const m of members.filter((m) => m.isUser)) {
-      const roles = m.roles.length > 0 ? ` — ${m.roles.join(", ")}` : "";
-      md.appendText(`${m.name}${roles}`);
-      md.appendMarkdown("\n\n");
+    const users = members.filter((m) => m.isUser);
+    const byRole = new Map<string, string[]>();
+    for (const m of users) {
+      for (const role of m.roles.length > 0 ? m.roles : ["Other"]) {
+        if (!byRole.has(role)) byRole.set(role, []);
+        byRole.get(role)!.push(m.name);
+      }
+    }
+    if (byRole.size > 0) {
+      md.appendMarkdown("---\n\n");
+      for (const [role, names] of byRole) {
+        md.appendMarkdown("**");
+        md.appendText(`${role}:`);
+        md.appendMarkdown("** ");
+        md.appendText(names.join(", "));
+        md.appendMarkdown("\n\n");
+      }
     }
   }
 
