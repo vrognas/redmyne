@@ -464,7 +464,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
           label: `Today (${dayName} ${dayNum})`,
           description: formatHoursWithComparison(todayTotal, todayAvailable).short,
           tooltip: formatHoursWithComparison(todayTotal, todayAvailable).full,
-          collapsibleState: this.getCollapsibleState("group-today", true),
+          collapsibleState: this.getCollapsibleState("group-today", todayWithDrafts.length > 0),
           type: "group",
           contextValue: "day-group",
           _cachedEntries: todayWithDrafts,
