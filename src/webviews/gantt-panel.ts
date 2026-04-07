@@ -1432,19 +1432,19 @@ export class GanttPanel {
         break;
       case "toggleAdHoc":
         if (message.issueId) {
-          const isNowAdHoc = adHocTracker.toggle(message.issueId);
-          showStatusBarMessage(
-            isNowAdHoc ? `$(check) #${message.issueId} tagged as ad-hoc` : `$(check) #${message.issueId} ad-hoc tag removed`,
-            2000
-          );
-          // Refresh Gantt to update contribution data
-          this._isRefreshing = true;
-          vscode.commands.executeCommand("redmyne.refreshIssues");
+          adHocTracker.toggle(message.issueId).then((isNowAdHoc) => {
+            showStatusBarMessage(
+              isNowAdHoc ? `$(check) #${message.issueId} tagged as ad-hoc` : `$(check) #${message.issueId} ad-hoc tag removed`,
+              2000
+            );
+            this._isRefreshing = true;
+            vscode.commands.executeCommand("redmyne.refreshIssues");
+          });
         }
         break;
       case "togglePrecedence":
-        if (message.issueId && GanttPanel._globalState) {
-          togglePrecedence(GanttPanel._globalState, message.issueId).then((isNowPrecedence) => {
+        if (message.issueId) {
+          togglePrecedence(message.issueId).then((isNowPrecedence) => {
             showStatusBarMessage(
               isNowPrecedence
                 ? `$(check) #${message.issueId} tagged with precedence priority`
@@ -2028,9 +2028,7 @@ export class GanttPanel {
     const internalEstimates: InternalEstimates = GanttPanel._globalState
       ? getInternalEstimates(GanttPanel._globalState)
       : new Map();
-    const precedenceIssues: Set<number> = GanttPanel._globalState
-      ? getPrecedenceIssues(GanttPanel._globalState)
-      : new Set();
+    const precedenceIssues = getPrecedenceIssues();
     const issueScheduleMap = new Map<number, Map<string, number>>();
     const dayScheduleMap = new Map<string, { issueId: number; hours: number; project: string }[]>();
     // Always build issueScheduleMap in person view for instant intensity toggle
@@ -2382,7 +2380,7 @@ export class GanttPanel {
       buildProjectTooltip: (row: GanttRow) => this.buildProjectTooltip(row),
       getHealthDot: (status: string) => this.getHealthDot(status as "green" | "yellow" | "red" | "grey"),
       getInternalEstimate: (issueId: number) => GanttPanel._globalState ? getInternalEstimate(GanttPanel._globalState, issueId) : null,
-      hasPrecedence: (issueId: number) => GanttPanel._globalState ? hasPrecedence(GanttPanel._globalState, issueId) : false,
+      hasPrecedence: (issueId: number) => hasPrecedence(issueId),
       isAutoUpdateEnabled: (issueId: number) => autoUpdateTracker.isEnabled(issueId),
     } as GanttRenderContext;
 

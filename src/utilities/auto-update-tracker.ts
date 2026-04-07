@@ -1,50 +1,41 @@
 import * as vscode from "vscode";
 
-/**
- * Tracks which issues have auto-update %done enabled (opt-in per issue)
- * Persisted in workspace state
- */
+const SETTING_KEY = "autoUpdateIssues";
+
+function getIds(): number[] {
+  return vscode.workspace.getConfiguration("redmyne").get<number[]>(SETTING_KEY, []);
+}
+
+async function setIds(ids: number[]): Promise<void> {
+  await vscode.workspace.getConfiguration("redmyne").update(SETTING_KEY, ids, vscode.ConfigurationTarget.Global);
+}
+
 class AutoUpdateTracker {
-  private context: vscode.ExtensionContext | null = null;
-  private readonly STORAGE_KEY = "redmyne.autoUpdateEnabledIssues";
-
-  initialize(context: vscode.ExtensionContext): void {
-    this.context = context;
-  }
-
-  private getEnabledIssues(): Set<number> {
-    if (!this.context) return new Set();
-    const stored = this.context.globalState.get<number[]>(this.STORAGE_KEY, []);
-    return new Set(stored);
-  }
-
-  private saveEnabledIssues(issues: Set<number>): void {
-    if (!this.context) return;
-    this.context.globalState.update(this.STORAGE_KEY, Array.from(issues));
-  }
+  /** @deprecated No-op, kept for migration compatibility */
+  initialize(_context: unknown): void { /* no-op */ }
 
   isEnabled(issueId: number): boolean {
-    return this.getEnabledIssues().has(issueId);
+    return getIds().includes(issueId);
   }
 
-  enable(issueId: number): void {
-    const issues = this.getEnabledIssues();
-    issues.add(issueId);
-    this.saveEnabledIssues(issues);
+  async enable(issueId: number): Promise<void> {
+    const ids = getIds();
+    if (!ids.includes(issueId)) {
+      await setIds([...ids, issueId]);
+    }
   }
 
-  disable(issueId: number): void {
-    const issues = this.getEnabledIssues();
-    issues.delete(issueId);
-    this.saveEnabledIssues(issues);
+  async disable(issueId: number): Promise<void> {
+    const ids = getIds();
+    await setIds(ids.filter((id) => id !== issueId));
   }
 
-  toggle(issueId: number): boolean {
+  async toggle(issueId: number): Promise<boolean> {
     if (this.isEnabled(issueId)) {
-      this.disable(issueId);
+      await this.disable(issueId);
       return false;
     } else {
-      this.enable(issueId);
+      await this.enable(issueId);
       return true;
     }
   }

@@ -303,7 +303,7 @@ export function registerIssueContextCommands(
       if (!ensureIssueId(issue)) return;
       const issueId = issue.id;
 
-      const nowEnabled = autoUpdateTracker.toggle(issueId);
+      const nowEnabled = await autoUpdateTracker.toggle(issueId);
       showStatusBarMessage(
         nowEnabled
           ? `$(check) Auto-update %done enabled for #${issueId}`
@@ -336,7 +336,7 @@ export function registerIssueContextCommands(
       if (!ensureIssueId(issue)) return;
       const issueId = issue.id;
 
-      const isNow = await togglePrecedence(deps.globalState, issueId);
+      const isNow = await togglePrecedence(issueId);
       showStatusBarMessage(
         isNow ? `$(check) #${issueId} tagged with precedence` : `$(check) #${issueId} precedence removed`,
         2000
@@ -428,10 +428,10 @@ export function registerIssueContextCommands(
         const issueId = issue.id;
 
         if (issue.value) {
-          await setPrecedence(deps.globalState, issueId);
+          await setPrecedence(issueId);
           showStatusBarMessage(`$(check) #${issueId} tagged with precedence`, 2000);
         } else {
-          await clearPrecedence(deps.globalState, issueId);
+          await clearPrecedence(issueId);
           showStatusBarMessage(`$(check) #${issueId} precedence removed`, 2000);
         }
         refreshGanttData();

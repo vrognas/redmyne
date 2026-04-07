@@ -309,8 +309,8 @@ describe("registerIssueContextCommands", () => {
     expect(disableSpy).toHaveBeenCalledWith(1);
     expect(tagSpy).toHaveBeenCalledWith(2);
     expect(untagSpy).toHaveBeenCalledWith(2);
-    expect(setPrecedenceSpy).toHaveBeenCalledWith(expect.anything(), 3);
-    expect(clearPrecedenceSpy).toHaveBeenCalledWith(expect.anything(), 3);
+    expect(setPrecedenceSpy).toHaveBeenCalledWith(3);
+    expect(clearPrecedenceSpy).toHaveBeenCalledWith(3);
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.refreshGanttData");
   });
 

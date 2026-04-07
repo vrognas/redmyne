@@ -532,8 +532,6 @@ describe("extension lifecycle", () => {
 
     expect(hoisted.runMigration).toHaveBeenCalledWith(context);
     expect(hoisted.initRecentIssues).toHaveBeenCalledWith(context);
-    expect(hoisted.autoUpdateInit).toHaveBeenCalledWith(context);
-    expect(hoisted.adHocInit).toHaveBeenCalledWith(context);
     expect(hoisted.updateClipboardContext).toHaveBeenCalled();
     expect(hoisted.draftModeManager.initialize).toHaveBeenCalled();
     expect(hoisted.draftModeManager.disable).toHaveBeenCalled();

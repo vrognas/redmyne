@@ -1,55 +1,40 @@
-/**
- * Precedence priority tracker - tags issues that should be scheduled before all others.
- * Stored locally in VS Code globalState (not synced to Redmine).
- */
-
 import * as vscode from "vscode";
 
-const STORAGE_KEY = "redmyne.precedenceIssues";
+const SETTING_KEY = "precedenceIssues";
 
-/**
- * Get all issue IDs tagged with precedence priority
- */
-export function getPrecedenceIssues(globalState: vscode.Memento): Set<number> {
-  const stored = globalState.get<number[]>(STORAGE_KEY, []);
-  return new Set(stored);
+function getIds(): number[] {
+  return vscode.workspace.getConfiguration("redmyne").get<number[]>(SETTING_KEY, []);
 }
 
-/**
- * Check if an issue has precedence priority
- */
-export function hasPrecedence(globalState: vscode.Memento, issueId: number): boolean {
-  return getPrecedenceIssues(globalState).has(issueId);
+async function setIds(ids: number[]): Promise<void> {
+  await vscode.workspace.getConfiguration("redmyne").update(SETTING_KEY, ids, vscode.ConfigurationTarget.Global);
 }
 
-/**
- * Set precedence priority for an issue
- */
-export async function setPrecedence(globalState: vscode.Memento, issueId: number): Promise<void> {
-  const issues = getPrecedenceIssues(globalState);
-  issues.add(issueId);
-  await globalState.update(STORAGE_KEY, Array.from(issues));
+export function getPrecedenceIssues(): Set<number> {
+  return new Set(getIds());
 }
 
-/**
- * Remove precedence priority from an issue
- */
-export async function clearPrecedence(globalState: vscode.Memento, issueId: number): Promise<void> {
-  const issues = getPrecedenceIssues(globalState);
-  issues.delete(issueId);
-  await globalState.update(STORAGE_KEY, Array.from(issues));
+export function hasPrecedence(issueId: number): boolean {
+  return getIds().includes(issueId);
 }
 
-/**
- * Toggle precedence priority for an issue
- * Returns true if precedence is now set, false if cleared
- */
-export async function togglePrecedence(globalState: vscode.Memento, issueId: number): Promise<boolean> {
-  if (hasPrecedence(globalState, issueId)) {
-    await clearPrecedence(globalState, issueId);
+export async function setPrecedence(issueId: number): Promise<void> {
+  const ids = getIds();
+  if (!ids.includes(issueId)) {
+    await setIds([...ids, issueId]);
+  }
+}
+
+export async function clearPrecedence(issueId: number): Promise<void> {
+  await setIds(getIds().filter((id) => id !== issueId));
+}
+
+export async function togglePrecedence(issueId: number): Promise<boolean> {
+  if (hasPrecedence(issueId)) {
+    await clearPrecedence(issueId);
     return false;
   } else {
-    await setPrecedence(globalState, issueId);
+    await setPrecedence(issueId);
     return true;
   }
 }

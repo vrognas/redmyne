@@ -49,7 +49,8 @@ export type GanttWebviewMessage =
   | { command: "setSelectedKey"; collapseKey?: string | null }
   | { command: "setSort"; sortBy?: "id" | "assignee" | "start" | "due" | "status" | null; sortOrder?: "asc" | "desc" }
   | { command: "showStatus"; message?: string }
-  | { command: "setAllProjectsVisibility"; projectIds?: number[]; visible?: boolean };
+  | { command: "setAllProjectsVisibility"; projectIds?: number[]; visible?: boolean }
+  | { command: "requestProjectMembers"; projectId?: number };
 
 const LOOKBACK_VALUES = new Set(["2", "5", "10", ""]);
 

@@ -38,8 +38,6 @@ import { registerViewCommands } from "./commands/view-commands";
 import { registerContextProxyCommands } from "./commands/context-proxy-commands";
 import { registerCreateTestIssuesCommand } from "./commands/create-test-issues";
 import { WorkloadStatusBar } from "./status-bars/workload-status-bar";
-import { autoUpdateTracker } from "./utilities/auto-update-tracker";
-import { adHocTracker } from "./utilities/adhoc-tracker";
 import { debounce, DebouncedFunction } from "./utilities/debounce";
 import { runMigration } from "./utilities/migration";
 import { initRecentIssues } from "./utilities/recent-issues";
@@ -85,12 +83,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Initialize recent issues tracker
   initRecentIssues(context);
-
-  // Initialize auto-update tracker
-  autoUpdateTracker.initialize(context);
-
-  // Initialize ad-hoc budget tracker
-  adHocTracker.initialize(context);
 
   // Initialize time entry clipboard context (for copy/paste)
   updateClipboardContext();

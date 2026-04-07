@@ -54,7 +54,7 @@ export async function toggleAdHoc(item: IssueItem | undefined): Promise<void> {
     return;
   }
 
-  const isNowAdHoc = adHocTracker.toggle(item.id);
+  const isNowAdHoc = await adHocTracker.toggle(item.id);
 
   vscode.window.showInformationMessage(
     isNowAdHoc
