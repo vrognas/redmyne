@@ -55,7 +55,7 @@ describe("migration", () => {
   describe("runMigration", () => {
     it("skips migration if already at current version", async () => {
       const context = createMockContext();
-      context._stateStore["redmyne.migrationVersion"] = 1;
+      context._stateStore["redmyne.migrationVersion"] = 2;
 
       await runMigration(context);
 
@@ -123,7 +123,7 @@ describe("migration", () => {
 
       await runMigration(context);
 
-      expect(context._stateStore["redmyne.migrationVersion"]).toBe(1);
+      expect(context._stateStore["redmyne.migrationVersion"]).toBe(2);
     });
 
     it("handles empty migration gracefully", async () => {
@@ -132,7 +132,7 @@ describe("migration", () => {
       await runMigration(context);
 
       // Should complete without errors
-      expect(context._stateStore["redmyne.migrationVersion"]).toBe(1);
+      expect(context._stateStore["redmyne.migrationVersion"]).toBe(2);
     });
   });
 });

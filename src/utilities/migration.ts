@@ -6,7 +6,7 @@
 import * as vscode from "vscode";
 
 const MIGRATION_VERSION_KEY = "redmyne.migrationVersion";
-const CURRENT_MIGRATION_VERSION = 1;
+const CURRENT_MIGRATION_VERSION = 2;
 
 /** Old → New key mappings for globalState */
 const GLOBAL_STATE_MIGRATIONS: [string, string][] = [
@@ -112,6 +112,24 @@ export async function runMigration(
   for (const [oldKey, newKey] of SECRET_MIGRATIONS) {
     if (await migrateSecretKey(context.secrets, oldKey, newKey)) {
       migratedCount++;
+    }
+  }
+
+  // V2: Move tracker data from globalState to vscode settings
+  if (currentVersion < 2) {
+    const config = vscode.workspace.getConfiguration("redmyne");
+    const trackerMigrations: [string, string][] = [
+      ["redmyne.autoUpdateEnabledIssues", "autoUpdateIssues"],
+      ["redmyne.adHocIssues", "adHocBudgetIssues"],
+      ["redmyne.precedenceIssues", "precedenceIssues"],
+    ];
+    for (const [gsKey, settingKey] of trackerMigrations) {
+      const ids = context.globalState.get<number[]>(gsKey);
+      if (ids && ids.length > 0) {
+        await config.update(settingKey, ids, vscode.ConfigurationTarget.Global);
+        await context.globalState.update(gsKey, undefined);
+        migratedCount++;
+      }
     }
   }
 
