@@ -189,6 +189,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   cleanupResources.myTimeEntriesTreeView = vscode.window.createTreeView("redmyne-explorer-my-time-entries", {
     treeDataProvider: myTimeEntriesTree,
+    showCollapseAll: true,
   });
   myTimeEntriesTree.setTreeView(cleanupResources.myTimeEntriesTreeView as vscode.TreeView<import("./trees/my-time-entries-tree").TimeEntryNode>);
   myTimeEntriesTree.setMonthlySchedules(cleanupResources.monthlySchedules ?? {});
