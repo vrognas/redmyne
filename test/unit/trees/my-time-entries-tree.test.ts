@@ -875,6 +875,67 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     expect(weekGroups[0].type).toBe("week-subgroup");
   });
 
+  it("boundary week dateRange is clipped to month boundary", async () => {
+    mockServer.getTimeEntries.mockResolvedValue({ time_entries: [] });
+
+    const groups = await getLoadedGroups();
+    // Expand last month (groups[3]) and current month (groups[2])
+    const lastMonth = groups[3];
+    const thisMonth = groups[2];
+    expect(lastMonth.type).toBe("month-group");
+    expect(thisMonth.type).toBe("month-group");
+
+    // Load both months
+    await provider.getChildren(lastMonth);
+    const lastMonthWeeks = await waitUntilLoaded(
+      () => provider.getChildren(lastMonth),
+      "last month weeks"
+    );
+    await provider.getChildren(thisMonth);
+    const thisMonthWeeks = await waitUntilLoaded(
+      () => provider.getChildren(thisMonth),
+      "this month weeks"
+    );
+
+    // Find a week label that appears in both months (boundary week)
+    const lastMonthLabels = lastMonthWeeks.map((w) => w.label);
+    const thisMonthLabels = thisMonthWeeks.map((w) => w.label);
+    const sharedLabel = lastMonthLabels.find((l) => thisMonthLabels.includes(l));
+
+    if (sharedLabel) {
+      // Boundary week exists — verify date ranges don't overlap
+      const inLast = lastMonthWeeks.find((w) => w.label === sharedLabel)!;
+      const inThis = thisMonthWeeks.find((w) => w.label === sharedLabel)!;
+      // Last month's range must end before this month's range starts
+      expect(inLast._dateRange!.end < inThis._dateRange!.start).toBe(true);
+    }
+    // If no shared label, month boundary aligns with week boundary — no clipping needed
+  });
+
+  it("weeks are sorted descending by week number", async () => {
+    mockServer.getTimeEntries.mockResolvedValue({ time_entries: [] });
+
+    const groups = await getLoadedGroups();
+    const targetMonth = groups[3];
+
+    await provider.getChildren(targetMonth);
+    const weekGroups = await waitUntilLoaded(
+      () => provider.getChildren(targetMonth),
+      "month weeks for sort check"
+    );
+
+    // Extract week numbers from labels like "Week 14", "Week 9"
+    const weekNums = weekGroups.map((w) => {
+      const match = w.label?.match(/Week (\d+)/);
+      return match ? parseInt(match[1], 10) : 0;
+    });
+
+    // Verify strictly descending
+    for (let i = 1; i < weekNums.length; i++) {
+      expect(weekNums[i]).toBeLessThan(weekNums[i - 1]);
+    }
+  });
+
   it("assigns command for load-earlier tree item", () => {
     const item = provider.getTreeItem({
       id: "load-earlier",
