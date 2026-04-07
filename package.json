@@ -2195,6 +2195,11 @@
           "scope": "application",
           "markdownDescription": "**Maximum concurrent API requests**\n\nLimits how many requests run simultaneously to prevent server overload.\n\n- **2** (default): Safe for most servers\n- **5-10**: For faster servers\n- **20**: Maximum, use if server handles high load\n\nReduce if you see 503 errors. Increase for faster data loading."
         },
+        "redmyne.showProjectMembers": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "**Show project members in tooltips**\n\nDisplay team members and their roles when hovering over projects in the Issues tree and Gantt view."
+        },
         "redmyne.caFile": {
           "type": "string",
           "scope": "machine",

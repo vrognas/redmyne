@@ -137,13 +137,13 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   }
 
   async resolveTreeItem(item: vscode.TreeItem, element: TreeItem): Promise<vscode.TreeItem> {
-    // Lazily add members to project tooltips on hover
     if (isProjectNode(element) && this.server) {
+      const showMembers = vscode.workspace.getConfiguration("redmyne").get<boolean>("showProjectMembers", true);
       try {
-        const members = await this.server.getMemberships(element.project.id);
+        const members = showMembers ? await this.server.getMemberships(element.project.id) : undefined;
         item.tooltip = createProjectTooltip(element.project, this.server, members);
       } catch {
-        // Keep existing tooltip on error
+        item.tooltip = createProjectTooltip(element.project, this.server);
       }
     }
     return item;

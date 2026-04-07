@@ -717,7 +717,8 @@ export class GanttPanel {
     this._flexibilityCache = flexibilityCache;
 
     // Pre-fetch memberships for all projects (uses server cache)
-    if (this._server) {
+    const showMembers = vscode.workspace.getConfiguration("redmyne").get<boolean>("showProjectMembers", true);
+    if (showMembers && this._server) {
       const server = this._server;
       await Promise.all(
         this._projects.map(async (p) => {
