@@ -634,31 +634,24 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const date = new Date((entry.spent_on || "unknown") + "T12:00:00");
       const weekNum = getISOWeekNumber(date);
       const year = getISOWeekYear(date);
-      const key = `${year}-W${weekNum}`;
+      const key = `${year}-W${String(weekNum).padStart(2, "0")}`;
       if (!byWeek.has(key)) {
         byWeek.set(key, { weekNum, year, entries: [] });
       }
       byWeek.get(key)!.entries.push(entry);
     }
 
-    // Ensure all weeks whose Monday falls within the month range are represented
+    // Ensure all weeks overlapping the month range are represented
     if (monthDateRange) {
-      const start = new Date(monthDateRange.start + "T12:00:00");
-      const end = new Date(monthDateRange.end + "T12:00:00");
-      // Advance to first Monday on or after month start
-      const current = new Date(start);
-      const dow = current.getDay();
-      if (dow !== 1) {
-        current.setDate(current.getDate() + ((8 - dow) % 7));
-      }
-      while (current <= end) {
-        const weekNum = getISOWeekNumber(current);
-        const year = getISOWeekYear(current);
-        const key = `${year}-W${weekNum}`;
+      const allDates = getDateRange(monthDateRange.start, monthDateRange.end);
+      for (const dateStr of allDates) {
+        const date = new Date(dateStr + "T12:00:00");
+        const weekNum = getISOWeekNumber(date);
+        const year = getISOWeekYear(date);
+        const key = `${year}-W${String(weekNum).padStart(2, "0")}`;
         if (!byWeek.has(key)) {
           byWeek.set(key, { weekNum, year, entries: [] });
         }
-        current.setDate(current.getDate() + 7);
       }
     }
 
@@ -678,14 +671,19 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const { weekNum, year, entries: weekEntries } = byWeek.get(key)!;
       const total = calculateTotal(weekEntries);
 
-      // Calculate week date range (Mon-Sun), capped at today
+      // Calculate week date range (Mon-Sun), capped at today and clipped to month
       const weekRange = getWeekDateRange(weekNum, year);
-      const cappedEnd = weekRange.end > today ? today : weekRange.end;
+      let rangeStart = weekRange.start;
+      let rangeEnd = weekRange.end > today ? today : weekRange.end;
+      if (monthDateRange) {
+        if (rangeStart < monthDateRange.start) rangeStart = monthDateRange.start;
+        if (rangeEnd > monthDateRange.end) rangeEnd = monthDateRange.end;
+      }
 
-      // Calculate available hours for the week range
+      // Calculate available hours for the clipped range
       const available = countAvailableHoursMonthly(
-        new Date(weekRange.start + "T12:00:00"),
-        new Date(cappedEnd + "T12:00:00"),
+        new Date(rangeStart + "T12:00:00"),
+        new Date(rangeEnd + "T12:00:00"),
         this.monthlySchedules,
         defaultSchedule
       );
@@ -698,12 +696,12 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         id: nodeId,
         label: `Week ${weekNum}${yearSuffix}`,
         description: formatHoursWithComparison(total, available),
-        tooltip: `${weekRange.start} to ${cappedEnd}`,
+        tooltip: `${rangeStart} to ${rangeEnd}`,
         collapsibleState: this.getCollapsibleState(nodeId, true),
         type: "week-subgroup" as const,
         contextValue: "week-group",
         _cachedEntries: weekEntries,
-        _dateRange: { start: weekRange.start, end: cappedEnd },
+        _dateRange: { start: rangeStart, end: rangeEnd },
         _weekStart: weekRange.start,
       };
     });
