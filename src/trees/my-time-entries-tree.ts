@@ -717,7 +717,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         id: nodeId,
         label: `Week ${weekNum}${yearSuffix}`,
         description: hours.short,
-        tooltip: `${rangeStart} to ${rangeEnd} — ${hours.full}`,
+        tooltip: `${formatWeekRange(rangeStart, rangeEnd)}; ${hours.full}`,
         collapsibleState: this.getCollapsibleState(nodeId, true),
         type: "week-subgroup" as const,
         contextValue: "week-group",
@@ -954,6 +954,21 @@ function calculateTotal(entries: TimeEntry[]): number {
   return entries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
 }
 
+
+/** Format "2026-03-02" + "2026-03-06" → "2026 March 2–6" (or cross-month) */
+function formatWeekRange(start: string, end: string): string {
+  const s = new Date(start + "T12:00:00");
+  const e = new Date(end + "T12:00:00");
+  const sMonth = s.toLocaleDateString("en-US", { month: "long" });
+  const eMonth = e.toLocaleDateString("en-US", { month: "long" });
+  if (s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth()) {
+    return `${s.getFullYear()} ${sMonth} ${s.getDate()}–${e.getDate()}`;
+  }
+  if (s.getFullYear() === e.getFullYear()) {
+    return `${s.getFullYear()} ${sMonth} ${s.getDate()} – ${eMonth} ${e.getDate()}`;
+  }
+  return `${s.getFullYear()} ${sMonth} ${s.getDate()} – ${e.getFullYear()} ${eMonth} ${e.getDate()}`;
+}
 
 function formatHoursWithComparison(
   logged: number,
