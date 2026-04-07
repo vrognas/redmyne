@@ -210,7 +210,7 @@ describe("webview panel public flows", () => {
       .mockImplementation(() => undefined);
     const toggleAdHocSpy = vi
       .spyOn(adHocTracker, "toggle")
-      .mockReturnValue(true);
+      .mockResolvedValue(true);
     const togglePrecedenceSpy = vi
       .spyOn(precedenceTracker, "togglePrecedence")
       .mockResolvedValue(true);

@@ -1,35 +1,41 @@
-import { describe, expect, it, vi } from "vitest";
-import { autoUpdateTracker } from "../../../src/utilities/auto-update-tracker";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+
+let stored: number[] = [];
+
+vi.mock("vscode", () => ({
+  workspace: {
+    getConfiguration: vi.fn(() => ({
+      get: vi.fn((_key: string, def?: unknown) => stored.length > 0 ? [...stored] : def),
+      update: vi.fn(async (_key: string, value: number[]) => { stored = value; }),
+    })),
+  },
+  ConfigurationTarget: { Global: 1 },
+}));
 
 describe("auto-update-tracker", () => {
-  it("returns false when not initialized and no-ops enable/disable", () => {
-    expect(autoUpdateTracker.isEnabled(10)).toBe(false);
-    expect(() => autoUpdateTracker.enable(10)).not.toThrow();
-    expect(() => autoUpdateTracker.disable(10)).not.toThrow();
+  let tracker: typeof import("../../../src/utilities/auto-update-tracker").autoUpdateTracker;
+
+  beforeEach(async () => {
+    stored = [];
+    vi.clearAllMocks();
+    vi.resetModules();
+    const module = await import("../../../src/utilities/auto-update-tracker");
+    tracker = module.autoUpdateTracker;
   });
 
-  it("persists enable/disable/toggle to global state after initialize", () => {
-    let stored: number[] = [];
-    const context = {
-      globalState: {
-        get: vi.fn(() => stored),
-        update: vi.fn((_key: string, value: number[]) => {
-          stored = value;
-        }),
-      },
-    };
+  it("reads and writes via settings", async () => {
+    expect(tracker.isEnabled(1)).toBe(false);
 
-    autoUpdateTracker.initialize(context as never);
-    autoUpdateTracker.enable(1);
-    autoUpdateTracker.enable(2);
-    expect(autoUpdateTracker.isEnabled(1)).toBe(true);
-    expect(autoUpdateTracker.isEnabled(2)).toBe(true);
+    await tracker.enable(1);
+    await tracker.enable(2);
+    expect(tracker.isEnabled(1)).toBe(true);
+    expect(tracker.isEnabled(2)).toBe(true);
 
-    autoUpdateTracker.disable(1);
-    expect(autoUpdateTracker.isEnabled(1)).toBe(false);
+    await tracker.disable(1);
+    expect(tracker.isEnabled(1)).toBe(false);
     expect(stored).toEqual([2]);
 
-    expect(autoUpdateTracker.toggle(2)).toBe(false);
-    expect(autoUpdateTracker.toggle(2)).toBe(true);
+    expect(await tracker.toggle(2)).toBe(false);
+    expect(await tracker.toggle(2)).toBe(true);
   });
 });

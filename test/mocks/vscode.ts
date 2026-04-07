@@ -88,7 +88,7 @@ export const window = {
 
 export const workspace = {
   getConfiguration: vi.fn(() => ({
-    get: vi.fn(),
+    get: vi.fn((_key: string, def?: unknown) => def),
     update: vi.fn(),
   })),
   workspaceFolders: [],

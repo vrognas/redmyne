@@ -73,7 +73,7 @@ export function registerIssueContextCommands(
 
         try {
           await server.updateDoneRatio(issueId, selectedValue);
-          autoUpdateTracker.disable(issueId);
+          await autoUpdateTracker.disable(issueId);
 
           const hoursInput = await vscode.window.showInputBox({
             title: `Internal Estimate: #${issueId}`,
@@ -166,7 +166,7 @@ export function registerIssueContextCommands(
 
       try {
         await Promise.all(issueIds.map((id) => server.updateDoneRatio(id, selected.value)));
-        issueIds.forEach((id) => autoUpdateTracker.disable(id));
+        await Promise.all(issueIds.map((id) => autoUpdateTracker.disable(id)));
 
         const hoursInput = await vscode.window.showInputBox({
           title: `Internal Estimate for ${issueIds.length} issues`,
@@ -303,7 +303,7 @@ export function registerIssueContextCommands(
       if (!ensureIssueId(issue)) return;
       const issueId = issue.id;
 
-      const nowEnabled = autoUpdateTracker.toggle(issueId);
+      const nowEnabled = await autoUpdateTracker.toggle(issueId);
       showStatusBarMessage(
         nowEnabled
           ? `$(check) Auto-update %done enabled for #${issueId}`
@@ -336,7 +336,7 @@ export function registerIssueContextCommands(
       if (!ensureIssueId(issue)) return;
       const issueId = issue.id;
 
-      const isNow = await togglePrecedence(deps.globalState, issueId);
+      const isNow = await togglePrecedence(issueId);
       showStatusBarMessage(
         isNow ? `$(check) #${issueId} tagged with precedence` : `$(check) #${issueId} precedence removed`,
         2000
@@ -393,10 +393,10 @@ export function registerIssueContextCommands(
         const issueId = issue.id;
 
         if (issue.value) {
-          autoUpdateTracker.enable(issueId);
+          await autoUpdateTracker.enable(issueId);
           showStatusBarMessage(`$(check) Auto-update %done enabled for #${issueId}`, 2000);
         } else {
-          autoUpdateTracker.disable(issueId);
+          await autoUpdateTracker.disable(issueId);
           showStatusBarMessage(`$(x) Auto-update %done disabled for #${issueId}`, 2000);
         }
       }
@@ -410,10 +410,10 @@ export function registerIssueContextCommands(
         const issueId = issue.id;
 
         if (issue.value) {
-          adHocTracker.tag(issueId);
+          await adHocTracker.tag(issueId);
           showStatusBarMessage(`$(check) #${issueId} tagged as ad-hoc budget`, 2000);
         } else {
-          adHocTracker.untag(issueId);
+          await adHocTracker.untag(issueId);
           showStatusBarMessage(`$(check) #${issueId} ad-hoc budget removed`, 2000);
         }
         refreshGanttData();
@@ -428,10 +428,10 @@ export function registerIssueContextCommands(
         const issueId = issue.id;
 
         if (issue.value) {
-          await setPrecedence(deps.globalState, issueId);
+          await setPrecedence(issueId);
           showStatusBarMessage(`$(check) #${issueId} tagged with precedence`, 2000);
         } else {
-          await clearPrecedence(deps.globalState, issueId);
+          await clearPrecedence(issueId);
           showStatusBarMessage(`$(check) #${issueId} precedence removed`, 2000);
         }
         refreshGanttData();

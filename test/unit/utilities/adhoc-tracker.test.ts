@@ -1,130 +1,49 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-// Mock vscode module
+let stored: number[] = [];
+
 vi.mock("vscode", () => ({
   workspace: {
     getConfiguration: vi.fn(() => ({
-      get: vi.fn(),
+      get: vi.fn((_key: string, def?: unknown) => stored.length > 0 ? [...stored] : def),
+      update: vi.fn(async (_key: string, value: number[]) => { stored = value; }),
     })),
   },
+  ConfigurationTarget: { Global: 1 },
 }));
-
-// Create mock context
-function createMockContext() {
-  const storage = new Map<string, unknown>();
-  return {
-    globalState: {
-      get: vi.fn((key: string, defaultValue?: unknown) => storage.get(key) ?? defaultValue),
-      update: vi.fn((key: string, value: unknown) => {
-        storage.set(key, value);
-        return Promise.resolve();
-      }),
-    },
-  };
-}
 
 describe("AdHocTracker", () => {
   let tracker: typeof import("../../../src/utilities/adhoc-tracker").adHocTracker;
-  let mockContext: ReturnType<typeof createMockContext>;
 
   beforeEach(async () => {
+    stored = [];
+    vi.clearAllMocks();
     vi.resetModules();
-    mockContext = createMockContext();
     const module = await import("../../../src/utilities/adhoc-tracker");
     tracker = module.adHocTracker;
-    tracker.initialize(mockContext as any);
   });
 
-  describe("isAdHoc", () => {
-    it("returns false for untagged issues", () => {
-      expect(tracker.isAdHoc(1234)).toBe(false);
-    });
-
-    it("returns true for tagged issues", () => {
-      tracker.tag(1234);
-      expect(tracker.isAdHoc(1234)).toBe(true);
-    });
+  it("returns false for untagged issues", () => {
+    expect(tracker.isAdHoc(1234)).toBe(false);
   });
 
-  describe("tag", () => {
-    it("adds issue to ad-hoc set", () => {
-      tracker.tag(1234);
-      expect(tracker.isAdHoc(1234)).toBe(true);
-    });
+  it("tag/untag/toggle via settings", async () => {
+    await tracker.tag(1234);
+    expect(tracker.isAdHoc(1234)).toBe(true);
 
-    it("persists to storage", () => {
-      tracker.tag(1234);
-      expect(mockContext.globalState.update).toHaveBeenCalledWith(
-        "redmyne.adHocIssues",
-        [1234]
-      );
-    });
+    await tracker.tag(5678);
+    expect(tracker.getAll()).toContain(1234);
+    expect(tracker.getAll()).toContain(5678);
 
-    it("handles multiple issues", () => {
-      tracker.tag(1234);
-      tracker.tag(5678);
-      expect(tracker.isAdHoc(1234)).toBe(true);
-      expect(tracker.isAdHoc(5678)).toBe(true);
-    });
+    await tracker.untag(1234);
+    expect(tracker.isAdHoc(1234)).toBe(false);
+    expect(stored).toEqual([5678]);
+
+    expect(await tracker.toggle(5678)).toBe(false);
+    expect(await tracker.toggle(5678)).toBe(true);
   });
 
-  describe("untag", () => {
-    it("removes issue from ad-hoc set", () => {
-      tracker.tag(1234);
-      tracker.untag(1234);
-      expect(tracker.isAdHoc(1234)).toBe(false);
-    });
-
-    it("persists removal to storage", () => {
-      tracker.tag(1234);
-      tracker.untag(1234);
-      expect(mockContext.globalState.update).toHaveBeenLastCalledWith(
-        "redmyne.adHocIssues",
-        []
-      );
-    });
-  });
-
-  describe("toggle", () => {
-    it("tags untagged issue and returns true", () => {
-      const result = tracker.toggle(1234);
-      expect(result).toBe(true);
-      expect(tracker.isAdHoc(1234)).toBe(true);
-    });
-
-    it("untags tagged issue and returns false", () => {
-      tracker.tag(1234);
-      const result = tracker.toggle(1234);
-      expect(result).toBe(false);
-      expect(tracker.isAdHoc(1234)).toBe(false);
-    });
-  });
-
-  describe("getAll", () => {
-    it("returns empty array when no issues tagged", () => {
-      expect(tracker.getAll()).toEqual([]);
-    });
-
-    it("returns all tagged issue IDs", () => {
-      tracker.tag(1234);
-      tracker.tag(5678);
-      expect(tracker.getAll()).toContain(1234);
-      expect(tracker.getAll()).toContain(5678);
-      expect(tracker.getAll().length).toBe(2);
-    });
-  });
-
-  describe("initialization", () => {
-    it("loads existing tags from storage", async () => {
-      // Pre-populate storage
-      mockContext.globalState.get = vi.fn(() => [1234, 5678]);
-
-      vi.resetModules();
-      const module = await import("../../../src/utilities/adhoc-tracker");
-      module.adHocTracker.initialize(mockContext as any);
-
-      expect(module.adHocTracker.isAdHoc(1234)).toBe(true);
-      expect(module.adHocTracker.isAdHoc(5678)).toBe(true);
-    });
+  it("getAll returns empty when none tagged", () => {
+    expect(tracker.getAll()).toEqual([]);
   });
 });
