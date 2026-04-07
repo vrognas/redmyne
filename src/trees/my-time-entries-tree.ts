@@ -641,17 +641,24 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       byWeek.get(key)!.entries.push(entry);
     }
 
-    // Ensure all weeks overlapping the month range are represented
+    // Ensure all weeks whose Monday falls within the month range are represented
     if (monthDateRange) {
-      const allDates = getDateRange(monthDateRange.start, monthDateRange.end);
-      for (const dateStr of allDates) {
-        const date = new Date(dateStr + "T12:00:00");
-        const weekNum = getISOWeekNumber(date);
-        const year = getISOWeekYear(date);
+      const start = new Date(monthDateRange.start + "T12:00:00");
+      const end = new Date(monthDateRange.end + "T12:00:00");
+      // Advance to first Monday on or after month start
+      const current = new Date(start);
+      const dow = current.getDay();
+      if (dow !== 1) {
+        current.setDate(current.getDate() + ((8 - dow) % 7));
+      }
+      while (current <= end) {
+        const weekNum = getISOWeekNumber(current);
+        const year = getISOWeekYear(current);
         const key = `${year}-W${weekNum}`;
         if (!byWeek.has(key)) {
           byWeek.set(key, { weekNum, year, entries: [] });
         }
+        current.setDate(current.getDate() + 7);
       }
     }
 
