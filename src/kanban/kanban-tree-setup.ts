@@ -21,6 +21,7 @@ export function createKanbanTreeSetup(
     treeDataProvider: provider,
     dragAndDropController: provider,
     canSelectMany: true,
+    showCollapseAll: true,
   });
 
   return { provider, treeView };

@@ -40,6 +40,7 @@ describe("createKanbanTreeSetup", () => {
         treeDataProvider: setup.provider,
         dragAndDropController: setup.provider,
         canSelectMany: true,
+        showCollapseAll: true,
       }
     );
     expect(setup.treeView).toBe(treeView);

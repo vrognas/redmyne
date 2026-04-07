@@ -162,6 +162,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   cleanupResources.projectsTreeView = vscode.window.createTreeView("redmyne-explorer-projects", {
     treeDataProvider: projectsTree,
+    showCollapseAll: true,
   });
 
   // Sync collapse state between Issues pane and Gantt
