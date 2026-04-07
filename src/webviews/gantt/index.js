@@ -165,10 +165,9 @@ function setupTooltips({ addDocListener, addWinListener }) {
 
       const openMatch = trimmed.match(/^Open in Browser:\s*(\S+)/);
       if (openMatch && /^https?:\/\//i.test(openMatch[1])) {
-        lineEl.appendChild(document.createTextNode('Open in Browser: '));
         const link = document.createElement('a');
         link.href = openMatch[1];
-        link.textContent = openMatch[1];
+        link.textContent = 'Open in Browser';
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
         lineEl.appendChild(link);

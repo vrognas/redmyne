@@ -3410,7 +3410,8 @@ export class GanttPanel {
     }
 
     if (this._server && row.identifier) {
-      tooltip += `Open in Browser: ${this._server.options.address}/projects/${row.identifier}`;
+      const base = this._server.options.address.replace(/\/+$/, "");
+      tooltip += `Open in Browser: ${base}/projects/${row.identifier}`;
     }
 
     return tooltip.trim();
