@@ -1030,7 +1030,6 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     expect(provider.getHideZeroDays()).toBe(true);
 
     const testDate = getWeekdayThisWeek();
-    const dayNumInt = getDayOfMonth(testDate);
 
     const weekEntries: TimeEntry[] = [
       {
