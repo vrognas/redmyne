@@ -1,23 +1,54 @@
-# Change Log
+# Changelog
 
-All notable changes to the "Redmyne" extension will be documented in this file.
+All notable changes to Redmyne are documented here.
 
-## [4.18.0]
+Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
+
+## [Unreleased]
+
+## [4.19.0]
 
 ### Added
 
-- **Time Entries: "Show 0% Days" filter** - days with zero logged hours are hidden by default; toggle via the filter menu in the Time Entries header
+- **Time Entries: "Show 0% Days" filter** - days with zero logged hours hidden by default; toggle via filter menu
+- **Time Entries: collapse-all button** - in header for Time Entries, Issues, and Kanban views
+- **Compact hours display** - description shows `2:00 (31%)` instead of `2:00/6:24 (31%)`; full breakdown in tooltip
+- **Human-readable week tooltips** - hover shows `2026 March 2–6; 2:00/6:24 (31%)`
+- **Project members in tooltips** - members grouped by role in both Issues tree and Gantt view (lazy-loaded)
+- **Parent project in Gantt tooltip** - shown as `Client: <name>`
+- **`showProjectMembers` setting** - toggle member display in tooltips (default: on)
+- **`hideProjectMembersFor` setting** - exclude specific project IDs from member display
+- **`autoUpdateIssues` setting** - replaces context menu toggle for auto-update %done
+- **`adHocBudgetIssues` setting** - replaces context menu toggle for ad-hoc budget
+- **`precedenceIssues` setting** - replaces context menu toggle for precedence priority
+
+### Changed
+
+- **Tracker storage moved to settings.json** - auto-update, ad-hoc, and precedence issue IDs now stored in VS Code settings instead of globalState; V2 migration runs automatically
+- **Gantt project members loaded lazily** - fetched on first hover instead of all at once during data load
+- **Gantt sourcemap URL suppressed** - eliminates CSP warning in webview DevTools
 
 ### Fixed
 
-- **Time Entries: show empty weeks in month view** - weeks with zero logged hours now appear in the tree so users can expand them and add entries
+- **Time Entries: show empty weeks in month view** - weeks with zero logged hours now appear
 - **Time Entries: boundary week clipping** - weeks spanning two months show correct days under each month
-- **Time Entries: week sort order** - single-digit week numbers now sort correctly
-- **Time Entries: weekend-only boundary weeks hidden** - boundary weeks containing only non-working days are no longer shown
+- **Time Entries: week sort order** - single-digit week numbers sort correctly
+- **Time Entries: weekend-only boundary weeks hidden** - boundary weeks with only non-working days not shown
 - **Time Entries: node ID zero-padding** - expansion state preserved for single-digit weeks
 - **Time Entries: month date range edge case** - midnight comparison replaced with year/month check
 - **Time Entries: skip entries without date** - prevents "Week NaN" from appearing
 - **Time Entries: error handling** - month load errors no longer leave tree in loading state
+- **Time Entries: Today chevron** - only shows when entries exist
+- **Gantt: project tooltip URL double-slash** - stripped trailing slash from server address
+- **Gantt: "Open in Browser" link** - shows as clickable text, URL visible on hover
+- **All tooltip URLs** - trailing slash stripped consistently
+
+### Removed
+
+- **Context menu toggles** - Auto-update %, Ad-hoc Budget, and Precedence On/Off submenus removed from tree and Gantt context menus (use settings.json instead)
+- **6 toggle/set commands** - `toggleAutoUpdateDoneRatio`, `toggleAdHoc`, `togglePrecedence`, `setAutoUpdateDoneRatio`, `setAdHoc`, `setPrecedence`
+- **12 proxy commands** - On/Off variants for tree and Gantt contexts
 
 ## [4.17.1]
 
