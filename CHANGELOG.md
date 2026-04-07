@@ -2,6 +2,12 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
+## [4.17.2]
+
+### Fixed
+
+- **Time Entries: show empty weeks in month view** - weeks with zero logged hours now appear in the tree so users can expand them and add entries
+
 ## [4.17.1]
 
 ### Fixed

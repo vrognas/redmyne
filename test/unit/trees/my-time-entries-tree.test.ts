@@ -781,6 +781,100 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     expect(provider.getSort()).toEqual({ field: "user", direction: "asc" });
   });
 
+  it("shows all weeks in month even with entries in only one week", async () => {
+    const now = new Date();
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 15);
+    const lastMonthStr = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, "0")}`;
+    const entryDate = `${lastMonthStr}-15`;
+
+    const monthEntries: TimeEntry[] = [
+      {
+        id: 1,
+        issue_id: 123,
+        activity_id: 9,
+        activity: { id: 9, name: "Development" },
+        hours: "4",
+        comments: "",
+        spent_on: entryDate,
+      },
+    ];
+
+    mockServer.getTimeEntries
+      .mockResolvedValueOnce({ time_entries: [] })
+      .mockResolvedValue({ time_entries: monthEntries });
+
+    const groups = await getLoadedGroups();
+    const targetMonth = groups[3];
+    expect(targetMonth.type).toBe("month-group");
+
+    await provider.getChildren(targetMonth);
+    const weekGroups = await waitUntilLoaded(
+      () => provider.getChildren(targetMonth),
+      "month weeks"
+    );
+
+    // Every month spans at least 4 ISO weeks
+    expect(weekGroups.length).toBeGreaterThanOrEqual(4);
+    expect(weekGroups.every((w) => w.type === "week-subgroup")).toBe(true);
+  });
+
+  it("empty week is expandable with working day nodes", async () => {
+    const now = new Date();
+    const lastMonthStr = `${new Date(now.getFullYear(), now.getMonth() - 1, 1).getFullYear()}-${String(new Date(now.getFullYear(), now.getMonth() - 1, 1).getMonth() + 1).padStart(2, "0")}`;
+    const entryDate = `${lastMonthStr}-15`;
+
+    const monthEntries: TimeEntry[] = [
+      {
+        id: 1,
+        issue_id: 123,
+        activity_id: 9,
+        activity: { id: 9, name: "Development" },
+        hours: "4",
+        comments: "",
+        spent_on: entryDate,
+      },
+    ];
+
+    mockServer.getTimeEntries
+      .mockResolvedValueOnce({ time_entries: [] })
+      .mockResolvedValue({ time_entries: monthEntries });
+
+    const groups = await getLoadedGroups();
+    const targetMonth = groups[3];
+
+    await provider.getChildren(targetMonth);
+    const weekGroups = await waitUntilLoaded(
+      () => provider.getChildren(targetMonth),
+      "month weeks"
+    );
+
+    const emptyWeek = weekGroups.find(
+      (w) => w._cachedEntries && w._cachedEntries.length === 0
+    );
+    expect(emptyWeek).toBeDefined();
+
+    const dayNodes = await provider.getChildren(emptyWeek!);
+    expect(dayNodes.length).toBeGreaterThanOrEqual(1);
+    expect(dayNodes[0].type).toBe("day-group");
+  });
+
+  it("completely empty month shows week nodes not 'No time entries'", async () => {
+    mockServer.getTimeEntries.mockResolvedValue({ time_entries: [] });
+
+    const groups = await getLoadedGroups();
+    const targetMonth = groups[3];
+    expect(targetMonth.type).toBe("month-group");
+
+    await provider.getChildren(targetMonth);
+    const weekGroups = await waitUntilLoaded(
+      () => provider.getChildren(targetMonth),
+      "empty month weeks"
+    );
+
+    expect(weekGroups.length).toBeGreaterThanOrEqual(4);
+    expect(weekGroups[0].type).toBe("week-subgroup");
+  });
+
   it("assigns command for load-earlier tree item", () => {
     const item = provider.getTreeItem({
       id: "load-earlier",

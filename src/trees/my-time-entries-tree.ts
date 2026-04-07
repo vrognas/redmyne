@@ -541,7 +541,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       });
       const entries = applyDraftsToEntries(serverEntries, draftOps);
 
-      const weekGroups = this.groupEntriesByWeek(entries, element.id || "month");
+      const weekGroups = this.groupEntriesByWeek(entries, element.id || "month", { start, end });
       if (weekGroups.length === 0) {
         return [{
           label: "No time entries",
@@ -627,7 +627,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     });
   }
 
-  private groupEntriesByWeek(entries: TimeEntry[], idPrefix = "week"): TimeEntryNode[] {
+  private groupEntriesByWeek(entries: TimeEntry[], idPrefix = "week", monthDateRange?: { start: string; end: string }): TimeEntryNode[] {
     // Group entries by ISO week number and year
     const byWeek = new Map<string, { weekNum: number; year: number; entries: TimeEntry[] }>();
     for (const entry of entries) {
@@ -639,6 +639,20 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         byWeek.set(key, { weekNum, year, entries: [] });
       }
       byWeek.get(key)!.entries.push(entry);
+    }
+
+    // Ensure all weeks overlapping the month range are represented
+    if (monthDateRange) {
+      const allDates = getDateRange(monthDateRange.start, monthDateRange.end);
+      for (const dateStr of allDates) {
+        const date = new Date(dateStr + "T12:00:00");
+        const weekNum = getISOWeekNumber(date);
+        const year = getISOWeekYear(date);
+        const key = `${year}-W${weekNum}`;
+        if (!byWeek.has(key)) {
+          byWeek.set(key, { weekNum, year, entries: [] });
+        }
+      }
     }
 
     // Sort weeks descending (most recent first)
