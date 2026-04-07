@@ -168,6 +168,7 @@ function setupTooltips({ addDocListener, addWinListener }) {
         const link = document.createElement('a');
         link.href = openMatch[1];
         link.textContent = 'Open in Browser';
+        link.title = openMatch[1];
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
         lineEl.appendChild(link);
