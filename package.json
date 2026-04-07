@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "4.17.2",
+  "version": "4.18.0",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -89,6 +89,10 @@
       {
         "command": "redmyne.timeFilterAll",
         "title": "All Time Entries"
+      },
+      {
+        "command": "redmyne.timeFilterToggleZeroDays",
+        "title": "Show 0% Days"
       },
       {
         "command": "redmyne.issueSortId",
@@ -910,6 +914,10 @@
         {
           "command": "redmyne.timeFilterAll",
           "group": "1_filters@2"
+        },
+        {
+          "command": "redmyne.timeFilterToggleZeroDays",
+          "group": "2_display@1"
         }
       ],
       "redmyne.issueSortMenu": [
@@ -1007,6 +1015,10 @@
         },
         {
           "command": "redmyne.timeFilterAll",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.timeFilterToggleZeroDays",
           "when": "false"
         },
         {

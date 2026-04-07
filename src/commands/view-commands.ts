@@ -114,6 +114,12 @@ export function registerViewCommands(
       showStatusBarMessage("$(eye) All Time Entries", 2000);
     }),
 
+    vscode.commands.registerCommand("redmyne.timeFilterToggleZeroDays", () => {
+      const current = deps.timeEntriesTree.getHideZeroDays();
+      deps.timeEntriesTree.setHideZeroDays(!current);
+      showStatusBarMessage(current ? "$(eye) Show 0% Days" : "$(eye-closed) Hide 0% Days", 2000);
+    }),
+
     // Issue sort commands
     vscode.commands.registerCommand("redmyne.issueSortId", () => {
       deps.projectsTree.setSort("id");

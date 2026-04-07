@@ -651,8 +651,10 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     expect(weekGroups.length).toBeGreaterThanOrEqual(1);
     expect(weekGroups[0].type).toBe("week-subgroup");
 
-    // Get days for a week
-    const weekDays = await provider.getChildren(weekGroups[0]);
+    // Get days for a week that has entries (not a boundary week)
+    const weekWithEntries = weekGroups.find((w) => w._cachedEntries && w._cachedEntries.length > 0);
+    expect(weekWithEntries).toBeDefined();
+    const weekDays = await provider.getChildren(weekWithEntries!);
     expect(weekDays.length).toBeGreaterThanOrEqual(1);
     expect(weekDays[0].type).toBe("day-group");
   });
@@ -818,7 +820,8 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     expect(weekGroups.every((w) => w.type === "week-subgroup")).toBe(true);
   });
 
-  it("empty week is expandable with working day nodes", async () => {
+  it("empty week is expandable with working day nodes when 0% days shown", async () => {
+    provider.setHideZeroDays(false);
     const now = new Date();
     const lastMonthStr = `${new Date(now.getFullYear(), now.getMonth() - 1, 1).getFullYear()}-${String(new Date(now.getFullYear(), now.getMonth() - 1, 1).getMonth() + 1).padStart(2, "0")}`;
     const entryDate = `${lastMonthStr}-15`;
@@ -1020,6 +1023,58 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     const pastMonth = { year: 2025, month: 0 }; // January 2025
     const pastRange = getRange(pastMonth);
     expect(pastRange.end).toBe("2025-01-31");
+  });
+
+  it("hides zero-percent days by default, shows when filter toggled", async () => {
+    // hideZeroDays is true by default
+    expect(provider.getHideZeroDays()).toBe(true);
+
+    const testDate = getWeekdayThisWeek();
+    const dayNumInt = getDayOfMonth(testDate);
+
+    const weekEntries: TimeEntry[] = [
+      {
+        id: 1,
+        issue_id: 123,
+        activity_id: 9,
+        activity: { id: 9, name: "Development" },
+        hours: "2",
+        comments: "",
+        spent_on: testDate,
+      },
+    ];
+
+    mockServer.getTimeEntries
+      .mockResolvedValueOnce({ time_entries: weekEntries })
+      .mockResolvedValueOnce({ time_entries: weekEntries })
+      .mockResolvedValueOnce({ time_entries: weekEntries })
+      .mockResolvedValueOnce({ time_entries: [] });
+
+    const groups = await getLoadedGroups();
+    const thisWeek = groups[1];
+    const dayGroups = await provider.getChildren(thisWeek);
+
+    // Only the day with entries should show (0% days hidden)
+    const withEntries = dayGroups.filter((d) => d._cachedEntries && d._cachedEntries.length > 0);
+    const withoutEntries = dayGroups.filter((d) => d._cachedEntries && d._cachedEntries.length === 0);
+    expect(withEntries.length).toBe(1);
+    expect(withoutEntries.length).toBe(0);
+
+    // Toggle filter off — now 0% days should appear
+    provider.setHideZeroDays(false);
+
+    // Re-fetch with same data
+    mockServer.getTimeEntries
+      .mockResolvedValueOnce({ time_entries: weekEntries })
+      .mockResolvedValueOnce({ time_entries: weekEntries });
+
+    const groups2 = await getLoadedGroups();
+    const thisWeek2 = groups2[1];
+    const dayGroups2 = await provider.getChildren(thisWeek2);
+
+    // Now working days without entries should appear too
+    const withoutEntries2 = dayGroups2.filter((d) => d._cachedEntries && d._cachedEntries.length === 0);
+    expect(withoutEntries2.length).toBeGreaterThanOrEqual(1);
   });
 
   it("assigns command for load-earlier tree item", () => {

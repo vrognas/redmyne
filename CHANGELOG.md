@@ -2,11 +2,22 @@
 
 All notable changes to the "Redmyne" extension will be documented in this file.
 
-## [4.17.2]
+## [4.18.0]
+
+### Added
+
+- **Time Entries: "Show 0% Days" filter** - days with zero logged hours are hidden by default; toggle via the filter menu in the Time Entries header
 
 ### Fixed
 
 - **Time Entries: show empty weeks in month view** - weeks with zero logged hours now appear in the tree so users can expand them and add entries
+- **Time Entries: boundary week clipping** - weeks spanning two months show correct days under each month
+- **Time Entries: week sort order** - single-digit week numbers now sort correctly
+- **Time Entries: weekend-only boundary weeks hidden** - boundary weeks containing only non-working days are no longer shown
+- **Time Entries: node ID zero-padding** - expansion state preserved for single-digit weeks
+- **Time Entries: month date range edge case** - midnight comparison replaced with year/month check
+- **Time Entries: skip entries without date** - prevents "Week NaN" from appearing
+- **Time Entries: error handling** - month load errors no longer leave tree in loading state
 
 ## [4.17.1]
 

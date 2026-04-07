@@ -133,6 +133,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   private expandedIds = new Set<string>();
   private monthlySchedules: MonthlyScheduleOverrides = {};
   private showAllUsers = false; // false = my entries only, true = all users
+  private hideZeroDays = true; // true = hide days with 0% logged
   private entrySort: SortConfig<TimeEntrySortField> | null = null;
   private draftQueue?: DraftQueue;
   private draftQueueDisposable?: { dispose: () => void };
@@ -599,9 +600,12 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       // Generate all dates in range, filter to working days or days with entries
       allDates = getDateRange(dateRange.start, dateRange.end).filter(
         (dateStr) => {
+          const hasEntries = byDate.has(dateStr);
           const date = new Date(dateStr + "T12:00:00");
           const hours = getHoursForDateMonthly(date, this.monthlySchedules, defaultSchedule);
-          return hours > 0 || byDate.has(dateStr);
+          // When hideZeroDays is on, only show days with entries
+          if (this.hideZeroDays) return hasEntries;
+          return hours > 0 || hasEntries;
         }
       );
     } else {
@@ -876,6 +880,16 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
    */
   getShowAllUsers(): boolean {
     return this.showAllUsers;
+  }
+
+  setHideZeroDays(hide: boolean): void {
+    if (this.hideZeroDays === hide) return;
+    this.hideZeroDays = hide;
+    this._onDidChangeTreeData.fire(undefined);
+  }
+
+  getHideZeroDays(): boolean {
+    return this.hideZeroDays;
   }
 
   /**
