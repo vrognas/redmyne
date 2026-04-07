@@ -11,30 +11,41 @@ async function setIds(ids: number[]): Promise<void> {
 }
 
 class AutoUpdateTracker {
+  private _queue: Promise<void> = Promise.resolve();
+
+  private enqueue<T>(fn: () => Promise<T>): Promise<T> {
+    const result = this._queue.then(fn);
+    this._queue = result.then(() => {}, () => {});
+    return result;
+  }
+
   isEnabled(issueId: number): boolean {
     return getIds().includes(issueId);
   }
 
-  async enable(issueId: number): Promise<void> {
-    const ids = getIds();
-    if (!ids.includes(issueId)) {
-      await setIds([...ids, issueId]);
-    }
+  enable(issueId: number): Promise<void> {
+    return this.enqueue(async () => {
+      const ids = getIds();
+      if (!ids.includes(issueId)) await setIds([...ids, issueId]);
+    });
   }
 
-  async disable(issueId: number): Promise<void> {
-    const ids = getIds();
-    await setIds(ids.filter((id) => id !== issueId));
+  disable(issueId: number): Promise<void> {
+    return this.enqueue(async () => {
+      await setIds(getIds().filter((id) => id !== issueId));
+    });
   }
 
-  async toggle(issueId: number): Promise<boolean> {
-    if (this.isEnabled(issueId)) {
-      await this.disable(issueId);
-      return false;
-    } else {
-      await this.enable(issueId);
-      return true;
-    }
+  toggle(issueId: number): Promise<boolean> {
+    return this.enqueue(async () => {
+      if (this.isEnabled(issueId)) {
+        await setIds(getIds().filter((id) => id !== issueId));
+        return false;
+      } else {
+        await setIds([...getIds(), issueId]);
+        return true;
+      }
+    });
   }
 }
 

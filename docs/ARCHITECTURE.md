@@ -2,7 +2,7 @@
 
 VS Code/Positron extension for Redmine workload management. TypeScript 5.9+.
 
-**v4.17.1** | VS Code ≥1.105.0 | Node ≥20
+**v4.19.0** | VS Code ≥1.105.0 | Node ≥20
 
 ## Core Pattern
 
@@ -91,6 +91,7 @@ Commands execute actions → API calls → refresh trees
 | API Key | VS Code Secrets API (encrypted) |
 | Collapse state, filters | globalState (memento) |
 | Timer/Kanban state | globalState |
+| Auto-update/Ad-hoc/Precedence issue IDs | VS Code settings (arrays) |
 | Draft queue | globalStorageUri (file) |
 | Config | VS Code settings |
 

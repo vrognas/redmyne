@@ -11,30 +11,41 @@ async function setIds(ids: number[]): Promise<void> {
 }
 
 class AdHocTracker {
+  private _queue: Promise<void> = Promise.resolve();
+
+  private enqueue<T>(fn: () => Promise<T>): Promise<T> {
+    const result = this._queue.then(fn);
+    this._queue = result.then(() => {}, () => {});
+    return result;
+  }
+
   isAdHoc(issueId: number): boolean {
     return getIds().includes(issueId);
   }
 
-  async tag(issueId: number): Promise<void> {
-    const ids = getIds();
-    if (!ids.includes(issueId)) {
-      await setIds([...ids, issueId]);
-    }
+  tag(issueId: number): Promise<void> {
+    return this.enqueue(async () => {
+      const ids = getIds();
+      if (!ids.includes(issueId)) await setIds([...ids, issueId]);
+    });
   }
 
-  async untag(issueId: number): Promise<void> {
-    const ids = getIds();
-    await setIds(ids.filter((id) => id !== issueId));
+  untag(issueId: number): Promise<void> {
+    return this.enqueue(async () => {
+      await setIds(getIds().filter((id) => id !== issueId));
+    });
   }
 
-  async toggle(issueId: number): Promise<boolean> {
-    if (this.isAdHoc(issueId)) {
-      await this.untag(issueId);
-      return false;
-    } else {
-      await this.tag(issueId);
-      return true;
-    }
+  toggle(issueId: number): Promise<boolean> {
+    return this.enqueue(async () => {
+      if (this.isAdHoc(issueId)) {
+        await setIds(getIds().filter((id) => id !== issueId));
+        return false;
+      } else {
+        await setIds([...getIds(), issueId]);
+        return true;
+      }
+    });
   }
 
   getAll(): number[] {

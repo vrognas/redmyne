@@ -1432,7 +1432,7 @@ export class GanttPanel {
               nowEnabled ? `$(check) Auto-update %done enabled for #${message.issueId}` : `$(x) Auto-update %done disabled for #${message.issueId}`,
               2000
             );
-          });
+          }).catch(() => {});
         }
         break;
       case "toggleAdHoc":
@@ -1444,7 +1444,7 @@ export class GanttPanel {
             );
             this._isRefreshing = true;
             vscode.commands.executeCommand("redmyne.refreshIssues");
-          });
+          }).catch(() => {});
         }
         break;
       case "togglePrecedence":
@@ -1459,7 +1459,7 @@ export class GanttPanel {
             // Refresh to update intensity calculations
             this._isRefreshing = true;
             vscode.commands.executeCommand("redmyne.refreshIssues");
-          });
+          }).catch(() => {});
         }
         break;
       case "setFilter":

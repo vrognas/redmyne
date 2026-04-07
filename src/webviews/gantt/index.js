@@ -394,7 +394,10 @@ window.addEventListener('message', event => {
     if (el) {
       const existing = (el.dataset.tooltip || '').trimEnd();
       const memberText = message.memberLines.join('\n');
-      el.dataset.tooltip = existing + '\n\n---\n\n' + memberText;
+      // Skip if already appended (e.g. after re-render)
+      if (!existing.includes(memberText)) {
+        el.dataset.tooltip = existing + '\n\n---\n\n' + memberText;
+      }
     }
     return;
   }

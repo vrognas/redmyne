@@ -2407,7 +2407,9 @@
       if (el) {
         const existing = (el.dataset.tooltip || "").trimEnd();
         const memberText = message.memberLines.join("\n");
-        el.dataset.tooltip = existing + "\n\n---\n\n" + memberText;
+        if (!existing.includes(memberText)) {
+          el.dataset.tooltip = existing + "\n\n---\n\n" + memberText;
+        }
       }
       return;
     }
@@ -3426,4 +3428,3 @@
     perfMeasure("initializeGantt", "initializeGantt-start", "initializeGantt-end");
   }
 })();
-//# sourceMappingURL=gantt.js.map
