@@ -21,7 +21,7 @@ describe("registerContextProxyCommands", () => {
     const disposables = registerContextProxyCommands();
 
     expect(disposables).toHaveLength(handlers.size);
-    expect(handlers.size).toBeGreaterThan(70);
+    expect(handlers.size).toBeGreaterThan(60);
     expect(handlers.has("redmyne.gantt.updateIssue")).toBe(true);
     expect(handlers.has("redmyne.gantt.setPriorityHigh")).toBe(true);
     expect(handlers.has("redmyne.timesheet.showIssueInSidebar")).toBe(true);
@@ -109,12 +109,6 @@ describe("registerContextProxyCommands", () => {
 
     handlers.get("redmyne.gantt.setDoneRatio0")?.({ issueId: 7 });
     handlers.get("redmyne.gantt.setDoneRatio100")?.({ issueId: 7 });
-    handlers.get("redmyne.gantt.autoUpdateOn")?.({ issueId: 7 });
-    handlers.get("redmyne.gantt.autoUpdateOff")?.({ issueId: 7 });
-    handlers.get("redmyne.gantt.adHocOn")?.({ issueId: 7 });
-    handlers.get("redmyne.gantt.adHocOff")?.({ issueId: 7 });
-    handlers.get("redmyne.gantt.precedenceOn")?.({ issueId: 7 });
-    handlers.get("redmyne.gantt.precedenceOff")?.({ issueId: 7 });
     handlers.get("redmyne.gantt.setInternalEstimate")?.({ issueId: 7 });
     handlers.get("redmyne.gantt.clearInternalEstimate")?.({ issueId: 7 });
 
@@ -125,18 +119,6 @@ describe("registerContextProxyCommands", () => {
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       "redmyne.setDoneRatio",
       { id: 7, percentage: 100 }
-    );
-    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "redmyne.setAutoUpdateDoneRatio",
-      { id: 7, value: true }
-    );
-    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "redmyne.setAdHoc",
-      { id: 7, value: false }
-    );
-    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "redmyne.setPrecedence",
-      { id: 7, value: true }
     );
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       "redmyne.clearInternalEstimate",
@@ -197,12 +179,6 @@ describe("registerContextProxyCommands", () => {
     handlers.get("redmyne.setPriorityUrgent")?.({ id: 5 });
     handlers.get("redmyne.setPriorityImmediate")?.({ id: 5 });
     handlers.get("redmyne.setPriorityOther")?.({ id: 5 });
-    handlers.get("redmyne.autoUpdateOn")?.({ id: 5 });
-    handlers.get("redmyne.autoUpdateOff")?.({ id: 5 });
-    handlers.get("redmyne.adHocOn")?.({ id: 5 });
-    handlers.get("redmyne.adHocOff")?.({ id: 5 });
-    handlers.get("redmyne.precedenceOn")?.({ id: 5 });
-    handlers.get("redmyne.precedenceOff")?.({ id: 5 });
 
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.setIssueStatus", {
       id: 5,
@@ -211,14 +187,6 @@ describe("registerContextProxyCommands", () => {
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.setIssuePriority", {
       id: 5,
       priorityPattern: "immediate",
-    });
-    expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.setAutoUpdateDoneRatio", {
-      id: 5,
-      value: true,
-    });
-    expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.setPrecedence", {
-      id: 5,
-      value: false,
     });
   });
 

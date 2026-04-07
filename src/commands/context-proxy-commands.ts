@@ -148,18 +148,6 @@ export function registerContextProxyCommands(): vscode.Disposable[] {
       forwardIssueIdPayload("redmyne.setIssueStatus")
     ),
     vscode.commands.registerCommand(
-      "redmyne.gantt.toggleAutoUpdate",
-      forwardIssueIdPayload("redmyne.toggleAutoUpdateDoneRatio")
-    ),
-    vscode.commands.registerCommand(
-      "redmyne.gantt.toggleAdHoc",
-      forwardIssueIdPayload("redmyne.toggleAdHoc")
-    ),
-    vscode.commands.registerCommand(
-      "redmyne.gantt.togglePrecedence",
-      forwardIssueIdPayload("redmyne.togglePrecedence")
-    ),
-    vscode.commands.registerCommand(
       "redmyne.gantt.copyUrl",
       forwardIssueIdPayload("redmyne.copyIssueUrl")
     ),
@@ -263,30 +251,6 @@ export function registerContextProxyCommands(): vscode.Disposable[] {
       forwardIssueIdPayload("redmyne.setIssuePriority")
     ),
     vscode.commands.registerCommand(
-      "redmyne.gantt.autoUpdateOn",
-      forwardIssueIdPayload("redmyne.setAutoUpdateDoneRatio", { value: true })
-    ),
-    vscode.commands.registerCommand(
-      "redmyne.gantt.autoUpdateOff",
-      forwardIssueIdPayload("redmyne.setAutoUpdateDoneRatio", { value: false })
-    ),
-    vscode.commands.registerCommand(
-      "redmyne.gantt.adHocOn",
-      forwardIssueIdPayload("redmyne.setAdHoc", { value: true })
-    ),
-    vscode.commands.registerCommand(
-      "redmyne.gantt.adHocOff",
-      forwardIssueIdPayload("redmyne.setAdHoc", { value: false })
-    ),
-    vscode.commands.registerCommand(
-      "redmyne.gantt.precedenceOn",
-      forwardIssueIdPayload("redmyne.setPrecedence", { value: true })
-    ),
-    vscode.commands.registerCommand(
-      "redmyne.gantt.precedenceOff",
-      forwardIssueIdPayload("redmyne.setPrecedence", { value: false })
-    ),
-    vscode.commands.registerCommand(
       "redmyne.gantt.setInternalEstimate",
       forwardIssueIdPayload("redmyne.setInternalEstimate")
     ),
@@ -359,30 +323,6 @@ export function registerContextProxyCommands(): vscode.Disposable[] {
     vscode.commands.registerCommand(
       "redmyne.setPriorityOther",
       forwardIssuePayload("redmyne.setIssuePriority")
-    ),
-    vscode.commands.registerCommand(
-      "redmyne.autoUpdateOn",
-      forwardIssuePayload("redmyne.setAutoUpdateDoneRatio", { value: true })
-    ),
-    vscode.commands.registerCommand(
-      "redmyne.autoUpdateOff",
-      forwardIssuePayload("redmyne.setAutoUpdateDoneRatio", { value: false })
-    ),
-    vscode.commands.registerCommand(
-      "redmyne.adHocOn",
-      forwardIssuePayload("redmyne.setAdHoc", { value: true })
-    ),
-    vscode.commands.registerCommand(
-      "redmyne.adHocOff",
-      forwardIssuePayload("redmyne.setAdHoc", { value: false })
-    ),
-    vscode.commands.registerCommand(
-      "redmyne.precedenceOn",
-      forwardIssuePayload("redmyne.setPrecedence", { value: true })
-    ),
-    vscode.commands.registerCommand(
-      "redmyne.precedenceOff",
-      forwardIssuePayload("redmyne.setPrecedence", { value: false })
     ),
     vscode.commands.registerCommand("redmyne.updateIssue", (issue: IssueContext | undefined) => {
       if (hasIssue(issue)) {

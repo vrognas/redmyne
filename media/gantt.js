@@ -164,9 +164,6 @@
         { label: "Show in Issues", command: "showInIssues" },
         { label: "Log Time", command: "logTime" },
         { label: "Set % Done", command: "setDoneRatio" },
-        { label: "Toggle Auto-update %", command: "toggleAutoUpdate" },
-        { label: "Toggle Ad-hoc Budget", command: "toggleAdHoc" },
-        { label: "Toggle Precedence", command: "togglePrecedence" },
         { label: "Set Internal Estimate", command: "setInternalEstimate" },
         { label: "Copy Link", command: "copyLink", local: true },
         { label: "Copy URL", command: "copyUrl" }
@@ -3429,4 +3426,3 @@
     perfMeasure("initializeGantt", "initializeGantt-start", "initializeGantt-end");
   }
 })();
-//# sourceMappingURL=gantt.js.map

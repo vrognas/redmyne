@@ -283,30 +283,6 @@
         "icon": "$(arrow-both)"
       },
       {
-        "command": "redmyne.autoUpdateOn",
-        "title": "On"
-      },
-      {
-        "command": "redmyne.autoUpdateOff",
-        "title": "Off"
-      },
-      {
-        "command": "redmyne.adHocOn",
-        "title": "On"
-      },
-      {
-        "command": "redmyne.adHocOff",
-        "title": "Off"
-      },
-      {
-        "command": "redmyne.precedenceOn",
-        "title": "On"
-      },
-      {
-        "command": "redmyne.precedenceOff",
-        "title": "Off"
-      },
-      {
         "command": "redmyne.copyIssueUrl",
         "title": "Copy URL",
         "icon": "$(copy)"
@@ -631,30 +607,6 @@
         "title": "Set Priority"
       },
       {
-        "command": "redmyne.gantt.autoUpdateOn",
-        "title": "On"
-      },
-      {
-        "command": "redmyne.gantt.autoUpdateOff",
-        "title": "Off"
-      },
-      {
-        "command": "redmyne.gantt.adHocOn",
-        "title": "On"
-      },
-      {
-        "command": "redmyne.gantt.adHocOff",
-        "title": "Off"
-      },
-      {
-        "command": "redmyne.gantt.precedenceOn",
-        "title": "On"
-      },
-      {
-        "command": "redmyne.gantt.precedenceOff",
-        "title": "Off"
-      },
-      {
         "command": "redmyne.gantt.setInternalEstimate",
         "title": "Set..."
       },
@@ -843,36 +795,12 @@
         "label": "% Done"
       },
       {
-        "id": "redmyne.gantt.autoUpdateMenu",
-        "label": "Auto-update %"
-      },
-      {
-        "id": "redmyne.gantt.adHocMenu",
-        "label": "Ad-hoc Budget"
-      },
-      {
-        "id": "redmyne.gantt.precedenceMenu",
-        "label": "Precedence"
-      },
-      {
         "id": "redmyne.gantt.internalEstimateMenu",
         "label": "Internal Estimate"
       },
       {
         "id": "redmyne.doneRatioMenu",
         "label": "% Done"
-      },
-      {
-        "id": "redmyne.autoUpdateMenu",
-        "label": "Auto-update %"
-      },
-      {
-        "id": "redmyne.adHocMenu",
-        "label": "Ad-hoc Budget"
-      },
-      {
-        "id": "redmyne.precedenceMenu",
-        "label": "Precedence"
       },
       {
         "id": "redmyne.internalEstimateMenu",
@@ -1554,24 +1482,9 @@
           "group": "4_time@1"
         },
         {
-          "submenu": "redmyne.autoUpdateMenu",
-          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
-          "group": "5_settings@1"
-        },
-        {
-          "submenu": "redmyne.adHocMenu",
-          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
-          "group": "5_settings@2"
-        },
-        {
-          "submenu": "redmyne.precedenceMenu",
-          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
-          "group": "5_settings@3"
-        },
-        {
           "submenu": "redmyne.internalEstimateMenu",
           "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
-          "group": "5_settings@4"
+          "group": "5_settings@1"
         },
         {
           "command": "redmyne.addIssueToKanban",
@@ -1794,36 +1707,6 @@
           "group": "2_custom@1"
         }
       ],
-      "redmyne.gantt.autoUpdateMenu": [
-        {
-          "command": "redmyne.gantt.autoUpdateOn",
-          "group": "1_toggle@1"
-        },
-        {
-          "command": "redmyne.gantt.autoUpdateOff",
-          "group": "1_toggle@2"
-        }
-      ],
-      "redmyne.gantt.adHocMenu": [
-        {
-          "command": "redmyne.gantt.adHocOn",
-          "group": "1_toggle@1"
-        },
-        {
-          "command": "redmyne.gantt.adHocOff",
-          "group": "1_toggle@2"
-        }
-      ],
-      "redmyne.gantt.precedenceMenu": [
-        {
-          "command": "redmyne.gantt.precedenceOn",
-          "group": "1_toggle@1"
-        },
-        {
-          "command": "redmyne.gantt.precedenceOff",
-          "group": "1_toggle@2"
-        }
-      ],
       "redmyne.gantt.internalEstimateMenu": [
         {
           "command": "redmyne.gantt.setInternalEstimate",
@@ -1884,36 +1767,6 @@
           "group": "2_custom@1"
         }
       ],
-      "redmyne.autoUpdateMenu": [
-        {
-          "command": "redmyne.autoUpdateOn",
-          "group": "1_toggle@1"
-        },
-        {
-          "command": "redmyne.autoUpdateOff",
-          "group": "1_toggle@2"
-        }
-      ],
-      "redmyne.adHocMenu": [
-        {
-          "command": "redmyne.adHocOn",
-          "group": "1_toggle@1"
-        },
-        {
-          "command": "redmyne.adHocOff",
-          "group": "1_toggle@2"
-        }
-      ],
-      "redmyne.precedenceMenu": [
-        {
-          "command": "redmyne.precedenceOn",
-          "group": "1_toggle@1"
-        },
-        {
-          "command": "redmyne.precedenceOff",
-          "group": "1_toggle@2"
-        }
-      ],
       "redmyne.internalEstimateMenu": [
         {
           "command": "redmyne.setInternalEstimate",
@@ -1966,24 +1819,9 @@
           "group": "4_time@1"
         },
         {
-          "submenu": "redmyne.gantt.autoUpdateMenu",
-          "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar'",
-          "group": "5_settings@1"
-        },
-        {
-          "submenu": "redmyne.gantt.adHocMenu",
-          "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar'",
-          "group": "5_settings@2"
-        },
-        {
-          "submenu": "redmyne.gantt.precedenceMenu",
-          "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar'",
-          "group": "5_settings@3"
-        },
-        {
           "submenu": "redmyne.gantt.internalEstimateMenu",
           "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar'",
-          "group": "5_settings@4"
+          "group": "5_settings@1"
         },
         {
           "command": "redmyne.gantt.addToKanban",
