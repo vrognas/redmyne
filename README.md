@@ -27,7 +27,7 @@ Your issues appear in the sidebar. Start logging time.
 |----------|--------|
 | `Ctrl+Y Ctrl+Y` | Quick log time |
 | `Ctrl+Y Ctrl+N` | Quick create issue |
-| `Ctrl+Y Ctrl+T` | Plan day / toggle timer |
+| `Ctrl+Y Ctrl+T` | Toggle timer |
 
 *(Mac: use `Cmd` instead of `Ctrl`)*
 
@@ -76,6 +76,10 @@ See logged time grouped by **Today**, **This Week**, **This Month**.
 
 **Add entries:** Right-click any date → Add Time Entry
 
+**Copy/paste:** Copy single entries, days, or weeks → paste to other dates
+
+**Custom fields:** Required and optional custom fields prompted when logging time
+
 ### Gantt Chart
 
 Interactive timeline for workload visualization.
@@ -100,8 +104,9 @@ Interactive timeline for workload visualization.
 
 **Visualization:**
 - Zoom: Day / Week / Month / Quarter / Year
-- Heatmap toggle → daily utilization (green → red)
+- Intensity toggle → daily work distribution on bars
 - Critical path toggle → highlight blocking chains
+- Capacity ribbon → daily utilization overview
 - % Done shown on bars
 - Overdue issues → red outline
 - Project filter → checkboxes to show/hide
@@ -115,6 +120,18 @@ Interactive timeline for workload visualization.
 - Undo/redo for all edits
 - Project bars show aggregate dates
 
+### Time Sheet
+
+Week-by-week time entry editing in a spreadsheet-style webview.
+
+- Open via table icon in Time Entries pane header
+- Cascading dropdowns: Client → Project → Task → Activity
+- Daily hours input with dirty tracking and draft mode
+- Undo/redo (`Ctrl+Z` / `Ctrl+Shift+Z`)
+- Sortable columns, searchable issue picker
+- Copy/paste rows, duplicate entries
+- Custom fields support (required + optional)
+
 ### Timer (Pomodoro)
 
 Structured work sessions with auto-logging.
@@ -125,7 +142,7 @@ Structured work sessions with auto-logging.
 4. Time auto-logged when unit completes
 
 **Features:**
-- Status bar countdown
+- Status bar countdown with progress bar
 - Sound notification
 - State persists across restarts
 - Add/remove/reorder units
@@ -138,7 +155,18 @@ Stage tasks before timing them.
 - Add standalone tasks or link to Redmine issues
 - Priority levels: High / Medium / Low
 - Status: Todo → In Progress → Done
+- Tasks grouped by client/project hierarchy
 - Add to Today's Plan when ready
+
+### Draft Mode
+
+Queue write operations locally before sending to Redmine.
+
+- Toggle via command palette or status bar
+- Review panel to inspect, apply, or discard pending drafts
+- Per-draft or bulk apply/discard
+- Server identity validation
+- Persists across restarts
 
 ### Quick Actions
 
@@ -198,9 +226,30 @@ API keys stored via `Redmyne: Set API Key` command (encrypted keychain).
 | `redmyne.gantt.visibleRelationTypes` | Relation types shown as dependency arrows in Gantt | `["blocks","precedes"]` |
 | `redmyne.gantt.perfDebug` | Enable performance debug logging for Gantt | `false` |
 
+### Tooltips & Display
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `redmyne.showProjectMembers` | Show project members in tooltips (Issues tree + Gantt) | `true` |
+| `redmyne.hideProjectMembersFor` | Project IDs to exclude from member display | `[]` |
+
+### Issue Tracking
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `redmyne.autoUpdateIssues` | Issue IDs that auto-update %done when logging time | `[]` |
+| `redmyne.adHocBudgetIssues` | Issue IDs tagged as ad-hoc budget pools | `[]` |
+| `redmyne.precedenceIssues` | Issue IDs scheduled before all others in Gantt | `[]` |
+
+### Advanced
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `redmyne.caFile` | Custom CA certificate file path (PEM/CRT) for TLS validation | — |
+
 ## Requirements
 
-- VS Code 1.105+ or Positron 2025.06+
+- VS Code 1.105+ or Positron 2025.12.0+
 - Redmine with REST API enabled (`/settings` → API tab)
 - API key from My Account → API access key
 
@@ -232,13 +281,17 @@ Stay in your IDE. Stay in flow.
 | Command | Description |
 |---------|-------------|
 | `Redmyne: Set API Key` | Configure server URL and API key |
-| `Redmyne: Quick Log Time` | Log time with keyboard (Ctrl+Y Ctrl+Y) |
-| `Redmyne: Quick Create Issue` | Create issue wizard (Ctrl+Y Ctrl+N) |
-| `Redmyne: Plan Day` | Set up timer work units (Ctrl+Y Ctrl+T) |
-| `Redmyne: Show Gantt` | Open Gantt chart |
+| `Log Time` | Log time with keyboard (Ctrl+Y Ctrl+Y) |
+| `Create Issue` | Create issue wizard (Ctrl+Y Ctrl+N) |
+| `Toggle Timer` | Start/stop timer (Ctrl+Y Ctrl+T) |
+| `Show Gantt` | Open Gantt chart |
+| `Time Sheet` | Open week-by-week time entry editor |
 | `Redmyne: Edit Monthly Working Hours` | Configure FTE per month |
 | `Redmyne: Show API Output` | View API request/response log |
 | `Redmyne: Toggle API Logging` | Enable/disable request logging |
+| `Redmyne: Review Drafts` | Review pending draft operations |
+| `Redmyne: Apply All Drafts` | Send all queued drafts to Redmine |
+| `Redmyne: Discard All Drafts` | Discard all pending drafts |
 
 </details>
 
