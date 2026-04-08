@@ -15,7 +15,7 @@ Please, make sure new features and support questions related to the extension ar
 - Keep PRs as small possible - do not batch multiple features within a single PR
 - Try to keep PR with a single commit - otherwise maintainers may squash it into single commit
 - Name your commits following the format described in Conventions section below
-- Be welcoming to newcomers and encourage diverse new contributors from all backgrounds. See the [Code of Conduct](./CODE_OF_CONDUCT.md).
+- Be welcoming to newcomers and encourage diverse new contributors from all backgrounds. See the [Code of Conduct](./docs/CODE_OF_CONDUCT.md).
 
 # Your First Contribution
 

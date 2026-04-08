@@ -4,10 +4,10 @@
 
 | Version | Supported  |
 | ------- | ---------- |
-| 3.0.x   | ✓ Yes      |
-| < 3.0   | ✗ No       |
+| 4.x     | ✓ Yes      |
+| < 4.0   | ✗ No       |
 
-**Recommendation**: Use latest 3.x release for security fixes.
+**Recommendation**: Use latest 4.x release for security fixes.
 
 ## Reporting a Vulnerability
 
@@ -61,5 +61,5 @@ See [Migration Guide](../docs/MIGRATION_GUIDE.md).
 
 - Rotate API keys regularly
 - Use read-only Redmine accounts if possible
-- Review `redmine.additionalHeaders` for sensitive data (it syncs, unlike API keys)
+- Review `redmyne.additionalHeaders` for sensitive data (it syncs, unlike API keys)
 - Disable Settings Sync for workspaces with sensitive URLs
