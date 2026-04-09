@@ -1,5 +1,0 @@
-{
-  "name": "redmine-api",
-  "description": "Redmine REST API correctness guard for the redmyne extension",
-  "version": "1.0.0"
-}
