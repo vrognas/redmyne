@@ -1440,16 +1440,15 @@ export class RedmineServer implements IRedmineServer {
   async searchIssues(query: string, limit = 10): Promise<Issue[]> {
     if (!query.trim()) return [];
 
-    // Use both search methods in parallel for better coverage
-    const [searchApiResults, subjectFilterResults] = await Promise.all([
-      // Method 1: Redmine search API (searches indexed content)
-      this.searchViaSearchApi(query, limit),
-      // Method 2: Subject filter (searches subject field directly - more reliable)
-      this.searchViaSubjectFilter(query, limit),
-    ]);
+    // Fast path: subject filter (1 HTTP call, returns full Issue objects)
+    const subjectResults = await this.searchViaSubjectFilter(query, limit);
+    if (subjectResults.length >= limit) {
+      return subjectResults;
+    }
 
-    // Merge results: subject filter first (more reliable), then search API
-    const merged = this.deduplicateById([...subjectFilterResults, ...searchApiResults]);
+    // Supplement with search API if subject filter returned fewer than limit
+    const searchApiResults = await this.searchViaSearchApi(query, limit);
+    const merged = this.deduplicateById([...subjectResults, ...searchApiResults]);
     return merged.slice(0, limit);
   }
 
@@ -1467,30 +1466,19 @@ export class RedmineServer implements IRedmineServer {
         .map((r) => r.id);
 
       if (issueIds.length === 0) return [];
-      return this.getIssuesByIds(issueIds);
+      return this.getIssuesByIds(issueIds, false);
     } catch {
       return []; // Fail silently, other method may work
     }
   }
 
   /**
-   * Search using subject filter with two strategies:
-   * 1. Starts-with (^): Focused prefix matches like "Vacation" for "vac"
-   * 2. Contains (~) sorted by created_on:asc: Old important issues first
-   * Redmine API caps at 100 results, so we use smart queries instead of pagination.
+   * Search using subject contains filter (~).
+   * Client-side sort prioritizes exact/starts-with matches.
    */
   private async searchViaSubjectFilter(query: string, limit: number): Promise<Issue[]> {
     try {
       const lowerQuery = query.toLowerCase();
-
-      // Two parallel searches with different strategies
-      const startsWithParams = new URLSearchParams();
-      startsWithParams.append("set_filter", "1");
-      startsWithParams.append("f[]", "subject");
-      startsWithParams.append("op[subject]", "^"); // Starts with
-      startsWithParams.append("v[subject][]", query);
-      startsWithParams.append("status_id", "*");
-      startsWithParams.append("limit", "100");
 
       const containsParams = new URLSearchParams();
       containsParams.append("set_filter", "1");
@@ -1498,28 +1486,17 @@ export class RedmineServer implements IRedmineServer {
       containsParams.append("op[subject]", "~"); // Contains
       containsParams.append("v[subject][]", query);
       containsParams.append("status_id", "*");
-      containsParams.append("sort", "created_on:asc"); // Oldest first - catches old important issues
       containsParams.append("limit", "100");
 
-      const [startsWithResult, containsResult] = await Promise.all([
-        this.doRequest<{ issues: Issue[] }>(
-          `/issues.json?${startsWithParams.toString()}`,
-          "GET"
-        ).catch(() => ({ issues: [] })),
-        this.doRequest<{ issues: Issue[] }>(
-          `/issues.json?${containsParams.toString()}`,
-          "GET"
-        ).catch(() => ({ issues: [] })),
-      ]);
+      const result = await this.doRequest<{ issues: Issue[] }>(
+        `/issues.json?${containsParams.toString()}`,
+        "GET"
+      ).catch(() => ({ issues: [] }));
 
-      // Merge: starts-with first (more focused), then contains
-      const merged = this.deduplicateById([
-        ...(startsWithResult?.issues || []),
-        ...(containsResult?.issues || []),
-      ]);
+      const issues = result?.issues || [];
 
       // Rank by relevance
-      merged.sort((a, b) => {
+      issues.sort((a, b) => {
         const aSubject = a.subject?.toLowerCase() || "";
         const bSubject = b.subject?.toLowerCase() || "";
 
@@ -1543,7 +1520,7 @@ export class RedmineServer implements IRedmineServer {
         return b.id - a.id;
       });
 
-      return merged.slice(0, limit);
+      return issues.slice(0, limit);
     } catch {
       return [];
     }

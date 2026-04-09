@@ -88,11 +88,29 @@ function createAutoSelectQuickPick(
   let onDidAccept: (() => void) | undefined;
   let onDidHide: (() => void) | undefined;
 
-  const quickPick = {
+  // Track state for async item loading (picker shows before items arrive)
+  let _items: vscode.QuickPickItem[] = [];
+  let shown = false;
+  let resolved = false;
+
+  const trySelect = () => {
+    if (!shown || resolved || _items.length === 0) return;
+    const selected = pickItem(_items);
+    if (!selected) {
+      resolved = true;
+      onDidHide?.();
+      return;
+    }
+    resolved = true;
+    quickPick.activeItems = [selected];
+    onDidChangeSelection?.([selected]);
+    onDidAccept?.();
+  };
+
+  const quickPick: Record<string, unknown> = {
     title: "",
     placeholder: "",
     value: "",
-    items: [] as vscode.QuickPickItem[],
     activeItems: [] as vscode.QuickPickItem[],
     selectedItems: [] as vscode.QuickPickItem[],
     canSelectMany: false,
@@ -114,20 +132,25 @@ function createAutoSelectQuickPick(
       return { dispose: vi.fn() };
     }),
     show: vi.fn(() => {
-      const selected = pickItem(quickPick.items);
-      if (!selected) {
-        onDidHide?.();
-        return;
-      }
-      quickPick.activeItems = [selected];
-      onDidChangeSelection?.([selected]);
-      onDidAccept?.();
+      shown = true;
+      trySelect();
     }),
     hide: vi.fn(() => {
       onDidHide?.();
     }),
     dispose: vi.fn(),
   };
+
+  // React to async item assignment (items set after show)
+  Object.defineProperty(quickPick, "items", {
+    get: () => _items,
+    set: (value: vscode.QuickPickItem[]) => {
+      _items = value;
+      trySelect();
+    },
+    enumerable: true,
+    configurable: true,
+  });
 
   return quickPick as unknown as vscode.QuickPick<vscode.QuickPickItem>;
 }
@@ -444,6 +467,10 @@ describe("issue-picker", () => {
       getFilteredIssues: vi.fn().mockRejectedValue(new Error("issues down")),
     });
 
+    // Picker now shows immediately — provide a mock that auto-cancels
+    const autoCancel = createAutoSelectQuickPick(() => undefined);
+    vi.spyOn(vscodeApi.window, "createQuickPick").mockReturnValue(autoCancel);
+
     const result = await pickIssueWithSearch(server as unknown as IRedmineServer, "Pick issue/activity");
 
     expect(result).toBeUndefined();
@@ -642,7 +669,7 @@ describe("issue-picker", () => {
     expect(server.searchIssues).not.toHaveBeenCalled();
 
     quickPick.triggerValue("remote");
-    await vi.advanceTimersByTimeAsync(200);
+    await vi.advanceTimersByTimeAsync(250);
     const selectedDisabled = quickPick.triggerSelection((items) =>
       items.find((item) => item.label.includes("#942"))
     );
@@ -677,7 +704,7 @@ describe("issue-picker", () => {
     expect(quickPick.onDidChangeValue).toHaveBeenCalled();
 
     quickPick.triggerValue("123");
-    await vi.advanceTimersByTimeAsync(200);
+    await vi.advanceTimersByTimeAsync(250);
 
     expect(server.getIssueById).toHaveBeenCalledWith(123);
     expect(quickPick.items).toEqual(
@@ -718,7 +745,7 @@ describe("issue-picker", () => {
     expect(quickPick.onDidChangeValue).toHaveBeenCalled();
 
     quickPick.triggerValue("#999");
-    await vi.advanceTimersByTimeAsync(200);
+    await vi.advanceTimersByTimeAsync(250);
 
     expect(server.getIssueById).toHaveBeenCalledWith(999);
     expect(quickPick.items).toEqual(
@@ -773,8 +800,8 @@ describe("issue-picker", () => {
         createProject(22, "Platform", { id: 21, name: "ClientA" }),
       ]),
       isTimeTrackingEnabled: vi.fn().mockResolvedValue(true),
-      searchIssues: vi.fn(async (token: string) => {
-        if (token.toLowerCase().includes("auth") || token.toLowerCase().includes("bug")) {
+      searchIssues: vi.fn(async (query: string) => {
+        if (query.toLowerCase().includes("auth") || query.toLowerCase().includes("bug")) {
           return [openMatch, closedMismatch];
         }
         return [];
@@ -789,10 +816,9 @@ describe("issue-picker", () => {
     expect(quickPick.onDidChangeValue).toHaveBeenCalled();
 
     quickPick.triggerValue("clienta project:ClientA status:Open auth bug");
-    await vi.advanceTimersByTimeAsync(200);
+    await vi.advanceTimersByTimeAsync(250);
 
-    expect(server.searchIssues).toHaveBeenCalledWith("auth", 10);
-    expect(server.searchIssues).toHaveBeenCalledWith("bug", 10);
+    expect(server.searchIssues).toHaveBeenCalledWith("clienta project:ClientA status:Open auth bug", 25);
     expect(server.getOpenIssuesForProject).toHaveBeenCalledWith(22, true, 30, false);
     expect(
       quickPick.items.some((item) => item.label.includes("#701"))
@@ -838,7 +864,7 @@ describe("issue-picker", () => {
     expect(quickPick.onDidChangeValue).toHaveBeenCalled();
 
     quickPick.triggerValue("retry");
-    await vi.advanceTimersByTimeAsync(200);
+    await vi.advanceTimersByTimeAsync(250);
 
     expect(quickPick.items).toEqual(
       expect.arrayContaining([
@@ -900,7 +926,7 @@ describe("issue-picker", () => {
     await flushMicrotasks();
 
     quickPick.triggerValue("auth");
-    await vi.advanceTimersByTimeAsync(200);
+    await vi.advanceTimersByTimeAsync(250);
 
     expect(
       quickPick.items.some((item) => item.label.includes("$(account) #901"))
@@ -954,7 +980,7 @@ describe("issue-picker", () => {
     await flushMicrotasks();
 
     quickPick.triggerValue("remote");
-    await vi.advanceTimersByTimeAsync(200);
+    await vi.advanceTimersByTimeAsync(250);
 
     expect(
       quickPick.items.some((item) => item.label.includes("$(search) #912"))
@@ -995,7 +1021,7 @@ describe("issue-picker", () => {
     await flushMicrotasks();
 
     quickPick.triggerValue("zz");
-    await vi.advanceTimersByTimeAsync(200);
+    await vi.advanceTimersByTimeAsync(250);
     expect(
       quickPick.items.some((item) => item.label.includes("No results for"))
     ).toBe(true);
@@ -1379,12 +1405,13 @@ describe("issue-picker", () => {
     });
 
     const server = {
+      options: { address: "https://redmine.local" },
       getIssueById: vi
         .fn()
         .mockRejectedValueOnce(new Error("403 forbidden"))
         .mockRejectedValueOnce(new Error("404 missing")),
-      searchIssues: vi.fn(async (token: string) => {
-        if (token.toLowerCase().includes("auth") || token.toLowerCase().includes("bug")) {
+      searchIssues: vi.fn(async (query: string) => {
+        if (query.toLowerCase().includes("auth") || query.toLowerCase().includes("bug")) {
           return [serverIssue];
         }
         return [];
@@ -1417,8 +1444,7 @@ describe("issue-picker", () => {
       new Map<number, string>([[22, "ClientA: Platform"]]),
       new Set<number>([101])
     );
-    expect(server.searchIssues).toHaveBeenCalledWith("auth", 10);
-    expect(server.searchIssues).toHaveBeenCalledWith("bug", 10);
+    expect(server.searchIssues).toHaveBeenCalledWith("clienta auth bug", 25);
     expect(server.getOpenIssuesForProject).toHaveBeenCalledWith(22, true, 30, false);
     expect(mixed.results.map((i: Issue) => i.id)).toEqual(expect.arrayContaining([101, 102, 103]));
   });
@@ -1431,6 +1457,7 @@ describe("issue-picker", () => {
       project: { id: 71, name: "Core" },
     });
     const server = {
+      options: { address: "https://redmine.local" },
       getIssueById: vi
         .fn()
         .mockResolvedValueOnce({ issue: exactIssue })

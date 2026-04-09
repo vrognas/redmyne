@@ -15,6 +15,8 @@ export interface DatePickerOptions {
   showYesterday?: boolean;
   /** Show "Tomorrow" and "Next week" options (default: false) */
   showFutureDates?: boolean;
+  /** Custom title for the QuickPick (default: "Select Date") */
+  title?: string;
 }
 
 /**
@@ -60,10 +62,30 @@ export async function pickDate(
     );
   }
 
+  // Add recent working days for time logging (past weekdays beyond yesterday)
+  if (!allowFuture && showYesterday) {
+    const recentDays: DateOption[] = [];
+    for (let daysBack = 2; daysBack <= 7; daysBack++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - daysBack);
+      const dow = d.getDay();
+      if (dow === 0 || dow === 6) continue; // Skip weekends
+      recentDays.push({
+        label: `$(history) ${formatDisplay(d)}`,
+        value: formatDateISO(d),
+        action: "preset",
+      });
+      if (recentDays.length >= 3) break; // Max 3 extra days
+    }
+    if (recentDays.length > 0) {
+      items.push(...recentDays);
+    }
+  }
+
   items.push({ label: "$(edit) Pick date...", value: "", action: "pick" });
 
   const choice = await vscode.window.showQuickPick(items, {
-    title: "Select Date",
+    title: options?.title ?? "Select Date",
     placeHolder: "Which day?",
   });
 
@@ -71,6 +93,7 @@ export async function pickDate(
 
   if (choice.action === "pick") {
     const customDate = await vscode.window.showInputBox({
+      title: options?.title,
       prompt: "Enter date (YYYY-MM-DD)",
       placeHolder: yesterdayStr,
       validateInput: (value) => validateDateInput(value, allowFuture),

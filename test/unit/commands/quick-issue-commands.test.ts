@@ -100,7 +100,7 @@ describe("registerQuickIssueCommands", () => {
 
     await action?.(props, { id: 42 });
 
-    expect(quickLogTime).toHaveBeenCalledWith(props, context, undefined, 42);
+    expect(quickLogTime).toHaveBeenCalledWith(props, undefined, 42);
   });
 
   it("refreshes projects after successful quick issue creation", async () => {

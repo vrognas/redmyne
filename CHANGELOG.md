@@ -7,6 +7,22 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.19.1]
+
+### Improved
+
+- **Time Entry UX: progressive context titles** — each step (issue → activity → date → hours → comment) shows accumulated selections in the title so user always knows where they are
+- **Time Entry UX: recent working-day shortcuts** — date picker shows up to 3 recent weekdays beyond Today/Yesterday for faster retroactive logging
+- **Issue picker: instant display** — picker shows immediately with loading indicator; issues populate asynchronously instead of blocking until all data is fetched
+- **Issue picker: time tracking cache** — project time-tracking status cached for 5 min, eliminating redundant HTTP requests on repeat opens
+- **Issue search: ~16 → ~4-6 HTTP calls per query** — single full-query search instead of per-token, dropped redundant starts-with filter, deferred search API behind subject filter, capped project searches at 3
+- **Issue search: prefix cache** — typing "fea" → "feat" → "feature" reuses cached results client-side (5s TTL), eliminating all HTTP calls for prefix extensions
+- **Issue search: debounce 150 → 250ms** — reduces wasted searches during active typing
+
+### Fixed
+
+- **Search API dropped closed issues** — `getIssuesByIds` defaulted `skipClosed=true` during search result hydration; closed issues from `/search.json` were silently lost
+
 ## [4.19.0]
 
 ### Added

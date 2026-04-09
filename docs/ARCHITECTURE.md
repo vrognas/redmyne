@@ -2,7 +2,7 @@
 
 VS Code/Positron extension for Redmine workload management. TypeScript 5.9+.
 
-**v4.19.0** | VS Code ≥1.105.0 | Node ≥20
+**v4.19.1** | VS Code ≥1.105.0 | Node ≥20
 
 ## Core Pattern
 

@@ -298,7 +298,6 @@ export function registerTimeEntryCommands(
 
       await quickLogTime(
         { server, config: { ...config, serverUrl: url } },
-        context,
         node?._date
       );
       deps.refreshTree();

@@ -7,7 +7,7 @@ import { RedmineProject } from "../redmine/redmine-project";
 import { debounce } from "./debounce";
 import { recordRecentIssue, getRecentIssueIds } from "./recent-issues";
 
-const SEARCH_DEBOUNCE_MS = 150;
+const SEARCH_DEBOUNCE_MS = 250;
 const PROJECT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 function isNonZeroNumber(value: number | null | undefined): value is number {
@@ -31,6 +31,141 @@ interface ProjectPathCache {
   serverAddress: string;
 }
 let projectPathCache: ProjectPathCache | null = null;
+
+// Time tracking status cache (module-level, shared across picker invocations)
+interface TimeTrackingStatusCache {
+  map: Map<number, boolean>;
+  timestamp: number;
+  serverAddress: string;
+}
+let timeTrackingStatusCache: TimeTrackingStatusCache | null = null;
+
+/**
+ * Get or check time tracking status for projects with caching.
+ * Returns cached results immediately, fetches only uncached project IDs.
+ */
+async function getTimeTrackingStatusCached(
+  server: IRedmineServer,
+  projectIds: number[]
+): Promise<Map<number, boolean>> {
+  const serverAddress = server.options.address;
+  const isCacheValid =
+    timeTrackingStatusCache &&
+    timeTrackingStatusCache.serverAddress === serverAddress &&
+    Date.now() - timeTrackingStatusCache.timestamp < PROJECT_CACHE_TTL_MS;
+
+  // Copy cached map to avoid mutating the live cache during concurrent reads
+  const result = isCacheValid
+    ? new Map(timeTrackingStatusCache!.map)
+    : new Map<number, boolean>();
+  const uncached = projectIds.filter((id) => !result.has(id));
+
+  if (uncached.length > 0) {
+    await Promise.all(
+      uncached.map(async (projectId) => {
+        try {
+          const enabled = await server.isTimeTrackingEnabled(projectId);
+          result.set(projectId, enabled);
+        } catch {
+          result.set(projectId, true); // Fail open
+        }
+      })
+    );
+    // Merge into existing cache (don't overwrite concurrent writes)
+    timeTrackingStatusCache = {
+      map: new Map([...(timeTrackingStatusCache?.map ?? []), ...result]),
+      timestamp: Date.now(),
+      serverAddress,
+    };
+  }
+
+  return result;
+}
+
+/**
+ * Build QuickPick items from categorized issue lists
+ */
+function buildIssuePickerItems(
+  trackableOpen: Issue[],
+  trackableClosed: Issue[],
+  nonTrackable: Issue[],
+  projectPathMap: Map<number, string>,
+  allowSkip: boolean
+): IssueQuickPickItem[] {
+  // Collect recent issues from all trackable lists (open + closed), sorted by recency
+  const recentIssueIdsList = getRecentIssueIds();
+  const allTrackable = [...trackableOpen, ...trackableClosed];
+  const recentIssues = recentIssueIdsList
+    .filter((id) => allTrackable.some((i) => i.id === id))
+    .slice(0, 5)
+    .map((id) => allTrackable.find((i) => i.id === id)!);
+  const recentIdSet = new Set(recentIssues.map((i) => i.id));
+
+  const otherOpen = trackableOpen.filter((i) => !recentIdSet.has(i.id));
+  const otherClosed = trackableClosed.filter((i) => !recentIdSet.has(i.id));
+  const items: IssueQuickPickItem[] = [];
+
+  if (recentIssues.length > 0) {
+    items.push({ label: "Recent", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
+    for (const issue of recentIssues) {
+      const isClosed = issue.status?.is_closed ?? false;
+      const icon = isClosed ? "$(archive)" : "$(history)";
+      const statusTag = isClosed ? ` · ${issue.status?.name ?? "closed"}` : "";
+      items.push({
+        label: `${icon} #${issue.id} ${issue.subject}`,
+        description: `${issue.assigned_to?.name ?? "Unassigned"}${statusTag}`,
+        detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
+        issue,
+        disabled: false,
+      });
+    }
+  }
+
+  if (otherOpen.length > 0) {
+    items.push({ label: "My Open", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
+    for (const issue of otherOpen) {
+      items.push({
+        label: `#${issue.id} ${issue.subject}`,
+        description: issue.assigned_to?.name ?? "Unassigned",
+        detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
+        issue,
+        disabled: false,
+      });
+    }
+  }
+
+  if (otherClosed.length > 0) {
+    items.push({ label: "My Closed", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
+    for (const issue of otherClosed.slice(0, 20)) {
+      items.push({
+        label: `$(archive) #${issue.id} ${issue.subject}`,
+        description: `${issue.assigned_to?.name ?? "Unassigned"} · ${issue.status?.name ?? "closed"}`,
+        detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
+        issue,
+        disabled: false,
+      });
+    }
+  }
+
+  if (nonTrackable.length > 0) {
+    items.push({ label: "No Time Tracking", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
+    for (const issue of nonTrackable) {
+      items.push({
+        label: `$(circle-slash) #${issue.id} ${issue.subject}`,
+        description: issue.assigned_to?.name ?? "Unassigned",
+        detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name ?? "Unknown",
+        issue,
+        disabled: true,
+      });
+    }
+  }
+
+  if (allowSkip) {
+    items.push({ label: "$(dash) Skip (assign later)", action: "skip" });
+  }
+
+  return items;
+}
 
 /**
  * Get or build project path map with caching
@@ -69,11 +204,22 @@ interface IssueSearchResult {
   exactMatchError: string | null; // "no access" | "not found" | null
 }
 
+// Search result cache for prefix-extension optimization
+interface SearchResultCache {
+  query: string;
+  candidates: Issue[];
+  timestamp: number;
+  serverAddress: string;
+}
+let searchResultCache: SearchResultCache | null = null;
+const SEARCH_CACHE_TTL_MS = 5 * 1000; // 5 seconds
+
 /**
  * Search issues across multiple sources with fuzzy matching
- * - Searches server by each query token (for multi-word queries)
+ * - Searches server with the full query string
  * - Searches projects by name and fetches their issues
  * - Applies fuzzy matching to rank all candidates
+ * - Uses prefix cache: if new query extends a recent cached query, skips server
  */
 async function searchIssuesWithFuzzy(
   server: IRedmineServer,
@@ -87,6 +233,25 @@ async function searchIssuesWithFuzzy(
   const isNumericQuery = !isNaN(possibleId) && cleanQuery === String(possibleId);
   const queryTokens = query.trim().split(/\s+/).filter(t => t.length >= 2);
 
+  // Prefix cache: if query extends a recent cached query, skip server calls
+  const serverAddress = server.options?.address ?? "";
+  const hasOperators = query.includes(":");
+  if (
+    searchResultCache &&
+    searchResultCache.serverAddress === serverAddress &&
+    Date.now() - searchResultCache.timestamp < SEARCH_CACHE_TTL_MS &&
+    searchResultCache.query.length >= 2 &&
+    query.toLowerCase().startsWith(searchResultCache.query.toLowerCase()) &&
+    !isNumericQuery && // Always fetch fresh for exact ID lookups
+    !hasOperators // Operators change filter semantics — don't reuse cached set
+  ) {
+    const assignedIds = new Set(localIssues.map(i => i.id));
+    const results = fuzzyFilterIssues(
+      searchResultCache.candidates, query, projectPathMap, assignedIds, recentIds
+    );
+    return { results, exactMatch: null, exactMatchError: null };
+  }
+
   // Find projects matching any token (for project-name search)
   const matchingProjectIds: number[] = [];
   for (const token of queryTokens) {
@@ -98,7 +263,7 @@ async function searchIssuesWithFuzzy(
     }
   }
 
-  // Parallel fetch: exact ID + token searches + project issues
+  // Parallel fetch: exact ID + search + project issues
   let exactMatch: Issue | null = null;
   let exactMatchError: string | null = null;
   const serverResults: Issue[] = [];
@@ -118,18 +283,13 @@ async function searchIssuesWithFuzzy(
         }
       }
     })(),
-    // Search each token separately for multi-word queries
-    ...(queryTokens.length > 1
-      ? queryTokens.map(async (token) => {
-          const results = await server.searchIssues(token, 10);
-          serverResults.push(...results);
-        })
-      : [(async () => {
-          const results = await server.searchIssues(query, 10);
-          serverResults.push(...results);
-        })()]),
+    // Search full query (Redmine handles multi-word natively; Fuse.js ranks client-side)
+    (async () => {
+      const results = await server.searchIssues(query, 25);
+      serverResults.push(...results);
+    })(),
     // Fetch issues from projects matching search tokens (include subprojects + closed)
-    ...matchingProjectIds.slice(0, 8).map(async (projectId) => {
+    ...matchingProjectIds.slice(0, 3).map(async (projectId) => {
       try {
         const result = await server.getOpenIssuesForProject(projectId, true, 30, false);
         serverResults.push(...result.issues);
@@ -159,6 +319,14 @@ async function searchIssuesWithFuzzy(
       seenIds.add(issue.id);
     }
   }
+
+  // Cache candidates for prefix-extension optimization
+  searchResultCache = {
+    query,
+    candidates: candidateIssues,
+    timestamp: Date.now(),
+    serverAddress,
+  };
 
   // Apply fuzzy search for ranking (assigned issues ranked higher)
   const assignedIds = new Set(localIssues.map(i => i.id));
@@ -458,147 +626,25 @@ export async function pickIssueWithSearch(
 ): Promise<PickedIssueAndActivity | "skip" | undefined> {
   const allowSkip = options?.allowSkip ?? false;
 
-  // Get my issues (both open and closed)
-  let myOpenIssues: Issue[];
-  let myClosedIssues: Issue[];
-  try {
-    const [openResult, closedResult] = await Promise.all([
-      server.getFilteredIssues({ assignee: "me", status: "open" }),
-      server.getFilteredIssues({ assignee: "me", status: "closed" }),
-    ]);
-    myOpenIssues = openResult.issues;
-    myClosedIssues = closedResult.issues;
-  } catch (error) {
-    vscode.window.showErrorMessage(`Failed to fetch issues: ${error}`);
-    return undefined;
-  }
-  const issues = [...myOpenIssues, ...myClosedIssues];
-  const myIssueIds = new Set(issues.map(i => i.id));
-
-  // Fetch project path map (cached) + check time_tracking in parallel
-  const projectIds = [...new Set(issues.map(i => i.project?.id).filter(isNonZeroNumber))];
-  const timeTrackingByProject = new Map<number, boolean>();
-
-  const [projectPathMap] = await Promise.all([
-    getProjectPathMap(server),
-    // Check time_tracking for all projects
-    ...projectIds.map(async (projectId) => {
-      const enabled = await server.isTimeTrackingEnabled(projectId);
-      timeTrackingByProject.set(projectId, enabled);
-    }),
-  ]);
-
-  // Get recent issue IDs for boosting
-  const recentIds = new Set(getRecentIssueIds());
-
-  // Build issue list: trackable issues first, then non-trackable (disabled)
-  const trackableOpenIssues = myOpenIssues.filter(
-    (issue) => issue.project?.id && timeTrackingByProject.get(issue.project.id)
-  );
-  const trackableClosedIssues = myClosedIssues.filter(
-    (issue) => issue.project?.id && timeTrackingByProject.get(issue.project.id)
-  );
-  const nonTrackableIssues = issues.filter(
-    (issue) => !issue.project?.id || !timeTrackingByProject.get(issue.project.id)
-  );
-
-  // Sort by recency
-  const sortByRecency = (a: Issue, b: Issue): number => {
-    const recentIssueIdsList = getRecentIssueIds();
-    const aRecent = recentIssueIdsList.indexOf(a.id);
-    const bRecent = recentIssueIdsList.indexOf(b.id);
-    // Both recent: sort by recency
-    if (aRecent !== -1 && bRecent !== -1) return aRecent - bRecent;
-    // Only one recent
-    if (aRecent !== -1) return -1;
-    if (bRecent !== -1) return 1;
-    return 0;
-  };
-
-  trackableOpenIssues.sort(sortByRecency);
-  trackableClosedIssues.sort(sortByRecency);
-
-  // Build base items with visual grouping
-  const recentOpen = trackableOpenIssues.filter(i => recentIds.has(i.id));
-  const otherOpen = trackableOpenIssues.filter(i => !recentIds.has(i.id));
-
-  const baseItems: IssueQuickPickItem[] = [];
-
-  // Recent open issues section
-  if (recentOpen.length > 0) {
-    baseItems.push({ label: "Recent", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
-    for (const issue of recentOpen) {
-      baseItems.push({
-        label: `$(history) #${issue.id} ${issue.subject}`,
-        description: issue.assigned_to?.name ?? "Unassigned",
-        detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
-        issue,
-        disabled: false,
-      });
-    }
-  }
-
-  // Other open assigned issues
-  if (otherOpen.length > 0) {
-    baseItems.push({ label: "My Open", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
-    for (const issue of otherOpen) {
-      baseItems.push({
-        label: `#${issue.id} ${issue.subject}`,
-        description: issue.assigned_to?.name ?? "Unassigned",
-        detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
-        issue,
-        disabled: false,
-      });
-    }
-  }
-
-  // My closed issues (limit to 20 most recent)
-  if (trackableClosedIssues.length > 0) {
-    baseItems.push({ label: "My Closed", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
-    for (const issue of trackableClosedIssues.slice(0, 20)) {
-      baseItems.push({
-        label: `$(archive) #${issue.id} ${issue.subject}`,
-        description: `${issue.assigned_to?.name ?? "Unassigned"} · ${issue.status?.name ?? "closed"}`,
-        detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
-        issue,
-        disabled: false,
-      });
-    }
-  }
-
-  // Non-trackable issues (disabled, greyed out)
-  if (nonTrackableIssues.length > 0) {
-    baseItems.push({ label: "No Time Tracking", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
-    for (const issue of nonTrackableIssues) {
-      baseItems.push({
-        label: `$(circle-slash) #${issue.id} ${issue.subject}`,
-        description: issue.assigned_to?.name ?? "Unassigned",
-        detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name ?? "Unknown",
-        issue,
-        disabled: true,
-      });
-    }
-  }
-
-  // Add skip option if allowed
-  if (allowSkip) {
-    baseItems.push({
-      label: "$(dash) Skip (assign later)",
-      action: "skip",
-    });
-  }
-
-  // Use createQuickPick for inline search
+  // Show picker IMMEDIATELY — load data in background
   const selectedIssue = await new Promise<Issue | "skip" | undefined>((resolve) => {
     const quickPick = vscode.window.createQuickPick<IssueQuickPickItem>();
     quickPick.title = title;
-    quickPick.placeholder = "Type to search, or select from list";
+    quickPick.placeholder = "Loading issues...";
+    quickPick.busy = true;
     if (hasSortByLabel(quickPick)) {
-      quickPick.sortByLabel = false; // Preserve our custom sort order
+      quickPick.sortByLabel = false;
     }
-    quickPick.items = baseItems;
     quickPick.matchOnDescription = true;
     quickPick.matchOnDetail = true;
+
+    // Mutable shared state — populated asynchronously
+    let baseItems: IssueQuickPickItem[] = [];
+    let issues: Issue[] = [];
+    let myIssueIds = new Set<number>();
+    let projectPathMap = new Map<number, string>();
+    let recentIds = new Set<number>();
+    let timeTrackingByProject = new Map<number, boolean>();
 
     let resolved = false;
     let searchVersion = 0;
@@ -622,7 +668,6 @@ export async function pickIssueWithSearch(
 
       if (selected.issue) {
         resolved = true;
-        // Record selection for recent issues
         recordRecentIssue(
           selected.issue.id,
           selected.issue.subject,
@@ -646,7 +691,6 @@ export async function pickIssueWithSearch(
         const possibleId = parseInt(cleanQuery, 10);
         const isNumericQuery = !isNaN(possibleId) && cleanQuery === String(possibleId);
 
-        // Use shared search helper
         const { results: allResults, exactMatchError } = await searchIssuesWithFuzzy(
           server,
           query,
@@ -655,7 +699,7 @@ export async function pickIssueWithSearch(
           recentIds
         );
 
-        // Check time tracking for new projects
+        // Check time tracking for new projects (uses cache)
         const newProjectIds = [...new Set(
           allResults
             .map(i => i.project?.id)
@@ -663,30 +707,19 @@ export async function pickIssueWithSearch(
         )];
 
         if (newProjectIds.length > 0) {
-          await Promise.all(
-            newProjectIds.map(async (projectId) => {
-              try {
-                const enabled = await server.isTimeTrackingEnabled(projectId);
-                timeTrackingByProject.set(projectId, enabled);
-              } catch {
-                timeTrackingByProject.set(projectId, false);
-              }
-            })
-          );
+          const newStatuses = await getTimeTrackingStatusCached(server, newProjectIds);
+          for (const [id, enabled] of newStatuses) {
+            timeTrackingByProject.set(id, enabled);
+          }
         }
 
-        // 5. Filter to trackable issues
         const trackableResults = allResults.filter((issue) => {
           const projectId = issue.project?.id;
-          return projectId !== null && projectId !== undefined && timeTrackingByProject.get(projectId) === true;
+          return projectId !== null && projectId !== undefined && timeTrackingByProject.get(projectId) !== false;
         });
 
-        // Note: Results are already sorted by fuzzy relevance - don't override
-
-        // 6. Check if results are still relevant
         if (thisSearchVersion !== searchVersion || resolved) return;
 
-        // 7. Build result items
         const limitedResults = trackableResults.slice(0, 15);
         const resultItems: IssueQuickPickItem[] = [];
 
@@ -709,7 +742,6 @@ export async function pickIssueWithSearch(
         for (const issue of limitedResults) {
           const isMine = myIssueIds.has(issue.id);
           const isClosed = issue.status?.is_closed ?? false;
-          // Icon: mine+open > others+open > mine+closed > others+closed
           const icon = isClosed ? "$(archive)" : isMine ? "$(account)" : "$(search)";
           const tagStr = isClosed ? " (closed)" : "";
           resultItems.push({
@@ -717,11 +749,10 @@ export async function pickIssueWithSearch(
             description: `${issue.assigned_to?.name ?? "Unassigned"}${tagStr}`,
             detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name ?? "",
             issue,
-            alwaysShow: true,  // Bypass VSCode's built-in filter
+            alwaysShow: true,
           });
         }
 
-        // Filter baseItems to exclude issues already in search results
         const resultIds = new Set(limitedResults.map(i => i.id));
         const filteredBaseItems = baseItems.filter(item => !item.issue || !resultIds.has(item.issue.id));
 
@@ -774,6 +805,92 @@ export async function pickIssueWithSearch(
     });
 
     quickPick.show();
+
+    // Load data in background — picker is already visible
+    (async () => {
+      try {
+        // Phase 1: Fetch issues + project paths in parallel
+        const [openResult, closedResult, pathMap] = await Promise.all([
+          server.getFilteredIssues({ assignee: "me", status: "open" }),
+          server.getFilteredIssues({ assignee: "me", status: "closed" }),
+          getProjectPathMap(server),
+        ]);
+        const myOpenIssues = openResult.issues;
+        const myClosedIssues = closedResult.issues;
+
+        if (resolved) return;
+        myIssueIds = new Set([...myOpenIssues, ...myClosedIssues].map(i => i.id));
+        projectPathMap = pathMap;
+        recentIds = new Set(getRecentIssueIds());
+
+        // Hydrate recent issues not in "my issues" (e.g., unassigned issues picked via search)
+        const missingRecentIds = getRecentIssueIds().filter((id) => !myIssueIds.has(id));
+        if (missingRecentIds.length > 0) {
+          const hydrated = await Promise.all(
+            missingRecentIds.slice(0, 10).map(async (id) => {
+              try {
+                const result = await server.getIssueById(id);
+                return result.issue;
+              } catch {
+                return null;
+              }
+            })
+          );
+          for (const issue of hydrated) {
+            if (issue) {
+              const isClosed = issue.status?.is_closed ?? false;
+              if (isClosed) myClosedIssues.push(issue);
+              else myOpenIssues.push(issue);
+              myIssueIds.add(issue.id);
+            }
+          }
+        }
+
+        issues = [...myOpenIssues, ...myClosedIssues];
+
+        // Show issues immediately (all enabled optimistically)
+        baseItems = buildIssuePickerItems(
+          myOpenIssues, myClosedIssues, [], projectPathMap, allowSkip
+        );
+
+        if (!resolved && !quickPick.value) {
+          quickPick.items = baseItems;
+          quickPick.busy = false;
+          quickPick.placeholder = "Type to search, or select from list";
+        }
+
+        // Phase 2: Check time tracking in background (cached)
+        const projectIds = [...new Set(issues.map(i => i.project?.id).filter(isNonZeroNumber))];
+        timeTrackingByProject = await getTimeTrackingStatusCached(server, projectIds);
+
+        if (resolved) return;
+
+        // Rebuild items with correct trackability
+        const trackableOpen = myOpenIssues.filter(
+          (i) => i.project?.id && timeTrackingByProject.get(i.project.id) !== false
+        );
+        const trackableClosed = myClosedIssues.filter(
+          (i) => i.project?.id && timeTrackingByProject.get(i.project.id) !== false
+        );
+        const nonTrackable = issues.filter(
+          (i) => !i.project?.id || timeTrackingByProject.get(i.project.id) === false
+        );
+        baseItems = buildIssuePickerItems(
+          trackableOpen, trackableClosed, nonTrackable, projectPathMap, allowSkip
+        );
+
+        if (!resolved && !quickPick.value) {
+          quickPick.items = baseItems;
+        }
+      } catch (error) {
+        if (!resolved) {
+          resolved = true;
+          quickPick.dispose();
+          vscode.window.showErrorMessage(`Failed to fetch issues: ${error}`);
+          resolve(undefined);
+        }
+      }
+    })();
   });
 
   if (selectedIssue === undefined) return undefined;
@@ -794,9 +911,9 @@ export async function pickIssueWithSearch(
     return undefined;
   }
 
-  // Check if project has time tracking enabled
-  const hasTimeTracking = await server.isTimeTrackingEnabled(finalIssue.project.id);
-  if (!hasTimeTracking) {
+  // Check if project has time tracking enabled (uses cache)
+  const ttStatus = await getTimeTrackingStatusCached(server, [finalIssue.project.id]);
+  if (ttStatus.get(finalIssue.project.id) === false) {
     vscode.window.showErrorMessage(
       `Cannot log time: Project "${finalIssue.project.name}" does not have time tracking enabled`
     );
@@ -857,17 +974,14 @@ export async function pickIssue(
     return undefined;
   }
 
-  // Fetch project path map (cached) + check time_tracking in parallel
-  const timeTrackingByProject = new Map<number, boolean>();
+  // Fetch project path map (cached) + check time_tracking (cached) in parallel
   const projectIds = [...new Set(issues.map(i => i.project?.id).filter(isNonZeroNumber))];
 
-  const [projectPathMap] = await Promise.all([
+  const [projectPathMap, timeTrackingByProject] = await Promise.all([
     getProjectPathMap(server),
-    // Check time_tracking for all projects (unless skipped)
-    ...(skipTimeTrackingCheck ? [] : projectIds.map(async (projectId) => {
-      const enabled = await server.isTimeTrackingEnabled(projectId);
-      timeTrackingByProject.set(projectId, enabled);
-    })),
+    skipTimeTrackingCheck
+      ? Promise.resolve(new Map<number, boolean>())
+      : getTimeTrackingStatusCached(server, projectIds),
   ]);
 
   // Get recent issue IDs for boosting
@@ -918,12 +1032,12 @@ export async function pickIssue(
       }
     }
   } else {
-    // Split by time tracking
+    // Split by time tracking (fail-open: unchecked projects treated as trackable)
     const trackableIssues = issues.filter(
-      (issue) => issue.project?.id && timeTrackingByProject.get(issue.project.id)
+      (issue) => issue.project?.id && timeTrackingByProject.get(issue.project.id) !== false
     );
     const nonTrackableIssues = issues.filter(
-      (issue) => !issue.project?.id || !timeTrackingByProject.get(issue.project.id)
+      (issue) => !issue.project?.id || timeTrackingByProject.get(issue.project.id) === false
     );
 
     trackableIssues.sort(sortByRecency);
@@ -1174,4 +1288,6 @@ export const __testIssuePicker = {
   fuzzyFilterIssues,
   searchIssuesWithFuzzy,
   showActivityPicker,
+  getTimeTrackingStatusCached,
+  buildIssuePickerItems,
 };

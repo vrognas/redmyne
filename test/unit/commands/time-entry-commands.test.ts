@@ -417,7 +417,6 @@ describe("registerTimeEntryCommands", () => {
 
     expect(quickLogSpy).toHaveBeenCalledWith(
       expect.objectContaining({ server: mockServer }),
-      expect.anything(),
       "2026-02-06"
     );
     expect(refreshTree).toHaveBeenCalledTimes(1);

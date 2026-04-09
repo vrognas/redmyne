@@ -9,7 +9,6 @@ import type { WorkloadStatusBar } from "../status-bars/workload-status-bar";
 
 export interface QuickIssueCommandsDeps {
   registerConfiguredCommand: RegisterConfiguredCommand;
-  context: vscode.ExtensionContext;
   projectsTree: ProjectsTree;
   timeEntriesTree: MyTimeEntriesTreeDataProvider;
   getWorkloadStatusBar: () => WorkloadStatusBar | undefined;
@@ -40,7 +39,7 @@ export function registerQuickIssueCommands(deps: QuickIssueCommandsDeps): void {
   registerCommand("quickLogTime", (props, ...args) => {
     // Extract issue ID from tree node (Issue) or Gantt context ({ id: number }).
     const issueId = getIssueIdFromArg(args[0]);
-    return quickLogTime(props, deps.context, undefined, issueId);
+    return quickLogTime(props, undefined, issueId);
   });
 
   registerCommand("quickCreateIssue", async (props, ...args) => {

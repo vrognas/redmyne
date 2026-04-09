@@ -3,35 +3,24 @@ import type { ActionProperties } from "./action-properties";
 import { parseTimeInput, validateTimeInput, formatHoursAsHHMM } from "../utilities/time-input";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { pickIssueWithSearch, pickActivityForProject } from "../utilities/issue-picker";
+import { recordRecentIssue } from "../utilities/recent-issues";
 import { pickDate } from "../utilities/date-picker";
 import { errorToString } from "../utilities/error-feedback";
 import { pickRequiredCustomFields, TimeEntryCustomFieldValue } from "../utilities/custom-field-picker";
 import { confirmLogTimeOnClosedIssue } from "../utilities/closed-issue-guard";
 
-interface RecentTimeLog {
-  issueId: number;
-  issueSubject: string;
-  lastActivityId: number;
-  lastActivityName: string;
-  lastLogged: Date;
-}
-
-function isRecent(date: Date): boolean {
-  return Date.now() - new Date(date).getTime() < 24 * 60 * 60 * 1000; // 24h
+function truncateSubject(subject: string, max = 30): string {
+  return subject.length > max ? subject.slice(0, max - 1) + "…" : subject;
 }
 
 export async function quickLogTime(
   props: ActionProperties,
-  context: vscode.ExtensionContext,
   presetDate?: string, // Optional pre-selected date (YYYY-MM-DD)
   presetIssueId?: number // Optional pre-selected issue ID (from context menu)
 ): Promise<void> {
   let promptedForCustomFields = false;
   try {
-    // 1. Get recent log from cache
-    const recent = context.globalState.get<RecentTimeLog>("lastTimeLog");
-
-    // 2. Determine issue selection
+    // 1. Determine issue + activity selection
     let selection: {
       issueId: number;
       activityId: number;
@@ -52,8 +41,8 @@ export async function quickLogTime(
       const activity = await pickActivityForProject(
         props.server,
         issue.project.id,
-        "Log Time",
-        `#${issue.id}`
+        `Log Time · #${issue.id} ${truncateSubject(issue.subject)}`,
+        "What type of work?"
       );
       if (!activity) return;
       selection = {
@@ -62,34 +51,10 @@ export async function quickLogTime(
         activityId: activity.activityId,
         activityName: activity.activityName,
       };
-    } else if (recent && isRecent(recent.lastLogged)) {
-      const choice = await vscode.window.showQuickPick(
-        [
-          {
-            label: `$(history) Log to #${recent.issueId}: ${recent.issueSubject} [${recent.lastActivityName}]`,
-            value: "recent",
-          },
-          { label: "$(search) Pick different issue", value: "pick" },
-        ],
-        { title: "Quick Log Time", placeHolder: "Log time to..." }
-      );
-
-      if (!choice) return; // User cancelled
-
-      if (choice.value === "recent") {
-        selection = {
-          issueId: recent.issueId,
-          activityId: recent.lastActivityId,
-          activityName: recent.lastActivityName,
-          issueSubject: recent.issueSubject,
-        };
-      } else {
-        const picked = await pickIssueWithSearch(props.server, "Log Time (1/2)");
-        if (!picked || picked === "skip") return;
-        selection = picked;
-      }
+      recordRecentIssue(issue.id, issue.subject, issue.project?.name ?? "");
     } else {
-      const picked = await pickIssueWithSearch(props.server, "Log Time (1/2)");
+      // Searchable picker with recent issues at the top
+      const picked = await pickIssueWithSearch(props.server, "Log Time");
       if (!picked || picked === "skip") return;
       selection = picked;
     }
@@ -98,11 +63,17 @@ export async function quickLogTime(
     const confirmed = await confirmLogTimeOnClosedIssue(props.server, selection.issueId, fetchedIssue);
     if (!confirmed) return;
 
+    // Build progressive context string
+    const issueCtx = `#${selection.issueId} ${truncateSubject(selection.issueSubject)}`;
+    const activityCtx = `[${selection.activityName}]`;
+
     // 3. Pick date (skip if presetDate provided)
-    const selectedDate = presetDate ?? (await pickDate());
+    const selectedDate = presetDate ?? (await pickDate({
+      title: `Log Time · ${issueCtx} ${activityCtx}`,
+    }));
     if (selectedDate === undefined) return; // User cancelled
 
-    // 4. Fetch time entries for selected date (runs during date picker)
+    // 4. Fetch time entries for selected date
     const timeEntriesPromise = props.server.getTimeEntries({
       from: selectedDate,
       to: selectedDate,
@@ -114,11 +85,14 @@ export async function quickLogTime(
       0
     );
 
-    // 5. Input hours
+    // 5. Input hours — title shows context, prompt shows the question
     const today = new Date().toISOString().split("T")[0];
     const dateLabel = selectedDate === today ? "Today" : selectedDate;
     const hoursInput = await vscode.window.showInputBox({
-      prompt: `Log time to #${selection.issueId} (${selection.activityName})${dateTotal > 0 ? ` | ${dateLabel}: ${formatHoursAsHHMM(dateTotal)} logged` : ""}`,
+      title: `Log Time · ${issueCtx} ${activityCtx} · ${dateLabel}`,
+      prompt: dateTotal > 0
+        ? `Hours? (${formatHoursAsHHMM(dateTotal)} already logged ${dateLabel.toLowerCase()})`
+        : "Hours?",
       placeHolder: "e.g., 2.5, 1:45, 1h 45min",
       validateInput: (value: string) => validateTimeInput(value, dateTotal),
     });
@@ -128,9 +102,10 @@ export async function quickLogTime(
     const hours = parseTimeInput(hoursInput)!; // Already validated
     const hoursStr = hours.toString();
 
-    // 6. Input comment (optional)
+    // 6. Input comment — full context in title
     const comment = await vscode.window.showInputBox({
-      prompt: `Comment for #${selection.issueId} (optional)`,
+      title: `Log Time · ${issueCtx} · ${formatHoursAsHHMM(hours)} ${activityCtx} · ${dateLabel}`,
+      prompt: "Comment (optional, press Enter to skip)",
       placeHolder: "e.g., Implemented feature X",
     });
 
@@ -164,16 +139,7 @@ export async function quickLogTime(
     // 9. Refresh time entries tree
     vscode.commands.executeCommand("redmyne.refreshTimeEntries");
 
-    // 10. Update cache
-    await context.globalState.update("lastTimeLog", {
-      issueId: selection.issueId,
-      issueSubject: selection.issueSubject,
-      lastActivityId: selection.activityId,
-      lastActivityName: selection.activityName,
-      lastLogged: new Date(),
-    });
-
-    // 11. Confirm with status bar flash (NOT notification)
+    // 10. Confirm with status bar flash (NOT notification)
     const dateConfirmation = selectedDate === today ? "" : ` on ${selectedDate}`;
     showStatusBarMessage(
       `$(check) Logged ${formatHoursAsHHMM(hours)} to #${selection.issueId}${dateConfirmation}`

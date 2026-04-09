@@ -393,7 +393,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // addTimeEntryForDate moved to time-entry-commands.ts
   registerQuickIssueCommands({
     registerConfiguredCommand: registerCommand,
-    context,
     projectsTree,
     timeEntriesTree: myTimeEntriesTree,
     getWorkloadStatusBar: () => cleanupResources.workloadStatusBar,
