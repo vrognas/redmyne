@@ -70,3 +70,54 @@ curl -s -k -X DELETE \
 - **Test before implementing** — hit the endpoint first, inspect the actual response shape, then write code to match
 - **Security** — never log or display the full response of `/users/current.json` or `/my/account.json` as they contain the API key in plaintext
 - When in doubt about a response shape, test it live rather than guessing from docs
+
+## Common Pitfalls
+
+Non-obvious behaviors discovered through live testing. Review these before writing new API code.
+
+| Pitfall | Detail |
+|---------|--------|
+| **Response nesting** | All responses nest under a resource key: `{ "issues": [...] }`, `{ "issue": {...} }` — never a bare array or object |
+| **PUT returns empty body** | Successful PUT returns HTTP 200 with empty body, not the updated resource |
+| **Pagination max** | `limit` max is 100; must recurse with `offset` for complete data |
+| **Subproject exclusion** | Use `subproject_id=!*` to exclude subprojects from issue queries |
+| **Custom fields shape** | Array of `{ id: number, name: string, value: string, multiple?: boolean }` — embedded in projects, issues, users, time entries |
+| **Journal details are strings** | `old_value` and `new_value` are always strings (e.g., `"231"` not `231`), even for numeric IDs |
+| **Journal notes empty string** | Journals without comments have `notes: ""` (empty string), not `null` |
+| **No journal pagination** | `?include=journals` returns ALL journals in one array — no pagination available |
+| **Journal property types** | `property` values: `"attr"` (standard fields), `"relation"` (issue relations), `"cf"` (custom fields) |
+| **403 = admin-only** | `/users.json`, `/groups.json`, `/custom_fields.json` return 403 with empty body for non-admin users |
+| **403 = module disabled** | `/projects/{id}/files.json` returns 403 if the Files module is disabled |
+| **Wiki is per-project** | `/projects/{id}/wiki/index.json` returns 404 if wiki module disabled; 200 otherwise |
+
+### Access Matrix
+
+Verified against live server (non-admin user):
+
+| Endpoint | Status | Notes |
+|----------|--------|-------|
+| `GET /projects.json` | 200 | Paginated, includes custom_fields |
+| `GET /issues.json` | 200 | Paginated; filters: `status_id`, `assigned_to_id`, `project_id`, `sort` |
+| `GET /issues/{id}.json` | 200 | Supports `?include=journals,relations,children` |
+| `PUT /issues/{id}.json` | 200 | Empty body on success |
+| `GET /issue_statuses.json` | 200 | Not paginated |
+| `GET /trackers.json` | 200 | Includes `enabled_standard_fields` |
+| `GET /enumerations/time_entry_activities.json` | 200 | Not paginated |
+| `GET /enumerations/issue_priorities.json` | 200 | Includes `is_default` |
+| `GET /users/current.json` | 200 | **Contains API key** — never log full response |
+| `GET /my/account.json` | 200 | Similar to current user |
+| `GET /time_entries.json` | 200 | Paginated |
+| `POST /time_entries.json` | 201 | Returns created entry |
+| `GET /issues/{id}/relations.json` | 200 | Includes `relation_type`, `delay` |
+| `GET /projects/{id}/issue_categories.json` | 200 | Paginated |
+| `GET /projects/{id}/versions.json` | 200 | Paginated |
+| `GET /projects/{id}/memberships.json` | 200 | Paginated, user+roles |
+| `GET /roles.json` | 200 | Not paginated |
+| `GET /queries.json` | 200 | Paginated |
+| `GET /search.json?q=` | 200 | Returns mixed resource types |
+| `GET /news.json` | 200 | Paginated |
+| `GET /users.json` | 403 | Admin-only |
+| `GET /groups.json` | 403 | Admin-only |
+| `GET /custom_fields.json` | 403 | Admin-only |
+| `GET /projects/{id}/files.json` | 403 | Module may be disabled |
+| `GET /projects/{id}/wiki/index.json` | 200/404 | Depends on wiki module |
