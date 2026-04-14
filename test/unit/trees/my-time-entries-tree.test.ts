@@ -115,7 +115,8 @@ describe("MyTimeEntriesTreeDataProvider", () => {
       update: vi.fn(),
     } as never);
 
-    provider = new MyTimeEntriesTreeDataProvider();
+    const mockGlobalState = { get: vi.fn().mockReturnValue(true), update: vi.fn() };
+    provider = new MyTimeEntriesTreeDataProvider(mockGlobalState as never);
     provider.setServer(mockServer as unknown as never);
   });
 
@@ -200,13 +201,15 @@ describe("MyTimeEntriesTreeDataProvider", () => {
 
     // New structure: Today, This Week, 3 month nodes, Load Earlier = 6 items
     expect(groups).toHaveLength(6);
-    expect(mockServer.getTimeEntries).toHaveBeenCalledTimes(1); // Single fetch for today/week
+    // 1 fetch for today/week + up to 3 preloaded months
+    expect(mockServer.getTimeEntries).toHaveBeenCalled();
 
     // Get children for first group (Today)
+    const callCountBefore = mockServer.getTimeEntries.mock.calls.length;
     const todayChildren = await provider.getChildren(groups[0]);
 
-    // Should NOT call API again (cached)
-    expect(mockServer.getTimeEntries).toHaveBeenCalledTimes(1);
+    // Today children come from cache (no additional API call for today specifically)
+    expect(mockServer.getTimeEntries.mock.calls.length).toBe(callCountBefore);
     expect(todayChildren).toHaveLength(1);
   });
 
@@ -639,11 +642,8 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     expect(targetMonth.type).toBe("month-group");
     expect(targetMonth._monthYear).toBeDefined();
 
-    // First expansion triggers lazy load (returns loading state)
-    const loadingState = await provider.getChildren(targetMonth);
-    expect(loadingState[0].label).toBe("Loading...");
-
-    // Second expansion returns loaded data
+    // Month may be preloaded (first 3 months load in background after init).
+    // Wait until data is available (either preloaded or lazy-loaded on expand).
     const weekGroups = await waitUntilLoaded(
       () => provider.getChildren(targetMonth),
       "month group load"

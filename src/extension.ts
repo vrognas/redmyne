@@ -145,7 +145,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   };
 
   const projectsTree = new ProjectsTree(context.globalState);
-  const myTimeEntriesTree = new MyTimeEntriesTreeDataProvider();
+  const myTimeEntriesTree = new MyTimeEntriesTreeDataProvider(context.globalState);
   cleanupResources.projectsTree = projectsTree;
   cleanupResources.myTimeEntriesTree = myTimeEntriesTree;
 

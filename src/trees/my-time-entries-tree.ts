@@ -133,7 +133,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   private expandedIds = new Set<string>();
   private monthlySchedules: MonthlyScheduleOverrides = {};
   private showAllUsers = false; // false = my entries only, true = all users
-  private hideZeroDays = true; // true = hide days with 0% logged
+  private hideZeroDays: boolean;
   private entrySort: SortConfig<TimeEntrySortField> | null = null;
   private draftQueue?: DraftQueue;
   private draftQueueDisposable?: { dispose: () => void };
@@ -145,8 +145,13 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   private todayEntries?: TimeEntry[];
   private weekEntries?: TimeEntry[];
 
-  constructor() {
+  private static readonly HIDE_ZERO_DAYS_KEY = "redmyne.timeEntries.hideZeroDays";
+  private globalState: vscode.Memento;
+
+  constructor(globalState: vscode.Memento) {
     super();
+    this.globalState = globalState;
+    this.hideZeroDays = globalState.get<boolean>(MyTimeEntriesTreeDataProvider.HIDE_ZERO_DAYS_KEY, true);
     this.initializeVisibleMonths();
     // Refresh when working hours config changes
     this.disposables.push(
@@ -227,13 +232,11 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   }
 
   override refresh(): void {
-    // Clear all caches
+    // Clear lookup caches but keep display data until new data arrives
     this.issueCache.clear();
-        this.loadedMonthEntries.clear();
+    this.loadedMonthEntries.clear();
     this.loadingMonths.clear();
-    this.todayEntries = undefined;
-    this.weekEntries = undefined;
-    // Fetch new data in background
+    // Fetch new data in background (old todayEntries/weekEntries stay visible)
     if (!this.isLoading && this.server) {
       this.isLoading = true;
       this.loadTodayAndThisWeek();
@@ -266,6 +269,22 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     } finally {
       this.isLoading = false;
       this._onDidChangeTreeData.fire(undefined);
+      // Preload visible months in background
+      this.preloadVisibleMonths();
+    }
+  }
+
+  private static readonly PRELOAD_MONTHS = 3;
+
+  private preloadVisibleMonths(): void {
+    if (!this.server) return;
+    const toPreload = this.visibleMonths.slice(0, MyTimeEntriesTreeDataProvider.PRELOAD_MONTHS);
+    for (const { year, month } of toPreload) {
+      const monthKey = this.getMonthKey(year, month);
+      if (this.loadedMonthEntries.has(monthKey) || this.loadingMonths.has(monthKey)) continue;
+      this.loadMonthEntries({ year, month }).then(() => {
+        this._onDidChangeTreeData.fire(undefined);
+      }).catch(() => {});
     }
   }
 
@@ -315,11 +334,12 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     const entries = this.loadedMonthEntries.get(monthKey) || [];
     const total = calculateTotal(entries);
 
+    const { start, end } = this.getMonthDateRange({ year, month });
+    const dateRange = `${monthName} ${new Date(start + "T12:00:00").getDate()}\u2013${new Date(end + "T12:00:00").getDate()}, ${year}`;
     let description = "";
-    let tooltip: string | undefined;
+    let tooltip: string;
     if (isLoaded) {
       const defaultSchedule = getWeeklySchedule();
-      const { start, end } = this.getMonthDateRange({ year, month });
       const available = countAvailableHoursMonthly(
         new Date(start + "T12:00:00"),
         new Date(end + "T12:00:00"),
@@ -328,7 +348,9 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       );
       const hours = formatHoursWithComparison(total, available);
       description = hours.short;
-      tooltip = hours.full;
+      tooltip = `${dateRange}; ${hours.full}`;
+    } else {
+      tooltip = `${dateRange}; loading...`;
     }
 
     return {
@@ -396,16 +418,10 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       if (this.todayEntries === undefined && !this.isLoading) {
         this.isLoading = true;
         this.loadTodayAndThisWeek();
-        return [{
-          label: "Loading...",
-          iconPath: new vscode.ThemeIcon("loading~spin"),
-          collapsibleState: vscode.TreeItemCollapsibleState.None,
-          type: "loading",
-        }];
       }
 
-      // Still loading
-      if (this.isLoading) {
+      // Show spinner only when no data at all (first load)
+      if (this.todayEntries === undefined) {
         return [{
           label: "Loading...",
           iconPath: new vscode.ThemeIcon("loading~spin"),
@@ -896,6 +912,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   setHideZeroDays(hide: boolean): void {
     if (this.hideZeroDays === hide) return;
     this.hideZeroDays = hide;
+    void this.globalState.update(MyTimeEntriesTreeDataProvider.HIDE_ZERO_DAYS_KEY, hide);
     this._onDidChangeTreeData.fire(undefined);
   }
 
@@ -940,7 +957,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     } else {
       this.entrySort = { field, direction: "asc" };
     }
-    this.refresh();
+    this._onDidChangeTreeData.fire(undefined); // Re-render only, data unchanged
   }
 
   /**
