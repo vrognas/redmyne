@@ -237,43 +237,16 @@ export function generateProjectLabel(
     ? generateChevron(indent, ctx.barHeight, row.isExpanded)
     : "";
 
-  const health = row.health;
-  const healthDot = health ? ctx.getHealthDot(health.status) : "";
   const labelX = 10 + indent + ctx.chevronWidth;
-
-  let countsStr = "";
-  if (health && health.counts.total > 0) {
-    const parts: string[] = [`${health.counts.open} open`];
-    if (health.counts.blocked > 0) parts.push(`${health.counts.blocked} blocked`);
-    if (health.counts.overdue > 0) parts.push(`${health.counts.overdue} overdue`);
-    countsStr = parts.join(" · ");
-  }
-
-  const progressBarWidth = 40;
-  const progressBarHeight = 4;
-  const progressBarX = labelX + escapeHtml(row.label).length * 7 + 24;
-  const progressBarY = ctx.barHeight / 2 - progressBarHeight / 2;
-  const progressFillWidth = health ? (health.progress / 100) * progressBarWidth : 0;
-  const progressBar = health && health.counts.total > 0 ? `
-    <rect x="${progressBarX}" y="${progressBarY}" width="${progressBarWidth}" height="${progressBarHeight}" rx="2" fill="var(--vscode-progressBar-background)" opacity="0.3"/>
-    <rect x="${progressBarX}" y="${progressBarY}" width="${progressFillWidth}" height="${progressBarHeight}" rx="2" fill="var(--vscode-progressBar-foreground)"/>
-    <text x="${progressBarX + progressBarWidth + 4}" y="${ctx.barHeight / 2 + 4}" fill="var(--vscode-descriptionForeground)" font-size="10">${health.progress}%</text>
-  ` : "";
-
-  const countsX = progressBarX + progressBarWidth + 30;
-  const countsText = countsStr ? `<text x="${countsX}" y="${ctx.barHeight / 2 + 4}" fill="var(--vscode-descriptionForeground)" font-size="10">${countsStr}</text>` : "";
-
   const tooltip = ctx.buildProjectTooltip(row);
 
   return `
     <g class="project-label gantt-row cursor-pointer${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${originalY}" data-tooltip="${escapeAttr(tooltip)}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}' transform="translate(0, ${y})"${hiddenAttr} tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
       <rect class="row-hit-area" x="0" y="-1" width="100%" height="${ctx.barHeight + 2}" fill="transparent" pointer-events="all"/>
       ${chevron}
-      <text x="${labelX}" y="${ctx.barHeight / 2 + 5}" fill="var(--vscode-descriptionForeground)" font-size="13" pointer-events="none">
-        ${healthDot}${escapeHtml(row.label)}
+      <text x="${labelX}" y="${ctx.barHeight / 2 + 5}" fill="var(--vscode-descriptionForeground)" font-size="13" font-weight="bold" pointer-events="none">
+        ${escapeHtml(row.label)}
       </text>
-      ${progressBar}
-      ${countsText}
     </g>
   `;
 }

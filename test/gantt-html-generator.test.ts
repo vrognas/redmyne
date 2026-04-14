@@ -135,7 +135,9 @@ describe("gantt-html-generator", () => {
       expect(svg).toContain('class="project-label');
       expect(svg).toContain('data-project-id="1"');
       expect(svg).toContain("Test Project");
-      expect(svg).toContain("4 open");
+      // Project label shows only name (no health dot, progress, or counts)
+      expect(svg).not.toContain("4 open");
+      expect(svg).not.toContain("●");
     });
   });
 
