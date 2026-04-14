@@ -156,12 +156,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
    * Create tree item for a project node
    */
   private createProjectTreeItem(node: ProjectNode): vscode.TreeItem {
-    const {
-      project,
-      assignedIssues,
-      hasAssignedIssues,
-      totalIssuesWithSubprojects,
-    } = node;
+    const { project, totalIssuesWithSubprojects } = node;
 
     const treeItem = new vscode.TreeItem(
       project.toQuickPickItem().label,
@@ -171,24 +166,16 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
     // Set id for tree item persistence across refreshes
     treeItem.id = `project-${project.id}`;
 
-    // Check if has issues directly or in subprojects
+    // Count direct subprojects and direct issues
+    const subprojectCount = (this.projects ?? []).filter(p => p.parent?.id === project.id).length;
+    const directIssueCount = (this.issuesByProject.get(project.id) || []).length;
     const hasAnyIssues = totalIssuesWithSubprojects > 0;
-    const subprojectIssues = totalIssuesWithSubprojects - assignedIssues.length;
 
-    if (hasAssignedIssues) {
-      // Project with direct issues
-      const count = assignedIssues.length;
-      const subNote =
-        subprojectIssues > 0 ? ` +${subprojectIssues} in subprojects` : "";
-      treeItem.description = `(${count}${subNote})`;
-      treeItem.iconPath = new vscode.ThemeIcon(
-        "folder-opened",
-        new vscode.ThemeColor("list.highlightForeground")
-      );
-      treeItem.contextValue = "project-with-issues";
-    } else if (hasAnyIssues) {
-      // Parent project with issues only in subprojects
-      treeItem.description = `(${subprojectIssues} in subprojects)`;
+    if (hasAnyIssues) {
+      const parts: string[] = [];
+      if (subprojectCount > 0) parts.push(`${subprojectCount} ${subprojectCount === 1 ? "project" : "projects"}`);
+      if (directIssueCount > 0) parts.push(`${directIssueCount} ${directIssueCount === 1 ? "issue" : "issues"}`);
+      treeItem.description = parts.length > 0 ? parts.join(" · ") : "";
       treeItem.iconPath = new vscode.ThemeIcon(
         "folder-opened",
         new vscode.ThemeColor("list.highlightForeground")

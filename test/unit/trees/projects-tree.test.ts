@@ -106,11 +106,16 @@ describe("ProjectsTree", () => {
         project,
         assignedIssues: [issue],
         hasAssignedIssues: true,
+        totalIssuesWithSubprojects: 1,
       };
+
+      // Populate issuesByProject so createProjectTreeItem can count direct issues
+      (tree as any).issuesByProject = new Map([[1, [issue]]]);
+      (tree as any).projects = [project];
 
       const treeItem = tree.getTreeItem(projectNode);
 
-      expect(treeItem.description).toBe("(1)");
+      expect(treeItem.description).toBe("1 issue");
     });
   });
 
