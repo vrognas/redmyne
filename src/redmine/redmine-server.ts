@@ -472,12 +472,14 @@ export class RedmineServer implements IRedmineServer {
 
   /**
    * Lightweight probe: has anything changed since `since` timestamp?
-   * Uses updated_on>=TIMESTAMP with limit=1 to minimize response size.
+   * Uses updated_on>TIMESTAMP (strictly greater) with limit=1.
+   * The `>=` operator would always match the last-seen record itself,
+   * so we use `>` (Redmine supports `><` range and `>` / `<` operators).
    */
   private async hasChanges(endpoint: string, since: string): Promise<boolean> {
     try {
       const separator = endpoint.includes("?") ? "&" : "?";
-      const probeUrl = `${endpoint}${separator}updated_on=>=${since}&limit=1&offset=0`;
+      const probeUrl = `${endpoint}${separator}updated_on=>${since}&limit=1&offset=0`;
       const response = await this.doRequest<{ total_count: number }>(probeUrl, "GET");
       return (response?.total_count ?? 0) > 0;
     } catch {
@@ -530,7 +532,7 @@ export class RedmineServer implements IRedmineServer {
       "projects",
       (projects) => projects.map((proj) => new RedmineProject({ ...proj }))
     );
-    this.changeCache.touch("projects");
+    this.changeCache.set("projects", true, new Date().toISOString());
     return this.cachedProjects;
   }
 
