@@ -17,6 +17,7 @@ import { IssueStatus as RedmineIssueStatus, IssuePriority } from "./models/commo
 import { Membership as RedmineMembership } from "./models/membership";
 import { CustomFieldDefinition, TimeEntryCustomFieldValue } from "./models/custom-field-definition";
 import type { IRedmineServer } from "./redmine-server-interface";
+import { ChangeAwareCache, CHANGE_CACHE_TTL_MS, MIN_PROBE_INTERVAL_MS, extractMaxUpdatedOn } from "./change-aware-cache";
 
 type HttpMethods = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
@@ -96,6 +97,7 @@ export class RedmineServer implements IRedmineServer {
   private issueCache = new Map<number, IssueCacheEntry>();
   private lastIssueCachePruneMs = 0;
   private cachedCaBuffer: Buffer | undefined;
+  private changeCache = new ChangeAwareCache();
 
   // Request queue to prevent server overload
   private activeRequests = 0;
@@ -469,6 +471,21 @@ export class RedmineServer implements IRedmineServer {
   }
 
   /**
+   * Lightweight probe: has anything changed since `since` timestamp?
+   * Uses updated_on>=TIMESTAMP with limit=1 to minimize response size.
+   */
+  private async hasChanges(endpoint: string, since: string): Promise<boolean> {
+    try {
+      const separator = endpoint.includes("?") ? "&" : "?";
+      const probeUrl = `${endpoint}${separator}updated_on=>=${since}&limit=1&offset=0`;
+      const response = await this.doRequest<{ total_count: number }>(probeUrl, "GET");
+      return (response?.total_count ?? 0) > 0;
+    } catch {
+      return true; // Probe failed — assume changes, fall through to full fetch
+    }
+  }
+
+  /**
    * Encode data as JSON buffer for POST/PUT requests
    */
   private encodeJson<T>(data: T): Buffer {
@@ -489,7 +506,23 @@ export class RedmineServer implements IRedmineServer {
 
   async getProjects(): Promise<RedmineProject[]> {
     if (this.cachedProjects) {
-      return this.cachedProjects;
+      // Probe: check if project count changed
+      if (!this.changeCache.shouldProbe("projects", MIN_PROBE_INTERVAL_MS)) {
+        return this.cachedProjects;
+      }
+      try {
+        const response = await this.doRequest<{ total_count: number }>("/projects.json?limit=1&offset=0", "GET");
+        const serverCount = response?.total_count ?? 0;
+        if (serverCount === this.cachedProjects.length) {
+          this.changeCache.touch("projects");
+          return this.cachedProjects;
+        }
+      } catch {
+        // Probe failed — return cached data
+        return this.cachedProjects;
+      }
+      // Count changed — refetch
+      this.cachedProjects = null;
     }
 
     this.cachedProjects = await this.paginate<Project, RedmineProject>(
@@ -497,6 +530,7 @@ export class RedmineServer implements IRedmineServer {
       "projects",
       (projects) => projects.map((proj) => new RedmineProject({ ...proj }))
     );
+    this.changeCache.touch("projects");
     return this.cachedProjects;
   }
 
@@ -506,6 +540,7 @@ export class RedmineServer implements IRedmineServer {
   clearProjectsCache(): void {
     this.cachedProjects = null;
     this.membershipsCache.clear();
+    this.changeCache.invalidate("projects");
   }
 
   async getTimeEntryActivities(): Promise<{
@@ -710,8 +745,9 @@ export class RedmineServer implements IRedmineServer {
       this.encodeJson({ time_entry: entry })
     );
 
-    // Invalidate issue cache (spent_hours changed)
+    // Invalidate caches (spent_hours changed)
     this.invalidateIssueCache(issueId);
+    this.changeCache.invalidatePrefix("time_entries:");
 
     // Auto-update %done based on spent/estimated hours
     await this.autoUpdateDonePercent(issueId);
@@ -787,11 +823,25 @@ export class RedmineServer implements IRedmineServer {
       queryParams.set("to", params.to);
     }
 
-    // Use pagination to fetch all entries (Redmine defaults to 25)
-    const time_entries = await this.paginate<TimeEntry>(
-      `/time_entries.json?${queryParams.toString()}`,
-      "time_entries"
-    );
+    const endpoint = `/time_entries.json?${queryParams.toString()}`;
+    const user = params?.allUsers ? "all" : "me";
+    const cacheKey = `time_entries:${user}:${params?.from ?? ""}:${params?.to ?? ""}`;
+
+    // Check change-aware cache
+    const cached = this.changeCache.get<TimeEntry[]>(cacheKey);
+    if (cached && !this.changeCache.isExpired(cacheKey, CHANGE_CACHE_TTL_MS)) {
+      if (!this.changeCache.shouldProbe(cacheKey, MIN_PROBE_INTERVAL_MS)) {
+        return { time_entries: cached.data };
+      }
+      const changed = await this.hasChanges(endpoint, cached.lastCheckedAt);
+      if (!changed) {
+        this.changeCache.touch(cacheKey);
+        return { time_entries: cached.data };
+      }
+    }
+
+    const time_entries = await this.paginate<TimeEntry>(endpoint, "time_entries");
+    this.changeCache.set(cacheKey, time_entries, extractMaxUpdatedOn(time_entries));
     return { time_entries };
   }
 
@@ -887,6 +937,7 @@ export class RedmineServer implements IRedmineServer {
       "PUT",
       this.encodeJson({ time_entry: updates })
     );
+    this.changeCache.invalidatePrefix("time_entries:");
   }
 
   /**
@@ -895,6 +946,7 @@ export class RedmineServer implements IRedmineServer {
    */
   async deleteTimeEntry(id: number): Promise<void> {
     await this.doRequest(`/time_entries/${id}.json`, "DELETE");
+    this.changeCache.invalidatePrefix("time_entries:");
   }
 
   /**
@@ -1362,6 +1414,8 @@ export class RedmineServer implements IRedmineServer {
       this.encodeJson({ issue: issuePayload })
     );
 
+    this.changeCache.invalidatePrefix("issues:");
+
     // Fetch updated issue to verify changes
     const { issue } = await this.getIssueById(quickUpdate.issueId);
     const updateResult = new QuickUpdateResult();
@@ -1426,10 +1480,24 @@ export class RedmineServer implements IRedmineServer {
       params.set("priority_id", String(filter.priority));
     }
 
-    const issues = await this.paginate<Issue>(
-      `/issues.json?${params.toString()}`,
-      "issues"
-    );
+    const endpoint = `/issues.json?${params.toString()}`;
+    const cacheKey = `issues:${filter.assignee}:${filter.status}:${filter.priority ?? "any"}`;
+
+    // Check change-aware cache
+    const cached = this.changeCache.get<Issue[]>(cacheKey);
+    if (cached && !this.changeCache.isExpired(cacheKey, CHANGE_CACHE_TTL_MS)) {
+      if (!this.changeCache.shouldProbe(cacheKey, MIN_PROBE_INTERVAL_MS)) {
+        return { issues: cached.data };
+      }
+      const changed = await this.hasChanges(endpoint, cached.lastCheckedAt);
+      if (!changed) {
+        this.changeCache.touch(cacheKey);
+        return { issues: cached.data };
+      }
+    }
+
+    const issues = await this.paginate<Issue>(endpoint, "issues");
+    this.changeCache.set(cacheKey, issues, extractMaxUpdatedOn(issues));
     return { issues };
   }
 
