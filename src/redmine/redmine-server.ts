@@ -1303,23 +1303,41 @@ export class RedmineServer implements IRedmineServer {
   }
 
   private membershipsCache = new Map<number, Membership[]>();
+  private membershipsFetchMap = new Map<number, Promise<Membership[]>>();
+
+  getCachedMemberships(projectId: number): Membership[] | undefined {
+    return this.membershipsCache.get(projectId);
+  }
 
   async getMemberships(projectId: number): Promise<Membership[]> {
     const cached = this.membershipsCache.get(projectId);
     if (cached) return cached;
 
-    const membershipsResponse = await this.doRequest<{
-      memberships: RedmineMembership[];
-    }>(`/projects/${projectId}/memberships.json`, "GET");
+    // Deduplicate in-flight requests
+    const inFlight = this.membershipsFetchMap.get(projectId);
+    if (inFlight) return inFlight;
 
-    const members = (membershipsResponse?.memberships || []).map((m) => {
-      const roles = m.roles.map((r) => r.name);
-      return "user" in m
-        ? new Membership(m.user.id, m.user.name, true, roles)
-        : new Membership(m.group.id, m.group.name, false, roles);
-    });
-    this.membershipsCache.set(projectId, members);
-    return members;
+    const promise = (async () => {
+      const membershipsResponse = await this.doRequest<{
+        memberships: RedmineMembership[];
+      }>(`/projects/${projectId}/memberships.json`, "GET");
+
+      const members = (membershipsResponse?.memberships || []).map((m) => {
+        const roles = m.roles.map((r) => r.name);
+        return "user" in m
+          ? new Membership(m.user.id, m.user.name, true, roles)
+          : new Membership(m.group.id, m.group.name, false, roles);
+      });
+      this.membershipsCache.set(projectId, members);
+      return members;
+    })();
+
+    this.membershipsFetchMap.set(projectId, promise);
+    try {
+      return await promise;
+    } finally {
+      this.membershipsFetchMap.delete(projectId);
+    }
   }
   async applyQuickUpdate(quickUpdate: QuickUpdate): Promise<QuickUpdateResult> {
     // Build issue payload with optional date fields

@@ -142,10 +142,18 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
       const showMembers = config.get<boolean>("showProjectMembers", true);
       const excludeIds = config.get<number[]>("hideProjectMembersFor", []);
       const shouldFetch = showMembers && !excludeIds.includes(element.project.id);
-      try {
-        const members = shouldFetch ? await this.server.getMemberships(element.project.id) : undefined;
-        item.tooltip = createProjectTooltip(element.project, this.server, members);
-      } catch {
+      // Use cached members first (instant), fetch if not cached
+      const cached = shouldFetch ? this.server.getCachedMemberships(element.project.id) : undefined;
+      if (cached) {
+        item.tooltip = createProjectTooltip(element.project, this.server, cached);
+      } else if (shouldFetch) {
+        try {
+          const members = await this.server.getMemberships(element.project.id);
+          item.tooltip = createProjectTooltip(element.project, this.server, members);
+        } catch {
+          item.tooltip = createProjectTooltip(element.project, this.server);
+        }
+      } else {
         item.tooltip = createProjectTooltip(element.project, this.server);
       }
     }
@@ -295,6 +303,9 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
 
         // Fire refresh in case VS Code received a loading placeholder during async load
         this.refresh();
+
+        // Preload memberships in background (so tooltips show instantly on hover)
+        this.preloadMemberships(projects);
       } finally {
         this.isLoadingProjects = false;
       }
@@ -338,6 +349,31 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
       // Parent not in our set = treat as root (parent not visible)
       return !issueIds.has(issue.parent.id);
     });
+  }
+
+  /**
+   * Preload memberships for all projects with issues (background, sequential to avoid API flood)
+   */
+  private async preloadMemberships(projects: RedmineProject[]): Promise<void> {
+    if (!this.server) return;
+    const config = vscode.workspace.getConfiguration("redmyne");
+    const showMembers = config.get<boolean>("showProjectMembers", true);
+    if (!showMembers) return;
+    const excludeIds = config.get<number[]>("hideProjectMembersFor", []);
+
+    // Only preload for projects that have issues (most relevant)
+    const projectsWithIssues = projects.filter(p =>
+      !excludeIds.includes(p.id) && (this.issuesByProject.get(p.id)?.length ?? 0) > 0
+    );
+
+    for (const p of projectsWithIssues) {
+      if (this.server.getCachedMemberships(p.id)) continue;
+      try {
+        await this.server.getMemberships(p.id);
+      } catch {
+        // Ignore — tooltip will show without members
+      }
+    }
   }
 
   /**

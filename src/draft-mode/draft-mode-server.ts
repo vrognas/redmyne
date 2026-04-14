@@ -54,6 +54,7 @@ export class DraftModeServer implements IRedmineServer {
   getCurrentUser!: RedmineServer["getCurrentUser"];
   getCustomFields!: RedmineServer["getCustomFields"];
   getMemberships!: RedmineServer["getMemberships"];
+  getCachedMemberships!: RedmineServer["getCachedMemberships"];
   isTimeTrackingEnabled!: RedmineServer["isTimeTrackingEnabled"];
   getUserFte!: RedmineServer["getUserFte"];
   getUserFteBatch!: RedmineServer["getUserFteBatch"];
@@ -97,6 +98,7 @@ export class DraftModeServer implements IRedmineServer {
     this.getCurrentUser = inner.getCurrentUser.bind(inner);
     this.getCustomFields = inner.getCustomFields.bind(inner);
     this.getMemberships = inner.getMemberships.bind(inner);
+    this.getCachedMemberships = inner.getCachedMemberships.bind(inner);
     this.isTimeTrackingEnabled = inner.isTimeTrackingEnabled.bind(inner);
     this.getUserFte = inner.getUserFte.bind(inner);
     this.getUserFteBatch = inner.getUserFteBatch.bind(inner);

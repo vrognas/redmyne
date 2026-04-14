@@ -50,6 +50,7 @@ function createMockServer(): RedmineServer {
     getCurrentUser: vi.fn().mockResolvedValue(undefined),
     getCustomFields: vi.fn().mockResolvedValue([]),
     getMemberships: vi.fn().mockResolvedValue([]),
+    getCachedMemberships: vi.fn().mockReturnValue(undefined),
     isTimeTrackingEnabled: vi.fn().mockResolvedValue(true),
     getUserFte: vi.fn().mockResolvedValue(100),
     getUserFteBatch: vi.fn().mockResolvedValue(new Map()),

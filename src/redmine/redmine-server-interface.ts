@@ -185,6 +185,7 @@ export interface IRedmineServer {
     }[]
   >;
   getMemberships(projectId: number): Promise<Membership[]>;
+  getCachedMemberships(projectId: number): Membership[] | undefined;
 
   // ============ Misc ============
 
