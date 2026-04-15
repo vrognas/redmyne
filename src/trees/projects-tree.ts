@@ -275,36 +275,33 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
         this.projects = projects;
         this.assignedIssues = issuesResult.issues;
 
-        // Fetch external scheduling dependencies (blockers not assigned to me)
+        // Start dependency fetch in background (don't await yet)
         const depIds = extractSchedulingDependencyIds(this.assignedIssues);
-        if (depIds.size > 0) {
-          this.dependencyIssues = await this.server.getIssuesByIds([...depIds]);
-        } else {
-          this.dependencyIssues = [];
-        }
+        const depPromise = depIds.size > 0
+          ? this.server.getIssuesByIds([...depIds])
+          : Promise.resolve([]);
 
-        // Calculate flexibility for assigned issues
+        // Do CPU work while dependency fetch runs in parallel
         buildFlexibilityCache(this.assignedIssues, this.flexibilityCache, getWeeklySchedule());
 
-        // Group issues by project
         this.issuesByProject = groupBy(
           this.assignedIssues.filter((i) => i.project?.id),
           (issue) => issue.project!.id
         );
 
-        // Group issues by parent (for hierarchical display)
         this.issuesByParent = groupBy(
           this.assignedIssues.filter((i) => i.parent?.id),
           (issue) => issue.parent!.id
         );
 
-        // Build project nodes
         this.projectNodes = this.projects.map((p) => this.createProjectNode(p));
 
-        // Fire refresh in case VS Code received a loading placeholder during async load
+        // Await dependency fetch (likely already done while we grouped)
+        this.dependencyIssues = await depPromise;
+
         this.refresh();
 
-        // Preload memberships in background (so tooltips show instantly on hover)
+        // Preload memberships in background
         this.preloadMemberships(projects);
       } finally {
         this.isLoadingProjects = false;
@@ -354,6 +351,8 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   /**
    * Preload memberships for all projects with issues (background, sequential to avoid API flood)
    */
+  private static readonly MEMBERSHIP_BATCH_SIZE = 3;
+
   private async preloadMemberships(projects: RedmineProject[]): Promise<void> {
     if (!this.server) return;
     const config = vscode.workspace.getConfiguration("redmyne");
@@ -362,17 +361,16 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
     const excludeIds = config.get<number[]>("hideProjectMembersFor", []);
 
     // Only preload for projects that have issues (most relevant)
-    const projectsWithIssues = projects.filter(p =>
-      !excludeIds.includes(p.id) && (this.issuesByProject.get(p.id)?.length ?? 0) > 0
+    const toPreload = projects.filter(p =>
+      !excludeIds.includes(p.id) &&
+      (this.issuesByProject.get(p.id)?.length ?? 0) > 0 &&
+      !this.server!.getCachedMemberships(p.id)
     );
 
-    for (const p of projectsWithIssues) {
-      if (this.server.getCachedMemberships(p.id)) continue;
-      try {
-        await this.server.getMemberships(p.id);
-      } catch {
-        // Ignore — tooltip will show without members
-      }
+    // Fetch in parallel batches (3 at a time to avoid flooding)
+    for (let i = 0; i < toPreload.length; i += ProjectsTree.MEMBERSHIP_BATCH_SIZE) {
+      const batch = toPreload.slice(i, i + ProjectsTree.MEMBERSHIP_BATCH_SIZE);
+      await Promise.allSettled(batch.map(p => this.server!.getMemberships(p.id)));
     }
   }
 
