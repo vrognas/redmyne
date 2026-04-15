@@ -473,17 +473,16 @@ export class RedmineServer implements IRedmineServer {
   /**
    * Lightweight probe: has anything changed since `since` timestamp?
    * Uses updated_on>TIMESTAMP (strictly greater) with limit=1.
-   * The `>=` operator would always match the last-seen record itself,
-   * so we use `>` (Redmine supports `><` range and `>` / `<` operators).
+   * Returns true (changed), false (no change), or null (probe failed).
    */
-  private async hasChanges(endpoint: string, since: string): Promise<boolean> {
+  private async hasChanges(endpoint: string, since: string): Promise<boolean | null> {
     try {
       const separator = endpoint.includes("?") ? "&" : "?";
       const probeUrl = `${endpoint}${separator}updated_on=>${since}&limit=1&offset=0`;
       const response = await this.doRequest<{ total_count: number }>(probeUrl, "GET");
       return (response?.total_count ?? 0) > 0;
     } catch {
-      return true; // Probe failed — assume changes, fall through to full fetch
+      return null; // Probe failed — caller decides whether to refetch or use cache
     }
   }
 
@@ -846,7 +845,8 @@ export class RedmineServer implements IRedmineServer {
         return { time_entries: cached.data };
       }
       const changed = await this.hasChanges(endpoint, cached.lastCheckedAt);
-      if (!changed) {
+      if (changed === null || !changed) {
+        // null = probe failed (use cache, apply backoff); false = no changes
         this.changeCache.touch(cacheKey);
         return { time_entries: cached.data };
       }
@@ -1438,7 +1438,7 @@ export class RedmineServer implements IRedmineServer {
       this.encodeJson({ issue: issuePayload })
     );
 
-    this.changeCache.invalidatePrefix("issues:");
+    this.invalidateIssueCache(quickUpdate.issueId);
 
     // Fetch updated issue to verify changes
     const { issue } = await this.getIssueById(quickUpdate.issueId);
@@ -1514,7 +1514,7 @@ export class RedmineServer implements IRedmineServer {
         return { issues: cached.data };
       }
       const changed = await this.hasChanges(endpoint, cached.lastCheckedAt);
-      if (!changed) {
+      if (changed === null || !changed) {
         this.changeCache.touch(cacheKey);
         return { issues: cached.data };
       }
