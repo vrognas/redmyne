@@ -894,27 +894,38 @@ export class RedmineServer implements IRedmineServer {
   ): Promise<TimeEntry[]> {
     if (issueIds.length === 0) return [];
 
-    // Build filter string from options
+    // Build filter params from options
     const filters: string[] = [];
     if (options?.userId) filters.push(`user_id=${options.userId}`);
     if (options?.from) filters.push(`from=${options.from}`);
     if (options?.to) filters.push(`to=${options.to}`);
     const filterStr = filters.length > 0 ? `&${filters.join("&")}` : "";
 
-    // Fetch in batches to respect concurrency and avoid URL length limits
+    // Redmine supports comma-separated issue_id filter.
+    // Batch by URL length (~1800 chars safe) rather than per-issue.
+    const MAX_URL_LEN = 1800;
+    const baseUrl = `/time_entries.json?`;
     const allEntries: TimeEntry[] = [];
-    for (let i = 0; i < issueIds.length; i += this.maxConcurrentRequests) {
-      const batch = issueIds.slice(i, i + this.maxConcurrentRequests);
-      const batchResults = await Promise.all(
-        batch.map(id =>
-          this.paginate<TimeEntry>(
-            `/time_entries.json?issue_id=${id}${filterStr}`,
-            "time_entries"
-          )
-        )
-      );
-      allEntries.push(...batchResults.flat());
+    let currentBatch: number[] = [];
+
+    const fetchBatch = async (batch: number[]) => {
+      const url = `${baseUrl}issue_id=${batch.join(",")}${filterStr}`;
+      const entries = await this.paginate<TimeEntry>(url, "time_entries");
+      allEntries.push(...entries);
+    };
+
+    for (const id of issueIds) {
+      currentBatch.push(id);
+      const testUrl = `${baseUrl}issue_id=${currentBatch.join(",")}${filterStr}`;
+      if (testUrl.length > MAX_URL_LEN) {
+        // Current batch would exceed limit — flush without the last ID
+        currentBatch.pop();
+        if (currentBatch.length > 0) await fetchBatch(currentBatch);
+        currentBatch = [id];
+      }
     }
+    if (currentBatch.length > 0) await fetchBatch(currentBatch);
+
     return allEntries;
   }
 

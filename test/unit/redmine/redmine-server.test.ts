@@ -599,15 +599,13 @@ describe("RedmineServer", () => {
         if (method === "GET" && path.includes("/time_entries.json")) {
           const parsed = new URL(`https://redmine.local${path}`);
           const issueId = parsed.searchParams.get("issue_id");
+          // Support comma-separated issue IDs (combined batch query)
+          const ids = issueId ? issueId.split(",").map(Number) : [1];
+          const entries = ids.map(id => ({ id: isNaN(id) ? null : id, comments: "entry" }));
           return {
             body: {
-              time_entries: [
-                {
-                  id: issueId ? Number(issueId) : 1,
-                  comments: "entry",
-                },
-              ],
-              total_count: 1,
+              time_entries: entries,
+              total_count: entries.length,
             },
           };
         }
