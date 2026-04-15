@@ -834,7 +834,13 @@
         },
         {
           "command": "redmyne.timeFilterToggleZeroDays",
-          "group": "2_display@1"
+          "group": "2_display@1",
+          "when": "!redmyne:showZeroDays"
+        },
+        {
+          "command": "redmyne.timeFilterToggleZeroDaysOff",
+          "group": "2_display@1",
+          "when": "redmyne:showZeroDays"
         }
       ],
       "redmyne.issueSortMenu": [
@@ -936,6 +942,10 @@
         },
         {
           "command": "redmyne.timeFilterToggleZeroDays",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.timeFilterToggleZeroDaysOff",
           "when": "false"
         },
         {

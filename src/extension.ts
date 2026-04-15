@@ -156,8 +156,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     treeDataProvider: projectsTree,
     showCollapseAll: true,
   });
-  projectsTree.setTreeView(cleanupResources.projectsTreeView);
-
   // Sync collapse state between Issues pane and Gantt
   const getCollapseKey = (element: unknown): string | null => {
     if (!element || typeof element !== "object") return null;
