@@ -1268,6 +1268,18 @@
           "when": "false"
         },
         {
+          "command": "redmyne.applySingleDraft",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.gantt.setInternalEstimate",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.gantt.clearInternalEstimate",
+          "when": "false"
+        },
+        {
           "command": "redmyne.timesheet.openIssueInBrowser",
           "when": "false"
         },
