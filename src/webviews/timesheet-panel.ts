@@ -1602,7 +1602,7 @@ export class TimeSheetPanel {
       }
 
       if (errorCount === 0) {
-        showStatusBarMessage(`$(check) Saved ${successCount} entries`, 2000);
+        showStatusBarMessage(`$(check) Saved ${successCount} ${successCount === 1 ? "entry" : "entries"}`, 2000);
       } else {
         showStatusBarMessage(`$(warning) ${successCount} saved, ${errorCount} failed`, 3000);
       }
@@ -1661,7 +1661,7 @@ export class TimeSheetPanel {
       sourceWeekStart: this._currentWeek.startDate,
     });
 
-    showStatusBarMessage(`$(copy) Copied ${allEntries.length} entries`, 2000);
+    showStatusBarMessage(`$(copy) Copied ${allEntries.length} ${allEntries.length === 1 ? "entry" : "entries"}`, 2000);
   }
 
   private async _pasteWeek(): Promise<void> {
@@ -1720,7 +1720,7 @@ export class TimeSheetPanel {
         }
       }
 
-      showStatusBarMessage(`$(check) Pasted ${created} entries to draft`, 2000);
+      showStatusBarMessage(`$(check) Pasted ${created} ${created === 1 ? "entry" : "entries"} to draft`, 2000);
 
       // Reload week to show new entries
       await this._loadWeek(this._currentWeek);

@@ -157,7 +157,7 @@ export function registerIssueContextCommands(
       }));
 
       const selected = await vscode.window.showQuickPick(options, {
-        placeHolder: `Set % Done for ${issueIds.length} issues`,
+        placeHolder: `Set % Done for ${issueIds.length} ${issueIds.length === 1 ? "issue" : "issues"}`,
       });
 
       if (selected === undefined) return;
@@ -167,7 +167,7 @@ export function registerIssueContextCommands(
         await Promise.all(issueIds.map((id) => autoUpdateTracker.disable(id)));
 
         const hoursInput = await vscode.window.showInputBox({
-          title: `Internal Estimate for ${issueIds.length} issues`,
+          title: `Internal Estimate for ${issueIds.length} ${issueIds.length === 1 ? "issue" : "issues"}`,
           prompt: "Hours remaining per issue until 100% done (e.g., 5, 2.5, 1:30)",
           placeHolder: "Leave blank to skip",
           validateInput: (value) => {
@@ -184,12 +184,12 @@ export function registerIssueContextCommands(
           if (hours !== null) {
             await Promise.all(issueIds.map((id) => setInternalEstimate(deps.globalState, id, hours)));
             showStatusBarMessage(
-              `$(check) ${issueIds.length} issues set to ${selected.value}% with ${hours}h remaining each`,
+              `$(check) ${issueIds.length} ${issueIds.length === 1 ? "issue" : "issues"} set to ${selected.value}% with ${hours}h remaining each`,
               2000
             );
           }
         } else {
-          showStatusBarMessage(`$(check) ${issueIds.length} issues set to ${selected.value}%`, 2000);
+          showStatusBarMessage(`$(check) ${issueIds.length} ${issueIds.length === 1 ? "issue" : "issues"} set to ${selected.value}%`, 2000);
         }
 
         issueIds.forEach((id) => GanttPanel.currentPanel?.updateIssueDoneRatio(id, selected.value));

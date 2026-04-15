@@ -41,6 +41,8 @@ describe("registerViewCommands", () => {
     };
     timeEntriesTree = {
       setShowAllUsers: vi.fn(),
+      setHideZeroDays: vi.fn(),
+      getHideZeroDays: vi.fn().mockReturnValue(true),
       setSort: vi.fn(),
     };
     outputChannel = {

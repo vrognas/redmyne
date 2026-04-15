@@ -15,6 +15,8 @@ vi.mock("../../../src/draft-mode/draft-operation", () => ({
 vi.mock("../../../src/draft-mode/draft-mode-server", () => ({
   DraftModeServer: class {
     getCurrentUser = hoisted.getCurrentUser;
+    getFilteredIssues = vi.fn().mockResolvedValue({ issues: [] });
+    options = { address: "https://redmine.example.com" };
 
     constructor(inner: unknown, queue: unknown, manager: unknown) {
       hoisted.draftCtor(inner, queue, manager);
@@ -40,7 +42,10 @@ function flushPromises(times = 3): Promise<void> {
 
 function createDeps() {
   const createServer = vi.fn(
-    () => ({ getCurrentUser: vi.fn() }) as unknown as RedmineServer
+    () => ({
+      getCurrentUser: vi.fn(),
+      getFilteredIssues: vi.fn().mockResolvedValue({ issues: [] }),
+    }) as unknown as RedmineServer
   );
   const projectsTree = {
     setServer: vi.fn(),
@@ -120,7 +125,7 @@ describe("createConfiguredContextUpdater", () => {
 
     const updateConfiguredContext = createConfiguredContextUpdater(deps);
     await updateConfiguredContext();
-    await flushPromises();
+    await flushPromises(10);
 
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       "setContext",

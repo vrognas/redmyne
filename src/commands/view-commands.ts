@@ -27,6 +27,9 @@ export function registerViewCommands(
     deps.projectsTree.refresh();
   });
 
+  // Initialize toggle state from persisted value
+  vscode.commands.executeCommand("setContext", "redmyne:showZeroDays", !deps.timeEntriesTree.getHideZeroDays());
+
   context.subscriptions.push(
     vscode.commands.registerCommand("redmyne.refreshIssues", debouncedRefresh),
 
@@ -115,9 +118,15 @@ export function registerViewCommands(
     }),
 
     vscode.commands.registerCommand("redmyne.timeFilterToggleZeroDays", () => {
-      const current = deps.timeEntriesTree.getHideZeroDays();
-      deps.timeEntriesTree.setHideZeroDays(!current);
-      showStatusBarMessage(current ? "$(eye) Show 0% Days" : "$(eye-closed) Hide 0% Days", 2000);
+      deps.timeEntriesTree.setHideZeroDays(false);
+      vscode.commands.executeCommand("setContext", "redmyne:showZeroDays", true);
+      showStatusBarMessage("$(eye) Show 0% Days", 2000);
+    }),
+
+    vscode.commands.registerCommand("redmyne.timeFilterToggleZeroDaysOff", () => {
+      deps.timeEntriesTree.setHideZeroDays(true);
+      vscode.commands.executeCommand("setContext", "redmyne:showZeroDays", false);
+      showStatusBarMessage("$(eye-closed) Hide 0% Days", 2000);
     }),
 
     // Issue sort commands

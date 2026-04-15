@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import type { ActionProperties } from "./action-properties";
 import { parseTimeInput, validateTimeInput, formatHoursAsHHMM } from "../utilities/time-input";
 import { showStatusBarMessage } from "../utilities/status-bar";
-import { pickIssueWithSearch, pickActivityForProject } from "../utilities/issue-picker";
+import { pickIssueWithSearch, pickActivityForProject, invalidateIssuePickerCache } from "../utilities/issue-picker";
 import { recordRecentIssue } from "../utilities/recent-issues";
 import { pickDate } from "../utilities/date-picker";
 import { errorToString } from "../utilities/error-feedback";
@@ -136,8 +136,9 @@ export async function quickLogTime(
       customFieldValues
     );
 
-    // 9. Refresh time entries tree
+    // 9. Refresh time entries tree + invalidate issue picker (auto-close may change status)
     vscode.commands.executeCommand("redmyne.refreshTimeEntries");
+    invalidateIssuePickerCache();
 
     // 10. Confirm with status bar flash (NOT notification)
     const dateConfirmation = selectedDate === today ? "" : ` on ${selectedDate}`;

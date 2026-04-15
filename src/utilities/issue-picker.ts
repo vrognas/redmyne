@@ -40,6 +40,91 @@ interface TimeTrackingStatusCache {
 }
 let timeTrackingStatusCache: TimeTrackingStatusCache | null = null;
 
+// My issues cache (module-level, pre-warmable)
+interface MyIssuesCache {
+  openIssues: Issue[];
+  closedIssues: Issue[];
+  timestamp: number;
+  serverAddress: string;
+}
+let myIssuesCache: MyIssuesCache | null = null;
+let myIssuesFetchPromise: Promise<void> | null = null;
+
+/**
+ * Pre-warm the issues cache for the quick picker.
+ * Call on extension activate / server change so picker opens instantly.
+ */
+export function prewarmIssuePicker(server: IRedmineServer): void {
+  const serverAddress = server.options.address;
+  const isCacheValid =
+    myIssuesCache &&
+    myIssuesCache.serverAddress === serverAddress &&
+    Date.now() - myIssuesCache.timestamp < PROJECT_CACHE_TTL_MS;
+  if (isCacheValid || myIssuesFetchPromise) return;
+
+  myIssuesFetchPromise = (async () => {
+    try {
+      const [openResult, closedResult] = await Promise.all([
+        server.getFilteredIssues({ assignee: "me", status: "open" }),
+        server.getFilteredIssues({ assignee: "me", status: "closed" }),
+      ]);
+      myIssuesCache = {
+        openIssues: openResult.issues,
+        closedIssues: closedResult.issues,
+        timestamp: Date.now(),
+        serverAddress,
+      };
+    } catch {
+      // Fail silently — picker will fetch on demand
+    } finally {
+      myIssuesFetchPromise = null;
+    }
+  })();
+}
+
+/**
+ * Get cached issues or fetch them. Returns instantly if cache is warm.
+ */
+async function getMyIssues(server: IRedmineServer): Promise<{ openIssues: Issue[]; closedIssues: Issue[] }> {
+  const serverAddress = server.options.address;
+  const isCacheValid =
+    myIssuesCache &&
+    myIssuesCache.serverAddress === serverAddress &&
+    Date.now() - myIssuesCache.timestamp < PROJECT_CACHE_TTL_MS;
+
+  if (isCacheValid) {
+    return { openIssues: myIssuesCache!.openIssues, closedIssues: myIssuesCache!.closedIssues };
+  }
+
+  // If a fetch is in flight, wait for it
+  if (myIssuesFetchPromise) {
+    await myIssuesFetchPromise;
+    if (myIssuesCache && myIssuesCache.serverAddress === serverAddress) {
+      return { openIssues: myIssuesCache.openIssues, closedIssues: myIssuesCache.closedIssues };
+    }
+  }
+
+  // Fetch fresh
+  const [openResult, closedResult] = await Promise.all([
+    server.getFilteredIssues({ assignee: "me", status: "open" }),
+    server.getFilteredIssues({ assignee: "me", status: "closed" }),
+  ]);
+  myIssuesCache = {
+    openIssues: openResult.issues,
+    closedIssues: closedResult.issues,
+    timestamp: Date.now(),
+    serverAddress,
+  };
+  return { openIssues: myIssuesCache.openIssues, closedIssues: myIssuesCache.closedIssues };
+}
+
+/**
+ * Invalidate the issues cache (e.g., after logging time).
+ */
+export function invalidateIssuePickerCache(): void {
+  myIssuesCache = null;
+}
+
 /**
  * Get or check time tracking status for projects with caching.
  * Returns cached results immediately, fetches only uncached project IDs.
@@ -809,14 +894,11 @@ export async function pickIssueWithSearch(
     // Load data in background — picker is already visible
     (async () => {
       try {
-        // Phase 1: Fetch issues + project paths in parallel
-        const [openResult, closedResult, pathMap] = await Promise.all([
-          server.getFilteredIssues({ assignee: "me", status: "open" }),
-          server.getFilteredIssues({ assignee: "me", status: "closed" }),
+        // Phase 1: Fetch issues (from cache if warm) + project paths in parallel
+        const [{ openIssues: myOpenIssues, closedIssues: myClosedIssues }, pathMap] = await Promise.all([
+          getMyIssues(server),
           getProjectPathMap(server),
         ]);
-        const myOpenIssues = openResult.issues;
-        const myClosedIssues = closedResult.issues;
 
         if (resolved) return;
         myIssueIds = new Set([...myOpenIssues, ...myClosedIssues].map(i => i.id));

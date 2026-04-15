@@ -404,7 +404,7 @@ describe("registerTimeEntryCommands", () => {
     expect(refreshTree).not.toHaveBeenCalled();
   });
 
-  it("adds time entry for specific date and refreshes tree", async () => {
+  it("adds time entry for specific date without redundant refresh", async () => {
     const mockServer = {};
     const quickLogSpy = vi.spyOn(quickLogTimeModule, "quickLogTime").mockResolvedValue(undefined);
     const { refreshTree } = registerCommands({
@@ -419,7 +419,8 @@ describe("registerTimeEntryCommands", () => {
       expect.objectContaining({ server: mockServer }),
       "2026-02-06"
     );
-    expect(refreshTree).toHaveBeenCalledTimes(1);
+    // quickLogTime handles refresh internally — no redundant refreshTree call
+    expect(refreshTree).not.toHaveBeenCalled();
   });
 
   it("copies single and day entries into clipboard payloads", async () => {

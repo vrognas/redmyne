@@ -17,6 +17,7 @@ const hoisted = vi.hoisted(() => {
     onDidChangeTreeData: vi.fn(),
     getAssignedIssues: vi.fn().mockReturnValue([]),
     getProjectNodeById: vi.fn(),
+    setTreeView: vi.fn(),
   };
   const myTimeEntriesTree = {
     server: undefined,
@@ -211,6 +212,7 @@ vi.mock("../../../src/trees/projects-tree", () => ({
     onDidChangeTreeData = hoisted.projectsTree.onDidChangeTreeData;
     getAssignedIssues = hoisted.projectsTree.getAssignedIssues;
     getProjectNodeById = hoisted.projectsTree.getProjectNodeById;
+    setTreeView = hoisted.projectsTree.setTreeView;
     constructor() {}
   },
 }));

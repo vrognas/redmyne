@@ -95,6 +95,10 @@
         "title": "Show 0% Days"
       },
       {
+        "command": "redmyne.timeFilterToggleZeroDaysOff",
+        "title": "Hide 0% Days"
+      },
+      {
         "command": "redmyne.issueSortId",
         "title": "Sort by #ID"
       },

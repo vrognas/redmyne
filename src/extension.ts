@@ -156,6 +156,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     treeDataProvider: projectsTree,
     showCollapseAll: true,
   });
+  projectsTree.setTreeView(cleanupResources.projectsTreeView);
 
   // Sync collapse state between Issues pane and Gantt
   const getCollapseKey = (element: unknown): string | null => {
@@ -278,7 +279,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Initialize workload status bar
   cleanupResources.workloadStatusBar = new WorkloadStatusBar({
-    fetchIssuesIfNeeded: () => projectsTree.fetchIssuesIfNeeded(),
+    fetchIssuesIfNeeded: async () => { await projectsTree.fetchIssuesIfNeeded(); return projectsTree.getAssignedIssues(); },
     getMonthlySchedules: () => cleanupResources.monthlySchedules,
     getUserFte: () => cleanupResources.userFte,
   });

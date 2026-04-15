@@ -49,7 +49,7 @@ interface DayGroupNode {
   _cachedEntries?: Array<{
     id?: number;
     issue_id?: number;
-    issue?: { id: number };
+    issue?: { id: number; subject?: string };
     activity_id?: number;
     activity?: { id: number };
     hours: string;
@@ -65,7 +65,7 @@ interface WeekGroupNode {
   _cachedEntries?: Array<{
     id?: number;
     issue_id?: number;
-    issue?: { id: number };
+    issue?: { id: number; subject?: string };
     activity_id?: number;
     activity?: { id: number };
     hours: string;
@@ -300,7 +300,6 @@ export function registerTimeEntryCommands(
         { server, config: { ...config, serverUrl: url } },
         node?._date
       );
-      deps.refreshTree();
     })
   );
 
@@ -315,6 +314,7 @@ export function registerTimeEntryCommands(
         activity_id: entry.activity?.id ?? 0,
         hours: entry.hours,
         comments: entry.comments || "",
+        issueSubject: entry.issue?.subject,
         custom_fields: entry.custom_fields?.map((cf) => ({
           id: cf.id,
           value: cf.value as string | string[],
@@ -354,6 +354,7 @@ export function registerTimeEntryCommands(
           activity_id: e.activity_id ?? e.activity?.id ?? 0,
           hours: e.hours,
           comments: e.comments || "",
+          issueSubject: e.issue?.subject,
           custom_fields: e.custom_fields?.map((cf) => ({
             id: cf.id,
             value: cf.value as string | string[],
@@ -408,6 +409,7 @@ export function registerTimeEntryCommands(
             activity_id: e.activity_id ?? e.activity?.id ?? 0,
             hours: e.hours,
             comments: e.comments || "",
+            issueSubject: e.issue?.subject,
             custom_fields: e.custom_fields?.map((cf) => ({
               id: cf.id,
               value: cf.value as string | string[],
@@ -546,9 +548,54 @@ export function registerTimeEntryCommands(
         const closedConfirmed = await confirmLogTimeOnClosedIssues(server, issueIds);
         if (!closedConfirmed) return;
 
-        // Confirmation
+        // Build informative confirmation message
+        const confirmLines: string[] = [];
+
+        // What's being pasted
+        const formatEntry = (e: ClipboardEntry) => {
+          const label = e.issueSubject ? `#${e.issue_id} ${e.issueSubject}` : `#${e.issue_id}`;
+          return `  ${label} — ${formatHoursAsHHMM(parseFloat(e.hours))}`;
+        };
+
+        if (targetKind === "day" && targetDate) {
+          const d = new Date(targetDate + "T00:00:00");
+          const dayLabel = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+          confirmLines.push(`Paste to ${dayLabel}:`);
+        } else if (targetWeekStart) {
+          const ws = new Date(targetWeekStart + "T00:00:00");
+          const weekNum = Math.ceil(((ws.getTime() - new Date(ws.getFullYear(), 0, 1).getTime()) / 86400000 + 1) / 7);
+          confirmLines.push(`Paste to Week ${weekNum}:`);
+        }
+
+        // Show entries being created (cap at 5)
+        const entriesToShow = clipboard.entries.slice(0, 5);
+        for (const e of entriesToShow) {
+          confirmLines.push(formatEntry(e));
+        }
+        if (clipboard.entries.length > 5) {
+          confirmLines.push(`  ... and ${clipboard.entries.length - 5} more`);
+        }
+
+        // Show existing entries on target day (only for day paste)
+        if (isDayTarget && node && "_cachedEntries" in node) {
+          const existing = (node as DayGroupNode)._cachedEntries?.filter(e => (e.id ?? 0) >= 0) || [];
+          if (existing.length > 0) {
+            const totalExisting = existing.reduce((sum, e) => sum + parseFloat(e.hours), 0);
+            confirmLines.push("");
+            confirmLines.push(`Already on this day (${formatHoursAsHHMM(totalExisting)}):`);
+            for (const e of existing.slice(0, 5)) {
+              const id = e.issue_id ?? e.issue?.id ?? 0;
+              const label = e.issue?.subject ? `#${id} ${e.issue.subject}` : `#${id}`;
+              confirmLines.push(`  ${label} — ${formatHoursAsHHMM(parseFloat(e.hours))}`);
+            }
+            if (existing.length > 5) {
+              confirmLines.push(`  ... and ${existing.length - 5} more`);
+            }
+          }
+        }
+
         const confirm = await vscode.window.showInformationMessage(
-          `Create ${totalEntries} time ${totalEntries === 1 ? "entry" : "entries"}?`,
+          confirmLines.join("\n"),
           { modal: true },
           "Create"
         );
@@ -591,10 +638,10 @@ export function registerTimeEntryCommands(
 
             if (errors.length > 0) {
               vscode.window.showWarningMessage(
-                `Created ${created}/${totalEntries} entries. ${errors.length} failed.`
+                `Created ${created}/${totalEntries} ${totalEntries === 1 ? "entry" : "entries"}. ${errors.length} failed.`
               );
             } else {
-              showStatusBarMessage(`$(check) Created ${created} entries`, 2000);
+              showStatusBarMessage(`$(check) Created ${created} ${created === 1 ? "entry" : "entries"}`, 2000);
             }
           }
         );

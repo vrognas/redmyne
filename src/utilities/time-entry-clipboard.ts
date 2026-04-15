@@ -17,6 +17,7 @@ export interface ClipboardEntry {
   activity_id: number;
   hours: string;
   comments: string;
+  issueSubject?: string;
   project_id?: number;
   custom_fields?: Array<{ id: number; value: string | string[] }>;
 }

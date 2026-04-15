@@ -90,6 +90,8 @@ export function createConfiguredContextUpdater(
         deps.projectsTree.refresh();
         deps.timeEntriesTree.refresh();
 
+        // Issue picker prewarms lazily on first use (via getMyIssues cache)
+
         // Fetch FTE from user's custom fields (non-critical, silent fail).
         server
           .getCurrentUser()
