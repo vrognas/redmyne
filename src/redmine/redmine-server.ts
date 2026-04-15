@@ -920,6 +920,13 @@ export class RedmineServer implements IRedmineServer {
 
     const fetchBatch = async (batch: number[]) => {
       const url = `${baseUrl}issue_id=${batch.join(",")}${filterStr}`;
+      if (url.length > MAX_URL_LEN && batch.length === 1) {
+        // Single ID exceeds limit (extremely long filterStr) — fetch without filters as fallback
+        const fallbackUrl = `${baseUrl}issue_id=${batch[0]}`;
+        const entries = await this.paginate<TimeEntry>(fallbackUrl, "time_entries");
+        allEntries.push(...entries);
+        return;
+      }
       const entries = await this.paginate<TimeEntry>(url, "time_entries");
       allEntries.push(...entries);
     };
@@ -928,7 +935,6 @@ export class RedmineServer implements IRedmineServer {
       currentBatch.push(id);
       const testUrl = `${baseUrl}issue_id=${currentBatch.join(",")}${filterStr}`;
       if (testUrl.length > MAX_URL_LEN) {
-        // Current batch would exceed limit — flush without the last ID
         currentBatch.pop();
         if (currentBatch.length > 0) await fetchBatch(currentBatch);
         currentBatch = [id];
