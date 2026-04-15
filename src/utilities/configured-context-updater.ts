@@ -7,6 +7,7 @@ import { DraftModeServer } from "../draft-mode/draft-mode-server";
 import { hashString } from "../draft-mode/draft-operation";
 import type { DraftQueue } from "../draft-mode/draft-queue";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
+import { prewarmIssuePicker } from "./issue-picker";
 import type { ProjectsTree } from "../trees/projects-tree";
 import type { MyTimeEntriesTreeDataProvider } from "../trees/my-time-entries-tree";
 
@@ -90,7 +91,8 @@ export function createConfiguredContextUpdater(
         deps.projectsTree.refresh();
         deps.timeEntriesTree.refresh();
 
-        // Issue picker prewarms lazily on first use (via getMyIssues cache)
+        // Pre-warm issue picker so it opens instantly
+        prewarmIssuePicker(server);
 
         // Fetch FTE from user's custom fields (non-critical, silent fail).
         server
