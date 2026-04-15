@@ -11,6 +11,9 @@ export const CHANGE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 /** Minimum interval between hasChanges probes for same key */
 export const MIN_PROBE_INTERVAL_MS = 10 * 1000; // 10 seconds
 
+/** Max probe interval after repeated no-change results */
+export const MAX_PROBE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
 interface CacheEntry<T> {
   data: T;
   /** max(updated_on) from Redmine response — used as probe baseline */
@@ -19,6 +22,8 @@ interface CacheEntry<T> {
   storedAt: number;
   /** Date.now() of last hasChanges probe — for probe cooldown */
   lastProbedAt: number;
+  /** Consecutive no-change probe results — drives exponential backoff */
+  noChangeCount: number;
 }
 
 export class ChangeAwareCache {
@@ -30,7 +35,7 @@ export class ChangeAwareCache {
 
   set<T>(key: string, data: T, lastCheckedAt: string): void {
     const now = Date.now();
-    this.entries.set(key, { data, lastCheckedAt, storedAt: now, lastProbedAt: now });
+    this.entries.set(key, { data, lastCheckedAt, storedAt: now, lastProbedAt: now, noChangeCount: 0 });
   }
 
   invalidate(key: string): void {
@@ -57,18 +62,22 @@ export class ChangeAwareCache {
     return Date.now() - entry.storedAt >= ttlMs;
   }
 
-  /** True if enough time has passed since last probe to warrant another */
+  /** True if enough time has passed since last probe to warrant another.
+   *  Uses exponential backoff: interval doubles with each consecutive no-change,
+   *  capped at MAX_PROBE_INTERVAL_MS. Resets on data change (set()). */
   shouldProbe(key: string, minIntervalMs: number): boolean {
     const entry = this.entries.get(key);
     if (!entry) return true;
-    return Date.now() - entry.lastProbedAt >= minIntervalMs;
+    const backoff = Math.min(minIntervalMs * Math.pow(2, entry.noChangeCount), MAX_PROBE_INTERVAL_MS);
+    return Date.now() - entry.lastProbedAt >= backoff;
   }
 
-  /** Update probe timestamp without changing data */
+  /** Update probe timestamp and increment no-change counter (drives backoff) */
   touch(key: string): void {
     const entry = this.entries.get(key);
     if (entry) {
       entry.lastProbedAt = Date.now();
+      entry.noChangeCount++;
     }
   }
 }

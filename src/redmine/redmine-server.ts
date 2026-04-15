@@ -542,6 +542,7 @@ export class RedmineServer implements IRedmineServer {
   clearProjectsCache(): void {
     this.cachedProjects = null;
     this.membershipsCache.clear();
+    this.versionsCache.clear();
     this.changeCache.invalidate("projects");
   }
 
@@ -590,36 +591,41 @@ export class RedmineServer implements IRedmineServer {
     }
   }
 
+  private versionsCache = new Map<string, Version[]>();
+
   /**
-   * Get versions (milestones) for a project
-   * Includes shared versions from parent/related projects
+   * Get versions (milestones) for a project (cached)
    */
   async getProjectVersions(projectId: number | string): Promise<Version[]> {
+    const key = String(projectId);
+    const cached = this.versionsCache.get(key);
+    if (cached) return cached;
+
     const response = await this.doRequest<{ versions: Version[] }>(
       `/projects/${projectId}/versions.json`,
       "GET"
     );
-    return response?.versions || [];
+    const versions = response?.versions || [];
+    this.versionsCache.set(key, versions);
+    return versions;
   }
 
   /**
-   * Get versions for multiple projects (batched)
+   * Get versions for multiple projects (batched, 5 concurrent)
    */
   async getVersionsForProjects(projectIds: (number | string)[]): Promise<Map<number | string, Version[]>> {
     const result = new Map<number | string, Version[]>();
-    // Fetch in batches matching request queue concurrency
-    const batchSize = this.maxConcurrentRequests;
+    const batchSize = 5;
     for (let i = 0; i < projectIds.length; i += batchSize) {
       const batch = projectIds.slice(i, i + batchSize);
-      const promises = batch.map(async (id) => {
+      await Promise.allSettled(batch.map(async (id) => {
         try {
           const versions = await this.getProjectVersions(id);
           result.set(id, versions);
         } catch {
           result.set(id, []);
         }
-      });
-      await Promise.all(promises);
+      }));
     }
     return result;
   }
@@ -1244,11 +1250,11 @@ export class RedmineServer implements IRedmineServer {
       }
     }
 
-    // Fetch uncached values in parallel (limit concurrency)
-    const batchSize = 5;
+    // Fetch uncached values in parallel batches (10 at a time — lightweight GETs)
+    const batchSize = 10;
     for (let i = 0; i < uncached.length; i += batchSize) {
       const batch = uncached.slice(i, i + batchSize);
-      await Promise.all(batch.map((id) => this.getUserFte(id)));
+      await Promise.allSettled(batch.map((id) => this.getUserFte(id)));
     }
 
     // Add newly fetched values
