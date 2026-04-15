@@ -356,6 +356,7 @@ export function registerTimeEntryCommands(
           hours: e.hours,
           comments: e.comments || "",
           issueSubject: e.issue?.subject,
+          activityName: e.activity?.name,
           custom_fields: e.custom_fields?.map((cf) => ({
             id: cf.id,
             value: cf.value as string | string[],
@@ -411,6 +412,7 @@ export function registerTimeEntryCommands(
             hours: e.hours,
             comments: e.comments || "",
             issueSubject: e.issue?.subject,
+            activityName: e.activity?.name,
             custom_fields: e.custom_fields?.map((cf) => ({
               id: cf.id,
               value: cf.value as string | string[],

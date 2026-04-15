@@ -1124,14 +1124,18 @@ export class RedmineServer implements IRedmineServer {
       "POST",
       Buffer.from(JSON.stringify({ relation: relationData }), "utf8")
     );
+    this.invalidateIssueCache(issueId);
+    this.invalidateIssueCache(targetIssueId);
     return response!;
   }
 
   /**
    * Delete a relation by ID
    */
-  deleteRelation(relationId: number): Promise<unknown> {
-    return this.doRequest(`/relations/${relationId}.json`, "DELETE");
+  async deleteRelation(relationId: number): Promise<unknown> {
+    const result = await this.doRequest(`/relations/${relationId}.json`, "DELETE");
+    this.changeCache.invalidatePrefix("issues:");
+    return result;
   }
 
   /**
@@ -1319,11 +1323,13 @@ export class RedmineServer implements IRedmineServer {
     parent_issue_id?: number;
     custom_fields?: { id: number; value: string }[];
   }): Promise<{ issue: Issue }> {
-    return this.doRequest(
+    const result = await this.doRequest<{ issue: Issue }>(
       "/issues.json",
       "POST",
       this.encodeJson({ issue })
     );
+    this.changeCache.invalidatePrefix("issues:");
+    return result;
   }
 
   issueStatuses: { issue_statuses: RedmineIssueStatus[] } | null = null;
