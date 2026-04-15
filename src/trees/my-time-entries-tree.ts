@@ -870,7 +870,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         collapsibleState: vscode.TreeItemCollapsibleState.None,
         type: "entry" as const,
         contextValue,
-        _entry: entry,
+        _entry: { ...entry, issue: { ...entry.issue, id: issueId, subject: issueSubject } },
         _isDraft: isDraft || isDraftModified,
       };
     });
