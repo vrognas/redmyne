@@ -520,7 +520,8 @@ export class RedmineServer implements IRedmineServer {
           return this.cachedProjects;
         }
       } catch {
-        // Probe failed — return cached data
+        // Probe failed — touch to prevent repeated probing on flaky network
+        this.changeCache.touch("projects");
         return this.cachedProjects;
       }
       // Count changed — refetch
@@ -652,6 +653,7 @@ export class RedmineServer implements IRedmineServer {
     if (!response?.version) {
       throw new Error("Failed to create version");
     }
+    this.versionsCache.delete(String(projectId));
     return response.version;
   }
 
@@ -670,6 +672,7 @@ export class RedmineServer implements IRedmineServer {
     }
   ): Promise<void> {
     await this.doRequest(`/versions/${versionId}.json`, "PUT", this.encodeJson({ version }));
+    this.versionsCache.clear(); // Can't determine project from versionId
   }
 
   /**
@@ -677,6 +680,7 @@ export class RedmineServer implements IRedmineServer {
    */
   async deleteVersion(versionId: number): Promise<void> {
     await this.doRequest(`/versions/${versionId}.json`, "DELETE");
+    this.versionsCache.clear();
   }
 
   /**
@@ -1021,6 +1025,7 @@ export class RedmineServer implements IRedmineServer {
    */
   private invalidateIssueCache(issueId: number): void {
     this.issueCache.delete(issueId);
+    this.changeCache.invalidatePrefix("issues:");
   }
 
   /**
