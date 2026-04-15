@@ -315,6 +315,7 @@ export function registerTimeEntryCommands(
         hours: entry.hours,
         comments: entry.comments || "",
         issueSubject: entry.issue?.subject,
+        activityName: entry.activity?.name,
         custom_fields: entry.custom_fields?.map((cf) => ({
           id: cf.id,
           value: cf.value as string | string[],
@@ -554,7 +555,8 @@ export function registerTimeEntryCommands(
         // What's being pasted
         const formatEntry = (e: ClipboardEntry) => {
           const label = e.issueSubject ? `#${e.issue_id} ${e.issueSubject}` : `#${e.issue_id}`;
-          return `  ${label} — ${formatHoursAsHHMM(parseFloat(e.hours))}`;
+          const activity = e.activityName ? ` [${e.activityName}]` : "";
+          return `  ${label}${activity} — ${formatHoursAsHHMM(parseFloat(e.hours))}`;
         };
 
         if (targetKind === "day" && targetDate) {
