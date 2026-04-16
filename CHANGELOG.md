@@ -7,6 +7,38 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.20.0]
+
+### Performance
+
+- **Change-aware API cache** — probes `updated_on` before refetching issues/time entries; exponential backoff on stable data (10s→5min)
+- **Batch time entries** — combines ~80 per-issue API calls into 1 comma-separated query for Gantt contributions
+- **Parallel dependency fetch** — scheduling dependencies fetched concurrently with grouping/flexibility computation
+- **Batch membership preload** — 3 concurrent instead of sequential; tooltips show instantly
+- **FTE batch size** 5→10, version cache per project, version fetch concurrency 2→5
+
+### Improved
+
+- **Project labels** simplified to name only (no health dot/progress/counts)
+- **Project descriptions** show subproject + direct issue count (`3 projects · 5 issues`)
+- **Time entries: preload 3 months** in background after initial load
+- **Time entries: persist hideZeroDays** across sessions
+- **Time entries: better month tooltips** with date range + hours summary
+- **Issue picker prewarm** — pre-fetches issues on server init so picker opens instantly
+- **Paste confirmation** shows issue name, activity, and hours per entry
+- **Zero-days toggle** split into Show/Hide with context-aware menu
+
+### Fixed
+
+- Cache probe used `>=` (always matched last record) — changed to `>`
+- Projects probe failure caused repeated probing — now applies backoff
+- Issue mutations (status/dates/priority) didn't invalidate change cache
+- Version cache not invalidated after create/update/delete
+- `applyQuickUpdate` read stale per-issue cache for verification
+- Probe failure triggered full refetch — now returns cached data with backoff
+- `createIssue`/`createRelation`/`deleteRelation` missing cache invalidation
+- 3 context-menu-only commands visible in command palette
+
 ## [4.19.1]
 
 ### Improved
