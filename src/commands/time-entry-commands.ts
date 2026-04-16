@@ -51,7 +51,7 @@ interface DayGroupNode {
     issue_id?: number;
     issue?: { id: number; subject?: string };
     activity_id?: number;
-    activity?: { id: number };
+    activity?: { id: number; name?: string };
     hours: string;
     comments: string;
     spent_on?: string;
@@ -67,7 +67,7 @@ interface WeekGroupNode {
     issue_id?: number;
     issue?: { id: number; subject?: string };
     activity_id?: number;
-    activity?: { id: number };
+    activity?: { id: number; name?: string };
     hours: string;
     comments: string;
     spent_on?: string;

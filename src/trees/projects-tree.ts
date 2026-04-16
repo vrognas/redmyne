@@ -143,7 +143,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
       const excludeIds = config.get<number[]>("hideProjectMembersFor", []);
       const shouldFetch = showMembers && !excludeIds.includes(element.project.id);
       // Use cached members first (instant), fetch if not cached
-      const cached = shouldFetch ? this.server.getCachedMemberships(element.project.id) : undefined;
+      const cached = shouldFetch ? this.server.getCachedMemberships?.(element.project.id) : undefined;
       if (cached) {
         item.tooltip = createProjectTooltip(element.project, this.server, cached);
       } else if (shouldFetch) {
@@ -354,23 +354,25 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   private static readonly MEMBERSHIP_BATCH_SIZE = 3;
 
   private async preloadMemberships(projects: RedmineProject[]): Promise<void> {
-    if (!this.server) return;
-    const config = vscode.workspace.getConfiguration("redmyne");
-    const showMembers = config.get<boolean>("showProjectMembers", true);
-    if (!showMembers) return;
-    const excludeIds = config.get<number[]>("hideProjectMembersFor", []);
+    try {
+      if (!this.server?.getMemberships) return;
+      const config = vscode.workspace.getConfiguration("redmyne");
+      const showMembers = config.get<boolean>("showProjectMembers", true);
+      if (!showMembers) return;
+      const excludeIds = config.get<number[]>("hideProjectMembersFor", []);
 
-    // Only preload for projects that have issues (most relevant)
-    const toPreload = projects.filter(p =>
-      !excludeIds.includes(p.id) &&
-      (this.issuesByProject.get(p.id)?.length ?? 0) > 0 &&
-      !this.server!.getCachedMemberships(p.id)
-    );
+      const toPreload = projects.filter(p =>
+        !excludeIds.includes(p.id) &&
+        (this.issuesByProject.get(p.id)?.length ?? 0) > 0 &&
+        !this.server!.getCachedMemberships?.(p.id)
+      );
 
-    // Fetch in parallel batches (3 at a time to avoid flooding)
-    for (let i = 0; i < toPreload.length; i += ProjectsTree.MEMBERSHIP_BATCH_SIZE) {
-      const batch = toPreload.slice(i, i + ProjectsTree.MEMBERSHIP_BATCH_SIZE);
-      await Promise.allSettled(batch.map(p => this.server!.getMemberships(p.id)));
+      for (let i = 0; i < toPreload.length; i += ProjectsTree.MEMBERSHIP_BATCH_SIZE) {
+        const batch = toPreload.slice(i, i + ProjectsTree.MEMBERSHIP_BATCH_SIZE);
+        await Promise.allSettled(batch.map(p => this.server!.getMemberships(p.id)));
+      }
+    } catch {
+      // Background preload — silent fail
     }
   }
 
