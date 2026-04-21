@@ -7,6 +7,14 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.20.1]
+
+### Improved
+
+- **Kanban: Add Task** available in command palette (`Redmyne: Add Kanban Task`)
+- **Kanban: Toggle Timer** available in command palette (`Redmyne: Toggle Timer`, hotkey `Ctrl+Y Ctrl+T`)
+- **Kanban: estimated hours** shown in task description (e.g., `2:00est / 1:30log`)
+
 ## [4.20.0]
 
 ### Performance
