@@ -358,6 +358,7 @@
       {
         "command": "redmyne.kanban.add",
         "title": "Add Kanban Task",
+        "category": "Redmyne",
         "icon": "$(add)"
       },
       {
@@ -1058,7 +1059,7 @@
         },
         {
           "command": "redmyne.kanban.add",
-          "when": "false"
+          "when": "redmyne:configured"
         },
         {
           "command": "redmyne.kanban.edit",
