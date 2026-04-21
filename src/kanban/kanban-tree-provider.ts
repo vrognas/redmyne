@@ -271,8 +271,10 @@ export class KanbanTreeProvider
       const stateStr = task.timerPhase ? "" : " (ready)";
       item.description = `${timeStr}${activityStr}${stateStr} #${task.linkedIssueId}`;
     } else {
-      const hoursStr =
-        task.loggedHours > 0 ? ` (${formatHoursAsHHMM(task.loggedHours)} logged)` : "";
+      const parts: string[] = [];
+      if (task.estimatedHours) parts.push(`${formatHoursAsHHMM(task.estimatedHours)}est`);
+      if (task.loggedHours > 0) parts.push(`${formatHoursAsHHMM(task.loggedHours)}log`);
+      const hoursStr = parts.length > 0 ? ` (${parts.join(" / ")})` : "";
       item.description = `#${task.linkedIssueId} ${task.linkedIssueSubject}${hoursStr}`;
     }
 
