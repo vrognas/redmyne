@@ -433,7 +433,8 @@
       },
       {
         "command": "redmyne.kanban.toggleTimer",
-        "title": "Toggle Timer"
+        "title": "Toggle Timer",
+        "category": "Redmyne"
       },
       {
         "command": "redmyne.kanban.skipBreak",
