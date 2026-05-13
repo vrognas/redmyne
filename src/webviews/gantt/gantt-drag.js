@@ -497,13 +497,15 @@ export function setupDrag(ctx) {
     let dragScrollSnapshot = null; // Scroll position at drag start, for restoration (modal cancel)
     let justEndedDrag = false; // Flag to skip click handler after drag ends
 
-    // Handle drag start on handles
-    document.querySelectorAll('.drag-handle').forEach(handle => {
-      handle.addEventListener('mousedown', (e) => {
-        e.preventDefault(); // Prevent focus/scroll anchoring
-        e.stopPropagation();
-        // Save scroll position at drag start for later restoration
-        dragScrollSnapshot = { left: ganttScroll?.scrollLeft, top: ganttScroll?.scrollTop };
+    // Handle drag start on handles (delegated: 1 listener instead of 2*N per render)
+    addDocListener('mousedown', (e) => {
+      const handle = e.target.closest('.drag-handle');
+      if (!handle) return;
+      e.preventDefault(); // Prevent focus/scroll anchoring
+      e.stopPropagation();
+      // Save scroll position at drag start for later restoration
+      dragScrollSnapshot = { left: ganttScroll?.scrollLeft, top: ganttScroll?.scrollTop };
+      {
         const bar = handle.closest('.issue-bar');
         const isLeft = handle.classList.contains('drag-left');
         const issueId = parseInt(bar.dataset.issueId);
@@ -565,20 +567,23 @@ export function setupDrag(ctx) {
           showDragTooltip((isLeft ? 'Start: ' : 'Due: ') + formatDateShort(currentDate));
           positionDragTooltip(e.clientX, e.clientY);
         }
-      });
+      }
     });
 
     // Handle drag start on bar body (move entire bar or bulk move)
-    document.querySelectorAll('.bar-outline').forEach(outline => {
-      outline.addEventListener('mousedown', (e) => {
-        // Skip if clicking on drag handles (they're on top)
-        if (e.target.classList.contains('drag-handle')) return;
-        // Skip if Ctrl/Shift held (selection mode)
-        if (e.ctrlKey || e.metaKey || e.shiftKey) return;
-        e.preventDefault(); // Prevent focus/scroll anchoring
-        e.stopPropagation();
-        // Save scroll position at drag start for later restoration
-        dragScrollSnapshot = { left: ganttScroll?.scrollLeft, top: ganttScroll?.scrollTop };
+    // (delegated: 1 listener instead of N per render)
+    addDocListener('mousedown', (e) => {
+      // Skip if clicking inside a drag handle (those have their own handler)
+      if (e.target.closest('.drag-handle')) return;
+      // Skip if Ctrl/Shift held (selection mode)
+      if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const outline = e.target.closest('.bar-outline');
+      if (!outline) return;
+      e.preventDefault(); // Prevent focus/scroll anchoring
+      e.stopPropagation();
+      // Save scroll position at drag start for later restoration
+      dragScrollSnapshot = { left: ganttScroll?.scrollLeft, top: ganttScroll?.scrollTop };
+      {
         const bar = outline.closest('.issue-bar');
         if (!bar) return;
         const issueId = bar.dataset.issueId;
@@ -669,7 +674,7 @@ export function setupDrag(ctx) {
           showDragTooltip(formatDateRange(bar.dataset.startDate, bar.dataset.dueDate));
           positionDragTooltip(e.clientX, e.clientY);
         }
-      });
+      }
     });
 
     // Linking drag state

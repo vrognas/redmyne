@@ -1083,28 +1083,28 @@ function initializeGantt(state) {
       announce(`Selected all ${selectedIssues.size} issues`);
     }
 
-    // Handle Ctrl+click and Shift+click on bars for selection
-    allIssueBars.forEach(bar => {
-      bar.addEventListener('mousedown', (e) => {
-        // Only handle Ctrl or Shift clicks for selection
-        if (!e.ctrlKey && !e.metaKey && !e.shiftKey) return;
+    // Handle Ctrl+click and Shift+click on bars for selection (delegated: 1
+    // listener on document instead of N per render).
+    addDocListener('mousedown', (e) => {
+      // Only handle Ctrl or Shift clicks for selection
+      if (!e.ctrlKey && !e.metaKey && !e.shiftKey) return;
+      // Don't interfere with drag handles or link handles (closest catches
+      // descendants like drag-grip circles, which classList wouldn't).
+      if (e.target.closest('.drag-handle') || e.target.closest('.link-handle')) return;
+      const bar = e.target.closest('.issue-bar');
+      if (!bar) return;
 
-        // Don't interfere with drag handles
-        if (e.target.classList.contains('drag-handle') ||
-            e.target.classList.contains('link-handle')) return;
+      e.preventDefault();
+      e.stopPropagation();
 
-        e.preventDefault();
-        e.stopPropagation();
-
-        const issueId = bar.dataset.issueId;
-        if (e.shiftKey && lastClickedIssueId) {
-          // Shift+click: range selection
-          selectRange(lastClickedIssueId, issueId);
-        } else {
-          // Ctrl/Cmd+click: toggle selection
-          toggleSelection(issueId);
-        }
-      });
+      const issueId = bar.dataset.issueId;
+      if (e.shiftKey && lastClickedIssueId) {
+        // Shift+click: range selection
+        selectRange(lastClickedIssueId, issueId);
+      } else {
+        // Ctrl/Cmd+click: toggle selection
+        toggleSelection(issueId);
+      }
     });
 
     // Ctrl+A to select all, Escape to clear
