@@ -7,6 +7,23 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.20.2]
+
+### Fixed
+
+- **Kanban: Log & Continue** now resets the work timer to full duration instead of continuing from the partially-elapsed seconds (could otherwise re-fire completion immediately and risk double-logging)
+- **Draft mode: quick-update** no longer surfaces a spurious `TypeError` on save — drafted ops were queued correctly but the user saw a scary error message
+- **Time entry clipboard: week paste** is DST-safe — entries copied across a spring-forward DST boundary no longer shift onto the wrong day
+- **Time entry: edit activity** now shows a clear error when the entry has no linked issue, instead of producing a confusing `/issues/0` server error
+- **Project cache** detects in-place edits (renames, parent/identifier changes) via `updated_on` probe instead of count-delta only
+- **Version cache** invalidated selectively on update/delete instead of clearing every project's cache
+
+### Improved
+
+- **Kanban: Toggle Timer** hidden from command palette when Redmyne isn't configured (was visible unconditionally)
+- **Time entry node types** deduplicated to a shared `CachedEntry` interface
+- **`startTimer`** now accepts an explicit `reset` flag, making "fresh start vs resume existing seconds" an explicit caller choice
+
 ## [4.20.1]
 
 ### Improved
