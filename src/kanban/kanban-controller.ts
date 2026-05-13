@@ -347,12 +347,15 @@ export class KanbanController {
   }
 
   /**
-   * Start timer for a task
+   * Start timer for a task.
+   * @param reset if true, force seconds back to full workDurationSeconds; otherwise
+   *   preserve any existing timerSecondsLeft (e.g. set by moveToDoing).
    */
   async startTimer(
     id: string,
     activityId: number,
-    activityName: string
+    activityName: string,
+    reset = false
   ): Promise<void> {
     const index = this.tasks.findIndex((t) => t.id === id);
     if (index === -1) return;
@@ -371,7 +374,9 @@ export class KanbanController {
     this.tasks[index] = {
       ...this.tasks[index],
       timerPhase: "working",
-      timerSecondsLeft: this.tasks[index].timerSecondsLeft ?? this.workDurationSeconds,
+      timerSecondsLeft: reset
+        ? this.workDurationSeconds
+        : (this.tasks[index].timerSecondsLeft ?? this.workDurationSeconds),
       activityId,
       activityName,
       lastActiveAt: new Date().toISOString(),

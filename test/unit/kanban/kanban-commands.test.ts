@@ -505,7 +505,7 @@ describe("registerKanbanCommands", () => {
       [{ id: 2, value: "B" }]
     );
     expect(controller.addLoggedHours).toHaveBeenCalledWith("task-continue", 0.5);
-    expect(controller.startTimer).toHaveBeenCalledWith("task-continue", 13, "Development");
+    expect(controller.startTimer).toHaveBeenCalledWith("task-continue", 13, "Development", true);
     expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
       "Logged 0.5h, timer restarted"
     );

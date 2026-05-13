@@ -606,7 +606,7 @@ export function registerKanbanCommands(
           );
           await controller.addLoggedHours(task.id, roundedHours);
           // Reset timer to full duration and keep running
-          await controller.startTimer(task.id, task.activityId ?? 0, task.activityName ?? "");
+          await controller.startTimer(task.id, task.activityId ?? 0, task.activityName ?? "", true);
           vscode.window.showInformationMessage(`Logged ${roundedHours}h, timer restarted`);
         } catch (error) {
           const errorMsg = String(error);

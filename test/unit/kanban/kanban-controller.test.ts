@@ -263,6 +263,21 @@ describe("KanbanController", () => {
 
       expect(controller.getActiveTask()?.id).toBe(task.id);
     });
+
+    it("startTimer with reset=true forces seconds back to full duration", async () => {
+      const task = await controller.addTask("Task", 1, "Issue", 1, "P");
+      // Simulate a partially-elapsed timer (e.g. user invokes Log & Continue mid-session)
+      await controller.startTimer(task.id, 10, "Dev");
+      const fullDuration = controller.getTaskById(task.id)?.timerSecondsLeft;
+      // Manually consume some seconds via internal state to simulate elapsed work
+      const partial = (fullDuration ?? 0) - 60;
+      (controller as unknown as { tasks: Array<{ id: string; timerSecondsLeft: number }> })
+        .tasks.find((t) => t.id === task.id)!.timerSecondsLeft = partial;
+
+      await controller.startTimer(task.id, 10, "Dev", true);
+
+      expect(controller.getTaskById(task.id)?.timerSecondsLeft).toBe(fullDuration);
+    });
   });
 
   describe("deferred minutes", () => {
