@@ -17,7 +17,8 @@ import {
   calculatePasteTargetDates,
   getEntriesForTargetDate,
 } from "../utilities/time-entry-clipboard";
-import { parseLocalDate, getWeekStart, formatLocalDate } from "../utilities/date-utils";
+import { parseLocalDate, getWeekStart, formatLocalDate, getISOWeekNumber } from "../utilities/date-utils";
+import { differenceInCalendarDays } from "date-fns";
 import { DEFAULT_WEEKLY_SCHEDULE, WeeklySchedule } from "../utilities/flexibility-calculator";
 import { MonthlyScheduleOverrides } from "../utilities/monthly-schedule";
 import { pickCustomFields, TimeEntryCustomFieldValue } from "../utilities/custom-field-picker";
@@ -417,12 +418,10 @@ export function registerTimeEntryCommands(
           };
           allEntries.push(clipEntry);
 
-          // Calculate day offset from Monday
+          // Calculate day offset from Monday (calendar-day diff, DST-safe)
           if (e.spent_on) {
             const entryDate = parseLocalDate(e.spent_on);
-            const dayOffset = Math.floor(
-              (entryDate.getTime() - monday.getTime()) / (1000 * 60 * 60 * 24)
-            );
+            const dayOffset = differenceInCalendarDays(entryDate, monday);
             if (dayOffset >= 0 && dayOffset < 7) {
               if (!weekMap.has(dayOffset)) {
                 weekMap.set(dayOffset, []);
@@ -564,8 +563,7 @@ export function registerTimeEntryCommands(
           confirmLines.push(`Paste to ${dayLabel}:`);
         } else if (targetWeekStart) {
           const ws = new Date(targetWeekStart + "T00:00:00");
-          const weekNum = Math.ceil(((ws.getTime() - new Date(ws.getFullYear(), 0, 1).getTime()) / 86400000 + 1) / 7);
-          confirmLines.push(`Paste to Week ${weekNum}:`);
+          confirmLines.push(`Paste to Week ${getISOWeekNumber(ws)}:`);
         }
 
         // Show entries being created (cap at 5)

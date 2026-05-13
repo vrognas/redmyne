@@ -6,6 +6,7 @@
  */
 
 import * as vscode from "vscode";
+import { differenceInCalendarDays } from "date-fns";
 import { WeeklySchedule, getDayName } from "./flexibility-calculator";
 import { MonthlyScheduleOverrides, getMonthKey } from "./monthly-schedule";
 import { formatLocalDate, parseLocalDate } from "./date-utils";
@@ -202,9 +203,8 @@ export function getEntriesForTargetDate(
 
   const targetDay = parseLocalDate(targetDate);
   const targetMonday = parseLocalDate(targetWeekStart);
-  const dayOffset = Math.floor(
-    (targetDay.getTime() - targetMonday.getTime()) / (1000 * 60 * 60 * 24)
-  );
+  // Calendar-day diff (not ms-based) so DST transitions don't off-by-one the map lookup.
+  const dayOffset = differenceInCalendarDays(targetDay, targetMonday);
 
   return clipboard.weekMap.get(dayOffset) ?? [];
 }
