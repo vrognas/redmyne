@@ -3,6 +3,8 @@
  * Defines communication protocol between extension and webview
  */
 
+import { formatLocalDate, getISOWeekNumber } from "../utilities/date-utils";
+
 // Sentinel value for orphan projects (no parent)
 export const OTHERS_PARENT_ID = -1;
 
@@ -458,39 +460,6 @@ export type WebviewToExtensionMessage =
 export type TimeSheetMessage = ExtensionToWebviewMessage | WebviewToExtensionMessage;
 
 /**
- * Get Monday of the week containing the given date
- */
-export function getWeekStart(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust if Sunday
-  d.setDate(diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-/**
- * Format date as YYYY-MM-DD
- */
-export function formatDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-/**
- * Get ISO week number
- */
-export function getISOWeekNumber(date: Date): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-}
-
-/**
  * Build WeekInfo from a Monday date
  */
 export function buildWeekInfo(monday: Date): WeekInfo {
@@ -498,7 +467,7 @@ export function buildWeekInfo(monday: Date): WeekInfo {
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday);
     d.setDate(d.getDate() + i);
-    dayDates.push(formatDate(d));
+    dayDates.push(formatLocalDate(d));
   }
   return {
     weekNumber: getISOWeekNumber(monday),
