@@ -182,7 +182,11 @@ export function registerIssueContextCommands(
         if (hoursInput && hoursInput.trim()) {
           const hours = parseTimeInput(hoursInput);
           if (hours !== null) {
-            await Promise.all(issueIds.map((id) => setInternalEstimate(deps.globalState, id, hours)));
+            // Sequential: setInternalEstimate is read-modify-write on a shared
+            // globalState key; parallel writes drop all but the last estimate.
+            for (const id of issueIds) {
+              await setInternalEstimate(deps.globalState, id, hours);
+            }
             showStatusBarMessage(
               `$(check) ${issueIds.length} ${issueIds.length === 1 ? "issue" : "issues"} set to ${selected.value}% with ${hours}h remaining each`,
               2000

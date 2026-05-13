@@ -203,6 +203,34 @@ describe("registerIssueContextCommands", () => {
     );
   });
 
+  it("serializes setInternalEstimate in bulk so writes don't race on globalState", async () => {
+    const mockServer = {
+      updateDoneRatio: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.spyOn(autoUpdateTracker, "disable").mockResolvedValue(undefined);
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const estimateSpy = vi
+      .spyOn(internalEstimates, "setInternalEstimate")
+      .mockImplementation(async () => {
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await Promise.resolve();
+        inFlight--;
+      });
+    vi.mocked(vscode.window.showQuickPick).mockResolvedValue({
+      label: "50%",
+      value: 50,
+    } as unknown as vscode.QuickPickItem);
+    vi.mocked(vscode.window.showInputBox).mockResolvedValue("1");
+
+    registerCommands({ getProjectsServer: () => mockServer });
+    await handlers.get("redmyne.bulkSetDoneRatio")?.([1, 2, 3]);
+
+    expect(estimateSpy).toHaveBeenCalledTimes(3);
+    expect(maxInFlight).toBe(1);
+  });
+
   it("bulk updates done ratio and internal estimates for selected issues", async () => {
     const mockServer = {
       updateDoneRatio: vi.fn().mockResolvedValue(undefined),
