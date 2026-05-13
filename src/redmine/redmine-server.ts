@@ -506,24 +506,22 @@ export class RedmineServer implements IRedmineServer {
   }
 
   async getProjects(): Promise<RedmineProject[]> {
-    if (this.cachedProjects) {
-      // Probe: check if project count changed
+    const cached = this.changeCache.get<true>("projects");
+    if (
+      this.cachedProjects &&
+      cached &&
+      !this.changeCache.isExpired("projects", CHANGE_CACHE_TTL_MS)
+    ) {
       if (!this.changeCache.shouldProbe("projects", MIN_PROBE_INTERVAL_MS)) {
         return this.cachedProjects;
       }
-      try {
-        const response = await this.doRequest<{ total_count: number }>("/projects.json?limit=1&offset=0", "GET");
-        const serverCount = response?.total_count ?? 0;
-        if (serverCount === this.cachedProjects.length) {
-          this.changeCache.touch("projects");
-          return this.cachedProjects;
-        }
-      } catch {
-        // Probe failed — touch to prevent repeated probing on flaky network
+      // Probe via updated_on so renames/parent/identifier changes are caught
+      // (count-only probes missed in-place edits).
+      const changed = await this.hasChanges("/projects.json", cached.lastCheckedAt);
+      if (changed === null || !changed) {
         this.changeCache.touch("projects");
         return this.cachedProjects;
       }
-      // Count changed — refetch
       this.cachedProjects = null;
     }
 
@@ -592,6 +590,16 @@ export class RedmineServer implements IRedmineServer {
   }
 
   private versionsCache = new Map<string, Version[]>();
+
+  /** Invalidate only the project cache that contains the given versionId. */
+  private invalidateVersionCacheFor(versionId: number): void {
+    for (const [projectKey, versions] of this.versionsCache) {
+      if (versions.some((v) => v.id === versionId)) {
+        this.versionsCache.delete(projectKey);
+        return; // a version belongs to exactly one project
+      }
+    }
+  }
 
   /**
    * Get versions (milestones) for a project (cached)
@@ -671,7 +679,7 @@ export class RedmineServer implements IRedmineServer {
     }
   ): Promise<void> {
     await this.doRequest(`/versions/${versionId}.json`, "PUT", this.encodeJson({ version }));
-    this.versionsCache.clear(); // Can't determine project from versionId
+    this.invalidateVersionCacheFor(versionId);
   }
 
   /**
@@ -679,7 +687,7 @@ export class RedmineServer implements IRedmineServer {
    */
   async deleteVersion(versionId: number): Promise<void> {
     await this.doRequest(`/versions/${versionId}.json`, "DELETE");
-    this.versionsCache.clear();
+    this.invalidateVersionCacheFor(versionId);
   }
 
   /**
