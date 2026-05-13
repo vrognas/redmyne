@@ -87,7 +87,7 @@ export function registerQuickIssueCommands(deps: QuickIssueCommandsDeps): void {
     const created = await quickCreateVersion(props, projectId);
     if (created) {
       // Refresh Gantt if open to show new milestone
-      vscode.commands.executeCommand("redmyne.refreshGantt");
+      vscode.commands.executeCommand("redmyne.refreshGanttData");
     }
   });
 

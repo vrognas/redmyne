@@ -129,8 +129,8 @@ export async function contributeToIssue(
 
   let newComment: string;
   if (existingTarget) {
-    // Replace existing #<id> (and any following text) with new target
-    newComment = currentComment.replace(/#\d+.*$/, targetRef).trim();
+    // Replace existing #<id> and subject (until end of line) with new target
+    newComment = currentComment.replace(/#\d+[^\n]*/, targetRef).trim();
   } else {
     // Append target reference
     newComment = currentComment ? `${currentComment} ${targetRef}` : targetRef;
@@ -167,8 +167,8 @@ export async function removeContribution(
     return;
   }
 
-  // Remove #<id> and any following subject text from comment
-  const newComment = currentComment.replace(/#\d+.*$/, "").trim();
+  // Remove #<id> and subject text (until end of line) from comment
+  const newComment = currentComment.replace(/#\d+[^\n]*/, "").trim();
 
   try {
     await resolvedServer.updateTimeEntry(entry.id, { comments: newComment });

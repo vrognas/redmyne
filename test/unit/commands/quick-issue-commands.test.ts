@@ -147,7 +147,7 @@ describe("registerQuickIssueCommands", () => {
 
     expect(quickCreateVersion).toHaveBeenCalledWith(props, 91);
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "redmyne.refreshGantt"
+      "redmyne.refreshGanttData"
     );
   });
 
