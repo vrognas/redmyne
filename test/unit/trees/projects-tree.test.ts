@@ -245,6 +245,8 @@ describe("ProjectsTree", () => {
         getFilteredIssues: vi.fn().mockResolvedValue({ issues: [issue] }),
         getIssuesByIds: vi.fn().mockResolvedValue([createIssue({ id: 900, subject: "Dependency" })]),
         clearProjectsCache: vi.fn(),
+        getMemberships: vi.fn().mockResolvedValue([]),
+        getCachedMemberships: vi.fn().mockReturnValue(undefined),
       };
 
       const tree = new ProjectsTree();
@@ -267,6 +269,8 @@ describe("ProjectsTree", () => {
         getIssuesByIds: vi.fn().mockResolvedValue([]),
         getOpenIssuesForProject: vi.fn().mockRejectedValue(new Error("403")),
         clearProjectsCache: vi.fn(),
+        getMemberships: vi.fn().mockResolvedValue([]),
+        getCachedMemberships: vi.fn().mockReturnValue(undefined),
       };
 
       const tree = new ProjectsTree();

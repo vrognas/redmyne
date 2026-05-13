@@ -43,36 +43,29 @@ interface TimeEntryNode {
   };
 }
 
+/** Cached time entry shape shared by day/week group nodes */
+interface CachedEntry {
+  id?: number;
+  issue_id?: number;
+  issue?: { id: number; subject?: string };
+  activity_id?: number;
+  activity?: { id: number; name?: string };
+  hours: string;
+  comments: string;
+  spent_on?: string;
+  custom_fields?: Array<{ id: number; name?: string; value: unknown }>;
+}
+
 /** Day group node from tree view */
 interface DayGroupNode {
   _date?: string; // YYYY-MM-DD
-  _cachedEntries?: Array<{
-    id?: number;
-    issue_id?: number;
-    issue?: { id: number; subject?: string };
-    activity_id?: number;
-    activity?: { id: number; name?: string };
-    hours: string;
-    comments: string;
-    spent_on?: string;
-    custom_fields?: Array<{ id: number; name: string; value: unknown }>;
-  }>;
+  _cachedEntries?: CachedEntry[];
 }
 
 /** Week group node from tree view */
 interface WeekGroupNode {
   _weekStart?: string; // YYYY-MM-DD (Monday)
-  _cachedEntries?: Array<{
-    id?: number;
-    issue_id?: number;
-    issue?: { id: number; subject?: string };
-    activity_id?: number;
-    activity?: { id: number; name?: string };
-    hours: string;
-    comments: string;
-    spent_on?: string;
-    custom_fields?: Array<{ id: number; name?: string; value: unknown }>;
-  }>;
+  _cachedEntries?: CachedEntry[];
 }
 
 export interface TimeEntryCommandDeps {
