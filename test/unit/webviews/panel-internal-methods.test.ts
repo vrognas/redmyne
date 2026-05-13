@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as vscode from "vscode";
+
+vi.mock("../../../src/utilities/webview-nonce", () => ({
+  getNonce: () => "fixednonce",
+}));
+
 import { GanttPanel } from "../../../src/webviews/gantt-panel";
 import { TimeSheetPanel } from "../../../src/webviews/timesheet-panel";
 import {
@@ -220,11 +225,6 @@ describe("webview panel internal methods", () => {
   });
 
   it("covers timesheet html rendering branches for draft mode", () => {
-    vi.spyOn(
-      TimeSheetPanel.prototype as unknown as { _getNonce: () => string },
-      "_getNonce"
-    ).mockReturnValue("fixednonce");
-
     const mock = createMockPanel();
     const extensionUri = vscode.Uri.parse("file:///ext");
     const context = createContext();

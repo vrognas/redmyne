@@ -420,14 +420,11 @@ function initializeGantt(state) {
     minDateMs,
     maxDateMs,
     totalDays,
-    extendedRelationTypes,
     redmineBaseUrl,
     minimapBarsData,
     minimapHeight,
     minimapBarHeight,
     minimapTodayX,
-    extScrollLeft,
-    extScrollTop,
     labelWidth,
     leftExtrasWidth,
     sortBy,
@@ -554,9 +551,9 @@ function initializeGantt(state) {
 
     trimHistoryStack(undoStack);
     trimHistoryStack(redoStack);
-    // Use webview state if available, otherwise use extension-stored position
-    let savedScrollLeft = previousState.scrollLeft ?? (extScrollLeft > 0 ? extScrollLeft : null);
-    let savedScrollTop = previousState.scrollTop ?? (extScrollTop > 0 ? extScrollTop : null);
+    // Restore scroll from webview state (centerDateMs is the primary mechanism)
+    let savedScrollLeft = previousState.scrollLeft ?? null;
+    let savedScrollTop = previousState.scrollTop ?? null;
     let savedCenterDateMs = previousState.centerDateMs;
 
     // Convert scroll position to center date (milliseconds)
@@ -1129,11 +1126,6 @@ function initializeGantt(state) {
       vscode.postMessage({ command: 'refresh' });
     });
 
-    // Draft badge handler - open draft review
-    document.getElementById('draftBadge')?.addEventListener('click', () => {
-      vscode.postMessage({ command: 'openDraftReview' });
-    });
-
     // Show relation context menu
     function showDeletePicker(x, y, relationId, fromId, toId, relationType) {
       document.querySelector('.relation-picker')?.remove();
@@ -1447,7 +1439,6 @@ function initializeGantt(state) {
       clearSelection,
       allIssueBars,
       redmineBaseUrl,
-      extendedRelationTypes,
       minDateMs,
       maxDateMs,
       timelineWidth,

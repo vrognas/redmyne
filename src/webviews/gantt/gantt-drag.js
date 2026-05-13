@@ -14,7 +14,6 @@ export function setupDrag(ctx) {
       clearSelection,
       allIssueBars,
       redmineBaseUrl,
-      extendedRelationTypes,
       minDateMs,
       maxDateMs,
       timelineWidth,
@@ -724,17 +723,7 @@ export function setupDrag(ctx) {
         { value: 'copied_to', label: '📄 Copied to', cssClass: 'rel-line-informational',
           tooltip: 'This issue was copied to create the target issue' }
       ];
-      const extendedTypes = [
-        { value: 'finish_to_start', label: '⏩ Finish→Start', cssClass: 'rel-line-scheduling',
-          tooltip: 'Target starts after this issue finishes (FS)' },
-        { value: 'start_to_start', label: '▶️ Start→Start', cssClass: 'rel-line-scheduling',
-          tooltip: 'Target starts when this issue starts (SS)' },
-        { value: 'finish_to_finish', label: '⏹️ Finish→Finish', cssClass: 'rel-line-scheduling',
-          tooltip: 'Target finishes when this issue finishes (FF)' },
-        { value: 'start_to_finish', label: '⏪ Start→Finish', cssClass: 'rel-line-scheduling',
-          tooltip: 'Target finishes when this issue starts (SF)' }
-      ];
-      const types = extendedRelationTypes ? [...baseTypes, ...extendedTypes] : baseTypes;
+      const types = baseTypes;
 
       // Delay input for precedes (hidden by default, shown when precedes is hovered/focused)
       let currentDelay = -1; // Default: same day (most useful)

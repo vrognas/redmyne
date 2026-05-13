@@ -28,17 +28,13 @@ export type GanttWebviewMessage =
   | { command: "collapseAll" }
   | { command: "collapseStateSync"; collapseKey?: string; isExpanded?: boolean }
   | { command: "requestRerender" }
-  | { command: "scrollPosition"; left?: number; top?: number }
   | { command: "undoRelation"; operation: string; relationId?: number; issueId?: number; targetIssueId?: number; relationType?: string }
   | { command: "redoRelation"; operation: string; relationId?: number; issueId?: number; targetIssueId?: number; relationType?: string }
   | { command: "openInBrowser"; issueId: number }
-  | { command: "openProjectInBrowser"; projectId: number }
   | { command: "showInIssues"; issueId: number }
   | { command: "logTime"; issueId: number }
-  | { command: "setDoneRatio"; issueId: number; value: number }
+  | { command: "setDoneRatio"; issueId: number }
   | { command: "bulkSetDoneRatio"; issueIds: number[] }
-  | { command: "setIssueStatus"; issueId: number; statusPattern: string }
-  | { command: "setIssuePriority"; issueId: number; priorityPattern: string }
   | { command: "copyUrl"; issueId: number }
   | { command: "todayOutOfRange" }
   | { command: "setInternalEstimate"; issueId: number }
@@ -49,7 +45,6 @@ export type GanttWebviewMessage =
   | { command: "setSelectedKey"; collapseKey?: string | null }
   | { command: "setSort"; sortBy?: "id" | "assignee" | "start" | "due" | "status" | null; sortOrder?: "asc" | "desc" }
   | { command: "showStatus"; message?: string }
-  | { command: "setAllProjectsVisibility"; projectIds?: number[]; visible?: boolean }
   | { command: "requestProjectMembers"; projectId?: number };
 
 const LOOKBACK_VALUES = new Set(["2", "5", "10", ""]);

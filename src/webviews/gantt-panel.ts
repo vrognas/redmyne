@@ -1,5 +1,4 @@
 import * as vscode from "vscode";
-import * as crypto from "crypto";
 import { Issue, IssueRelation } from "../redmine/models/issue";
 import { Version } from "../redmine/models/version";
 import type { IRedmineServer } from "../redmine/redmine-server-interface";
@@ -26,10 +25,10 @@ import { getInternalEstimates, getInternalEstimate } from "../utilities/internal
 import { getPrecedenceIssues, hasPrecedence, togglePrecedence } from "../utilities/precedence-tracker";
 import { autoUpdateTracker } from "../utilities/auto-update-tracker";
 import { CollapseStateManager } from "../utilities/collapse-state";
-import { debounce, DebouncedFunction } from "../utilities/debounce";
 import { IssueFilter, DEFAULT_ISSUE_FILTER, GanttViewMode, CustomField } from "../redmine/models/common";
 import { formatCustomFieldValue } from "../utilities/custom-field-formatter";
 import { parseLocalDate, getLocalToday, formatLocalDate } from "../utilities/date-utils";
+import { getNonce } from "../utilities/webview-nonce";
 import { GanttWebviewMessage, parseLookbackYears } from "./gantt-webview-messages";
 import { escapeAttr, escapeHtml } from "./gantt-html-escape";
 import { CreatableRelationType, GanttIssue, GanttRow, nodeToGanttRow } from "./gantt-model";
@@ -75,8 +74,6 @@ function perfEnd(name: string, extra?: string): void {
 /** Get today's date as YYYY-MM-DD string */
 const getTodayStr = (): string => formatLocalDate(getLocalToday());
 
-const COLLAPSE_DEBOUNCE_MS = 50;
-
 type ZoomLevel = "day" | "week" | "month" | "quarter" | "year";
 
 interface GanttMinimapBar {
@@ -96,8 +93,6 @@ interface GanttRenderState {
   minimapHeight: number;
   minimapBarHeight: number;
   minimapTodayX: number;
-  extScrollLeft: number;
-  extScrollTop: number;
   labelWidth: number;
   leftExtrasWidth: number;
   sortBy: "id" | "assignee" | "start" | "due" | "status" | null;
@@ -198,10 +193,8 @@ export class GanttPanel {
   private _showDependencies: boolean = true;
   private _showBadges: boolean = true;
   private _showIntensity: boolean = false;
-  private _scrollPosition: { left: number; top: number } = { left: 0, top: 0 };
   private _visibleRelationTypes: Set<string> = new Set(["blocks", "precedes"]);
   private _closedStatusIds: Set<number> = new Set();
-  private _debouncedCollapseUpdate: DebouncedFunction<() => void>;
   private _cachedHierarchy?: HierarchyNode[];
   private _collapseState = new CollapseStateManager(); // Gantt-specific collapse state (independent from tree view)
   private _renderKey = 0; // Incremented on each render to force SVG re-creation
@@ -275,9 +268,6 @@ export class GanttPanel {
       if (savedStatus) this._currentFilter.status = savedStatus;
       this._lookbackYears = GanttPanel._globalState.get<2 | 5 | 10 | null>(LOOKBACK_YEARS_KEY, 2);
     }
-
-    // Create debounced collapse update to prevent rapid re-renders
-    this._debouncedCollapseUpdate = debounce(COLLAPSE_DEBOUNCE_MS, () => this._updateContent());
 
     // Subscribe to draft mode and queue changes
     this._setupDraftModeSubscriptions();
@@ -649,8 +639,6 @@ export class GanttPanel {
       minimapHeight: 30,
       minimapBarHeight: 5,
       minimapTodayX: 0,
-      extScrollLeft: this._scrollPosition.left,
-      extScrollTop: this._scrollPosition.top,
       labelWidth,
       leftExtrasWidth: resizeHandleWidth + extraColumnsWidth,
       sortBy: this._sortBy,
@@ -1358,12 +1346,6 @@ export class GanttPanel {
         // Re-render requested (e.g., to fix zebra stripes after fallback toggle)
         this._updateContent();
         break;
-      case "scrollPosition":
-        // Store scroll position for restoration after update
-        if (message.left !== undefined && message.top !== undefined) {
-          this._scrollPosition = { left: message.left, top: message.top };
-        }
-        break;
       case "undoRelation":
         if (this._server && message.operation) {
           this._handleUndoRelation(message as { operation: string; relationId?: number; issueId?: number; targetIssueId?: number; relationType?: string });
@@ -1377,14 +1359,6 @@ export class GanttPanel {
       case "openInBrowser":
         if (message.issueId) {
           vscode.commands.executeCommand("redmyne.openIssueInBrowser", { id: message.issueId });
-        }
-        break;
-      case "openProjectInBrowser":
-        if (message.projectId) {
-          const project = this._projects.find(p => p.id === message.projectId);
-          if (project) {
-            vscode.commands.executeCommand("redmyne.openProjectInBrowser", { project: { identifier: project.identifier } });
-          }
         }
         break;
       case "showInIssues":
@@ -1503,6 +1477,7 @@ export class GanttPanel {
           const exclude = cfg.get<number[]>("hideProjectMembersFor", []);
           if (show && !exclude.includes(pid) && !this._membershipsCache.has(pid)) {
             this._server.getMemberships(pid).then((members) => {
+              if (this._disposed) return; // Panel closed mid-fetch
               this._membershipsCache.set(pid, members);
               // Send members back; webview appends to tooltip
               const byRole = groupMembersByRole(members);
@@ -1838,9 +1813,9 @@ export class GanttPanel {
   }
 
   public dispose(): void {
+    if (this._disposed) return; // onDidDispose re-entry guard
     this._disposed = true; // Prevent late webview access from async ops
     GanttPanel.currentPanel = undefined;
-    this._debouncedCollapseUpdate.cancel();
     this._panel.dispose();
     while (this._disposables.length) {
       const x = this._disposables.pop();
@@ -3060,8 +3035,6 @@ export class GanttPanel {
       minimapHeight,
       minimapBarHeight,
       minimapTodayX: Math.round(todayX),
-      extScrollLeft: this._scrollPosition.left,
-      extScrollTop: this._scrollPosition.top,
       labelWidth,
       leftExtrasWidth: resizeHandleWidth + extraColumnsWidth,
       sortBy: this._sortBy,
@@ -3543,9 +3516,6 @@ export class GanttPanel {
   }
 }
 
-function getNonce(): string {
-  return crypto.randomBytes(16).toString("base64");
-}
 
 
 

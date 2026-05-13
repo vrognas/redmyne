@@ -13,6 +13,7 @@ import { generateTempId, generateDraftId } from "../draft-mode/draft-operation";
 import { DRAFT_COMMAND_SOURCE } from "../draft-mode/draft-change-sources";
 import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "../utilities/flexibility-calculator";
 import { parseLocalDate, getLocalToday } from "../utilities/date-utils";
+import { getNonce } from "../utilities/webview-nonce";
 import { pickIssue } from "../utilities/issue-picker";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import {
@@ -96,6 +97,7 @@ export class TimeSheetPanel {
   private _activitiesByProject: Map<number, ActivityOption[]> = new Map();
   private _issueDetailsCache: Map<number, IssueDetails> = new Map();
   private _disposables: vscode.Disposable[] = [];
+  private _disposed = false;
   private _schedule: WeeklySchedule = DEFAULT_WEEKLY_SCHEDULE;
   private _sortColumn: SortColumn = null;
   private _sortDirection: SortDirection = "asc";
@@ -275,6 +277,8 @@ export class TimeSheetPanel {
   }
 
   private _dispose(): void {
+    if (this._disposed) return; // onDidDispose re-entry guard
+    this._disposed = true;
     TimeSheetPanel.currentPanel = undefined;
     this._panel.dispose();
     for (const d of this._disposables) {
@@ -2374,7 +2378,7 @@ export class TimeSheetPanel {
     const weekSelectJsUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this._extensionUri, "media", "flatpickr-weekSelect.js")
     );
-    const nonce = this._getNonce();
+    const nonce = getNonce();
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -2474,12 +2478,4 @@ export class TimeSheetPanel {
 </html>`;
   }
 
-  private _getNonce(): string {
-    let text = "";
-    const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    for (let i = 0; i < 32; i++) {
-      text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-    return text;
-  }
 }
