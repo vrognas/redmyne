@@ -79,7 +79,7 @@ let cleanupResources: {
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   // Run migration from redmine.* to redmyne.* namespace (one-time on upgrade)
-  runMigration(context);
+  await runMigration(context);
 
   // Initialize recent issues tracker
   initRecentIssues(context);
@@ -455,6 +455,18 @@ export function deactivate(): void {
   // Cancel pending debounced config change
   cleanupResources.debouncedConfigChange?.cancel();
 
+  // Dispose views BEFORE their providers (views subscribe to provider
+  // EventEmitters; disposing providers first can throw on unsubscribe).
+  if (cleanupResources.projectsTreeView) {
+    cleanupResources.projectsTreeView.dispose();
+  }
+  if (cleanupResources.myTimeEntriesTreeView) {
+    cleanupResources.myTimeEntriesTreeView.dispose();
+  }
+  if (cleanupResources.kanbanTreeView) {
+    cleanupResources.kanbanTreeView.dispose();
+  }
+
   // Dispose tree providers
   if (cleanupResources.projectsTree) {
     cleanupResources.projectsTree.dispose();
@@ -462,20 +474,16 @@ export function deactivate(): void {
   if (cleanupResources.myTimeEntriesTree) {
     cleanupResources.myTimeEntriesTree.dispose();
   }
-
-  // Dispose tree view instances
-  if (cleanupResources.projectsTreeView) {
-    cleanupResources.projectsTreeView.dispose();
-  }
-  if (cleanupResources.myTimeEntriesTreeView) {
-    cleanupResources.myTimeEntriesTreeView.dispose();
-  }
-  // Dispose kanban resources
-  if (cleanupResources.kanbanTreeView) {
-    cleanupResources.kanbanTreeView.dispose();
-  }
   if (cleanupResources.kanbanTreeProvider) {
     cleanupResources.kanbanTreeProvider.dispose();
+  }
+
+  // Dispose kanban controller and status bar
+  if (cleanupResources.kanbanController) {
+    cleanupResources.kanbanController.dispose();
+  }
+  if (cleanupResources.kanbanStatusBar) {
+    cleanupResources.kanbanStatusBar.dispose();
   }
 
   // Dispose status bar
@@ -489,6 +497,15 @@ export function deactivate(): void {
   // Dispose draft mode resources
   if (cleanupResources.draftModeStatusBar) {
     cleanupResources.draftModeStatusBar.dispose();
+  }
+  if (cleanupResources.draftModeServer instanceof LoggingRedmineServer) {
+    cleanupResources.draftModeServer.dispose();
+  }
+  if (cleanupResources.draftQueue) {
+    cleanupResources.draftQueue.dispose();
+  }
+  if (cleanupResources.draftModeManager) {
+    cleanupResources.draftModeManager.dispose();
   }
 
   // Dispose and clear bucket servers

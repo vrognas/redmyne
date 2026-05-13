@@ -59,6 +59,7 @@ const hoisted = vi.hoisted(() => {
     initialize: vi.fn().mockResolvedValue(undefined),
     disable: vi.fn().mockResolvedValue(undefined),
     setQueue: vi.fn(),
+    dispose: vi.fn(),
   };
   let draftModeCtorOptions:
     | {
@@ -570,6 +571,11 @@ describe("extension lifecycle", () => {
       webview: {},
     } as unknown as vscode.WebviewPanel);
 
+    const treeViewDisposeOrder = hoisted.projectsTreeView.dispose.mock
+      .invocationCallOrder[0];
+    const treeProviderDisposeOrder = hoisted.projectsTree.dispose.mock
+      .invocationCallOrder[0];
+
     deactivate();
 
     expect(hoisted.projectsTree.dispose).toHaveBeenCalled();
@@ -578,9 +584,23 @@ describe("extension lifecycle", () => {
     expect(hoisted.myTimeEntriesTreeView.dispose).toHaveBeenCalled();
     expect(hoisted.kanbanTreeView.dispose).toHaveBeenCalled();
     expect(hoisted.kanbanTreeProvider.dispose).toHaveBeenCalled();
+    expect(hoisted.kanbanController.dispose).toHaveBeenCalled();
+    expect(hoisted.kanbanStatusBar.dispose).toHaveBeenCalled();
     expect(hoisted.workloadStatusBar.dispose).toHaveBeenCalled();
     expect(hoisted.disposeStatusBar).toHaveBeenCalled();
     expect(hoisted.draftModeStatusBar.dispose).toHaveBeenCalled();
+    expect(hoisted.draftQueue.dispose).toHaveBeenCalled();
+    expect(hoisted.draftModeManager.dispose).toHaveBeenCalled();
+
+    // Tree VIEW must be disposed before its provider; views subscribe to
+    // provider EventEmitters and disposing the provider first throws.
+    const viewOrder = hoisted.projectsTreeView.dispose.mock
+      .invocationCallOrder.at(-1) as number;
+    const providerOrder = hoisted.projectsTree.dispose.mock
+      .invocationCallOrder.at(-1) as number;
+    expect(viewOrder).toBeLessThan(providerOrder);
+    expect(treeViewDisposeOrder).toBeUndefined();
+    expect(treeProviderDisposeOrder).toBeUndefined();
   });
 
   it("reacts to secret/config changes and disposes logging servers", async () => {
