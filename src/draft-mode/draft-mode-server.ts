@@ -8,7 +8,8 @@ import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import type { Issue } from "../redmine/models/issue";
 import type { TimeEntry } from "../redmine/models/time-entry";
 import type { Version } from "../redmine/models/version";
-import type { QuickUpdate, QuickUpdateResult } from "../controllers/domain";
+import type { QuickUpdate } from "../controllers/domain";
+import { QuickUpdateResult } from "../controllers/domain";
 import type { DraftQueue } from "./draft-queue";
 import type { DraftModeManager } from "./draft-mode-manager";
 import type { DraftOperation, DraftOperationType, HttpMethod } from "./draft-operation";
@@ -362,8 +363,8 @@ export class DraftModeServer implements IRedmineServer {
       await this.queue.add(op);
     }
 
-    // Return success stub
-    return { differences: [] } as unknown as QuickUpdateResult;
+    // Return a real (empty-differences) result so callers can invoke isSuccessful()
+    return new QuickUpdateResult();
   }
 
   // ============ Time Entry Methods ============

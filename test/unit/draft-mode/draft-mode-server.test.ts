@@ -476,6 +476,22 @@ describe("DraftModeServer", () => {
       expect(innerServer.applyQuickUpdate).toHaveBeenCalled();
       expect(queue.add).not.toHaveBeenCalled();
     });
+
+    it("returns a real QuickUpdateResult so callers can invoke isSuccessful()", async () => {
+      const manager = createMockManager(true);
+      const server = new DraftModeServer(innerServer, queue, manager);
+
+      const result = await server.applyQuickUpdate({
+        issueId: 123,
+        status: { statusId: 2, name: "In Progress" },
+        assignee: { id: 5, name: "John" },
+      });
+
+      // Regression: stub used to be `{ differences: [] } as unknown as QuickUpdateResult`,
+      // which crashed callers that invoked `.isSuccessful()`.
+      expect(typeof result.isSuccessful).toBe("function");
+      expect(result.isSuccessful()).toBe(true);
+    });
   });
 
   describe("options passthrough", () => {
