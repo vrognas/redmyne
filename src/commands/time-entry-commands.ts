@@ -208,8 +208,12 @@ export function registerTimeEntryCommands(
           if (input === undefined) return;
           await server.updateTimeEntry(entry.id, { comments: input });
         } else if (choice.field === "activity") {
+          if (!entry.issue?.id) {
+            vscode.window.showErrorMessage("No issue linked to this time entry");
+            return;
+          }
           // Need to fetch activities for this issue's project
-          const issueResult = await server.getIssueById(entry.issue?.id || 0);
+          const issueResult = await server.getIssueById(entry.issue.id);
           const projectId = issueResult.issue.project?.id;
           if (!projectId) {
             vscode.window.showErrorMessage("Could not determine project");
