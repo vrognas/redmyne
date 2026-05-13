@@ -230,6 +230,7 @@ describe("createConfiguredCommandRegistrar", () => {
     const matchingServer = makeServer(true);
     const otherServer = makeServer(false);
     const candidateServer = makeServer(false);
+    const disposeServer = vi.fn();
     const bucket = { servers: [matchingServer, otherServer] };
 
     vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(
@@ -245,7 +246,7 @@ describe("createConfiguredCommandRegistrar", () => {
       createServer: vi.fn().mockReturnValue(candidateServer),
       bucket,
       maxServerCacheSize: 3,
-      disposeServer: vi.fn(),
+      disposeServer,
     });
 
     register("sample", action);
@@ -254,6 +255,8 @@ describe("createConfiguredCommandRegistrar", () => {
 
     expect(bucket.servers).toEqual([otherServer, matchingServer]);
     expect(action).toHaveBeenCalledTimes(1);
+    // Freshly-built duplicate must be disposed to free background timers.
+    expect(disposeServer).toHaveBeenCalledWith(candidateServer);
 
     const [calledProps, contextArg, trailingArg] = action.mock.calls[0];
     expect(calledProps).toEqual(

@@ -93,6 +93,9 @@ export function createConfiguredCommandRegistrar(
       }
       deps.bucket.servers.push(server);
     } else {
+      // Discard the freshly-built duplicate so any background timers it
+      // holds (e.g. LoggingRedmineServer's cleanup interval) get released.
+      deps.disposeServer(redmineServer);
       // Move to end (most recently used).
       const index = deps.bucket.servers.indexOf(fromBucket);
       if (index > -1) {
