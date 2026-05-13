@@ -11,8 +11,8 @@
     "url": "https://github.com/vrognas/redmyne.git"
   },
   "engines": {
-    "vscode": "^1.105.0",
-    "positron": "^2025.12.0",
+    "vscode": "^1.109.0",
+    "positron": "^2026.04.0",
     "node": ">=20.0.0"
   },
   "categories": [
@@ -2153,7 +2153,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@types/node": "^25.3.5",
-    "@types/vscode": "~1.105.0",
+    "@types/vscode": "~1.109.0",
     "@vitest/coverage-v8": "^4.1.6",
     "esbuild": "^0.27.2",
     "eslint": "^9.39.2",
