@@ -7,6 +7,45 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.21.0]
+
+### Performance
+
+- **Gantt view-switch no longer freezes the UI** — the ~5-7s lockup when switching to a 1000+ row "By Project" view came from `initializeGantt` attaching per-element listeners on `.drag-handle`, `.bar-outline`, and `.issue-bar` (~6K listeners per render). Converted to delegated handlers on `document`; the existing `_ganttCleanup` registry now also removes them on re-render
+- **Gantt person view** no longer re-runs the day-by-day capacity simulator twice per render (`calculateScheduledCapacityByZoom` was duplicating the work already done to build `issueScheduleMap`). ~50-80ms saved per render with 100 schedulable issues
+- **`actualTimeEntries`** pre-inverted to `Map<date, Entry[]>` once per simulation; previously every past day walked the full per-issue Map (~9K Map.get calls per render returning mostly undefined)
+- **`WeeklySchedule` cache keys** memoized via WeakMap, eliminating ~600 `JSON.stringify` calls per flexibility refresh
+- **Project-children parent map** in Gantt view filter cached by `projects` reference instead of rebuilt per render
+- **`isAdHoc()`** now reads a cached `Set` invalidated via `onDidChangeConfiguration` instead of a fresh config read on every call (called per row in Gantt render and per time entry in contributions)
+- **Kanban timer tick** decoupled from the tree refresh: countdown frames fire a new `_onTimerTick` event that only the status bar listens to; tree + context-sync stay on `_onTasksChange` and skip the per-second work
+- **Projects tree refresh** dropped from O(N²) to O(N) by precomputing `projectsByParent: Map<id, children>` once instead of `.filter(this.projects)` per `countIssuesWithSubprojects` call
+- **`perfDebug` flag** pinned at render entry so the ~17 `perfStart`/`perfEnd` call sites inside `_getRenderPayload` stop hitting vscode config on each call
+- **`updateIssues` cold-start fetches** (`getIssueStatuses`, `getCurrentUser`, time entries) now run via `Promise.all` instead of serialized awaits; saves ~100-300ms on first open / fresh project switch
+- **`GanttPanel._membershipsCache` removed** — was shadowing `RedmineServer.membershipsCache` (which already dedupes in-flight requests and is shared with `ProjectsTree`)
+
+### Fixed
+
+- **Gantt: quick-create version** triggered `redmyne.refreshGantt`, which does not exist — Gantt never refreshed after milestone creation. Now correctly dispatches `redmyne.refreshGanttData`
+- **Ad-hoc time entries: contribution target replacement** failed silently on multi-line comments (regex `/#\d+.*$/` couldn't span newlines and required end-of-string anchor). Switched to `/#\d+[^\n]*/`
+- **First-launch migration** is now awaited during activation; previously raced with `initRecentIssues`, `loadMonthlySchedules`, and `DraftModeManager.initialize` writing to overlapping `globalState` keys on fresh upgrades
+- **Bulk %-done update** previously fired `setInternalEstimate` calls in parallel against a single `globalState` key; all but the last write silently lost. Now serialized
+- **Logging server** per-command leak — `configured-command-registrar` built a fresh `LoggingRedmineServer` per invocation and dropped it without `dispose()` when an equivalent cached one existed. Each leak left an active 30s cleanup interval
+- **Extension deactivation** now disposes tree views before their providers (views subscribe to provider EventEmitters and disposing the provider first could throw), and disposes the previously-leaked `kanbanController`, `kanbanStatusBar`, `draftQueue`, `draftModeManager`, and `draftModeServer`
+- **Webview panel re-entry** — `dispose()` now early-returns if already disposed, preventing re-entry through `onDidDispose`. The `requestProjectMembers` `.then` is also guarded against writes to a disposed panel
+
+### Changed
+
+- **Engine floor raised** — `engines.vscode` `^1.105.0 → ^1.109.0`, `engines.positron` `^2025.12.0 → ^2026.04.0`. Users on older VS Code versions will no longer be able to install via the Marketplace listing. `@types/vscode` aligned with the floor
+
+### Internal
+
+- Dead webview message types (`scrollPosition`, `openProjectInBrowser`, `setIssueStatus`, `setIssuePriority`, `setAllProjectsVisibility`, `setDoneRatio.value`, `extendedRelationTypes`) and matching handlers removed
+- Duplicate `draftBadge` click handler removed
+- Unused `_debouncedCollapseUpdate` + `COLLAPSE_DEBOUNCE_MS` deleted
+- `getNonce` extracted to `utilities/webview-nonce.ts`; timesheet panel's `Math.random` nonce replaced with the crypto-backed one (CSP requires a CSPRNG)
+- `buildWeekInfo` reuses `formatLocalDate` + `getISOWeekNumber` from `date-utils` instead of three local re-implementations
+- `_currentUserId` dropped from capacity cache key (pinned per session, redundant)
+
 ## [4.20.2]
 
 ### Fixed
