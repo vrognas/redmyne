@@ -1,8 +1,8 @@
 # Redmyne
 
-![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/vrognas/redmyne/ci.yml)
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/vrognas/vrognas-redmyne/ci.yml)
 ![Visual Studio Marketplace Downloads](https://img.shields.io/visual-studio-marketplace/d/vrognas.redmyne)
-![GitHub License](https://img.shields.io/github/license/vrognas/redmyne)
+![GitHub License](https://img.shields.io/github/license/vrognas/vrognas-redmyne)
 
 **Personal workload management for Redmine** — log time, track capacity, stay in flow.
 
@@ -320,4 +320,4 @@ Logo remixed from Redmine Logo © 2009 Martin Herr ([CC BY-SA 2.5](http://creati
 
 </details>
 
-[Changelog](./CHANGELOG.md) · [Issues](https://github.com/vrognas/redmyne/issues)
+[Changelog](./CHANGELOG.md) · [Issues](https://github.com/vrognas/vrognas-redmyne/issues)
