@@ -1,14 +1,42 @@
 import * as vscode from "vscode";
 
 const SETTING_KEY = "adHocBudgetIssues";
+const FULL_SETTING_KEY = `redmyne.${SETTING_KEY}`;
 
-function getIds(): number[] {
-  return vscode.workspace.getConfiguration("redmyne").get<number[]>(SETTING_KEY, []);
+// Cached set of ad-hoc IDs. Reading vscode config is non-trivial and
+// isAdHoc() is called from inside hot loops (per-row Gantt render,
+// per-time-entry contribution calc). Cache and invalidate on config change.
+let cachedIds: Set<number> | undefined;
+
+function loadIds(): Set<number> {
+  const arr = vscode.workspace
+    .getConfiguration("redmyne")
+    .get<number[]>(SETTING_KEY, []);
+  return new Set(arr);
+}
+
+function getIdsSet(): Set<number> {
+  if (!cachedIds) cachedIds = loadIds();
+  return cachedIds;
+}
+
+function getIdsArray(): number[] {
+  return [...getIdsSet()];
 }
 
 async function setIds(ids: number[]): Promise<void> {
-  await vscode.workspace.getConfiguration("redmyne").update(SETTING_KEY, ids, vscode.ConfigurationTarget.Global);
+  await vscode.workspace
+    .getConfiguration("redmyne")
+    .update(SETTING_KEY, ids, vscode.ConfigurationTarget.Global);
+  cachedIds = new Set(ids);
 }
+
+// Listen for external config changes (Settings UI, sync, draft mode).
+vscode.workspace.onDidChangeConfiguration((e) => {
+  if (e.affectsConfiguration(FULL_SETTING_KEY)) {
+    cachedIds = undefined;
+  }
+});
 
 class AdHocTracker {
   private _queue: Promise<void> = Promise.resolve();
@@ -20,36 +48,36 @@ class AdHocTracker {
   }
 
   isAdHoc(issueId: number): boolean {
-    return getIds().includes(issueId);
+    return getIdsSet().has(issueId);
   }
 
   tag(issueId: number): Promise<void> {
     return this.enqueue(async () => {
-      const ids = getIds();
+      const ids = getIdsArray();
       if (!ids.includes(issueId)) await setIds([...ids, issueId]);
     });
   }
 
   untag(issueId: number): Promise<void> {
     return this.enqueue(async () => {
-      await setIds(getIds().filter((id) => id !== issueId));
+      await setIds(getIdsArray().filter((id) => id !== issueId));
     });
   }
 
   toggle(issueId: number): Promise<boolean> {
     return this.enqueue(async () => {
       if (this.isAdHoc(issueId)) {
-        await setIds(getIds().filter((id) => id !== issueId));
+        await setIds(getIdsArray().filter((id) => id !== issueId));
         return false;
       } else {
-        await setIds([...getIds(), issueId]);
+        await setIds([...getIdsArray(), issueId]);
         return true;
       }
     });
   }
 
   getAll(): number[] {
-    return getIds();
+    return getIdsArray();
   }
 }
 

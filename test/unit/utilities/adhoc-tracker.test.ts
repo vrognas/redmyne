@@ -8,6 +8,7 @@ vi.mock("vscode", () => ({
       get: vi.fn((_key: string, def?: unknown) => stored.length > 0 ? [...stored] : def),
       update: vi.fn(async (_key: string, value: number[]) => { stored = value; }),
     })),
+    onDidChangeConfiguration: vi.fn(() => ({ dispose: vi.fn() })),
   },
   ConfigurationTarget: { Global: 1 },
 }));
