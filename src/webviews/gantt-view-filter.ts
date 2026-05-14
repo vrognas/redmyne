@@ -98,22 +98,30 @@ export function filterIssuesForView(options: {
   };
 }
 
-function collectProjectIds(projects: RedmineProject[], rootId: number): Set<number> {
-  // Build parent-to-children map once: O(n)
-  const childrenMap = new Map<number, number[]>();
+// Parent→children lookup is identical across renders for the same projects
+// array. Cache by reference so we don't rebuild a 50-entry Map per render.
+const projectChildrenCache = new WeakMap<RedmineProject[], Map<number, number[]>>();
+function getProjectChildrenMap(projects: RedmineProject[]): Map<number, number[]> {
+  let map = projectChildrenCache.get(projects);
+  if (map !== undefined) return map;
+  map = new Map<number, number[]>();
   for (const project of projects) {
     const parentId = project.parent?.id;
     if (parentId !== undefined) {
-      const children = childrenMap.get(parentId);
+      const children = map.get(parentId);
       if (children) {
         children.push(project.id);
       } else {
-        childrenMap.set(parentId, [project.id]);
+        map.set(parentId, [project.id]);
       }
     }
   }
+  projectChildrenCache.set(projects, map);
+  return map;
+}
 
-  // Traverse using map: O(n) total
+function collectProjectIds(projects: RedmineProject[], rootId: number): Set<number> {
+  const childrenMap = getProjectChildrenMap(projects);
   const projectIds = new Set<number>();
   const stack = [rootId];
   while (stack.length > 0) {
@@ -125,6 +133,5 @@ function collectProjectIds(projects: RedmineProject[], rootId: number): Set<numb
       stack.push(...children);
     }
   }
-
   return projectIds;
 }
