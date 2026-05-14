@@ -57,6 +57,19 @@ export interface FlexibilityIssue {
 // Memoization cache for working days calculation
 const workingDaysCache = new Map<string, number>();
 
+// Schedule reference identity → stable string key. JSON.stringify(schedule)
+// per call costs measurable time when countWorkingDays runs N times per
+// flexibility refresh; the schedule reference is stable per session.
+const scheduleKeyCache = new WeakMap<WeeklySchedule, string>();
+function getScheduleKey(schedule: WeeklySchedule): string {
+  let key = scheduleKeyCache.get(schedule);
+  if (key === undefined) {
+    key = JSON.stringify(schedule);
+    scheduleKeyCache.set(schedule, key);
+  }
+  return key;
+}
+
 /**
  * Calculate flexibility score for an issue.
  * Returns null if issue lacks required data (due_date, estimated_hours).
@@ -155,7 +168,7 @@ export function countWorkingDays(
   end: Date,
   schedule: WeeklySchedule
 ): number {
-  const key = `${start.toISOString().split("T")[0]}_${end.toISOString().split("T")[0]}_${JSON.stringify(schedule)}`;
+  const key = `${start.toISOString().split("T")[0]}_${end.toISOString().split("T")[0]}_${getScheduleKey(schedule)}`;
 
   if (workingDaysCache.has(key)) {
     return workingDaysCache.get(key)!;
@@ -206,7 +219,7 @@ export function countAvailableHours(
   end: Date,
   schedule: WeeklySchedule
 ): number {
-  const key = `hours_${start.toISOString().split("T")[0]}_${end.toISOString().split("T")[0]}_${JSON.stringify(schedule)}`;
+  const key = `hours_${start.toISOString().split("T")[0]}_${end.toISOString().split("T")[0]}_${getScheduleKey(schedule)}`;
 
   if (workingDaysCache.has(key)) {
     return workingDaysCache.get(key)!;
