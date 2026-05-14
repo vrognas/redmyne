@@ -73,6 +73,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   private issueSort: SortConfig<IssueSortField> | null = null; // null = use risk sorting
   private issuesByProject = new Map<number, Issue[]>();
   private issuesByParent = new Map<number, Issue[]>(); // parent issue ID → child issues
+  private projectsByParent = new Map<number, RedmineProject[]>(); // parent project ID → child projects
   private flexibilityCache = new Map<number, FlexibilityScore | null>();
   private globalState?: vscode.Memento;
 
@@ -218,10 +219,9 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
     if (projectOrIssue && isProjectNode(projectOrIssue)) {
       const { project, assignedIssues, hasAssignedIssues } = projectOrIssue;
 
-      // Get subprojects if in tree view mode
+      // Get subprojects if in tree view mode (O(1) lookup via projectsByParent)
       const subprojects = this.viewStyle === ProjectsViewStyle.TREE
-        ? (this.projects ?? [])
-            .filter((p) => p.parent && p.parent.id === project.id)
+        ? (this.projectsByParent.get(project.id) ?? [])
             .map((p) => this.createProjectNode(p))
         : [];
 
@@ -294,6 +294,13 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
           (issue) => issue.parent!.id
         );
 
+        // Build parent→children project map once so countIssuesWithSubprojects
+        // is O(1) per lookup instead of filtering this.projects per call.
+        this.projectsByParent = groupBy(
+          this.projects.filter((p) => p.parent?.id),
+          (p) => p.parent!.id
+        );
+
         this.projectNodes = this.projects.map((p) => this.createProjectNode(p));
 
         // Await dependency fetch (likely already done while we grouped)
@@ -313,11 +320,13 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   }
 
   /**
-   * Count issues recursively including subprojects
+   * Count issues recursively including subprojects.
+   * Uses projectsByParent for O(N) total work across all projects (was
+   * O(N²) when each call re-filtered this.projects).
    */
   private countIssuesWithSubprojects(projectId: number): number {
     const direct = this.issuesByProject.get(projectId)?.length || 0;
-    const subprojects = (this.projects || []).filter((p) => p.parent?.id === projectId);
+    const subprojects = this.projectsByParent.get(projectId) ?? [];
     const subCount = subprojects.reduce(
       (sum, sub) => sum + this.countIssuesWithSubprojects(sub.id),
       0
@@ -472,6 +481,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
     this.dependencyIssues = [];
     this.issuesByProject.clear();
     this.issuesByParent.clear();
+    this.projectsByParent.clear();
     this.flexibilityCache.clear();
     // Also clear server's project cache so next fetch gets fresh data
     this.server?.clearProjectsCache();
