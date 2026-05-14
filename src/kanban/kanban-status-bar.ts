@@ -22,9 +22,10 @@ export class KanbanStatusBar {
     this.statusBarItem.name = "Redmyne Kanban Timer";
     this.statusBarItem.command = "redmyne.kanban.toggleTimer";
 
-    // Subscribe to state changes
+    // Subscribe to both data mutations and per-second timer ticks.
     this.disposables.push(
-      controller.onTasksChange(() => this.update())
+      controller.onTasksChange(() => this.update()),
+      controller.onTimerTick(() => this.update())
     );
 
     // Initial render

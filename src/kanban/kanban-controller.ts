@@ -38,8 +38,16 @@ export class KanbanController {
   private breakSecondsLeft: number = 0;
   private deferredMinutes: number = 0;
 
+  // Data-mutation event (task added/moved/edited/etc). Heavy subscribers
+  // (tree provider, context sync) listen here.
   private readonly _onTasksChange = new vscode.EventEmitter<void>();
   readonly onTasksChange = this._onTasksChange.event;
+
+  // Per-second timer countdown event. Only the status bar listens — the
+  // tree and context state never change between ticks, so they stay
+  // subscribed to onTasksChange and skip the per-second work.
+  private readonly _onTimerTick = new vscode.EventEmitter<void>();
+  readonly onTimerTick = this._onTimerTick.event;
 
   private readonly _onTimerComplete = new vscode.EventEmitter<KanbanTask>();
   readonly onTimerComplete = this._onTimerComplete.event;
@@ -61,6 +69,7 @@ export class KanbanController {
     this.stopInterval();
     this.stopBreakInterval();
     this._onTasksChange.dispose();
+    this._onTimerTick.dispose();
     this._onTimerComplete.dispose();
     this._onBreakComplete.dispose();
   }
@@ -556,15 +565,17 @@ export class KanbanController {
       };
       this.stopInterval();
       this._onTimerComplete.fire(this.tasks[activeIndex]);
+      // Timer completion changes task state, so notify data subscribers.
+      this._onTasksChange.fire();
     } else {
       this.tasks[activeIndex] = {
         ...task,
         timerSecondsLeft: secondsLeft - 1,
         lastActiveAt: new Date().toISOString(),
       };
+      // Countdown only — only the status bar needs to repaint.
+      this._onTimerTick.fire();
     }
-
-    this._onTasksChange.fire();
   }
 
   // --- Break Timer ---
@@ -603,11 +614,13 @@ export class KanbanController {
       this.breakSecondsLeft = 0;
       this.stopBreakInterval();
       this._onBreakComplete.fire();
+      // Break end transitions state for tree/context subscribers too.
+      this._onTasksChange.fire();
     } else {
       this.breakSecondsLeft--;
+      // Countdown only — only the status bar needs to repaint.
+      this._onTimerTick.fire();
     }
-
-    this._onTasksChange.fire();
   }
 
   // --- Persistence ---

@@ -22,6 +22,7 @@ function createMockController(overrides: Partial<{
   const config = { ...defaults, ...overrides };
 
   const listeners: Array<() => void> = [];
+  const tickListeners: Array<() => void> = [];
 
   return {
     getTasks: vi.fn(() => config.tasks),
@@ -34,7 +35,12 @@ function createMockController(overrides: Partial<{
       listeners.push(listener);
       return { dispose: vi.fn() };
     }),
+    onTimerTick: vi.fn((listener: () => void) => {
+      tickListeners.push(listener);
+      return { dispose: vi.fn() };
+    }),
     _fireChange: () => listeners.forEach((l) => l()),
+    _fireTick: () => tickListeners.forEach((l) => l()),
   };
 }
 
