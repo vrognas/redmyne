@@ -13,6 +13,7 @@ import { buildProjectHierarchy, buildResourceHierarchy, flattenHierarchyAll, Hie
 import { ProjectHealth } from "../utilities/project-health";
 import { buildDependencyGraph, resetDownstreamCountCache } from "../utilities/dependency-graph";
 import {
+  aggregateScheduledByZoom,
   calculateScheduledCapacity,
   calculateScheduledCapacityByZoom,
   type CapacityZoomLevel,
@@ -2041,11 +2042,14 @@ export class GanttPanel {
     const dayScheduleMap = new Map<string, { issueId: number; hours: number; project: string }[]>();
     // Always build issueScheduleMap in person view for instant intensity toggle
     const shouldBuildIssueScheduleMap = this._viewFocus === "person";
+    // Shared between the breakdown loop and the capacity-ribbon aggregator
+    // below so the day-by-day simulator only runs once per render.
+    let scheduledDays: ScheduledDailyCapacity[] | undefined;
     if (this._viewFocus === "person") {
       // Get today's date for past/future split in capacity calculation
       const todayStr = getTodayStr();
       perfStart("calculateScheduledCapacity");
-      const scheduledDays: ScheduledDailyCapacity[] = calculateScheduledCapacity(
+      scheduledDays = calculateScheduledCapacity(
         filteredIssues,
         this._schedule,
         minDateStr,
@@ -2772,26 +2776,33 @@ export class GanttPanel {
     const capacityZoomLevel = this._zoomLevel as CapacityZoomLevel;
     let capacityData: PeriodCapacity[] = [];
     if (this._viewFocus === "person") {
-      const capacityCacheKey = `${this._dataRevision}-${this._viewFocus}-${this._selectedAssignee}-${filterKey}-${minDateStr}-${maxDateStr}-${capacityZoomLevel}-${this._currentUserId}-${JSON.stringify(this._schedule)}`;
+      // _currentUserId omitted: it's pinned for the session, so _dataRevision
+      // already covers any cross-user invalidation that could matter.
+      const capacityCacheKey = `${this._dataRevision}-${this._viewFocus}-${this._selectedAssignee}-${filterKey}-${minDateStr}-${maxDateStr}-${capacityZoomLevel}-${JSON.stringify(this._schedule)}`;
       if (this._capacityCache?.key === capacityCacheKey) {
         capacityData = this._capacityCache.data;
       } else {
-        perfStart("calculateScheduledCapacityByZoom");
-        capacityData = calculateScheduledCapacityByZoom(
-          filteredIssues,
-          this._schedule,
-          minDateStr,
-          maxDateStr,
-          depGraph,
-          internalEstimates,
-          capacityZoomLevel,
-          this._currentUserId ?? undefined,
-          issueMap,
-          precedenceIssues,
-          this._actualTimeEntries,
-          getTodayStr()
-        );
-        perfEnd("calculateScheduledCapacityByZoom");
+        perfStart("aggregateScheduledByZoom");
+        // Reuse the daily simulator output already produced above. Previously
+        // calculateScheduledCapacityByZoom ran the full simulator a second
+        // time with the identical inputs.
+        capacityData = scheduledDays
+          ? aggregateScheduledByZoom(scheduledDays, capacityZoomLevel)
+          : calculateScheduledCapacityByZoom(
+              filteredIssues,
+              this._schedule,
+              minDateStr,
+              maxDateStr,
+              depGraph,
+              internalEstimates,
+              capacityZoomLevel,
+              this._currentUserId ?? undefined,
+              issueMap,
+              precedenceIssues,
+              this._actualTimeEntries,
+              getTodayStr()
+            );
+        perfEnd("aggregateScheduledByZoom");
         this._capacityCache = { key: capacityCacheKey, data: capacityData };
       }
     }

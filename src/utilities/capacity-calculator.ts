@@ -610,6 +610,26 @@ export function calculateScheduledCapacity(
   // Track issues that have received scheduled time (for continuity bonus)
   const scheduledIssues = new Set<number>();
 
+  // Pre-invert actuals for O(1) per-day lookup. Original layout
+  // (issueId -> date -> hours) forced a full Map walk per past day; with
+  // ~100 issues × 90 lookback days that's ~9K Map.get calls, ~99% returning
+  // undefined. Single pass flips it into date -> [{issueId, hours}].
+  const actualsByDate = new Map<string, { issueId: number; hours: number }[]>();
+  if (actualTimeEntries) {
+    for (const [issueId, dateMap] of actualTimeEntries) {
+      for (const [dateStr, hours] of dateMap) {
+        if (hours > 0) {
+          let list = actualsByDate.get(dateStr);
+          if (!list) {
+            list = [];
+            actualsByDate.set(dateStr, list);
+          }
+          list.push({ issueId, hours });
+        }
+      }
+    }
+  }
+
   const result: ScheduledDailyCapacity[] = [];
   // Use parseLocalDate to avoid UTC/local timezone mismatch with getScheduledIntensity
   const current = parseLocalDate(startDate);
@@ -632,11 +652,11 @@ export function calculateScheduledCapacity(
       let availableNormal = capacityHours * PREDICTION_CAPACITY_FACTOR;
       let availableOverplan = capacityHours * OVERPLAN_CAPACITY_FACTOR;
 
-      // Step 1: Add actuals for past and today (truth)
-      if ((isPast || isToday) && actualTimeEntries) {
-        for (const [issueId, dateMap] of actualTimeEntries) {
-          const hours = dateMap.get(dateStr) ?? 0;
-          if (hours > 0) {
+      // Step 1: Add actuals for past and today (truth) — O(1) lookup
+      if (isPast || isToday) {
+        const todaysActuals = actualsByDate.get(dateStr);
+        if (todaysActuals) {
+          for (const { issueId, hours } of todaysActuals) {
             const issue = issueMap.get(issueId);
             const isSlippage = issue?.due_date ? dateStr > issue.due_date : false;
             breakdown.push({
@@ -725,38 +745,15 @@ export function calculateScheduledCapacity(
 }
 
 /**
- * Aggregate scheduled capacity by zoom level.
- * Wraps calculateScheduledCapacity and aggregates results.
+ * Aggregate already-computed daily capacity data by zoom level.
+ * Callers that already produced the daily slice (e.g. Gantt panel building
+ * the issueScheduleMap) should call this directly to avoid re-running the
+ * full day-by-day simulator a second time.
  */
-export function calculateScheduledCapacityByZoom(
-  issues: Issue[],
-  schedule: WeeklySchedule,
-  startDate: string,
-  endDate: string,
-  graph: DependencyGraph,
-  internalEstimates: InternalEstimates,
-  zoomLevel: CapacityZoomLevel,
-  myUserId?: number,
-  allIssuesMap?: Map<number, Issue>,
-  precedenceIssues?: Set<number>,
-  actualTimeEntries?: ActualTimeEntries,
-  today?: string
+export function aggregateScheduledByZoom(
+  dailyData: ScheduledDailyCapacity[],
+  zoomLevel: CapacityZoomLevel
 ): PeriodCapacity[] {
-  // Get daily scheduled capacity first
-  const dailyData = calculateScheduledCapacity(
-    issues,
-    schedule,
-    startDate,
-    endDate,
-    graph,
-    internalEstimates,
-    myUserId,
-    allIssuesMap,
-    precedenceIssues,
-    actualTimeEntries,
-    today
-  );
-
   if (dailyData.length === 0) {
     return [];
   }
@@ -773,17 +770,17 @@ export function calculateScheduledCapacityByZoom(
     }));
   }
 
-  // Group days by period key (reusing existing logic)
+  // Group days by period key
   const periodGroups = new Map<string, ScheduledDailyCapacity[]>();
-
   for (const day of dailyData) {
     const date = new Date(day.date + "T00:00:00Z");
     const key = getPeriodKey(date, zoomLevel);
-
-    if (!periodGroups.has(key)) {
-      periodGroups.set(key, []);
+    let group = periodGroups.get(key);
+    if (!group) {
+      group = [];
+      periodGroups.set(key, group);
     }
-    periodGroups.get(key)!.push(day);
+    group.push(day);
   }
 
   // Aggregate each period
@@ -791,9 +788,41 @@ export function calculateScheduledCapacityByZoom(
   for (const days of periodGroups.values()) {
     periods.push(aggregatePeriod(days));
   }
-
-  // Sort by start date
   periods.sort((a, b) => a.startDate.localeCompare(b.startDate));
-
   return periods;
+}
+
+/**
+ * Aggregate scheduled capacity by zoom level.
+ * Convenience wrapper: computes daily data and aggregates in one call.
+ * Prefer aggregateScheduledByZoom if the daily slice is already available.
+ */
+export function calculateScheduledCapacityByZoom(
+  issues: Issue[],
+  schedule: WeeklySchedule,
+  startDate: string,
+  endDate: string,
+  graph: DependencyGraph,
+  internalEstimates: InternalEstimates,
+  zoomLevel: CapacityZoomLevel,
+  myUserId?: number,
+  allIssuesMap?: Map<number, Issue>,
+  precedenceIssues?: Set<number>,
+  actualTimeEntries?: ActualTimeEntries,
+  today?: string
+): PeriodCapacity[] {
+  const dailyData = calculateScheduledCapacity(
+    issues,
+    schedule,
+    startDate,
+    endDate,
+    graph,
+    internalEstimates,
+    myUserId,
+    allIssuesMap,
+    precedenceIssues,
+    actualTimeEntries,
+    today
+  );
+  return aggregateScheduledByZoom(dailyData, zoomLevel);
 }
