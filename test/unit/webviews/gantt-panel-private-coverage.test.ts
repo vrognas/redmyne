@@ -402,6 +402,7 @@ describe("gantt panel private coverage", () => {
     const extensionUri = vscode.Uri.parse("file:///ext");
     const server = {
       options: { address: "https://redmine.example" },
+      getCachedMemberships: vi.fn(() => undefined),
     };
 
     GanttPanel.restore(
@@ -648,6 +649,7 @@ describe("gantt panel private coverage", () => {
     const extensionUri = vscode.Uri.parse("file:///ext");
     const server = {
       options: { address: "https://redmine.example" },
+      getCachedMemberships: vi.fn(() => undefined),
     };
 
     GanttPanel.restore(
@@ -775,7 +777,7 @@ describe("gantt panel private coverage", () => {
 
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
 
-    GanttPanel.restore(mock.panel, extensionUri, () => ({ options: { address: "https://redmine.example" } }) as any);
+    GanttPanel.restore(mock.panel, extensionUri, () => ({ options: { address: "https://redmine.example" }, getCachedMemberships: () => undefined }) as any);
     const panel = GanttPanel.currentPanel as any;
     panel._issues = [
       createIssue({
@@ -884,6 +886,7 @@ describe("gantt panel private coverage", () => {
           },
         ],
       }),
+      getCachedMemberships: vi.fn(() => undefined),
     };
     vi.spyOn(adHocTracker, "isAdHoc").mockImplementation((issueId: number) => issueId === 900);
 

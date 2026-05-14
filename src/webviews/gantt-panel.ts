@@ -3,7 +3,7 @@ import { Issue, IssueRelation } from "../redmine/models/issue";
 import { Version } from "../redmine/models/version";
 import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { RedmineProject } from "../redmine/redmine-project";
-import { Membership, groupMembersByRole } from "../controllers/domain";
+import { groupMembersByRole } from "../controllers/domain";
 import { FlexibilityScore, WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE, calculateFlexibility, scaleScheduleByFte, ContributionData } from "../utilities/flexibility-calculator";
 import { calculateContributions, parseTargetIssueId } from "../utilities/contribution-calculator";
 import { adHocTracker } from "../utilities/adhoc-tracker";
@@ -49,18 +49,28 @@ import { deriveAssigneeState, filterIssuesForView } from "./gantt-view-filter";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
 import { DRAFT_COMMAND_SOURCE } from "../draft-mode/draft-change-sources";
 
-// Performance instrumentation (gated behind redmyne.gantt.perfDebug config)
+// Performance instrumentation (gated behind redmyne.gantt.perfDebug config).
+// The flag is read once at render entry and pinned for the duration of the
+// render so the 17-ish perfStart/perfEnd call sites inside hot loops don't
+// pay a vscode config lookup each. Reset between renders so toggling the
+// setting takes effect on the next render with no listener plumbing.
 const perfTimers: Map<string, number> = new Map();
+let perfDebugFlag = false;
+function refreshPerfDebugFlag(): void {
+  perfDebugFlag = vscode.workspace
+    .getConfiguration("redmyne.gantt")
+    .get<boolean>("perfDebug", false);
+}
 function isPerfDebugEnabled(): boolean {
-  return vscode.workspace.getConfiguration("redmyne.gantt").get<boolean>("perfDebug", false);
+  return perfDebugFlag;
 }
 function perfStart(name: string): void {
-  if (isPerfDebugEnabled()) {
+  if (perfDebugFlag) {
     perfTimers.set(name, performance.now());
   }
 }
 function perfEnd(name: string, extra?: string): void {
-  if (isPerfDebugEnabled()) {
+  if (perfDebugFlag) {
     const start = perfTimers.get(name);
     if (start !== undefined) {
       const duration = performance.now() - start;
@@ -173,7 +183,6 @@ export class GanttPanel {
   private _dependencyIssues: Issue[] = []; // External scheduling dependencies
   private _issueById: Map<number, Issue> = new Map(); // O(1) lookup cache
   private _projects: RedmineProject[] = [];
-  private _membershipsCache = new Map<number, Membership[]>();
   private _versions: Version[] = []; // Milestones across all projects
   private _flexibilityCache: Map<number, FlexibilityScore | null> = new Map();
   private _userFteCache: Map<number, number> = new Map(); // FTE percentages per user
@@ -709,74 +718,90 @@ export class GanttPanel {
     // Invalidate caches when data changes
     this._bumpRevision();
 
-    // Fetch closed status IDs if not cached
+    // Kick off independent cold-start fetches in parallel. Serial awaits
+    // were ~100-300ms wasted on initial open / fresh project switch.
+    const parallelFetches: Promise<unknown>[] = [];
+
     if (this._closedStatusIds.size === 0 && this._server) {
-      try {
-        const statuses = await this._server.getIssueStatuses();
-        this._closedStatusIds = new Set(
-          statuses.issue_statuses.filter(s => s.is_closed).map(s => s.id)
-        );
-      } catch {
-        // Ignore errors, just won't show closed status
-      }
+      parallelFetches.push(
+        this._server
+          .getIssueStatuses()
+          .then((statuses) => {
+            this._closedStatusIds = new Set(
+              statuses.issue_statuses.filter((s) => s.is_closed).map((s) => s.id)
+            );
+          })
+          .catch(() => {
+            // Ignore errors, just won't show closed status
+          })
+      );
     }
 
-    // Fetch current user ID for highlighting (name captured from issues later)
     if (this._currentUserId === null && this._server) {
-      try {
-        const user = await this._server.getCurrentUser();
-        if (user) {
-          this._currentUserId = user.id;
-        }
-      } catch {
-        // Ignore errors
-      }
+      parallelFetches.push(
+        this._server
+          .getCurrentUser()
+          .then((user) => {
+            if (user) this._currentUserId = user.id;
+          })
+          .catch(() => {
+            // Ignore errors
+          })
+      );
     }
 
-    // Fetch time entries for intensity calculation (person view uses actual hours for past days)
     if (this._viewFocus === "person" && this._server) {
-      try {
-        const today = getLocalToday();
-        // Fetch last 90 days of time entries for current user
-        const fromDate = new Date(today);
-        fromDate.setDate(fromDate.getDate() - 90);
-        const fromStr = formatLocalDate(fromDate);
-        const toStr = formatLocalDate(today);
+      parallelFetches.push(this._loadActualTimeEntriesForPersonView());
+    }
 
-        const { time_entries } = await this._server.getTimeEntries({ from: fromStr, to: toStr });
-
-        // Build actualTimeEntries map: issueId -> date -> hours
-        // For ad-hoc issues with target references (#1234), add hours to TARGET issue
-        this._actualTimeEntries = new Map();
-        for (const entry of time_entries) {
-          if (!entry.issue?.id || !entry.spent_on) continue;
-          const sourceIssueId = entry.issue.id;
-          const date = entry.spent_on;
-          const hours = parseFloat(entry.hours as unknown as string) || 0;
-
-          // Check if this is an ad-hoc issue contributing to another issue
-          let targetIssueId = sourceIssueId;
-          if (adHocTracker.isAdHoc(sourceIssueId)) {
-            const parsed = parseTargetIssueId(entry.comments);
-            if (parsed) {
-              targetIssueId = parsed; // Map hours to target issue
-            }
-          }
-
-          if (!this._actualTimeEntries.has(targetIssueId)) {
-            this._actualTimeEntries.set(targetIssueId, new Map());
-          }
-          const issueMap = this._actualTimeEntries.get(targetIssueId)!;
-          issueMap.set(date, (issueMap.get(date) ?? 0) + hours);
-        }
-      } catch {
-        // Ignore errors, fall back to prediction-only
-        this._actualTimeEntries = new Map();
-      }
+    if (parallelFetches.length > 0) {
+      await Promise.all(parallelFetches);
     }
 
     this._updateContent();
     void this._refreshSupplementalData();
+  }
+
+  /**
+   * Fetch the last 90 days of time entries and build actualTimeEntries map
+   * (issueId -> date -> hours). Used by person-view intensity calculation.
+   */
+  private async _loadActualTimeEntriesForPersonView(): Promise<void> {
+    if (!this._server) return;
+    try {
+      const today = getLocalToday();
+      const fromDate = new Date(today);
+      fromDate.setDate(fromDate.getDate() - 90);
+      const fromStr = formatLocalDate(fromDate);
+      const toStr = formatLocalDate(today);
+
+      const { time_entries } = await this._server.getTimeEntries({ from: fromStr, to: toStr });
+
+      // Build actualTimeEntries map: issueId -> date -> hours.
+      // For ad-hoc issues with target references (#1234), map hours to TARGET.
+      this._actualTimeEntries = new Map();
+      for (const entry of time_entries) {
+        if (!entry.issue?.id || !entry.spent_on) continue;
+        const sourceIssueId = entry.issue.id;
+        const date = entry.spent_on;
+        const hours = parseFloat(entry.hours as unknown as string) || 0;
+
+        let targetIssueId = sourceIssueId;
+        if (adHocTracker.isAdHoc(sourceIssueId)) {
+          const parsed = parseTargetIssueId(entry.comments);
+          if (parsed) targetIssueId = parsed;
+        }
+
+        if (!this._actualTimeEntries.has(targetIssueId)) {
+          this._actualTimeEntries.set(targetIssueId, new Map());
+        }
+        const issueMap = this._actualTimeEntries.get(targetIssueId)!;
+        issueMap.set(date, (issueMap.get(date) ?? 0) + hours);
+      }
+    } catch {
+      // Ignore errors, fall back to prediction-only
+      this._actualTimeEntries = new Map();
+    }
   }
 
   /**
@@ -1138,6 +1163,7 @@ export class GanttPanel {
   }
 
   private _updateContent(): void {
+    refreshPerfDebugFlag(); // Pin perfDebug for this render's many call sites
     perfStart("_updateContent");
     this._renderKey++; // Force SVG re-creation on each render
     this._queueRender(this._getRenderPayload());
@@ -1475,10 +1501,11 @@ export class GanttPanel {
           const cfg = vscode.workspace.getConfiguration("redmyne");
           const show = cfg.get<boolean>("showProjectMembers", true);
           const exclude = cfg.get<number[]>("hideProjectMembersFor", []);
-          if (show && !exclude.includes(pid) && !this._membershipsCache.has(pid)) {
+          // Server already caches + dedupes in-flight requests; just call
+          // getMemberships and let it short-circuit on cache hit.
+          if (show && !exclude.includes(pid) && !this._server.getCachedMemberships(pid)) {
             this._server.getMemberships(pid).then((members) => {
               if (this._disposed) return; // Panel closed mid-fetch
-              this._membershipsCache.set(pid, members);
               // Send members back; webview appends to tooltip
               const byRole = groupMembersByRole(members);
               const lines: string[] = [];
@@ -1824,6 +1851,7 @@ export class GanttPanel {
   }
 
   private _getRenderPayload(): GanttRenderPayload {
+    refreshPerfDebugFlag(); // Pin flag for this render's perfStart/End calls
     perfStart("_getRenderPayload");
     // Read gantt config settings
     const ganttConfig = vscode.workspace.getConfiguration("redmyne.gantt");
@@ -3415,8 +3443,9 @@ export class GanttPanel {
       tooltip += `${this.formatHealthTooltip(row.health)}\n\n`;
     }
 
-    // Members grouped by role
-    const members = this._membershipsCache.get(row.id);
+    // Members grouped by role (read from server's cache; populated lazily
+    // on hover via requestProjectMembers + eagerly by ProjectsTree preload)
+    const members = this._server?.getCachedMemberships(row.id);
     if (members && members.length > 0) {
       const byRole = groupMembersByRole(members);
       if (byRole.size > 0) {
