@@ -19,7 +19,7 @@ async function main() {
     plugins: [esbuildProblemMatcherPlugin],
   });
 
-  const webviewCtx = await esbuild.context({
+  const ganttJsCtx = await esbuild.context({
     entryPoints: ["src/webviews/gantt/index.js"],
     bundle: true,
     format: "iife",
@@ -32,11 +32,47 @@ async function main() {
     plugins: [esbuildProblemMatcherPlugin],
   });
 
+  const timesheetJsCtx = await esbuild.context({
+    entryPoints: ["src/webviews/timesheet/index.js"],
+    bundle: true,
+    format: "iife",
+    minify: production,
+    sourcemap: production ? false : "external",
+    sourcesContent: false,
+    platform: "browser",
+    outfile: "media/timesheet.js",
+    logLevel: "silent",
+    plugins: [esbuildProblemMatcherPlugin],
+  });
+
+  // CSS is a first-class esbuild target; minification strips comments and
+  // whitespace and shortens color/length values. No bundling needed since
+  // these files have no @import edges.
+  const ganttCssCtx = await esbuild.context({
+    entryPoints: ["src/webviews/gantt/styles.css"],
+    minify: production,
+    sourcemap: false,
+    outfile: "media/gantt.css",
+    logLevel: "silent",
+    plugins: [esbuildProblemMatcherPlugin],
+  });
+
+  const timesheetCssCtx = await esbuild.context({
+    entryPoints: ["src/webviews/timesheet/styles.css"],
+    minify: production,
+    sourcemap: false,
+    outfile: "media/timesheet.css",
+    logLevel: "silent",
+    plugins: [esbuildProblemMatcherPlugin],
+  });
+
+  const contexts = [extensionCtx, ganttJsCtx, timesheetJsCtx, ganttCssCtx, timesheetCssCtx];
+
   if (watch) {
-    await Promise.all([extensionCtx.watch(), webviewCtx.watch()]);
+    await Promise.all(contexts.map((c) => c.watch()));
   } else {
-    await Promise.all([extensionCtx.rebuild(), webviewCtx.rebuild()]);
-    await Promise.all([extensionCtx.dispose(), webviewCtx.dispose()]);
+    await Promise.all(contexts.map((c) => c.rebuild()));
+    await Promise.all(contexts.map((c) => c.dispose()));
   }
 }
 

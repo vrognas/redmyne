@@ -7,6 +7,19 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.22.1]
+
+### Packaging
+
+- **VSIX shrunk 226 KB → 207 KB** (~8.5% smaller, 19 KB compressed off the published artifact). Three contributing changes:
+  - `.remember/**` (AI scratch logs / handoff buffer) added to `.vscodeignore` — was leaking ~258 KB of uncompressed text into every install because `.vscodeignore` and `.gitignore` are independent lists
+  - `media/timesheet.js` (77 KB hand-written IIFE) moved to `src/webviews/timesheet/index.js` and bundled through esbuild like `media/gantt.js` — 77 KB → 35 KB minified
+  - `media/gantt.css` and `media/timesheet.css` moved to `src/webviews/{gantt,timesheet}/styles.css` and minified through esbuild — 45 KB → 36 KB and 37 KB → 29 KB
+
+### Internal
+
+- esbuild config consolidated: extension + 2 webview bundles + 2 CSS minifications now drive off a single contexts array so adding a webview is one entry instead of three
+
 ## [4.22.0]
 
 ### Performance
