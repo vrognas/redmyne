@@ -7,7 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-## [4.22.1]
+## [4.22.2]
+
+> v4.22.1 was tagged but the publish workflow failed lint (ESLint
+> didn't ignore the newly moved `src/webviews/timesheet/` webview
+> source — same situation `src/webviews/gantt/` was already in).
+> v4.22.2 is v4.22.1 with that ignore added; no functional change.
 
 ### Packaging
 
