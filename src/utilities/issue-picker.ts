@@ -6,6 +6,7 @@ import { TimeEntryActivity } from "../redmine/models/common";
 import { RedmineProject } from "../redmine/redmine-project";
 import { debounce } from "./debounce";
 import { recordRecentIssue, getRecentIssueIds } from "./recent-issues";
+import { fetchMyOpenAndClosedIssues } from "./get-my-issues";
 
 const SEARCH_DEBOUNCE_MS = 250;
 const PROJECT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -64,13 +65,10 @@ export function prewarmIssuePicker(server: IRedmineServer): void {
 
   myIssuesFetchPromise = (async () => {
     try {
-      const [openResult, closedResult] = await Promise.all([
-        server.getFilteredIssues({ assignee: "me", status: "open" }),
-        server.getFilteredIssues({ assignee: "me", status: "closed" }),
-      ]);
+      const { open, closed } = await fetchMyOpenAndClosedIssues(server);
       myIssuesCache = {
-        openIssues: openResult.issues,
-        closedIssues: closedResult.issues,
+        openIssues: open,
+        closedIssues: closed,
         timestamp: Date.now(),
         serverAddress,
       };
@@ -105,13 +103,10 @@ async function getMyIssues(server: IRedmineServer): Promise<{ openIssues: Issue[
   }
 
   // Fetch fresh
-  const [openResult, closedResult] = await Promise.all([
-    server.getFilteredIssues({ assignee: "me", status: "open" }),
-    server.getFilteredIssues({ assignee: "me", status: "closed" }),
-  ]);
+  const { open, closed } = await fetchMyOpenAndClosedIssues(server);
   myIssuesCache = {
-    openIssues: openResult.issues,
-    closedIssues: closedResult.issues,
+    openIssues: open,
+    closedIssues: closed,
     timestamp: Date.now(),
     serverAddress,
   };

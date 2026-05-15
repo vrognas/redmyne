@@ -4,6 +4,7 @@ import { KanbanTask, TaskPriority } from "./kanban-state";
 import { Issue } from "../redmine/models/issue";
 import { debounce } from "../utilities/debounce";
 import { getProjectPathMap } from "../utilities/issue-picker";
+import { fetchMyOpenAndClosedIssues } from "../utilities/get-my-issues";
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -173,13 +174,12 @@ async function pickIssueForTask(server: IRedmineServer): Promise<Issue | undefin
   let myClosedIssues: Issue[];
   let projectPathMap: Map<number, string>;
   try {
-    const [openResult, closedResult, pathMap] = await Promise.all([
-      server.getFilteredIssues({ assignee: "me", status: "open" }),
-      server.getFilteredIssues({ assignee: "me", status: "closed" }),
+    const [{ open, closed }, pathMap] = await Promise.all([
+      fetchMyOpenAndClosedIssues(server),
       getProjectPathMap(server),
     ]);
-    myOpenIssues = openResult.issues;
-    myClosedIssues = closedResult.issues;
+    myOpenIssues = open;
+    myClosedIssues = closed;
     projectPathMap = pathMap;
   } catch (error) {
     vscode.window.showErrorMessage(`Failed to fetch issues: ${error}`);

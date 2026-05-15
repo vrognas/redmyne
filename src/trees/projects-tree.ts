@@ -80,6 +80,10 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   // Coalesce per-page refresh during streaming load so VS Code re-queries
   // tree nodes at most ~5×/sec instead of once per pagination batch.
   private debouncedRefresh = debounce(150, () => this.refresh());
+  // Bumped by clearProjects() to invalidate any in-flight streaming load.
+  // Each load captures the current value; stale callbacks check before
+  // mutating state.
+  private loadToken = 0;
 
   constructor(globalState?: vscode.Memento) {
     super();
@@ -213,122 +217,141 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   }
 
   async getChildren(projectOrIssue?: TreeItem): Promise<TreeItem[]> {
-    if (!this.server) {
-      return [];
-    }
+    if (!this.server) return [];
 
-    // Handle issue expansion - return child issues
     if (projectOrIssue && isIssue(projectOrIssue)) {
       const children = this.issuesByParent.get(projectOrIssue.id) || [];
       return this.sortIssues(children);
     }
 
-    // Handle project expansion
     if (projectOrIssue && isProjectNode(projectOrIssue)) {
-      const { project, assignedIssues, hasAssignedIssues } = projectOrIssue;
-
-      // Get subprojects if in tree view mode (O(1) lookup via projectsByParent)
-      const subprojects = this.viewStyle === ProjectsViewStyle.TREE
-        ? (this.projectsByParent.get(project.id) ?? [])
-            .map((p) => this.createProjectNode(p))
-        : [];
-
-      if (hasAssignedIssues) {
-        // Return subprojects + root-level issues
-        const rootIssues = this.filterRootIssues(assignedIssues);
-        return [...subprojects, ...this.sortIssues(rootIssues)];
-      }
-
-      // No assigned issues - only show subprojects when filtered by "me"
-      // (don't fetch all issues as that would ignore the filter)
-      if (this.issueFilter.assignee === "me") {
-        return subprojects;
-      }
-
-      // Fetch all open issues for project (only when not filtering by assignee)
-      if (this.loadingIssuesForProject.has(project.id)) {
-        return createSkeletonPlaceholders(3);
-      }
-
-      this.loadingIssuesForProject.add(project.id);
-      try {
-        let issues: Issue[] = [];
-        try {
-          issues = (
-            await this.server.getOpenIssuesForProject(project.id, false)
-          ).issues;
-        } catch {
-          // 403 = no access to project issues, show subprojects only
-        }
-        return [...subprojects, ...issues];
-      } finally {
-        this.loadingIssuesForProject.delete(project.id);
-      }
+      return this.expandProjectNode(projectOrIssue);
     }
 
-    // Root level - fetch projects and assigned issues.
-    // Skeleton only when we genuinely have nothing to show; once project nodes
-    // are populated (even partially during streaming), render them instead so
-    // VS Code's re-query after debouncedRefresh paints incremental progress.
+    // Root level. Skeleton only when we genuinely have nothing to show; once
+    // project nodes are populated (even partially during streaming), render
+    // them instead so VS Code's re-query after debouncedRefresh paints
+    // incremental progress.
     if (this.isLoadingProjects && this.projectNodes.length === 0) {
       return createSkeletonPlaceholders(5);
     }
+    if (!this.projects) await this.loadRoot();
+    return this.sortProjectNodes(this.projectNodes);
+  }
 
-    if (!this.projects) {
-      this.isLoadingProjects = true;
-      try {
-        // Assign projects as soon as they arrive so streamed onProgress pages
-        // can build project nodes — otherwise the first ~1s of streamed issues
-        // would have no project structure to attach to.
-        const projectsPromise = this.server.getProjects().then((projects) => {
-          this.applyProjects(projects);
-          this.debouncedRefresh();
-          return projects;
-        });
+  /**
+   * Build the children of an expanded project node: subprojects (tree view)
+   * plus either the project's assigned issues or — when not filtering by
+   * assignee — all open issues fetched on demand. Per-project load is gated
+   * by loadingIssuesForProject so concurrent expansions return a skeleton.
+   */
+  private async expandProjectNode(node: ProjectNode): Promise<TreeItem[]> {
+    if (!this.server) return [];
+    const { project, assignedIssues, hasAssignedIssues } = node;
 
-        // Stream partial issue pages into the tree as they arrive. The first
-        // page renders ~1s after refresh starts instead of waiting for the
-        // full ~16s pagination set; debouncedRefresh coalesces re-renders.
-        // Refresh is gated on projects already being applied — otherwise
-        // rebuildProjectNodes is a no-op, projectNodes stays empty, and the
-        // re-query just paints another skeleton. The next applyProjects (or
-        // final applyIssues) will fire its own refresh.
-        const onProgress = (issuesSoFar: Issue[]) => {
-          this.applyIssues(issuesSoFar);
-          if (this.projects) this.debouncedRefresh();
-        };
+    const subprojects = this.viewStyle === ProjectsViewStyle.TREE
+      ? (this.projectsByParent.get(project.id) ?? [])
+          .map((p) => this.createProjectNode(p))
+      : [];
 
-        const [projects, issuesResult] = await Promise.all([
-          projectsPromise,
-          this.server.getFilteredIssues(this.issueFilter, onProgress),
-        ]);
-
-        // Start dependency fetch in background (don't await yet)
-        const depIds = extractSchedulingDependencyIds(issuesResult.issues);
-        const depPromise = depIds.size > 0
-          ? this.server.getIssuesByIds([...depIds])
-          : Promise.resolve([]);
-
-        // Final apply on the canonical (offset-ordered) issue set — also
-        // covers the cache-hit path where onProgress never fired.
-        this.applyIssues(issuesResult.issues);
-
-        // Await dependency fetch (likely already done while we grouped)
-        this.dependencyIssues = await depPromise;
-
-        // Replace any pending debounced refresh with an immediate one.
-        this.debouncedRefresh.cancel();
-        this.refresh();
-
-        // Preload memberships in background
-        this.preloadMemberships(projects);
-      } finally {
-        this.isLoadingProjects = false;
-      }
+    if (hasAssignedIssues) {
+      const rootIssues = this.filterRootIssues(assignedIssues);
+      return [...subprojects, ...this.sortIssues(rootIssues)];
     }
 
-    // Sort and return project nodes
-    return this.sortProjectNodes(this.projectNodes);
+    // No assigned issues — only show subprojects when filtered by "me"
+    // (don't fetch all issues as that would ignore the filter).
+    if (this.issueFilter.assignee === "me") return subprojects;
+
+    if (this.loadingIssuesForProject.has(project.id)) {
+      return createSkeletonPlaceholders(3);
+    }
+
+    this.loadingIssuesForProject.add(project.id);
+    try {
+      let issues: Issue[] = [];
+      try {
+        issues = (await this.server.getOpenIssuesForProject(project.id, false)).issues;
+      } catch {
+        // 403 = no access to project issues, show subprojects only
+      }
+      return [...subprojects, ...issues];
+    } finally {
+      this.loadingIssuesForProject.delete(project.id);
+    }
+  }
+
+  /**
+   * Fetch projects + assigned issues for the root level, streaming pages in
+   * as they arrive. Idempotent against mid-load filter changes via loadToken:
+   * clearProjects() bumps the token, and every state mutation here checks
+   * before writing. Stale callbacks return without corrupting the cleared
+   * state; the next getChildren starts a fresh load.
+   */
+  private async loadRoot(): Promise<void> {
+    if (!this.server) return;
+    this.isLoadingProjects = true;
+    const myToken = this.loadToken;
+    try {
+      // Assign projects as soon as they arrive so streamed onProgress pages
+      // can build project nodes — otherwise the first ~1s of streamed issues
+      // would have no project structure to attach to.
+      const projectsPromise = this.server.getProjects().then((projects) => {
+        if (this.loadToken === myToken) {
+          this.applyProjects(projects);
+          this.debouncedRefresh();
+        }
+        return projects;
+      });
+
+      // Stream partial issue pages into the tree as they arrive. The first
+      // page renders ~1s after refresh starts instead of waiting for the
+      // full ~16s pagination set; debouncedRefresh coalesces re-renders.
+      // Refresh is gated on projects already being applied — otherwise
+      // rebuildProjectNodes is a no-op, projectNodes stays empty, and the
+      // re-query just paints another skeleton. The next applyProjects (or
+      // final applyIssues) will fire its own refresh.
+      let onProgressFired = false;
+      const onProgress = (issuesSoFar: Issue[]) => {
+        if (this.loadToken !== myToken) return;
+        onProgressFired = true;
+        this.applyIssues(issuesSoFar);
+        if (this.projects) this.debouncedRefresh();
+      };
+
+      const [projects, issuesResult] = await Promise.all([
+        projectsPromise,
+        this.server.getFilteredIssues(this.issueFilter, onProgress),
+      ]);
+
+      if (this.loadToken !== myToken) return;
+
+      // Start dependency fetch in background (don't await yet)
+      const depIds = extractSchedulingDependencyIds(issuesResult.issues);
+      const depPromise = depIds.size > 0
+        ? this.server.getIssuesByIds([...depIds])
+        : Promise.resolve([]);
+
+      // Skip the final apply when streaming already covered the full set —
+      // saves a redundant flexibility-cache + groupBy rebuild on the
+      // heaviest page. Mid-stream order is page-completion, not offset;
+      // tree sorts internally and external consumers tolerate either.
+      if (!onProgressFired) this.applyIssues(issuesResult.issues);
+
+      // Await dependency fetch (likely already done while we grouped)
+      const deps = await depPromise;
+      if (this.loadToken !== myToken) return;
+      this.dependencyIssues = deps;
+
+      this.debouncedRefresh.cancel();
+      this.refresh();
+      this.preloadMemberships(projects);
+    } finally {
+      this.isLoadingProjects = false;
+      // If our load was invalidated mid-flight, fire a refresh so VS Code
+      // re-queries and the next getChildren can start a fresh load.
+      if (this.loadToken !== myToken) this.refresh();
+    }
   }
 
   /**
@@ -528,6 +551,10 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   }
 
   clearProjects() {
+    // Invalidate any in-flight load so its callbacks won't write to the
+    // state we're about to clear.
+    this.loadToken++;
+    this.debouncedRefresh.cancel();
     this.projects = null;
     this.projectNodes = [];
     this.assignedIssues = [];

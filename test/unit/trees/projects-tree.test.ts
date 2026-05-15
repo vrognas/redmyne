@@ -289,6 +289,116 @@ describe("ProjectsTree", () => {
       expect(result[0]).toBe(node);
     });
 
+    it("ignores stale onProgress and result after clearProjects() bumps loadToken", async () => {
+      const project = new RedmineProject({ id: 1, name: "P", identifier: "p" });
+      const staleIssue = createIssue({ id: 99, project: { id: 1, name: "P" } });
+
+      let onProgressRef: ((issues: Issue[]) => void) | undefined;
+      let resolveFetch: ((value: { issues: Issue[] }) => void) | undefined;
+
+      const server = {
+        getProjects: vi.fn().mockResolvedValue([project]),
+        getFilteredIssues: vi.fn().mockImplementation(
+          async (_filter: unknown, onProgress?: (issues: Issue[]) => void) => {
+            onProgressRef = onProgress;
+            return new Promise<{ issues: Issue[] }>((resolve) => {
+              resolveFetch = resolve;
+            });
+          }
+        ),
+        getIssuesByIds: vi.fn().mockResolvedValue([]),
+        clearProjectsCache: vi.fn(),
+        getMemberships: vi.fn().mockResolvedValue([]),
+        getCachedMemberships: vi.fn().mockReturnValue(undefined),
+      };
+
+      const tree = new ProjectsTree();
+      tree.setServer(server as never);
+      tree.setFilter({ assignee: "any", status: "any", showEmptyProjects: true });
+
+      const loadPromise = tree.getChildren();
+      // Let getChildren capture token and register onProgress.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Simulate filter change mid-load: bumps token, clears state.
+      tree.clearProjects();
+
+      // Stale onProgress fires post-clear — must be ignored.
+      onProgressRef?.([staleIssue]);
+      expect(tree.getAssignedIssues()).toEqual([]);
+
+      // Complete the stale fetch; post-await stale guard must also bail.
+      resolveFetch?.({ issues: [staleIssue] });
+      await loadPromise;
+
+      expect(tree.getAssignedIssues()).toEqual([]);
+      expect(tree.getDependencyIssues()).toEqual([]);
+    });
+
+    it("skips redundant final applyIssues when streaming covered the full set", async () => {
+      const project = new RedmineProject({ id: 1, name: "P", identifier: "p" });
+      const i1 = createIssue({ id: 1, project: { id: 1, name: "P" } });
+      const i2 = createIssue({ id: 2, project: { id: 1, name: "P" } });
+
+      const tree = new ProjectsTree();
+      const applySpy = vi.spyOn(
+        tree as unknown as { applyIssues: (issues: Issue[]) => void },
+        "applyIssues"
+      );
+
+      const server = {
+        getProjects: vi.fn().mockResolvedValue([project]),
+        getFilteredIssues: vi.fn().mockImplementation(
+          async (_filter: unknown, onProgress?: (issues: Issue[]) => void) => {
+            onProgress?.([i1]);
+            onProgress?.([i1, i2]);
+            return { issues: [i1, i2] };
+          }
+        ),
+        getIssuesByIds: vi.fn().mockResolvedValue([]),
+        clearProjectsCache: vi.fn(),
+        getMemberships: vi.fn().mockResolvedValue([]),
+        getCachedMemberships: vi.fn().mockReturnValue(undefined),
+      };
+
+      tree.setServer(server as never);
+      tree.setFilter({ assignee: "any", status: "any", showEmptyProjects: true });
+      await tree.getChildren();
+
+      // Two onProgress applies, no redundant final apply.
+      expect(applySpy).toHaveBeenCalledTimes(2);
+      expect(tree.getAssignedIssues()).toHaveLength(2);
+    });
+
+    it("still applies issues once on cache-hit path where onProgress never fires", async () => {
+      const project = new RedmineProject({ id: 1, name: "P", identifier: "p" });
+      const issue = createIssue({ id: 1, project: { id: 1, name: "P" } });
+
+      const tree = new ProjectsTree();
+      const applySpy = vi.spyOn(
+        tree as unknown as { applyIssues: (issues: Issue[]) => void },
+        "applyIssues"
+      );
+
+      const server = {
+        getProjects: vi.fn().mockResolvedValue([project]),
+        // No onProgress invocation — simulates cached/single-page result.
+        getFilteredIssues: vi.fn().mockResolvedValue({ issues: [issue] }),
+        getIssuesByIds: vi.fn().mockResolvedValue([]),
+        clearProjectsCache: vi.fn(),
+        getMemberships: vi.fn().mockResolvedValue([]),
+        getCachedMemberships: vi.fn().mockReturnValue(undefined),
+      };
+
+      tree.setServer(server as never);
+      tree.setFilter({ assignee: "any", status: "any", showEmptyProjects: true });
+      await tree.getChildren();
+
+      expect(applySpy).toHaveBeenCalledTimes(1);
+      expect(tree.getAssignedIssues()).toEqual([issue]);
+    });
+
     it("updates assignedIssues incrementally as onProgress fires during load", async () => {
       const project = new RedmineProject({ id: 1, name: "Test", identifier: "test" });
       const i1 = createIssue({ id: 1, project: { id: 1, name: "Test" } });
