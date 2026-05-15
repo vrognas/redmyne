@@ -7,6 +7,21 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.22.3]
+
+### Fixed
+
+- **Filter-change-mid-load race in `ProjectsTree`** — old streaming load's `onProgress` callbacks could fire after `clearProjects()` and overwrite the cleared state with stale issues, leaving `getAssignedIssues()` (consumed by Gantt and status bar) showing data for the previous filter. Fixed via a `loadToken` bumped in `clearProjects()`; in-flight loads check before mutating state. Stale loads also fire one refresh on completion so the next load can start cleanly
+
+### Performance
+
+- **Skip redundant final `applyIssues` when streaming covered the full set** — previously `applyIssues` ran one extra time at the end of every streamed load to canonicalize offset order. Saves a full `buildFlexibilityCache` + 2× `groupBy` + all project-node rebuilds on the heaviest data set. Cache-hit (non-streaming) path unchanged
+
+### Internal
+
+- Extracted `fetchMyOpenAndClosedIssues(server)` helper (`src/utilities/get-my-issues.ts`) replacing three duplicated `Promise.all` of `getFilteredIssues({assignee:"me",...})` call sites (kanban-dialogs, issue-picker prewarm, issue-picker fresh fetch)
+- Extracted `ProjectsTree.loadRoot()` and `ProjectsTree.expandProjectNode()` private methods: `getChildren()` is now a pure ~18-line dispatcher (issue → inline, project → `expandProjectNode`, root → `loadRoot`). The ~55-line streaming-load orchestration with 4 token-invalidation guards and the ~40-line project-expansion logic each live in their own focused method. Stale-bails in `loadRoot` simplify from `return this.sortProjectNodes(this.projectNodes)` to plain `return;` since the caller falls through to the same sort
+
 ## [4.22.2]
 
 > v4.22.1 was tagged but the publish workflow failed lint (ESLint
