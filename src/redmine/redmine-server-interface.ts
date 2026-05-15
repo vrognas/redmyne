@@ -32,11 +32,14 @@ export interface IRedmineServer {
   getIssueById(issueId: number): Promise<{ issue: Issue }>;
   getIssueWithJournals(issueId: number): Promise<{ issue: Issue }>;
   getIssuesByIds(ids: number[], skipClosed?: boolean): Promise<Issue[]>;
-  getFilteredIssues(filter: {
-    assignee: "me" | "any";
-    status: "open" | "closed" | "any";
-    priority?: number | "any";
-  }): Promise<{ issues: Issue[] }>;
+  getFilteredIssues(
+    filter: {
+      assignee: "me" | "any";
+      status: "open" | "closed" | "any";
+      priority?: number | "any";
+    },
+    onProgress?: (issuesSoFar: Issue[]) => void
+  ): Promise<{ issues: Issue[] }>;
   getIssuesAssignedToMe(): Promise<{ issues: Issue[] }>;
   getAllOpenIssues(): Promise<{ issues: Issue[] }>;
   getOpenIssuesForProject(

@@ -14,6 +14,7 @@ import {
 import { groupBy } from "../utilities/collection-utils";
 import { extractSchedulingDependencyIds } from "../utilities/dependency-extractor";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
+import { debounce } from "../utilities/debounce";
 import {
   LoadingPlaceholder,
   isLoadingPlaceholder,
@@ -76,6 +77,9 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   private projectsByParent = new Map<number, RedmineProject[]>(); // parent project ID → child projects
   private flexibilityCache = new Map<number, FlexibilityScore | null>();
   private globalState?: vscode.Memento;
+  // Coalesce per-page refresh during streaming load so VS Code re-queries
+  // tree nodes at most ~5×/sec instead of once per pagination batch.
+  private debouncedRefresh = debounce(150, () => this.refresh());
 
   constructor(globalState?: vscode.Memento) {
     super();
@@ -104,6 +108,10 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
         }
       })
     );
+
+    // Cancel any pending debounced refresh on dispose so a stale timer
+    // doesn't fire refresh() against a disposed EventEmitter.
+    this.disposables.push({ dispose: () => this.debouncedRefresh.cancel() });
   }
 
   getTreeItem(item: TreeItem): vscode.TreeItem | Thenable<vscode.TreeItem> {
@@ -258,54 +266,58 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
       }
     }
 
-    // Root level - fetch projects and assigned issues
-    if (this.isLoadingProjects) {
+    // Root level - fetch projects and assigned issues.
+    // Skeleton only when we genuinely have nothing to show; once project nodes
+    // are populated (even partially during streaming), render them instead so
+    // VS Code's re-query after debouncedRefresh paints incremental progress.
+    if (this.isLoadingProjects && this.projectNodes.length === 0) {
       return createSkeletonPlaceholders(5);
     }
 
     if (!this.projects) {
       this.isLoadingProjects = true;
       try {
-        // Fetch projects and issues in parallel using current filter
+        // Assign projects as soon as they arrive so streamed onProgress pages
+        // can build project nodes — otherwise the first ~1s of streamed issues
+        // would have no project structure to attach to.
+        const projectsPromise = this.server.getProjects().then((projects) => {
+          this.applyProjects(projects);
+          this.debouncedRefresh();
+          return projects;
+        });
+
+        // Stream partial issue pages into the tree as they arrive. The first
+        // page renders ~1s after refresh starts instead of waiting for the
+        // full ~16s pagination set; debouncedRefresh coalesces re-renders.
+        // Refresh is gated on projects already being applied — otherwise
+        // rebuildProjectNodes is a no-op, projectNodes stays empty, and the
+        // re-query just paints another skeleton. The next applyProjects (or
+        // final applyIssues) will fire its own refresh.
+        const onProgress = (issuesSoFar: Issue[]) => {
+          this.applyIssues(issuesSoFar);
+          if (this.projects) this.debouncedRefresh();
+        };
+
         const [projects, issuesResult] = await Promise.all([
-          this.server.getProjects(),
-          this.server.getFilteredIssues(this.issueFilter),
+          projectsPromise,
+          this.server.getFilteredIssues(this.issueFilter, onProgress),
         ]);
 
-        this.projects = projects;
-        this.assignedIssues = issuesResult.issues;
-
         // Start dependency fetch in background (don't await yet)
-        const depIds = extractSchedulingDependencyIds(this.assignedIssues);
+        const depIds = extractSchedulingDependencyIds(issuesResult.issues);
         const depPromise = depIds.size > 0
           ? this.server.getIssuesByIds([...depIds])
           : Promise.resolve([]);
 
-        // Do CPU work while dependency fetch runs in parallel
-        buildFlexibilityCache(this.assignedIssues, this.flexibilityCache, getWeeklySchedule());
-
-        this.issuesByProject = groupBy(
-          this.assignedIssues.filter((i) => i.project?.id),
-          (issue) => issue.project!.id
-        );
-
-        this.issuesByParent = groupBy(
-          this.assignedIssues.filter((i) => i.parent?.id),
-          (issue) => issue.parent!.id
-        );
-
-        // Build parent→children project map once so countIssuesWithSubprojects
-        // is O(1) per lookup instead of filtering this.projects per call.
-        this.projectsByParent = groupBy(
-          this.projects.filter((p) => p.parent?.id),
-          (p) => p.parent!.id
-        );
-
-        this.projectNodes = this.projects.map((p) => this.createProjectNode(p));
+        // Final apply on the canonical (offset-ordered) issue set — also
+        // covers the cache-hit path where onProgress never fired.
+        this.applyIssues(issuesResult.issues);
 
         // Await dependency fetch (likely already done while we grouped)
         this.dependencyIssues = await depPromise;
 
+        // Replace any pending debounced refresh with an immediate one.
+        this.debouncedRefresh.cancel();
         this.refresh();
 
         // Preload memberships in background
@@ -317,6 +329,47 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
 
     // Sort and return project nodes
     return this.sortProjectNodes(this.projectNodes);
+  }
+
+  /**
+   * Apply project-derived state. Called once when getProjects() resolves.
+   */
+  private applyProjects(projects: RedmineProject[]): void {
+    this.projects = projects;
+    // Parent→children map for O(1) subproject lookups in
+    // countIssuesWithSubprojects.
+    this.projectsByParent = groupBy(
+      projects.filter((p) => p.parent?.id),
+      (p) => p.parent!.id
+    );
+    this.rebuildProjectNodes();
+  }
+
+  /**
+   * Apply issue-derived state. Called once per streamed page and again with
+   * the final issue set after pagination completes.
+   */
+  private applyIssues(issues: Issue[]): void {
+    this.assignedIssues = issues;
+    buildFlexibilityCache(issues, this.flexibilityCache, getWeeklySchedule());
+    this.issuesByProject = groupBy(
+      issues.filter((i) => i.project?.id),
+      (issue) => issue.project!.id
+    );
+    this.issuesByParent = groupBy(
+      issues.filter((i) => i.parent?.id),
+      (issue) => issue.parent!.id
+    );
+    this.rebuildProjectNodes();
+  }
+
+  /**
+   * Rebuild project nodes from current projects + issue groupings. No-op
+   * until projects have been loaded.
+   */
+  private rebuildProjectNodes(): void {
+    if (!this.projects) return;
+    this.projectNodes = this.projects.map((p) => this.createProjectNode(p));
   }
 
   /**

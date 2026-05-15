@@ -7,6 +7,25 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.22.0]
+
+### Performance
+
+- **Side-pane "any/any" load is interactive ~10× sooner** — `getFilteredIssues` now accepts an `onProgress` callback that fires per pagination batch, and `ProjectsTree` rebuilds its derived state + refreshes (debounced 150ms) as each page lands. With 1500 issues across 16 pages, the first page is visible after ~1s instead of waiting ~16s for the slow last batch
+- **Default `maxConcurrentRequests` raised 2 → 4** — earlier pagination batches now overlap; safe for typical Redmine servers (range 1–20 unchanged in `redmyne.maxConcurrentRequests` setting)
+
+### Internal
+
+- `RedmineServer.paginate` gained an optional `onPage` callback so any paginated endpoint can be streamed in the future
+- `ProjectsTree` data-derivation split into `applyProjects(projects)` + `applyIssues(issues)` + `rebuildProjectNodes()`, separating project-state from issue-state. Eliminates per-page rebuild of `projectsByParent` (depends only on projects)
+- Skeleton placeholder gate now keys on `projectNodes.length === 0` in addition to `isLoadingProjects`, so VS Code's re-query after the debounced refresh paints streamed partials instead of falling back to skeletons (fix: streaming was silently invisible before this)
+- `debouncedRefresh.cancel()` registered as a disposable so a pending timer can't fire `refresh()` on a disposed `EventEmitter`
+- Projects assigned via `getProjects().then(...)` so streamed onProgress pages always have project structure to attach to, regardless of which request resolves first
+
+### Investigation
+
+- Documented the Redmine-side deep-pagination spike (offset=1500 → 9.9s on a 1505-issue dataset) in `docs/PERFORMANCE.md` with hypotheses (JOIN cost from `include=children,relations`, OFFSET losing the covering index), an `EXPLAIN ANALYZE` validation query, and next-step client mitigations
+
 ## [4.21.0]
 
 ### Performance

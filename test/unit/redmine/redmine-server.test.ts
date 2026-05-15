@@ -541,7 +541,7 @@ describe("RedmineServer", () => {
       await Promise.all(promises);
     });
 
-    it("should use default maxConcurrentRequests of 2", async () => {
+    it("should use default maxConcurrentRequests of 4", async () => {
       const server = new RedmineServer({
         address: "https://redmine.example.com",
         key: "test-api-key",
@@ -549,7 +549,7 @@ describe("RedmineServer", () => {
       });
 
       // Access private field for testing (not ideal but verifies default)
-      expect((server as unknown as { maxConcurrentRequests: number }).maxConcurrentRequests).toBe(2);
+      expect((server as unknown as { maxConcurrentRequests: number }).maxConcurrentRequests).toBe(4);
     });
 
     it("should allow configuring maxConcurrentRequests", async () => {
@@ -724,6 +724,94 @@ describe("RedmineServer", () => {
         ok: "put",
       });
       await expect(serverWithRoutes.delete("/delete.json")).resolves.toBeNull();
+    });
+
+    it("getFilteredIssues fires onProgress per page with cumulative issues", async () => {
+      const requestFn = createRouteMockRequest((options) => {
+        const path = options.path || "/";
+        if (options.method === "GET" && path.includes("/issues.json")) {
+          const parsed = new URL(`https://redmine.local${path}`);
+          const offset = Number(parsed.searchParams.get("offset") || "0");
+          const limit = Number(parsed.searchParams.get("limit") || "100");
+          const remaining = Math.max(0, 205 - offset);
+          const count = Math.min(limit, remaining);
+          return {
+            body: {
+              issues: Array.from({ length: count }, (_, i) => ({
+                id: offset + i + 1,
+                subject: `Issue ${offset + i + 1}`,
+                status: { id: 1, name: "New" },
+                tracker: { id: 1, name: "Bug" },
+                author: { id: 1, name: "Me" },
+                project: { id: 1, name: "Test" },
+              })),
+              total_count: 205,
+            },
+          };
+        }
+        return { body: { ok: true } };
+      });
+
+      const server = new RedmineServer({
+        address: "https://redmine.example.com",
+        key: "test-key",
+        requestFn,
+        maxConcurrentRequests: 4,
+      });
+
+      const snapshots: number[] = [];
+      const result = await server.getFilteredIssues(
+        { assignee: "any", status: "any" },
+        (issuesSoFar) => {
+          snapshots.push(issuesSoFar.length);
+        }
+      );
+
+      expect(result.issues).toHaveLength(205);
+      // First snapshot must be page 1 (100 issues); final must be all 205.
+      expect(snapshots[0]).toBe(100);
+      expect(snapshots[snapshots.length - 1]).toBe(205);
+      expect(snapshots.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("getFilteredIssues does not fire onProgress when returning cached result", async () => {
+      const requestFn = createRouteMockRequest((options) => {
+        const path = options.path || "/";
+        if (options.method === "GET" && path.includes("/issues.json")) {
+          return {
+            body: {
+              issues: [
+                {
+                  id: 1,
+                  subject: "X",
+                  status: { id: 1, name: "N" },
+                  tracker: { id: 1, name: "B" },
+                  author: { id: 1, name: "A" },
+                  project: { id: 1, name: "P" },
+                },
+              ],
+              total_count: 1,
+            },
+          };
+        }
+        return { body: { ok: true } };
+      });
+
+      const server = new RedmineServer({
+        address: "https://redmine.example.com",
+        key: "test-key",
+        requestFn,
+      });
+
+      await server.getFilteredIssues({ assignee: "any", status: "any" });
+
+      const calls: number[] = [];
+      await server.getFilteredIssues(
+        { assignee: "any", status: "any" },
+        (issuesSoFar) => calls.push(issuesSoFar.length)
+      );
+
+      expect(calls).toEqual([]);
     });
 
     it("covers fallback/cache branches for custom fields, modules, activities and versions", async () => {

@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "4.21.0",
+  "version": "4.22.0",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -2036,11 +2036,11 @@
         },
         "redmyne.maxConcurrentRequests": {
           "type": "number",
-          "default": 2,
+          "default": 4,
           "minimum": 1,
           "maximum": 20,
           "scope": "application",
-          "markdownDescription": "**Maximum concurrent API requests**\n\nLimits how many requests run simultaneously to prevent server overload.\n\n- **2** (default): Safe for most servers\n- **5-10**: For faster servers\n- **20**: Maximum, use if server handles high load\n\nReduce if you see 503 errors. Increase for faster data loading."
+          "markdownDescription": "**Maximum concurrent API requests**\n\nLimits how many requests run simultaneously to prevent server overload.\n\n- **4** (default): Balanced throughput for typical servers\n- **5-10**: For faster servers\n- **20**: Maximum, use if server handles high load\n\nReduce if you see 503 errors. Increase for faster data loading."
         },
         "redmyne.showProjectMembers": {
           "type": "boolean",

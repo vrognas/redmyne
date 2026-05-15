@@ -195,6 +195,55 @@ code --disable-extensions && code --install-extension ./positron-redmine-*.vsix
 
 ---
 
+## 2026-05-15 — Deep-Pagination Investigation (offset=1500 spike)
+
+**Symptom:** Cold load of side pane with `assignee=any, status=any` filter takes ~16s for ~1505 issues across 16 pages. Page timing is mostly 0.6–1.3s, **except offset=1500 → 9.9s** (~10× the median). The same Redmine server's `/projects/*/memberships.json` calls right after take 100–250ms, so it is not a general server slowdown.
+
+**Endpoint:** `GET /issues.json?include=children,relations&status_id=*&limit=100&offset=1500`. Returns 5 issues / 47 KB — payload size is not the cost driver.
+
+### Hypotheses (most → least likely)
+
+1. **`include=children,relations` JOIN cost at the tail.** `relations` requires a left join + group-concat on `issue_relations`; `children` adds a correlated subquery. When the outer slice is small (5 rows) but Redmine still has to materialise the JOIN over the full filter set before slicing, the per-row cost dominates. Mid-pages mask it because more rows amortise the work.
+2. **`OFFSET 1500` against `id DESC` (Redmine's default sort) loses the covering index.** MySQL/PostgreSQL count rows up to the offset; when combined with the JOINs in (1), the planner may switch from index scan → filesort + temp table.
+3. **Cold buffer pool for the last slice.** Late rows (oldest, by `id DESC`) may not be in the InnoDB buffer pool while top 1400 are hot from previous user activity. Plausible but doesn't fully explain 10× spike.
+4. **Network/TLS jitter.** Possible noise, but the same client made fast requests immediately before and after, so not the primary cause.
+
+### Validation (server-side, recommended)
+
+Run these against the Redmine DB to confirm hypothesis (1)/(2):
+
+```sql
+EXPLAIN ANALYZE
+SELECT issues.*
+FROM issues
+LEFT JOIN issue_relations ON issue_relations.issue_from_id = issues.id
+WHERE issues.status_id IN (<all status ids>)
+ORDER BY issues.id DESC
+LIMIT 100 OFFSET 1500;
+```
+
+Compare against the same query at `OFFSET 0` and `OFFSET 1400`. If `OFFSET 1500` switches to a filesort or shows a much higher `rows_examined`, hypothesis (2) is confirmed.
+
+Also check that these indexes exist:
+- `issues(status_id, id)` — supports the WHERE + ORDER BY
+- `issue_relations(issue_from_id)` — already standard
+- `issue_children` is a self-join through `issues.parent_id`; ensure `issues(parent_id)` index exists
+
+### Client-side mitigations available now
+
+- **(Shipped)** Streaming render: first page is visible after ~1s, so the 9.9s tail no longer blocks UX. (See projects-tree.ts:applyIssues, redmine-server.ts:paginate.)
+- **(Shipped)** Default `maxConcurrentRequests` raised 2→4 — earlier pages overlap, but won't help the tail page if it's the bottleneck.
+- **(Available, not shipped)** Drop `include=children` from the side-pane query: parent→child hierarchy is already derivable from `issue.parent.id`, which Redmine returns without `include`. The `children` array is unused by `ProjectsTree`. Expected ~30–50% reduction in per-page cost.
+- **(Available, not shipped)** Drop `include=relations` for `assignee=any` filter (relations are only consumed by `extractSchedulingDependencyIds`, which is meaningful only for the assigned-to-me view). Expected ~20–30% reduction.
+- **(Future)** Partition by project (`project_id=<id>`) and fetch in parallel. Smaller queries; no large OFFSET. Trade-off: more requests, but each one is bounded.
+- **(Future)** Cursor on `id<`<lastSeenId> instead of `offset=` — avoids the OFFSET scan entirely. Requires a stable sort (`sort=id:desc`).
+
+### Recommendation
+
+If the 9.9s tail persists after measuring with EXPLAIN, ship the `include=` reduction first (smallest blast radius). If still slow, move to ID-cursor pagination. Server-side index review is the durable fix.
+
+---
+
 ## Related Documentation
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - System design

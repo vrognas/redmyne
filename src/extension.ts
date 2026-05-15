@@ -131,7 +131,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   ): RedmineServer => {
     const config = vscode.workspace.getConfiguration("redmyne");
     const loggingEnabled = config.get<boolean>("logging.enabled") || false;
-    const maxConcurrentRequests = config.get<number>("maxConcurrentRequests") || 2;
+    const maxConcurrentRequests = config.get<number>("maxConcurrentRequests") || 4;
 
     const serverOptions = { ...options, maxConcurrentRequests };
 

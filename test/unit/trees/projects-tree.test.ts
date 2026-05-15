@@ -261,6 +261,74 @@ describe("ProjectsTree", () => {
       expect(tree.getDependencyIssues()).toHaveLength(1);
     });
 
+    it("returns existing project nodes (not skeletons) when re-entered mid-stream", async () => {
+      const tree = new ProjectsTree();
+      const proj = new RedmineProject({ id: 1, name: "P", identifier: "p" });
+      const node = {
+        project: proj,
+        assignedIssues: [],
+        hasAssignedIssues: false,
+        totalIssuesWithSubprojects: 0,
+      };
+      // setServer clears tree state, so configure server first then seed
+      // internals to simulate "mid-stream: loading flag set, nodes populated".
+      tree.setServer({ clearProjectsCache: vi.fn() } as never);
+      const internals = tree as unknown as {
+        isLoadingProjects: boolean;
+        projects: RedmineProject[];
+        projectNodes: typeof node[];
+      };
+      internals.isLoadingProjects = true;
+      internals.projects = [proj];
+      internals.projectNodes = [node];
+
+      const result = await tree.getChildren();
+
+      // Should return the 1 populated node, not the 5 skeleton placeholders.
+      expect(result).toHaveLength(1);
+      expect(result[0]).toBe(node);
+    });
+
+    it("updates assignedIssues incrementally as onProgress fires during load", async () => {
+      const project = new RedmineProject({ id: 1, name: "Test", identifier: "test" });
+      const i1 = createIssue({ id: 1, project: { id: 1, name: "Test" } });
+      const i2 = createIssue({ id: 2, project: { id: 1, name: "Test" } });
+
+      const tree = new ProjectsTree();
+      const snapshots: number[] = [];
+      const server = {
+        getProjects: vi.fn().mockResolvedValue([project]),
+        getFilteredIssues: vi.fn().mockImplementation(
+          async (
+            _filter: unknown,
+            onProgress?: (issues: Issue[]) => void
+          ) => {
+            onProgress?.([i1]);
+            snapshots.push(tree.getAssignedIssues().length);
+            onProgress?.([i1, i2]);
+            snapshots.push(tree.getAssignedIssues().length);
+            return { issues: [i1, i2] };
+          }
+        ),
+        getIssuesByIds: vi.fn().mockResolvedValue([]),
+        clearProjectsCache: vi.fn(),
+        getMemberships: vi.fn().mockResolvedValue([]),
+        getCachedMemberships: vi.fn().mockReturnValue(undefined),
+      };
+
+      tree.setServer(server as never);
+      tree.setFilter({ assignee: "any", status: "any", showEmptyProjects: true });
+
+      await tree.getChildren();
+
+      expect(snapshots).toEqual([1, 2]);
+      expect(tree.getAssignedIssues()).toHaveLength(2);
+      expect(server.getFilteredIssues).toHaveBeenCalledWith(
+        expect.objectContaining({ assignee: "any", status: "any" }),
+        expect.any(Function)
+      );
+    });
+
     it("expands project with no assigned issues using filter/server branches", async () => {
       const project = new RedmineProject({ id: 10, name: "Solo", identifier: "solo" });
       const server = {

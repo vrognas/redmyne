@@ -45,7 +45,7 @@ export interface RedmineServerConnectionOptions {
    */
   requestFn?: typeof http.request;
   /**
-   * Maximum concurrent API requests (default: 2)
+   * Maximum concurrent API requests (default: 4)
    * Prevents server overload by queuing excess requests
    */
   maxConcurrentRequests?: number;
@@ -65,7 +65,7 @@ export class RedmineOptionsError extends Error {
 }
 
 /** Default max concurrent API requests */
-const DEFAULT_MAX_CONCURRENT_REQUESTS = 2;
+const DEFAULT_MAX_CONCURRENT_REQUESTS = 4;
 
 /** Issue cache entry with timestamp for TTL */
 interface IssueCacheEntry {
@@ -423,22 +423,33 @@ export class RedmineServer implements IRedmineServer {
   private async paginate<TRaw, TResult = TRaw>(
     endpoint: string,
     responseKey: string,
-    transform?: (items: TRaw[]) => TResult[]
+    transform?: (items: TRaw[]) => TResult[],
+    onPage?: (pageItems: TResult[]) => void
   ): Promise<TResult[]> {
     const limit = 100; // Redmine max is 100
+    const separator = endpoint.includes("?") ? "&" : "?";
+    const pageUrl = (offset: number) =>
+      `${endpoint}${separator}limit=${limit}&offset=${offset}`;
 
-    // First request to get total_count
-    const firstUrl = `${endpoint}${endpoint.includes("?") ? "&" : "?"}limit=${limit}&offset=0`;
+    const fetchPage = async (offset: number): Promise<TResult[]> => {
+      const response = await this.doRequest<Record<string, unknown>>(pageUrl(offset), "GET");
+      const rawItems = (response?.[responseKey] || []) as TRaw[];
+      const page = transform ? transform(rawItems) : (rawItems as unknown as TResult[]);
+      if (onPage) onPage(page);
+      return page;
+    };
+
+    // First request also needs total_count, so fetch it directly (not via
+    // fetchPage which discards the envelope).
     const firstResponse = await this.doRequest<Record<string, unknown> & { total_count: number }>(
-      firstUrl,
+      pageUrl(0),
       "GET"
     );
-
     const totalCount = firstResponse?.total_count || 0;
     const rawFirstPage = (firstResponse?.[responseKey] || []) as TRaw[];
     const firstPage = transform ? transform(rawFirstPage) : (rawFirstPage as unknown as TResult[]);
+    if (onPage) onPage(firstPage);
 
-    // If all items fit in first page, we're done
     if (totalCount <= limit) {
       return firstPage;
     }
@@ -455,14 +466,7 @@ export class RedmineServer implements IRedmineServer {
 
     for (let i = 0; i < remainingOffsets.length; i += paginationBatchSize) {
       const batch = remainingOffsets.slice(i, i + paginationBatchSize);
-      const batchResults = await Promise.all(
-        batch.map(async (offset) => {
-          const pageUrl = `${endpoint}${endpoint.includes("?") ? "&" : "?"}limit=${limit}&offset=${offset}`;
-          const response = await this.doRequest<Record<string, unknown>>(pageUrl, "GET");
-          const rawItems = (response?.[responseKey] || []) as TRaw[];
-          return transform ? transform(rawItems) : (rawItems as unknown as TResult[]);
-        })
-      );
+      const batchResults = await Promise.all(batch.map(fetchPage));
       remainingPages.push(...batchResults);
     }
 
@@ -1496,11 +1500,14 @@ export class RedmineServer implements IRedmineServer {
    * Get issues with flexible filtering
    * Consolidates assignee and status filters into single method
    */
-  async getFilteredIssues(filter: {
-    assignee: "me" | "any";
-    status: "open" | "closed" | "any";
-    priority?: number | "any";
-  }): Promise<{ issues: Issue[] }> {
+  async getFilteredIssues(
+    filter: {
+      assignee: "me" | "any";
+      status: "open" | "closed" | "any";
+      priority?: number | "any";
+    },
+    onProgress?: (issuesSoFar: Issue[]) => void
+  ): Promise<{ issues: Issue[] }> {
     const params = new URLSearchParams();
     params.set("include", "children,relations");
 
@@ -1540,7 +1547,18 @@ export class RedmineServer implements IRedmineServer {
       }
     }
 
-    const issues = await this.paginate<Issue>(endpoint, "issues");
+    // Stream pages into onProgress as they arrive. Only accumulate when the
+    // caller cares (avoids ~1500-ref array work on every plain fetch); pass a
+    // snapshot so callers can't observe later mutations through the reference.
+    let onPage: ((page: Issue[]) => void) | undefined;
+    if (onProgress) {
+      const accumulated: Issue[] = [];
+      onPage = (page) => {
+        accumulated.push(...page);
+        onProgress([...accumulated]);
+      };
+    }
+    const issues = await this.paginate<Issue>(endpoint, "issues", undefined, onPage);
     this.changeCache.set(cacheKey, issues, extractMaxUpdatedOn(issues));
     return { issues };
   }
