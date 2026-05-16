@@ -43,6 +43,21 @@ export default [
     },
   },
 
+  // Type-aware rules for production code (catches unhandled promises at lint time)
+  {
+    files: ["src/**/*.ts", "src/**/*.tsx"],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/no-misused-promises": "error",
+    },
+  },
+
   // Relax rules for test files (allow any for mocking, unused vars for test setup)
   {
     files: ["test/**/*.ts"],
