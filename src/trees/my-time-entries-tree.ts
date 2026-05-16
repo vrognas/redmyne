@@ -239,7 +239,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     // Fetch new data in background (old todayEntries/weekEntries stay visible)
     if (!this.isLoading && this.server) {
       this.isLoading = true;
-      this.loadTodayAndThisWeek();
+      void this.loadTodayAndThisWeek();
     }
   }
 
@@ -399,6 +399,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
 
   loadEarlierMonths(): void {
     const lastVisible = this.visibleMonths[this.visibleMonths.length - 1];
+    if (!lastVisible) return;
     for (let i = 1; i <= MyTimeEntriesTreeDataProvider.LOAD_BATCH_SIZE; i++) {
       const date = new Date(lastVisible.year, lastVisible.month - i, 1);
       this.visibleMonths.push({ year: date.getFullYear(), month: date.getMonth() });
@@ -417,7 +418,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       // If today/week not loaded yet, trigger load
       if (this.todayEntries === undefined && !this.isLoading) {
         this.isLoading = true;
-        this.loadTodayAndThisWeek();
+        void this.loadTodayAndThisWeek();
       }
 
       // Show spinner only when no data at all (first load)

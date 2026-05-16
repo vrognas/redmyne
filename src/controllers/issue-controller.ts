@@ -42,7 +42,7 @@ export class IssueController {
     );
     if (!act) return;
 
-    this.setTimeEntryMessage(act);
+    void this.setTimeEntryMessage(act);
   }
 
   /**
@@ -168,12 +168,12 @@ export class IssueController {
 
   private async changeStatus() {
     const statuses = await this.redmine.getIssueStatuses();
-    this.changeIssueStatus(statuses.issue_statuses);
+    void this.changeIssueStatus(statuses.issue_statuses);
   }
 
   private async changePriority() {
     const { issue_priorities } = await this.redmine.getIssuePriorities();
-    this.changeIssuePriority(issue_priorities);
+    void this.changeIssuePriority(issue_priorities);
   }
 
   private async addTimeEntry() {
@@ -181,7 +181,7 @@ export class IssueController {
     const activities = await this.redmine.getProjectTimeEntryActivities(
       this.issue.project.id
     );
-    this.chooseTimeEntryType(activities);
+    void this.chooseTimeEntryType(activities);
   }
 
   private async quickUpdate() {
@@ -349,22 +349,22 @@ export class IssueController {
       );
       if (!option) return;
       if (option.action === "openInBrowser") {
-        this.openInBrowser();
+        void this.openInBrowser();
       }
       if (option.action === "changeStatus") {
-        this.changeStatus();
+        void this.changeStatus();
       }
       if (option.action === "changePriority") {
-        this.changePriority();
+        void this.changePriority();
       }
       if (option.action === "addTimeEntry") {
-        this.addTimeEntry();
+        void this.addTimeEntry();
       }
       if (option.action === "quickUpdate") {
-        this.quickUpdate();
+        void this.quickUpdate();
       }
       if (option.action === "viewHistory") {
-        this.viewHistory();
+        void this.viewHistory();
       }
     } catch (error) {
       vscode.window.showErrorMessage(errorToString(error));
@@ -441,7 +441,7 @@ export class IssueController {
           await vscode.env.clipboard.writeText(selected.journal.notes);
           showStatusBarMessage("$(check) Copied to clipboard", 2000);
         } else if (action?.action === "back") {
-          this.viewHistory();
+          void this.viewHistory();
         }
       }
     } catch (error) {

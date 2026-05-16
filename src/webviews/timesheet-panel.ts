@@ -237,7 +237,7 @@ export class TimeSheetPanel {
       () => {
         if (this._panel.visible) {
           // Refresh when panel becomes visible
-          this._loadWeek(this._currentWeek);
+          void this._loadWeek(this._currentWeek);
         } else {
           // Save new rows when panel loses visibility
           this._saveIncompleteRows();
@@ -538,7 +538,7 @@ export class TimeSheetPanel {
       }
 
       // Load issue details for tooltips (fire and forget)
-      this._loadAllIssueDetails();
+      void this._loadAllIssueDetails();
     } catch (error) {
       this._postMessage({ type: "showError", message: `Failed to load: ${error}` });
     } finally {
@@ -920,7 +920,7 @@ export class TimeSheetPanel {
 
     for (const row of this._rows) {
       for (let i = 0; i < 7; i++) {
-        days[i] += row.days[i]?.hours ?? 0;
+        days[i] = (days[i] ?? 0) + (row.days[i]?.hours ?? 0);
       }
       weekTotal += row.weekTotal;
     }
@@ -979,6 +979,7 @@ export class TimeSheetPanel {
     if (rowIndex === -1) return;
 
     const row = this._rows[rowIndex];
+    if (!row) return;
 
     // If not new, mark entries for deletion via draft queue
     if (!row.isNew && this._draftQueue && this._draftModeManager?.isEnabled) {
@@ -1104,7 +1105,7 @@ export class TimeSheetPanel {
       row = sourceRows[0];
       for (const srcRow of sourceRows) {
         for (let i = 0; i < 7; i++) {
-          totalHoursPerDay[i] += srcRow.days[i]?.hours ?? 0;
+          totalHoursPerDay[i] = (totalHoursPerDay[i] ?? 0) + (srcRow.days[i]?.hours ?? 0);
         }
       }
     } else {
@@ -1114,6 +1115,7 @@ export class TimeSheetPanel {
         totalHoursPerDay[i] = row.days[i]?.hours ?? 0;
       }
     }
+    if (!row) return;
 
     const newRow = this._createEmptyRow();
     newRow.parentProjectId = row.parentProjectId;
@@ -1127,7 +1129,7 @@ export class TimeSheetPanel {
     newRow.comments = row.comments;
     // Copy hours but mark as dirty (new entries)
     for (let i = 0; i < 7; i++) {
-      const hours = totalHoursPerDay[i];
+      const hours = totalHoursPerDay[i] ?? 0;
       newRow.days[i] = {
         hours,
         originalHours: 0, // New row has no server entry
@@ -1838,6 +1840,7 @@ export class TimeSheetPanel {
       }, TIMESHEET_SOURCE);
     } else if (sourceCount === 1) {
       const entry = sourceEntries[0];
+      if (!entry) return;
       if (entry.isDraft || entry.entryId === null) {
         // Draft entry (not saved to server yet)
         // Use canonical resourceKey based on issueId:activityId:date (not rowId)
@@ -1991,17 +1994,19 @@ export class TimeSheetPanel {
         r.issueId === issueId &&
         r.activityId === activityId &&
         r.days[dayIndex]?.entryId === null &&
-        r.days[dayIndex]?.hours > 0
+        (r.days[dayIndex]?.hours ?? 0) > 0
       );
       if (newRowIndex !== -1) {
         const row = this._rows[newRowIndex];
-        // Set hours to 0 for this day
-        row.days[dayIndex] = { hours: 0, originalHours: 0, entryId: null, isDirty: false };
-        row.weekTotal = Object.values(row.days).reduce((sum, cell) => sum + cell.hours, 0);
-        // Remove row if it has no hours at all
-        if (row.weekTotal === 0) {
-          this._rows.splice(newRowIndex, 1);
-          this._clearCompletedRow(row.id);
+        if (row) {
+          // Set hours to 0 for this day
+          row.days[dayIndex] = { hours: 0, originalHours: 0, entryId: null, isDirty: false };
+          row.weekTotal = Object.values(row.days).reduce((sum, cell) => sum + cell.hours, 0);
+          // Remove row if it has no hours at all
+          if (row.weekTotal === 0) {
+            this._rows.splice(newRowIndex, 1);
+            this._clearCompletedRow(row.id);
+          }
         }
       }
     } else if (sourceEntries.length === 0 && newHours > 0) {
@@ -2023,6 +2028,7 @@ export class TimeSheetPanel {
     } else if (sourceEntries.length === 1) {
       // Update or delete the single source row
       const entry = sourceEntries[0];
+      if (!entry) return;
       const row = this._rows.find(r => r.id === entry.rowId);
       if (row) {
         row.days[dayIndex] = {
@@ -2086,10 +2092,11 @@ export class TimeSheetPanel {
 
     // Find all source rows
     const sourceRows = this._rows.filter(r => sourceRowIds.includes(r.id));
-    if (sourceRows.length === 0) return;
+    const firstSourceRow = sourceRows[0];
+    if (!firstSourceRow) return;
 
     // Get old value from first source row for undo
-    const oldValue = this._getFieldValue(sourceRows[0], field);
+    const oldValue = this._getFieldValue(firstSourceRow, field);
 
     // If multiple source rows and not confirmed, request confirm via toast
     if (sourceRows.length > 1 && !confirmed) {
@@ -2315,6 +2322,7 @@ export class TimeSheetPanel {
     // Sort by entryId to keep oldest (lowest ID) as target
     const sorted = [...sourceEntries].sort((a, b) => a.entryId - b.entryId);
     const targetEntry = sorted[0];
+    if (!targetEntry) return;
     const entriesToDelete = sorted.slice(1);
 
     // Sum all hours

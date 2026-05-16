@@ -14,7 +14,7 @@ const ISSUE_REF_PATTERN = /#(\d+)/;
 export function parseTargetIssueId(comment: string): number | null {
   if (!comment) return null;
   const match = comment.match(ISSUE_REF_PATTERN);
-  return match ? parseInt(match[1], 10) : null;
+  return match ? parseInt(match[1]!, 10) : null;
 }
 
 export interface ContributionSource {

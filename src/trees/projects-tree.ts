@@ -345,7 +345,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
 
       this.debouncedRefresh.cancel();
       this.refresh();
-      this.preloadMemberships(projects);
+      void this.preloadMemberships(projects);
     } finally {
       this.isLoadingProjects = false;
       // If our load was invalidated mid-flight, fire a refresh so VS Code

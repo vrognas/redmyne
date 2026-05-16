@@ -62,7 +62,7 @@ export function createConfiguredContextUpdater(
         const server = draftModeServer;
 
         // Load draft queue with server identity check (async, non-blocking).
-        hashString(serverUrl! + apiKey!).then(async (serverIdentity) => {
+        void hashString(serverUrl! + apiKey!).then(async (serverIdentity) => {
           try {
             const conflict =
               await deps.draftQueue.checkServerConflict(serverIdentity);

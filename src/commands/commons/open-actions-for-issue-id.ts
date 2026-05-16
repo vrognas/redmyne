@@ -34,7 +34,7 @@ export default async (
 
     const controller = new IssueController(issue.issue, server);
 
-    controller.listActions();
+    void controller.listActions();
   } catch (error) {
     vscode.window.showErrorMessage(errorToString(error));
   }

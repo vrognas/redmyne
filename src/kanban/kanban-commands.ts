@@ -56,7 +56,7 @@ export function registerKanbanCommands(
     vscode.commands.registerCommand("redmyne.kanban.add", async () => {
       const server = getServer();
       if (!server) {
-        showActionableError("Redmyne not configured", [
+        void showActionableError("Redmyne not configured", [
           { title: "Configure", command: "redmyne.configure" },
         ]);
         return;
@@ -168,7 +168,7 @@ export function registerKanbanCommands(
 
         const server = getServer();
         if (!server) {
-          showActionableError("Redmyne not configured", [
+          void showActionableError("Redmyne not configured", [
           { title: "Configure", command: "redmyne.configure" },
         ]);
           return;
@@ -205,7 +205,7 @@ export function registerKanbanCommands(
     vscode.commands.registerCommand("redmyne.kanban.refreshParentProjects", async () => {
       const server = getServer();
       if (!server) {
-        showActionableError("Redmyne not configured", [
+        void showActionableError("Redmyne not configured", [
           { title: "Configure", command: "redmyne.configure" },
         ]);
         return;
@@ -230,6 +230,7 @@ export function registerKanbanCommands(
           let updated = 0;
           for (let i = 0; i < tasks.length; i++) {
             const task = tasks[i];
+            if (!task) continue;
             progress.report({ increment: (100 / tasks.length), message: `${i + 1}/${tasks.length}` });
 
             const project = projectMap.get(task.linkedProjectId);
@@ -351,7 +352,7 @@ export function registerKanbanCommands(
 
         const server = getServer();
         if (!server) {
-          showActionableError("Redmyne not configured", [
+          void showActionableError("Redmyne not configured", [
             { title: "Configure", command: "redmyne.configure" },
           ]);
           return;
@@ -465,7 +466,7 @@ export function registerKanbanCommands(
 
         const server = getServer();
         if (!server) {
-          showActionableError("Redmyne not configured", [
+          void showActionableError("Redmyne not configured", [
             { title: "Configure", command: "redmyne.configure" },
           ]);
           return;
@@ -576,7 +577,7 @@ export function registerKanbanCommands(
 
         const server = getServer();
         if (!server) {
-          showActionableError("Redmyne not configured", [
+          void showActionableError("Redmyne not configured", [
             { title: "Configure", command: "redmyne.configure" },
           ]);
           return;

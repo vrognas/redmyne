@@ -198,7 +198,7 @@ export function countWorkingDays(
   const startDayIndex = from.getDay();
   for (let i = 0; i < remainingDays; i++) {
     const dayIndex = (startDayIndex + fullWeeks * 7 + i) % 7;
-    if (schedule[DAY_KEYS[dayIndex]] > 0) {
+    if (schedule[DAY_KEYS[dayIndex]!] > 0) {
       count++;
     }
   }
@@ -251,7 +251,7 @@ export function countAvailableHours(
   const startDayIndex = startNorm.getDay();
   for (let i = 0; i < remainingDays; i++) {
     const dayIndex = (startDayIndex + fullWeeks * 7 + i) % 7;
-    hours += schedule[DAY_KEYS[dayIndex]];
+    hours += schedule[DAY_KEYS[dayIndex]!];
   }
 
   workingDaysCache.set(key, hours);
@@ -271,7 +271,7 @@ export function getDayName(date: Date): keyof WeeklySchedule {
     "Fri",
     "Sat",
   ];
-  return days[date.getDay()];
+  return days[date.getDay()]!;
 }
 
 /**

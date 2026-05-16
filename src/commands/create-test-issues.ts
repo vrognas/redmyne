@@ -191,6 +191,7 @@ export function registerCreateTestIssuesCommand(
 
           for (let i = 0; i < testIssues.length; i++) {
             const issue = testIssues[i];
+            if (!issue) continue;
             progress.report({
               message: `Creating ${i + 1}/${testIssues.length}: ${issue.subject}`,
               increment: 100 / testIssues.length

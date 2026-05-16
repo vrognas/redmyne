@@ -176,9 +176,11 @@ export class KanbanController {
   ): Promise<void> {
     const index = this.tasks.findIndex((t) => t.id === id);
     if (index === -1) return;
+    const task = this.tasks[index];
+    if (!task) return;
 
     this.tasks[index] = {
-      ...this.tasks[index],
+      ...task,
       ...updates,
       updatedAt: new Date().toISOString(),
     };
@@ -196,9 +198,11 @@ export class KanbanController {
   ): Promise<void> {
     const index = this.tasks.findIndex((t) => t.id === id);
     if (index === -1) return;
+    const task = this.tasks[index];
+    if (!task) return;
 
     this.tasks[index] = {
-      ...this.tasks[index],
+      ...task,
       linkedParentProjectId,
       linkedParentProjectName,
       updatedAt: new Date().toISOString(),
@@ -221,9 +225,11 @@ export class KanbanController {
   async markDone(id: string): Promise<void> {
     const index = this.tasks.findIndex((t) => t.id === id);
     if (index === -1) return;
+    const task = this.tasks[index];
+    if (!task) return;
 
     this.tasks[index] = {
-      ...this.tasks[index],
+      ...task,
       completedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -234,9 +240,11 @@ export class KanbanController {
   async reopen(id: string): Promise<void> {
     const index = this.tasks.findIndex((t) => t.id === id);
     if (index === -1) return;
+    const task = this.tasks[index];
+    if (!task) return;
 
     this.tasks[index] = {
-      ...this.tasks[index],
+      ...task,
       completedAt: undefined,
       updatedAt: new Date().toISOString(),
     };
@@ -248,10 +256,12 @@ export class KanbanController {
     if (hours <= 0) return; // Reject non-positive hours
     const index = this.tasks.findIndex((t) => t.id === id);
     if (index === -1) return;
+    const task = this.tasks[index];
+    if (!task) return;
 
     this.tasks[index] = {
-      ...this.tasks[index],
-      loggedHours: this.tasks[index].loggedHours + hours,
+      ...task,
+      loggedHours: task.loggedHours + hours,
       updatedAt: new Date().toISOString(),
     };
     await this.persist();
@@ -285,20 +295,24 @@ export class KanbanController {
 
     // Ensure both tasks have sortOrder, then swap
     const prevTask = sameStatusTasks[currentIndex - 1];
+    if (!prevTask) return;
     const currentOrder = task.sortOrder ?? currentIndex;
     const prevOrder = prevTask.sortOrder ?? currentIndex - 1;
 
     // Find and update in main array
     const taskIdx = this.tasks.findIndex((t) => t.id === id);
     const prevIdx = this.tasks.findIndex((t) => t.id === prevTask.id);
+    const taskAtIdx = this.tasks[taskIdx];
+    const prevAtIdx = this.tasks[prevIdx];
+    if (!taskAtIdx || !prevAtIdx) return;
 
     this.tasks[taskIdx] = {
-      ...this.tasks[taskIdx],
+      ...taskAtIdx,
       sortOrder: prevOrder,
       updatedAt: new Date().toISOString(),
     };
     this.tasks[prevIdx] = {
-      ...this.tasks[prevIdx],
+      ...prevAtIdx,
       sortOrder: currentOrder,
       updatedAt: new Date().toISOString(),
     };
@@ -324,20 +338,24 @@ export class KanbanController {
 
     // Ensure both tasks have sortOrder, then swap
     const nextTask = sameStatusTasks[currentIndex + 1];
+    if (!nextTask) return;
     const currentOrder = task.sortOrder ?? currentIndex;
     const nextOrder = nextTask.sortOrder ?? currentIndex + 1;
 
     // Find and update in main array
     const taskIdx = this.tasks.findIndex((t) => t.id === id);
     const nextIdx = this.tasks.findIndex((t) => t.id === nextTask.id);
+    const taskAtIdx = this.tasks[taskIdx];
+    const nextAtIdx = this.tasks[nextIdx];
+    if (!taskAtIdx || !nextAtIdx) return;
 
     this.tasks[taskIdx] = {
-      ...this.tasks[taskIdx],
+      ...taskAtIdx,
       sortOrder: nextOrder,
       updatedAt: new Date().toISOString(),
     };
     this.tasks[nextIdx] = {
-      ...this.tasks[nextIdx],
+      ...nextAtIdx,
       sortOrder: currentOrder,
       updatedAt: new Date().toISOString(),
     };
@@ -368,24 +386,29 @@ export class KanbanController {
   ): Promise<void> {
     const index = this.tasks.findIndex((t) => t.id === id);
     if (index === -1) return;
+    const task = this.tasks[index];
+    if (!task) return;
 
     // Auto-pause any currently working task
     const activeIndex = this.tasks.findIndex((t) => t.timerPhase === "working");
     if (activeIndex >= 0 && activeIndex !== index) {
-      this.tasks[activeIndex] = {
-        ...this.tasks[activeIndex],
-        timerPhase: "paused",
-        updatedAt: new Date().toISOString(),
-      };
+      const activeTask = this.tasks[activeIndex];
+      if (activeTask) {
+        this.tasks[activeIndex] = {
+          ...activeTask,
+          timerPhase: "paused",
+          updatedAt: new Date().toISOString(),
+        };
+      }
     }
 
     // Start timer on this task
     this.tasks[index] = {
-      ...this.tasks[index],
+      ...task,
       timerPhase: "working",
       timerSecondsLeft: reset
         ? this.workDurationSeconds
-        : (this.tasks[index].timerSecondsLeft ?? this.workDurationSeconds),
+        : (task.timerSecondsLeft ?? this.workDurationSeconds),
       activityId,
       activityName,
       lastActiveAt: new Date().toISOString(),
@@ -403,11 +426,13 @@ export class KanbanController {
   async pauseTimer(id: string): Promise<void> {
     const index = this.tasks.findIndex((t) => t.id === id);
     if (index === -1) return;
-    if (this.tasks[index].timerPhase !== "working") return;
+    const task = this.tasks[index];
+    if (!task) return;
+    if (task.timerPhase !== "working") return;
 
     this.stopInterval();
     this.tasks[index] = {
-      ...this.tasks[index],
+      ...task,
       timerPhase: "paused",
       updatedAt: new Date().toISOString(),
     };
@@ -422,20 +447,25 @@ export class KanbanController {
   async resumeTimer(id: string): Promise<void> {
     const index = this.tasks.findIndex((t) => t.id === id);
     if (index === -1) return;
-    if (this.tasks[index].timerPhase !== "paused") return;
+    const task = this.tasks[index];
+    if (!task) return;
+    if (task.timerPhase !== "paused") return;
 
     // Auto-pause any currently working task
     const activeIndex = this.tasks.findIndex((t) => t.timerPhase === "working");
     if (activeIndex >= 0) {
-      this.tasks[activeIndex] = {
-        ...this.tasks[activeIndex],
-        timerPhase: "paused",
-        updatedAt: new Date().toISOString(),
-      };
+      const activeTask = this.tasks[activeIndex];
+      if (activeTask) {
+        this.tasks[activeIndex] = {
+          ...activeTask,
+          timerPhase: "paused",
+          updatedAt: new Date().toISOString(),
+        };
+      }
     }
 
     this.tasks[index] = {
-      ...this.tasks[index],
+      ...task,
       timerPhase: "working",
       lastActiveAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -452,13 +482,15 @@ export class KanbanController {
   async stopTimer(id: string): Promise<void> {
     const index = this.tasks.findIndex((t) => t.id === id);
     if (index === -1) return;
+    const task = this.tasks[index];
+    if (!task) return;
 
-    if (this.tasks[index].timerPhase === "working") {
+    if (task.timerPhase === "working") {
       this.stopInterval();
     }
 
     this.tasks[index] = {
-      ...this.tasks[index],
+      ...task,
       timerPhase: undefined,
       timerSecondsLeft: undefined,
       lastActiveAt: undefined,
@@ -475,13 +507,15 @@ export class KanbanController {
   async moveToTodo(id: string): Promise<void> {
     const index = this.tasks.findIndex((t) => t.id === id);
     if (index === -1) return;
+    const task = this.tasks[index];
+    if (!task) return;
 
-    if (this.tasks[index].timerPhase === "working") {
+    if (task.timerPhase === "working") {
       this.stopInterval();
     }
 
     this.tasks[index] = {
-      ...this.tasks[index],
+      ...task,
       timerPhase: undefined,
       timerSecondsLeft: undefined,
       activityId: undefined,
@@ -503,9 +537,11 @@ export class KanbanController {
   async moveToDoing(id: string): Promise<void> {
     const index = this.tasks.findIndex((t) => t.id === id);
     if (index === -1) return;
+    const task = this.tasks[index];
+    if (!task) return;
 
     this.tasks[index] = {
-      ...this.tasks[index],
+      ...task,
       doingAt: new Date().toISOString(),
       timerSecondsLeft: this.workDurationSeconds,
       completedAt: undefined, // Clear if reopening from Done
@@ -522,9 +558,11 @@ export class KanbanController {
   async resetTimer(id: string): Promise<void> {
     const index = this.tasks.findIndex((t) => t.id === id);
     if (index === -1) return;
+    const task = this.tasks[index];
+    if (!task) return;
 
     this.tasks[index] = {
-      ...this.tasks[index],
+      ...task,
       timerSecondsLeft: this.workDurationSeconds,
       timerPhase: "pending",
       updatedAt: new Date().toISOString(),
@@ -555,16 +593,18 @@ export class KanbanController {
     if (activeIndex < 0) return;
 
     const task = this.tasks[activeIndex];
+    if (!task) return;
     const secondsLeft = task.timerSecondsLeft ?? 0;
 
     if (secondsLeft <= 1) {
-      this.tasks[activeIndex] = {
+      const completed: KanbanTask = {
         ...task,
         timerSecondsLeft: 0,
         updatedAt: new Date().toISOString(),
       };
+      this.tasks[activeIndex] = completed;
       this.stopInterval();
-      this._onTimerComplete.fire(this.tasks[activeIndex]);
+      this._onTimerComplete.fire(completed);
       // Timer completion changes task state, so notify data subscribers.
       this._onTasksChange.fire();
     } else {
@@ -637,6 +677,7 @@ export class KanbanController {
     const now = Date.now();
     for (let i = 0; i < this.tasks.length; i++) {
       const task = this.tasks[i];
+      if (!task) continue;
       if (task.timerPhase === "working" && task.lastActiveAt && task.timerSecondsLeft !== undefined) {
         const lastActive = new Date(task.lastActiveAt).getTime();
         const elapsedSeconds = Math.floor((now - lastActive) / 1000);

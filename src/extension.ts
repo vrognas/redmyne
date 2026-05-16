@@ -282,19 +282,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     getUserFte: () => cleanupResources.userFte,
   });
   // Defer initial update to avoid blocking activation
-  setImmediate(() => cleanupResources.workloadStatusBar?.update());
+  setImmediate(() => { void cleanupResources.workloadStatusBar?.update(); });
 
   // Update on tree refresh (workload bar + Gantt if open)
   projectsTree.onDidChangeTreeData(() => {
-    cleanupResources.workloadStatusBar?.update();
+    void cleanupResources.workloadStatusBar?.update();
     // Refresh Gantt if open
-    vscode.commands.executeCommand("redmyne.refreshGanttData");
+    void vscode.commands.executeCommand("redmyne.refreshGanttData");
   });
 
   // Listen for secret changes
   context.subscriptions.push(
     secretManager.onSecretChanged(() => {
-      updateConfiguredContext();
+      void updateConfiguredContext();
     })
   );
 
@@ -312,33 +312,35 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     setUserFte: (fte) => {
       cleanupResources.userFte = fte;
     },
-    updateWorkloadStatusBar: () => cleanupResources.workloadStatusBar?.update(),
+    updateWorkloadStatusBar: () => { void cleanupResources.workloadStatusBar?.update(); },
   });
 
   // Initial check
-  updateConfiguredContext();
+  void updateConfiguredContext();
 
   // Listen for configuration changes (debounced)
   cleanupResources.debouncedConfigChange = debounce(
     CONFIG_DEBOUNCE_MS,
-    async (event: vscode.ConfigurationChangeEvent) => {
-      // Only update server context for server-related config changes
-      // Skip for UI-only configs (statusBar, workingHours)
-      if (
-        !event.affectsConfiguration("redmyne.statusBar") &&
-        !event.affectsConfiguration("redmyne.workingHours")
-      ) {
-        await updateConfiguredContext();
-      }
-      // Re-initialize status bar on config change
-      if (event.affectsConfiguration("redmyne.statusBar")) {
-        cleanupResources.workloadStatusBar?.reinitialize();
-        cleanupResources.workloadStatusBar?.update();
-      }
-      // Update status bar on schedule change
-      if (event.affectsConfiguration("redmyne.workingHours")) {
-        cleanupResources.workloadStatusBar?.update();
-      }
+    (event: vscode.ConfigurationChangeEvent) => {
+      void (async () => {
+        // Only update server context for server-related config changes
+        // Skip for UI-only configs (statusBar, workingHours)
+        if (
+          !event.affectsConfiguration("redmyne.statusBar") &&
+          !event.affectsConfiguration("redmyne.workingHours")
+        ) {
+          await updateConfiguredContext();
+        }
+        // Re-initialize status bar on config change
+        if (event.affectsConfiguration("redmyne.statusBar")) {
+          cleanupResources.workloadStatusBar?.reinitialize();
+          void cleanupResources.workloadStatusBar?.update();
+        }
+        // Update status bar on schedule change
+        if (event.affectsConfiguration("redmyne.workingHours")) {
+          void cleanupResources.workloadStatusBar?.update();
+        }
+      })();
     }
   );
 

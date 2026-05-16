@@ -70,7 +70,7 @@ export async function confirmLogTimeOnClosedIssues(
   // Show single confirmation for batch
   const message =
     closedIssues.length === 1
-      ? `Issue #${closedIssues[0].id} is closed. Log time anyway?`
+      ? `Issue #${closedIssues[0]!.id} is closed. Log time anyway?`
       : `${closedIssues.length} issues are closed (#${closedIssues.map((i) => i.id).join(", #")}). Log time anyway?`;
 
   const choice = await vscode.window.showWarningMessage(

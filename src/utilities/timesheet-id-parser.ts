@@ -33,9 +33,9 @@ function parseAggregatedSegments(value: string): AggregatedSegments | null {
   }
 
   return {
-    issueIdRaw: match[1],
-    activityIdRaw: match[2],
-    tail: match[3],
+    issueIdRaw: match[1]!,
+    activityIdRaw: match[2]!,
+    tail: match[3]!,
   };
 }
 

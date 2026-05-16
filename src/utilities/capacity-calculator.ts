@@ -141,7 +141,7 @@ export function calculateDailyCapacity(
   while (current <= end) {
     const dateStr = current.toISOString().slice(0, 10);
     const dayOfWeek = current.getUTCDay();  // Use UTC day
-    const capacityHours = schedule[DAY_KEYS[dayOfWeek]];
+    const capacityHours = schedule[DAY_KEYS[dayOfWeek]!];
 
     // Skip non-working days
     if (capacityHours > 0) {
@@ -185,7 +185,7 @@ function generateEmptyCapacity(
   while (current <= end) {
     const dateStr = current.toISOString().slice(0, 10);
     const dayOfWeek = current.getUTCDay();  // Use UTC day
-    const capacityHours = schedule[DAY_KEYS[dayOfWeek]];
+    const capacityHours = schedule[DAY_KEYS[dayOfWeek]!];
 
     if (capacityHours > 0) {
       result.push({
@@ -239,8 +239,8 @@ function aggregatePeriod(days: DailyCapacity[]): PeriodCapacity {
     throw new Error("Cannot aggregate empty period");
   }
 
-  const startDate = days[0].date;
-  const endDate = days[days.length - 1].date;
+  const startDate = days[0]!.date;
+  const endDate = days[days.length - 1]!.date;
 
   // Sum hours across all days
   let loadHours = 0;
@@ -587,7 +587,7 @@ export function calculateScheduledCapacity(
     const cursor = new Date(issueStart);
     while (cursor <= issueDue) {
       const dow = cursor.getDay();
-      const dayCapacity = schedule[DAY_KEYS[dow]];
+      const dayCapacity = schedule[DAY_KEYS[dow]!];
       available75 += dayCapacity * PREDICTION_CAPACITY_FACTOR;
       cursor.setDate(cursor.getDate() + 1);
     }
@@ -638,7 +638,7 @@ export function calculateScheduledCapacity(
   while (current <= end) {
     const dateStr = formatLocalDate(current);
     const dayOfWeek = current.getDay();  // Local day
-    const capacityHours = schedule[DAY_KEYS[dayOfWeek]];
+    const capacityHours = schedule[DAY_KEYS[dayOfWeek]!];
 
     // Skip non-working days
     if (capacityHours > 0) {

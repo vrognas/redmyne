@@ -102,6 +102,6 @@ export function registerQuickIssueCommands(deps: QuickIssueCommandsDeps): void {
   // Refresh after issue update (status change, etc.) - updates workload and trees
   registerCommand("refreshAfterIssueUpdate", () => {
     deps.projectsTree.refresh();
-    deps.getWorkloadStatusBar()?.update();
+    void deps.getWorkloadStatusBar()?.update();
   });
 }

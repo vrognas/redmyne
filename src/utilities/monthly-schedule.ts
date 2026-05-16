@@ -33,7 +33,7 @@ export function getMonthKey(date: Date): MonthKey {
  */
 function parseMonthKey(key: MonthKey): { year: number; month: number } {
   const [year, month] = key.split("-").map(Number);
-  return { year, month };
+  return { year: year!, month: month! };
 }
 
 /**

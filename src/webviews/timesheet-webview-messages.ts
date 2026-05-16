@@ -472,8 +472,8 @@ export function buildWeekInfo(monday: Date): WeekInfo {
   return {
     weekNumber: getISOWeekNumber(monday),
     year: monday.getFullYear(),
-    startDate: dayDates[0],
-    endDate: dayDates[6],
+    startDate: dayDates[0] ?? "",
+    endDate: dayDates[6] ?? "",
     dayDates,
   };
 }

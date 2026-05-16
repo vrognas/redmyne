@@ -511,6 +511,7 @@ function parseSearchOperators(query: string): {
   const matches = query.matchAll(OPERATOR_REGEX);
   for (const match of matches) {
     const [fullMatch, operator, value] = match;
+    if (!operator || value === undefined) continue;
     const cleanValue = value.replace(/^"|"$/g, "").toLowerCase();
     if (operator.toLowerCase() === "project") {
       projectFilter = cleanValue;
@@ -615,7 +616,7 @@ function fuzzyFilterIssues(
   };
 
   if (tokens.length === 1) {
-    const results = fuse.search(tokens[0]);
+    const results = fuse.search(tokens[0]!);
     const scored = results.map(r => ({
       score: applyBoosts(r.score ?? 0, r.item.original),
       item: r.item,
@@ -632,7 +633,7 @@ function fuzzyFilterIssues(
   });
 
   // Find items present in ALL token results, sum scores
-  const firstMap = tokenResultMaps[0];
+  const firstMap = tokenResultMaps[0]!;
   const intersection: Array<{ totalScore: number; item: SearchableIssue }> = [];
 
   for (const [id, { score, item }] of firstMap) {
@@ -640,7 +641,7 @@ function fuzzyFilterIssues(
     let inAll = true;
 
     for (let i = 1; i < tokenResultMaps.length; i++) {
-      const match = tokenResultMaps[i].get(id);
+      const match = tokenResultMaps[i]!.get(id);
       if (!match) {
         inAll = false;
         break;
@@ -863,7 +864,7 @@ export async function pickIssueWithSearch(
         quickPick.items = baseItems;
         return;
       }
-      debouncedSearch(query);
+      void debouncedSearch(query);
     });
 
     quickPick.onDidAccept(() => {
@@ -872,7 +873,7 @@ export async function pickIssueWithSearch(
     });
 
     quickPick.onDidChangeSelection((items) => {
-      if (items.length > 0) handleSelection(items[0]);
+      if (items.length > 0) handleSelection(items[0]!);
     });
 
     quickPick.onDidHide(() => {
@@ -887,7 +888,7 @@ export async function pickIssueWithSearch(
     quickPick.show();
 
     // Load data in background — picker is already visible
-    (async () => {
+    void (async () => {
       try {
         // Phase 1: Fetch issues (from cache if warm) + project paths in parallel
         const [{ openIssues: myOpenIssues, closedIssues: myClosedIssues }, pathMap] = await Promise.all([
@@ -1290,7 +1291,7 @@ export async function pickIssue(
         quickPick.items = baseItems;
         return;
       }
-      debouncedSearch(query);
+      void debouncedSearch(query);
     });
 
     quickPick.onDidAccept(() => {
@@ -1299,7 +1300,7 @@ export async function pickIssue(
     });
 
     quickPick.onDidChangeSelection((items) => {
-      if (items.length > 0) handleSelection(items[0]);
+      if (items.length > 0) handleSelection(items[0]!);
     });
 
     quickPick.onDidHide(() => {

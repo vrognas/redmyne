@@ -1195,7 +1195,7 @@ export class GanttPanel {
         break;
       case "updateDates":
         if (message.issueId && this._server) {
-          this._updateIssueDates(
+          void this._updateIssueDates(
             message.issueId,
             message.startDate ?? null,
             message.dueDate ?? null
@@ -1206,7 +1206,7 @@ export class GanttPanel {
         // Remove draft for an issue (used by undo in draft mode)
         if (message.issueId && this._draftModeManager?.queue) {
           const resourceKey = `issue:${message.issueId}:dates`;
-          this._draftModeManager.queue.removeByKey(resourceKey).then(() => {
+          void this._draftModeManager.queue.removeByKey(resourceKey).then(() => {
             // Update local UI to show old dates
             const issue = this._issueById.get(message.issueId);
             if (issue && message.startDate !== undefined) {
@@ -1271,17 +1271,17 @@ export class GanttPanel {
         break;
       case "deleteRelation":
         if (message.relationId && this._server) {
-          this._deleteRelation(message.relationId);
+          void this._deleteRelation(message.relationId);
         }
         break;
       case "updateRelationDelay":
         if (message.relationId && message.fromId && message.toId && this._server) {
-          this._updateRelationDelay(message.relationId, message.fromId, message.toId);
+          void this._updateRelationDelay(message.relationId, message.fromId, message.toId);
         }
         break;
       case "createRelation":
         if (message.issueId && message.targetIssueId && message.relationType && this._server) {
-          this._createRelation(message.issueId, message.targetIssueId, message.relationType as CreatableRelationType, message.delay);
+          void this._createRelation(message.issueId, message.targetIssueId, message.relationType as CreatableRelationType, message.delay);
         }
         break;
       case "toggleDependencies":
@@ -1375,12 +1375,12 @@ export class GanttPanel {
         break;
       case "undoRelation":
         if (this._server && message.operation) {
-          this._handleUndoRelation(message as { operation: string; relationId?: number; issueId?: number; targetIssueId?: number; relationType?: string });
+          void this._handleUndoRelation(message as { operation: string; relationId?: number; issueId?: number; targetIssueId?: number; relationType?: string });
         }
         break;
       case "redoRelation":
         if (this._server && message.operation) {
-          this._handleRedoRelation(message as { operation: string; relationId?: number; issueId?: number; targetIssueId?: number; relationType?: string });
+          void this._handleRedoRelation(message as { operation: string; relationId?: number; issueId?: number; targetIssueId?: number; relationType?: string });
         }
         break;
       case "openInBrowser":
@@ -2192,7 +2192,7 @@ export class GanttPanel {
     // Map parentKey to its visible Y position
     const parentYMap = new Map<string, number>();
     for (let i = 0; i < filteredRowCount; i++) {
-      const row = filteredRows[i];
+      const row = filteredRows[i]!;
       if (row.isVisible) {
         const y = visibleIdx * barHeight;
         initialYPositions.push(y);
@@ -2235,7 +2235,7 @@ export class GanttPanel {
     if (useProjectGrouping) {
       // Multiple projects: group by project headers
       for (let i = 0; i < visibleRowCount; i++) {
-        const row = visibleRows[i];
+        const row = visibleRows[i]!;
         if ((row.type === "project" || row.type === "time-group") && i > 0) {
           groupRanges.push({ startIdx: currentGroupStart, endIdx: i - 1, groupIdx: currentGroupIdx });
           currentGroupStart = i;
@@ -2251,7 +2251,7 @@ export class GanttPanel {
         : 1;
 
       for (let i = 0; i < visibleRowCount; i++) {
-        const row = visibleRows[i];
+        const row = visibleRows[i]!;
         // New family starts at each top-level issue (at minIssueDepth)
         if (row.type === "issue" && row.depth === minIssueDepth) {
           if (currentGroupStart < i) {
@@ -2270,9 +2270,9 @@ export class GanttPanel {
 
     // Helper to calculate gap before a row (for stripe height calculations)
     const getGapBefore = (_row: typeof visibleRows[0], idx: number): number => {
-      if (idx === 0) return rowYPositions[0]; // Gap from top of chart to first row
+      if (idx === 0) return rowYPositions[0]!; // Gap from top of chart to first row
       // Gap = current row Y - (previous row Y + previous row height)
-      return rowYPositions[idx] - (rowYPositions[idx - 1] + rowHeights[idx - 1]);
+      return rowYPositions[idx]! - (rowYPositions[idx - 1]! + rowHeights[idx - 1]!);
     };
 
     // All groups get visual enclosure, alternating between two subtle treatments
@@ -2281,10 +2281,10 @@ export class GanttPanel {
       .map(g => {
         // Include the gap BEFORE the first row in the zebra stripe
         // This makes the gap visually "belong" to this group
-        const firstRow = visibleRows[g.startIdx];
+        const firstRow = visibleRows[g.startIdx]!;
         const gapBeforeFirst = getGapBefore(firstRow, g.startIdx);
-        const startY = rowYPositions[g.startIdx] - gapBeforeFirst;
-        const endY = rowYPositions[g.endIdx] + rowHeights[g.endIdx];
+        const startY = rowYPositions[g.startIdx]! - gapBeforeFirst;
+        const endY = rowYPositions[g.endIdx]! + rowHeights[g.endIdx]!;
         const height = endY - startY;
         // Alternate: even groups (including first) = lower alpha, odd groups = higher alpha
         const opacity = g.groupIdx % 2 === 0 ? 0.03 : 0.06;
@@ -2294,10 +2294,10 @@ export class GanttPanel {
         // This ensures collapse correctly removes hidden rows' gaps
         const rowContributions: Record<string, number> = {};
         for (let i = g.startIdx; i <= g.endIdx; i++) {
-          const row = visibleRows[i];
+          const row = visibleRows[i]!;
           // Gap owned: first row includes stripe-leading gap, others own their preceding gap
           const gapOwned = i === g.startIdx ? gapBeforeFirst : getGapBefore(row, i);
-          rowContributions[row.collapseKey] = gapOwned + rowHeights[i];
+          rowContributions[row.collapseKey] = gapOwned + rowHeights[i]!;
         }
 
         return `<rect class="zebra-stripe" x="0" y="${startY}" width="100%" height="${height}" opacity="${opacity}" data-first-row-key="${firstRow.collapseKey}" data-original-y="${startY}" data-original-height="${height}" data-row-contributions='${JSON.stringify(rowContributions)}' />`;
@@ -2311,8 +2311,8 @@ export class GanttPanel {
     const subtreeEndIndex = new Array<number>(visibleRows.length);
     const parentStack: number[] = [];
     for (let i = 0; i < visibleRows.length; i++) {
-      const depth = visibleRows[i].depth;
-      while (parentStack.length > 0 && depth <= visibleRows[parentStack[parentStack.length - 1]].depth) {
+      const depth = visibleRows[i]!.depth;
+      while (parentStack.length > 0 && depth <= visibleRows[parentStack[parentStack.length - 1]!]!.depth) {
         const idx = parentStack.pop()!;
         subtreeEndIndex[idx] = i - 1;
       }
@@ -2325,7 +2325,7 @@ export class GanttPanel {
 
     const continuousIndentLines: string[] = [];
     for (let i = 0; i < visibleRows.length; i++) {
-      const row = visibleRows[i];
+      const row = visibleRows[i]!;
 
       // Only process parent rows (rows that have children)
       if (!row.hasChildren) continue;
@@ -2333,14 +2333,14 @@ export class GanttPanel {
       const parentDepth = row.depth;
       const firstDescendantIndex = i + 1;
       if (firstDescendantIndex >= visibleRows.length) continue;
-      if (visibleRows[firstDescendantIndex].depth <= parentDepth) continue;
-      const lastDescendantIndex = subtreeEndIndex[i];
+      if (visibleRows[firstDescendantIndex]!.depth <= parentDepth) continue;
+      const lastDescendantIndex = subtreeEndIndex[i]!;
       if (lastDescendantIndex <= i) continue;
 
       // Draw line at parent's depth position (guides appear inside children's indent area)
       const lineX = 8 + parentDepth * indentSize;
-      const startY = rowYPositions[firstDescendantIndex];
-      const endY = rowYPositions[lastDescendantIndex] + barHeight;
+      const startY = rowYPositions[firstDescendantIndex]!;
+      const endY = rowYPositions[lastDescendantIndex]! + barHeight;
 
       continuousIndentLines.push(
         `<line class="indent-guide-line" data-for-parent="${row.collapseKey}" x1="${lineX}" y1="${startY}" x2="${lineX}" y2="${endY}" stroke="var(--vscode-tree-indentGuidesStroke)" stroke-width="1" opacity="0.4"/>`
@@ -2399,8 +2399,8 @@ export class GanttPanel {
     // Generate labels using delegated functions
     const labels = filteredRows
       .map((row, idx) => {
-        const y = initialYPositions[idx];
-        const originalY = filteredRowYPositions[idx];
+        const y = initialYPositions[idx]!;
+        const originalY = filteredRowYPositions[idx]!;
         if (row.type === "project") return generateProjectLabel(row, idx, y, originalY, renderContext);
         if (row.type === "time-group") return generateTimeGroupLabel(row, idx, y, originalY, renderContext);
         return generateIssueLabel(row, idx, y, originalY, renderContext);
@@ -2409,29 +2409,29 @@ export class GanttPanel {
 
     // Column cells - delegate to generator functions
     const idCells = filteredRows
-      .map((row, idx) => generateIdCell(row, initialYPositions[idx], filteredRowYPositions[idx], renderContext))
+      .map((row, idx) => generateIdCell(row, initialYPositions[idx]!, filteredRowYPositions[idx]!, renderContext))
       .join("");
 
     const startDateCells = filteredRows
-      .map((row, idx) => generateStartDateCell(row, initialYPositions[idx], filteredRowYPositions[idx], renderContext))
+      .map((row, idx) => generateStartDateCell(row, initialYPositions[idx]!, filteredRowYPositions[idx]!, renderContext))
       .join("");
 
     const statusCells = filteredRows
-      .map((row, idx) => generateStatusCell(row, initialYPositions[idx], filteredRowYPositions[idx], renderContext))
+      .map((row, idx) => generateStatusCell(row, initialYPositions[idx]!, filteredRowYPositions[idx]!, renderContext))
       .join("");
 
     const dueCells = filteredRows
-      .map((row, idx) => generateDueDateCell(row, initialYPositions[idx], filteredRowYPositions[idx], renderContext))
+      .map((row, idx) => generateDueDateCell(row, initialYPositions[idx]!, filteredRowYPositions[idx]!, renderContext))
       .join("");
 
     const assigneeCells = filteredRows
-      .map((row, idx) => generateAssigneeCell(row, initialYPositions[idx], filteredRowYPositions[idx], renderContext))
+      .map((row, idx) => generateAssigneeCell(row, initialYPositions[idx]!, filteredRowYPositions[idx]!, renderContext))
       .join("");
 
     // Right bars (scrollable timeline) - render all rows for instant toggle
     // Generate bars for all rows (hidden rows have visibility:hidden)
     const bars = filteredRows
-      .map((row, idx) => generateIssueBar(row, idx, initialYPositions[idx], filteredRowYPositions[idx], renderContext))
+      .map((row, idx) => generateIssueBar(row, idx, initialYPositions[idx]!, filteredRowYPositions[idx]!, renderContext))
       .join("");
 
     // Dependency arrows - draw from end of source to start of target
@@ -2456,7 +2456,7 @@ export class GanttPanel {
           ((endPlusOne.getTime() - minDate.getTime()) /
             (maxDate.getTime() - minDate.getTime())) *
           timelineWidth;
-        const y = rowYPositions[idx] + barHeight / 2;
+        const y = rowYPositions[idx]! + barHeight / 2;
         issuePositions.set(issue.id, { startX, endX, y });
       }
     });
@@ -2500,7 +2500,7 @@ export class GanttPanel {
           const target = issuePositions.get(rel.targetId);
           if (!source || !target) return null;
 
-          const style = relationStyles[rel.type] || relationStyles.relates;
+          const style = (relationStyles[rel.type] || relationStyles.relates)!;
           const arrowSize = 4;
           const sameRow = Math.abs(source.y - target.y) < 5;
 
@@ -3121,7 +3121,7 @@ export class GanttPanel {
   private _getStatusColor(
     status: FlexibilityScore["status"] | null
   ): string {
-    const entry = GanttPanel.STATUS_COLORS[status ?? "default"] ?? GanttPanel.STATUS_COLORS.default;
+    const entry = (GanttPanel.STATUS_COLORS[status ?? "default"] ?? GanttPanel.STATUS_COLORS.default)!;
     return entry.cssVar;
   }
 
@@ -3129,7 +3129,7 @@ export class GanttPanel {
   private _getStatusTextColor(
     status: FlexibilityScore["status"] | null
   ): string {
-    const entry = GanttPanel.STATUS_COLORS[status ?? "default"] ?? GanttPanel.STATUS_COLORS.default;
+    const entry = (GanttPanel.STATUS_COLORS[status ?? "default"] ?? GanttPanel.STATUS_COLORS.default)!;
     return entry.darkText ? "rgba(0,0,0,0.87)" : "rgba(255,255,255,0.95)";
   }
 
@@ -3137,7 +3137,7 @@ export class GanttPanel {
   private _getStatusOpacity(
     status: FlexibilityScore["status"] | null
   ): number {
-    const entry = GanttPanel.STATUS_COLORS[status ?? "default"] ?? GanttPanel.STATUS_COLORS.default;
+    const entry = (GanttPanel.STATUS_COLORS[status ?? "default"] ?? GanttPanel.STATUS_COLORS.default)!;
     return entry.opacity;
   }
 

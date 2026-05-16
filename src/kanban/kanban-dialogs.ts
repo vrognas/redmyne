@@ -371,7 +371,7 @@ async function pickIssueForTask(server: IRedmineServer): Promise<Issue | undefin
         quickPick.items = items;
         return;
       }
-      debouncedSearch(query);
+      void debouncedSearch(query);
     });
 
     quickPick.onDidAccept(() => {
@@ -380,7 +380,8 @@ async function pickIssueForTask(server: IRedmineServer): Promise<Issue | undefin
     });
 
     quickPick.onDidChangeSelection((sel) => {
-      if (sel.length > 0) handleSelection(sel[0]);
+      const first = sel[0];
+      if (first) handleSelection(first);
     });
 
     quickPick.onDidHide(() => {

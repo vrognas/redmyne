@@ -259,7 +259,7 @@ function formatRelationsCompact(relations: IssueRelation[]): string {
     if (!groups[rel.relation_type]) {
       groups[rel.relation_type] = [];
     }
-    groups[rel.relation_type].push(rel.issue_to_id);
+    groups[rel.relation_type]!.push(rel.issue_to_id);
   }
 
   const lines: string[] = [];

@@ -19,8 +19,8 @@ const AVATAR_COLOR_COUNT = 12;
 /** Extract initials from full name (e.g., "Viktor Rognås" → "VR") */
 export function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  if (parts.length === 1) return parts[0]!.substring(0, 2).toUpperCase();
+  return (parts[0]!.charAt(0) + parts[parts.length - 1]!.charAt(0)).toUpperCase();
 }
 
 /** Generate consistent fill + stroke color indices from name (144 unique combos) */
@@ -51,8 +51,8 @@ export function formatHoursAsTime(hours: number | null): string {
 export function formatShortName(name: string): string {
   const parts = name.trim().split(/\s+/);
   if (parts.length === 1) return name;
-  const firstName = parts[0];
-  const lastInitial = parts[parts.length - 1][0];
+  const firstName = parts[0]!;
+  const lastInitial = parts[parts.length - 1]![0];
   return `${firstName} ${lastInitial}.`;
 }
 
@@ -66,7 +66,7 @@ function formatDateWithWeekday(dateStr: string | null): string {
 /** Get day name key for WeeklySchedule lookup */
 function getDayKey(date: Date): keyof WeeklySchedule {
   const keys: (keyof WeeklySchedule)[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  return keys[date.getDay()];
+  return keys[date.getDay()]!;
 }
 
 // ============================================================================
@@ -904,7 +904,7 @@ function generateBarBadges(
   const showBlocker = blockerCount > 0 && !issue.isClosed;
   const blockerBadgeW = showBlocker ? 28 : 0;
   const blockerLabel = showBlocker ? `⏳${blockerCount}` : "";
-  const firstBlockerId = showBlocker ? issue.blockedBy[0].id : null;
+  const firstBlockerId = showBlocker ? issue.blockedBy[0]!.id : null;
   const blockerBadgeStartX = startX - blockerBadgeW - 16;
   const blockerBadgeCenterX = blockerBadgeStartX + blockerBadgeW / 2;
   const blockerColor = blockerCount >= 2 ? "var(--vscode-charts-red)" : "var(--vscode-charts-yellow)";
@@ -1004,24 +1004,24 @@ export function generateZebraStripes(
   rowHeights: number[]
 ): string {
   const getGapBefore = (_row: GanttRow, idx: number): number => {
-    if (idx === 0) return rowYPositions[0];
-    return rowYPositions[idx] - (rowYPositions[idx - 1] + rowHeights[idx - 1]);
+    if (idx === 0) return rowYPositions[0]!;
+    return rowYPositions[idx]! - (rowYPositions[idx - 1]! + rowHeights[idx - 1]!);
   };
 
   return groupRanges
     .map(g => {
-      const firstRow = visibleRows[g.startIdx];
+      const firstRow = visibleRows[g.startIdx]!;
       const gapBeforeFirst = getGapBefore(firstRow, g.startIdx);
-      const startY = rowYPositions[g.startIdx] - gapBeforeFirst;
-      const endY = rowYPositions[g.endIdx] + rowHeights[g.endIdx];
+      const startY = rowYPositions[g.startIdx]! - gapBeforeFirst;
+      const endY = rowYPositions[g.endIdx]! + rowHeights[g.endIdx]!;
       const height = endY - startY;
       const opacity = g.groupIdx % 2 === 0 ? 0.03 : 0.06;
 
       const rowContributions: Record<string, number> = {};
       for (let i = g.startIdx; i <= g.endIdx; i++) {
-        const row = visibleRows[i];
+        const row = visibleRows[i]!;
         const gapOwned = i === g.startIdx ? gapBeforeFirst : getGapBefore(row, i);
-        rowContributions[row.collapseKey] = gapOwned + rowHeights[i];
+        rowContributions[row.collapseKey] = gapOwned + rowHeights[i]!;
       }
 
       return `<rect class="zebra-stripe" x="0" y="${startY}" width="100%" height="${height}" opacity="${opacity}" data-first-row-key="${firstRow.collapseKey}" data-original-y="${startY}" data-original-height="${height}" data-row-contributions='${JSON.stringify(rowContributions)}' />`;
@@ -1040,8 +1040,8 @@ export function generateIndentGuides(
   const parentStack: number[] = [];
 
   for (let i = 0; i < visibleRows.length; i++) {
-    const depth = visibleRows[i].depth;
-    while (parentStack.length > 0 && depth <= visibleRows[parentStack[parentStack.length - 1]].depth) {
+    const depth = visibleRows[i]!.depth;
+    while (parentStack.length > 0 && depth <= visibleRows[parentStack[parentStack.length - 1]!]!.depth) {
       const idx = parentStack.pop()!;
       subtreeEndIndex[idx] = i - 1;
     }
@@ -1054,19 +1054,19 @@ export function generateIndentGuides(
 
   const lines: string[] = [];
   for (let i = 0; i < visibleRows.length; i++) {
-    const row = visibleRows[i];
+    const row = visibleRows[i]!;
     if (!row.hasChildren) continue;
 
     const parentDepth = row.depth;
     const firstDescendantIndex = i + 1;
     if (firstDescendantIndex >= visibleRows.length) continue;
-    if (visibleRows[firstDescendantIndex].depth <= parentDepth) continue;
-    const lastDescendantIndex = subtreeEndIndex[i];
+    if (visibleRows[firstDescendantIndex]!.depth <= parentDepth) continue;
+    const lastDescendantIndex = subtreeEndIndex[i]!;
     if (lastDescendantIndex <= i) continue;
 
     const lineX = 8 + parentDepth * indentSize;
-    const startY = rowYPositions[firstDescendantIndex];
-    const endY = rowYPositions[lastDescendantIndex] + barHeight;
+    const startY = rowYPositions[firstDescendantIndex]!;
+    const endY = rowYPositions[lastDescendantIndex]! + barHeight;
 
     lines.push(
       `<line class="indent-guide-line" data-for-parent="${row.collapseKey}" x1="${lineX}" y1="${startY}" x2="${lineX}" y2="${endY}" stroke="var(--vscode-tree-indentGuidesStroke)" stroke-width="1" opacity="0.4"/>`

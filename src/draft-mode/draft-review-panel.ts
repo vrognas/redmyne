@@ -963,9 +963,10 @@ export function formatChangesPreview(data: Record<string, unknown> | undefined):
 
   // Extract the inner object (time_entry, issue, etc.)
   const entries = Object.entries(data);
-  if (entries.length === 0) return "";
+  const firstEntry = entries[0];
+  if (!firstEntry) return "";
 
-  const [, innerData] = entries[0];
+  const [, innerData] = firstEntry;
   if (!innerData || typeof innerData !== "object") return "";
 
   const fields = innerData as Record<string, unknown>;

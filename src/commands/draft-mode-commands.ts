@@ -47,6 +47,7 @@ export async function applyDraftsWithTracking(
 
   for (let i = 0; i < operations.length; i++) {
     const op = operations[i];
+    if (!op) continue;
     onProgress?.(i + 1, operations.length, op.description);
 
     try {
@@ -60,7 +61,8 @@ export async function applyDraftsWithTracking(
       const shouldContinue = await onError(op, msg);
       if (!shouldContinue) {
         for (let j = i + 1; j < operations.length; j++) {
-          result.skipped.push(operations[j]);
+          const skipped = operations[j];
+          if (skipped) result.skipped.push(skipped);
         }
         break;
       }
@@ -403,7 +405,7 @@ async function executeOperation(
     }
     case "createVersion": {
       const match = http.path.match(/\/projects\/([^/]+)\/versions\.json/);
-      if (!match) throw new Error("Invalid version path");
+      if (!match || !match[1]) throw new Error("Invalid version path");
       const projectId = match[1];
       const versionData = (http.data as { version: Parameters<typeof server.createVersion>[1] }).version;
       await server.createVersion(projectId, versionData, { _bypassDraft: true });
@@ -422,7 +424,7 @@ async function executeOperation(
     }
     case "createRelation": {
       const match = http.path.match(/\/issues\/(\d+)\/relations\.json/);
-      if (!match) throw new Error("Invalid relation path");
+      if (!match || !match[1]) throw new Error("Invalid relation path");
       const issueId = parseInt(match[1], 10);
       const relationData = (http.data as { relation: { issue_to_id: number; relation_type: string; delay?: number } }).relation;
       await server.createRelation(

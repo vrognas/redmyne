@@ -14,14 +14,14 @@ export function parseTimeInput(input: string): number | null {
   // Format: "1.75" or "1,75" (decimal hours)
   const decimalMatch = trimmed.match(/^(\d+(?:[.,]\d+)?)$/);
   if (decimalMatch) {
-    return parseFloat(decimalMatch[1].replace(",", "."));
+    return parseFloat(decimalMatch[1]!.replace(",", "."));
   }
 
   // Format: "1:45" (hours:minutes)
   const colonMatch = trimmed.match(/^(\d+):(\d+)$/);
   if (colonMatch) {
-    const hours = parseInt(colonMatch[1], 10);
-    const minutes = parseInt(colonMatch[2], 10);
+    const hours = parseInt(colonMatch[1]!, 10);
+    const minutes = parseInt(colonMatch[2]!, 10);
     if (minutes >= 60) return null; // Invalid minutes
     return hours + minutes / 60;
   }
