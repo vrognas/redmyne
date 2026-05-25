@@ -31,6 +31,7 @@ describe("registerTimeEntryCommands", () => {
   function registerCommands(options?: {
     getServer?: () => unknown;
     refreshTree?: ReturnType<typeof vi.fn>;
+    getSelectedNode?: () => unknown;
   }): { refreshTree: ReturnType<typeof vi.fn> } {
     const context = {
       subscriptions: [],
@@ -41,6 +42,7 @@ describe("registerTimeEntryCommands", () => {
     registerTimeEntryCommands(context, {
       getServer: getServer as () => never,
       refreshTree,
+      getSelectedNode: options?.getSelectedNode as never,
     } as never);
 
     return { refreshTree };
@@ -501,6 +503,68 @@ describe("registerTimeEntryCommands", () => {
     expect(payload.entries).toHaveLength(1);
     expect(payload.entries[0].issue_id).toBe(1);
     expect(payload.weekMap.get(1)).toHaveLength(1);
+  });
+
+  it("falls back to tree selection when copy commands are invoked without args (keybinding)", async () => {
+    const setClipboardSpy = vi.spyOn(clipboard, "setClipboard");
+    const selectedEntry = {
+      _entry: {
+        id: 5,
+        issue_id: 99,
+        activity: { id: 7, name: "Dev" },
+        hours: "2.0",
+        comments: "kb",
+        spent_on: "2026-02-04",
+      },
+    };
+    registerCommands({ getSelectedNode: () => selectedEntry });
+
+    await handlers.get("redmyne.copyTimeEntry")?.();
+
+    expect(setClipboardSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "entry",
+        entries: [expect.objectContaining({ issue_id: 99, hours: "2.0" })],
+      })
+    );
+  });
+
+  it("falls back to tree selection for copyDayTimeEntries when invoked without args", async () => {
+    const setClipboardSpy = vi.spyOn(clipboard, "setClipboard");
+    const selectedDay = {
+      _date: "2026-02-04",
+      _cachedEntries: [
+        { id: 11, issue_id: 4, activity_id: 2, hours: "1.0", comments: "x", spent_on: "2026-02-04" },
+      ],
+    };
+    registerCommands({ getSelectedNode: () => selectedDay });
+
+    await handlers.get("redmyne.copyDayTimeEntries")?.();
+
+    expect(setClipboardSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "day",
+        sourceDate: "2026-02-04",
+        entries: [expect.objectContaining({ issue_id: 4 })],
+      })
+    );
+  });
+
+  it("falls back to tree selection for copyWeekTimeEntries when invoked without args", async () => {
+    const setClipboardSpy = vi.spyOn(clipboard, "setClipboard");
+    const selectedWeek = {
+      _weekStart: "2026-02-02",
+      _cachedEntries: [
+        { id: 20, issue_id: 7, activity_id: 1, hours: "3.0", comments: "wk", spent_on: "2026-02-03" },
+      ],
+    };
+    registerCommands({ getSelectedNode: () => selectedWeek });
+
+    await handlers.get("redmyne.copyWeekTimeEntries")?.();
+
+    const payload = setClipboardSpy.mock.calls[0][0] as { kind: string; sourceWeekStart?: string };
+    expect(payload.kind).toBe("week");
+    expect(payload.sourceWeekStart).toBe("2026-02-02");
   });
 
   it("shows fetch error when toolbar week copy cannot load entries", async () => {

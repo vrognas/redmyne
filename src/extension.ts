@@ -21,7 +21,7 @@ import type { KanbanController } from "./kanban/kanban-controller";
 import type { KanbanStatusBar } from "./kanban/kanban-status-bar";
 import type { KanbanTreeProvider } from "./kanban/kanban-tree-provider";
 import { setupKanban } from "./kanban/kanban-setup";
-import { registerTimeEntryCommands } from "./commands/time-entry-commands";
+import { registerTimeEntryCommands, type SelectableNode } from "./commands/time-entry-commands";
 import { updateClipboardContext } from "./utilities/time-entry-clipboard";
 import { registerMonthlyScheduleCommands } from "./commands/monthly-schedule-commands";
 import { registerGanttCommands } from "./commands/gantt-commands";
@@ -210,6 +210,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       vscode.commands.executeCommand("redmyne.refreshGanttData");
     },
     getMonthlySchedules: () => cleanupResources.monthlySchedules ?? {},
+    getSelectedNode: () => myTimeEntriesTree.getSelectedNode() as SelectableNode | undefined,
   });
 
   // Register monthly schedule commands

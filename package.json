@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "4.22.3",
+  "version": "4.23.0",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -708,6 +708,36 @@
         "key": "ctrl+y ctrl+t",
         "mac": "cmd+y cmd+t",
         "when": "!terminalFocus && !inDebugMode && !inQuickOpen"
+      },
+      {
+        "command": "redmyne.copyTimeEntry",
+        "key": "ctrl+c",
+        "mac": "cmd+c",
+        "when": "focusedView == 'redmyne-explorer-my-time-entries' && viewItem =~ /^time-entry/ && viewItem != 'time-entry-draft'"
+      },
+      {
+        "command": "redmyne.copyDayTimeEntries",
+        "key": "ctrl+c",
+        "mac": "cmd+c",
+        "when": "focusedView == 'redmyne-explorer-my-time-entries' && viewItem == 'day-group'"
+      },
+      {
+        "command": "redmyne.copyWeekTimeEntries",
+        "key": "ctrl+c",
+        "mac": "cmd+c",
+        "when": "focusedView == 'redmyne-explorer-my-time-entries' && viewItem == 'week-group'"
+      },
+      {
+        "command": "redmyne.pasteTimeEntries",
+        "key": "ctrl+v",
+        "mac": "cmd+v",
+        "when": "focusedView == 'redmyne-explorer-my-time-entries' && viewItem == 'day-group' && redmyne:timeEntryClipboardType =~ /^(entry|day)$/"
+      },
+      {
+        "command": "redmyne.pasteTimeEntries",
+        "key": "ctrl+v",
+        "mac": "cmd+v",
+        "when": "focusedView == 'redmyne-explorer-my-time-entries' && viewItem == 'week-group' && redmyne:timeEntryClipboardType"
       }
     ],
     "views": {

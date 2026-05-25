@@ -28,6 +28,7 @@ Your issues appear in the sidebar. Start logging time.
 | `Ctrl+Y Ctrl+Y` | Quick log time |
 | `Ctrl+Y Ctrl+N` | Quick create issue |
 | `Ctrl+Y Ctrl+T` | Toggle timer |
+| `Ctrl+C` / `Ctrl+V` | Copy / paste in Time Entries pane (entry, day, or week) |
 
 *(Mac: use `Cmd` instead of `Ctrl`)*
 
@@ -76,7 +77,7 @@ See logged time grouped by **Today**, **This Week**, **This Month**.
 
 **Add entries:** Right-click any date → Add Time Entry
 
-**Copy/paste:** Copy single entries, days, or weeks → paste to other dates
+**Copy/paste:** Copy single entries, days, or weeks → paste to other dates. Right-click or `Ctrl+C` / `Ctrl+V` on the focused row
 
 **Custom fields:** Required and optional custom fields prompted when logging time
 

@@ -1026,6 +1026,13 @@ describe("MyTimeEntriesTreeDataProvider", () => {
   });
 
   it("hides zero-percent days by default, shows when filter toggled", async () => {
+    // Pin clock to mid-week so the current week's date range (capped at today)
+    // contains earlier working days that can manifest as zero-entry rows once
+    // the filter is toggled off. On a real Monday the range is a single day and
+    // there's no way to surface a zero-entry working day.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-03-04T12:00:00")); // Wednesday
+
     // hideZeroDays is true by default
     expect(provider.getHideZeroDays()).toBe(true);
 

@@ -73,6 +73,19 @@ export interface TimeEntryCommandDeps {
   getServer: () => IRedmineServer | undefined;
   refreshTree: () => void;
   getMonthlySchedules?: () => MonthlyScheduleOverrides;
+  /** Returns currently focused tree node — used as fallback when commands are invoked via keybinding */
+  getSelectedNode?: () => SelectableNode | undefined;
+}
+
+/**
+ * Structural shape covering any tree node that can be the target of copy/paste.
+ * All fields optional — commands check which fields are present to dispatch.
+ */
+export interface SelectableNode {
+  _entry?: TimeEntryNode["_entry"];
+  _date?: string;
+  _weekStart?: string;
+  _cachedEntries?: CachedEntry[];
 }
 
 function getTimeEntryOrShowError(
@@ -303,8 +316,9 @@ export function registerTimeEntryCommands(
 
   // Copy single time entry
   context.subscriptions.push(
-    vscode.commands.registerCommand("redmyne.copyTimeEntry", (node: TimeEntryNode) => {
-      const entry = getTimeEntryOrShowError(node);
+    vscode.commands.registerCommand("redmyne.copyTimeEntry", (node?: TimeEntryNode) => {
+      const resolved = node ?? deps.getSelectedNode?.();
+      const entry = getTimeEntryOrShowError(resolved);
       if (!entry) return;
 
       const clipEntry: ClipboardEntry = {
@@ -332,14 +346,15 @@ export function registerTimeEntryCommands(
 
   // Copy all entries from a day
   context.subscriptions.push(
-    vscode.commands.registerCommand("redmyne.copyDayTimeEntries", (node: DayGroupNode) => {
-      const entries = node?._cachedEntries;
+    vscode.commands.registerCommand("redmyne.copyDayTimeEntries", (node?: DayGroupNode) => {
+      const resolved = node ?? deps.getSelectedNode?.();
+      const entries = resolved?._cachedEntries;
       if (!entries || entries.length === 0) {
         // Allow copying empty day (results in empty paste)
         setClipboard({
           kind: "day",
           entries: [],
-          sourceDate: node?._date,
+          sourceDate: resolved?._date,
         });
         showStatusBarMessage("$(copy) Day copied (empty)", 2000);
         return;
@@ -364,7 +379,7 @@ export function registerTimeEntryCommands(
       setClipboard({
         kind: "day",
         entries: clipEntries,
-        sourceDate: node._date,
+        sourceDate: resolved._date,
       });
 
       const count = clipEntries.length;
@@ -375,8 +390,9 @@ export function registerTimeEntryCommands(
   // Copy all entries from a week
   context.subscriptions.push(
     vscode.commands.registerCommand("redmyne.copyWeekTimeEntries", async (node?: WeekGroupNode) => {
-      let entries = node?._cachedEntries;
-      let weekStart = node?._weekStart;
+      const resolved = node ?? deps.getSelectedNode?.();
+      let entries = resolved?._cachedEntries;
+      let weekStart = resolved?._weekStart;
 
       // If no node (toolbar invocation), fetch current week from server
       if (!weekStart) {
@@ -463,9 +479,11 @@ export function registerTimeEntryCommands(
         const server = getServerOrShowError(deps.getServer);
         if (!server) return;
 
+        const resolved = node ?? deps.getSelectedNode?.();
+
         // Determine target type and date
-        const isDayTarget = node && "_date" in node && !!node._date;
-        const isWeekTarget = node && "_weekStart" in node && !!node._weekStart;
+        const isDayTarget = resolved && "_date" in resolved && !!resolved._date;
+        const isWeekTarget = resolved && "_weekStart" in resolved && !!resolved._weekStart;
 
         // Default to "This Week" if no node (toolbar invocation)
         let targetKind: "day" | "week";
@@ -474,10 +492,10 @@ export function registerTimeEntryCommands(
 
         if (isDayTarget) {
           targetKind = "day";
-          targetDate = (node as DayGroupNode)._date;
+          targetDate = (resolved as DayGroupNode)._date;
         } else if (isWeekTarget) {
           targetKind = "week";
-          targetWeekStart = (node as WeekGroupNode)._weekStart;
+          targetWeekStart = (resolved as WeekGroupNode)._weekStart;
         } else {
           // Toolbar: default to current week
           targetKind = "week";
@@ -576,8 +594,8 @@ export function registerTimeEntryCommands(
         }
 
         // Show existing entries on target day (only for day paste)
-        if (isDayTarget && node && "_cachedEntries" in node) {
-          const existing = (node as DayGroupNode)._cachedEntries?.filter(e => (e.id ?? 0) >= 0) || [];
+        if (isDayTarget && resolved && "_cachedEntries" in resolved) {
+          const existing = (resolved as DayGroupNode)._cachedEntries?.filter(e => (e.id ?? 0) >= 0) || [];
           if (existing.length > 0) {
             const totalExisting = existing.reduce((sum, e) => sum + parseFloat(e.hours), 0);
             confirmLines.push("");

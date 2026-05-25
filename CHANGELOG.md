@@ -7,6 +7,17 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.23.0]
+
+### Added
+
+- **Ctrl/Cmd+C and Ctrl/Cmd+V in Time Entries pane** — copy a focused time entry, day-group, or week-group with `Ctrl+C` (`Cmd+C` on macOS) and paste with `Ctrl+V` (`Cmd+V`). Same semantics as the right-click menu: copy detects node type (entry / day / week); paste only enables on day/week targets with a compatible clipboard kind (week→day still disallowed per existing rule). Implemented via per-`viewItem` keybindings scoped to `focusedView == 'redmyne-explorer-my-time-entries'` so normal Ctrl+C/V elsewhere (editors, inputs, terminal) is untouched
+
+### Internal
+
+- `MyTimeEntriesTreeDataProvider.getSelectedNode()` exposes the focused tree node for `TimeEntryCommandDeps.getSelectedNode`, letting `redmyne.copyTimeEntry`, `redmyne.copyDayTimeEntries`, `redmyne.copyWeekTimeEntries`, and `redmyne.pasteTimeEntries` resolve their target from selection when invoked without an arg (keybinding path), while preserving the existing context-menu and toolbar paths
+- Pinned the clock with `vi.setSystemTime` in the `hides zero-percent days by default…` test in `my-time-entries-tree.test.ts`; the test failed every Monday because the current-week date range (capped at today) collapses to a single day, leaving no zero-entry working day to assert against
+
 ## [4.22.3]
 
 ### Fixed

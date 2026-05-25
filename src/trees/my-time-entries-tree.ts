@@ -131,6 +131,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   server?: IRedmineServer;
   private issueCache = new Map<number, { id: number; subject: string; projectId?: number; project: string; client?: string }>();
   private expandedIds = new Set<string>();
+  private treeView?: vscode.TreeView<TimeEntryNode>;
   private monthlySchedules: MonthlyScheduleOverrides = {};
   private showAllUsers = false; // false = my entries only, true = all users
   private hideZeroDays: boolean;
@@ -184,6 +185,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
    * Connect tree view to track expansion state
    */
   setTreeView(treeView: vscode.TreeView<TimeEntryNode>): void {
+    this.treeView = treeView;
     this.disposables.push(
       treeView.onDidExpandElement((e) => {
         if (e.element.id) this.expandedIds.add(e.element.id);
@@ -192,6 +194,11 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         if (e.element.id) this.expandedIds.delete(e.element.id);
       })
     );
+  }
+
+  /** Get currently focused tree node (for keybinding fallback when no arg passed) */
+  getSelectedNode(): TimeEntryNode | undefined {
+    return this.treeView?.selection[0];
   }
 
   /**
