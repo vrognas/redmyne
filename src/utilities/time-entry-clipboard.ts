@@ -24,6 +24,44 @@ export interface ClipboardEntry {
   custom_fields?: Array<{ id: number; value: string | string[] }>;
 }
 
+/**
+ * Structural source shape for nested-style time entries (TimeEntry from the
+ * Redmine model, or CachedEntry from the tree provider). Used by
+ * `toClipboardEntry` to produce flat `ClipboardEntry` payloads consistently.
+ */
+export interface ClipboardEntrySource {
+  issue_id?: number;
+  issue?: { id: number; subject?: string };
+  project?: { id: number; name?: string };
+  activity_id?: number;
+  activity?: { id: number; name?: string };
+  hours: string;
+  comments: string;
+  custom_fields?: Array<{ id: number; value: unknown }>;
+}
+
+/**
+ * Build a flat ClipboardEntry from a nested-shape time-entry source. Producers
+ * with already-flat shapes (e.g. Timesheet rows) construct ClipboardEntry
+ * directly. Keeping both producers populating the same fields prevents data
+ * loss when copying in one UI and pasting in the other.
+ */
+export function toClipboardEntry(e: ClipboardEntrySource): ClipboardEntry {
+  return {
+    issue_id: e.issue_id ?? e.issue?.id ?? 0,
+    activity_id: e.activity_id ?? e.activity?.id ?? 0,
+    hours: e.hours,
+    comments: e.comments || "",
+    issueSubject: e.issue?.subject,
+    activityName: e.activity?.name,
+    project_id: e.project?.id,
+    custom_fields: e.custom_fields?.map((cf) => ({
+      id: cf.id,
+      value: cf.value as string | string[],
+    })),
+  };
+}
+
 export interface TimeEntryClipboard {
   kind: ClipboardKind;
   entries: ClipboardEntry[];

@@ -8,6 +8,7 @@ import {
   getWorkingDaysInWeek,
   calculatePasteTargetDates,
   getEntriesForTargetDate,
+  toClipboardEntry,
   ClipboardEntry,
   TimeEntryClipboard,
 } from "../../../src/utilities/time-entry-clipboard";
@@ -37,6 +38,56 @@ describe("time-entry-clipboard", () => {
   beforeEach(() => {
     clearClipboard();
     vi.clearAllMocks();
+  });
+
+  describe("toClipboardEntry", () => {
+    it("maps nested TimeEntry shape (issue.subject, activity.name, project.id) to flat fields", () => {
+      const result = toClipboardEntry({
+        issue_id: 42,
+        issue: { id: 42, subject: "Feature work" },
+        project: { id: 7, name: "Backend" },
+        activity_id: 3,
+        activity: { id: 3, name: "Development" },
+        hours: "2.5",
+        comments: "implement parser",
+        custom_fields: [{ id: 11, value: "X" }],
+      });
+
+      expect(result).toEqual({
+        issue_id: 42,
+        activity_id: 3,
+        hours: "2.5",
+        comments: "implement parser",
+        issueSubject: "Feature work",
+        activityName: "Development",
+        project_id: 7,
+        custom_fields: [{ id: 11, value: "X" }],
+      });
+    });
+
+    it("falls back to nested ids when flat ids are missing", () => {
+      const result = toClipboardEntry({
+        issue: { id: 99 },
+        activity: { id: 4 },
+        hours: "1",
+        comments: "",
+      });
+
+      expect(result.issue_id).toBe(99);
+      expect(result.activity_id).toBe(4);
+      expect(result.project_id).toBeUndefined();
+      expect(result.custom_fields).toBeUndefined();
+    });
+
+    it("normalises null/missing comments to empty string", () => {
+      const result = toClipboardEntry({
+        issue_id: 1,
+        activity_id: 2,
+        hours: "0.5",
+        comments: "",
+      });
+      expect(result.comments).toBe("");
+    });
   });
 
   describe("clipboard state management", () => {

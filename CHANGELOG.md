@@ -7,6 +7,17 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.23.2]
+
+### Fixed
+
+- **Symmetric clipboard payload between Time Entries pane and Timesheet panel** — tree-pane copies now include `project_id` (which Timesheet paste needs to build its draft payload), and Timesheet copies now include `issueSubject` and `activityName` (which the tree paste confirm dialog renders). Cross-UI copy/paste no longer drops these fields. Custom fields remain tree-only until Timesheet rows track them
+- **Clipboard cleared on Redmine server URL change** — module-level clipboard previously survived `redmyne.serverUrl` switches, leaving stale `issue_id` values that pointed at issues on the prior server. Paste would 404 or, worse, hit unrelated issues with the same numeric ID on the new server. `extension.ts` now calls `clearClipboard()` from the debounced config-change handler when `redmyne.serverUrl` changes
+
+### Internal
+
+- Extracted `toClipboardEntry(source)` helper in `time-entry-clipboard.ts` (Rule of Three — three nested-shape mappings in tree-pane copy commands collapsed to one call site each). Timesheet keeps its inline flat construction since it builds from a different source shape (`TimeSheetRow`). Both producers now populate the same `ClipboardEntry` fields where data is available
+
 ## [4.23.1]
 
 ### Fixed

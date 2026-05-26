@@ -22,7 +22,7 @@ import type { KanbanStatusBar } from "./kanban/kanban-status-bar";
 import type { KanbanTreeProvider } from "./kanban/kanban-tree-provider";
 import { setupKanban } from "./kanban/kanban-setup";
 import { registerTimeEntryCommands, type SelectableNode } from "./commands/time-entry-commands";
-import { updateClipboardContext } from "./utilities/time-entry-clipboard";
+import { updateClipboardContext, clearClipboard } from "./utilities/time-entry-clipboard";
 import { registerMonthlyScheduleCommands } from "./commands/monthly-schedule-commands";
 import { registerGanttCommands } from "./commands/gantt-commands";
 import { registerTimeSheetCommands } from "./commands/timesheet-commands";
@@ -324,6 +324,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     CONFIG_DEBOUNCE_MS,
     (event: vscode.ConfigurationChangeEvent) => {
       void (async () => {
+        // Drop the time-entry clipboard when the user switches servers — its
+        // issue_id values are scoped to the previous Redmine instance and
+        // would either 404 or hit unrelated issues on the new one.
+        if (event.affectsConfiguration("redmyne.serverUrl")) {
+          clearClipboard();
+        }
         // Only update server context for server-related config changes
         // Skip for UI-only configs (statusBar, workingHours)
         if (

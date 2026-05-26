@@ -16,6 +16,7 @@ import {
   ClipboardEntry,
   calculatePasteTargetDates,
   getEntriesForTargetDate,
+  toClipboardEntry,
 } from "../utilities/time-entry-clipboard";
 import { parseLocalDate, getWeekStart, formatLocalDate, getISOWeekNumber } from "../utilities/date-utils";
 import { differenceInCalendarDays } from "date-fns";
@@ -49,6 +50,7 @@ interface CachedEntry {
   id?: number;
   issue_id?: number;
   issue?: { id: number; subject?: string };
+  project?: { id: number; name?: string };
   activity_id?: number;
   activity?: { id: number; name?: string };
   hours: string;
@@ -322,22 +324,9 @@ export function registerTimeEntryCommands(
       const entry = getTimeEntryOrShowError(resolved);
       if (!entry) return;
 
-      const clipEntry: ClipboardEntry = {
-        issue_id: entry.issue_id ?? entry.issue?.id ?? 0,
-        activity_id: entry.activity?.id ?? 0,
-        hours: entry.hours,
-        comments: entry.comments || "",
-        issueSubject: entry.issue?.subject,
-        activityName: entry.activity?.name,
-        custom_fields: entry.custom_fields?.map((cf) => ({
-          id: cf.id,
-          value: cf.value as string | string[],
-        })),
-      };
-
       setClipboard({
         kind: "entry",
-        entries: [clipEntry],
+        entries: [toClipboardEntry(entry)],
         sourceDate: entry.spent_on,
       });
 
@@ -364,18 +353,7 @@ export function registerTimeEntryCommands(
       // Filter out drafts (negative IDs)
       const clipEntries: ClipboardEntry[] = entries
         .filter((e) => (e.id ?? 0) >= 0)
-        .map((e) => ({
-          issue_id: e.issue_id ?? e.issue?.id ?? 0,
-          activity_id: e.activity_id ?? e.activity?.id ?? 0,
-          hours: e.hours,
-          comments: e.comments || "",
-          issueSubject: e.issue?.subject,
-          activityName: e.activity?.name,
-          custom_fields: e.custom_fields?.map((cf) => ({
-            id: cf.id,
-            value: cf.value as string | string[],
-          })),
-        }));
+        .map(toClipboardEntry);
 
       setClipboard({
         kind: "day",
@@ -421,18 +399,7 @@ export function registerTimeEntryCommands(
           // Filter out drafts
           if ((e.id ?? 0) < 0) continue;
 
-          const clipEntry: ClipboardEntry = {
-            issue_id: e.issue_id ?? e.issue?.id ?? 0,
-            activity_id: e.activity_id ?? e.activity?.id ?? 0,
-            hours: e.hours,
-            comments: e.comments || "",
-            issueSubject: e.issue?.subject,
-            activityName: e.activity?.name,
-            custom_fields: e.custom_fields?.map((cf) => ({
-              id: cf.id,
-              value: cf.value as string | string[],
-            })),
-          };
+          const clipEntry = toClipboardEntry(e);
           allEntries.push(clipEntry);
 
           // Calculate day offset from Monday (calendar-day diff, DST-safe)

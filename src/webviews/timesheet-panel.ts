@@ -1643,6 +1643,8 @@ export class TimeSheetPanel {
           activity_id: row.activityId,
           hours: String(cell.hours),
           comments: row.comments || "",
+          issueSubject: row.issueSubject ?? undefined,
+          activityName: row.activityName ?? undefined,
           project_id: row.projectId ?? undefined,
         };
 
