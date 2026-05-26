@@ -567,6 +567,52 @@ describe("registerTimeEntryCommands", () => {
     expect(payload.sourceWeekStart).toBe("2026-02-02");
   });
 
+  it("copy dispatcher routes by contextValue to the matching copy command", async () => {
+    const executeSpy = vi.spyOn(vscode.commands, "executeCommand");
+
+    // entry
+    registerCommands({ getSelectedNode: () => ({ contextValue: "time-entry", _entry: {} }) });
+    await handlers.get("redmyne.copyFromTimeEntriesPane")?.();
+    expect(executeSpy).toHaveBeenLastCalledWith("redmyne.copyTimeEntry", expect.objectContaining({ contextValue: "time-entry" }));
+
+    // adhoc variant (still time-entry*)
+    registerCommands({ getSelectedNode: () => ({ contextValue: "time-entry-adhoc-linked" }) });
+    await handlers.get("redmyne.copyFromTimeEntriesPane")?.();
+    expect(executeSpy).toHaveBeenLastCalledWith("redmyne.copyTimeEntry", expect.objectContaining({ contextValue: "time-entry-adhoc-linked" }));
+
+    // day-group
+    registerCommands({ getSelectedNode: () => ({ contextValue: "day-group", _date: "2026-02-04" }) });
+    await handlers.get("redmyne.copyFromTimeEntriesPane")?.();
+    expect(executeSpy).toHaveBeenLastCalledWith("redmyne.copyDayTimeEntries", expect.objectContaining({ _date: "2026-02-04" }));
+
+    // week-group
+    registerCommands({ getSelectedNode: () => ({ contextValue: "week-group", _weekStart: "2026-02-02" }) });
+    await handlers.get("redmyne.copyFromTimeEntriesPane")?.();
+    expect(executeSpy).toHaveBeenLastCalledWith("redmyne.copyWeekTimeEntries", expect.objectContaining({ _weekStart: "2026-02-02" }));
+  });
+
+  it("copy dispatcher noops for drafts and unknown contextValues", async () => {
+    const executeSpy = vi.spyOn(vscode.commands, "executeCommand");
+
+    // draft — excluded
+    registerCommands({ getSelectedNode: () => ({ contextValue: "time-entry-draft" }) });
+    await handlers.get("redmyne.copyFromTimeEntriesPane")?.();
+    const draftCalls = executeSpy.mock.calls.filter(c => /^redmyne\.copy/.test(String(c[0])));
+    expect(draftCalls).toHaveLength(0);
+
+    // load-earlier — not a copy target
+    executeSpy.mockClear();
+    registerCommands({ getSelectedNode: () => ({ contextValue: "load-earlier" }) });
+    await handlers.get("redmyne.copyFromTimeEntriesPane")?.();
+    expect(executeSpy.mock.calls.filter(c => /^redmyne\.copy/.test(String(c[0])))).toHaveLength(0);
+
+    // no selection
+    executeSpy.mockClear();
+    registerCommands({ getSelectedNode: () => undefined });
+    await handlers.get("redmyne.copyFromTimeEntriesPane")?.();
+    expect(executeSpy.mock.calls.filter(c => /^redmyne\.copy/.test(String(c[0])))).toHaveLength(0);
+  });
+
   it("shows fetch error when toolbar week copy cannot load entries", async () => {
     const mockServer = {
       getTimeEntries: vi.fn().mockRejectedValue(new Error("fetch fail")),

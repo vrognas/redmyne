@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.23.1]
+
+### Fixed
+
+- **Ctrl/Cmd+C in Time Entries pane never fired** — the 4.23.0 keybindings filtered on `viewItem =~ /^time-entry/`, but VS Code only populates `viewItem` in menu `when`-clauses, not keybinding ones, so the bindings always failed to match. Replaced the three per-`viewItem` copy bindings with a single `redmyne.copyFromTimeEntriesPane` dispatcher bound to `focusedView == 'redmyne-explorer-my-time-entries' && listFocus`; the dispatcher reads the focused tree node's `contextValue` from `treeView.selection[0]` and routes to `copyTimeEntry` / `copyDayTimeEntries` / `copyWeekTimeEntries`. Paste now binds directly to `redmyne.pasteTimeEntries` with the same `focusedView && listFocus && redmyne:timeEntryClipboardType` clause; the existing selection-fallback in that command already handles dispatch by node shape
+
 ## [4.23.0]
 
 ### Added

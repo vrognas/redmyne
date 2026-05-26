@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "4.23.0",
+  "version": "4.23.1",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -202,6 +202,10 @@
         "command": "redmyne.pasteTimeEntries",
         "title": "Paste",
         "icon": "$(clippy)"
+      },
+      {
+        "command": "redmyne.copyFromTimeEntriesPane",
+        "title": "Copy Time Entry (keyboard dispatch)"
       },
       {
         "command": "redmyne.openIssueInBrowser",
@@ -710,34 +714,16 @@
         "when": "!terminalFocus && !inDebugMode && !inQuickOpen"
       },
       {
-        "command": "redmyne.copyTimeEntry",
+        "command": "redmyne.copyFromTimeEntriesPane",
         "key": "ctrl+c",
         "mac": "cmd+c",
-        "when": "focusedView == 'redmyne-explorer-my-time-entries' && viewItem =~ /^time-entry/ && viewItem != 'time-entry-draft'"
-      },
-      {
-        "command": "redmyne.copyDayTimeEntries",
-        "key": "ctrl+c",
-        "mac": "cmd+c",
-        "when": "focusedView == 'redmyne-explorer-my-time-entries' && viewItem == 'day-group'"
-      },
-      {
-        "command": "redmyne.copyWeekTimeEntries",
-        "key": "ctrl+c",
-        "mac": "cmd+c",
-        "when": "focusedView == 'redmyne-explorer-my-time-entries' && viewItem == 'week-group'"
+        "when": "focusedView == 'redmyne-explorer-my-time-entries' && listFocus"
       },
       {
         "command": "redmyne.pasteTimeEntries",
         "key": "ctrl+v",
         "mac": "cmd+v",
-        "when": "focusedView == 'redmyne-explorer-my-time-entries' && viewItem == 'day-group' && redmyne:timeEntryClipboardType =~ /^(entry|day)$/"
-      },
-      {
-        "command": "redmyne.pasteTimeEntries",
-        "key": "ctrl+v",
-        "mac": "cmd+v",
-        "when": "focusedView == 'redmyne-explorer-my-time-entries' && viewItem == 'week-group' && redmyne:timeEntryClipboardType"
+        "when": "focusedView == 'redmyne-explorer-my-time-entries' && listFocus && redmyne:timeEntryClipboardType"
       }
     ],
     "views": {
@@ -1054,6 +1040,10 @@
         },
         {
           "command": "redmyne.pasteTimeEntries",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.copyFromTimeEntriesPane",
           "when": "false"
         },
         {

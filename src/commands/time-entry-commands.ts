@@ -86,6 +86,7 @@ export interface SelectableNode {
   _date?: string;
   _weekStart?: string;
   _cachedEntries?: CachedEntry[];
+  contextValue?: string;
 }
 
 function getTimeEntryOrShowError(
@@ -668,5 +669,24 @@ export function registerTimeEntryCommands(
         vscode.commands.executeCommand("redmyne.refreshGanttData");
       }
     )
+  );
+
+  // Copy dispatcher — bound to Ctrl/Cmd+C. VS Code's `viewItem` context key only
+  // applies in menu when-clauses, so a single keybinding inspects the focused
+  // tree node's contextValue and routes to the right command.
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmyne.copyFromTimeEntriesPane", async () => {
+      const node = deps.getSelectedNode?.();
+      const cv = node?.contextValue;
+      if (!cv) return;
+      if (cv === "time-entry-draft") return;
+      if (cv.startsWith("time-entry")) {
+        await vscode.commands.executeCommand("redmyne.copyTimeEntry", node);
+      } else if (cv === "day-group") {
+        await vscode.commands.executeCommand("redmyne.copyDayTimeEntries", node);
+      } else if (cv === "week-group") {
+        await vscode.commands.executeCommand("redmyne.copyWeekTimeEntries", node);
+      }
+    })
   );
 }

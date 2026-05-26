@@ -28,7 +28,7 @@ Your issues appear in the sidebar. Start logging time.
 | `Ctrl+Y Ctrl+Y` | Quick log time |
 | `Ctrl+Y Ctrl+N` | Quick create issue |
 | `Ctrl+Y Ctrl+T` | Toggle timer |
-| `Ctrl+C` / `Ctrl+V` | Copy / paste in Time Entries pane (entry, day, or week) |
+| `Ctrl+C` / `Ctrl+V` | Copy / paste in Time Entries pane (focused entry, day, or week) |
 
 *(Mac: use `Cmd` instead of `Ctrl`)*
 
