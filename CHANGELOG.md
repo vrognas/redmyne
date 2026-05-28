@@ -7,6 +7,17 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.24.0]
+
+### Changed
+
+- **Paste messages reflect draft mode** — when draft mode is active, pasting time entries now shows "Queueing time entries..." and "Queued N entries to draft" instead of "Creating..."/"Created N entries". Tree-pane paste always routed through the draft queue via the `DraftModeServer` wrapper; the wording just made it look like a direct commit. Threaded `isDraftMode` through `TimeEntryCommandDeps`
+- **Closed-issue check deferred until after confirm** — `confirmLogTimeOnClosedIssues` (a batched server lookup) now runs only after the user clicks "Create" in the paste confirmation, so cancelling the paste no longer pays for the lookup
+
+### Fixed
+
+- **Copying an empty day no longer clobbers the clipboard** — `Copy Day` on a day with no entries previously stored an empty clipboard, which then failed to paste with "Clipboard is empty" (a dead end that also discarded whatever was previously copied). It now shows "Nothing to copy — day is empty" and leaves the existing clipboard intact
+
 ## [4.23.2]
 
 ### Fixed

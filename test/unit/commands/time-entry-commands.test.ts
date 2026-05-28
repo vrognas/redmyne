@@ -6,6 +6,7 @@ import * as customFieldPicker from "../../../src/utilities/custom-field-picker";
 import * as clipboard from "../../../src/utilities/time-entry-clipboard";
 import * as quickLogTimeModule from "../../../src/commands/quick-log-time";
 import * as closedIssueGuard from "../../../src/utilities/closed-issue-guard";
+import * as statusBar from "../../../src/utilities/status-bar";
 
 type RegisteredHandler = (...args: unknown[]) => unknown;
 
@@ -32,6 +33,7 @@ describe("registerTimeEntryCommands", () => {
     getServer?: () => unknown;
     refreshTree?: ReturnType<typeof vi.fn>;
     getSelectedNode?: () => unknown;
+    isDraftMode?: () => boolean;
   }): { refreshTree: ReturnType<typeof vi.fn> } {
     const context = {
       subscriptions: [],
@@ -43,6 +45,7 @@ describe("registerTimeEntryCommands", () => {
       getServer: getServer as () => never,
       refreshTree,
       getSelectedNode: options?.getSelectedNode as never,
+      isDraftMode: options?.isDraftMode,
     } as never);
 
     return { refreshTree };
@@ -425,7 +428,7 @@ describe("registerTimeEntryCommands", () => {
     expect(refreshTree).not.toHaveBeenCalled();
   });
 
-  it("copies single and day entries into clipboard payloads", async () => {
+  it("copies a single entry into an entry clipboard payload", async () => {
     const setClipboardSpy = vi.spyOn(clipboard, "setClipboard");
     registerCommands();
 
@@ -440,13 +443,8 @@ describe("registerTimeEntryCommands", () => {
         custom_fields: [{ id: 9, name: "CF", value: "A" }],
       },
     });
-    await handlers.get("redmyne.copyDayTimeEntries")?.({
-      _date: "2026-02-04",
-      _cachedEntries: [],
-    });
 
-    expect(setClipboardSpy).toHaveBeenNthCalledWith(
-      1,
+    expect(setClipboardSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: "entry",
         entries: [
@@ -458,14 +456,18 @@ describe("registerTimeEntryCommands", () => {
         ],
       })
     );
-    expect(setClipboardSpy).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        kind: "day",
-        entries: [],
-        sourceDate: "2026-02-04",
-      })
-    );
+  });
+
+  it("copying an empty day does not clobber an existing clipboard", async () => {
+    const setClipboardSpy = vi.spyOn(clipboard, "setClipboard");
+    registerCommands();
+
+    await handlers.get("redmyne.copyDayTimeEntries")?.({
+      _date: "2026-02-04",
+      _cachedEntries: [],
+    });
+
+    expect(setClipboardSpy).not.toHaveBeenCalled();
   });
 
   it("copies week entries, filtering drafts and grouping by day", async () => {
@@ -669,5 +671,45 @@ describe("registerTimeEntryCommands", () => {
     expect(mockServer.addTimeEntry).toHaveBeenCalledTimes(2);
     expect(refreshTree).toHaveBeenCalledTimes(1);
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.refreshGanttData");
+  });
+
+  it("reports 'queued to draft' instead of 'created' when draft mode is active", async () => {
+    const mockServer = { addTimeEntry: vi.fn().mockResolvedValue(undefined) };
+    vi.spyOn(clipboard, "getClipboard").mockReturnValue({
+      kind: "day",
+      entries: [{ issue_id: 1, activity_id: 2, hours: "1", comments: "" }],
+      sourceDate: "2026-02-03",
+    });
+    vi.spyOn(clipboard, "calculatePasteTargetDates").mockReturnValue(["2026-02-05"]);
+    vi.spyOn(closedIssueGuard, "confirmLogTimeOnClosedIssues").mockResolvedValue(true);
+    vi.mocked(vscode.window.showInformationMessage).mockResolvedValue("Create" as never);
+    const statusSpy = vi.spyOn(statusBar, "showStatusBarMessage");
+
+    registerCommands({ getServer: () => mockServer, isDraftMode: () => true });
+    await handlers.get("redmyne.pasteTimeEntries")?.({ _date: "2026-02-05" });
+
+    expect(statusSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Queued 1 entry to draft"),
+      expect.any(Number)
+    );
+  });
+
+  it("defers closed-issue check until after the paste is confirmed", async () => {
+    const mockServer = { addTimeEntry: vi.fn() };
+    vi.spyOn(clipboard, "getClipboard").mockReturnValue({
+      kind: "day",
+      entries: [{ issue_id: 1, activity_id: 2, hours: "1", comments: "" }],
+      sourceDate: "2026-02-03",
+    });
+    vi.spyOn(clipboard, "calculatePasteTargetDates").mockReturnValue(["2026-02-05"]);
+    const closedSpy = vi.spyOn(closedIssueGuard, "confirmLogTimeOnClosedIssues").mockResolvedValue(true);
+    // User dismisses the confirm dialog
+    vi.mocked(vscode.window.showInformationMessage).mockResolvedValue(undefined as never);
+
+    registerCommands({ getServer: () => mockServer });
+    await handlers.get("redmyne.pasteTimeEntries")?.({ _date: "2026-02-05" });
+
+    expect(closedSpy).not.toHaveBeenCalled();
+    expect(mockServer.addTimeEntry).not.toHaveBeenCalled();
   });
 });

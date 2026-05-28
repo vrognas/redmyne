@@ -211,6 +211,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     },
     getMonthlySchedules: () => cleanupResources.monthlySchedules ?? {},
     getSelectedNode: () => myTimeEntriesTree.getSelectedNode() as SelectableNode | undefined,
+    isDraftMode: () => draftModeManager.isEnabled,
   });
 
   // Register monthly schedule commands

@@ -77,6 +77,8 @@ export interface TimeEntryCommandDeps {
   getMonthlySchedules?: () => MonthlyScheduleOverrides;
   /** Returns currently focused tree node — used as fallback when commands are invoked via keybinding */
   getSelectedNode?: () => SelectableNode | undefined;
+  /** True when draft mode is active — paste queues drafts instead of committing to the server */
+  isDraftMode?: () => boolean;
 }
 
 /**
@@ -340,13 +342,9 @@ export function registerTimeEntryCommands(
       const resolved = node ?? deps.getSelectedNode?.();
       const entries = resolved?._cachedEntries;
       if (!entries || entries.length === 0) {
-        // Allow copying empty day (results in empty paste)
-        setClipboard({
-          kind: "day",
-          entries: [],
-          sourceDate: resolved?._date,
-        });
-        showStatusBarMessage("$(copy) Day copied (empty)", 2000);
+        // Don't clobber a previously-copied clipboard with an empty day —
+        // an empty clipboard can't be pasted, so this would be a dead end.
+        showStatusBarMessage("$(info) Nothing to copy — day is empty", 2000);
         return;
       }
 
@@ -528,11 +526,6 @@ export function registerTimeEntryCommands(
           return;
         }
 
-        // Check for closed issues in batch
-        const issueIds = clipboard.entries.map((e) => e.issue_id);
-        const closedConfirmed = await confirmLogTimeOnClosedIssues(server, issueIds);
-        if (!closedConfirmed) return;
-
         // Build informative confirmation message
         const confirmLines: string[] = [];
 
@@ -586,9 +579,22 @@ export function registerTimeEntryCommands(
         );
         if (confirm !== "Create") return;
 
+        // Check for closed issues — only after the user commits to pasting, so a
+        // cancelled paste doesn't pay for the issue-status lookup.
+        const issueIds = clipboard.entries.map((e) => e.issue_id);
+        const closedConfirmed = await confirmLogTimeOnClosedIssues(server, issueIds);
+        if (!closedConfirmed) return;
+
+        // In draft mode the server wrapper queues entries instead of committing
+        // them, so phrase progress/results as "queued" rather than "created".
+        const draftMode = deps.isDraftMode?.() ?? false;
+
         // Execute paste with progress
         await vscode.window.withProgress(
-          { location: vscode.ProgressLocation.Notification, title: "Creating time entries..." },
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: draftMode ? "Queueing time entries..." : "Creating time entries...",
+          },
           async (progress) => {
             let created = 0;
             const errors: string[] = [];
@@ -621,12 +627,14 @@ export function registerTimeEntryCommands(
               }
             }
 
+            const verb = draftMode ? "Queued" : "Created";
             if (errors.length > 0) {
               vscode.window.showWarningMessage(
-                `Created ${created}/${totalEntries} ${totalEntries === 1 ? "entry" : "entries"}. ${errors.length} failed.`
+                `${verb} ${created}/${totalEntries} ${totalEntries === 1 ? "entry" : "entries"}. ${errors.length} failed.`
               );
             } else {
-              showStatusBarMessage(`$(check) Created ${created} ${created === 1 ? "entry" : "entries"}`, 2000);
+              const suffix = draftMode ? " to draft" : "";
+              showStatusBarMessage(`$(check) ${verb} ${created} ${created === 1 ? "entry" : "entries"}${suffix}`, 2000);
             }
           }
         );
