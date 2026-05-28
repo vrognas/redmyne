@@ -14,6 +14,7 @@ import {
   setClipboard,
   getClipboard,
   ClipboardEntry,
+  TimeEntryClipboard,
   calculatePasteTargetDates,
   getEntriesForTargetDate,
   toClipboardEntry,
@@ -102,6 +103,127 @@ function getTimeEntryOrShowError(
     return undefined;
   }
   return entry;
+}
+
+/** Max entry lines shown per section in the paste confirm dialog before "... N more". */
+const PASTE_CONFIRM_ENTRY_CAP = 5;
+
+/** Format a YYYY-MM-DD string as a short human label, e.g. "Mon, Mar 16". */
+function formatDayLabel(dateStr: string): string {
+  return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function formatClipboardEntryLine(e: ClipboardEntry): string {
+  const label = e.issueSubject ? `#${e.issue_id} ${e.issueSubject}` : `#${e.issue_id}`;
+  const activity = e.activityName ? ` [${e.activityName}]` : "";
+  return `${label}${activity} — ${formatHoursAsHHMM(parseFloat(e.hours))}`;
+}
+
+export interface PasteConfirmContext {
+  clipboard: TimeEntryClipboard;
+  targetKind: "day" | "week";
+  targetDate?: string;
+  targetWeekStart?: string;
+  targetDates: string[];
+  isWeekToWeekPaste: boolean;
+  targetWeekStartForPaste: string;
+  /** Non-draft entries already present on the target day (day paste) or whole week (week paste). */
+  existingEntries: CachedEntry[];
+}
+
+/**
+ * Build the lines for the paste confirmation dialog. Scenario-aware so the user
+ * sees what lands where before committing:
+ * - Entry/Day → Day: flat entry list + what's already on that day
+ * - Entry/Day → Week: entry list with an "× working days" multiplier note
+ * - Week → Week: per-day breakdown of which entries map to which day
+ * Week targets also summarise entries already in the week to flag duplicates.
+ */
+export function buildPasteConfirmLines(ctx: PasteConfirmContext): string[] {
+  const {
+    clipboard,
+    targetKind,
+    targetDate,
+    targetWeekStart,
+    targetDates,
+    isWeekToWeekPaste,
+    targetWeekStartForPaste,
+    existingEntries,
+  } = ctx;
+  const lines: string[] = [];
+  const weekNum = targetWeekStart
+    ? getISOWeekNumber(new Date(targetWeekStart + "T00:00:00"))
+    : undefined;
+
+  // ---- What's being pasted ----
+  if (targetKind === "day" && targetDate) {
+    lines.push(`Paste to ${formatDayLabel(targetDate)}:`);
+    pushEntryLines(lines, clipboard.entries);
+  } else if (isWeekToWeekPaste) {
+    lines.push(`Paste to Week ${weekNum ?? "?"}:`);
+    for (const date of targetDates) {
+      const dayEntries = getEntriesForTargetDate(clipboard, date, targetWeekStartForPaste);
+      if (dayEntries.length === 0) continue;
+      lines.push(`  ${formatDayLabel(date)}:`);
+      pushEntryLines(lines, dayEntries, "    ");
+    }
+  } else {
+    // Entry/Day → Week: the same entries are created on each working day
+    const dayCount = targetDates.length;
+    lines.push(`Paste to Week ${weekNum ?? "?"} — on each of ${dayCount} working ${dayCount === 1 ? "day" : "days"}:`);
+    pushEntryLines(lines, clipboard.entries);
+    lines.push(`  = ${clipboard.entries.length * dayCount} entries total`);
+  }
+
+  // ---- Existing entries on the target ----
+  const existing = existingEntries.filter((e) => (e.id ?? 0) >= 0);
+  if (existing.length === 0) return lines;
+
+  if (targetKind === "day") {
+    const total = existing.reduce((sum, e) => sum + parseFloat(e.hours), 0);
+    lines.push("");
+    lines.push(`Already on this day (${formatHoursAsHHMM(total)}):`);
+    for (const e of existing.slice(0, PASTE_CONFIRM_ENTRY_CAP)) {
+      const id = e.issue_id ?? e.issue?.id ?? 0;
+      const label = e.issue?.subject ? `#${id} ${e.issue.subject}` : `#${id}`;
+      lines.push(`  ${label} — ${formatHoursAsHHMM(parseFloat(e.hours))}`);
+    }
+    if (existing.length > PASTE_CONFIRM_ENTRY_CAP) {
+      lines.push(`  ... and ${existing.length - PASTE_CONFIRM_ENTRY_CAP} more`);
+    }
+  } else {
+    // Week target: compact per-day summary so duplicates are visible at a glance
+    const byDate = new Map<string, CachedEntry[]>();
+    for (const e of existing) {
+      const date = e.spent_on ?? "unknown";
+      const bucket = byDate.get(date) ?? [];
+      bucket.push(e);
+      byDate.set(date, bucket);
+    }
+    lines.push("");
+    lines.push("Already in target week:");
+    for (const date of [...byDate.keys()].sort()) {
+      const dayEntries = byDate.get(date)!;
+      const total = dayEntries.reduce((sum, e) => sum + parseFloat(e.hours), 0);
+      const label = date === "unknown" ? "(no date)" : formatDayLabel(date);
+      lines.push(`  ${label} — ${dayEntries.length} ${dayEntries.length === 1 ? "entry" : "entries"}, ${formatHoursAsHHMM(total)}`);
+    }
+  }
+
+  return lines;
+
+  function pushEntryLines(target: string[], entries: ClipboardEntry[], indent = "  "): void {
+    for (const e of entries.slice(0, PASTE_CONFIRM_ENTRY_CAP)) {
+      target.push(`${indent}${formatClipboardEntryLine(e)}`);
+    }
+    if (entries.length > PASTE_CONFIRM_ENTRY_CAP) {
+      target.push(`${indent}... and ${entries.length - PASTE_CONFIRM_ENTRY_CAP} more`);
+    }
+  }
 }
 
 function getTimeEntryWithIdOrShowError(
@@ -526,51 +648,23 @@ export function registerTimeEntryCommands(
           return;
         }
 
-        // Build informative confirmation message
-        const confirmLines: string[] = [];
+        // Existing entries on the target: day node carries that day's entries,
+        // week node carries the whole week's — both live on _cachedEntries.
+        const existingEntries =
+          resolved && "_cachedEntries" in resolved
+            ? (resolved as DayGroupNode | WeekGroupNode)._cachedEntries ?? []
+            : [];
 
-        // What's being pasted
-        const formatEntry = (e: ClipboardEntry) => {
-          const label = e.issueSubject ? `#${e.issue_id} ${e.issueSubject}` : `#${e.issue_id}`;
-          const activity = e.activityName ? ` [${e.activityName}]` : "";
-          return `  ${label}${activity} — ${formatHoursAsHHMM(parseFloat(e.hours))}`;
-        };
-
-        if (targetKind === "day" && targetDate) {
-          const d = new Date(targetDate + "T00:00:00");
-          const dayLabel = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-          confirmLines.push(`Paste to ${dayLabel}:`);
-        } else if (targetWeekStart) {
-          const ws = new Date(targetWeekStart + "T00:00:00");
-          confirmLines.push(`Paste to Week ${getISOWeekNumber(ws)}:`);
-        }
-
-        // Show entries being created (cap at 5)
-        const entriesToShow = clipboard.entries.slice(0, 5);
-        for (const e of entriesToShow) {
-          confirmLines.push(formatEntry(e));
-        }
-        if (clipboard.entries.length > 5) {
-          confirmLines.push(`  ... and ${clipboard.entries.length - 5} more`);
-        }
-
-        // Show existing entries on target day (only for day paste)
-        if (isDayTarget && resolved && "_cachedEntries" in resolved) {
-          const existing = (resolved as DayGroupNode)._cachedEntries?.filter(e => (e.id ?? 0) >= 0) || [];
-          if (existing.length > 0) {
-            const totalExisting = existing.reduce((sum, e) => sum + parseFloat(e.hours), 0);
-            confirmLines.push("");
-            confirmLines.push(`Already on this day (${formatHoursAsHHMM(totalExisting)}):`);
-            for (const e of existing.slice(0, 5)) {
-              const id = e.issue_id ?? e.issue?.id ?? 0;
-              const label = e.issue?.subject ? `#${id} ${e.issue.subject}` : `#${id}`;
-              confirmLines.push(`  ${label} — ${formatHoursAsHHMM(parseFloat(e.hours))}`);
-            }
-            if (existing.length > 5) {
-              confirmLines.push(`  ... and ${existing.length - 5} more`);
-            }
-          }
-        }
+        const confirmLines = buildPasteConfirmLines({
+          clipboard,
+          targetKind,
+          targetDate,
+          targetWeekStart,
+          targetDates,
+          isWeekToWeekPaste,
+          targetWeekStartForPaste,
+          existingEntries,
+        });
 
         const confirm = await vscode.window.showInformationMessage(
           confirmLines.join("\n"),

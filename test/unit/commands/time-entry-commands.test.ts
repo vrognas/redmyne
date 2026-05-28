@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as vscode from "vscode";
-import { registerTimeEntryCommands } from "../../../src/commands/time-entry-commands";
+import { registerTimeEntryCommands, buildPasteConfirmLines } from "../../../src/commands/time-entry-commands";
 import * as issuePicker from "../../../src/utilities/issue-picker";
 import * as customFieldPicker from "../../../src/utilities/custom-field-picker";
 import * as clipboard from "../../../src/utilities/time-entry-clipboard";
@@ -711,5 +711,100 @@ describe("registerTimeEntryCommands", () => {
 
     expect(closedSpy).not.toHaveBeenCalled();
     expect(mockServer.addTimeEntry).not.toHaveBeenCalled();
+  });
+});
+
+describe("buildPasteConfirmLines", () => {
+  const entryFoo = { issue_id: 1, activity_id: 2, hours: "2", comments: "", issueSubject: "Foo", activityName: "Dev" };
+  const entryBar = { issue_id: 3, activity_id: 2, hours: "1", comments: "", issueSubject: "Bar" };
+
+  it("Entry/Day → Day: lists entries and existing-on-day with total", () => {
+    const lines = buildPasteConfirmLines({
+      clipboard: { kind: "day", entries: [entryFoo, entryBar], sourceDate: "2026-03-10" },
+      targetKind: "day",
+      targetDate: "2026-03-16",
+      targetDates: ["2026-03-16"],
+      isWeekToWeekPaste: false,
+      targetWeekStartForPaste: "",
+      existingEntries: [
+        { id: 50, issue_id: 9, issue: { id: 9, subject: "Old" }, hours: "3", comments: "", spent_on: "2026-03-16" },
+      ],
+    });
+    const text = lines.join("\n");
+    expect(text).toContain("Paste to Mon, Mar 16:");
+    expect(text).toContain("#1 Foo [Dev] — 2:00");
+    expect(text).toContain("Already on this day (3:00):");
+    expect(text).toContain("#9 Old — 3:00");
+  });
+
+  it("Entry/Day → Week: notes the per-day multiplier and total count", () => {
+    const lines = buildPasteConfirmLines({
+      clipboard: { kind: "day", entries: [entryFoo, entryBar], sourceDate: "2026-03-10" },
+      targetKind: "week",
+      targetWeekStart: "2026-03-16",
+      targetDates: ["2026-03-16", "2026-03-17", "2026-03-18"],
+      isWeekToWeekPaste: false,
+      targetWeekStartForPaste: "",
+      existingEntries: [],
+    });
+    const text = lines.join("\n");
+    expect(text).toMatch(/Paste to Week \d+ — on each of 3 working days:/);
+    expect(text).toContain("= 6 entries total");
+  });
+
+  it("Week → Week: breaks entries down per target day", () => {
+    const weekMap = new Map([
+      [0, [entryFoo]],
+      [1, [entryBar]],
+    ]);
+    const lines = buildPasteConfirmLines({
+      clipboard: { kind: "week", entries: [entryFoo, entryBar], weekMap, sourceWeekStart: "2026-03-09" },
+      targetKind: "week",
+      targetWeekStart: "2026-03-16",
+      targetDates: ["2026-03-16", "2026-03-17"],
+      isWeekToWeekPaste: true,
+      targetWeekStartForPaste: "2026-03-16",
+      existingEntries: [],
+    });
+    const text = lines.join("\n");
+    expect(text).toContain("Mon, Mar 16:");
+    expect(text).toContain("#1 Foo [Dev] — 2:00");
+    expect(text).toContain("Tue, Mar 17:");
+    expect(text).toContain("#3 Bar — 1:00");
+  });
+
+  it("Week target: summarises existing entries per day", () => {
+    const lines = buildPasteConfirmLines({
+      clipboard: { kind: "day", entries: [entryFoo], sourceDate: "2026-03-10" },
+      targetKind: "week",
+      targetWeekStart: "2026-03-16",
+      targetDates: ["2026-03-16"],
+      isWeekToWeekPaste: false,
+      targetWeekStartForPaste: "",
+      existingEntries: [
+        { id: 60, issue_id: 9, hours: "2", comments: "", spent_on: "2026-03-16" },
+        { id: 61, issue_id: 9, hours: "1.5", comments: "", spent_on: "2026-03-16" },
+        { id: 62, issue_id: 8, hours: "4", comments: "", spent_on: "2026-03-18" },
+      ],
+    });
+    const text = lines.join("\n");
+    expect(text).toContain("Already in target week:");
+    expect(text).toContain("Mon, Mar 16 — 2 entries, 3:30");
+    expect(text).toContain("Wed, Mar 18 — 1 entry, 4:00");
+  });
+
+  it("excludes draft entries (negative id) from the existing summary", () => {
+    const lines = buildPasteConfirmLines({
+      clipboard: { kind: "day", entries: [entryFoo], sourceDate: "2026-03-10" },
+      targetKind: "day",
+      targetDate: "2026-03-16",
+      targetDates: ["2026-03-16"],
+      isWeekToWeekPaste: false,
+      targetWeekStartForPaste: "",
+      existingEntries: [
+        { id: -5, issue_id: 9, hours: "3", comments: "", spent_on: "2026-03-16" },
+      ],
+    });
+    expect(lines.join("\n")).not.toContain("Already on this day");
   });
 });

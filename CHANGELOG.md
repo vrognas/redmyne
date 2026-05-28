@@ -9,6 +9,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [4.24.0]
 
+### Added
+
+- **Paste confirmation shows what lands where** — the confirm dialog is now scenario-aware. Pasting a day/entry across a week notes "on each of N working days" with the total entry count; pasting a week onto a week shows a per-day breakdown of which entries map to which day. Week targets also summarise entries already in the target week (per-day count + hours) so duplicates are visible before you commit, not just for single-day pastes. Extracted a pure, tested `buildPasteConfirmLines` helper
+
 ### Changed
 
 - **Paste messages reflect draft mode** — when draft mode is active, pasting time entries now shows "Queueing time entries..." and "Queued N entries to draft" instead of "Creating..."/"Created N entries". Tree-pane paste always routed through the draft queue via the `DraftModeServer` wrapper; the wording just made it look like a direct commit. Threaded `isDraftMode` through `TimeEntryCommandDeps`
