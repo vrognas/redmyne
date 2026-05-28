@@ -7,6 +7,16 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.25.0]
+
+### Added
+
+- **Retry failed entries after a partial paste** — when some entries in a paste fail (e.g. a network blip mid-batch), the warning now offers a "Retry Failed" action that re-creates only the failed entries. Previously the only recourse was re-pasting the whole batch, which duplicated everything that had already succeeded. Retry re-runs until everything lands or you dismiss it; the success total accumulates across attempts
+
+### Internal
+
+- Extracted `buildPasteWorkItems` (pure, flattens a paste into `(date, entry)` items — the single source of truth for the count, execution, and retry) and `executePaste` (runs the items, returns successes + the items that failed) from the ~60-line inline paste loop. Paste stays sequential by design: in draft mode every entry serializes on the draft-queue persist lock so concurrency buys nothing, and in direct mode it avoids parallel writes to the Redmine server
+
 ## [4.24.0]
 
 ### Added

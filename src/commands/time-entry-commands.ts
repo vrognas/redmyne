@@ -226,6 +226,71 @@ export function buildPasteConfirmLines(ctx: PasteConfirmContext): string[] {
   }
 }
 
+/** One time entry to create on one date — the unit of work for paste + retry. */
+export interface PasteWorkItem {
+  date: string;
+  entry: ClipboardEntry;
+}
+
+/**
+ * Flatten a paste into a list of (date, entry) work items — the single source
+ * of truth for the total count, execution, and retry. Week→week paste maps each
+ * target day to its source-day entries; every other shape applies all clipboard
+ * entries to every target date.
+ */
+export function buildPasteWorkItems(
+  clipboard: TimeEntryClipboard,
+  targetDates: string[],
+  isWeekToWeekPaste: boolean,
+  targetWeekStartForPaste: string
+): PasteWorkItem[] {
+  const items: PasteWorkItem[] = [];
+  for (const date of targetDates) {
+    const entries = isWeekToWeekPaste
+      ? getEntriesForTargetDate(clipboard, date, targetWeekStartForPaste)
+      : clipboard.entries;
+    for (const entry of entries) {
+      items.push({ date, entry });
+    }
+  }
+  return items;
+}
+
+/**
+ * Create one time entry per work item, sequentially. Returns the success count
+ * and the items that failed, so the caller can retry just those without
+ * duplicating entries that already succeeded.
+ *
+ * Sequential by design: in draft mode every addTimeEntry serializes on the
+ * draft-queue persist lock (concurrency buys nothing); in direct mode it avoids
+ * hammering the Redmine server with parallel writes.
+ */
+async function executePaste(
+  server: IRedmineServer,
+  items: PasteWorkItem[],
+  onProgress: (done: number) => void
+): Promise<{ created: number; failures: PasteWorkItem[] }> {
+  let created = 0;
+  const failures: PasteWorkItem[] = [];
+  for (const item of items) {
+    try {
+      await server.addTimeEntry(
+        item.entry.issue_id,
+        item.entry.activity_id,
+        item.entry.hours,
+        item.entry.comments,
+        item.date,
+        item.entry.custom_fields
+      );
+      created++;
+      onProgress(created);
+    } catch {
+      failures.push(item);
+    }
+  }
+  return { created, failures };
+}
+
 function getTimeEntryWithIdOrShowError(
   node: TimeEntryNode | undefined
 ): (NonNullable<TimeEntryNode["_entry"]> & { id: number }) | undefined {
@@ -626,24 +691,16 @@ export function registerTimeEntryCommands(
           targetWeekStartForPaste = targetWeekStart;
         }
 
-        // Calculate total entries to create
-        let totalEntries = 0;
-        if (isWeekToWeekPaste) {
-          // Week→Week: entries per mapped day
-          for (const date of targetDates) {
-            const dayEntries = getEntriesForTargetDate(
-              clipboard,
-              date,
-              targetWeekStartForPaste
-            );
-            totalEntries += dayEntries.length;
-          }
-        } else {
-          // Entry/Day→Day or Entry/Day→Week: all entries for each target date
-          totalEntries = clipboard.entries.length * targetDates.length;
-        }
+        // Flatten into (date, entry) work items — the unit of work for the
+        // count, execution, and targeted retry.
+        const workItems = buildPasteWorkItems(
+          clipboard,
+          targetDates,
+          isWeekToWeekPaste,
+          targetWeekStartForPaste
+        );
 
-        if (totalEntries === 0) {
+        if (workItems.length === 0) {
           vscode.window.showInformationMessage("No entries to paste");
           return;
         }
@@ -682,60 +739,51 @@ export function registerTimeEntryCommands(
         // In draft mode the server wrapper queues entries instead of committing
         // them, so phrase progress/results as "queued" rather than "created".
         const draftMode = deps.isDraftMode?.() ?? false;
+        const verb = draftMode ? "Queued" : "Created";
+        const noun = (n: number) => (n === 1 ? "entry" : "entries");
 
-        // Execute paste with progress
-        await vscode.window.withProgress(
-          {
-            location: vscode.ProgressLocation.Notification,
-            title: draftMode ? "Queueing time entries..." : "Creating time entries...",
-          },
-          async (progress) => {
-            let created = 0;
-            const errors: string[] = [];
+        const runPaste = (items: PasteWorkItem[]) =>
+          vscode.window.withProgress(
+            {
+              location: vscode.ProgressLocation.Notification,
+              title: draftMode ? "Queueing time entries..." : "Creating time entries...",
+            },
+            (progress) =>
+              executePaste(server, items, (done) =>
+                progress.report({
+                  increment: (1 / items.length) * 100,
+                  message: `${done}/${items.length}`,
+                })
+              )
+          );
 
-            for (const date of targetDates) {
-              // Get entries for this date
-              const entriesToCreate =
-                isWeekToWeekPaste
-                  ? getEntriesForTargetDate(clipboard, date, targetWeekStartForPaste)
-                  : clipboard.entries;
+        // Run, then offer a retry of just the failed items so a mid-batch error
+        // doesn't force re-pasting (and duplicating) the entries that succeeded.
+        let pending = workItems;
+        let totalCreated = 0;
+        for (;;) {
+          const { created, failures } = await runPaste(pending);
+          totalCreated += created;
+          deps.refreshTree();
+          // Refresh Gantt if open
+          vscode.commands.executeCommand("redmyne.refreshGanttData");
 
-              for (const entry of entriesToCreate) {
-                try {
-                  await server.addTimeEntry(
-                    entry.issue_id,
-                    entry.activity_id,
-                    entry.hours,
-                    entry.comments,
-                    date,
-                    entry.custom_fields
-                  );
-                  created++;
-                  progress.report({
-                    increment: (1 / totalEntries) * 100,
-                    message: `${created}/${totalEntries}`,
-                  });
-                } catch (error) {
-                  errors.push(`${date}: ${error}`);
-                }
-              }
-            }
-
-            const verb = draftMode ? "Queued" : "Created";
-            if (errors.length > 0) {
-              vscode.window.showWarningMessage(
-                `${verb} ${created}/${totalEntries} ${totalEntries === 1 ? "entry" : "entries"}. ${errors.length} failed.`
-              );
-            } else {
-              const suffix = draftMode ? " to draft" : "";
-              showStatusBarMessage(`$(check) ${verb} ${created} ${created === 1 ? "entry" : "entries"}${suffix}`, 2000);
-            }
+          if (failures.length === 0) {
+            const suffix = draftMode ? " to draft" : "";
+            showStatusBarMessage(
+              `$(check) ${verb} ${totalCreated} ${noun(totalCreated)}${suffix}`,
+              2000
+            );
+            break;
           }
-        );
 
-        deps.refreshTree();
-        // Refresh Gantt if open
-        vscode.commands.executeCommand("redmyne.refreshGanttData");
+          const choice = await vscode.window.showWarningMessage(
+            `${verb} ${created}/${pending.length} ${noun(pending.length)}. ${failures.length} failed.`,
+            "Retry Failed"
+          );
+          if (choice !== "Retry Failed") break;
+          pending = failures;
+        }
       }
     )
   );

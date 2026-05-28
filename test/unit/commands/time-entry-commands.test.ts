@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as vscode from "vscode";
-import { registerTimeEntryCommands, buildPasteConfirmLines } from "../../../src/commands/time-entry-commands";
+import { registerTimeEntryCommands, buildPasteConfirmLines, buildPasteWorkItems } from "../../../src/commands/time-entry-commands";
 import * as issuePicker from "../../../src/utilities/issue-picker";
 import * as customFieldPicker from "../../../src/utilities/custom-field-picker";
 import * as clipboard from "../../../src/utilities/time-entry-clipboard";
@@ -711,6 +711,102 @@ describe("registerTimeEntryCommands", () => {
 
     expect(closedSpy).not.toHaveBeenCalled();
     expect(mockServer.addTimeEntry).not.toHaveBeenCalled();
+  });
+
+  it("offers a retry of only the failed entries after a partial failure", async () => {
+    const addTimeEntry = vi
+      .fn()
+      .mockResolvedValueOnce(undefined) // entry 1 ok
+      .mockRejectedValueOnce(new Error("boom")) // entry 2 fails
+      .mockResolvedValueOnce(undefined); // retry of entry 2 ok
+    vi.spyOn(clipboard, "getClipboard").mockReturnValue({
+      kind: "day",
+      entries: [
+        { issue_id: 1, activity_id: 2, hours: "1", comments: "a" },
+        { issue_id: 2, activity_id: 2, hours: "1", comments: "b" },
+      ],
+      sourceDate: "2026-02-03",
+    });
+    vi.spyOn(clipboard, "calculatePasteTargetDates").mockReturnValue(["2026-02-05"]);
+    vi.spyOn(closedIssueGuard, "confirmLogTimeOnClosedIssues").mockResolvedValue(true);
+    vi.mocked(vscode.window.showInformationMessage).mockResolvedValue("Create" as never);
+    vi.mocked(vscode.window.showWarningMessage).mockResolvedValue("Retry Failed" as never);
+    const statusSpy = vi.spyOn(statusBar, "showStatusBarMessage");
+
+    registerCommands({ getServer: () => ({ addTimeEntry }) });
+    await handlers.get("redmyne.pasteTimeEntries")?.({ _date: "2026-02-05" });
+
+    // 2 first attempt + 1 retry of only the failed item
+    expect(addTimeEntry).toHaveBeenCalledTimes(3);
+    // retry call targets the failed entry (#2), not the already-created #1
+    expect(addTimeEntry).toHaveBeenNthCalledWith(3, 2, 2, "1", "b", "2026-02-05", undefined);
+    expect(vscode.window.showWarningMessage).toHaveBeenCalledTimes(1);
+    expect(statusSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Created 2 entries"),
+      expect.any(Number)
+    );
+  });
+
+  it("does not retry when the user dismisses the failure warning", async () => {
+    const addTimeEntry = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("boom"));
+    vi.spyOn(clipboard, "getClipboard").mockReturnValue({
+      kind: "day",
+      entries: [
+        { issue_id: 1, activity_id: 2, hours: "1", comments: "a" },
+        { issue_id: 2, activity_id: 2, hours: "1", comments: "b" },
+      ],
+      sourceDate: "2026-02-03",
+    });
+    vi.spyOn(clipboard, "calculatePasteTargetDates").mockReturnValue(["2026-02-05"]);
+    vi.spyOn(closedIssueGuard, "confirmLogTimeOnClosedIssues").mockResolvedValue(true);
+    vi.mocked(vscode.window.showInformationMessage).mockResolvedValue("Create" as never);
+    vi.mocked(vscode.window.showWarningMessage).mockResolvedValue(undefined as never);
+
+    registerCommands({ getServer: () => ({ addTimeEntry }) });
+    await handlers.get("redmyne.pasteTimeEntries")?.({ _date: "2026-02-05" });
+
+    expect(addTimeEntry).toHaveBeenCalledTimes(2); // no retry
+    expect(vscode.window.showWarningMessage).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("buildPasteWorkItems", () => {
+  const entryA = { issue_id: 1, activity_id: 2, hours: "1", comments: "a" };
+  const entryB = { issue_id: 3, activity_id: 2, hours: "2", comments: "b" };
+
+  it("applies every entry to every target date for day/entry paste", () => {
+    const items = buildPasteWorkItems(
+      { kind: "day", entries: [entryA, entryB], sourceDate: "2026-03-10" },
+      ["2026-03-16", "2026-03-17"],
+      false,
+      ""
+    );
+    expect(items).toHaveLength(4);
+    expect(items.map((i) => i.date)).toEqual([
+      "2026-03-16",
+      "2026-03-16",
+      "2026-03-17",
+      "2026-03-17",
+    ]);
+  });
+
+  it("maps each target day to its source-day entries for week→week paste", () => {
+    const weekMap = new Map([
+      [0, [entryA]],
+      [1, [entryB]],
+    ]);
+    const items = buildPasteWorkItems(
+      { kind: "week", entries: [entryA, entryB], weekMap, sourceWeekStart: "2026-03-09" },
+      ["2026-03-16", "2026-03-17"],
+      true,
+      "2026-03-16"
+    );
+    expect(items).toHaveLength(2);
+    expect(items[0]).toEqual({ date: "2026-03-16", entry: entryA });
+    expect(items[1]).toEqual({ date: "2026-03-17", entry: entryB });
   });
 });
 
