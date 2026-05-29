@@ -165,6 +165,33 @@ describe("timesheet panel private coverage", () => {
     );
   });
 
+  it("_copyWeek copies only persisted cells, excluding unsaved (entryId===null) ones", () => {
+    const { panel } = setupPanel({ draftEnabled: true });
+    panel._currentWeek = buildWeekInfo(new Date(2026, 1, 2)); // Mon Feb 2 2026
+
+    const persisted = panel._createEmptyRow();
+    persisted.issueId = 5;
+    persisted.activityId = 9;
+    persisted.projectId = 2;
+    persisted.days[0] = { hours: 2, originalHours: 2, entryId: 500, isDirty: false };
+
+    const unsaved = panel._createEmptyRow();
+    unsaved.issueId = 7;
+    unsaved.activityId = 9;
+    unsaved.projectId = 2;
+    unsaved.days[1] = { hours: 3, originalHours: 0, entryId: null, isDirty: true };
+
+    panel._rows = [persisted, unsaved];
+
+    const setClipboardSpy = vi.spyOn(clipboardUtil, "setClipboard");
+    panel._copyWeek();
+
+    expect(setClipboardSpy).toHaveBeenCalledTimes(1);
+    const payload = setClipboardSpy.mock.calls[0][0] as { entries: Array<{ issue_id: number }> };
+    expect(payload.entries).toHaveLength(1);
+    expect(payload.entries[0].issue_id).toBe(5);
+  });
+
   it("covers project loaders and loadWeek success/no-server/error branches", async () => {
     const noServerSetup = setupPanel({ server: undefined, draftEnabled: false });
     await noServerSetup.panel._loadWeek(noServerSetup.panel._currentWeek);
@@ -356,6 +383,7 @@ describe("timesheet panel private coverage", () => {
     row.projectId = 2;
     row.comments = "note";
     row.days[0].hours = 2;
+    row.days[0].entryId = 500; // persisted cell — eligible for copy
     row.weekTotal = 2;
     panel._rows = [row];
 

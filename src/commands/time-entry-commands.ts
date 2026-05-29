@@ -21,7 +21,7 @@ import {
   isDraftEntry,
 } from "../utilities/time-entry-clipboard";
 import { parseLocalDate, getWeekStart, formatLocalDate, getISOWeekNumber } from "../utilities/date-utils";
-import { differenceInCalendarDays } from "date-fns";
+import { differenceInCalendarDays, addDays } from "date-fns";
 import { DEFAULT_WEEKLY_SCHEDULE, WeeklySchedule } from "../utilities/flexibility-calculator";
 import { MonthlyScheduleOverrides } from "../utilities/monthly-schedule";
 import { pickCustomFields, TimeEntryCustomFieldValue } from "../utilities/custom-field-picker";
@@ -290,6 +290,21 @@ async function executePaste(
     }
   }
   return { created, failures };
+}
+
+/**
+ * Fetch all time entries for the full Mon–Sun week beginning at weekStart.
+ * Copy/paste need the whole week, but the tree's current-week cache stops at
+ * today (it drives the in-progress display), so both refetch through here when
+ * the target is the current week.
+ */
+async function fetchFullWeekEntries(
+  server: IRedmineServer,
+  weekStart: string
+): Promise<CachedEntry[]> {
+  const weekEnd = formatLocalDate(addDays(parseLocalDate(weekStart), 6));
+  const result = await server.getTimeEntries({ from: weekStart, to: weekEnd });
+  return result.time_entries;
 }
 
 /**
@@ -630,18 +645,19 @@ export function registerTimeEntryCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand("redmyne.copyWeekTimeEntries", async (node?: WeekGroupNode) => {
       const resolved = node ?? deps.getSelectedNode?.();
-      let entries = resolved?._cachedEntries;
-      let weekStart = resolved?._weekStart;
+      const currentWeekStart = getWeekStart();
+      const weekStart = resolved?._weekStart ?? currentWeekStart;
 
-      // If no node (toolbar invocation), fetch current week from server
-      if (!weekStart) {
+      // The current week's cached entries stop at today (they drive the
+      // in-progress display), and a toolbar invocation has no node at all.
+      // Refetch the full Mon–Sun week so copy captures future-dated entries too;
+      // past-week nodes already carry the complete week in _cachedEntries.
+      let entries = resolved?._cachedEntries;
+      if (!entries || weekStart === currentWeekStart) {
         const server = getServerOrShowError(deps.getServer);
         if (!server) return;
-        weekStart = getWeekStart();
-        const today = formatLocalDate(new Date());
         try {
-          const result = await server.getTimeEntries({ from: weekStart, to: today });
-          entries = result.time_entries;
+          entries = await fetchFullWeekEntries(server, weekStart);
         } catch {
           vscode.window.showErrorMessage("Failed to fetch time entries");
           return;
@@ -713,10 +729,11 @@ export function registerTimeEntryCommands(
         if (!server) return;
 
         const resolved = node ?? deps.getSelectedNode?.();
+        const currentWeekStart = getWeekStart();
         // Day node → that day; week node → that week; no node (toolbar) → current week.
         const { targetKind, targetDate, targetWeekStart } = resolvePasteTarget(
           resolved,
-          getWeekStart()
+          currentWeekStart
         );
 
         // Get schedule config
@@ -769,12 +786,18 @@ export function registerTimeEntryCommands(
           return;
         }
 
-        // Existing entries on the target: day node carries that day's entries,
-        // week node carries the whole week's — both live on _cachedEntries.
-        const existingEntries =
-          resolved && "_cachedEntries" in resolved
-            ? (resolved as DayGroupNode | WeekGroupNode)._cachedEntries ?? []
-            : [];
+        // Existing entries on the target — day node carries that day's, week node
+        // the whole week's (both on _cachedEntries). For a current-week target the
+        // cache stops at today, so refetch the full week (best-effort) to keep the
+        // "already in week" duplicate summary complete for future days too.
+        let existingEntries: CachedEntry[] = resolved?._cachedEntries ?? [];
+        if (targetKind === "week" && targetWeekStart === currentWeekStart) {
+          try {
+            existingEntries = await fetchFullWeekEntries(server, targetWeekStart);
+          } catch {
+            /* keep the cached fallback — the summary is only informational */
+          }
+        }
 
         const confirmLines = buildPasteConfirmLines({
           clipboard,

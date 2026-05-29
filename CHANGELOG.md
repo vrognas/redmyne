@@ -16,12 +16,15 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Fixed
 
 - **Copying an empty week no longer clobbers the clipboard** — mirroring the empty-day guard from 4.24.0, `Copy Week` on a week with no entries previously stored an empty, unpasteable clipboard (a dead end that also discarded whatever was previously copied). It now shows "Nothing to copy — week is empty" and leaves the existing clipboard intact
+- **Current-week copy & paste now cover the full week** — copying the current week (toolbar or the "This Week" node), and the paste confirm's "already in target week" summary, previously read the tree's display cache, which stops at today. Entries dated later this week (e.g. hours logged in advance) were silently dropped from the copy and absent from the duplicate summary. Both now fetch the full Mon–Sun week; past weeks were already complete and are unaffected
+- **Timesheet "Copy Week" skips unsaved cells** — it copied every cell with hours, including queued-but-unsaved draft creates, so pasting could duplicate work that wasn't committed yet. It now copies only persisted cells (those with a server id), matching the sidebar's deliberate draft exclusion
 
 ### Internal
 
 - Extracted `buildPasteWorkItems` (pure, flattens a paste into `(date, entry)` items — the single source of truth for the count, execution, and retry) and `executePaste` (runs the items, returns successes + the items that failed) from the ~60-line inline paste loop. Paste stays sequential by design: in draft mode every entry serializes on the draft-queue persist lock so concurrency buys nothing, and in direct mode it avoids parallel writes to the Redmine server
 - Decomposed the `pasteTimeEntries` command further into a pure, tested `resolvePasteTarget` (focused node → target day/week, with the fallback week passed in) and `runPasteWithRetry` (progress reporting + failed-item retry loop), leaving the command body as orchestration
 - Consolidated five inline "draft entry = negative id" checks behind a single `isDraftEntry` predicate, and removed the now-unused `getISODayOfWeek` helper
+- Added a shared `fetchFullWeekEntries` helper for the full-week copy/paste fetches, and simplified the paste handler's existing-entries extraction (dropped a redundant `in`-check + cast)
 
 ## [4.24.0]
 

@@ -1637,6 +1637,10 @@ export class TimeSheetPanel {
       for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
         const cell = row.days[dayIndex];
         if (!cell || cell.hours <= 0) continue;
+        // Skip unsaved cells (no server id) — copying them would re-create
+        // duplicates of work not yet committed. Mirrors the sidebar's draft
+        // exclusion (which keys on negative ids in its own model).
+        if (cell.entryId === null) continue;
 
         const entry: ClipboardEntry = {
           issue_id: row.issueId,

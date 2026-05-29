@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as vscode from "vscode";
 import { registerTimeEntryCommands, buildPasteConfirmLines, buildPasteWorkItems, resolvePasteTarget } from "../../../src/commands/time-entry-commands";
+import { getWeekStart } from "../../../src/utilities/date-utils";
+
+/** Calendar-day span between two YYYY-MM-DD strings. */
+function daySpan(from: string, to: string): number {
+  return (new Date(to).getTime() - new Date(from).getTime()) / 86_400_000;
+}
 import * as issuePicker from "../../../src/utilities/issue-picker";
 import * as customFieldPicker from "../../../src/utilities/custom-field-picker";
 import * as clipboard from "../../../src/utilities/time-entry-clipboard";
@@ -638,6 +644,37 @@ describe("registerTimeEntryCommands", () => {
     expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Failed to fetch time entries");
   });
 
+  it("toolbar week copy fetches the full Mon–Sun week, not capped at today", async () => {
+    const getTimeEntries = vi.fn().mockResolvedValue({ time_entries: [] });
+    registerCommands({ getServer: () => ({ getTimeEntries }) });
+
+    await handlers.get("redmyne.copyWeekTimeEntries")?.();
+
+    expect(getTimeEntries).toHaveBeenCalledTimes(1);
+    const { from, to } = getTimeEntries.mock.calls[0][0] as { from: string; to: string };
+    expect(from).toBe(getWeekStart());
+    expect(daySpan(from, to)).toBe(6); // Monday → Sunday, full week
+  });
+
+  it("current-week node copy refetches the full week instead of the today-capped cache", async () => {
+    const cur = getWeekStart();
+    const getTimeEntries = vi.fn().mockResolvedValue({ time_entries: [] });
+    // Node carries a today-capped cache; copy must ignore it and refetch the full week.
+    registerCommands({
+      getServer: () => ({ getTimeEntries }),
+      getSelectedNode: () => ({
+        _weekStart: cur,
+        _cachedEntries: [{ id: 1, issue_id: 4, activity_id: 2, hours: "1", comments: "", spent_on: cur }],
+      }),
+    });
+
+    await handlers.get("redmyne.copyWeekTimeEntries")?.();
+
+    expect(getTimeEntries).toHaveBeenCalledTimes(1);
+    const { from, to } = getTimeEntries.mock.calls[0][0] as { from: string; to: string };
+    expect(daySpan(from, to)).toBe(6);
+  });
+
   it("stops paste flow for empty clipboard and invalid target dates", async () => {
     const getClipboardSpy = vi.spyOn(clipboard, "getClipboard");
     const calculateDatesSpy = vi.spyOn(clipboard, "calculatePasteTargetDates");
@@ -782,6 +819,30 @@ describe("registerTimeEntryCommands", () => {
 
     expect(addTimeEntry).toHaveBeenCalledTimes(2); // no retry
     expect(vscode.window.showWarningMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it("pasting to the current week fetches the full week for the duplicate summary", async () => {
+    const cur = getWeekStart();
+    const getTimeEntries = vi.fn().mockResolvedValue({ time_entries: [] });
+    const addTimeEntry = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(clipboard, "getClipboard").mockReturnValue({
+      kind: "day",
+      entries: [{ issue_id: 1, activity_id: 2, hours: "1", comments: "" }],
+      sourceDate: "2026-02-03",
+    });
+    vi.spyOn(clipboard, "calculatePasteTargetDates").mockReturnValue([cur]);
+    vi.spyOn(closedIssueGuard, "confirmLogTimeOnClosedIssues").mockResolvedValue(true);
+    // Cancel at the confirm dialog — the existing-entries fetch happens before it.
+    vi.mocked(vscode.window.showInformationMessage).mockResolvedValue(undefined as never);
+
+    registerCommands({ getServer: () => ({ getTimeEntries, addTimeEntry }) });
+    await handlers.get("redmyne.pasteTimeEntries")?.({ _weekStart: cur });
+
+    expect(getTimeEntries).toHaveBeenCalledTimes(1);
+    const { from, to } = getTimeEntries.mock.calls[0][0] as { from: string; to: string };
+    expect(from).toBe(cur);
+    expect(daySpan(from, to)).toBe(6);
+    expect(addTimeEntry).not.toHaveBeenCalled(); // cancelled at confirm
   });
 });
 
