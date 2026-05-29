@@ -18,6 +18,7 @@ import {
   calculatePasteTargetDates,
   getEntriesForTargetDate,
   toClipboardEntry,
+  isDraftEntry,
 } from "../utilities/time-entry-clipboard";
 import { parseLocalDate, getWeekStart, formatLocalDate, getISOWeekNumber } from "../utilities/date-utils";
 import { differenceInCalendarDays } from "date-fns";
@@ -180,7 +181,7 @@ export function buildPasteConfirmLines(ctx: PasteConfirmContext): string[] {
   }
 
   // ---- Existing entries on the target ----
-  const existing = existingEntries.filter((e) => (e.id ?? 0) >= 0);
+  const existing = existingEntries.filter((e) => !isDraftEntry(e));
   if (existing.length === 0) return lines;
 
   if (targetKind === "day") {
@@ -291,6 +292,80 @@ async function executePaste(
   return { created, failures };
 }
 
+/**
+ * Resolve the paste target from the focused node: a day node → that day, a week
+ * node → that week, no node (toolbar) → the supplied fallback week. Kept pure —
+ * the fallback is passed in rather than read from the clock — so it's unit-testable.
+ */
+export function resolvePasteTarget(
+  resolved: SelectableNode | undefined,
+  fallbackWeekStart: string
+): { targetKind: "day" | "week"; targetDate?: string; targetWeekStart?: string } {
+  if (resolved?._date) {
+    return { targetKind: "day", targetDate: resolved._date };
+  }
+  if (resolved?._weekStart) {
+    return { targetKind: "week", targetWeekStart: resolved._weekStart };
+  }
+  return { targetKind: "week", targetWeekStart: fallbackWeekStart };
+}
+
+/**
+ * Run a paste, then offer to retry just the failed items so a mid-batch error
+ * doesn't force re-pasting (and duplicating) the entries that already succeeded.
+ * The success total accumulates across retry attempts.
+ */
+async function runPasteWithRetry(
+  server: IRedmineServer,
+  workItems: PasteWorkItem[],
+  draftMode: boolean,
+  refreshTree: () => void
+): Promise<void> {
+  const verb = draftMode ? "Queued" : "Created";
+  const noun = (n: number) => (n === 1 ? "entry" : "entries");
+
+  const runPaste = (items: PasteWorkItem[]) =>
+    vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: draftMode ? "Queueing time entries..." : "Creating time entries...",
+      },
+      (progress) =>
+        executePaste(server, items, (done) =>
+          progress.report({
+            increment: (1 / items.length) * 100,
+            message: `${done}/${items.length}`,
+          })
+        )
+    );
+
+  let pending = workItems;
+  let totalCreated = 0;
+  for (;;) {
+    const { created, failures } = await runPaste(pending);
+    totalCreated += created;
+    refreshTree();
+    // Refresh Gantt if open
+    vscode.commands.executeCommand("redmyne.refreshGanttData");
+
+    if (failures.length === 0) {
+      const suffix = draftMode ? " to draft" : "";
+      showStatusBarMessage(
+        `$(check) ${verb} ${totalCreated} ${noun(totalCreated)}${suffix}`,
+        2000
+      );
+      return;
+    }
+
+    const choice = await vscode.window.showWarningMessage(
+      `${verb} ${created}/${pending.length} ${noun(pending.length)}. ${failures.length} failed.`,
+      "Retry Failed"
+    );
+    if (choice !== "Retry Failed") return;
+    pending = failures;
+  }
+}
+
 function getTimeEntryWithIdOrShowError(
   node: TimeEntryNode | undefined
 ): (NonNullable<TimeEntryNode["_entry"]> & { id: number }) | undefined {
@@ -369,7 +444,7 @@ export function registerTimeEntryCommands(
 
       // Only show Custom Fields option if there are custom fields configured
       // and entry is not a draft (drafts have negative IDs and can't be fetched)
-      const isDraft = (entry.id ?? 0) < 0;
+      const isDraft = isDraftEntry(entry);
       if (customFieldDefs.length > 0 && !isDraft) {
         options.push({ label: "$(symbol-field) Custom Fields", field: "customFields" });
       }
@@ -537,7 +612,7 @@ export function registerTimeEntryCommands(
 
       // Filter out drafts (negative IDs)
       const clipEntries: ClipboardEntry[] = entries
-        .filter((e) => (e.id ?? 0) >= 0)
+        .filter((e) => !isDraftEntry(e))
         .map(toClipboardEntry);
 
       setClipboard({
@@ -582,7 +657,7 @@ export function registerTimeEntryCommands(
 
         for (const e of entries) {
           // Filter out drafts
-          if ((e.id ?? 0) < 0) continue;
+          if (isDraftEntry(e)) continue;
 
           const clipEntry = toClipboardEntry(e);
           allEntries.push(clipEntry);
@@ -601,6 +676,13 @@ export function registerTimeEntryCommands(
         }
       }
 
+      if (allEntries.length === 0) {
+        // Don't clobber a previously-copied clipboard with an empty week —
+        // an empty clipboard can't be pasted, so this would be a dead end.
+        showStatusBarMessage("$(info) Nothing to copy — week is empty", 2000);
+        return;
+      }
+
       setClipboard({
         kind: "week",
         entries: allEntries,
@@ -610,9 +692,7 @@ export function registerTimeEntryCommands(
 
       const count = allEntries.length;
       showStatusBarMessage(
-        count === 0
-          ? "$(copy) Week copied (empty)"
-          : `$(copy) ${count} ${count === 1 ? "entry" : "entries"} copied`,
+        `$(copy) ${count} ${count === 1 ? "entry" : "entries"} copied`,
         2000
       );
     })
@@ -633,27 +713,11 @@ export function registerTimeEntryCommands(
         if (!server) return;
 
         const resolved = node ?? deps.getSelectedNode?.();
-
-        // Determine target type and date
-        const isDayTarget = resolved && "_date" in resolved && !!resolved._date;
-        const isWeekTarget = resolved && "_weekStart" in resolved && !!resolved._weekStart;
-
-        // Default to "This Week" if no node (toolbar invocation)
-        let targetKind: "day" | "week";
-        let targetDate: string | undefined;
-        let targetWeekStart: string | undefined;
-
-        if (isDayTarget) {
-          targetKind = "day";
-          targetDate = (resolved as DayGroupNode)._date;
-        } else if (isWeekTarget) {
-          targetKind = "week";
-          targetWeekStart = (resolved as WeekGroupNode)._weekStart;
-        } else {
-          // Toolbar: default to current week
-          targetKind = "week";
-          targetWeekStart = getWeekStart();
-        }
+        // Day node → that day; week node → that week; no node (toolbar) → current week.
+        const { targetKind, targetDate, targetWeekStart } = resolvePasteTarget(
+          resolved,
+          getWeekStart()
+        );
 
         // Get schedule config
         const config = vscode.workspace.getConfiguration("redmyne.workingHours");
@@ -739,51 +803,7 @@ export function registerTimeEntryCommands(
         // In draft mode the server wrapper queues entries instead of committing
         // them, so phrase progress/results as "queued" rather than "created".
         const draftMode = deps.isDraftMode?.() ?? false;
-        const verb = draftMode ? "Queued" : "Created";
-        const noun = (n: number) => (n === 1 ? "entry" : "entries");
-
-        const runPaste = (items: PasteWorkItem[]) =>
-          vscode.window.withProgress(
-            {
-              location: vscode.ProgressLocation.Notification,
-              title: draftMode ? "Queueing time entries..." : "Creating time entries...",
-            },
-            (progress) =>
-              executePaste(server, items, (done) =>
-                progress.report({
-                  increment: (1 / items.length) * 100,
-                  message: `${done}/${items.length}`,
-                })
-              )
-          );
-
-        // Run, then offer a retry of just the failed items so a mid-batch error
-        // doesn't force re-pasting (and duplicating) the entries that succeeded.
-        let pending = workItems;
-        let totalCreated = 0;
-        for (;;) {
-          const { created, failures } = await runPaste(pending);
-          totalCreated += created;
-          deps.refreshTree();
-          // Refresh Gantt if open
-          vscode.commands.executeCommand("redmyne.refreshGanttData");
-
-          if (failures.length === 0) {
-            const suffix = draftMode ? " to draft" : "";
-            showStatusBarMessage(
-              `$(check) ${verb} ${totalCreated} ${noun(totalCreated)}${suffix}`,
-              2000
-            );
-            break;
-          }
-
-          const choice = await vscode.window.showWarningMessage(
-            `${verb} ${created}/${pending.length} ${noun(pending.length)}. ${failures.length} failed.`,
-            "Retry Failed"
-          );
-          if (choice !== "Retry Failed") break;
-          pending = failures;
-        }
+        await runPasteWithRetry(server, workItems, draftMode, deps.refreshTree);
       }
     )
   );

@@ -4,7 +4,7 @@ import {
   getClipboard,
   clearClipboard,
   updateClipboardContext,
-  getISODayOfWeek,
+  isDraftEntry,
   getWorkingDaysInWeek,
   calculatePasteTargetDates,
   getEntriesForTargetDate,
@@ -151,10 +151,12 @@ describe("time-entry-clipboard", () => {
     });
   });
 
-  describe("date helpers", () => {
-    it("getISODayOfWeek converts JS day index to ISO Monday-first", () => {
-      expect(getISODayOfWeek(new Date("2025-01-13"))).toBe(0); // Monday
-      expect(getISODayOfWeek(new Date("2025-01-19"))).toBe(6); // Sunday
+  describe("isDraftEntry", () => {
+    it("treats negative ids as drafts; zero/positive/missing ids as persisted", () => {
+      expect(isDraftEntry({ id: -1 })).toBe(true);
+      expect(isDraftEntry({ id: 1 })).toBe(false);
+      expect(isDraftEntry({ id: 0 })).toBe(false);
+      expect(isDraftEntry({})).toBe(false);
     });
   });
 

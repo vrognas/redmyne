@@ -62,6 +62,14 @@ export function toClipboardEntry(e: ClipboardEntrySource): ClipboardEntry {
   };
 }
 
+/**
+ * A draft (unsaved) entry carries a synthetic negative id; persisted server
+ * entries have positive ids. Entries with no id are treated as persisted.
+ */
+export function isDraftEntry(entry: { id?: number }): boolean {
+  return (entry.id ?? 0) < 0;
+}
+
 export interface TimeEntryClipboard {
   kind: ClipboardKind;
   entries: ClipboardEntry[];
@@ -109,14 +117,6 @@ export function updateClipboardContext(): void {
     "redmyne:timeEntryClipboardType",
     clipboardType
   );
-}
-
-/**
- * Get ISO day-of-week (0=Monday, 6=Sunday) from Date
- */
-export function getISODayOfWeek(date: Date): number {
-  const day = date.getDay();
-  return day === 0 ? 6 : day - 1; // Convert Sun=0..Sat=6 to Mon=0..Sun=6
 }
 
 /**

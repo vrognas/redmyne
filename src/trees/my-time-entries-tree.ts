@@ -4,6 +4,7 @@ import { TimeEntry } from "../redmine/models/time-entry";
 import { formatHoursAsHHMM } from "../utilities/time-input";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
 import { adHocTracker } from "../utilities/adhoc-tracker";
+import { isDraftEntry } from "../utilities/time-entry-clipboard";
 import { parseTargetIssueId } from "../utilities/contribution-calculator";
 import {
   MonthlyScheduleOverrides,
@@ -821,7 +822,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const clientName = cached?.projectId ? projectClientMap.get(cached.projectId) || "" : "";
 
       // Check if this is a draft entry (negative ID) or draft-modified
-      const isDraft = (entry.id ?? 0) < 0;
+      const isDraft = isDraftEntry(entry);
       const isDraftModified = (entry as TimeEntry & { _isDraftModified?: boolean })._isDraftModified === true;
 
       // Encode command arguments as JSON array for VS Code command URI

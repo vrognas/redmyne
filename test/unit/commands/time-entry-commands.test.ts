@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as vscode from "vscode";
-import { registerTimeEntryCommands, buildPasteConfirmLines, buildPasteWorkItems } from "../../../src/commands/time-entry-commands";
+import { registerTimeEntryCommands, buildPasteConfirmLines, buildPasteWorkItems, resolvePasteTarget } from "../../../src/commands/time-entry-commands";
 import * as issuePicker from "../../../src/utilities/issue-picker";
 import * as customFieldPicker from "../../../src/utilities/custom-field-picker";
 import * as clipboard from "../../../src/utilities/time-entry-clipboard";
@@ -470,6 +470,18 @@ describe("registerTimeEntryCommands", () => {
     expect(setClipboardSpy).not.toHaveBeenCalled();
   });
 
+  it("copying an empty week does not clobber an existing clipboard", async () => {
+    const setClipboardSpy = vi.spyOn(clipboard, "setClipboard");
+    registerCommands();
+
+    await handlers.get("redmyne.copyWeekTimeEntries")?.({
+      _weekStart: "2026-02-02",
+      _cachedEntries: [],
+    });
+
+    expect(setClipboardSpy).not.toHaveBeenCalled();
+  });
+
   it("copies week entries, filtering drafts and grouping by day", async () => {
     const setClipboardSpy = vi.spyOn(clipboard, "setClipboard");
     registerCommands();
@@ -902,5 +914,28 @@ describe("buildPasteConfirmLines", () => {
       ],
     });
     expect(lines.join("\n")).not.toContain("Already on this day");
+  });
+});
+
+describe("resolvePasteTarget", () => {
+  it("resolves a day node to a day target", () => {
+    expect(resolvePasteTarget({ _date: "2026-03-16" }, "2026-03-16")).toEqual({
+      targetKind: "day",
+      targetDate: "2026-03-16",
+    });
+  });
+
+  it("resolves a week node to a week target", () => {
+    expect(resolvePasteTarget({ _weekStart: "2026-03-16" }, "2026-03-09")).toEqual({
+      targetKind: "week",
+      targetWeekStart: "2026-03-16",
+    });
+  });
+
+  it("falls back to the supplied week when no node is focused (toolbar)", () => {
+    expect(resolvePasteTarget(undefined, "2026-03-09")).toEqual({
+      targetKind: "week",
+      targetWeekStart: "2026-03-09",
+    });
   });
 });

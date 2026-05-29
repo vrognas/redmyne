@@ -13,9 +13,15 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - **Retry failed entries after a partial paste** — when some entries in a paste fail (e.g. a network blip mid-batch), the warning now offers a "Retry Failed" action that re-creates only the failed entries. Previously the only recourse was re-pasting the whole batch, which duplicated everything that had already succeeded. Retry re-runs until everything lands or you dismiss it; the success total accumulates across attempts
 
+### Fixed
+
+- **Copying an empty week no longer clobbers the clipboard** — mirroring the empty-day guard from 4.24.0, `Copy Week` on a week with no entries previously stored an empty, unpasteable clipboard (a dead end that also discarded whatever was previously copied). It now shows "Nothing to copy — week is empty" and leaves the existing clipboard intact
+
 ### Internal
 
 - Extracted `buildPasteWorkItems` (pure, flattens a paste into `(date, entry)` items — the single source of truth for the count, execution, and retry) and `executePaste` (runs the items, returns successes + the items that failed) from the ~60-line inline paste loop. Paste stays sequential by design: in draft mode every entry serializes on the draft-queue persist lock so concurrency buys nothing, and in direct mode it avoids parallel writes to the Redmine server
+- Decomposed the `pasteTimeEntries` command further into a pure, tested `resolvePasteTarget` (focused node → target day/week, with the fallback week passed in) and `runPasteWithRetry` (progress reporting + failed-item retry loop), leaving the command body as orchestration
+- Consolidated five inline "draft entry = negative id" checks behind a single `isDraftEntry` predicate, and removed the now-unused `getISODayOfWeek` helper
 
 ## [4.24.0]
 
