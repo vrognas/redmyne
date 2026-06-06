@@ -702,8 +702,10 @@ export function setupCollapse(ctx) {
     // Drag-release click (bar move/resize/link): pointer travelled — skip.
     // (dragState lives module-local in gantt-drag.js; movement threshold is
     // the self-contained equivalent.)
-    if (lastMouseDown && (Math.abs(e.clientX - lastMouseDown.x) > DRAG_CLICK_THRESHOLD ||
-        Math.abs(e.clientY - lastMouseDown.y) > DRAG_CLICK_THRESHOLD)) {
+    const downAt = lastMouseDown;
+    lastMouseDown = null; // consume: stale/absent mousedown can't affect later synthetic clicks
+    if (downAt && (Math.abs(e.clientX - downAt.x) > DRAG_CLICK_THRESHOLD ||
+        Math.abs(e.clientY - downAt.y) > DRAG_CLICK_THRESHOLD)) {
       return;
     }
     // Only clicks inside the gantt body (excludes toolbar, minimap, modals,
