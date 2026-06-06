@@ -2,6 +2,7 @@ import {
   findDescendants as findDescendantsUtil,
   findVisibleDescendants as findVisibleDescendantsUtil,
 } from './collapse-utils.js';
+import { parseTranslateY } from './selection-utils.js';
 
 export function setupCollapse(ctx) {
   const { vscode, addDocListener, addWinListener, announce, barHeight, selectedCollapseKey } = ctx;
@@ -90,6 +91,7 @@ export function setupCollapse(ctx) {
         vscode.postMessage({ command: 'setSelectedKey', collapseKey: label.dataset.collapseKey });
       }
     }
+    updateRowSelectionOverlays();
   }
 
   // Restore focus to active label when webview regains focus
@@ -106,6 +108,7 @@ export function setupCollapse(ctx) {
       activeLabel.blur();
       activeLabel = null;
       vscode.postMessage({ command: 'setSelectedKey', collapseKey: null });
+      updateRowSelectionOverlays();
     }
   });
 
@@ -177,6 +180,49 @@ export function setupCollapse(ctx) {
   // Build indexes on load
   buildRowIndex();
   buildAncestorCache();
+
+  // Full-row selection overlays: ONE rect per column SVG + timeline (7 nodes
+  // total, O(1) DOM — per-cell rects would add ~5N nodes). Inserted as first
+  // child so they render under row content.
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const selectionOverlays = [];
+  [
+    '.gantt-labels svg',
+    '.gantt-col-status svg',
+    '.gantt-col-id svg',
+    '.gantt-col-start svg',
+    '.gantt-col-due svg',
+    '.gantt-col-assignee svg',
+    '.gantt-timeline svg'
+  ].forEach(selector => {
+    const svg = document.querySelector(selector);
+    if (!svg) return; // column may be hidden/absent
+    const rect = document.createElementNS(SVG_NS, 'rect');
+    rect.setAttribute('class', 'row-selection-overlay');
+    rect.setAttribute('x', '0');
+    rect.setAttribute('width', '100%');
+    rect.setAttribute('height', String(barHeight + 2)); // match row-hit-area band
+    rect.setAttribute('visibility', 'hidden');
+    svg.insertBefore(rect, svg.firstChild);
+    selectionOverlays.push(rect);
+  });
+
+  // Position overlays on the active row (current Y from transform — collapse
+  // shifts rows away from originalY). Hide when no/hidden selection.
+  function updateRowSelectionOverlays() {
+    const key = activeLabel?.dataset.collapseKey;
+    const entry = key ? rowIndex.get(key) : null;
+    if (!entry || !isLabelVisible(activeLabel)) {
+      selectionOverlays.forEach(rect => rect.setAttribute('visibility', 'hidden'));
+      return;
+    }
+    const el = entry.elements[0];
+    const y = parseTranslateY(el.getAttribute('transform'), entry.originalY);
+    selectionOverlays.forEach(rect => {
+      rect.setAttribute('y', String(y - 1)); // row-hit-area starts at -1
+      rect.setAttribute('visibility', 'visible');
+    });
+  }
 
   // Helper to toggle SVG element visibility
   function setSvgVisibility(el, hidden) {
@@ -487,6 +533,9 @@ export function setupCollapse(ctx) {
       const toHidden = toBar?.classList.contains('gantt-row-hidden');
       setSvgVisibility(arrow, fromHidden || toHidden);
     });
+
+    // Selected row may have shifted or been hidden by this toggle
+    updateRowSelectionOverlays();
 
     // Sync state to extension for persistence (no re-render)
     vscode.postMessage({ command: 'collapseStateSync', collapseKey, isExpanded: shouldExpand });

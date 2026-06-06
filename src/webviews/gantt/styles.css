@@ -1651,6 +1651,12 @@ button:focus {
   fill: var(--vscode-list-inactiveSelectionForeground) !important;
 }
 
+/* Click-to-select: full-row selection band (one overlay rect per column SVG) */
+.row-selection-overlay {
+  fill: var(--vscode-list-inactiveSelectionBackground);
+  pointer-events: none;
+}
+
 /* Collapse toggle chevron - VS Code style */
 .collapse-toggle {
   cursor: pointer;
