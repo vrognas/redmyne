@@ -577,6 +577,12 @@ fi
 - Parse once per stripe, reuse across operations
 - No invalidation needed (static data per render)
 
+### Click-to-Select Row Highlight
+
+**Single overlay rect per SVG row** — one `<rect>` spanning the full row width is O(1) to show/hide; coloring ~5 per-cell rects per row is O(N) and couples highlight logic to column count.
+
+**Movement-threshold mousedown-consume for click/drag disambiguation** — recording mousedown position and consuming the event only when the pointer travels <threshold px keeps click-select and drag-scroll fully independent without cross-module coordination.
+
 ### Lessons
 
 1. **Always-render for instant toggle**: Pre-render both states, toggle via CSS
@@ -586,6 +592,8 @@ fi
 4. **Diff for incremental updates**: Track what changed, update only that
 5. **Parse once, cache forever**: Static DOM data should be parsed and cached
 6. **Gate perf logging**: Use config flag (default: off) not hardcoded booleans
+7. **Single overlay rect for full-row highlight**: O(1) per row vs O(N) per-cell coloring
+8. **Movement-threshold for click/drag split**: Self-contained, no cross-module coordination
 
 ## Per-Unit Timer Architecture (2025-12-21)
 

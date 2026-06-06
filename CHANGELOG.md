@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.26.0]
+
+### Added
+
+- **Gantt click-to-select rows** — click any part of a row (label, column cell, bar, or empty timeline lane) to select it; a full-row highlight band spans all columns. Selection syncs with keyboard navigation, persists across re-renders, and clears on Escape. Drag-release does not trigger selection
+
 ## [4.25.0]
 
 ### Added
