@@ -2,7 +2,7 @@ import {
   findDescendants as findDescendantsUtil,
   findVisibleDescendants as findVisibleDescendantsUtil,
 } from './collapse-utils.js';
-import { parseTranslateY } from './selection-utils.js';
+import { parseTranslateY, pickRowKeyByY } from './selection-utils.js';
 
 export function setupCollapse(ctx) {
   const { vscode, addDocListener, addWinListener, announce, barHeight, selectedCollapseKey } = ctx;
@@ -687,5 +687,52 @@ export function setupCollapse(ctx) {
           break;
       }
     });
+  });
+
+  // Click-to-select: delegated handler for NON-label row clicks (column cells,
+  // bars, aggregate bars) and empty timeline lanes. Labels keep their own
+  // per-element handlers (which already call setActiveLabel). Additive: no
+  // stopPropagation, existing click actions still fire.
+  const DRAG_CLICK_THRESHOLD = 4;
+  let lastMouseDown = null;
+  addDocListener('mousedown', (e) => {
+    lastMouseDown = { x: e.clientX, y: e.clientY };
+  });
+  addDocListener('click', (e) => {
+    // Drag-release click (bar move/resize/link): pointer travelled — skip.
+    // (dragState lives module-local in gantt-drag.js; movement threshold is
+    // the self-contained equivalent.)
+    if (lastMouseDown && (Math.abs(e.clientX - lastMouseDown.x) > DRAG_CLICK_THRESHOLD ||
+        Math.abs(e.clientY - lastMouseDown.y) > DRAG_CLICK_THRESHOLD)) {
+      return;
+    }
+    // Only clicks inside the gantt body (excludes toolbar, minimap, modals,
+    // relation picker — those live outside #ganttScroll)
+    if (!e.target.closest('#ganttScroll')) return;
+    // Skip interactive elements
+    if (e.target.closest('.collapse-toggle, .chevron-hit-area, .drag-handle, ' +
+        '.link-handle, .blocks-badge-group, .blocker-badge, .progress-badge-group, ' +
+        '.flex-badge-group, button, input, select')) {
+      return;
+    }
+    const row = e.target.closest('.gantt-row[data-collapse-key]');
+    // Labels already select via their own handlers — avoid double setSelectedKey
+    if (row && row.matches('.project-label, .issue-label, .time-group-label')) return;
+
+    let key = row?.dataset.collapseKey || null;
+    if (!key) {
+      // Empty timeline lane: resolve row from click Y over visible label bands
+      if (!e.target.closest('.gantt-timeline')) return;
+      const rows = [];
+      for (const l of allLabels) {
+        if (!isLabelVisible(l)) continue;
+        const r = l.getBoundingClientRect();
+        rows.push({ key: l.dataset.collapseKey, y: r.top, height: r.height });
+      }
+      key = pickRowKeyByY(rows, e.clientY);
+      if (!key) return;
+    }
+    const label = allLabels.find(l => l.dataset.collapseKey === key);
+    if (label) setActiveLabel(label, false, false, true); // skipFocus: keep bar focus for arrow-nudge
   });
 }
