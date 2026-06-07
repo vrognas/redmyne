@@ -282,49 +282,21 @@ export class KanbanController {
    * Move task up in its status column
    */
   async moveUp(id: string): Promise<void> {
-    const task = this.tasks.find((t) => t.id === id);
-    if (!task) return;
-
-    const status = getTaskStatus(task);
-    const sameStatusTasks = sortTasksByPriority(
-      this.tasks.filter((t) => getTaskStatus(t) === status)
-    );
-
-    const currentIndex = sameStatusTasks.findIndex((t) => t.id === id);
-    if (currentIndex <= 0) return; // Already at top
-
-    // Ensure both tasks have sortOrder, then swap
-    const prevTask = sameStatusTasks[currentIndex - 1];
-    if (!prevTask) return;
-    const currentOrder = task.sortOrder ?? currentIndex;
-    const prevOrder = prevTask.sortOrder ?? currentIndex - 1;
-
-    // Find and update in main array
-    const taskIdx = this.tasks.findIndex((t) => t.id === id);
-    const prevIdx = this.tasks.findIndex((t) => t.id === prevTask.id);
-    const taskAtIdx = this.tasks[taskIdx];
-    const prevAtIdx = this.tasks[prevIdx];
-    if (!taskAtIdx || !prevAtIdx) return;
-
-    this.tasks[taskIdx] = {
-      ...taskAtIdx,
-      sortOrder: prevOrder,
-      updatedAt: new Date().toISOString(),
-    };
-    this.tasks[prevIdx] = {
-      ...prevAtIdx,
-      sortOrder: currentOrder,
-      updatedAt: new Date().toISOString(),
-    };
-
-    await this.persist();
-    this._onTasksChange.fire();
+    await this.move(id, -1);
   }
 
   /**
    * Move task down in its status column
    */
   async moveDown(id: string): Promise<void> {
+    await this.move(id, 1);
+  }
+
+  /**
+   * Swap a task with its column neighbor in the given direction
+   * (-1 = up/earlier, +1 = down/later). No-op at the column boundary.
+   */
+  private async move(id: string, direction: -1 | 1): Promise<void> {
     const task = this.tasks.find((t) => t.id === id);
     if (!task) return;
 
@@ -334,28 +306,29 @@ export class KanbanController {
     );
 
     const currentIndex = sameStatusTasks.findIndex((t) => t.id === id);
-    if (currentIndex < 0 || currentIndex >= sameStatusTasks.length - 1) return; // Already at bottom
+    if (currentIndex < 0) return;
+    const neighborIndex = currentIndex + direction;
+    if (neighborIndex < 0 || neighborIndex >= sameStatusTasks.length) return; // At boundary
 
-    // Ensure both tasks have sortOrder, then swap
-    const nextTask = sameStatusTasks[currentIndex + 1];
-    if (!nextTask) return;
+    const neighborTask = sameStatusTasks[neighborIndex];
+    if (!neighborTask) return;
     const currentOrder = task.sortOrder ?? currentIndex;
-    const nextOrder = nextTask.sortOrder ?? currentIndex + 1;
+    const neighborOrder = neighborTask.sortOrder ?? neighborIndex;
 
     // Find and update in main array
     const taskIdx = this.tasks.findIndex((t) => t.id === id);
-    const nextIdx = this.tasks.findIndex((t) => t.id === nextTask.id);
+    const neighborIdx = this.tasks.findIndex((t) => t.id === neighborTask.id);
     const taskAtIdx = this.tasks[taskIdx];
-    const nextAtIdx = this.tasks[nextIdx];
-    if (!taskAtIdx || !nextAtIdx) return;
+    const neighborAtIdx = this.tasks[neighborIdx];
+    if (!taskAtIdx || !neighborAtIdx) return;
 
     this.tasks[taskIdx] = {
       ...taskAtIdx,
-      sortOrder: nextOrder,
+      sortOrder: neighborOrder,
       updatedAt: new Date().toISOString(),
     };
-    this.tasks[nextIdx] = {
-      ...nextAtIdx,
+    this.tasks[neighborIdx] = {
+      ...neighborAtIdx,
       sortOrder: currentOrder,
       updatedAt: new Date().toISOString(),
     };
