@@ -1,3 +1,6 @@
+import { computeArrowEndpoints } from './arrow-utils.js';
+import { parseTranslateY } from './selection-utils.js';
+
 export function setupDrag(ctx) {
     const {
       vscode,
@@ -335,9 +338,23 @@ export function setupDrag(ctx) {
       return { path, arrowHead };
     }
 
+    // Bar center Y from CURRENT transform (rows shift on collapse/expand;
+    // data-center-y is render-time only). Generator contract:
+    // data-center-y = transformY + barHeight / 2.
+    function barCenterY(bar) {
+      const transformY = parseTranslateY(bar.getAttribute('transform'), NaN);
+      return Number.isNaN(transformY)
+        ? parseFloat(bar.dataset.centerY)
+        : transformY + barHeight / 2;
+    }
+
     function getConnectedArrows(issueId) {
-      const arrows = [];
       const selector = '.dependency-arrow[data-from="' + issueId + '"], .dependency-arrow[data-to="' + issueId + '"]';
+      return collectArrows(selector);
+    }
+
+    function collectArrows(selector) {
+      const arrows = [];
       document.querySelectorAll(selector).forEach(arrow => {
         const fromId = arrow.getAttribute('data-from');
         const toId = arrow.getAttribute('data-to');
@@ -366,40 +383,19 @@ export function setupDrag(ctx) {
         // Capture original path before update for debugging
         const originalPath = a.linePath ? a.linePath.getAttribute('d') : null;
 
-        // Get current positions (may be dragged or original)
+        // Get current positions (may be dragged or original); Y always from
+        // the live transform so arrows track collapse/expand row shifts
         const fromStartX = a.fromId == draggedIssueId ? newStartX : parseFloat(a.fromBar.dataset.startX);
         const fromEndX = a.fromId == draggedIssueId ? newEndX : parseFloat(a.fromBar.dataset.endX);
-        const fromY = parseFloat(a.fromBar.dataset.centerY);
+        const fromY = barCenterY(a.fromBar);
         const toStartX = a.toId == draggedIssueId ? newStartX : parseFloat(a.toBar.dataset.startX);
         const toEndX = a.toId == draggedIssueId ? newEndX : parseFloat(a.toBar.dataset.endX);
-        const toY = parseFloat(a.toBar.dataset.centerY);
+        const toY = barCenterY(a.toBar);
 
-        // Anchor positions based on relation type
-        const fromStart = a.relType === 'start_to_start' || a.relType === 'start_to_finish';
-        const toEnd = a.relType === 'finish_to_finish' || a.relType === 'start_to_finish';
-
-        let x1, y1, x2, y2;
-        if (a.isScheduling) {
-          x1 = fromStart ? fromStartX - 2 : fromEndX + 2;
-          y1 = fromY;
-          x2 = toEnd ? toEndX + 2 : toStartX - 2;
-          y2 = toY;
-        } else {
-          // Non-scheduling: center x, border y
-          x1 = (fromStartX + fromEndX) / 2;
-          x2 = (toStartX + toEndX) / 2;
-          const goingDown = toY > fromY;
-          const sameRowCenter = Math.abs(fromY - toY) < 5;
-          if (sameRowCenter) {
-            // Same row: both use top border
-            y1 = fromY - barHeight / 2;
-            y2 = toY - barHeight / 2;
-          } else {
-            // Different rows: use bottom/top borders based on direction
-            y1 = goingDown ? fromY + barHeight / 2 : fromY - barHeight / 2;
-            y2 = goingDown ? toY - barHeight / 2 : toY + barHeight / 2;
-          }
-        }
+        const { x1, y1, x2, y2, fromStart, toEnd } = computeArrowEndpoints({
+          fromStartX, fromEndX, fromY, toStartX, toEndX, toY,
+          relType: a.relType, barHeight
+        });
 
         logArrowDebug('updateArrowPositions', {
           arrow: a.fromId + ' -> ' + a.toId,
@@ -423,6 +419,12 @@ export function setupDrag(ctx) {
         if (a.hitPath) a.hitPath.setAttribute('d', path);
         if (a.headPath) a.headPath.setAttribute('d', arrowHead);
       });
+    }
+
+    // Recompute ALL arrow paths from current bar positions (called after
+    // collapse/expand toggles shift rows — render-time paths go stale)
+    function refreshArrowGeometry() {
+      updateArrowPositions(collectArrows('.dependency-arrow'), null, null, null);
     }
 
     // Drag confirmation modal
@@ -1493,4 +1495,6 @@ export function setupDrag(ctx) {
         });
       }
     });
+
+    return { refreshArrowGeometry };
 }

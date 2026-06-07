@@ -1388,7 +1388,7 @@ function initializeGantt(state) {
       document.addEventListener('keydown', window._ganttArrowKeyHandler);
     }
 
-    setupDrag({
+    const dragApi = setupDrag({
       vscode,
       menuUndo,
       menuRedo,
@@ -1426,7 +1426,8 @@ function initializeGantt(state) {
       addWinListener,
       announce,
       barHeight,
-      selectedCollapseKey
+      selectedCollapseKey,
+      refreshArrowGeometry: dragApi.refreshArrowGeometry
     });
 
     // Scroll to today marker (centered in visible timeline area)

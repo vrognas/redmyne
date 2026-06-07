@@ -5,7 +5,7 @@ import {
 import { parseTranslateX, parseTranslateY, pickRowKeyByY } from './selection-utils.js';
 
 export function setupCollapse(ctx) {
-  const { vscode, addDocListener, addWinListener, announce, barHeight, selectedCollapseKey } = ctx;
+  const { vscode, addDocListener, addWinListener, announce, barHeight, selectedCollapseKey, refreshArrowGeometry } = ctx;
 
   // Collapse toggle click (before issue-label handler to stop propagation)
   document.querySelectorAll('.collapse-toggle').forEach(el => {
@@ -514,6 +514,10 @@ export function setupCollapse(ctx) {
       const toHidden = toBar?.classList.contains('gantt-row-hidden');
       setSvgVisibility(arrow, fromHidden || toHidden);
     });
+
+    // Arrow paths were computed at render time — re-anchor them to the
+    // rows' current (shifted) positions
+    refreshArrowGeometry?.();
 
     // Selected row may have shifted or been hidden by this toggle
     updateRowSelectionOverlays();
