@@ -48,6 +48,13 @@
     }
     const action = undoStack.pop();
     console.log("[Timesheet] undo: popped action:", action);
+    // Barrier actions mark irreversible operations (e.g. an entry delete).
+    // Consume the barrier and stop so older actions are not mis-attributed.
+    if (action.type === "barrier") {
+      showToast(action.message || "Cannot undo this action");
+      updateUndoRedoButtons();
+      return;
+    }
     redoStack.push(action);
     applyAction(action, true);
     updateUndoRedoButtons();
@@ -195,6 +202,18 @@
           fieldInput.value = value || "";
           console.log("[Timesheet] applyAction aggregatedField: updated input visually to", value);
         }
+        break;
+      case "expandedEntry":
+        // Re-apply the individual entry's hours (reversible by entryId/rowId)
+        vscode.postMessage({
+          type: "updateExpandedEntry",
+          rowId: action.rowId,
+          entryId: action.entryId,
+          dayIndex: action.dayIndex,
+          newHours: value,
+          oldHours: isUndo ? action.newValue : action.oldValue,
+          skipUndo: true,
+        });
         break;
       case "paste":
         // Undo/redo paste by removing/adding draft ops
@@ -2093,6 +2112,15 @@
         }
         e.target.value = formatHours(newHours);
         if (oldHours !== newHours) {
+          // Push undo for this individual entry edit (reversible)
+          pushUndo({
+            type: "expandedEntry",
+            rowId: entry.rowId,
+            entryId: entry.entryId,
+            dayIndex,
+            oldValue: oldHours,
+            newValue: newHours,
+          });
           // Update individual entry
           vscode.postMessage({
             type: "updateExpandedEntry",
@@ -2120,6 +2148,13 @@
       deleteBtn.dataset.tooltip = "Delete this entry";
       deleteBtn.addEventListener("click", (e) => {
         e.stopPropagation();
+        // Deleting an entry is not reversible via existing wire messages, so
+        // push a barrier that stops the undo walk instead of letting a later
+        // Ctrl+Z mis-attribute to an older action.
+        pushUndo({
+          type: "barrier",
+          message: "Cannot undo entry delete",
+        });
         vscode.postMessage({
           type: "deleteExpandedEntry",
           rowId: entry.rowId,
