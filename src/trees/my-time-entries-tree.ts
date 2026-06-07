@@ -478,8 +478,8 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const weekTotal = calculateTotal(weekWithDrafts);
       const todayAvailable = getHoursForDateMonthly(new Date(), this.monthlySchedules, defaultSchedule);
       const weekAvailable = countAvailableHoursMonthly(
-        new Date(weekStart),
-        new Date(today),
+        parseLocalDate(weekStart),
+        parseLocalDate(today),
         this.monthlySchedules,
         defaultSchedule
       );
