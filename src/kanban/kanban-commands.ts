@@ -588,8 +588,13 @@ export function registerKanbanCommands(
         if (!item?.task) return;
 
         const task = item.task;
-        if (!task.timerPhase) {
-          vscode.window.showInformationMessage("No active timer");
+        // Guard: only operate on the currently-working task. Otherwise
+        // startTimer below would steal the real active timer (auto-pausing it).
+        const activeTask = controller.getActiveTask();
+        if (!activeTask || activeTask.id !== task.id) {
+          vscode.window.showInformationMessage(
+            "Log and continue only works on the active timer"
+          );
           return;
         }
 

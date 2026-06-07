@@ -518,6 +518,7 @@ describe("registerKanbanCommands", () => {
       getTimeEntryCustomFields: vi.fn().mockResolvedValue([]),
     });
     const { controller } = registerCommands({ server, tasks: [task] });
+    controller.getActiveTask.mockReturnValue(task);
     controller.getWorkDurationSeconds.mockReturnValue(1800);
     promptForRequiredCustomFieldsSpy.mockResolvedValue({
       values: [{ id: 2, value: "B" }],
@@ -539,6 +540,25 @@ describe("registerKanbanCommands", () => {
     expect(controller.startTimer).toHaveBeenCalledWith("task-continue", 13, "Development", true);
     expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
       "Logged 0.5h, timer restarted"
+    );
+  });
+
+  it("logAndContinue no-ops when target is not the active task", async () => {
+    const task = createTask({
+      id: "not-active",
+      timerPhase: "paused",
+      activityId: 9,
+    });
+    const otherActive = createTask({ id: "the-active", timerPhase: "working" });
+    const { controller } = registerCommands({ tasks: [task, otherActive] });
+    controller.getActiveTask.mockReturnValue(otherActive);
+
+    await handlers.get("redmyne.kanban.logAndContinue")?.({ task });
+
+    expect(controller.addLoggedHours).not.toHaveBeenCalled();
+    expect(controller.startTimer).not.toHaveBeenCalled();
+    expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
+      "Log and continue only works on the active timer"
     );
   });
 
