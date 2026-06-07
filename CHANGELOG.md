@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.26.2]
+
+### Fixed
+
+- **Nested collapse/expand no longer corrupts row layout** — expanding a parent whose subtasks are themselves expanded parents repositioned rows in breadth-first order, wedging a later subtask between an earlier subtask and its children; a subsequent toggle then stacked rows on top of each other (overlapping labels). Visible descendants are now repositioned in document (pre-order) order
+
 ## [4.26.1]
 
 ### Fixed
