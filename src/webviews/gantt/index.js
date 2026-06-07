@@ -1005,15 +1005,7 @@ function initializeGantt(state) {
       }
     });
 
-    // Update selection for specific changed IDs (O(changed) instead of O(all))
-    function updateSelectionForIds(changedIds) {
-      changedIds.forEach(issueId => {
-        const bars = barsByIssueId.get(issueId);
-        if (bars) {
-          bars.forEach(bar => bar.classList.toggle('selected', selectedIssues.has(issueId)));
-        }
-      });
-      // Update selection count display
+    function refreshSelectionChrome() {
       if (selectedIssues.size > 0) {
         selectionCountEl.textContent = `${selectedIssues.size} selected`;
         selectionCountEl.classList.remove('hidden');
@@ -1024,19 +1016,23 @@ function initializeGantt(state) {
       }
     }
 
+    // Update selection for specific changed IDs (O(changed) instead of O(all))
+    function updateSelectionForIds(changedIds) {
+      changedIds.forEach(issueId => {
+        const bars = barsByIssueId.get(issueId);
+        if (bars) {
+          bars.forEach(bar => bar.classList.toggle('selected', selectedIssues.has(issueId)));
+        }
+      });
+      refreshSelectionChrome();
+    }
+
     // Full UI update (for bulk operations like selectAll or clearSelection)
     function updateSelectionUI() {
       allIssueBars.forEach(bar => {
         bar.classList.toggle('selected', selectedIssues.has(bar.dataset.issueId));
       });
-      if (selectedIssues.size > 0) {
-        selectionCountEl.textContent = `${selectedIssues.size} selected`;
-        selectionCountEl.classList.remove('hidden');
-        ganttContainer.classList.add('multi-select-mode');
-      } else {
-        selectionCountEl.classList.add('hidden');
-        ganttContainer.classList.remove('multi-select-mode');
-      }
+      refreshSelectionChrome();
     }
 
     function clearSelection() {
