@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.26.3]
+
+### Fixed
+
+- **Dependency arrows track rows through collapse/expand** — arrow paths were computed once at render and only visibility-toggled afterwards, so arrows detached from their bars after collapse/expand shifted rows; paths now re-anchor to current row positions after every toggle (and bar drags compute endpoint Y from live positions instead of render-time values)
+
 ## [4.26.2]
 
 ### Fixed
