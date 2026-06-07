@@ -686,7 +686,7 @@ function generateRegularBar(
 
   // Past portion
   const todayX = ((ctx.today.getTime() - ctx.minDate.getTime()) / (ctx.maxDate.getTime() - ctx.minDate.getTime())) * ctx.timelineWidth;
-  const start = new Date(issue.start_date!);
+  const start = new Date(issue.start_date ?? issue.due_date!);
   const pastEndX = Math.min(todayX, endX);
   const pastWidth = Math.max(0, pastEndX - startX);
   const hasPastPortion = start < ctx.today && pastWidth > 0;
