@@ -290,8 +290,7 @@ export function setupCollapse(ctx) {
     let actualDelta = 0;
     let parentStripeY = 0;
     // For collapse: calculate visible descendants (excluding already-hidden nested items)
-    const currentlyVisibleDescendants = shouldExpand ? visibleDescendants : findVisibleDescendants(collapseKey);
-    const deltaDescendants = currentlyVisibleDescendants;
+    const deltaDescendants = shouldExpand ? visibleDescendants : findVisibleDescendants(collapseKey);
     const deltaSet = new Set(deltaDescendants);
     // Cache zebra-stripe query once (reused 3x in this function)
     const allStripes = document.querySelectorAll('.zebra-stripe');
