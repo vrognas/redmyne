@@ -559,9 +559,8 @@ export function setupCollapse(ctx) {
       // Issue labels
       const clickedOnText = e.target.classList?.contains('issue-text') || e.target.closest('.issue-text');
       if (issueId && clickedOnText) {
-        // Clicking on text opens quick-pick
-        setActiveLabel(el, false, false, true); // skipFocus=true
-        vscode.postMessage({ command: 'openIssue', issueId: parseInt(issueId, 10) });
+        // Single click on text selects; double click opens quick-pick
+        setActiveLabel(el);
       } else if (el.dataset.hasChildren === 'true' && collapseKey) {
         // Parent issue: clicking elsewhere toggles collapse
         setActiveLabel(el);
@@ -570,6 +569,19 @@ export function setupCollapse(ctx) {
       } else {
         // Regular issue: clicking elsewhere just selects
         setActiveLabel(el);
+      }
+    });
+
+    // Double click on issue text opens the quick-pick (Enter does too)
+    el.addEventListener('dblclick', (e) => {
+      if (e.target.closest?.('.collapse-toggle') || e.target.closest?.('.chevron-hit-area')) {
+        return;
+      }
+      const issueId = el.dataset.issueId;
+      const clickedOnText = e.target.classList?.contains('issue-text') || e.target.closest('.issue-text');
+      if (issueId && clickedOnText) {
+        e.preventDefault();
+        vscode.postMessage({ command: 'openIssue', issueId: parseInt(issueId, 10) });
       }
     });
 
