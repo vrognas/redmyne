@@ -159,19 +159,7 @@ export class DraftReviewPanel implements vscode.Disposable {
 
 
   public update(): void {
-    const operations = this.queue.getAll();
-    this.panel.webview.postMessage({
-      command: "updateOperations",
-      operations: operations.map(op => ({
-        id: op.id,
-        type: op.type,
-        description: op.description,
-        issueId: op.issueId,
-        timestamp: op.timestamp,
-        http: op.http,
-      })),
-      count: operations.length,
-    });
+    this.sendIncrementalUpdate();
   }
 
   private getHtmlForWebview(operations: DraftOperation[]): string {
