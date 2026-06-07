@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.27.0]
+
+### Changed
+
+- **Single click selects, double click opens** — clicking an issue's name in the Gantt now only selects the row; the issue quick-pick opens on double click (or Enter on a focused row, unchanged)
+
 ## [4.26.3]
 
 ### Fixed
