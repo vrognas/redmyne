@@ -56,7 +56,8 @@ export function setupKeyboard(ctx) {
       const addDays = (dateStr, days) => {
         const d = new Date(dateStr + 'T00:00:00');
         d.setDate(d.getDate() + days);
-        return d.toISOString().slice(0, 10);
+        const pad = n => String(n).padStart(2, '0');
+        return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
       };
 
       let newStart = null, newDue = null;
