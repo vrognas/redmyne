@@ -635,52 +635,25 @@ function initializeGantt(state) {
     requestAnimationFrame(() => updateUndoRedoButtons());
 
     // Handle messages from extension (for state updates without full re-render)
+    // Table-driven view-toggle message handlers
+    const viewToggleTable = {
+      setDependenciesState:  { targetSel: '.dependency-layer', menuId: 'menuDeps',      className: 'hidden',           addWhenEnabled: false },
+      setBadgesState:        { targetSel: '.gantt-container',  menuId: 'menuBadges',    className: 'hide-badges',      addWhenEnabled: false },
+      setCapacityRibbonState:{ targetSel: '.capacity-ribbon',  menuId: 'menuCapacity',  className: 'hidden',           addWhenEnabled: false },
+      setIntensityState:     { targetSel: '.gantt-container',  menuId: 'menuIntensity', className: 'intensity-enabled', addWhenEnabled: true  },
+    };
+    function applyViewToggle(cfg, enabled) {
+      const target = document.querySelector(cfg.targetSel);
+      const menu = document.getElementById(cfg.menuId);
+      const on = cfg.addWhenEnabled ? enabled : !enabled;
+      if (target) target.classList.toggle(cfg.className, on);
+      if (menu) menu.classList.toggle('active', enabled);
+    }
+
     window.__ganttHandleExtensionMessage = (message) => {
-      if (message.command === 'setDependenciesState') {
-        const dependencyLayer = document.querySelector('.dependency-layer');
-        const menuDeps = document.getElementById('menuDeps');
-
-        if (message.enabled) {
-          if (dependencyLayer) dependencyLayer.classList.remove('hidden');
-          if (menuDeps) menuDeps.classList.add('active');
-        } else {
-          if (dependencyLayer) dependencyLayer.classList.add('hidden');
-          if (menuDeps) menuDeps.classList.remove('active');
-        }
-      } else if (message.command === 'setBadgesState') {
-        const ganttContainer = document.querySelector('.gantt-container');
-        const menuBadges = document.getElementById('menuBadges');
-
-        if (message.enabled) {
-          if (ganttContainer) ganttContainer.classList.remove('hide-badges');
-          if (menuBadges) menuBadges.classList.add('active');
-        } else {
-          if (ganttContainer) ganttContainer.classList.add('hide-badges');
-          if (menuBadges) menuBadges.classList.remove('active');
-        }
-      } else if (message.command === 'setCapacityRibbonState') {
-        const capacityRibbon = document.querySelector('.capacity-ribbon');
-        const menuCapacity = document.getElementById('menuCapacity');
-
-        if (message.enabled) {
-          if (capacityRibbon) capacityRibbon.classList.remove('hidden');
-          if (menuCapacity) menuCapacity.classList.add('active');
-        } else {
-          if (capacityRibbon) capacityRibbon.classList.add('hidden');
-          if (menuCapacity) menuCapacity.classList.remove('active');
-        }
-      } else if (message.command === 'setIntensityState') {
-        // Toggle intensity visualization via container class (O(1) toggle)
-        const ganttContainer = document.querySelector('.gantt-container');
-        const menuIntensity = document.getElementById('menuIntensity');
-
-        if (message.enabled) {
-          ganttContainer?.classList.add('intensity-enabled');
-          if (menuIntensity) menuIntensity.classList.add('active');
-        } else {
-          ganttContainer?.classList.remove('intensity-enabled');
-          if (menuIntensity) menuIntensity.classList.remove('active');
-        }
+      const toggleCfg = viewToggleTable[message.command];
+      if (toggleCfg) {
+        applyViewToggle(toggleCfg, message.enabled);
       } else if (message.command === 'setDraftModeState') {
         // Update mutable draft mode state for drag handlers
         currentDraftMode = message.enabled;
