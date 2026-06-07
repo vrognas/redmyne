@@ -708,6 +708,15 @@ fi
 2. **Issue dates are dateless**: YYYY-MM-DD strings have no timezone - treat as local midnight
 3. **Don't flip-flop**: Previous fix (a1959b0) was correct; reverting to UTC (8e0ce55) broke it
 
+### Refinement: two frames, one rule (2026-06-07)
+
+The 2026-06 review found 6 bugs from mixing frames. The rule:
+
+- **Calendar date is LOCAL**: which day is "today" = user's local date (`getTodayStr()`)
+- **Geometry frame is UTC**: the gantt x-axis anchors on `new Date("YYYY-MM-DD")` (UTC midnight). ALL x-positioning Date objects must be UTC-parsed: bars, arrows, milestones, week markers (`getUTCDay`/`setUTCDate`), and today = `new Date(getTodayStr())` (UTC midnight OF the local calendar date — both rules at once)
+- Never compare `getLocalToday()`/`parseLocalDate()` output against UTC-parsed dates
+- Shared helpers: `dateToX`/`endExclusiveX` in `gantt/gantt-coords.ts` — don't inline the formula
+
 ## Webview Panel UX (2026-01-18)
 
 ### Incremental DOM Updates
