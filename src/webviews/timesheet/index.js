@@ -1743,12 +1743,9 @@
     issueTooltip.setAttribute("aria-hidden", "false");
   }
 
-  function positionTooltip(x, y) {
-    const padding = 8;
-    const offset = 12;
-    issueTooltip.style.left = "0";
-    issueTooltip.style.top = "0";
-    const rect = issueTooltip.getBoundingClientRect();
+  // Place a tooltip near (x, y), flipping to the opposite side and clamping to
+  // the viewport so it stays fully visible. Returns rounded {left, top} px.
+  function clampTooltipPosition(x, y, rect, padding, offset) {
     let left = x + offset;
     let top = y + offset;
 
@@ -1762,8 +1759,16 @@
     left = Math.max(padding, Math.min(left, window.innerWidth - rect.width - padding));
     top = Math.max(padding, Math.min(top, window.innerHeight - rect.height - padding));
 
-    issueTooltip.style.left = `${Math.round(left)}px`;
-    issueTooltip.style.top = `${Math.round(top)}px`;
+    return { left: Math.round(left), top: Math.round(top) };
+  }
+
+  function positionTooltip(x, y) {
+    issueTooltip.style.left = "0";
+    issueTooltip.style.top = "0";
+    const rect = issueTooltip.getBoundingClientRect();
+    const { left, top } = clampTooltipPosition(x, y, rect, 8, 12);
+    issueTooltip.style.left = `${left}px`;
+    issueTooltip.style.top = `${top}px`;
   }
 
   function hideIssueTooltip() {
@@ -1848,28 +1853,14 @@
     genericTooltip.textContent = text;
 
     // Position tooltip
-    const padding = 8;
-    const offset = 10;
     genericTooltip.style.left = "0";
     genericTooltip.style.top = "0";
     genericTooltip.classList.add("visible");
 
     const rect = genericTooltip.getBoundingClientRect();
-    let left = x + offset;
-    let top = y + offset;
-
-    if (left + rect.width > window.innerWidth - padding) {
-      left = x - rect.width - offset;
-    }
-    if (top + rect.height > window.innerHeight - padding) {
-      top = y - rect.height - offset;
-    }
-
-    left = Math.max(padding, Math.min(left, window.innerWidth - rect.width - padding));
-    top = Math.max(padding, Math.min(top, window.innerHeight - rect.height - padding));
-
-    genericTooltip.style.left = `${Math.round(left)}px`;
-    genericTooltip.style.top = `${Math.round(top)}px`;
+    const { left, top } = clampTooltipPosition(x, y, rect, 8, 10);
+    genericTooltip.style.left = `${left}px`;
+    genericTooltip.style.top = `${top}px`;
   }
 
   function hideGenericTooltip() {
