@@ -1217,7 +1217,7 @@ svg {
 }
 
 .temp-link-arrow {
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 .dependency-arrow .arrow-line {
