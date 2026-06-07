@@ -22,6 +22,19 @@ interface IntegerRangeValidatorOptions {
   maxInclusive?: boolean;
 }
 
+/**
+ * Read the task's current timerSecondsLeft from the controller, falling back to
+ * the captured snapshot. Avoids computing elapsed time from a stale task object
+ * when the timer ticked or state changed while dialogs were open.
+ */
+function getFreshTimerSecondsLeft(
+  controller: KanbanController,
+  task: KanbanTask
+): number {
+  const current = controller.getTaskById(task.id);
+  return current?.timerSecondsLeft ?? task.timerSecondsLeft ?? 0;
+}
+
 function createIntegerRangeValidator({
   min,
   max,
@@ -475,7 +488,8 @@ export function registerKanbanCommands(
         // Calculate elapsed time, including any deferred minutes from prior tasks
         const deferredMinutes = controller.getDeferredMinutes();
         const workDuration = controller.getWorkDurationSeconds();
-        const elapsedSeconds = workDuration - task.timerSecondsLeft;
+        const elapsedSeconds =
+          workDuration - getFreshTimerSecondsLeft(controller, task);
         const hours = elapsedSeconds / 3600 + deferredMinutes / 60;
 
         if (hours < 0.01) {
@@ -541,9 +555,10 @@ export function registerKanbanCommands(
           return;
         }
 
-        // Calculate elapsed time
+        // Calculate elapsed time from current timer state (not stale snapshot)
         const workDuration = controller.getWorkDurationSeconds();
-        const elapsedSeconds = workDuration - task.timerSecondsLeft;
+        const elapsedSeconds =
+          workDuration - getFreshTimerSecondsLeft(controller, task);
         const elapsedMinutes = Math.round(elapsedSeconds / 60);
 
         if (elapsedMinutes < 1) {

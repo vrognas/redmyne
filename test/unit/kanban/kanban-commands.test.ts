@@ -636,13 +636,15 @@ describe("registerKanbanCommands", () => {
       "Not enough time elapsed to defer"
     );
 
+    // Elapsed is read fresh from controller state, so update the stored task.
     controller.getWorkDurationSeconds.mockReturnValue(7200);
+    task.timerSecondsLeft = 6600;
     vi.mocked(vscode.window.showWarningMessage).mockResolvedValueOnce("Cancel" as never);
-    await handlers.get("redmyne.kanban.deferTime")?.({ task: { ...task, timerSecondsLeft: 6600 } });
+    await handlers.get("redmyne.kanban.deferTime")?.({ task });
     expect(controller.addDeferredMinutes).not.toHaveBeenCalled();
 
     vi.mocked(vscode.window.showWarningMessage).mockResolvedValueOnce("Defer" as never);
-    await handlers.get("redmyne.kanban.deferTime")?.({ task: { ...task, timerSecondsLeft: 6600 } });
+    await handlers.get("redmyne.kanban.deferTime")?.({ task });
     expect(controller.addDeferredMinutes).toHaveBeenCalledWith(10);
     expect(controller.stopTimer).toHaveBeenCalledWith("defer-1");
   });
