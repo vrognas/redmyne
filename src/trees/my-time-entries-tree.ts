@@ -19,6 +19,7 @@ import {
   getISOWeekYear,
   getWeekDateRange,
   formatLocalDate,
+  parseLocalDate,
 } from "../utilities/date-utils";
 import { SortConfig, TimeEntrySortField } from "../redmine/models/common";
 import type { DraftQueue } from "../draft-mode/draft-queue";
@@ -442,7 +443,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const today = formatLocalDate(new Date());
       const weekStart = getWeekStart();
       // Calculate week end (Sunday) for draft filtering
-      const weekStartDate = new Date(weekStart);
+      const weekStartDate = parseLocalDate(weekStart);
       const weekEndDate = new Date(weekStartDate);
       weekEndDate.setDate(weekEndDate.getDate() + 6);
       const weekEnd = formatLocalDate(weekEndDate);
