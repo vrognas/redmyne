@@ -2,7 +2,7 @@ import {
   findDescendants as findDescendantsUtil,
   findVisibleDescendants as findVisibleDescendantsUtil,
 } from './collapse-utils.js';
-import { parseTranslateY, pickRowKeyByY } from './selection-utils.js';
+import { parseTranslateX, parseTranslateY, pickRowKeyByY } from './selection-utils.js';
 
 export function setupCollapse(ctx) {
   const { vscode, addDocListener, addWinListener, announce, barHeight, selectedCollapseKey } = ctx;
@@ -327,11 +327,8 @@ export function setupCollapse(ctx) {
     // Get parent's CURRENT Y position (from transform, not originalY)
     let parentCurrentY = parentRowY;
     if (parentEntry && parentEntry.elements.length > 0) {
-      const parentTransform = parentEntry.elements[0].getAttribute('transform') || '';
-      const parentYMatch = parentTransform.match(/translate\([^,]+,\s*([-\d.]+)/);
-      if (parentYMatch) {
-        parentCurrentY = parseFloat(parentYMatch[1]);
-      }
+      const parentTransform = parentEntry.elements[0].getAttribute('transform');
+      parentCurrentY = parseTranslateY(parentTransform, parentRowY);
     }
 
     // Toggle visibility of descendants and position them correctly
@@ -342,9 +339,7 @@ export function setupCollapse(ctx) {
         const entry = rowIndex.get(key);
         if (entry) {
           entry.elements.forEach(el => {
-            const transform = el.getAttribute('transform') || '';
-            const xMatch = transform.match(/translate\(([-\d.]+)/);
-            const x = xMatch ? xMatch[1] : '0';
+            const x = parseTranslateX(el.getAttribute('transform'), 0);
             el.setAttribute('transform', 'translate(' + x + ', ' + nextY + ')');
             setSvgVisibility(el, false); // Show
           });
@@ -368,15 +363,12 @@ export function setupCollapse(ctx) {
       // Only shift rows that are below the parent and not any descendant
       if (originalY > parentRowY && !descendantSet.has(key)) {
         elements.forEach(el => {
-          const transform = el.getAttribute('transform') || '';
+          const transform = el.getAttribute('transform');
           // Extract current X (for timeline bars)
-          const xMatch = transform.match(/translate\(([-\d.]+)/);
-          const x = xMatch ? xMatch[1] : '0';
+          const x = parseTranslateX(transform, 0);
           // Extract current Y
-          const yMatch = transform.match(/translate\([^,]+,\s*([-\d.]+)/);
-          const currentY = yMatch ? parseFloat(yMatch[1]) : originalY;
-          const newY = currentY + delta;
-          el.setAttribute('transform', 'translate(' + x + ', ' + newY + ')');
+          const currentY = parseTranslateY(transform, originalY);
+          el.setAttribute('transform', 'translate(' + x + ', ' + (currentY + delta) + ')');
         });
       }
     });

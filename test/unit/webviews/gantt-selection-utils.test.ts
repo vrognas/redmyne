@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   parseTranslateY,
+  parseTranslateX,
   pickRowKeyByY,
 } from "../../../src/webviews/gantt/selection-utils.js";
 
@@ -10,6 +11,13 @@ describe("gantt selection utilities", () => {
     expect(parseTranslateY("translate(0, -8)", 0)).toBe(-8);
     expect(parseTranslateY("", 17)).toBe(17);
     expect(parseTranslateY(undefined, 17)).toBe(17);
+  });
+
+  it("parseTranslateX extracts x from transform, falls back when absent", () => {
+    expect(parseTranslateX("translate(12.5, 42)", 0)).toBe(12.5);
+    expect(parseTranslateX("translate(-3, 8)", 0)).toBe(-3);
+    expect(parseTranslateX("", 7)).toBe(7);
+    expect(parseTranslateX(undefined, 7)).toBe(7);
   });
 
   it("pickRowKeyByY returns the row whose band contains y", () => {

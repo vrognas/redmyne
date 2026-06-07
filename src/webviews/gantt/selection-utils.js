@@ -4,6 +4,17 @@
  */
 
 /**
+ * Parse the X component of an SVG transform="translate(x, y)" string.
+ * @param {string|null|undefined} transform - The SVG transform attribute value
+ * @param {number} fallback - Returned when transform absent or malformed
+ * @returns {number} The parsed x offset, or fallback
+ */
+export function parseTranslateX(transform, fallback) {
+  const match = /translate\(([-\d.]+)/.exec(transform || '');
+  return match ? parseFloat(match[1]) : fallback;
+}
+
+/**
  * Parse the Y component of an SVG transform="translate(x, y)" string.
  * @param {string|null|undefined} transform - The SVG transform attribute value
  * @param {number} fallback - Returned when transform absent or malformed
