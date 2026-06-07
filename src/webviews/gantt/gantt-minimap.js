@@ -109,7 +109,7 @@ export function setupMinimap({
       // Set offset to viewport center so dragging maintains centering (like VS Code)
       const rect = minimapSvg.getBoundingClientRect();
       const viewportWidth = parseFloat(minimapViewport.getAttribute('width') || '0');
-      minimapDragOffset = (viewportWidth / 100) * rect.width / 2;
+      minimapDragOffset = (viewportWidth / timelineWidth) * rect.width / 2;
       scrollFromMinimap(e, true);
     });
 
