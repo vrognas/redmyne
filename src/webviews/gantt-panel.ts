@@ -2888,12 +2888,14 @@ export class GanttPanel {
     const capacityWeekMarkers: string[] = [];
     if (this._viewFocus === "person") {
       const current = new Date(minDate);
+      // Iterate in UTC frame (mirrors _generateDateMarkers body gridlines) so
+      // ribbon week marks align with the UTC-anchored Monday gridlines.
       while (current <= maxDate) {
-        if (current.getDay() === 1) { // Monday
+        if (current.getUTCDay() === 1) { // Monday
           const weekX = ((current.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
           capacityWeekMarkers.push(`<line x1="${weekX}" y1="0" x2="${weekX}" y2="${ribbonHeight}" class="capacity-week-marker"/>`);
         }
-        current.setDate(current.getDate() + 1);
+        current.setUTCDate(current.getUTCDate() + 1);
       }
     }
 
