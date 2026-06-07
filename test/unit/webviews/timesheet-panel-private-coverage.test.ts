@@ -586,12 +586,18 @@ describe("timesheet panel private coverage", () => {
       expect.objectContaining({ type: "showToast", message: "Updated 2 entries" })
     );
 
+    queue.removeByKey.mockClear();
     await panel._restoreAggregatedEntries(
       [{ entryId: 101 }, { entryId: null }],
       aggRowId,
       0
     );
+    // Per-entry DELETE op removed (saved entry)
     expect(queue.removeByKey).toHaveBeenCalledWith("ts:timeentry:101", "timesheet-panel");
+    // Orphan summed CREATE op removed via the canonical key (agg-5::9::notes),
+    // not a dead aggRowId-based key. Mirrors _updateAggregatedCell ~:2031.
+    const expectedCreateKey = `ts:timeentry:new:5:9:${panel._currentWeek.dayDates[0]}:notes`;
+    expect(queue.removeByKey).toHaveBeenCalledWith(expectedCreateKey, "timesheet-panel");
     expect(panel._loadWeek).toHaveBeenCalled();
 
     panel._rows = [{ ...panel._createEmptyRow(), id: "r1" }];

@@ -99,7 +99,6 @@
         if (input) {
           input.value = formatHours(value);
           input.classList.toggle("zero", value === 0);
-        } else {
         }
         break;
       case "field":
@@ -172,7 +171,6 @@
         if (aggInput) {
           aggInput.value = formatHours(value);
           aggInput.classList.toggle("zero", value === 0);
-        } else {
         }
         break;
       case "aggregatedField":

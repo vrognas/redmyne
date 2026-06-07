@@ -2238,10 +2238,17 @@ export class TimeSheetPanel {
   ): Promise<void> {
     if (!this._draftQueue || !this._draftModeManager?.isEnabled) return;
 
-    // First, remove any pending operations for this cell
-    const tempKey = `${aggRowId}:${dayIndex}`;
-    await this._draftQueue.removeByKey(`ts:timeentry:${tempKey}`, TIMESHEET_SOURCE);
-    await this._draftQueue.removeByKey(`ts:timeentry:${tempKey}:new`, TIMESHEET_SOURCE);
+    // Remove the summed CREATE op queued by the multi-entry collapse. It was
+    // added under the canonical key (see _updateAggregatedCell ~:2031), so it
+    // must be removed via the same buildNewEntryResourceKey, not an
+    // aggRowId-based key (which never matches anything).
+    const parsedAggRowKey = parseAggregatedRowKey(aggRowId);
+    if (parsedAggRowKey) {
+      const { issueId, activityId, comments } = parsedAggRowKey;
+      const date = this._currentWeek.dayDates[dayIndex];
+      const newEntryResourceKey = buildNewEntryResourceKey(issueId, activityId, date, comments);
+      await this._draftQueue.removeByKey(newEntryResourceKey, TIMESHEET_SOURCE);
+    }
 
     // Remove delete operations for original entries
     for (const entry of entries) {
@@ -2249,6 +2256,10 @@ export class TimeSheetPanel {
         await this._draftQueue.removeByKey(`ts:timeentry:${entry.entryId}`, TIMESHEET_SOURCE);
       }
     }
+
+    // Known limitation: if the originals were already flushed to the server,
+    // their CREATE/DELETE ops are gone, so restore reduces to a no-op + reload.
+    // Undoing saved (server-side) state is out of scope for this path.
 
     // Reload to show original state
     await this._loadWeek(this._currentWeek);
