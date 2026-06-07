@@ -156,8 +156,7 @@ export function generateIssueLabel(
   ctx: GanttRenderContext
 ): string {
   const issue = row.issue!;
-  const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
-  const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
+  const { hiddenAttr, hiddenClass } = rowVisibility(row);
   const indent = row.depth * ctx.indentSize;
   const textOffset = ctx.chevronWidth;
 
@@ -227,8 +226,7 @@ export function generateProjectLabel(
   originalY: number,
   ctx: GanttRenderContext
 ): string {
-  const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
-  const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
+  const { hiddenAttr, hiddenClass } = rowVisibility(row);
   const indent = row.depth * ctx.indentSize;
 
   const chevron = row.hasChildren
@@ -256,8 +254,7 @@ export function generateTimeGroupLabel(
   originalY: number,
   ctx: GanttRenderContext
 ): string {
-  const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
-  const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
+  const { hiddenAttr, hiddenClass } = rowVisibility(row);
   const indent = row.depth * ctx.indentSize;
 
   const chevron = row.hasChildren
@@ -290,6 +287,16 @@ function generateChevron(indent: number, barHeight: number, isExpanded: boolean)
 // Column Cell Generation
 // ============================================================================
 
+function rowVisibility(row: GanttRow): { hiddenAttr: string; hiddenClass: string } {
+  const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
+  const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
+  return { hiddenAttr, hiddenClass };
+}
+
+function emptyCellRow(row: GanttRow, y: number, originalY: number, hiddenAttr: string, hiddenClass: string): string {
+  return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
+}
+
 /** Generate ID column cell */
 export function generateIdCell(
   row: GanttRow,
@@ -297,12 +304,8 @@ export function generateIdCell(
   originalY: number,
   ctx: GanttRenderContext
 ): string {
-  const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
-  const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
-
-  if (row.type !== "issue") {
-    return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
-  }
+  const { hiddenAttr, hiddenClass } = rowVisibility(row);
+  if (row.type !== "issue") return emptyCellRow(row, y, originalY, hiddenAttr, hiddenClass);
 
   const issue = row.issue!;
   return `<g class="gantt-row cursor-pointer${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr} data-vscode-context='{"webviewSection":"issueIdColumn","issueId":${issue.id},"preventDefaultContextMenuItems":true}'>
@@ -317,12 +320,8 @@ export function generateStartDateCell(
   originalY: number,
   ctx: GanttRenderContext
 ): string {
-  const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
-  const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
-
-  if (row.type !== "issue") {
-    return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
-  }
+  const { hiddenAttr, hiddenClass } = rowVisibility(row);
+  if (row.type !== "issue") return emptyCellRow(row, y, originalY, hiddenAttr, hiddenClass);
 
   const issue = row.issue!;
   if (!issue.start_date) {
@@ -345,12 +344,8 @@ export function generateStatusCell(
   originalY: number,
   ctx: GanttRenderContext
 ): string {
-  const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
-  const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
-
-  if (row.type !== "issue") {
-    return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
-  }
+  const { hiddenAttr, hiddenClass } = rowVisibility(row);
+  if (row.type !== "issue") return emptyCellRow(row, y, originalY, hiddenAttr, hiddenClass);
 
   const issue = row.issue!;
   const statusName = issue.statusName ?? "Unknown";
@@ -378,12 +373,8 @@ export function generateDueDateCell(
   originalY: number,
   ctx: GanttRenderContext
 ): string {
-  const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
-  const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
-
-  if (row.type !== "issue") {
-    return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
-  }
+  const { hiddenAttr, hiddenClass } = rowVisibility(row);
+  if (row.type !== "issue") return emptyCellRow(row, y, originalY, hiddenAttr, hiddenClass);
 
   const issue = row.issue!;
   if (!issue.due_date) {
@@ -423,12 +414,8 @@ export function generateAssigneeCell(
   originalY: number,
   ctx: GanttRenderContext
 ): string {
-  const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
-  const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
-
-  if (row.type !== "issue") {
-    return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
-  }
+  const { hiddenAttr, hiddenClass } = rowVisibility(row);
+  if (row.type !== "issue") return emptyCellRow(row, y, originalY, hiddenAttr, hiddenClass);
 
   const issue = row.issue!;
   if (!issue.assignee) {
@@ -460,8 +447,7 @@ export function generateIssueBar(
   originalY: number,
   ctx: GanttRenderContext
 ): string {
-  const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
-  const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
+  const { hiddenAttr, hiddenClass } = rowVisibility(row);
 
   // Project aggregate bars
   if (row.type === "project") {
