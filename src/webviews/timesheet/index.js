@@ -136,6 +136,19 @@
         }
         break;
       case "aggregatedCell":
+        // Multi-entry edits collapse N entries into one summed entry. A plain
+        // updateAggregatedCell undo would re-collapse into a single entry,
+        // destroying the original per-entry split. Restore the split instead.
+        if (isUndo && (action.sourceEntries?.length || 0) > 1) {
+          console.log("[Timesheet] applyAction aggregatedCell: restoring multi-entry split", { aggRowId: action.aggRowId, dayIndex: action.dayIndex, sourceEntries: action.sourceEntries });
+          vscode.postMessage({
+            type: "restoreAggregatedEntries",
+            entries: action.sourceEntries,
+            aggRowId: action.aggRowId,
+            dayIndex: action.dayIndex,
+          });
+          break;
+        }
         console.log("[Timesheet] applyAction aggregatedCell: sending updateAggregatedCell", { aggRowId: action.aggRowId, dayIndex: action.dayIndex, newHours: value, sourceEntries: action.sourceEntries });
         vscode.postMessage({
           type: "updateAggregatedCell",
