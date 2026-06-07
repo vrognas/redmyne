@@ -78,6 +78,7 @@ function createQueue() {
     getByKeyPrefix: vi.fn(() => []),
     add: vi.fn().mockResolvedValue(undefined),
     remove: vi.fn().mockResolvedValue(undefined),
+    removeMany: vi.fn().mockResolvedValue(undefined),
     removeByKey: vi.fn().mockResolvedValue(undefined),
     removeByTempIdPrefix: vi.fn().mockResolvedValue(undefined),
     onDidChange: vi.fn(() => ({ dispose: vi.fn() })),
@@ -1018,6 +1019,50 @@ describe("timesheet panel private coverage", () => {
 
     panel._restoreRow(savedRow);
     expect(queue.removeByKey).toHaveBeenCalledWith("ts:timeentry:101", "timesheet-panel");
+  });
+
+  it("deleting an unsaved pasted row removes its paste draft op", async () => {
+    const queue = createQueue();
+    const server = createServer();
+    const setup = setupPanel({ server, queue, draftEnabled: true });
+    const panel = setup.panel;
+    panel._loadWeek = vi.fn().mockResolvedValue(undefined);
+
+    const pastedDate = panel._currentWeek.dayDates[1];
+
+    // A queued paste create op (draft-timeentry-*) backing the row
+    queue.getAll.mockReturnValue([
+      {
+        id: "paste-op-1",
+        type: "createTimeEntry",
+        tempId: "draft-timeentry-abc",
+        http: {
+          method: "POST",
+          path: "/time_entries.json",
+          data: {
+            time_entry: {
+              issue_id: 7,
+              activity_id: 3,
+              comments: "pasted",
+              spent_on: pastedDate,
+            },
+          },
+        },
+      },
+    ]);
+
+    const pastedRow = panel._createEmptyRow();
+    pastedRow.id = "pasted-row";
+    pastedRow.isNew = true;
+    pastedRow.issueId = 7;
+    pastedRow.activityId = 3;
+    pastedRow.comments = "pasted";
+    pastedRow.days[1] = { hours: 1, originalHours: 0, entryId: null, isDirty: true };
+    panel._rows = [pastedRow];
+
+    await panel._deleteRow("pasted-row");
+
+    expect(queue.removeMany).toHaveBeenCalledWith(["paste-op-1"], "timesheet-panel");
   });
 
   it("covers issue picking and week navigation branch combinations", async () => {

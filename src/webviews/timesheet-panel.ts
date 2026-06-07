@@ -1029,8 +1029,12 @@ export class TimeSheetPanel {
       this._clearCompletedRow(rowId);
       // Also remove any queued draft operations for this row
       if (this._draftQueue) {
-        // tempId format is "rowId:dayIndex", so use rowId as prefix
+        // Cell-edit ops use tempId "rowId:dayIndex", so remove by rowId prefix
         void this._draftQueue.removeByTempIdPrefix(`${rowId}:`, TIMESHEET_SOURCE);
+        // Pasted rows are backed by "draft-timeentry-*" create ops whose tempId is
+        // unrelated to rowId; remove those by matching the row's identity instead,
+        // otherwise the deleted row resurrects on reload.
+        await this._removePastedDraftOpsForRow(row);
       }
     }
 
@@ -1040,6 +1044,45 @@ export class TimeSheetPanel {
       type: "rowDeleted",
       deletedRow,
     });
+  }
+
+  /**
+   * Remove queued paste-create draft ops backing an unsaved row.
+   *
+   * Pasted rows are reconstructed from "draft-timeentry-*" create ops (see
+   * _applyPendingDraftChanges) keyed by issue/activity/comments, with one op per
+   * pasted day. They carry no link back to the row id, so deleting such a row
+   * must match the ops by the row's identity for dates in the current week.
+   */
+  private async _removePastedDraftOpsForRow(row: TimeSheetRow): Promise<void> {
+    if (!this._draftQueue) return;
+
+    const rowComments = row.comments ?? "";
+    const weekDates = new Set(this._currentWeek.dayDates);
+
+    const idsToRemove = this._draftQueue
+      .getAll()
+      .filter((op) => {
+        if (op.type !== "createTimeEntry" || !op.tempId?.startsWith("draft-timeentry-")) {
+          return false;
+        }
+        const timeEntry = op.http?.data?.time_entry as
+          | { issue_id?: number; activity_id?: number; comments?: string; spent_on?: string }
+          | undefined;
+        if (!timeEntry) return false;
+        return (
+          (timeEntry.issue_id ?? null) === row.issueId &&
+          (timeEntry.activity_id ?? null) === row.activityId &&
+          (timeEntry.comments ?? "") === rowComments &&
+          !!timeEntry.spent_on &&
+          weekDates.has(timeEntry.spent_on)
+        );
+      })
+      .map((op) => op.id);
+
+    if (idsToRemove.length > 0) {
+      await this._draftQueue.removeMany(idsToRemove, TIMESHEET_SOURCE);
+    }
   }
 
   /**
