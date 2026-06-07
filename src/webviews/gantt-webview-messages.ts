@@ -28,8 +28,8 @@ export type GanttWebviewMessage =
   | { command: "collapseAll" }
   | { command: "collapseStateSync"; collapseKey?: string; isExpanded?: boolean }
   | { command: "requestRerender" }
-  | { command: "undoRelation"; operation: string; relationId?: number; issueId?: number; targetIssueId?: number; relationType?: string }
-  | { command: "redoRelation"; operation: string; relationId?: number; issueId?: number; targetIssueId?: number; relationType?: string }
+  | { command: "undoRelation"; operation: string; relationId?: number; issueId?: number; targetIssueId?: number; relationType?: string; delay?: number }
+  | { command: "redoRelation"; operation: string; relationId?: number; issueId?: number; targetIssueId?: number; relationType?: string; delay?: number }
   | { command: "openInBrowser"; issueId: number }
   | { command: "showInIssues"; issueId: number }
   | { command: "logTime"; issueId: number }

@@ -1376,12 +1376,12 @@ export class GanttPanel {
         break;
       case "undoRelation":
         if (this._server && message.operation) {
-          void this._handleUndoRelation(message as { operation: string; relationId?: number; issueId?: number; targetIssueId?: number; relationType?: string });
+          void this._handleUndoRelation(message as { operation: string; relationId?: number; issueId?: number; targetIssueId?: number; relationType?: string; delay?: number });
         }
         break;
       case "redoRelation":
         if (this._server && message.operation) {
-          void this._handleRedoRelation(message as { operation: string; relationId?: number; issueId?: number; targetIssueId?: number; relationType?: string });
+          void this._handleRedoRelation(message as { operation: string; relationId?: number; issueId?: number; targetIssueId?: number; relationType?: string; delay?: number });
         }
         break;
       case "openInBrowser":
@@ -1572,6 +1572,7 @@ export class GanttPanel {
         issueId: number;
         targetIssueId: number;
         relationType: string;
+        delay?: number;
       } | null = null;
       for (const issue of this._issues) {
         const rel = issue.relations?.find((r) => r.id === relationId);
@@ -1580,6 +1581,7 @@ export class GanttPanel {
             issueId: issue.id,
             targetIssueId: rel.issue_to_id,
             relationType: rel.relation_type,
+            delay: rel.delay,
           };
           break;
         }
@@ -1598,6 +1600,7 @@ export class GanttPanel {
             issueId: relationInfo.issueId,
             targetIssueId: relationInfo.targetIssueId,
             relationType: relationInfo.relationType,
+            delay: relationInfo.delay,
           },
         });
       }
@@ -1738,6 +1741,7 @@ export class GanttPanel {
           issueId,
           targetIssueId,
           relationType,
+          delay,
           datesBefore,
         },
       });
@@ -1771,6 +1775,7 @@ export class GanttPanel {
     issueId?: number;
     targetIssueId?: number;
     relationType?: string;
+    delay?: number;
   }): Promise<void> {
     if (!this._server) return;
 
@@ -1785,7 +1790,8 @@ export class GanttPanel {
         const response = await this._server.createRelation(
           message.issueId,
           message.targetIssueId,
-          message.relationType as CreatableRelationType
+          message.relationType as CreatableRelationType,
+          message.delay
         );
         // Send new relationId to update redo stack
         this._panel.webview.postMessage({
@@ -1809,6 +1815,7 @@ export class GanttPanel {
     issueId?: number;
     targetIssueId?: number;
     relationType?: string;
+    delay?: number;
   }): Promise<void> {
     if (!this._server) return;
 
@@ -1818,7 +1825,8 @@ export class GanttPanel {
         const response = await this._server.createRelation(
           message.issueId,
           message.targetIssueId,
-          message.relationType as CreatableRelationType
+          message.relationType as CreatableRelationType,
+          message.delay
         );
         // Send new relationId to update undo stack
         this._panel.webview.postMessage({

@@ -1397,7 +1397,8 @@ export function setupDrag(ctx) {
             operation: 'create',
             issueId: action.issueId,
             targetIssueId: action.targetIssueId,
-            relationType: action.relationType
+            relationType: action.relationType,
+            delay: action.delay
           });
         }
       } else if (action.type === 'bulk') {
@@ -1461,7 +1462,8 @@ export function setupDrag(ctx) {
             operation: 'create',
             issueId: action.issueId,
             targetIssueId: action.targetIssueId,
-            relationType: action.relationType
+            relationType: action.relationType,
+            delay: action.delay
           });
         } else {
           // Redo delete = delete the relation again
