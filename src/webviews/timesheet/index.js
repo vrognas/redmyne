@@ -69,6 +69,14 @@
     }
     const action = redoStack.pop();
     console.log("[Timesheet] redo: popped action:", action);
+    // Redo of a paste is unsupported. Drop it with a toast instead of pushing
+    // it onto the undo stack, which would leave a bogus entry that corrupts a
+    // later undo (the draft ops it references are already gone).
+    if (action.type === "paste") {
+      showToast("Redo paste not supported - use Paste again");
+      updateUndoRedoButtons();
+      return;
+    }
     undoStack.push(action);
     applyAction(action, false);
     updateUndoRedoButtons();
@@ -216,19 +224,14 @@
         });
         break;
       case "paste":
-        // Undo/redo paste by removing/adding draft ops
-        if (isUndo) {
-          console.log("[Timesheet] applyAction paste: undoing paste, removing draftIds:", action.draftIds);
-          vscode.postMessage({
-            type: "undoPaste",
-            draftIds: action.draftIds,
-          });
-          showToast(`Undid paste of ${action.count} entries`);
-        } else {
-          // Redo paste is complex - user should just paste again
-          console.log("[Timesheet] applyAction paste: redo paste not supported, user should paste again");
-          showToast("Redo paste not supported - use Paste again");
-        }
+        // Undo paste by removing the draft ops. Redo is handled in redo() and
+        // never reaches here.
+        console.log("[Timesheet] applyAction paste: undoing paste, removing draftIds:", action.draftIds);
+        vscode.postMessage({
+          type: "undoPaste",
+          draftIds: action.draftIds,
+        });
+        showToast(`Undid paste of ${action.count} entries`);
         break;
     }
   }
