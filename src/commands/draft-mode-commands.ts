@@ -168,19 +168,21 @@ export function registerDraftModeCommands(
       const server = getServerOrShowError(deps.getServer);
       if (!server) return;
 
-      const operations = queue.getAll();
-      if (operations.length === 0) {
+      const snapshotOperations = queue.getAll();
+      if (snapshotOperations.length === 0) {
         vscode.window.showInformationMessage("No drafts to apply");
         return;
       }
 
       const confirm = await vscode.window.showWarningMessage(
-        `Apply ${operations.length} draft${operations.length === 1 ? "" : "s"} to Redmine?`,
+        `Apply ${snapshotOperations.length} draft${snapshotOperations.length === 1 ? "" : "s"} to Redmine?`,
         { modal: true },
         "Apply All"
       );
 
       if (confirm !== "Apply All") return;
+      // Re-read queue after confirm dialog — ops may have changed while dialog was open
+      const operations = queue.getAll();
       const result = await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
