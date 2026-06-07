@@ -2414,9 +2414,9 @@ export class GanttPanel {
       .map((row, idx) => {
         const y = initialYPositions[idx]!;
         const originalY = filteredRowYPositions[idx]!;
-        if (row.type === "project") return generateProjectLabel(row, idx, y, originalY, renderContext);
-        if (row.type === "time-group") return generateTimeGroupLabel(row, idx, y, originalY, renderContext);
-        return generateIssueLabel(row, idx, y, originalY, renderContext);
+        if (row.type === "project") return generateProjectLabel(row, y, originalY, renderContext);
+        if (row.type === "time-group") return generateTimeGroupLabel(row, y, originalY, renderContext);
+        return generateIssueLabel(row, y, originalY, renderContext);
       })
       .join("");
 
@@ -2444,7 +2444,7 @@ export class GanttPanel {
     // Right bars (scrollable timeline) - render all rows for instant toggle
     // Generate bars for all rows (hidden rows have visibility:hidden)
     const bars = filteredRows
-      .map((row, idx) => generateIssueBar(row, idx, initialYPositions[idx]!, filteredRowYPositions[idx]!, renderContext))
+      .map((row, idx) => generateIssueBar(row, initialYPositions[idx]!, filteredRowYPositions[idx]!, renderContext))
       .join("");
 
     // Dependency arrows - draw from end of source to start of target

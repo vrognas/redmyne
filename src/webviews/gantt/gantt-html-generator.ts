@@ -151,7 +151,6 @@ function getScheduledIntensity(
 /** Generate SVG for issue label row */
 export function generateIssueLabel(
   row: GanttRow,
-  _idx: number,
   y: number,
   originalY: number,
   ctx: GanttRenderContext
@@ -224,7 +223,6 @@ export function generateIssueLabel(
 /** Generate SVG for project label row */
 export function generateProjectLabel(
   row: GanttRow,
-  _idx: number,
   y: number,
   originalY: number,
   ctx: GanttRenderContext
@@ -254,7 +252,6 @@ export function generateProjectLabel(
 /** Generate SVG for time-group label row */
 export function generateTimeGroupLabel(
   row: GanttRow,
-  _idx: number,
   y: number,
   originalY: number,
   ctx: GanttRenderContext
@@ -459,7 +456,6 @@ export function generateAssigneeCell(
 /** Generate issue bar SVG */
 export function generateIssueBar(
   row: GanttRow,
-  _idx: number,
   y: number,
   originalY: number,
   ctx: GanttRenderContext

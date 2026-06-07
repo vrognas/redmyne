@@ -98,7 +98,7 @@ describe("gantt-html-generator", () => {
         },
       };
 
-      const svg = generateIssueLabel(row, 0, 0, 0, baseContext as any);
+      const svg = generateIssueLabel(row, 0, 0, baseContext as any);
 
       expect(svg).toContain('class="issue-label');
       expect(svg).toContain('data-issue-id="123"');
@@ -130,7 +130,7 @@ describe("gantt-html-generator", () => {
         buildProjectTooltip: () => "Project tooltip",
       };
 
-      const svg = generateProjectLabel(row, 0, 0, 0, mockContext as any);
+      const svg = generateProjectLabel(row, 0, 0, mockContext as any);
 
       expect(svg).toContain('class="project-label');
       expect(svg).toContain('data-project-id="1"');
@@ -200,7 +200,7 @@ describe("gantt-html-generator", () => {
         isAutoUpdateEnabled: () => true,
       };
 
-      const svg = generateIssueBar(row, 0, 0, 0, mockContext as any);
+      const svg = generateIssueBar(row, 0, 0, mockContext as any);
 
       expect(svg).toContain('class="issue-bar');
       expect(svg).toContain('data-issue-id="456"');
@@ -234,7 +234,7 @@ describe("gantt-html-generator", () => {
         hasChildren: true,
         childDateRanges: [{ startDate: "2025-01-05", dueDate: "2025-01-10" }],
       };
-      const projectBar = generateIssueBar(projectRow, 0, 0, 0, ctx);
+      const projectBar = generateIssueBar(projectRow, 0, 0, ctx);
       expect(projectBar).toContain("aggregate-bars");
       expect(projectBar).toContain("data-project-id=\"1\"");
 
@@ -251,7 +251,7 @@ describe("gantt-html-generator", () => {
         timeGroup: "overdue",
         childDateRanges: [{ startDate: "2025-01-08", dueDate: "2025-01-09" }],
       };
-      const timeGroupBar = generateIssueBar(timeGroupRow, 0, 0, 0, ctx);
+      const timeGroupBar = generateIssueBar(timeGroupRow, 0, 0, ctx);
       expect(timeGroupBar).toContain("time-group-bars");
       expect(timeGroupBar).toContain("var(--vscode-charts-red)");
     });
@@ -315,7 +315,7 @@ describe("gantt-html-generator", () => {
           blockedBy: [],
         },
       };
-      expect(generateIssueBar(noDateRow, 0, 0, 0, ctx as any)).toBe("");
+      expect(generateIssueBar(noDateRow, 0, 0, ctx as any)).toBe("");
 
       const parentRow: GanttRow = {
         ...noDateRow,
@@ -331,7 +331,7 @@ describe("gantt-html-generator", () => {
         },
         isParent: true,
       };
-      const parentBar = generateIssueBar(parentRow, 0, 0, 0, ctx as any);
+      const parentBar = generateIssueBar(parentRow, 0, 0, ctx as any);
       expect(parentBar).toContain("parent-bar");
       expect(parentBar).toContain("40%");
     });
@@ -399,7 +399,7 @@ describe("gantt-html-generator", () => {
         icon: "🗓️",
         childCount: 3,
       };
-      const timeGroupSvg = generateTimeGroupLabel(timeGroupRow, 0, 0, 0, baseCtx);
+      const timeGroupSvg = generateTimeGroupLabel(timeGroupRow, 0, 0, baseCtx);
       expect(timeGroupSvg).toContain("time-group-label");
       expect(timeGroupSvg).toContain("(3)");
 
