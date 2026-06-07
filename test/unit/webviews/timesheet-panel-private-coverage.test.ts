@@ -424,6 +424,43 @@ describe("timesheet panel private coverage", () => {
     expect(queue.remove).toHaveBeenCalledWith("d2", "timesheet-panel");
   });
 
+  it("paste keeps comment-split entries as distinct draft ops", async () => {
+    const queue = createQueue();
+    const server = createServer();
+    const setup = setupPanel({ server, queue, draftEnabled: true });
+    const panel = setup.panel;
+
+    panel._loadWeek = vi.fn().mockResolvedValue(undefined);
+    panel._getDraftModeManagerFn = () =>
+      ({ isEnabled: true, queue } as unknown as import("../../../src/draft-mode/draft-mode-manager").DraftModeManager);
+
+    // Two clipboard entries for the same issue/activity/day differing only by comments
+    vi.spyOn(clipboardUtil, "getClipboard").mockReturnValueOnce({
+      kind: "week",
+      entries: [],
+      weekMap: new Map([[
+        0,
+        [
+          { issue_id: 5, activity_id: 9, hours: "1", comments: "morning", project_id: 2 },
+          { issue_id: 5, activity_id: 9, hours: "2", comments: "afternoon", project_id: 2 },
+        ],
+      ]]),
+      sourceWeekStart: panel._currentWeek.startDate,
+    } as unknown as ReturnType<typeof clipboardUtil.getClipboard>);
+
+    await panel._pasteWeek();
+
+    // Both entries must be queued (no silent collapse)
+    expect(queue.add).toHaveBeenCalledTimes(2);
+    const keys = queue.add.mock.calls.map(
+      (c) => (c[0] as { resourceKey: string }).resourceKey
+    );
+    expect(new Set(keys).size).toBe(2);
+    expect(setup.mock.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "pasteComplete", count: 2 })
+    );
+  });
+
   it("covers aggregated and expanded entry flows", async () => {
     const queue = createQueue();
     const server = createServer();

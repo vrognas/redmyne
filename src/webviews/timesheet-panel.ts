@@ -62,6 +62,24 @@ function extractHoursFromDraftOp(data: Record<string, unknown> | undefined): num
   return typeof hours === "number" ? hours : 0;
 }
 
+/**
+ * Build the canonical resourceKey for a not-yet-saved (new) time entry.
+ *
+ * Comments are folded into the key so that two entries differing only by
+ * comments (which are legitimately distinct rows) do not collide in the
+ * DraftQueue, where add() replaces any existing op with the same resourceKey.
+ * Without the comments component, pasting a week containing comment-split rows
+ * silently dropped all but the last entry per issue/activity/date.
+ */
+function buildNewEntryResourceKey(
+  issueId: number | null | undefined,
+  activityId: number | null | undefined,
+  date: string | undefined,
+  comments: string | null | undefined
+): string {
+  return `ts:timeentry:new:${issueId}:${activityId}:${date}:${comments ?? ""}`;
+}
+
 export class TimeSheetPanel {
   public static currentPanel: TimeSheetPanel | undefined;
 
@@ -1203,7 +1221,7 @@ export class TimeSheetPanel {
     // This ensures consistency between aggregate mode and normal mode
     const resourceKey = entryId
       ? `ts:timeentry:${entryId}`
-      : `ts:timeentry:new:${row.issueId}:${row.activityId}:${date}`;
+      : buildNewEntryResourceKey(row.issueId, row.activityId, date, row.comments);
 
     // If not dirty (restored to original), remove any pending operation
     if (!isDirty) {
@@ -1702,8 +1720,14 @@ export class TimeSheetPanel {
         for (const entry of entries) {
           const tempId = generateTempId("timeentry");
           const draftId = generateDraftId();
-          // Use canonical resourceKey for new entries
-          const resourceKey = `ts:timeentry:new:${entry.issue_id}:${entry.activity_id}:${targetDate}`;
+          // Canonical resourceKey for new entries; comments folded in so that
+          // comment-split clipboard rows do not collapse onto one another.
+          const resourceKey = buildNewEntryResourceKey(
+            entry.issue_id,
+            entry.activity_id,
+            targetDate,
+            entry.comments
+          );
           await this._draftQueue.add({
             id: draftId,
             type: "createTimeEntry",
@@ -1808,7 +1832,7 @@ export class TimeSheetPanel {
     if (!issueId || !activityId) return;
 
     // Canonical resourceKey for new entries in this cell
-    const newEntryResourceKey = `ts:timeentry:new:${issueId}:${activityId}:${date}`;
+    const newEntryResourceKey = buildNewEntryResourceKey(issueId, activityId, date, comments);
 
     if (sourceCount === 0 && newHours === 0) {
       // Empty cell set to 0 → remove any pending CREATE (e.g., undo of create)
@@ -1850,7 +1874,7 @@ export class TimeSheetPanel {
       if (entry.isDraft || entry.entryId === null) {
         // Draft entry (not saved to server yet)
         // Use canonical resourceKey based on issueId:activityId:date (not rowId)
-        const resourceKey = `ts:timeentry:new:${entry.issueId}:${entry.activityId}:${date}`;
+        const resourceKey = buildNewEntryResourceKey(entry.issueId, entry.activityId, date, entry.comments);
         if (newHours > 0) {
           // Update draft → replace pending CREATE with new hours
           await this._draftQueue.add({
@@ -1924,7 +1948,7 @@ export class TimeSheetPanel {
       for (const entry of sourceEntries) {
         if (entry.isDraft || entry.entryId === null) {
           // Draft entry → remove pending CREATE using canonical resourceKey
-          const resourceKey = `ts:timeentry:new:${entry.issueId}:${entry.activityId}:${date}`;
+          const resourceKey = buildNewEntryResourceKey(entry.issueId, entry.activityId, date, entry.comments);
           await this._draftQueue.removeByKey(resourceKey, TIMESHEET_SOURCE);
         } else {
           // Saved entry → queue DELETE
@@ -1945,7 +1969,7 @@ export class TimeSheetPanel {
 
       if (newHours > 0) {
         // Use canonical resourceKey for new entries
-        const resourceKey = `ts:timeentry:new:${issueId}:${activityId}:${date}`;
+        const resourceKey = buildNewEntryResourceKey(issueId, activityId, date, comments);
         await this._draftQueue.add({
           id: generateDraftId(),
           type: "createTimeEntry",
@@ -2196,7 +2220,7 @@ export class TimeSheetPanel {
     if (!entryId) {
       // Draft entry (not yet saved to server)
       const date = this._currentWeek.dayDates[dayIndex];
-      const resourceKey = `ts:timeentry:new:${row.issueId}:${row.activityId}:${date}`;
+      const resourceKey = buildNewEntryResourceKey(row.issueId, row.activityId, date, row.comments);
       if (newHours > 0) {
         await this._draftQueue.add({
           id: generateDraftId(),
@@ -2278,7 +2302,7 @@ export class TimeSheetPanel {
       const row = this._rows.find(r => r.id === rowId);
       if (!row) return;
       const date = this._currentWeek.dayDates[dayIndex];
-      const resourceKey = `ts:timeentry:new:${row.issueId}:${row.activityId}:${date}`;
+      const resourceKey = buildNewEntryResourceKey(row.issueId, row.activityId, date, row.comments);
       await this._draftQueue.removeByKey(resourceKey, TIMESHEET_SOURCE);
       await this._loadWeek(this._currentWeek);
       return;
