@@ -187,10 +187,6 @@ export class DraftQueue {
     return [...this.operations];
   }
 
-  getByIssueId(issueId: number): DraftOperation[] {
-    return this.operations.filter(op => op.issueId === issueId);
-  }
-
   getByKeyPrefix(prefix: string): DraftOperation[] {
     return this.operations.filter(op => op.resourceKey.startsWith(prefix));
   }

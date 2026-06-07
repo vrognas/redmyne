@@ -343,23 +343,6 @@ describe("DraftQueue", () => {
     });
   });
 
-  describe("getByIssueId", () => {
-    beforeEach(async () => {
-      await queue.load(serverIdentity);
-    });
-
-    it("returns operations for given issue", async () => {
-      await queue.add(createOp({ issueId: 123, resourceKey: "a" }));
-      await queue.add(createOp({ issueId: 456, resourceKey: "b" }));
-      await queue.add(createOp({ issueId: 123, resourceKey: "c" }));
-
-      const ops = queue.getByIssueId(123);
-
-      expect(ops).toHaveLength(2);
-      expect(ops.every(o => o.issueId === 123)).toBe(true);
-    });
-  });
-
   describe("removeByKey", () => {
     beforeEach(async () => {
       await queue.load(serverIdentity);
