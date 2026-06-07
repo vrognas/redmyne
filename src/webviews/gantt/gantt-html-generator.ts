@@ -3,7 +3,7 @@
  * Stateless rendering functions - all data passed explicitly
  */
 
-import type { GanttRenderContext, GroupRange, AvatarColors } from "./gantt-render-types";
+import type { GanttRenderContext, AvatarColors } from "./gantt-render-types";
 import type { GanttRow, GanttIssue } from "../gantt-model";
 import { escapeAttr, escapeHtml } from "../gantt-html-escape";
 import { parseLocalDate, formatLocalDate } from "../../utilities/date-utils";
@@ -978,86 +978,3 @@ function generateBarBadges(
   </g>` : ""}`;
 }
 
-// ============================================================================
-// Zebra Stripes & Indent Guides
-// ============================================================================
-
-/** Generate zebra stripe backgrounds */
-export function generateZebraStripes(
-  groupRanges: GroupRange[],
-  visibleRows: GanttRow[],
-  rowYPositions: number[],
-  rowHeights: number[]
-): string {
-  const getGapBefore = (_row: GanttRow, idx: number): number => {
-    if (idx === 0) return rowYPositions[0]!;
-    return rowYPositions[idx]! - (rowYPositions[idx - 1]! + rowHeights[idx - 1]!);
-  };
-
-  return groupRanges
-    .map(g => {
-      const firstRow = visibleRows[g.startIdx]!;
-      const gapBeforeFirst = getGapBefore(firstRow, g.startIdx);
-      const startY = rowYPositions[g.startIdx]! - gapBeforeFirst;
-      const endY = rowYPositions[g.endIdx]! + rowHeights[g.endIdx]!;
-      const height = endY - startY;
-      const opacity = g.groupIdx % 2 === 0 ? 0.03 : 0.06;
-
-      const rowContributions: Record<string, number> = {};
-      for (let i = g.startIdx; i <= g.endIdx; i++) {
-        const row = visibleRows[i]!;
-        const gapOwned = i === g.startIdx ? gapBeforeFirst : getGapBefore(row, i);
-        rowContributions[row.collapseKey] = gapOwned + rowHeights[i]!;
-      }
-
-      return `<rect class="zebra-stripe" x="0" y="${startY}" width="100%" height="${height}" opacity="${opacity}" data-first-row-key="${firstRow.collapseKey}" data-original-y="${startY}" data-original-height="${height}" data-row-contributions='${JSON.stringify(rowContributions)}' />`;
-    })
-    .join("");
-}
-
-/** Generate indent guide lines */
-export function generateIndentGuides(
-  visibleRows: GanttRow[],
-  rowYPositions: number[],
-  barHeight: number,
-  indentSize: number
-): string {
-  const subtreeEndIndex = new Array<number>(visibleRows.length);
-  const parentStack: number[] = [];
-
-  for (let i = 0; i < visibleRows.length; i++) {
-    const depth = visibleRows[i]!.depth;
-    while (parentStack.length > 0 && depth <= visibleRows[parentStack[parentStack.length - 1]!]!.depth) {
-      const idx = parentStack.pop()!;
-      subtreeEndIndex[idx] = i - 1;
-    }
-    parentStack.push(i);
-  }
-  while (parentStack.length > 0) {
-    const idx = parentStack.pop()!;
-    subtreeEndIndex[idx] = visibleRows.length - 1;
-  }
-
-  const lines: string[] = [];
-  for (let i = 0; i < visibleRows.length; i++) {
-    const row = visibleRows[i]!;
-    if (!row.hasChildren) continue;
-
-    const parentDepth = row.depth;
-    const firstDescendantIndex = i + 1;
-    if (firstDescendantIndex >= visibleRows.length) continue;
-    if (visibleRows[firstDescendantIndex]!.depth <= parentDepth) continue;
-    const lastDescendantIndex = subtreeEndIndex[i]!;
-    if (lastDescendantIndex <= i) continue;
-
-    const lineX = 8 + parentDepth * indentSize;
-    const startY = rowYPositions[firstDescendantIndex]!;
-    const endY = rowYPositions[lastDescendantIndex]! + barHeight;
-
-    lines.push(
-      `<line class="indent-guide-line" data-for-parent="${row.collapseKey}" x1="${lineX}" y1="${startY}" x2="${lineX}" y2="${endY}" stroke="var(--vscode-tree-indentGuidesStroke)" stroke-width="1" opacity="0.4"/>`
-    );
-  }
-
-  return lines.length > 0 ? `<g class="indent-guides-layer">${lines.join("")}</g>` : "";
-}

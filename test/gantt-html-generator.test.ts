@@ -13,8 +13,6 @@ import {
   generateDueDateCell,
   generateAssigneeCell,
   generateIssueBar,
-  generateZebraStripes,
-  generateIndentGuides,
 } from "../src/webviews/gantt/gantt-html-generator";
 import type { GanttRow } from "../src/webviews/gantt-model";
 
@@ -442,32 +440,4 @@ describe("gantt-html-generator", () => {
     });
   });
 
-  describe("zebra and indent layers", () => {
-    it("generates zebra stripes and indent guides", () => {
-      const rows: GanttRow[] = [
-        { type: "project", id: 1, label: "P", depth: 0, collapseKey: "p1", parentKey: "", isVisible: true, isExpanded: true, hasChildren: true },
-        { type: "issue", id: 2, label: "C1", depth: 1, collapseKey: "c1", parentKey: "p1", isVisible: true, isExpanded: false, hasChildren: false, issue: {} as any },
-        { type: "issue", id: 3, label: "C2", depth: 1, collapseKey: "c2", parentKey: "p1", isVisible: true, isExpanded: false, hasChildren: false, issue: {} as any },
-      ];
-      const stripes = generateZebraStripes(
-        [{ startIdx: 0, endIdx: 2, groupIdx: 0 }],
-        rows,
-        [0, 24, 48],
-        [22, 22, 22]
-      );
-      expect(stripes).toContain("zebra-stripe");
-      expect(stripes).toContain("data-row-contributions");
-
-      const guides = generateIndentGuides(rows, [0, 24, 48], 22, 8);
-      expect(guides).toContain("indent-guides-layer");
-      expect(guides).toContain("data-for-parent=\"p1\"");
-    });
-
-    it("returns empty indent layer when no expandable hierarchy exists", () => {
-      const rows: GanttRow[] = [
-        { type: "issue", id: 1, label: "A", depth: 0, collapseKey: "a", parentKey: "", isVisible: true, isExpanded: false, hasChildren: false, issue: {} as any },
-      ];
-      expect(generateIndentGuides(rows, [0], 22, 8)).toBe("");
-    });
-  });
 });
