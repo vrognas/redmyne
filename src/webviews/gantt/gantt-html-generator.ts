@@ -397,7 +397,11 @@ export function generateDueDateCell(
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const displayDate = `${monthNames[dueDate.getMonth()]} ${dueDate.getDate()}`;
 
-  const daysUntilDue = Math.floor((dueDate.getTime() - ctx.today.getTime()) / (1000 * 60 * 60 * 24));
+  // ctx.today is UTC-frame (UTC midnight of the user's local date), so compare
+  // against the UTC-parsed due date — not the local parseLocalDate above, which
+  // is only for the display string.
+  const dueUTC = new Date(issue.due_date);
+  const daysUntilDue = Math.floor((dueUTC.getTime() - ctx.today.getTime()) / (1000 * 60 * 60 * 24));
   let dueClass = "";
   let dueTooltip = issue.due_date;
 

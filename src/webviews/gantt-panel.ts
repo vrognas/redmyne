@@ -1859,8 +1859,17 @@ export class GanttPanel {
     const visibleTypes = ganttConfig.get<string[]>("visibleRelationTypes", ["blocks", "precedes"]);
     this._visibleRelationTypes = new Set(visibleTypes);
 
-    // Today for calculations (start of today in local timezone)
+    // Today for calculations (start of today in local timezone).
+    // Use this LOCAL-frame value only for comparisons against other
+    // parseLocalDate() values (e.g. the active-issue filter below).
     const today = getLocalToday();
+    // The timeline x-axis is UTC-anchored (minDate/maxDate built from
+    // `new Date("YYYY-MM-DD")` = UTC midnight; bars use `new Date(dateStr)`).
+    // The user's "today" is their LOCAL calendar date, but for x-axis math
+    // and comparisons against UTC-parsed bar dates it must be the UTC-midnight
+    // instant of that local date. getTodayStr() = local calendar date string;
+    // `new Date(str)` re-parses it as UTC midnight.
+    const todayUTC = new Date(getTodayStr());
 
     const assigneeState = deriveAssigneeState(this._issues, this._currentUserId, this._currentUserName);
     this._uniqueAssignees = assigneeState.uniqueAssignees;
@@ -2366,7 +2375,7 @@ export class GanttPanel {
       assigneeColumnWidth,
       minDate,
       maxDate,
-      today,
+      today: todayUTC,
       todayStr: getTodayStr(),
       rows,
       filteredRows,
@@ -2762,8 +2771,8 @@ export class GanttPanel {
         endPlusOne.setUTCDate(endPlusOne.getUTCDate() + 1);
         const startPct = (start.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime());
         const endPct = (endPlusOne.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime());
-        const isPast = !hasOnlyStart && end < today;
-        const isOverdue = !hasOnlyStart && !issue.isClosed && issue.done_ratio < 100 && end < today;
+        const isPast = !hasOnlyStart && end < todayUTC;
+        const isOverdue = !hasOnlyStart && !issue.isClosed && issue.done_ratio < 100 && end < todayUTC;
         const classes = ["minimap-bar", isPast ? "bar-past" : "", isOverdue ? "bar-overdue" : ""].filter(Boolean).join(" ");
         // Use same status color as main view (closed issues show as completed)
         const minimapEffectiveStatus = issue.isClosed ? "completed" : issue.status;
@@ -2882,8 +2891,7 @@ export class GanttPanel {
       }
     }
 
-    // Today marker for capacity ribbon (use UTC midnight to match minDate/maxDate reference frame)
-    const todayUTC = new Date(formatLocalDate(today));
+    // Today marker for capacity ribbon (uses the shared UTC-midnight anchor to match minDate/maxDate reference frame)
     const capacityTodayX = ((todayUTC.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
     const capacityTodayMarker = this._viewFocus === "person" && capacityTodayX >= 0 && capacityTodayX <= timelineWidth
       ? `<line x1="${capacityTodayX}" y1="0" x2="${capacityTodayX}" y2="${ribbonHeight}" class="capacity-today-marker"/>`
@@ -2900,9 +2908,9 @@ export class GanttPanel {
     );
     perfEnd("_generateDateMarkers");
 
-    // Calculate today's position for auto-scroll (reuse today from above)
+    // Calculate today's position for auto-scroll (UTC-frame anchor to match minDate/maxDate)
     const todayX =
-      ((today.getTime() - minDate.getTime()) /
+      ((todayUTC.getTime() - minDate.getTime()) /
         (maxDate.getTime() - minDate.getTime())) *
       timelineWidth;
     const todayInRange = todayX >= 0 && todayX <= timelineWidth;
