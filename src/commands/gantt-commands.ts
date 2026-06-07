@@ -29,50 +29,44 @@ export function registerGanttCommands(
   context: vscode.ExtensionContext,
   deps: GanttCommandDeps
 ): void {
+  function getSchedule(): WeeklySchedule {
+    const scheduleConfig = vscode.workspace.getConfiguration("redmyne.workingHours");
+    return scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
+  }
+
+  function bootstrapPanel(issues: Issue[]): ReturnType<typeof GanttPanel.createOrShow> {
+    const panel = GanttPanel.createOrShow(context.extensionUri, deps.getServer, deps.getDraftModeManager);
+    void panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), getSchedule(), deps.getFilter(), deps.getDependencyIssues(), deps.getServer);
+    panel.setFilterChangeCallback((filter) => deps.setFilter(filter));
+    return panel;
+  }
+
   context.subscriptions.push(
     // Gantt timeline command
     vscode.commands.registerCommand("redmyne.showGantt", async () => {
-      // Ensure issues are fetched
       const issues = await deps.fetchIssuesIfNeeded();
-
       if (issues.length === 0) {
         vscode.window.showInformationMessage(
           "No issues to display. Configure Redmine and assign issues to yourself."
         );
         return;
       }
-
-      // Get working hours schedule for intensity calculation
-      const scheduleConfig = vscode.workspace.getConfiguration("redmyne.workingHours");
-      const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
-
-      const panel = GanttPanel.createOrShow(context.extensionUri, deps.getServer, deps.getDraftModeManager);
-      void panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule, deps.getFilter(), deps.getDependencyIssues(), deps.getServer);
-      panel.setFilterChangeCallback((filter) => deps.setFilter(filter));
+      bootstrapPanel(issues);
     }),
 
     // Refresh Gantt data without resetting view state
     vscode.commands.registerCommand("redmyne.refreshGanttData", async () => {
       const panel = GanttPanel.currentPanel;
       if (!panel) return;
-
-      // Use already-fetched data (don't clear cache to avoid refresh loop)
       const issues = await deps.fetchIssuesIfNeeded();
-
       if (issues.length === 0) return;
-
-      const scheduleConfig = vscode.workspace.getConfiguration("redmyne.workingHours");
-      const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
-
-      void panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule, deps.getFilter(), deps.getDependencyIssues(), deps.getServer);
+      void panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), getSchedule(), deps.getFilter(), deps.getDependencyIssues(), deps.getServer);
     }),
 
     // Open specific issue in Gantt (context menu)
     vscode.commands.registerCommand("redmyne.openIssueInGantt", async (issue: { id: number; project?: { id: number } } | undefined) => {
       const issueId = getIssueIdOrShowError(issue);
       if (!issueId) return;
-
-      // Ensure Gantt is open and has data
       const issues = await deps.fetchIssuesIfNeeded();
       if (issues.length === 0) {
         vscode.window.showInformationMessage(
@@ -80,13 +74,7 @@ export function registerGanttCommands(
         );
         return;
       }
-
-      const scheduleConfig = vscode.workspace.getConfiguration("redmyne.workingHours");
-      const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
-
-      const panel = GanttPanel.createOrShow(context.extensionUri, deps.getServer, deps.getDraftModeManager);
-      void panel.updateIssues(issues, deps.getFlexibilityCache(), deps.getProjects(), schedule, deps.getFilter(), deps.getDependencyIssues(), deps.getServer);
-      panel.setFilterChangeCallback((filter) => deps.setFilter(filter));
+      const panel = bootstrapPanel(issues);
 
       // Find the issue's project and switch to it so the issue is visible
       const targetIssue = issues.find(i => i.id === issueId);
