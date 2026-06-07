@@ -55,15 +55,12 @@ export function filterIssuesForView(options: {
       ?? options.currentUserName
       ?? options.uniqueAssignees[0]
       ?? null;
-    const nextSelectedAssignee = effectiveAssignee && effectiveAssignee !== options.selectedAssignee
-      ? effectiveAssignee
-      : options.selectedAssignee;
     const filteredIssues = effectiveAssignee
       ? options.issues.filter((issue) => issue.assigned_to?.name === effectiveAssignee)
       : options.issues;
     return {
       filteredIssues,
-      selectedAssignee: nextSelectedAssignee,
+      selectedAssignee: effectiveAssignee,
       selectedProjectId: options.selectedProjectId,
     };
   }
