@@ -95,6 +95,26 @@ describe("gantt collapse utilities", () => {
       expect(result.sort()).toEqual(["child1", "child2", "grandchild2"]);
     });
 
+    it("returns document (pre-order DFS) order for nested expanded parents", () => {
+      // Regression: the expand repositioning in toggleCollapseClientSide
+      // consumes this array as the top-to-bottom visual sequence. BFS order
+      // (all children before any grandchild) wedges a later sibling between
+      // an expanded child and its own children -> overlapping rows.
+      // parent -> c1 (expanded) -> gc1, gc2
+      //        -> c2 (expanded) -> gc3, gc4
+      const childrenCache = new Map<string, Set<string>>([
+        ["parent", new Set(["c1", "c2"])],
+        ["c1", new Set(["gc1", "gc2"])],
+        ["c2", new Set(["gc3", "gc4"])],
+      ]);
+      const expandedState = new Map<string, boolean>([
+        ["c1", true],
+        ["c2", true],
+      ]);
+      const result = findVisibleDescendants("parent", childrenCache, expandedState);
+      expect(result).toEqual(["c1", "gc1", "gc2", "c2", "gc3", "gc4"]);
+    });
+
     it("stops traversal at collapsed nodes in deep hierarchy", () => {
       // root -> a (expanded) -> b (collapsed) -> c -> d
       const childrenCache = new Map<string, Set<string>>([
