@@ -474,8 +474,6 @@ export function generateIssueBar(
 
   const start = new Date(startDate);
   const end = new Date(dueDate);
-  const endPlusOne = new Date(end);
-  endPlusOne.setUTCDate(endPlusOne.getUTCDate() + 1);
 
   const minMs = ctx.minDate.getTime();
   const maxMs = ctx.maxDate.getTime();
