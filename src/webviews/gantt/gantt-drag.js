@@ -25,7 +25,6 @@ export function setupDrag(ctx) {
       clearFocus,
       getFocusedIssueId,
       scrollToAndHighlight,
-      setAllowScrollChange,
       isDraftModeEnabled,
       isPerfDebugEnabled,
       getLookupMaps
@@ -437,7 +436,6 @@ export function setupDrag(ctx) {
       if (!dragConfirmOverlay || !dragConfirmMessage) return;
       dragConfirmMessage.textContent = message;
       pendingDragConfirm = { onConfirm, onCancel };
-      setAllowScrollChange(true); // Keep scroll at new position while modal is visible
       dragConfirmOverlay.style.display = 'flex';
       if (dragConfirmOk) dragConfirmOk.focus();
     }

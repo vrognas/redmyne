@@ -617,10 +617,6 @@ function initializeGantt(state) {
     // Single scroll container - no sync needed, just update minimap and save state
     // Flag to prevent saving state during scroll restoration (would overwrite with wrong position)
     let restoringScroll = true;
-    let allowScrollChange = false;
-    const setAllowScrollChange = (value) => {
-      allowScrollChange = value;
-    };
     let deferredScrollUpdate = null;
     if (ganttScroll) {
       ganttScroll.addEventListener('scroll', () => {
@@ -1450,7 +1446,6 @@ function initializeGantt(state) {
       clearFocus,
       getFocusedIssueId,
       scrollToAndHighlight,
-      setAllowScrollChange,
       isDraftModeEnabled: () => currentDraftMode,
       isPerfDebugEnabled: () => PERF_DEBUG,
       // Lookup maps for O(1) element access
@@ -1483,7 +1478,6 @@ function initializeGantt(state) {
     // Scroll to and highlight an issue (for click/keyboard navigation)
     function scrollToAndHighlight(issueId) {
       if (!issueId) return;
-      allowScrollChange = true; // Intentional scroll
       const label = document.querySelector('.issue-label[data-issue-id="' + issueId + '"]');
       const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
       if (label) {
