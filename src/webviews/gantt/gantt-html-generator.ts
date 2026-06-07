@@ -8,6 +8,7 @@ import type { GanttRow, GanttIssue } from "../gantt-model";
 import { escapeAttr, escapeHtml } from "../gantt-html-escape";
 import { parseLocalDate, formatLocalDate } from "../../utilities/date-utils";
 import type { WeeklySchedule } from "../../utilities/flexibility-calculator";
+import { dateToX, endExclusiveX } from "./gantt-coords";
 
 // ============================================================================
 // Helper Functions (exported for testing)
@@ -476,8 +477,10 @@ export function generateIssueBar(
   const endPlusOne = new Date(end);
   endPlusOne.setUTCDate(endPlusOne.getUTCDate() + 1);
 
-  const startX = ((start.getTime() - ctx.minDate.getTime()) / (ctx.maxDate.getTime() - ctx.minDate.getTime())) * ctx.timelineWidth;
-  const endX = ((endPlusOne.getTime() - ctx.minDate.getTime()) / (ctx.maxDate.getTime() - ctx.minDate.getTime())) * ctx.timelineWidth;
+  const minMs = ctx.minDate.getTime();
+  const maxMs = ctx.maxDate.getTime();
+  const startX = dateToX(start.getTime(), minMs, maxMs, ctx.timelineWidth);
+  const endX = endExclusiveX(end, minMs, maxMs, ctx.timelineWidth);
   const width = Math.max(10, endX - startX);
 
   const effectiveStatus = issue.isClosed ? "completed" : (issue.status ?? "unknown");
@@ -522,11 +525,10 @@ function generateProjectAggregateBar(
       const dueDate = range.dueDate ?? range.startDate!;
       const start = new Date(startDate);
       const end = new Date(dueDate);
-      const endPlusOne = new Date(end);
-      endPlusOne.setUTCDate(endPlusOne.getUTCDate() + 1);
-
-      const startX = ((start.getTime() - ctx.minDate.getTime()) / (ctx.maxDate.getTime() - ctx.minDate.getTime())) * ctx.timelineWidth;
-      const endX = ((endPlusOne.getTime() - ctx.minDate.getTime()) / (ctx.maxDate.getTime() - ctx.minDate.getTime())) * ctx.timelineWidth;
+      const minMs = ctx.minDate.getTime();
+      const maxMs = ctx.maxDate.getTime();
+      const startX = dateToX(start.getTime(), minMs, maxMs, ctx.timelineWidth);
+      const endX = endExclusiveX(end, minMs, maxMs, ctx.timelineWidth);
       const width = Math.max(4, endX - startX);
 
       return `<rect class="aggregate-bar" x="${startX}" y="${barY}" width="${width}" height="${ctx.barContentHeight}" fill="var(--vscode-descriptionForeground)" opacity="0.5" rx="2" ry="2"><title>${escapeAttr(tooltip)}</title></rect>`;
@@ -562,11 +564,10 @@ function generateTimeGroupAggregateBar(
       const dueDate = range.dueDate ?? range.startDate!;
       const start = new Date(startDate);
       const end = new Date(dueDate);
-      const endPlusOne = new Date(end);
-      endPlusOne.setUTCDate(endPlusOne.getUTCDate() + 1);
-
-      const startX = ((start.getTime() - ctx.minDate.getTime()) / (ctx.maxDate.getTime() - ctx.minDate.getTime())) * ctx.timelineWidth;
-      const endX = ((endPlusOne.getTime() - ctx.minDate.getTime()) / (ctx.maxDate.getTime() - ctx.minDate.getTime())) * ctx.timelineWidth;
+      const minMs = ctx.minDate.getTime();
+      const maxMs = ctx.maxDate.getTime();
+      const startX = dateToX(start.getTime(), minMs, maxMs, ctx.timelineWidth);
+      const endX = endExclusiveX(end, minMs, maxMs, ctx.timelineWidth);
       const width = Math.max(4, endX - startX);
 
       return `<rect class="aggregate-bar" x="${startX}" y="${barY}" width="${width}" height="${ctx.barContentHeight}" fill="${timeGroupColor}" opacity="0.4" rx="2" ry="2"/>`;
@@ -667,7 +668,7 @@ function generateRegularBar(
   const handleWidth = 14;
 
   // Past portion
-  const todayX = ((ctx.today.getTime() - ctx.minDate.getTime()) / (ctx.maxDate.getTime() - ctx.minDate.getTime())) * ctx.timelineWidth;
+  const todayX = dateToX(ctx.today.getTime(), ctx.minDate.getTime(), ctx.maxDate.getTime(), ctx.timelineWidth);
   const start = new Date(issue.start_date ?? issue.due_date!);
   const pastEndX = Math.min(todayX, endX);
   const pastWidth = Math.max(0, pastEndX - startX);

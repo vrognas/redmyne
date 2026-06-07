@@ -47,6 +47,7 @@ import {
 import type { GanttRenderContext } from "./gantt/gantt-render-types";
 import { generateHeader, type GanttToolbarContext } from "./gantt/gantt-toolbar-generator";
 import { deriveAssigneeState, filterIssuesForView } from "./gantt-view-filter";
+import { dateToX, endExclusiveX } from "./gantt/gantt-coords";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
 import { DRAFT_COMMAND_SOURCE } from "../draft-mode/draft-change-sources";
 
@@ -2461,16 +2462,8 @@ export class GanttPanel {
           ? new Date(issue.due_date)
           : new Date(issue.start_date!);
         // Add 1 day to end to match bar width calculation
-        const endPlusOne = new Date(end);
-        endPlusOne.setUTCDate(endPlusOne.getUTCDate() + 1);
-        const startX =
-          ((start.getTime() - minDate.getTime()) /
-            (maxDate.getTime() - minDate.getTime())) *
-          timelineWidth;
-        const endX =
-          ((endPlusOne.getTime() - minDate.getTime()) /
-            (maxDate.getTime() - minDate.getTime())) *
-          timelineWidth;
+        const startX = dateToX(start.getTime(), minDate.getTime(), maxDate.getTime(), timelineWidth);
+        const endX = endExclusiveX(end, minDate.getTime(), maxDate.getTime(), timelineWidth);
         const y = rowYPositions[idx]! + barHeight / 2;
         issuePositions.set(issue.id, { startX, endX, y });
       }
@@ -2738,7 +2731,7 @@ export class GanttPanel {
         const versionDate = new Date(version.due_date!);
         if (versionDate < minDate || versionDate > maxDate) return "";
 
-        const x = ((versionDate.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
+        const x = dateToX(versionDate.getTime(), minDate.getTime(), maxDate.getTime(), timelineWidth);
         const diamondSize = 6;
         const truncatedName = version.name.length > 15 ? version.name.substring(0, 14) + "…" : version.name;
         const tooltip = `${version.name}\nDue: ${version.due_date}\n${version.description || ""}`.trim();
@@ -2775,10 +2768,11 @@ export class GanttPanel {
         const dueDate = issue.due_date ?? (hasOnlyStart ? maxDateStr : issue.start_date!);
         const start = new Date(startDate);
         const end = new Date(dueDate);
-        const endPlusOne = new Date(end);
-        endPlusOne.setUTCDate(endPlusOne.getUTCDate() + 1);
-        const startPct = (start.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime());
-        const endPct = (endPlusOne.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime());
+        // Fractions in [0,1] — pass width=1 so dateToX gives the 0-1 ratio directly
+        const minMs = minDate.getTime();
+        const maxMs = maxDate.getTime();
+        const startPct = dateToX(start.getTime(), minMs, maxMs, 1);
+        const endPct = endExclusiveX(end, minMs, maxMs, 1);
         const isPast = !hasOnlyStart && end < todayUTC;
         const isOverdue = !hasOnlyStart && !issue.isClosed && issue.done_ratio < 100 && end < todayUTC;
         const classes = ["minimap-bar", isPast ? "bar-past" : "", isOverdue ? "bar-overdue" : ""].filter(Boolean).join(" ");
@@ -2829,12 +2823,13 @@ export class GanttPanel {
     const capacityRibbonBars = capacityData.map((period) => {
       // Calculate bar position from period start date
       const startDateObj = new Date(period.startDate + "T00:00:00Z");
-      const startX = ((startDateObj.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
+      const minMs = minDate.getTime();
+      const maxMs = maxDate.getTime();
+      const startX = dateToX(startDateObj.getTime(), minMs, maxMs, timelineWidth);
 
       // Calculate bar width from period end date + 1 day (to include the end day)
       const endDateObj = new Date(period.endDate + "T00:00:00Z");
-      endDateObj.setUTCDate(endDateObj.getUTCDate() + 1);
-      const endX = ((endDateObj.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
+      const endX = endExclusiveX(endDateObj, minMs, maxMs, timelineWidth);
       const barWidth = Math.max(2, endX - startX); // Min 2px for visibility
 
       const fillColor = period.status === "available"
@@ -2894,7 +2889,7 @@ export class GanttPanel {
       // ribbon week marks align with the UTC-anchored Monday gridlines.
       while (current <= maxDate) {
         if (current.getUTCDay() === 1) { // Monday
-          const weekX = ((current.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
+          const weekX = dateToX(current.getTime(), minDate.getTime(), maxDate.getTime(), timelineWidth);
           capacityWeekMarkers.push(`<line x1="${weekX}" y1="0" x2="${weekX}" y2="${ribbonHeight}" class="capacity-week-marker"/>`);
         }
         current.setUTCDate(current.getUTCDate() + 1);
@@ -2902,7 +2897,7 @@ export class GanttPanel {
     }
 
     // Today marker for capacity ribbon (uses the shared UTC-midnight anchor to match minDate/maxDate reference frame)
-    const capacityTodayX = ((todayUTC.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
+    const capacityTodayX = dateToX(todayUTC.getTime(), minDate.getTime(), maxDate.getTime(), timelineWidth);
     const capacityTodayMarker = this._viewFocus === "person" && capacityTodayX >= 0 && capacityTodayX <= timelineWidth
       ? `<line x1="${capacityTodayX}" y1="0" x2="${capacityTodayX}" y2="${ribbonHeight}" class="capacity-today-marker"/>`
       : "";
@@ -2919,10 +2914,7 @@ export class GanttPanel {
     perfEnd("_generateDateMarkers");
 
     // Calculate today's position for auto-scroll (UTC-frame anchor to match minDate/maxDate)
-    const todayX =
-      ((todayUTC.getTime() - minDate.getTime()) /
-        (maxDate.getTime() - minDate.getTime())) *
-      timelineWidth;
+    const todayX = dateToX(todayUTC.getTime(), minDate.getTime(), maxDate.getTime(), timelineWidth);
     const todayInRange = todayX >= 0 && todayX <= timelineWidth;
 
     // Body height matches visible content (no hidden project checkboxes at bottom)
@@ -3252,11 +3244,7 @@ export class GanttPanel {
     const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
     while (current <= maxDate) {
-      const x =
-        leftMargin +
-        ((current.getTime() - minDate.getTime()) /
-          (maxDate.getTime() - minDate.getTime())) *
-          (svgWidth - leftMargin);
+      const x = leftMargin + dateToX(current.getTime(), minDate.getTime(), maxDate.getTime(), svgWidth - leftMargin);
 
       const dayOfWeek = current.getUTCDay();
       const dayOfMonth = current.getUTCDate();
