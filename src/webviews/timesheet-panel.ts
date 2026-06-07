@@ -122,6 +122,7 @@ export class TimeSheetPanel {
   private _groupBy: GroupBy = "none";
   private _collapsedGroups: Set<string> = new Set();
   private _aggregateRows: boolean = false;
+  private _weekLoadId = 0; // Monotonic id to ignore stale async week loads
 
   public static createOrShow(
     extensionUri: vscode.Uri,
@@ -497,6 +498,11 @@ export class TimeSheetPanel {
       return;
     }
 
+    // Guard against stale responses: rapid week navigation can let a slow older
+    // load resolve after a newer one and clobber the displayed week. Capture an
+    // id at entry and bail after every await once a newer load has started.
+    const loadId = ++this._weekLoadId;
+
     this._postMessage({ type: "setLoading", loading: true });
 
     try {
@@ -506,10 +512,12 @@ export class TimeSheetPanel {
         to: week.endDate,
         allUsers: false,
       });
+      if (loadId !== this._weekLoadId) return;
       const entries = result.time_entries;
 
       // Load projects
       await this._loadProjects();
+      if (loadId !== this._weekLoadId) return;
 
       // Convert entries to rows (each entry = separate row)
       this._rows = this._entriesToRows(entries, week);
@@ -535,6 +543,7 @@ export class TimeSheetPanel {
 
       // Load activities and issues for all projects in parallel
       await Promise.all([...projectIds].map((pid) => this._loadProjectData(pid)));
+      if (loadId !== this._weekLoadId) return;
 
       // Update issueSubject for all rows from cached issues
       for (const row of this._rows) {
@@ -558,9 +567,16 @@ export class TimeSheetPanel {
       // Load issue details for tooltips (fire and forget)
       void this._loadAllIssueDetails();
     } catch (error) {
-      this._postMessage({ type: "showError", message: `Failed to load: ${error}` });
+      // Suppress errors from superseded loads so they don't clobber the newer week
+      if (loadId === this._weekLoadId) {
+        this._postMessage({ type: "showError", message: `Failed to load: ${error}` });
+      }
     } finally {
-      this._postMessage({ type: "setLoading", loading: false });
+      // Only the current load may clear the spinner; a stale load clearing it
+      // would hide the spinner of the newer load still in flight.
+      if (loadId === this._weekLoadId) {
+        this._postMessage({ type: "setLoading", loading: false });
+      }
     }
   }
 

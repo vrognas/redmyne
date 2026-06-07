@@ -280,6 +280,55 @@ describe("timesheet panel private coverage", () => {
     expect(server.getIssueById).toHaveBeenCalledTimes(1);
   });
 
+  it("_loadWeek ignores a stale response from a superseded load", async () => {
+    const server = createServer();
+    const setup = setupPanel({ server, draftEnabled: false });
+    const panel = setup.panel;
+
+    // Neutralize downstream awaits/side-effects so each load is deterministic
+    panel._loadProjects = vi.fn().mockResolvedValue(undefined);
+    panel._loadProjectData = vi.fn().mockResolvedValue(undefined);
+    panel._loadAllIssueDetails = vi.fn();
+    panel._restoreIncompleteRows = vi.fn();
+    panel._applyPendingDraftChanges = vi.fn();
+    panel._sendChildProjects = vi.fn();
+    panel._entriesToRows = vi.fn((entries: unknown[]) =>
+      entries.map((e) => ({ ...(panel._createEmptyRow()), comments: (e as { comments: string }).comments }))
+    );
+
+    const weekStale = buildWeekInfo(new Date(2026, 1, 2)); // Mon Feb 2 2026
+    const weekFresh = buildWeekInfo(new Date(2026, 1, 9)); // Mon Feb 9 2026
+
+    // First (stale) load hangs until we release it; second resolves immediately
+    let releaseStale: (v: unknown) => void = () => {};
+    const stalePending = new Promise((resolve) => {
+      releaseStale = resolve;
+    });
+    server.getTimeEntries
+      .mockReturnValueOnce(stalePending)
+      .mockResolvedValueOnce({ time_entries: [{ comments: "fresh" }] });
+
+    const staleLoad = panel._loadWeek(weekStale); // do not await yet
+    await panel._loadWeek(weekFresh); // completes and renders weekFresh
+
+    setup.mock.webview.postMessage.mockClear();
+    releaseStale({ time_entries: [{ comments: "stale" }] });
+    await staleLoad; // stale load resumes, must bail after its await
+
+    // Stale load must not render nor clear loading after being superseded
+    const messagesAfterRelease = setup.mock.webview.postMessage.mock.calls.map(
+      (c: unknown[]) => c[0]
+    );
+    expect(
+      messagesAfterRelease.some((m: { type: string }) => m.type === "render")
+    ).toBe(false);
+    expect(
+      messagesAfterRelease.some(
+        (m: { type: string; loading?: boolean }) => m.type === "setLoading" && m.loading === false
+      )
+    ).toBe(false);
+  });
+
   it("covers queueCellOperation/updateCell/updateRowField branches", async () => {
     const queue = createQueue();
     const server = createServer();
