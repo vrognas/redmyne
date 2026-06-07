@@ -81,7 +81,8 @@ export function setupDrag(ctx) {
             const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
             const subject = bar?.dataset?.subject || 'Issue #' + issueId;
             const url = redmineBaseUrl + '/issues/' + issueId;
-            const html = '<a href="' + url + '">#' + issueId + ' ' + subject + '</a>';
+            const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            const html = '<a href="' + esc(url) + '">#' + issueId + ' ' + esc(subject) + '</a>';
             const plain = url;
             try {
               await navigator.clipboard.write([
