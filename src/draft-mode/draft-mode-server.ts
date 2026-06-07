@@ -15,6 +15,7 @@ import type { DraftModeManager } from "./draft-mode-manager";
 import type { DraftOperation, DraftOperationType, HttpMethod } from "./draft-operation";
 import { generateDraftId, generateTempId, generateNumericTempId } from "./draft-operation";
 import type { TimeEntryCustomFieldValue } from "../redmine/models/custom-field-definition";
+import { formatLocalDate, getLocalToday } from "../utilities/date-utils";
 
 export interface DraftBypassOptions {
   _bypassDraft?: boolean;
@@ -386,7 +387,7 @@ export class DraftModeServer implements IRedmineServer {
     const tempIdStr = generateTempId("timeentry");
 
     // Default spentOn to today if not provided (needed for tree filtering)
-    const effectiveSpentOn = spentOn ?? new Date().toISOString().split("T")[0];
+    const effectiveSpentOn = spentOn ?? formatLocalDate(getLocalToday());
 
     const entryData: Record<string, unknown> = {
       issue_id: issueId,
