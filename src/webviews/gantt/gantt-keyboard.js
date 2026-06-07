@@ -19,11 +19,13 @@ export function setupKeyboard(ctx) {
       menuRedo?.click();
     }
     // Zoom shortcuts (1-5)
-    else if (e.key >= '1' && e.key <= '5') {
+    else if (e.key >= '1' && e.key <= '5' && !modKey && !e.altKey) {
       const zoomSelect = document.getElementById('zoomSelect');
-      const levels = ['day', 'week', 'month', 'quarter', 'year'];
-      zoomSelect.value = levels[parseInt(e.key) - 1];
-      zoomSelect.dispatchEvent(new Event('change'));
+      if (zoomSelect) {
+        const levels = ['day', 'week', 'month', 'quarter', 'year'];
+        zoomSelect.value = levels[parseInt(e.key) - 1];
+        zoomSelect.dispatchEvent(new Event('change'));
+      }
     }
     // Toggle shortcuts (trigger menu items)
     else if (e.key.toLowerCase() === 'y') { document.getElementById('menuCapacity')?.click(); }
