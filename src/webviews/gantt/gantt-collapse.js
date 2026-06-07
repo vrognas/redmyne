@@ -235,6 +235,13 @@ export function setupCollapse(ctx) {
     }
   }
 
+  // Grow (or shrink) an SVG's height attribute by delta
+  function growSvgHeight(svg, delta) {
+    if (!svg) return;
+    const currentHeight = parseFloat(svg.getAttribute('height') || '0');
+    svg.setAttribute('height', String(currentHeight + delta));
+  }
+
   // Wrapper functions that pass module caches to utilities
   function findDescendants(parentKey) {
     return findDescendantsUtil(parentKey, childrenCache);
@@ -375,37 +382,20 @@ export function setupCollapse(ctx) {
     });
 
     // Update SVG heights
-    const labelColumn = document.querySelector('.gantt-labels svg');
-    if (labelColumn) {
-      const currentHeight = parseFloat(labelColumn.getAttribute('height') || '0');
-      const newHeight = currentHeight + delta;
-      labelColumn.setAttribute('height', String(newHeight));
-      // Don't set viewBox on labels SVG - it causes scaling issues on column resize
-    }
+    // Don't set viewBox on labels SVG - it causes scaling issues on column resize
+    growSvgHeight(document.querySelector('.gantt-labels svg'), delta);
 
     // Update other column heights
-    const columnSelectors = [
+    [
       '.gantt-col-status svg',
       '.gantt-col-id svg',
       '.gantt-col-start svg',
       '.gantt-col-due svg',
       '.gantt-col-assignee svg'
-    ];
-    columnSelectors.forEach(selector => {
-      const colSvg = document.querySelector(selector);
-      if (!colSvg) return;
-      const currentHeight = parseFloat(colSvg.getAttribute('height') || '0');
-      const newHeight = currentHeight + delta;
-      colSvg.setAttribute('height', String(newHeight));
-    });
+    ].forEach(sel => growSvgHeight(document.querySelector(sel), delta));
 
     // Update timeline height
-    const timelineSvg = document.querySelector('.gantt-timeline svg');
-    if (timelineSvg) {
-      const currentHeight = parseFloat(timelineSvg.getAttribute('height') || '0');
-      const newHeight = currentHeight + delta;
-      timelineSvg.setAttribute('height', newHeight);
-    }
+    growSvgHeight(document.querySelector('.gantt-timeline svg'), delta);
 
     // Build set of collapsed parents for visibility checks (use cache instead of DOM query)
     const collapsedKeys = new Set();
