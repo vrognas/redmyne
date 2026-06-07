@@ -438,6 +438,11 @@ function initializeGantt(state) {
   } = state;
   const dayWidth = timelineWidth / totalDays;
 
+  function setDraftBadgeContent(badge, count) {
+    badge.textContent = count;
+    badge.dataset.tooltip = count === 1 ? '1 change queued - click to review' : count + ' changes queued - click to review';
+  }
+
   // Mutable draft mode state (updated via setDraftModeState message)
   let currentDraftMode = isDraftMode;
 
@@ -452,9 +457,7 @@ function initializeGantt(state) {
   if (draftBadge) {
     if (isDraftMode) {
       draftBadge.classList.remove('hidden');
-      const c = draftQueueCount ?? 0;
-      draftBadge.textContent = c;
-      draftBadge.dataset.tooltip = c === 1 ? '1 change queued - click to review' : c + ' changes queued - click to review';
+      setDraftBadgeContent(draftBadge, draftQueueCount ?? 0);
     } else {
       draftBadge.classList.add('hidden');
     }
@@ -697,9 +700,7 @@ function initializeGantt(state) {
         if (draftBadge) {
           if (message.enabled) {
             draftBadge.classList.remove('hidden');
-            const c = message.queueCount ?? 0;
-            draftBadge.textContent = c;
-            draftBadge.dataset.tooltip = c === 1 ? '1 change queued - click to review' : c + ' changes queued - click to review';
+            setDraftBadgeContent(draftBadge, message.queueCount ?? 0);
           } else {
             draftBadge.classList.add('hidden');
           }
@@ -708,9 +709,7 @@ function initializeGantt(state) {
         // Update draft badge count
         const draftBadge = document.getElementById('draftBadge');
         if (draftBadge) {
-          const c = message.count;
-          draftBadge.textContent = c;
-          draftBadge.dataset.tooltip = c === 1 ? '1 change queued - click to review' : c + ' changes queued - click to review';
+          setDraftBadgeContent(draftBadge, message.count);
         }
       } else if (message.command === 'pushUndoAction') {
         // Push relation action to undo stack
