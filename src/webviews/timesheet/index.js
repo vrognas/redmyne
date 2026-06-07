@@ -21,6 +21,11 @@
   // Last render context from extension (stateless - rebuilt on each render message)
   let lastRenderContext = null;
 
+  // Grid cell to refocus after the next render (e.g. aggregate-mode blur
+  // triggers a full re-render that would otherwise destroy keyboard focus).
+  // Shape: { rowId, dayIndex } or null.
+  let pendingFocus = null;
+
   // Push action to undo stack
   function pushUndo(action) {
     console.log("[Timesheet] pushUndo:", action);
@@ -1120,6 +1125,7 @@
 
     renderTotals(ctx);
     updateSortIndicators(ctx);
+    restorePendingFocus();
   }
 
   // Sort rows (extracted for reuse in grouping)
@@ -1604,11 +1610,35 @@
 
     if (targetInput) {
       e.preventDefault();
+      // Record intended focus so it survives any re-render the blur triggers
+      // (aggregate-mode blur does a full re-render that replaces the DOM node).
+      const targetCell = targetInput.closest("td");
+      const targetRow = targetCell?.closest("tr");
+      if (targetRow && targetCell) {
+        pendingFocus = {
+          rowId: targetRow.dataset.rowId,
+          dayIndex: Number(targetCell.dataset.day),
+        };
+      }
       // Blur current to trigger save
       currentInput.blur();
       // Focus and select new cell
       targetInput.focus();
       targetInput.select();
+    }
+  }
+
+  // Restore keyboard focus to the cell recorded before a render-triggering blur
+  function restorePendingFocus() {
+    if (!pendingFocus) return;
+    const { rowId, dayIndex } = pendingFocus;
+    pendingFocus = null;
+    const input = document.querySelector(
+      `tr[data-row-id="${rowId}"] .day-cell[data-day="${dayIndex}"] .day-input`
+    );
+    if (input && !input.disabled) {
+      input.focus();
+      input.select();
     }
   }
 
