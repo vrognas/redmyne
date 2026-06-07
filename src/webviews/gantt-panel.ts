@@ -2450,12 +2450,14 @@ export class GanttPanel {
     visibleRows.forEach((row, idx) => {
       if (row.type === "issue" && row.issue) {
         const issue = row.issue;
+        // UTC parsing to match the UTC-anchored x-axis (bars use new Date(dateStr));
+        // parseLocalDate would offset arrow endpoints from bar edges by the tz fraction.
         const start = issue.start_date
-          ? parseLocalDate(issue.start_date)
-          : parseLocalDate(issue.due_date!);
+          ? new Date(issue.start_date)
+          : new Date(issue.due_date!);
         const end = issue.due_date
-          ? parseLocalDate(issue.due_date)
-          : parseLocalDate(issue.start_date!);
+          ? new Date(issue.due_date)
+          : new Date(issue.start_date!);
         // Add 1 day to end to match bar width calculation
         const endPlusOne = new Date(end);
         endPlusOne.setUTCDate(endPlusOne.getUTCDate() + 1);
@@ -2729,7 +2731,9 @@ export class GanttPanel {
     const milestoneMarkers = this._versions
       .filter(v => v.due_date)
       .map(version => {
-        const versionDate = parseLocalDate(version.due_date!);
+        // UTC parsing to match the UTC-anchored x-axis (range clamp + x-position
+        // both compare against UTC minDate/maxDate and bar dates).
+        const versionDate = new Date(version.due_date!);
         if (versionDate < minDate || versionDate > maxDate) return "";
 
         const x = ((versionDate.getTime() - minDate.getTime()) / (maxDate.getTime() - minDate.getTime())) * timelineWidth;
