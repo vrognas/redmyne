@@ -2198,10 +2198,6 @@ export class GanttPanel {
     }
     const cumulativeY = visibleRowCount * barHeight;
 
-    // Map collapseKey to visible index (for stripe calculations)
-    const visibleIndexMap = new Map<string, number>();
-    visibleRows.forEach((row, idx) => visibleIndexMap.set(row.collapseKey, idx));
-
     // Calculate initial Y for each row (collapsed state)
     // Visible rows: sequential positions
     // Hidden rows: positioned right after their nearest visible ancestor
@@ -2232,9 +2228,6 @@ export class GanttPanel {
     const minContentHeight = 600;
     const contentHeight = Math.max(cumulativeY > 0 ? cumulativeY + barGap : 0, minContentHeight);
 
-    // Pre-calculate visible indices for each row
-    const rowVisibleIndices = new Map<string, number>();
-    visibleRows.forEach((row, idx) => rowVisibleIndices.set(row.collapseKey, idx));
     const chevronWidth = 10;
 
     // Generate FULL-HEIGHT group backgrounds (Gestalt "common region" / enclosure)
