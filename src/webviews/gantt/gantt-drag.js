@@ -562,7 +562,6 @@ export function setupDrag(ctx) {
         };
 
         // Show drag date tooltip
-        const edgeX = isLeft ? startX : endX;
         const currentDate = isLeft ? oldStartDate : oldDueDate;
         if (currentDate) {
           showDragTooltip((isLeft ? 'Start: ' : 'Due: ') + formatDateShort(currentDate));
