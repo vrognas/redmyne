@@ -1240,6 +1240,7 @@ export class GanttPanel {
         this._contributionData = undefined;
         this._contributionsLoading = false;
         this._updateContent();
+        void this._refreshSupplementalData();
         break;
       case "setViewMode":
         if (message.viewMode && (message.viewMode === "projects" || message.viewMode === "mywork")) {
