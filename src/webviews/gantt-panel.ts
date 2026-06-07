@@ -856,8 +856,8 @@ export class GanttPanel {
       const allAdHocIds = Array.from(adHocIssueIds);
 
       // Calculate date range based on lookback period
-      const today = new Date();
-      const todayStr = today.toISOString().slice(0, 10);
+      const today = getLocalToday();
+      const todayStr = formatLocalDate(today);
 
       // Apply lookback limit (default 2 years, can be 5, 10, or null for unlimited)
       let fromDate: string;
@@ -873,7 +873,7 @@ export class GanttPanel {
         // Limited: use lookback period from today
         const lookbackDate = new Date(today);
         lookbackDate.setFullYear(lookbackDate.getFullYear() - this._lookbackYears);
-        fromDate = lookbackDate.toISOString().slice(0, 10);
+        fromDate = formatLocalDate(lookbackDate);
       }
 
       // In by-person mode, filter by viewed user for efficiency
