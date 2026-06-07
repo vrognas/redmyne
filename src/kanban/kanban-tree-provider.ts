@@ -500,10 +500,9 @@ export class KanbanTreeProvider
    * Get tasks for a status and client (parent project).
    */
   private getTasksForStatusAndClient(status: TaskStatus, clientId: number): KanbanTask[] {
-    return this.getTasksForStatus(status).filter((t) => {
-      const taskClientId = t.linkedParentProjectId ?? 0;
-      return taskClientId === clientId;
-    });
+    return this.getTasksForStatus(status).filter(
+      (t) => t.linkedParentProjectId === clientId
+    );
   }
 
   /**
