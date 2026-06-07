@@ -42,6 +42,8 @@ describe("registerKanbanTimerHandlers", () => {
     onTimerComplete: ReturnType<typeof vi.fn>;
     onBreakComplete: ReturnType<typeof vi.fn>;
     getWorkDurationSeconds: ReturnType<typeof vi.fn>;
+    getDeferredMinutes: ReturnType<typeof vi.fn>;
+    consumeDeferredMinutes: ReturnType<typeof vi.fn>;
     addLoggedHours: ReturnType<typeof vi.fn>;
     markDone: ReturnType<typeof vi.fn>;
     resetTimer: ReturnType<typeof vi.fn>;
@@ -71,6 +73,8 @@ describe("registerKanbanTimerHandlers", () => {
         return { dispose: vi.fn() } as unknown as vscode.Disposable;
       }),
       getWorkDurationSeconds: vi.fn(() => 45 * 60),
+      getDeferredMinutes: vi.fn(() => 0),
+      consumeDeferredMinutes: vi.fn(() => 0),
       addLoggedHours: vi.fn().mockResolvedValue(undefined),
       markDone: vi.fn().mockResolvedValue(undefined),
       resetTimer: vi.fn().mockResolvedValue(undefined),
@@ -148,6 +152,41 @@ describe("registerKanbanTimerHandlers", () => {
     );
     expect(refreshAfterTimeLog).toHaveBeenCalledTimes(1);
     expect(controller.startBreak).toHaveBeenCalledTimes(1);
+  });
+
+  it("includes and consumes deferred minutes on natural completion", async () => {
+    controller.getWorkDurationSeconds.mockReturnValue(60 * 60); // 1h work
+    controller.getDeferredMinutes.mockReturnValue(30); // +0.5h deferred
+
+    registerKanbanTimerHandlers({
+      controller,
+      getServer: () => server as never,
+      globalState,
+      refreshAfterTimeLog,
+    });
+
+    await timerHandler?.({
+      id: "task-defer",
+      title: "Deferred carryover",
+      linkedIssueId: 555,
+      activityId: 4,
+    });
+
+    // 1h work + 0.5h deferred = 1.5h
+    expect(server.addTimeEntry).toHaveBeenCalledWith(
+      555,
+      4,
+      "1.5",
+      "Deferred carryover",
+      undefined,
+      []
+    );
+    expect(controller.addLoggedHours).toHaveBeenCalledWith("task-defer", 1.5);
+    expect(controller.consumeDeferredMinutes).toHaveBeenCalledTimes(1);
+    expect(showStatusBarMessage).toHaveBeenCalledWith(
+      expect.stringContaining("30 min deferred included"),
+      2000
+    );
   });
 
   it("logs and resets timer when user chooses 'Log & continue'", async () => {

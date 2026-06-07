@@ -17,6 +17,8 @@ type TimerController = {
     listener: () => void | Promise<void>
   ) => vscode.Disposable;
   getWorkDurationSeconds: () => number;
+  getDeferredMinutes: () => number;
+  consumeDeferredMinutes: () => number;
   addLoggedHours: (taskId: string, hours: number) => Promise<void>;
   markDone: (taskId: string) => Promise<void>;
   resetTimer: (taskId: string) => Promise<void>;
@@ -45,9 +47,14 @@ export function registerKanbanTimerHandlers(
       playCompletionSound();
     }
 
+    // Include any deferred minutes carried over from prior tasks.
+    const deferredMinutes = deps.controller.getDeferredMinutes();
     const baseMinutes = deps.controller.getWorkDurationSeconds() / 60;
-    const totalHours = baseMinutes / 60;
+    const totalHours =
+      Math.round((baseMinutes / 60 + deferredMinutes / 60) * 100) / 100;
     const formattedTime = formatHoursAsHHMM(totalHours);
+    const deferredNote =
+      deferredMinutes > 0 ? ` (${deferredMinutes} min deferred included)` : "";
 
     const customFieldResult = await promptForRequiredCustomFields(() =>
       server.getTimeEntryCustomFields()
@@ -80,9 +87,10 @@ export function registerKanbanTimerHandlers(
           customFieldResult.values
         );
         await deps.controller.addLoggedHours(task.id, totalHours);
+        deps.controller.consumeDeferredMinutes();
         await deps.controller.markDone(task.id);
         showStatusBarMessage(
-          `$(check) Logged ${formattedTime} to #${task.linkedIssueId}`,
+          `$(check) Logged ${formattedTime} to #${task.linkedIssueId}${deferredNote}`,
           2000
         );
         deps.refreshAfterTimeLog();
@@ -101,9 +109,10 @@ export function registerKanbanTimerHandlers(
           customFieldResult.values
         );
         await deps.controller.addLoggedHours(task.id, totalHours);
+        deps.controller.consumeDeferredMinutes();
         await deps.controller.resetTimer(task.id);
         showStatusBarMessage(
-          `$(check) Logged ${formattedTime}, timer reset`,
+          `$(check) Logged ${formattedTime}, timer reset${deferredNote}`,
           2000
         );
         deps.refreshAfterTimeLog();
