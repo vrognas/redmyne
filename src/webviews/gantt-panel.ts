@@ -2022,11 +2022,13 @@ export class GanttPanel {
     let maxDate: Date;
 
     if (dates.length === 0) {
-      // No visible issues - use default range centered on today
-      minDate = new Date(today);
-      minDate.setDate(minDate.getDate() - 7);
-      maxDate = new Date(today);
-      maxDate.setDate(maxDate.getDate() + 30);
+      // No visible issues - use default range centered on today.
+      // Anchor on the UTC-frame today + setUTCDate so this fallback matches
+      // the dates-present branch (which uses new Date(d) + setUTCDate).
+      minDate = new Date(todayUTC);
+      minDate.setUTCDate(minDate.getUTCDate() - 7);
+      maxDate = new Date(todayUTC);
+      maxDate.setUTCDate(maxDate.getUTCDate() + 30);
     } else {
       minDate = new Date(Math.min(...dates.map((d) => new Date(d).getTime())));
       maxDate = new Date(Math.max(...dates.map((d) => new Date(d).getTime())));
