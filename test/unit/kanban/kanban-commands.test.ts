@@ -52,6 +52,8 @@ function createController(tasks: KanbanTask[] = []) {
     getWorkDurationSeconds: vi.fn(() => 3600),
     addLoggedHours: vi.fn(),
     addDeferredMinutes: vi.fn(),
+    getDeferredMinutes: vi.fn(() => 0),
+    consumeDeferredMinutes: vi.fn(),
     setWorkDurationSeconds: vi.fn(),
     moveUp: vi.fn(),
     moveDown: vi.fn(),
@@ -445,6 +447,35 @@ describe("registerKanbanCommands", () => {
     );
     expect(controller.addLoggedHours).toHaveBeenCalledWith("task-log", 0.75);
     expect(controller.stopTimer).toHaveBeenCalledWith("task-log");
+  });
+
+  it("logEarly includes deferred minutes and consumes them", async () => {
+    const task = createTask({
+      id: "task-defer-log",
+      linkedIssueId: 80,
+      timerPhase: "working",
+      timerSecondsLeft: 2700, // 15 min elapsed of 1h
+      activityId: 14,
+    });
+    const server = createServer({
+      addTimeEntry: vi.fn().mockResolvedValue(undefined),
+      getTimeEntryCustomFields: vi.fn().mockResolvedValue([]),
+    });
+    const { controller } = registerCommands({ server, tasks: [task] });
+    controller.getWorkDurationSeconds.mockReturnValue(3600);
+    controller.getDeferredMinutes.mockReturnValue(30); // +0.5h deferred
+    vi.mocked(vscode.window.showWarningMessage).mockResolvedValue("Log" as never);
+
+    await handlers.get("redmyne.kanban.logEarly")?.({ task });
+
+    // 0.25h elapsed + 0.5h deferred = 0.75h
+    expect(controller.addLoggedHours).toHaveBeenCalledWith("task-defer-log", 0.75);
+    expect(controller.consumeDeferredMinutes).toHaveBeenCalledTimes(1);
+    expect(vscode.window.showWarningMessage).toHaveBeenCalledWith(
+      expect.stringContaining("30 min deferred included"),
+      expect.anything(),
+      "Log"
+    );
   });
 
   it("shows admin hint when logEarly fails with custom-field error and no prompt", async () => {

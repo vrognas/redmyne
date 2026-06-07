@@ -472,10 +472,11 @@ export function registerKanbanCommands(
           return;
         }
 
-        // Calculate elapsed time
+        // Calculate elapsed time, including any deferred minutes from prior tasks
+        const deferredMinutes = controller.getDeferredMinutes();
         const workDuration = controller.getWorkDurationSeconds();
         const elapsedSeconds = workDuration - task.timerSecondsLeft;
-        const hours = elapsedSeconds / 3600;
+        const hours = elapsedSeconds / 3600 + deferredMinutes / 60;
 
         if (hours < 0.01) {
           vscode.window.showInformationMessage("Not enough time elapsed to log");
@@ -492,8 +493,9 @@ export function registerKanbanCommands(
         if (!closedConfirmed) return;
 
         const roundedHours = Math.round(hours * 100) / 100;
+        const deferredNote = deferredMinutes > 0 ? ` (${deferredMinutes} min deferred included)` : "";
         const confirm = await vscode.window.showWarningMessage(
-          `Log ${roundedHours}h for #${task.linkedIssueId}?`,
+          `Log ${roundedHours}h for #${task.linkedIssueId}?${deferredNote}`,
           { modal: true },
           "Log"
         );
@@ -509,6 +511,7 @@ export function registerKanbanCommands(
             customFieldValues
           );
           await controller.addLoggedHours(task.id, roundedHours);
+          controller.consumeDeferredMinutes();
           await controller.stopTimer(task.id);
           vscode.window.showInformationMessage(`Logged ${roundedHours}h`);
         } catch (error) {
@@ -592,8 +595,10 @@ export function registerKanbanCommands(
         const closedConfirmed = await confirmLogTimeOnClosedIssue(server, task.linkedIssueId);
         if (!closedConfirmed) return;
 
+        // Log full work duration plus any deferred minutes from prior tasks
+        const deferredMinutes = controller.getDeferredMinutes();
         const workDuration = controller.getWorkDurationSeconds();
-        const hours = workDuration / 3600;
+        const hours = workDuration / 3600 + deferredMinutes / 60;
         const roundedHours = Math.round(hours * 100) / 100;
 
         try {
@@ -606,9 +611,11 @@ export function registerKanbanCommands(
             customFieldValues
           );
           await controller.addLoggedHours(task.id, roundedHours);
+          controller.consumeDeferredMinutes();
           // Reset timer to full duration and keep running
           await controller.startTimer(task.id, task.activityId ?? 0, task.activityName ?? "", true);
-          vscode.window.showInformationMessage(`Logged ${roundedHours}h, timer restarted`);
+          const deferredNote = deferredMinutes > 0 ? ` (${deferredMinutes} min deferred included)` : "";
+          vscode.window.showInformationMessage(`Logged ${roundedHours}h, timer restarted${deferredNote}`);
         } catch (error) {
           const errorMsg = String(error);
           if (/custom.?field/i.test(errorMsg) && !prompted) {
