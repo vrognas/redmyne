@@ -7,6 +7,27 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.26.1]
+
+### Fixed
+
+- **Arrow-key date nudge is timezone-safe** — nudging start/due dates via keyboard now uses UTC parsing so dates don't shift by one day in negative-offset timezones
+- **Minimap jump-click position** — click-to-scroll on the minimap now maps the click offset to the correct timeline position
+- **Overdue and past bar styling** — bars compare dates in the UTC frame that the geometry uses, so past/overdue classes are applied consistently regardless of local timezone
+- **Today line is timezone-consistent** — the today marker and scroll target use a UTC-midnight anchor matching the bar geometry reference frame
+- **Dependency arrows and milestone markers aligned with bars** — x-positions for arrows and milestone diamonds use the same UTC-anchored geometry as bar start/end, eliminating sub-pixel drift
+- **Capacity-ribbon week markers aligned with body gridlines** — week-marker lines iterate in the UTC frame so they coincide with the Monday gridlines in the main body
+- **Lookback change re-fetches contributions** — changing the lookback slider now triggers a fresh contribution fetch instead of reusing stale data
+- **Relation delay preserved through undo/redo** — undo/redo of relation edits now round-trips the `delay` field, preventing silent delay loss
+- **Link-drag drop targets reliable** — drop-target hit detection accounts for row offsets so dragging a relation endpoint lands on the intended row
+- **Clipboard HTML is properly escaped** — angle brackets in issue subjects are HTML-escaped before being placed in the copy buffer, preventing broken SVG fragments
+- **Past shading for due-date-only issues** — issues with only a due date (no start date) now receive the past/overdue shading when the due date has passed
+- **Ctrl/Alt+1–5 no longer hijack zoom** — the zoom-level keybindings are scoped to the Gantt webview context and no longer fire when the editor or other panels are focused
+
+### Changed
+
+- Internal: extracted `dateToX` / `endExclusiveX` helpers (`gantt-coords.ts`) — eliminates ~10 copies of the date→pixel formula scattered across `gantt-panel.ts` and `gantt-html-generator.ts`
+
 ## [4.26.0]
 
 ### Added
