@@ -8,6 +8,7 @@ import { pickDate } from "../utilities/date-picker";
 import { errorToString } from "../utilities/error-feedback";
 import { pickRequiredCustomFields, TimeEntryCustomFieldValue } from "../utilities/custom-field-picker";
 import { confirmLogTimeOnClosedIssue } from "../utilities/closed-issue-guard";
+import { formatLocalDate, getLocalToday } from "../utilities/date-utils";
 
 function truncateSubject(subject: string, max = 30): string {
   return subject.length > max ? subject.slice(0, max - 1) + "…" : subject;
@@ -86,7 +87,7 @@ export async function quickLogTime(
     );
 
     // 5. Input hours — title shows context, prompt shows the question
-    const today = new Date().toISOString().split("T")[0];
+    const today = formatLocalDate(getLocalToday());
     const dateLabel = selectedDate === today ? "Today" : selectedDate;
     const hoursInput = await vscode.window.showInputBox({
       title: `Log Time · ${issueCtx} ${activityCtx} · ${dateLabel}`,
