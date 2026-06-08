@@ -908,8 +908,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   setShowAllUsers(showAll: boolean): void {
     if (this.showAllUsers === showAll) return;
     this.showAllUsers = showAll;
-        this.issueCache.clear();
-    this.refresh();
+    this.refresh(); // refresh() clears issueCache
   }
 
   /**
