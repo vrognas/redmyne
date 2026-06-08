@@ -187,8 +187,8 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
     // Set id for tree item persistence across refreshes
     treeItem.id = `project-${project.id}`;
 
-    // Count direct subprojects and direct issues
-    const subprojectCount = (this.projects ?? []).filter(p => p.parent?.id === project.id).length;
+    // Count direct subprojects and direct issues (O(1) via parent map)
+    const subprojectCount = (this.projectsByParent.get(project.id) ?? []).length;
     const directIssueCount = (this.issuesByProject.get(project.id) || []).length;
     const hasAnyIssues = totalIssuesWithSubprojects > 0;
 
