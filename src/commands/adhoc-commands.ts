@@ -128,9 +128,12 @@ export async function contributeToIssue(
   const targetRef = `#${targetId} ${targetIssue.subject}`;
 
   let newComment: string;
-  if (existingTarget) {
-    // Replace existing #<id> and subject (until end of line) with new target
-    newComment = currentComment.replace(/#\d+[^\n]*/, targetRef).trim();
+  // The feature appends its ref at the END of the comment, so only replace a
+  // TRAILING "#<id> ..." segment — a mid-text "#NNN" the user typed (with
+  // prose after it) must not be consumed to end-of-line.
+  const trailingRef = /#\d+[^\n]*$/;
+  if (existingTarget && trailingRef.test(currentComment)) {
+    newComment = currentComment.replace(trailingRef, targetRef).trim();
   } else {
     // Append target reference
     newComment = currentComment ? `${currentComment} ${targetRef}` : targetRef;
@@ -167,8 +170,14 @@ export async function removeContribution(
     return;
   }
 
-  // Remove #<id> and subject text (until end of line) from comment
-  const newComment = currentComment.replace(/#\d+[^\n]*/, "").trim();
+  // Remove the TRAILING "#<id> ..." ref this feature appended; for a mid-text
+  // "#NNN" (free-text reference), remove only the token itself so the user's
+  // trailing prose survives.
+  const trailingRef = /#\d+[^\n]*$/;
+  const newComment = (trailingRef.test(currentComment)
+    ? currentComment.replace(trailingRef, "")
+    : currentComment.replace(new RegExp(`#${targetId}\\b`), "")
+  ).trim();
 
   try {
     await resolvedServer.updateTimeEntry(entry.id, { comments: newComment });
