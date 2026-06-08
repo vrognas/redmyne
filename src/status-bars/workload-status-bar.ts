@@ -5,7 +5,7 @@
 
 import * as vscode from "vscode";
 import { Issue } from "../redmine/models/issue";
-import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "../utilities/flexibility-calculator";
+import { getWeeklySchedule } from "../utilities/flexibility-calculator";
 import { MonthlyScheduleOverrides, getMonthKey, formatMonthKeyDisplay, calculateWeeklyTotal } from "../utilities/monthly-schedule";
 import { calculateWorkload } from "../utilities/workload-calculator";
 import { formatHoursAsHHMM } from "../utilities/time-input";
@@ -63,8 +63,7 @@ export class WorkloadStatusBar implements vscode.Disposable {
       return;
     }
 
-    const scheduleConfig = vscode.workspace.getConfiguration("redmyne.workingHours");
-    const defaultSchedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
+    const defaultSchedule = getWeeklySchedule();
 
     const currentMonthKey = getMonthKey(new Date());
     const monthlySchedules = this.deps.getMonthlySchedules();

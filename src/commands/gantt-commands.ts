@@ -4,7 +4,7 @@
  */
 
 import * as vscode from "vscode";
-import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE, FlexibilityScore } from "../utilities/flexibility-calculator";
+import { FlexibilityScore, getWeeklySchedule } from "../utilities/flexibility-calculator";
 import { GanttPanel } from "../webviews/gantt-panel";
 import { Issue } from "../redmine/models/issue";
 import type { IRedmineServer } from "../redmine/redmine-server-interface";
@@ -29,10 +29,7 @@ export function registerGanttCommands(
   context: vscode.ExtensionContext,
   deps: GanttCommandDeps
 ): void {
-  function getSchedule(): WeeklySchedule {
-    const scheduleConfig = vscode.workspace.getConfiguration("redmyne.workingHours");
-    return scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
-  }
+  const getSchedule = getWeeklySchedule;
 
   function bootstrapPanel(issues: Issue[]): ReturnType<typeof GanttPanel.createOrShow> {
     const panel = GanttPanel.createOrShow(context.extensionUri, deps.getServer, deps.getDraftModeManager);

@@ -11,7 +11,7 @@ import { DraftQueue } from "../draft-mode/draft-queue";
 import { DraftModeManager } from "../draft-mode/draft-mode-manager";
 import { generateTempId, generateDraftId } from "../draft-mode/draft-operation";
 import { DRAFT_COMMAND_SOURCE } from "../draft-mode/draft-change-sources";
-import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "../utilities/flexibility-calculator";
+import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE, getWeeklySchedule } from "../utilities/flexibility-calculator";
 import { parseLocalDate, getLocalToday } from "../utilities/date-utils";
 import { getNonce } from "../utilities/webview-nonce";
 import { pickIssue } from "../utilities/issue-picker";
@@ -225,8 +225,7 @@ export class TimeSheetPanel {
     this._currentWeek = buildWeekInfo(monday);
 
     // Load schedule from config
-    const scheduleConfig = vscode.workspace.getConfiguration("redmyne.workingHours");
-    this._schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
+    this._schedule = getWeeklySchedule();
 
     // Load persisted sort state
     this._sortColumn = this._context.globalState.get<SortColumn>("redmyne.timesheet.sortColumn", null);

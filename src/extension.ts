@@ -32,7 +32,7 @@ import { registerNavigationClipboardCommands } from "./commands/navigation-clipb
 import { registerQuickIssueCommands } from "./commands/quick-issue-commands";
 import { createConfiguredCommandRegistrar } from "./commands/configured-command-registrar";
 import { GanttPanel } from "./webviews/gantt-panel";
-import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "./utilities/flexibility-calculator";
+import { getWeeklySchedule } from "./utilities/flexibility-calculator";
 import { registerConfigureCommand } from "./commands/configure-command";
 import { registerViewCommands } from "./commands/view-commands";
 import { registerContextProxyCommands } from "./commands/context-proxy-commands";
@@ -254,8 +254,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // Fetch and populate data
       const issues = await projectsTree.fetchIssuesIfNeeded();
       if (issues.length > 0) {
-        const scheduleConfig = vscode.workspace.getConfiguration("redmyne.workingHours");
-        const schedule = scheduleConfig.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
+        const schedule = getWeeklySchedule();
         await ganttPanel.updateIssues(
           issues,
           projectsTree.getFlexibilityCache(),
