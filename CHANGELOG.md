@@ -7,6 +7,30 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.27.1]
+
+### Fixed
+
+- **Timesheet paste no longer drops comment-split entries** — pasting a week where two rows share issue/activity/day but differ by comments queued only one draft; each entry now gets a distinct draft key. Note: pending NEW-entry drafts with comments queued before this version can no longer be cancelled from the cell UI (delete the row or save instead)
+- **Deleting an unsaved pasted row removes its draft** — previously the queued draft survived and the row resurrected on reload
+- **Rapid week navigation can't render a stale week** — overlapping loads are now guarded by a load id
+- **Undo of a multi-entry aggregated cell restores the original entries** — previously it collapsed them into one summed entry (and left an orphan draft)
+- **Keyboard grid navigation keeps focus in aggregate mode** — focus survives the re-render after a cell save
+- **Expanded-cell edits join the undo stack** — edits are undoable; entry deletes insert an explicit "cannot undo" stop instead of mis-attributing Ctrl+Z
+- **Redo of a paste no longer corrupts the redo stack**
+- **Draft time entries default to the local date** — `spent_on` no longer shifts a day in the evening west of UTC
+- **Kanban deferred minutes are actually logged** — deferred time is now included (and consumed) by every logging path: log early, log & continue, and natural timer completion
+- **Kanban logging uses fresh timer state** — elapsed time is computed at the moment of logging, not from a stale snapshot
+- **Log & continue only acts on the active timer** — invoking it on a paused task no longer hijacks the running timer
+- **Week hours and capacity aggregation are timezone-consistent** — three more UTC/local frame mixes fixed (time-entries tree week window, draft week filter, week-zoom capacity buckets)
+- **Contribution edit preserves comment text** — changing/removing a contribution target no longer deletes prose after a mid-comment `#id` reference
+- **Paste is resilient and informative** — a failed closed-issue lookup no longer silently aborts a confirmed paste, and the retry dialog now shows the first error's reason
+- **Misc**: readable quickUpdate errors, local "Today" label near midnight, local-frame test-issue dates, project change-probe uses server timestamps
+
+### Changed
+
+- Internal: dead code removal (unused messages, params, methods, exports), shared helpers (weekly-schedule config read, draft-op factory, tooltip clamp, child date ranges), O(1) subproject counts
+
 ## [4.27.0]
 
 ### Changed
