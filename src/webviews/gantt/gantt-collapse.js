@@ -84,7 +84,9 @@ export function setupCollapse(ctx) {
     activeLabel = label;
     if (label) {
       label.classList.add('active');
-      if (!skipFocus) label.focus();
+      // preventScroll: selecting via a chart click shouldn't yank the view to
+      // the label; keyboard nav scrolls explicitly via scrollLabelIntoView.
+      if (!skipFocus) label.focus({ preventScroll: true });
       if (scrollIntoView) scrollLabelIntoView(label);
       // Persist selection to extension for re-render preservation
       if (!skipNotify) {
@@ -732,6 +734,9 @@ export function setupCollapse(ctx) {
       if (!key) return;
     }
     const label = allLabels.find(l => l.dataset.collapseKey === key);
-    if (label) setActiveLabel(label, false, false, true); // skipFocus: keep bar focus for arrow-nudge
+    // Focus the row's label (same as a label click) so the row is clearly
+    // selected (bright :focus highlight) and arrow keys navigate rows. Bars
+    // can't hold focus anyway — the drag mousedown calls preventDefault.
+    if (label) setActiveLabel(label);
   });
 }
