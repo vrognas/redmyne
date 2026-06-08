@@ -293,7 +293,7 @@ export class IssueController {
       vscode.commands.executeCommand("redmyne.refreshAfterIssueUpdate");
     } catch (error) {
       vscode.window.showErrorMessage(
-        `Error while applying quick update: ${error}`
+        `Error while applying quick update: ${errorToString(error)}`
       );
     }
   }

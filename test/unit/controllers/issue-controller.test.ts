@@ -480,7 +480,7 @@ describe("IssueController", () => {
     server.applyQuickUpdate.mockRejectedValueOnce(new Error("apply failed"));
     await runQuickUpdate.quickUpdate();
     expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
-      "Error while applying quick update: Error: apply failed"
+      "Error while applying quick update: apply failed"
     );
   });
 
