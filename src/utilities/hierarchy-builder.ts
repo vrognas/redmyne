@@ -8,6 +8,13 @@ import { formatLocalDate } from "./date-utils";
 import { endOfISOWeek } from "date-fns";
 import { calculateProjectHealth, ProjectHealth } from "./project-health";
 
+/** Date range contributed by one descendant issue (for aggregate bars) */
+export interface ChildDateRange {
+  startDate: string | null;
+  dueDate: string | null;
+  issueId: number;
+}
+
 /**
  * Generic node in the hierarchy tree
  */
@@ -29,7 +36,7 @@ export interface HierarchyNode {
   /** Child count for containers */
   childCount?: number;
   /** Individual date ranges from all child issues (for non-continuous aggregate bars) */
-  childDateRanges?: Array<{ startDate: string | null; dueDate: string | null; issueId: number }>;
+  childDateRanges?: ChildDateRange[];
   /** Project name for My Work view (flat list) */
   projectName?: string;
   /** True for external dependencies (blockers not assigned to me) */
@@ -46,6 +53,22 @@ export interface HierarchyNode {
   identifier?: string;
   /** Custom fields (for project nodes) */
   customFields?: CustomField[];
+}
+
+/** Collect date ranges from a node's issue and all descendants (recursive) */
+function collectChildDateRanges(node: HierarchyNode): ChildDateRange[] {
+  const ranges: ChildDateRange[] = [];
+  if (node.issue && (node.issue.start_date || node.issue.due_date)) {
+    ranges.push({
+      startDate: node.issue.start_date ?? null,
+      dueDate: node.issue.due_date ?? null,
+      issueId: node.issue.id,
+    });
+  }
+  for (const child of node.children) {
+    ranges.push(...collectChildDateRanges(child));
+  }
+  return ranges;
 }
 
 export interface HierarchyOptions {
@@ -110,27 +133,6 @@ export function buildProjectHierarchy(
       projectChildrenMap.get(p.parent.id)!.push(p);
     }
   }
-
-  // Collect all child issue date ranges (recursive)
-  const collectChildDateRanges = (node: HierarchyNode): Array<{ startDate: string | null; dueDate: string | null; issueId: number }> => {
-    const ranges: Array<{ startDate: string | null; dueDate: string | null; issueId: number }> = [];
-
-    // Add this node's issue dates if it has any
-    if (node.issue && (node.issue.start_date || node.issue.due_date)) {
-      ranges.push({
-        startDate: node.issue.start_date ?? null,
-        dueDate: node.issue.due_date ?? null,
-        issueId: node.issue.id,
-      });
-    }
-
-    // Recursively collect from children
-    for (const child of node.children) {
-      ranges.push(...collectChildDateRanges(child));
-    }
-
-    return ranges;
-  };
 
   // Collect all issues from node and descendants (for health calculation)
   const collectAllIssues = (node: HierarchyNode): Issue[] => {
@@ -658,22 +660,6 @@ export function buildResourceHierarchy(
     a[1].name.localeCompare(b[1].name)
   );
 
-  // Helper to collect child date ranges recursively
-  const collectChildDateRanges = (node: HierarchyNode): Array<{ startDate: string | null; dueDate: string | null; issueId: number }> => {
-    const ranges: Array<{ startDate: string | null; dueDate: string | null; issueId: number }> = [];
-    if (node.issue && (node.issue.start_date || node.issue.due_date)) {
-      ranges.push({
-        startDate: node.issue.start_date ?? null,
-        dueDate: node.issue.due_date ?? null,
-        issueId: node.issue.id,
-      });
-    }
-    for (const child of node.children) {
-      ranges.push(...collectChildDateRanges(child));
-    }
-    return ranges;
-  };
-
   // Build project nodes with hierarchical issue tree
   return sortedProjects.map(([projectId, { name, issues: projectIssues }]) => {
     const projectKey = `project-${projectId}`;
@@ -682,7 +668,7 @@ export function buildResourceHierarchy(
     const children = buildIssueTree(projectIssues, flexibilityCache, projectKey, 1, preserveOrder);
 
     // Collect date ranges for aggregate bar
-    const childDateRanges: Array<{ startDate: string | null; dueDate: string | null; issueId: number }> = [];
+    const childDateRanges: ChildDateRange[] = [];
     for (const child of children) {
       childDateRanges.push(...collectChildDateRanges(child));
     }
