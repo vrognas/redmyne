@@ -39,8 +39,6 @@ export class DraftModeServer implements IRedmineServer {
   getProjects!: RedmineServer["getProjects"];
   clearProjectsCache!: RedmineServer["clearProjectsCache"];
   getTimeEntries!: RedmineServer["getTimeEntries"];
-  getProjectTimeEntries!: RedmineServer["getProjectTimeEntries"];
-  getAllTimeEntries!: RedmineServer["getAllTimeEntries"];
   getTimeEntriesForIssues!: RedmineServer["getTimeEntriesForIssues"];
   getTimeEntryActivities!: RedmineServer["getTimeEntryActivities"];
   getProjectTimeEntryActivities!: RedmineServer["getProjectTimeEntryActivities"];
@@ -83,8 +81,6 @@ export class DraftModeServer implements IRedmineServer {
     this.getProjects = inner.getProjects.bind(inner);
     this.clearProjectsCache = inner.clearProjectsCache.bind(inner);
     this.getTimeEntries = inner.getTimeEntries.bind(inner);
-    this.getProjectTimeEntries = inner.getProjectTimeEntries.bind(inner);
-    this.getAllTimeEntries = inner.getAllTimeEntries.bind(inner);
     this.getTimeEntriesForIssues = inner.getTimeEntriesForIssues.bind(inner);
     this.getTimeEntryActivities = inner.getTimeEntryActivities.bind(inner);
     this.getProjectTimeEntryActivities = inner.getProjectTimeEntryActivities.bind(inner);

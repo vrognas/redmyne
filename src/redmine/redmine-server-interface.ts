@@ -82,8 +82,6 @@ export interface IRedmineServer {
     to?: string;
     allUsers?: boolean;
   }): Promise<{ time_entries: TimeEntry[] }>;
-  getProjectTimeEntries(projectId: number | string): Promise<TimeEntry[]>;
-  getAllTimeEntries(): Promise<TimeEntry[]>;
   getTimeEntriesForIssues(
     issueIds: number[],
     options?: { userId?: number; from?: string; to?: string }

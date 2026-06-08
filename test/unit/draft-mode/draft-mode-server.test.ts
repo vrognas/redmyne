@@ -33,8 +33,6 @@ function createMockServer(): RedmineServer {
     getProjects: vi.fn().mockResolvedValue([]),
     clearProjectsCache: vi.fn(),
     getTimeEntries: vi.fn().mockResolvedValue({ time_entries: [] }),
-    getProjectTimeEntries: vi.fn().mockResolvedValue([]),
-    getAllTimeEntries: vi.fn().mockResolvedValue([]),
     getTimeEntriesForIssues: vi.fn().mockResolvedValue([]),
     getTimeEntryActivities: vi.fn().mockResolvedValue({ time_entry_activities: [] }),
     getProjectTimeEntryActivities: vi.fn().mockResolvedValue([]),

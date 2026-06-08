@@ -529,12 +529,23 @@ export class RedmineServer implements IRedmineServer {
       this.cachedProjects = null;
     }
 
+    // Baseline the change probe on the SERVER's max updated_on (consistent
+    // with getTimeEntries/getFilteredIssues) — client wall-clock skew vs the
+    // server makes `updated_on=>{baseline}` probes miss or over-report changes.
+    let maxUpdatedOn = "";
     this.cachedProjects = await this.paginate<Project, RedmineProject>(
       "/projects.json",
       "projects",
-      (projects) => projects.map((proj) => new RedmineProject({ ...proj }))
+      (projects) => {
+        for (const p of projects as Array<Project & { updated_on?: string }>) {
+          if (p.updated_on && p.updated_on > maxUpdatedOn) {
+            maxUpdatedOn = p.updated_on;
+          }
+        }
+        return projects.map((proj) => new RedmineProject({ ...proj }));
+      }
     );
-    this.changeCache.set("projects", true, new Date().toISOString());
+    this.changeCache.set("projects", true, maxUpdatedOn || new Date().toISOString());
     return this.cachedProjects;
   }
 
@@ -882,26 +893,6 @@ export class RedmineServer implements IRedmineServer {
       throw new Error(`Time entry ${id} not found`);
     }
     return result;
-  }
-
-  /**
-   * Returns all time entries for a project (all users, all time)
-   * Used for ad-hoc budget contribution calculation
-   * @param projectId Project ID or identifier
-   */
-  async getProjectTimeEntries(projectId: number | string): Promise<TimeEntry[]> {
-    return this.paginate<TimeEntry>(
-      `/time_entries.json?project_id=${projectId}`,
-      "time_entries"
-    );
-  }
-
-  /**
-   * Returns all time entries (all users, all projects)
-   * Single paginated fetch for Gantt contribution calculation
-   */
-  async getAllTimeEntries(): Promise<TimeEntry[]> {
-    return this.paginate<TimeEntry>(`/time_entries.json`, "time_entries");
   }
 
   /**
