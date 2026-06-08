@@ -8,35 +8,6 @@ import { formatCustomFieldValue } from "./custom-field-formatter";
 import { Membership, groupMembersByRole } from "../controllers/domain";
 
 /**
- * Creates a VS Code TreeItem for displaying a Redmine issue
- * Format: Label="{Subject}", Description="#{id}" (reduced opacity)
- * @param showAssignee If true, show assignee name in description
- */
-export function createIssueTreeItem(
-  issue: Issue,
-  server: IRedmineServer | undefined,
-  commandName: string,
-  showAssignee = false
-): vscode.TreeItem {
-  const treeItem = new vscode.TreeItem(
-    issue.subject,
-    vscode.TreeItemCollapsibleState.None
-  );
-
-  // Show assignee when viewing all issues
-  const assignee = showAssignee && issue.assigned_to?.name;
-  treeItem.description = assignee ? `#${issue.id} • ${assignee}` : `#${issue.id}`;
-
-  treeItem.command = {
-    command: commandName,
-    arguments: [false, { server }, `${issue.id}`],
-    title: `Open actions for issue #${issue.id}`,
-  };
-
-  return treeItem;
-}
-
-/**
  * Status display text for flexibility scores (used in tooltips)
  */
 const STATUS_TEXT = {

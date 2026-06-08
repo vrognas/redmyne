@@ -263,68 +263,6 @@ function aggregatePeriod(days: DailyCapacity[]): PeriodCapacity {
   };
 }
 
-/**
- * Calculate capacity aggregated by zoom level.
- * Returns array of PeriodCapacity for each period in range.
- *
- * @param issues - Issues to calculate load from
- * @param schedule - Weekly working hours schedule
- * @param startDate - Start of range (YYYY-MM-DD)
- * @param endDate - End of range (YYYY-MM-DD)
- * @param zoomLevel - Aggregation level (day, week, month, quarter, year)
- */
-export function calculateCapacityByZoom(
-  issues: Issue[],
-  schedule: WeeklySchedule,
-  startDate: string,
-  endDate: string,
-  zoomLevel: CapacityZoomLevel
-): PeriodCapacity[] {
-  // Get daily capacity first (reuse existing logic)
-  const dailyData = calculateDailyCapacity(issues, schedule, startDate, endDate);
-
-  if (dailyData.length === 0) {
-    return [];
-  }
-
-  // For day zoom, convert directly to PeriodCapacity format
-  if (zoomLevel === "day") {
-    return dailyData.map(day => ({
-      startDate: day.date,
-      endDate: day.date,
-      loadHours: day.loadHours,
-      capacityHours: day.capacityHours,
-      percentage: day.percentage,
-      status: day.status,
-    }));
-  }
-
-  // Group days by period key
-  const periodGroups = new Map<string, DailyCapacity[]>();
-
-  for (const day of dailyData) {
-    const date = new Date(day.date + "T00:00:00Z");
-    const key = getPeriodKey(date, zoomLevel);
-
-    if (!periodGroups.has(key)) {
-      periodGroups.set(key, []);
-    }
-    periodGroups.get(key)!.push(day);
-  }
-
-  // Aggregate each period and sort by start date
-  const periods: PeriodCapacity[] = [];
-  for (const days of periodGroups.values()) {
-    // Days are already in date order from calculateDailyCapacity
-    periods.push(aggregatePeriod(days));
-  }
-
-  // Sort by start date to ensure correct order
-  periods.sort((a, b) => a.startDate.localeCompare(b.startDate));
-
-  return periods;
-}
-
 // ============================================================================
 // Priority-Based Scheduled Capacity (frontloading with priority ordering)
 // ============================================================================
