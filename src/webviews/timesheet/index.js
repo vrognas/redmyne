@@ -1315,14 +1315,6 @@
         loadingOverlay.classList.toggle("hidden", !message.loading);
         break;
 
-      case "weekChanged":
-        if (lastRenderContext) {
-          lastRenderContext.week = message.week;
-          weekLabel.textContent = formatWeekLabel(lastRenderContext.week);
-          updateWeekHeaders(lastRenderContext);
-        }
-        break;
-
       case "showError":
         console.error(message.message);
         // Could show a toast notification

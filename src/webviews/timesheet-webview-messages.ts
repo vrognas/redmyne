@@ -169,11 +169,6 @@ export interface SetLoadingMessage {
   loading: boolean;
 }
 
-export interface WeekChangedMessage {
-  type: "weekChanged";
-  week: WeekInfo;
-}
-
 export interface ShowErrorMessage {
   type: "showError";
   message: string;
@@ -246,7 +241,6 @@ export type ExtensionToWebviewMessage =
   | UpdateIssuesMessage
   | UpdateActivitiesMessage
   | SetLoadingMessage
-  | WeekChangedMessage
   | ShowErrorMessage
   | DraftModeChangedMessage
   | UpdateIssueDetailsMessage
@@ -309,11 +303,6 @@ export interface RequestChildProjectsMessage {
 
 export interface RequestIssuesMessage {
   type: "requestIssues";
-  projectId: number;
-}
-
-export interface RequestActivitiesMessage {
-  type: "requestActivities";
   projectId: number;
 }
 
@@ -437,7 +426,6 @@ export type WebviewToExtensionMessage =
   | UpdateRowFieldMessage
   | RequestChildProjectsMessage
   | RequestIssuesMessage
-  | RequestActivitiesMessage
   | SaveAllMessage
   | PickIssueMessage
   | SortChangedMessage

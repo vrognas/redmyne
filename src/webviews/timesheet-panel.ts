@@ -9,7 +9,7 @@ import { TimeEntry } from "../redmine/models/time-entry";
 import { Issue } from "../redmine/models/issue";
 import { DraftQueue } from "../draft-mode/draft-queue";
 import { DraftModeManager } from "../draft-mode/draft-mode-manager";
-import { generateTempId, generateDraftId } from "../draft-mode/draft-operation";
+import { generateTempId, generateDraftId, type DraftOperation } from "../draft-mode/draft-operation";
 import { DRAFT_COMMAND_SOURCE } from "../draft-mode/draft-change-sources";
 import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE, getWeeklySchedule } from "../utilities/flexibility-calculator";
 import { parseLocalDate, getLocalToday } from "../utilities/date-utils";
@@ -78,6 +78,52 @@ function buildNewEntryResourceKey(
   comments: string | null | undefined
 ): string {
   return `ts:timeentry:new:${issueId}:${activityId}:${date}:${comments ?? ""}`;
+}
+
+/** "1 entry" / "N entries" */
+function entryCount(n: number): string {
+  return `${n} ${n === 1 ? "entry" : "entries"}`;
+}
+
+/**
+ * Build a createTimeEntry draft op. Single source for the POST envelope —
+ * the op shape was previously hand-built at six call sites and had already
+ * drifted (paste included project_id, others didn't).
+ */
+function buildCreateEntryOp(args: {
+  issueId: number;
+  activityId: number | null;
+  hours: number;
+  date: string | undefined;
+  comments: string | null | undefined;
+  tempId: string;
+  resourceKey: string;
+  id?: string;
+  projectId?: number;
+}): DraftOperation {
+  return {
+    id: args.id ?? generateDraftId(),
+    type: "createTimeEntry",
+    timestamp: Date.now(),
+    issueId: args.issueId,
+    tempId: args.tempId,
+    description: `Log ${args.hours}h to #${args.issueId} on ${args.date}`,
+    http: {
+      method: "POST",
+      path: "/time_entries.json",
+      data: {
+        time_entry: {
+          issue_id: args.issueId,
+          hours: args.hours,
+          activity_id: args.activityId,
+          spent_on: args.date,
+          comments: args.comments ?? "",
+          ...(args.projectId !== undefined ? { project_id: args.projectId } : {}),
+        },
+      },
+    },
+    resourceKey: args.resourceKey,
+  };
 }
 
 export class TimeSheetPanel {
@@ -345,10 +391,6 @@ export class TimeSheetPanel {
 
       case "requestIssues":
         await this._loadIssuesForProject(message.projectId);
-        break;
-
-      case "requestActivities":
-        await this._loadActivitiesForProject(message.projectId);
         break;
 
       case "saveAll":
@@ -1328,29 +1370,15 @@ export class TimeSheetPanel {
       }
     } else if (hours > 0) {
       // New entry (no entryId, hours > 0)
-      const operation = {
-        id: generateDraftId(),
-        type: "createTimeEntry" as const,
-        timestamp: Date.now(),
+      await this._draftQueue.add(buildCreateEntryOp({
         issueId: row.issueId,
+        activityId: row.activityId,
+        hours,
+        date,
+        comments: row.comments,
         tempId: `${row.id}:${dayIndex}`,
-        description: `Log ${hours}h to #${row.issueId} on ${date}`,
-        http: {
-          method: "POST" as const,
-          path: "/time_entries.json",
-          data: {
-            time_entry: {
-              issue_id: row.issueId,
-              hours,
-              activity_id: row.activityId,
-              spent_on: date,
-              comments: row.comments ?? "",
-            },
-          },
-        },
         resourceKey,
-      };
-      await this._draftQueue.add(operation, TIMESHEET_SOURCE);
+      }), TIMESHEET_SOURCE);
     } else {
       // No entryId and hours = 0 → remove pending create if exists
       await this._draftQueue.removeByKey(resourceKey, TIMESHEET_SOURCE);
@@ -1469,18 +1497,18 @@ export class TimeSheetPanel {
     });
   }
 
-  private async _loadIssuesForProject(projectId: number, forceRefresh = false): Promise<void> {
+  private async _loadIssuesForProject(projectId: number): Promise<void> {
     if (!this._server) return;
 
     // Return cached data immediately if available
-    if (!forceRefresh && this._issuesByProject.has(projectId)) {
+    if (this._issuesByProject.has(projectId)) {
       const cached = this._issuesByProject.get(projectId)!;
       this._postMessage({ type: "updateIssues", issues: cached, forProjectId: projectId });
       return;
     }
 
     // Try to use cached issues from sidebar (already loaded)
-    if (!forceRefresh && this._getCachedIssues) {
+    if (this._getCachedIssues) {
       const cachedIssues = this._getCachedIssues();
       const matchingIssues = cachedIssues.filter((i) => i.project?.id === projectId);
       if (matchingIssues.length > 0) {
@@ -1510,11 +1538,11 @@ export class TimeSheetPanel {
     }
   }
 
-  private async _loadActivitiesForProject(projectId: number, forceRefresh = false): Promise<void> {
+  private async _loadActivitiesForProject(projectId: number): Promise<void> {
     if (!this._server) return;
 
     // Return cached data immediately if available
-    if (!forceRefresh && this._activitiesByProject.has(projectId)) {
+    if (this._activitiesByProject.has(projectId)) {
       const cached = this._activitiesByProject.get(projectId)!;
       this._postMessage({ type: "updateActivities", activities: cached, forProjectId: projectId });
       return;
@@ -1684,7 +1712,7 @@ export class TimeSheetPanel {
       }
 
       if (errorCount === 0) {
-        showStatusBarMessage(`$(check) Saved ${successCount} ${successCount === 1 ? "entry" : "entries"}`, 2000);
+        showStatusBarMessage(`$(check) Saved ${entryCount(successCount)}`, 2000);
       } else {
         showStatusBarMessage(`$(warning) ${successCount} saved, ${errorCount} failed`, 3000);
       }
@@ -1749,7 +1777,7 @@ export class TimeSheetPanel {
       sourceWeekStart: this._currentWeek.startDate,
     });
 
-    showStatusBarMessage(`$(copy) Copied ${allEntries.length} ${allEntries.length === 1 ? "entry" : "entries"}`, 2000);
+    showStatusBarMessage(`$(copy) Copied ${entryCount(allEntries.length)}`, 2000);
   }
 
   private async _pasteWeek(): Promise<void> {
@@ -1786,35 +1814,23 @@ export class TimeSheetPanel {
             targetDate,
             entry.comments
           );
-          await this._draftQueue.add({
+          await this._draftQueue.add(buildCreateEntryOp({
             id: draftId,
-            type: "createTimeEntry",
-            timestamp: Date.now(),
             issueId: entry.issue_id,
+            activityId: entry.activity_id,
+            hours: parseFloat(entry.hours),
+            date: targetDate,
+            comments: entry.comments,
             tempId,
-            description: `Log ${entry.hours}h to #${entry.issue_id} on ${targetDate}`,
-            http: {
-              method: "POST",
-              path: "/time_entries.json",
-              data: {
-                time_entry: {
-                  issue_id: entry.issue_id,
-                  hours: parseFloat(entry.hours),
-                  activity_id: entry.activity_id,
-                  spent_on: targetDate,
-                  comments: entry.comments,
-                  project_id: entry.project_id,
-                },
-              },
-            },
             resourceKey,
-          }, TIMESHEET_SOURCE);
+            projectId: entry.project_id,
+          }), TIMESHEET_SOURCE);
           pastedDraftIds.push(draftId);
           created++;
         }
       }
 
-      showStatusBarMessage(`$(check) Pasted ${created} ${created === 1 ? "entry" : "entries"} to draft`, 2000);
+      showStatusBarMessage(`$(check) Pasted ${entryCount(created)} to draft`, 2000);
 
       // Reload week to show new entries
       await this._loadWeek(this._currentWeek);
@@ -1903,29 +1919,15 @@ export class TimeSheetPanel {
     if (sourceCount === 0 && newHours > 0) {
       // Empty cell → create new entry
       // Use canonical resourceKey based on issueId:activityId:date (not rowId)
-      const resourceKey = newEntryResourceKey;
-      await this._draftQueue.add({
-        id: generateDraftId(),
-        type: "createTimeEntry",
-        timestamp: Date.now(),
+      await this._draftQueue.add(buildCreateEntryOp({
         issueId,
+        activityId,
+        hours: newHours,
+        date,
+        comments,
         tempId: `${aggRowId}:${dayIndex}`,
-        description: `Log ${newHours}h to #${issueId} on ${date}`,
-        http: {
-          method: "POST",
-          path: "/time_entries.json",
-          data: {
-            time_entry: {
-              issue_id: issueId,
-              hours: newHours,
-              activity_id: activityId,
-              spent_on: date,
-              comments: comments ?? "",
-            },
-          },
-        },
-        resourceKey,
-      }, TIMESHEET_SOURCE);
+        resourceKey: newEntryResourceKey,
+      }), TIMESHEET_SOURCE);
     } else if (sourceCount === 1) {
       const entry = sourceEntries[0];
       if (!entry) return;
@@ -1935,28 +1937,15 @@ export class TimeSheetPanel {
         const resourceKey = buildNewEntryResourceKey(entry.issueId, entry.activityId, date, entry.comments);
         if (newHours > 0) {
           // Update draft → replace pending CREATE with new hours
-          await this._draftQueue.add({
-            id: generateDraftId(),
-            type: "createTimeEntry",
-            timestamp: Date.now(),
+          await this._draftQueue.add(buildCreateEntryOp({
             issueId: entry.issueId,
+            activityId: entry.activityId,
+            hours: newHours,
+            date,
+            comments: entry.comments,
             tempId: `${entry.rowId}:${dayIndex}`,
-            description: `Log ${newHours}h to #${entry.issueId} on ${date}`,
-            http: {
-              method: "POST",
-              path: "/time_entries.json",
-              data: {
-                time_entry: {
-                  issue_id: entry.issueId,
-                  hours: newHours,
-                  activity_id: entry.activityId,
-                  spent_on: date,
-                  comments: entry.comments ?? "",
-                },
-              },
-            },
             resourceKey,
-          }, TIMESHEET_SOURCE);
+          }), TIMESHEET_SOURCE);
         } else {
           // Delete draft → remove pending CREATE
           await this._draftQueue.removeByKey(resourceKey, TIMESHEET_SOURCE);
@@ -2026,30 +2015,15 @@ export class TimeSheetPanel {
       }
 
       if (newHours > 0) {
-        // Use canonical resourceKey for new entries
-        const resourceKey = buildNewEntryResourceKey(issueId, activityId, date, comments);
-        await this._draftQueue.add({
-          id: generateDraftId(),
-          type: "createTimeEntry",
-          timestamp: Date.now(),
+        await this._draftQueue.add(buildCreateEntryOp({
           issueId,
+          activityId,
+          hours: newHours,
+          date,
+          comments,
           tempId: `${aggRowId}:${dayIndex}:new`,
-          description: `Log ${newHours}h to #${issueId} on ${date}`,
-          http: {
-            method: "POST",
-            path: "/time_entries.json",
-            data: {
-              time_entry: {
-                issue_id: issueId,
-                hours: newHours,
-                activity_id: activityId,
-                spent_on: date,
-                comments: comments ?? "",
-              },
-            },
-          },
-          resourceKey,
-        }, TIMESHEET_SOURCE);
+          resourceKey: buildNewEntryResourceKey(issueId, activityId, date, comments),
+        }), TIMESHEET_SOURCE);
       }
     }
 
@@ -2291,28 +2265,15 @@ export class TimeSheetPanel {
       const date = this._currentWeek.dayDates[dayIndex];
       const resourceKey = buildNewEntryResourceKey(row.issueId, row.activityId, date, row.comments);
       if (newHours > 0) {
-        await this._draftQueue.add({
-          id: generateDraftId(),
-          type: "createTimeEntry",
-          timestamp: Date.now(),
+        await this._draftQueue.add(buildCreateEntryOp({
           issueId: row.issueId!,
+          activityId: row.activityId,
+          hours: newHours,
+          date,
+          comments: row.comments,
           tempId: `${row.id}:${dayIndex}`,
-          description: `Log ${newHours}h to #${row.issueId} on ${date}`,
-          http: {
-            method: "POST",
-            path: "/time_entries.json",
-            data: {
-              time_entry: {
-                issue_id: row.issueId,
-                hours: newHours,
-                activity_id: row.activityId,
-                spent_on: date,
-                comments: row.comments ?? "",
-              },
-            },
-          },
           resourceKey,
-        }, TIMESHEET_SOURCE);
+        }), TIMESHEET_SOURCE);
       } else {
         await this._draftQueue.removeByKey(resourceKey, TIMESHEET_SOURCE);
       }

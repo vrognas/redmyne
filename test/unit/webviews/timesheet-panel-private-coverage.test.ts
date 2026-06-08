@@ -268,10 +268,10 @@ describe("timesheet panel private coverage", () => {
     expect(okSetup.panel._parentProjects.some((p: { name: string }) => p.name === "Others")).toBe(true);
     expect(okSetup.panel._childrenByParent.get(1)).toHaveLength(1);
 
-    await okSetup.panel._loadIssuesForProject(2);
-    await okSetup.panel._loadIssuesForProject(2, true);
+    await okSetup.panel._loadIssuesForProject(2); // served from sidebar cache
+    await okSetup.panel._loadIssuesForProject(3); // no cache → server fetch
     await okSetup.panel._loadActivitiesForProject(2);
-    await okSetup.panel._loadActivitiesForProject(2, true);
+    await okSetup.panel._loadActivitiesForProject(2); // second call → cache hit
     await okSetup.panel._loadIssueDetails(77);
     await okSetup.panel._loadIssueDetails(77);
 
