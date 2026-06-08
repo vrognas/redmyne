@@ -22,10 +22,11 @@ import {
 } from "../utilities/time-entry-clipboard";
 import { parseLocalDate, getWeekStart, formatLocalDate, getISOWeekNumber } from "../utilities/date-utils";
 import { differenceInCalendarDays, addDays } from "date-fns";
-import { DEFAULT_WEEKLY_SCHEDULE, WeeklySchedule } from "../utilities/flexibility-calculator";
+import { getWeeklySchedule } from "../utilities/flexibility-calculator";
 import { MonthlyScheduleOverrides } from "../utilities/monthly-schedule";
 import { pickCustomFields, TimeEntryCustomFieldValue } from "../utilities/custom-field-picker";
 import { confirmLogTimeOnClosedIssues } from "../utilities/closed-issue-guard";
+import { errorToString } from "../utilities/error-feedback";
 import {
   getConfiguredServerUrlOrShowError,
   getIssueIdOrShowError,
@@ -270,8 +271,9 @@ async function executePaste(
   server: IRedmineServer,
   items: PasteWorkItem[],
   onProgress: (done: number) => void
-): Promise<{ created: number; failures: PasteWorkItem[] }> {
+): Promise<{ created: number; failures: PasteWorkItem[]; firstError?: string }> {
   let created = 0;
+  let firstError: string | undefined;
   const failures: PasteWorkItem[] = [];
   for (const item of items) {
     try {
@@ -285,11 +287,12 @@ async function executePaste(
       );
       created++;
       onProgress(created);
-    } catch {
+    } catch (error) {
+      firstError ??= errorToString(error);
       failures.push(item);
     }
   }
-  return { created, failures };
+  return { created, failures, firstError };
 }
 
 /**
@@ -357,7 +360,7 @@ async function runPasteWithRetry(
   let pending = workItems;
   let totalCreated = 0;
   for (;;) {
-    const { created, failures } = await runPaste(pending);
+    const { created, failures, firstError } = await runPaste(pending);
     totalCreated += created;
     refreshTree();
     // Refresh Gantt if open
@@ -372,8 +375,9 @@ async function runPasteWithRetry(
       return;
     }
 
+    const reason = firstError ? ` First error: ${firstError}` : "";
     const choice = await vscode.window.showWarningMessage(
-      `${verb} ${created}/${pending.length} ${noun(pending.length)}. ${failures.length} failed.`,
+      `${verb} ${created}/${pending.length} ${noun(pending.length)}. ${failures.length} failed.${reason}`,
       "Retry Failed"
     );
     if (choice !== "Retry Failed") return;
@@ -384,9 +388,10 @@ async function runPasteWithRetry(
 function getTimeEntryWithIdOrShowError(
   node: TimeEntryNode | undefined
 ): (NonNullable<TimeEntryNode["_entry"]> & { id: number }) | undefined {
-  const entry = getTimeEntryOrShowError(node);
-  if (!entry?.id) {
-    vscode.window.showErrorMessage("No time entry selected");
+  const entry = getTimeEntryOrShowError(node); // shows its own error when missing
+  if (!entry) return undefined;
+  if (!entry.id) {
+    vscode.window.showErrorMessage("Time entry has no id");
     return undefined;
   }
   return entry as NonNullable<TimeEntryNode["_entry"]> & { id: number };
@@ -737,8 +742,7 @@ export function registerTimeEntryCommands(
         );
 
         // Get schedule config
-        const config = vscode.workspace.getConfiguration("redmyne.workingHours");
-        const schedule = config.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
+        const schedule = getWeeklySchedule();
         const overrides = deps.getMonthlySchedules?.() ?? {};
 
         // Calculate target dates
@@ -818,9 +822,16 @@ export function registerTimeEntryCommands(
         if (confirm !== "Create") return;
 
         // Check for closed issues — only after the user commits to pasting, so a
-        // cancelled paste doesn't pay for the issue-status lookup.
+        // cancelled paste doesn't pay for the issue-status lookup. A lookup
+        // failure (deleted issue, network blip) must not silently abort a
+        // confirmed paste — proceed and let addTimeEntry surface real errors.
         const issueIds = clipboard.entries.map((e) => e.issue_id);
-        const closedConfirmed = await confirmLogTimeOnClosedIssues(server, issueIds);
+        let closedConfirmed = true;
+        try {
+          closedConfirmed = await confirmLogTimeOnClosedIssues(server, issueIds);
+        } catch {
+          // proceed: the guard is best-effort advice, not a gate
+        }
         if (!closedConfirmed) return;
 
         // In draft mode the server wrapper queues entries instead of committing
