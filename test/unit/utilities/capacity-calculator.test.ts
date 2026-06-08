@@ -3,6 +3,8 @@ import {
   calculateDailyCapacity,
   calculateCapacityByZoom,
   calculateScheduledCapacity,
+  aggregateScheduledByZoom,
+  type ScheduledDailyCapacity,
 } from "../../../src/utilities/capacity-calculator";
 import { Issue } from "../../../src/redmine/models/issue";
 import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "../../../src/utilities/flexibility-calculator";
@@ -522,6 +524,34 @@ describe("calculateCapacityByZoom", () => {
     expect(result[0].loadHours).toBe(0);
     expect(result[0].capacityHours).toBe(40);
     expect(result[0].status).toBe("available");
+  });
+
+});
+
+describe("aggregateScheduledByZoom", () => {
+  const day = (date: string): ScheduledDailyCapacity => ({
+    date,
+    loadHours: 4,
+    capacityHours: 8,
+    percentage: 50,
+    status: "available",
+    breakdown: [],
+  });
+
+  it("splits ISO-week boundary days into correct week buckets", () => {
+    // 2024-12-29 = Sun, ISO W52/2024; 2024-12-30 = Mon, ISO W01/2025.
+    // UTC-parsed dates fed to local date-fns ISO-week helpers shift the
+    // boundary day into the wrong week west of UTC (regression guard).
+    const result = aggregateScheduledByZoom(
+      [day("2024-12-29"), day("2024-12-30"), day("2024-12-31")],
+      "week"
+    );
+
+    expect(result.length).toBe(2);
+    expect(result[0].startDate).toBe("2024-12-29"); // W52/2024: Sun only
+    expect(result[0].endDate).toBe("2024-12-29");
+    expect(result[1].startDate).toBe("2024-12-30"); // W01/2025: Mon+Tue
+    expect(result[1].endDate).toBe("2024-12-31");
   });
 });
 

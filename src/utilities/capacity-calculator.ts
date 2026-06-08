@@ -773,7 +773,7 @@ export function aggregateScheduledByZoom(
   // Group days by period key
   const periodGroups = new Map<string, ScheduledDailyCapacity[]>();
   for (const day of dailyData) {
-    const date = new Date(day.date + "T00:00:00Z");
+    const date = parseLocalDate(day.date);
     const key = getPeriodKey(date, zoomLevel);
     let group = periodGroups.get(key);
     if (!group) {
