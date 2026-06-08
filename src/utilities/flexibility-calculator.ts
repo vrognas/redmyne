@@ -262,16 +262,7 @@ export function countAvailableHours(
  * Get day name from Date object
  */
 export function getDayName(date: Date): keyof WeeklySchedule {
-  const days: (keyof WeeklySchedule)[] = [
-    "Sun",
-    "Mon",
-    "Tue",
-    "Wed",
-    "Thu",
-    "Fri",
-    "Sat",
-  ];
-  return days[date.getDay()]!;
+  return DAY_KEYS[date.getDay()]!;
 }
 
 /**
@@ -371,14 +362,10 @@ export function buildFlexibilityCache(
   }
 }
 
-const DEFAULT_SCHEDULE: WeeklySchedule = {
-  Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0, Sun: 0,
-};
-
 /**
  * Get the weekly schedule from configuration
  */
 export function getWeeklySchedule(): WeeklySchedule {
   const config = vscode.workspace.getConfiguration("redmyne.workingHours");
-  return config.get<WeeklySchedule>("weeklySchedule", DEFAULT_SCHEDULE);
+  return config.get<WeeklySchedule>("weeklySchedule", DEFAULT_WEEKLY_SCHEDULE);
 }
