@@ -1001,6 +1001,41 @@ describe("gantt project-view root rows (skipTopProjectRow)", () => {
     expect(html).toContain('data-first-row-key="issue-100"'); // family band
   });
 
+  it("emits dependency arrows for render-time-hidden rows, marked hidden", () => {
+    const panel = setupTwoClients();
+    panel._selectedProjectId = null;
+    // Relation between two issues in the same (collapsed) project
+    const issues = [
+      createIssue({
+        id: 100, projectId: 2,
+        relations: [{ id: 500, issue_id: 100, issue_to_id: 101, relation_type: "blocks" }],
+      }),
+      createIssue({ id: 101, projectId: 2, start_date: "2025-12-11", due_date: "2025-12-20" }),
+    ];
+    panel._issues = issues;
+    panel._issueById = new Map(issues.map((i: any) => [i.id, i]));
+
+    // Collapsed: arrow must exist in the DOM, marked hidden (client unhides on expand)
+    const collapsedHtml = panel._getRenderPayload().html as string;
+    expect(collapsedHtml).toContain("dependency-arrow rel-blocks cursor-pointer gantt-row-hidden");
+
+    // Expanded: same arrow visible (no hidden marker)
+    panel._cachedHierarchy = undefined;
+    panel._expandAllOnNextRender = true;
+    const expandedHtml = panel._getRenderPayload().html as string;
+    expect(expandedHtml).toContain('dependency-arrow rel-blocks cursor-pointer"');
+    expect(expandedHtml).not.toContain("dependency-arrow rel-blocks cursor-pointer gantt-row-hidden");
+  });
+
+  it("display toggles invalidate the per-focus payload memo", () => {
+    const panel = setupTwoClients();
+    for (const command of ["toggleDependencies", "toggleBadges", "toggleCapacityRibbon", "toggleIntensity"]) {
+      panel._payloadByFocus.set("project", { html: "x", state: panel._getFallbackState() });
+      panel._handleMessage({ command });
+      expect(panel._payloadByFocus.size, command).toBe(0);
+    }
+  });
+
   it("expand-all-on-first-render survives an early empty render", () => {
     const mock = createMockPanel();
     GanttPanel.restore(mock.panel, vscode.Uri.parse("file:///ext"));

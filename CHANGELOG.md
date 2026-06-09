@@ -7,6 +7,14 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.28.7]
+
+### Fixed
+
+- **Dependency arrows survive first expand** — arrows whose endpoint rows were collapsed at render time were never put in the DOM, so the instant client-side expand (4.28.6) revealed rows with their arrows missing until a full re-render. Arrows are now emitted for all rows (hidden ones marked, unhidden by the expand toggle and re-anchored to live bar positions)
+- **Display toggles survive a view-focus round-trip** — hiding dependency arrows, badges, the capacity ribbon, or intensity shading then toggling By Project/By Person and back re-served a cached chart with the old state (and an inverted toolbar button). These toggles now invalidate the per-focus payload cache
+- **Packaging: restored production (minified) webview bundles** — a background `esbuild --watch` task had overwritten `media/` with unminified dev builds, which got committed; rebuilt with the production profile
+
 ## [4.28.6]
 
 ### Fixed

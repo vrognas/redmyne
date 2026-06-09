@@ -1325,6 +1325,9 @@ export class GanttPanel {
         break;
       case "toggleDependencies":
         this._showDependencies = !this._showDependencies;
+        // These display flags are baked into the rendered html — drop the
+        // per-focus payload memo or a focus toggle-back reverts the toggle
+        this._payloadByFocus.clear();
         this._panel.webview.postMessage({
           command: "setDependenciesState",
           enabled: this._showDependencies,
@@ -1332,6 +1335,7 @@ export class GanttPanel {
         break;
       case "toggleBadges":
         this._showBadges = !this._showBadges;
+        this._payloadByFocus.clear();
         this._panel.webview.postMessage({
           command: "setBadgesState",
           enabled: this._showBadges,
@@ -1339,6 +1343,7 @@ export class GanttPanel {
         break;
       case "toggleCapacityRibbon":
         this._showCapacityRibbon = !this._showCapacityRibbon;
+        this._payloadByFocus.clear();
         this._panel.webview.postMessage({
           command: "setCapacityRibbonState",
           enabled: this._showCapacityRibbon,
@@ -1346,6 +1351,7 @@ export class GanttPanel {
         break;
       case "toggleIntensity":
         this._showIntensity = !this._showIntensity;
+        this._payloadByFocus.clear();
         // CSS-only toggle: send message to webview to flip classes (no re-render)
         this._panel.webview.postMessage({
           command: "setIntensityState",
@@ -2516,9 +2522,13 @@ export class GanttPanel {
       .map((row, idx) => generateIssueBar(row, initialYPositions[idx]!, filteredRowYPositions[idx]!, renderContext))
       .join("");
 
-    // Dependency arrows - draw from end of source to start of target
+    // Dependency arrows - draw from end of source to start of target.
+    // Positions cover ALL rows (hidden included, at their initial collapsed-state
+    // Y) so arrows exist in the DOM for rows revealed by client-side expand —
+    // the toggle unhides them and refreshArrowGeometry re-anchors the paths.
     const issuePositions = new Map<number, { startX: number; endX: number; y: number }>();
-    visibleRows.forEach((row, idx) => {
+    const hiddenIssueIds = new Set<number>();
+    filteredRows.forEach((row, idx) => {
       if (row.type === "issue" && row.issue) {
         const issue = row.issue;
         // UTC parsing to match the UTC-anchored x-axis (bars use new Date(dateStr));
@@ -2532,8 +2542,9 @@ export class GanttPanel {
         // Add 1 day to end to match bar width calculation
         const startX = dateToX(start.getTime(), minDate.getTime(), maxDate.getTime(), timelineWidth);
         const endX = endExclusiveX(end, minDate.getTime(), maxDate.getTime(), timelineWidth);
-        const y = rowYPositions[idx]! + barHeight / 2;
+        const y = initialYPositions[idx]! + barHeight / 2;
         issuePositions.set(issue.id, { startX, endX, y });
+        if (!row.isVisible) hiddenIssueIds.add(issue.id);
       }
     });
 
@@ -2563,7 +2574,7 @@ export class GanttPanel {
         tip: "Start-to-Finish: Target finishes when source starts" },
     };
 
-    // Use rows (which have GanttIssue) for dependency arrows - only for visible projects
+    // Use rows (which have GanttIssue) for dependency arrows
     const visibleRelTypes = this._visibleRelationTypes;
     const dependencyArrows = rows
       .filter((row): row is GanttRow & { issue: GanttIssue } => row.type === "issue" && !!row.issue)
@@ -2752,9 +2763,12 @@ export class GanttPanel {
           const dashAttr = style.dash ? `stroke-dasharray="${style.dash}"` : "";
 
           const arrowTooltip = `#${issue.id} ${style.label} #${rel.targetId}\n${style.tip}\n(right-click to delete)`;
+          // Same hidden markers as setSvgVisibility (class + attribute) so the
+          // client-side collapse toggle can unhide the arrow when both rows show
+          const arrowHidden = hiddenIssueIds.has(issue.id) || hiddenIssueIds.has(rel.targetId);
           return {
             svg: `
-            <g class="dependency-arrow rel-${rel.type} cursor-pointer" data-relation-id="${rel.id}" data-from="${issue.id}" data-to="${rel.targetId}">
+            <g class="dependency-arrow rel-${rel.type} cursor-pointer${arrowHidden ? " gantt-row-hidden" : ""}"${arrowHidden ? ' visibility="hidden"' : ""} data-relation-id="${rel.id}" data-from="${issue.id}" data-to="${rel.targetId}">
               <title>${escapeAttr(arrowTooltip)}</title>
               <!-- Wide invisible hit area for easier clicking -->
               <path class="arrow-hit-area" d="${path}" stroke="transparent" stroke-width="24" fill="none"/>
