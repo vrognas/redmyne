@@ -2739,25 +2739,6 @@ export class GanttPanel {
               : `M ${x2 - arrowSize} ${y2 - arrowSize * 0.6} L ${x2} ${y2} L ${x2 - arrowSize} ${y2 + arrowSize * 0.6}`;
           }
 
-          // Debug logging for arrow paths (when perfDebug enabled)
-          if (isPerfDebugEnabled()) {
-            const pathCase = sameRow && goingRight ? "sameRow-right"
-              : !sameRow && nearlyVertical && (fromStart === goingRight || horizontalDist < minJogRoom) ? "nearlyVertical"
-              : goingRight ? "diffRow-right"
-              : sameRow ? "sameRow-left"
-              : "diffRow-left";
-            // eslint-disable-next-line no-console
-            console.log("[Arrow Debug] initialRender", {
-              arrow: `${issue.id} -> ${rel.targetId}`,
-              isScheduling,
-              source: { startX: source.startX, endX: source.endX, y: source.y },
-              target: { startX: target.startX, endX: target.endX, y: target.y },
-              coords: { x1, y1, x2, y2 },
-              conditions: { goingRight, horizontalDist, nearlyVertical, sameRow, goingDown: y2 > y1 },
-              pathCase,
-              path: path.substring(0, 80) + (path.length > 80 ? "..." : ""),
-            });
-          }
 
           const dashAttr = style.dash ? `stroke-dasharray="${style.dash}"` : "";
 

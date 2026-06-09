@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.28.3]
+
+### Changed
+
+- **Removed the `[Arrow Debug]` console logging** from Gantt arrow rendering (both initial render and drag/collapse geometry updates). It was gated behind `redmyne.gantt.perfDebug`, but with that flag on it logged a large object per arrow on every render and every collapse/expand — flooding the console and slowing those operations while measuring. Dev-only instrumentation that has served its purpose
+
 ## [4.28.2]
 
 ### Fixed

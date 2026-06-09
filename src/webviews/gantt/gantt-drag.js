@@ -29,7 +29,6 @@ export function setupDrag(ctx) {
       getFocusedIssueId,
       scrollToAndHighlight,
       isDraftModeEnabled,
-      isPerfDebugEnabled,
       getLookupMaps
     } = ctx;
 
@@ -187,13 +186,6 @@ export function setupDrag(ctx) {
     const arrowSize = 4;
     const r = 4; // corner radius for rounded turns - must match gantt-panel.ts
 
-    // Debug logging for arrow paths (enabled via redmyne.gantt.perfDebug setting)
-    function logArrowDebug(label, data) {
-      if (isPerfDebugEnabled && isPerfDebugEnabled()) {
-        console.log('[Arrow Debug]', label, data);
-      }
-    }
-
     function calcArrowPath(x1, y1, x2, y2, isScheduling, fromStart = false, toEnd = false) {
       const goingRight = x2 > x1;
       const horizontalDist = Math.abs(x2 - x1);
@@ -207,15 +199,6 @@ export function setupDrag(ctx) {
       const approachDir = toEnd ? 1 : -1;
       // Minimum horizontal room needed for simple jog path
       const minJogRoom = 8 + r; // jogX + r
-
-      // Determine which path case we're in
-      let pathCase;
-      if (!isScheduling) pathCase = 'non-scheduling';
-      else if (sameRow && goingRight) pathCase = 'sameRow-right';
-      else if (!sameRow && nearlyVertical && (fromStart === goingRight || horizontalDist < minJogRoom)) pathCase = 'nearlyVertical';
-      else if (goingRight) pathCase = 'diffRow-right';
-      else if (sameRow) pathCase = 'sameRow-left';
-      else pathCase = 'diffRow-left';
 
       let path;
       let arrowHead;
@@ -328,13 +311,6 @@ export function setupDrag(ctx) {
           : 'M ' + (x2 - arrowSize) + ' ' + (y2 - arrowSize * 0.6) + ' L ' + x2 + ' ' + y2 + ' L ' + (x2 - arrowSize) + ' ' + (y2 + arrowSize * 0.6);
       }
 
-      logArrowDebug('calcArrowPath', {
-        inputs: { x1, y1, x2, y2, isScheduling },
-        conditions: { goingRight, horizontalDist, nearlyVertical, sameRow, goingDown },
-        pathCase,
-        path: path.substring(0, 80) + (path.length > 80 ? '...' : '')
-      });
-
       return { path, arrowHead };
     }
 
@@ -380,9 +356,6 @@ export function setupDrag(ctx) {
 
     function updateArrowPositions(arrows, draggedIssueId, newStartX, newEndX) {
       arrows.forEach(a => {
-        // Capture original path before update for debugging
-        const originalPath = a.linePath ? a.linePath.getAttribute('d') : null;
-
         // Get current positions (may be dragged or original); Y always from
         // the live transform so arrows track collapse/expand row shifts
         const fromStartX = a.fromId == draggedIssueId ? newStartX : parseFloat(a.fromBar.dataset.startX);
@@ -395,23 +368,6 @@ export function setupDrag(ctx) {
         const { x1, y1, x2, y2, fromStart, toEnd } = computeArrowEndpoints({
           fromStartX, fromEndX, fromY, toStartX, toEndX, toY,
           relType: a.relType, barHeight
-        });
-
-        logArrowDebug('updateArrowPositions', {
-          arrow: a.fromId + ' -> ' + a.toId,
-          isScheduling: a.isScheduling,
-          draggedId: draggedIssueId,
-          barData: {
-            fromStartX: a.fromBar.dataset.startX,
-            fromEndX: a.fromBar.dataset.endX,
-            fromY: a.fromBar.dataset.centerY,
-            toStartX: a.toBar.dataset.startX,
-            toEndX: a.toBar.dataset.endX,
-            toY: a.toBar.dataset.centerY
-          },
-          computed: { fromStartX, fromEndX, fromY, toStartX, toEndX, toY },
-          coords: { x1, y1, x2, y2 },
-          originalPath: originalPath ? originalPath.substring(0, 60) + '...' : null
         });
 
         const { path, arrowHead } = calcArrowPath(x1, y1, x2, y2, a.isScheduling, fromStart, toEnd);
@@ -526,17 +482,6 @@ export function setupDrag(ctx) {
         const connectedArrows = getConnectedArrows(issueId);
         const linkHandle = bar.querySelector('.link-handle');
 
-        logArrowDebug('dragStart (resize)', {
-          issueId,
-          isLeft,
-          connectedArrowCount: connectedArrows.length,
-          arrows: connectedArrows.map(a => ({
-            from: a.fromId,
-            to: a.toId,
-            isScheduling: a.isScheduling,
-            currentPath: a.linePath ? a.linePath.getAttribute('d')?.substring(0, 60) + '...' : null
-          }))
-        });
         dragState = {
           issueId,
           isLeft,
@@ -632,17 +577,6 @@ export function setupDrag(ctx) {
         const singleLeftHandle = bar.querySelector('.drag-left');
         const singleRightHandle = bar.querySelector('.drag-right');
 
-        logArrowDebug('dragStart (move)', {
-          issueId,
-          isBulkDrag,
-          connectedArrowCount: connectedArrows.length,
-          arrows: connectedArrows.map(a => ({
-            from: a.fromId,
-            to: a.toId,
-            isScheduling: a.isScheduling,
-            currentPath: a.linePath ? a.linePath.getAttribute('d')?.substring(0, 60) + '...' : null
-          }))
-        });
         dragState = {
           issueId: parseInt(issueId),
           isLeft: false,
