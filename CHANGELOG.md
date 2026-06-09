@@ -11,7 +11,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
-- **Filter the Issues pane by task type** — a "Filter by Task Type…" entry in the Issues-pane filter menu lets you narrow issues to one task-type value (e.g. "Data Management"). Task type is read from a Redmine issue **custom field**, configurable via the `redmyne.taskTypeField` setting (default "Task Type"). The picker offers only the values present in your loaded issues; the filter is applied client-side (no refetch), combines with the assignee/status filter, and persists across sessions
+- **Filter by task type in the Issues pane and the Gantt** — narrow to one task-type value (e.g. "Data Management") via the Issues-pane filter menu ("Filter by Task Type…") and a new dropdown in the Gantt toolbar. Task type is read from a Redmine issue **custom field**, configurable via the `redmyne.taskTypeField` setting (default "Task Type"). Each view offers only the values present in its loaded issues, filters client-side (no refetch), combines with the other filters, and persists across sessions. The two views' task-type selections are independent
 
 ### Fixed
 
