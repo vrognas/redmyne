@@ -47,6 +47,7 @@ import {
 import type { GanttRenderContext } from "./gantt/gantt-render-types";
 import { generateHeader, type GanttToolbarContext } from "./gantt/gantt-toolbar-generator";
 import { deriveAssigneeState, filterIssuesForView } from "./gantt-view-filter";
+import { deriveTaskTypes, filterIssuesByTaskType } from "../utilities/issue-task-type-filter";
 import { dateToX, endExclusiveX } from "./gantt/gantt-coords";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
 import { DRAFT_COMMAND_SOURCE } from "../draft-mode/draft-change-sources";
@@ -167,6 +168,7 @@ const SELECTED_PROJECT_KEY = "redmyne.gantt.selectedProject";
 const SELECTED_ASSIGNEE_KEY = "redmyne.gantt.selectedAssignee";
 const FILTER_ASSIGNEE_KEY = "redmyne.gantt.filterAssignee";
 const FILTER_STATUS_KEY = "redmyne.gantt.filterStatus";
+const FILTER_TASK_TYPE_KEY = "redmyne.gantt.filterTaskType";
 const LOOKBACK_YEARS_KEY = "redmyne.gantt.lookbackYears";
 
 export class GanttPanel {
@@ -221,6 +223,7 @@ export class GanttPanel {
   private _versionsLoading = false; // Prevent duplicate version fetches
   private _supplementalLoadId = 0; // Monotonic id to ignore stale async loads
   private _currentFilter: IssueFilter = { ...DEFAULT_ISSUE_FILTER };
+  private _taskTypeFilter: string | "any" = "any"; // task-type custom-field value (gantt-local)
   private _filterChangeCallback?: (filter: IssueFilter) => void;
   private _viewMode: GanttViewMode = "projects";
   private _viewFocus: "project" | "person" = "project"; // Toggle: view by project or person
@@ -277,6 +280,7 @@ export class GanttPanel {
       const savedStatus = GanttPanel._globalState.get<"open" | "closed" | "any">(FILTER_STATUS_KEY);
       if (savedAssignee) this._currentFilter.assignee = savedAssignee;
       if (savedStatus) this._currentFilter.status = savedStatus;
+      this._taskTypeFilter = GanttPanel._globalState.get<string | "any">(FILTER_TASK_TYPE_KEY, "any");
       this._lookbackYears = GanttPanel._globalState.get<2 | 5 | 10 | null>(LOOKBACK_YEARS_KEY, 2);
     }
 
@@ -1485,6 +1489,12 @@ export class GanttPanel {
           }
         }
         break;
+      case "setTaskTypeFilter":
+        this._taskTypeFilter = (message.taskType as string | "any") ?? "any";
+        GanttPanel._globalState?.update(FILTER_TASK_TYPE_KEY, this._taskTypeFilter);
+        this._bumpRevision(); // invalidate hierarchy/capacity caches
+        this._updateContent();
+        break;
       case "setSelectedKey":
         // Preserve keyboard selection across re-renders
         this._selectedCollapseKey = message.collapseKey ?? null;
@@ -1862,6 +1872,11 @@ export class GanttPanel {
     }
   }
 
+  /** Name of the custom field used as the "task type" filter ("" disables it). */
+  private _taskTypeFieldName(): string {
+    return vscode.workspace.getConfiguration("redmyne").get<string>("taskTypeField", "Task Type");
+  }
+
   private _getRenderPayload(): GanttRenderPayload {
     refreshPerfDebugFlag(); // Pin flag for this render's perfStart/End calls
     perfStart("_getRenderPayload");
@@ -1899,7 +1914,14 @@ export class GanttPanel {
     });
     this._selectedAssignee = viewFilter.selectedAssignee;
     this._selectedProjectId = viewFilter.selectedProjectId;
-    const filteredIssues = viewFilter.filteredIssues;
+
+    // Task-type filter (custom field) narrows the chart, so hierarchy/
+    // dependencies/capacity all recompute on the filtered subset. The dropdown's
+    // available values are derived separately (from the full set) in the toolbar.
+    const taskTypeField = this._taskTypeFieldName();
+    const filteredIssues = taskTypeField
+      ? filterIssuesByTaskType(viewFilter.filteredIssues, taskTypeField, this._taskTypeFilter)
+      : viewFilter.filteredIssues;
 
     // Sort issues before building hierarchy (null = no sorting, keep natural order)
     const sortedIssues = this._sortBy === null ? [...filteredIssues] : [...filteredIssues].sort((a, b) => {
@@ -2932,6 +2954,8 @@ export class GanttPanel {
       lookbackYears: this._lookbackYears,
       zoomLevel: this._zoomLevel,
       currentFilter: this._currentFilter,
+      taskTypeValues: taskTypeField ? deriveTaskTypes(this._issues, taskTypeField) : [],
+      selectedTaskType: this._taskTypeFilter,
       showDependencies: this._showDependencies,
       showBadges: this._showBadges,
       showCapacityRibbon: this._showCapacityRibbon,

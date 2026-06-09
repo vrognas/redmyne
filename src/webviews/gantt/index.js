@@ -801,6 +801,9 @@ function initializeGantt(state) {
       const value = e.target.value;
       vscode.postMessage({ command: 'setFilter', filter: { status: value } });
     });
+    document.getElementById('filterTaskType')?.addEventListener('change', (e) => {
+      vscode.postMessage({ command: 'setTaskTypeFilter', taskType: e.target.value });
+    });
 
     // Sortable column header handlers (cycle: asc → desc → none)
     document.querySelectorAll('.gantt-col-header.sortable').forEach(header => {

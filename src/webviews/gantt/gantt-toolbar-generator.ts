@@ -30,6 +30,10 @@ export interface GanttToolbarContext {
   zoomLevel: ZoomLevel;
   currentFilter: IssueFilter;
 
+  // Task-type filter (custom field). Values present in the loaded issues.
+  taskTypeValues: string[];
+  selectedTaskType: string | "any";
+
   // Toggle states
   showDependencies: boolean;
   showBadges: boolean;
@@ -166,6 +170,11 @@ export function generateToolbar(ctx: GanttToolbarContext): string {
         <option value="closed"${ctx.currentFilter.status === "closed" ? " selected" : ""}>Closed</option>
         <option value="any"${ctx.currentFilter.status === "any" ? " selected" : ""}>Any status</option>
       </select>
+      ${ctx.taskTypeValues.length > 0 ? `
+      <select id="filterTaskType" class="toolbar-select" data-toolbar-tooltip="Filter by task type">
+        <option value="any"${ctx.selectedTaskType === "any" ? " selected" : ""}>All task types</option>
+        ${ctx.taskTypeValues.map((t) => `<option value="${escapeAttr(t)}"${ctx.selectedTaskType === t ? " selected" : ""}>${escapeHtml(t)}</option>`).join("")}
+      </select>` : ""}
       <!-- Primary actions -->
       <button id="refreshBtn" class="toggle-btn text-btn" data-toolbar-tooltip="Refresh (R)">↻</button>
       <button id="todayBtn" class="toggle-btn text-btn" data-toolbar-tooltip="${ctx.todayInRange ? "Today (T)" : "Today is outside timeline range"}"${ctx.todayInRange ? "" : " disabled"}>T</button>

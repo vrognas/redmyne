@@ -9,6 +9,7 @@ export type GanttWebviewMessage =
   | { command: "removeDraft"; issueId: number; startDate?: string | null; dueDate?: string | null }
   | { command: "setZoom"; zoomLevel: GanttZoomLevel }
   | { command: "setLookback"; years?: string }
+  | { command: "setTaskTypeFilter"; taskType?: string }
   | { command: "setViewMode"; viewMode: GanttViewMode }
   | { command: "setViewFocus"; focus: "project" | "person" }
   | { command: "setSelectedProject"; projectId?: number | null }

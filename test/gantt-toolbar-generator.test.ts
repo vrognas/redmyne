@@ -16,6 +16,8 @@ const baseContext: GanttToolbarContext = {
   lookbackYears: 2,
   zoomLevel: "month",
   currentFilter: { assignee: "me", status: "open" },
+  taskTypeValues: [],
+  selectedTaskType: "any",
   showDependencies: true,
   showBadges: true,
   showCapacityRibbon: true,
@@ -48,6 +50,19 @@ describe("gantt-toolbar-generator", () => {
       const html = generateToolbar(ctx);
       expect(html).toContain('id="zoomSelect"');
       expect(html).toContain('value="week" selected');
+    });
+
+    it("renders task-type filter only when values exist, marking selection", () => {
+      expect(generateToolbar(baseContext)).not.toContain('id="filterTaskType"');
+      const ctx = {
+        ...baseContext,
+        taskTypeValues: ["Analysis", "Data Management"],
+        selectedTaskType: "Data Management",
+      };
+      const html = generateToolbar(ctx);
+      expect(html).toContain('id="filterTaskType"');
+      expect(html).toContain('value="Data Management" selected');
+      expect(html).toContain(">Analysis</option>");
     });
 
     it("renders view focus selector", () => {
