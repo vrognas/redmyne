@@ -219,6 +219,14 @@ export class GanttPanel {
   private _baseHtmlSet = false;
   private _webviewReady = false;
   private _pendingRender?: GanttRenderPayload;
+  // Per-focus render payload memo: a project<->person view-focus toggle reuses
+  // the other focus's already-built payload so toggle-back is instant. Every
+  // non-toggle re-render path invalidates it (it clears in _updateContent
+  // because only setViewFocus sets _preserveFocusCacheOnce); collapse-sync and
+  // draft-mode-enable changes (which mutate render state without a re-render)
+  // clear it explicitly.
+  private _payloadByFocus = new Map<"project" | "person", GanttRenderPayload>();
+  private _preserveFocusCacheOnce = false;
   private _contributionsLoading = false; // Prevent duplicate contribution fetches
   private _versionsLoading = false; // Prevent duplicate version fetches
   private _supplementalLoadId = 0; // Monotonic id to ignore stale async loads
@@ -296,6 +304,9 @@ export class GanttPanel {
     this._draftModeSubscribed = true;
     this._disposables.push(
       this._draftModeManager.onDidChangeEnabled(() => {
+        // Toolbar HTML embeds draft-mode state, so the cached payloads are now
+        // stale; drop them (the button is updated client-side below).
+        this._payloadByFocus.clear();
         this._panel.webview.postMessage({
           command: "setDraftModeState",
           enabled: this._draftModeManager?.isEnabled ?? false,
@@ -1172,7 +1183,25 @@ export class GanttPanel {
     refreshPerfDebugFlag(); // Pin perfDebug for this render's many call sites
     perfStart("_updateContent");
     this._renderKey++; // Force SVG re-creation on each render
-    this._queueRender(this._getRenderPayload());
+    // A view-focus toggle preserves the other focus's cached payload (instant
+    // toggle-back). Any other re-render path lands here without the flag, so it
+    // drops both cached payloads — they are stale once data/filters/etc change.
+    if (this._preserveFocusCacheOnce) {
+      this._preserveFocusCacheOnce = false;
+    } else {
+      this._payloadByFocus.clear();
+    }
+    let payload = this._payloadByFocus.get(this._viewFocus);
+    if (payload === undefined) {
+      payload = this._getRenderPayload();
+      this._payloadByFocus.set(this._viewFocus, payload);
+    }
+    // Dynamic per-serve state that must stay fresh even on a cache hit (applied
+    // client-side, not baked into the cached HTML): keyboard-selection restore
+    // hint and the perf-debug flag (so measurements still fire on toggle-back).
+    payload.state.selectedCollapseKey = this._selectedCollapseKey;
+    payload.state.perfDebug = isPerfDebugEnabled();
+    this._queueRender(payload);
     this._isRefreshing = false; // Reset after render
     perfEnd("_updateContent");
   }
@@ -1257,7 +1286,11 @@ export class GanttPanel {
         break;
       case "setViewFocus":
         this._viewFocus = message.focus === "person" ? "person" : "project";
-        this._bumpRevision();
+        // A view-focus toggle changes no underlying data, so DON'T bump the
+        // revision or clear _capacityCache (its key self-discriminates on
+        // focus + assignee). Only the single-slot hierarchy is focus-specific.
+        this._cachedHierarchy = undefined;
+        this._preserveFocusCacheOnce = true; // reuse the other focus's cached payload
         GanttPanel._globalState?.update(VIEW_FOCUS_KEY, this._viewFocus);
         this._updateContent();
         break;
@@ -1373,6 +1406,9 @@ export class GanttPanel {
           } else {
             this._collapseState.collapse(message.collapseKey);
           }
+          // Collapse state changed without a re-render; drop the per-focus
+          // payload memo so a later focus toggle rebuilds with the new state.
+          this._payloadByFocus.clear();
         }
         break;
       case "requestRerender":

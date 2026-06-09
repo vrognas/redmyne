@@ -925,3 +925,84 @@ describe("gantt panel private coverage", () => {
     expect(panel._actualTimeEntries).toBeInstanceOf(Map);
   });
 });
+
+describe("gantt view-focus toggle perf (per-focus payload memo)", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+    GanttPanel.currentPanel = undefined;
+    vi.spyOn(vscode.workspace, "getConfiguration").mockImplementation(
+      () =>
+        ({
+          get: vi.fn((_key: string, fallback?: unknown) => fallback),
+          update: vi.fn(),
+        }) as unknown as vscode.WorkspaceConfiguration
+    );
+    (vscode.Uri as unknown as { joinPath: (...parts: unknown[]) => string }).joinPath = vi.fn(
+      (...parts: unknown[]) => parts.map((p) => String(p)).join("/")
+    );
+  });
+
+  function setup() {
+    const mock = createMockPanel();
+    GanttPanel.restore(mock.panel, vscode.Uri.parse("file:///ext"));
+    const panel = GanttPanel.currentPanel as any;
+    panel._webviewReady = true; // flush renders straight to postMessage
+    return { mock, panel };
+  }
+
+  function lastRenderHtml(mock: MockWebviewPanelBundle): string | undefined {
+    const calls = mock.webview.postMessage.mock.calls as Array<
+      [{ command?: string; payload?: { html?: string } }]
+    >;
+    for (let i = calls.length - 1; i >= 0; i--) {
+      if (calls[i][0]?.command === "render") return calls[i][0].payload?.html;
+    }
+    return undefined;
+  }
+
+  it("toggle preserves capacity cache + data revision, clears only hierarchy (option 1)", () => {
+    const { panel } = setup();
+    panel._viewFocus = "project";
+    panel._capacityCache = { key: "k", data: [] };
+    panel._cachedHierarchy = [{}];
+    const revBefore = panel._dataRevision;
+    panel._getRenderPayload = vi.fn(() => ({ html: "x", state: panel._getFallbackState() }));
+
+    panel._handleMessage({ command: "setViewFocus", focus: "person" });
+
+    expect(panel._viewFocus).toBe("person");
+    expect(panel._dataRevision).toBe(revBefore); // not bumped
+    expect(panel._capacityCache).toEqual({ key: "k", data: [] }); // preserved
+    expect(panel._cachedHierarchy).toBeUndefined(); // focus-specific, cleared
+  });
+
+  it("reuses the other focus's payload on toggle-back (memo hit)", () => {
+    const { mock, panel } = setup();
+    let n = 0;
+    panel._getRenderPayload = vi.fn(() => ({ html: `h${n++}`, state: panel._getFallbackState() }));
+    panel._viewFocus = "project";
+
+    panel._updateContent(); // h0 (project)
+    panel._handleMessage({ command: "setViewFocus", focus: "person" }); // h1 (person)
+    panel._handleMessage({ command: "setViewFocus", focus: "project" }); // hit -> no recompute
+
+    expect(panel._getRenderPayload).toHaveBeenCalledTimes(2);
+    expect(lastRenderHtml(mock)).toBe("h0"); // cached project payload reused
+  });
+
+  it("rebuilds after a collapse-state sync invalidates the memo", () => {
+    const { mock, panel } = setup();
+    let n = 0;
+    panel._getRenderPayload = vi.fn(() => ({ html: `h${n++}`, state: panel._getFallbackState() }));
+    panel._viewFocus = "project";
+
+    panel._updateContent(); // h0 (project)
+    panel._handleMessage({ command: "setViewFocus", focus: "person" }); // h1 (person)
+    panel._handleMessage({ command: "collapseStateSync", collapseKey: "k", isExpanded: false }); // clears memo
+    panel._handleMessage({ command: "setViewFocus", focus: "project" }); // miss -> h2 (fresh)
+
+    expect(panel._getRenderPayload).toHaveBeenCalledTimes(3);
+    expect(lastRenderHtml(mock)).toBe("h2"); // not the stale h0
+  });
+});

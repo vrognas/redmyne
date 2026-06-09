@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.28.1]
+
+### Changed
+
+- **Switching the Gantt between By Project and By Person is snappier** — a view-focus toggle no longer pretends data changed (it kept its own `_capacityCache`/revision invalidation), and each focus's rendered payload is now memoized so toggling back reuses it instead of rebuilding the chart. Toggle-back skips the day-by-day capacity simulator and the full SVG/HTML reassembly; the cache is dropped the moment anything else (data, filters, zoom, sort, collapse, draft mode) changes. The webview still re-parses the chart DOM on each switch — eliminating that residual is a separate, larger change
+
 ## [4.28.0]
 
 ### Added

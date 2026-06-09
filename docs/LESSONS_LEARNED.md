@@ -11,6 +11,15 @@ Quick reference of key patterns. Details in sections below.
 
 ---
 
+## v4.28.1 Gantt view-switch perf (2026-06-09)
+
+### Performance
+
+- **A view toggle is not a data change.** `setViewFocus` was calling `_bumpRevision()` (bumps `_dataRevision`, nukes `_capacityCache`/`_cachedHierarchy`) though no data changed — defeating the capacity cache on every toggle-back. Fix: clear only the single-slot, focus-specific `_cachedHierarchy`; the `_capacityCache` key already self-discriminates on `viewFocus`+`assignee`.
+- **Memoize the whole rendered payload per view, invalidate by default.** A per-`viewFocus` `Map` keyed payload, preserved across `setViewFocus` via a one-shot flag and cleared on every other `_updateContent`, makes toggle-back skip `_getRenderPayload` entirely. Invalidate-by-default (clear unless the flag is set) is far safer than enumerating a cache key over ~20 render inputs — the only extra clears needed are for the two paths that mutate render state *without* a re-render: `collapseStateSync` and draft-mode `onDidChangeEnabled`.
+- **Patch dynamic per-serve state on a cache hit.** `selectedCollapseKey` (client-side selection restore) and `perfDebug` ride in `payload.state` but don't affect the cached HTML — overwrite them each serve so a reused payload still restores selection and still logs timings.
+- **A single-tree "skip innerHTML if render-key matches" webview guard can't help a real toggle** — between two renders of focus A, focus B is mounted, so the key never matches. Killing the residual ~500ms `innerHTML` re-parse on toggle-back needs retained/detached per-focus DOM trees (or virtualization), not a skip guard. Measure `innerHTML` vs `_getRenderPayload` (via `redmyne.gantt.perfDebug`) before taking that on.
+
 ## v4.16.3 CI Stability (2026-02-07)
 
 ### Testing
