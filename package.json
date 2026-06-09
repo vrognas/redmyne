@@ -75,6 +75,10 @@
         "title": "All Issues"
       },
       {
+        "command": "redmyne.filterByTaskType",
+        "title": "Filter by Task Type…"
+      },
+      {
         "command": "redmyne.filterMyIssues",
         "title": "My Issues"
       },
@@ -839,6 +843,10 @@
         {
           "command": "redmyne.filterNone",
           "group": "2_special@1"
+        },
+        {
+          "command": "redmyne.filterByTaskType",
+          "group": "3_tasktype@1"
         }
       ],
       "redmyne.timeFilterMenu": [

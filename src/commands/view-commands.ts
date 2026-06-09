@@ -106,6 +106,30 @@ export function registerViewCommands(
       showStatusBarMessage("$(eye-closed) No Filter", 2000);
     }),
 
+    vscode.commands.registerCommand("redmyne.filterByTaskType", async () => {
+      const trackers = deps.projectsTree.getAvailableTrackers();
+      if (trackers.length === 0) {
+        showStatusBarMessage("$(info) No task types in the loaded issues yet", 2000);
+        return;
+      }
+      const current = deps.projectsTree.getTrackerFilter();
+      const items: (vscode.QuickPickItem & { trackerId: number | "any" })[] = [
+        { label: "All Task Types", trackerId: "any", description: current === "any" ? "current" : undefined },
+        ...trackers.map((t) => ({
+          label: t.name,
+          trackerId: t.id,
+          description: current === t.id ? "current" : undefined,
+        })),
+      ];
+      const pick = await vscode.window.showQuickPick(items, {
+        placeHolder: "Filter Issues by task type",
+      });
+      if (!pick) return;
+      deps.projectsTree.setTrackerFilter(pick.trackerId);
+      const name = pick.trackerId === "any" ? "All" : trackers.find((t) => t.id === pick.trackerId)?.name;
+      showStatusBarMessage(`$(filter) Task type: ${name}`, 2000);
+    }),
+
     // Time entries filter commands
     vscode.commands.registerCommand("redmyne.timeFilterMy", () => {
       deps.timeEntriesTree.setShowAllUsers(false);
