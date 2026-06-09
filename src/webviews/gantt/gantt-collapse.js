@@ -729,4 +729,31 @@ export function setupCollapse(ctx) {
     // mousedown's preventDefault blocks bar focus, so we focus the label here.
     if (label) setActiveLabel(label);
   });
+
+  // Row navigation when a row is selected but its label doesn't hold DOM focus
+  // — e.g. selected via a chart/bar press, where the drag's preventDefault
+  // stops the label taking focus. Without this, Arrow/Home/End fall through to
+  // the scroll container and scroll the chart instead of moving the selection.
+  // The per-label keydown handles the focused case and preventDefaults, so we
+  // bail on defaultPrevented (no double navigation). No selection → we do
+  // nothing and the chart scrolls as before.
+  addDocListener('keydown', (e) => {
+    if (e.defaultPrevented || !activeLabel) return;
+    const tag = e.target.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    const index = allLabels.indexOf(activeLabel);
+    if (index < 0) return;
+    let target = null;
+    switch (e.key) {
+      case 'ArrowDown': target = findVisibleLabel(index, 1); break;
+      case 'ArrowUp': target = findVisibleLabel(index, -1); break;
+      case 'Home': target = findVisibleLabel(-1, 1); break;
+      case 'End': target = findVisibleLabel(allLabels.length, -1); break;
+      default: return;
+    }
+    if (target) {
+      e.preventDefault();
+      setActiveLabel(target.label, false, true); // scrollIntoView
+    }
+  });
 }
