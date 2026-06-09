@@ -1431,9 +1431,16 @@ function initializeGantt(state) {
     });
 
     // Scroll to today marker (centered in visible timeline area)
-    function scrollToToday() {
+    // announceOutOfRange: only notify the user when THEY asked to go to today
+    // (button / "T"). On auto-scroll at load we silently rest at the nearest
+    // edge — a blocking modal on every open of a past-dated project is noise.
+    function scrollToToday(announceOutOfRange = true) {
       if (!todayInRange) {
-        vscode.postMessage({ command: 'todayOutOfRange' });
+        if (announceOutOfRange) {
+          vscode.postMessage({ command: 'todayOutOfRange' });
+        } else if (ganttScroll) {
+          ganttScroll.scrollLeft = todayX < 0 ? 0 : ganttScroll.scrollWidth;
+        }
         return;
       }
       if (ganttScroll) {
@@ -1506,7 +1513,7 @@ function initializeGantt(state) {
         savedScrollLeft = null;
         savedScrollTop = null;
       } else {
-        scrollToToday();
+        scrollToToday(false); // auto-scroll: no modal if today is out of range
       }
       // Initialize minimap viewport (batched with scroll restoration)
       updateMinimapViewport();
@@ -1514,8 +1521,8 @@ function initializeGantt(state) {
       restoringScroll = false;
     });
 
-    // Today button handler
-    document.getElementById('todayBtn')?.addEventListener('click', scrollToToday);
+    // Today button handler (user-initiated → announce if out of range)
+    document.getElementById('todayBtn')?.addEventListener('click', () => scrollToToday());
 
     // Column resize handling
     const resizeHandle = document.getElementById('resizeHandle');

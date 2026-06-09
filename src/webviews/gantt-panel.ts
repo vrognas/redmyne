@@ -1421,7 +1421,8 @@ export class GanttPanel {
         }
         break;
       case "todayOutOfRange":
-        vscode.window.showInformationMessage("Today is outside the current timeline range", { modal: true });
+        // Non-modal: a dismissible toast, not a blocking dialog
+        vscode.window.showInformationMessage("Today is outside the current timeline range");
         break;
       case "setInternalEstimate":
         if (message.issueId) {

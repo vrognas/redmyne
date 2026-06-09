@@ -296,8 +296,7 @@ describe("webview panel public flows", () => {
     expect(toggleAdHocSpy).toHaveBeenCalledWith(7);
     expect(togglePrecedenceSpy).toHaveBeenCalled();
     expect(infoSpy).toHaveBeenCalledWith(
-      "Today is outside the current timeline range",
-      { modal: true }
+      "Today is outside the current timeline range"
     );
     expect(statusSpy).toHaveBeenCalled();
   });
