@@ -1,6 +1,7 @@
 import {
   findDescendants as findDescendantsUtil,
   findVisibleDescendants as findVisibleDescendantsUtil,
+  buildAncestorChains,
 } from './collapse-utils.js';
 import { parseTranslateX, parseTranslateY, pickRowKeyByY } from './selection-utils.js';
 
@@ -149,29 +150,18 @@ export function setupCollapse(ctx) {
     ancestorCache.clear();
     childrenCache.clear();
     expandedStateCache.clear();
-    const elements = document.querySelectorAll('[data-collapse-key][data-parent-key]');
-    elements.forEach(el => {
-      const key = el.dataset.collapseKey;
-      const immediateParent = el.dataset.parentKey;
 
-      // Build children cache (parent → direct children)
-      if (immediateParent) {
-        if (!childrenCache.has(immediateParent)) {
-          childrenCache.set(immediateParent, new Set());
-        }
-        childrenCache.get(immediateParent).add(key);
-      }
-
-      if (ancestorCache.has(key)) return; // Already built ancestors for this key
-      const ancestors = [];
-      let parentKey = el.dataset.parentKey;
-      while (parentKey) {
-        ancestors.push(parentKey);
-        const parentEl = document.querySelector('[data-collapse-key="' + parentKey + '"]');
-        parentKey = parentEl?.dataset.parentKey || null;
-      }
-      ancestorCache.set(key, ancestors);
+    // Single O(N) pass to collect (key, parentKey) pairs, then resolve ancestor
+    // chains via a Map instead of a `document.querySelector` per ancestor — the
+    // old walk was O(rows × depth × N) over the full ~75K-node tree and was the
+    // dominant cost of initializeGantt (multi-second on large By-Project views).
+    const pairs = [];
+    document.querySelectorAll('[data-collapse-key][data-parent-key]').forEach(el => {
+      pairs.push({ key: el.dataset.collapseKey, parentKey: el.dataset.parentKey });
     });
+    const built = buildAncestorChains(pairs);
+    built.ancestorCache.forEach((ancestors, key) => ancestorCache.set(key, ancestors));
+    built.childrenCache.forEach((children, parentKey) => childrenCache.set(parentKey, children));
 
     // Build expanded state cache from DOM (once at init)
     document.querySelectorAll('[data-collapse-key][data-expanded]').forEach(el => {

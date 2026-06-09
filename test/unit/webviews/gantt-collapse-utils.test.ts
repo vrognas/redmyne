@@ -3,6 +3,7 @@ import {
   findDescendants,
   findVisibleDescendants,
   buildChildrenCache,
+  buildAncestorChains,
 } from "../../../src/webviews/gantt/collapse-utils.js";
 
 describe("gantt collapse utilities", () => {
@@ -196,6 +197,38 @@ describe("gantt collapse utilities", () => {
       const result = buildChildrenCache(ancestorCache);
       expect(result.has("orphan")).toBe(false);
       expect(result.get("root")).toEqual(new Set(["child"]));
+    });
+  });
+
+  describe("buildAncestorChains", () => {
+    it("builds direct-parent ancestors and children from (key, parentKey) pairs", () => {
+      const { ancestorCache, childrenCache } = buildAncestorChains([
+        { key: "c1", parentKey: "root" },
+        { key: "c2", parentKey: "root" },
+      ]);
+      expect(ancestorCache.get("c1")).toEqual(["root"]);
+      expect(ancestorCache.get("c2")).toEqual(["root"]);
+      expect(childrenCache.get("root")).toEqual(new Set(["c1", "c2"]));
+    });
+
+    it("walks the full chain and dedups repeated pairs (a row spans many column SVGs)", () => {
+      const { ancestorCache, childrenCache } = buildAncestorChains([
+        { key: "gc", parentKey: "child" },
+        { key: "gc", parentKey: "child" }, // duplicate: same row, another column
+        { key: "child", parentKey: "root" },
+      ]);
+      expect(ancestorCache.get("gc")).toEqual(["child", "root"]);
+      expect(ancestorCache.get("child")).toEqual(["root"]);
+      expect(childrenCache.get("child")).toEqual(new Set(["gc"]));
+    });
+
+    it("terminates on a parent cycle instead of looping forever", () => {
+      const { ancestorCache } = buildAncestorChains([
+        { key: "a", parentKey: "b" },
+        { key: "b", parentKey: "a" },
+      ]);
+      expect(ancestorCache.get("a")).toEqual(["b", "a"]);
+      expect(ancestorCache.get("b")).toEqual(["a", "b"]);
     });
   });
 });

@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.28.2]
+
+### Fixed
+
+- **Switching the Gantt into the By Project view is no longer multi-second** — `initializeGantt` resolved every row's ancestor chain with a `document.querySelector` per ancestor, an O(rows × depth × nodes) scan over the whole ~75K-node tree that measured **5–9 seconds** on large boards (this, not the HTML re-parse, was the real bottleneck). It now builds the chains from a single O(N) key→parent map — O(rows × depth) with zero DOM scans. Speeds up the first render and every re-render (zoom, sort, filter, collapse), not just the view toggle
+
 ## [4.28.1]
 
 ### Changed

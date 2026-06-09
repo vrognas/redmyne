@@ -65,6 +65,46 @@ export function findVisibleDescendants(parentKey, childrenCache, expandedStateCa
 }
 
 /**
+ * Build ancestor + children caches from (key, parentKey) pairs WITHOUT any DOM
+ * queries. Replaces an O(rows × depth × N) `document.querySelector`-per-ancestor
+ * walk (which scanned the whole ~75K-node tree for every ancestor of every row)
+ * with an O(rows × depth) Map walk. Duplicate pairs (a logical row appears in
+ * several column SVGs, each carrying the same data-collapse-key) are deduped.
+ * @param {Array<{key: string, parentKey: string}>} pairs - one per keyed element
+ * @returns {{ancestorCache: Map<string, string[]>, childrenCache: Map<string, Set<string>>}}
+ *   ancestorCache: key → [immediateParent, grandparent, ...]; childrenCache: parent → Set of direct children
+ */
+export function buildAncestorChains(pairs) {
+  const parentOf = new Map(); // key → immediate parentKey (first occurrence wins)
+  const childrenCache = new Map();
+  for (const { key, parentKey } of pairs) {
+    if (!key || !parentKey) continue;
+    if (!parentOf.has(key)) parentOf.set(key, parentKey);
+    let children = childrenCache.get(parentKey);
+    if (!children) {
+      children = new Set();
+      childrenCache.set(parentKey, children);
+    }
+    children.add(key);
+  }
+
+  const ancestorCache = new Map();
+  for (const key of parentOf.keys()) {
+    const ancestors = [];
+    const seen = new Set(); // guard against malformed parent cycles
+    let p = parentOf.get(key);
+    while (p && !seen.has(p)) {
+      seen.add(p);
+      ancestors.push(p);
+      p = parentOf.get(p);
+    }
+    ancestorCache.set(key, ancestors);
+  }
+
+  return { ancestorCache, childrenCache };
+}
+
+/**
  * Build children cache from ancestor cache.
  * @param {Map<string, string[]>} ancestorCache - Map of key → [parentKey, grandparentKey, ...]
  * @returns {Map<string, Set<string>>} Map of parentKey → Set of direct child keys

@@ -1,10 +1,2167 @@
-"use strict";(()=>{function wt({timelineWidth:w,minimapBarsData:p,minimapHeight:M,minimapBarHeight:X,minimapTodayX:z,ganttScroll:O,minimapSvg:N,minimapViewport:J,addDocListener:V}){function Y(){let T=document.querySelector(".gantt-body .gantt-sticky-left"),k=document.querySelector(".gantt-container");T&&k&&k.style.setProperty("--sticky-left-width",T.offsetWidth+"px")}requestAnimationFrame(Y),N&&requestAnimationFrame(()=>{let T=M/(p.length+1);if(p.forEach((k,oe)=>{let u=document.createElementNS("http://www.w3.org/2000/svg","rect");u.setAttribute("class",k.classes),u.setAttribute("x",(k.startPct*w).toString()),u.setAttribute("y",(T*(oe+.5)).toString()),u.setAttribute("width",Math.max(2,(k.endPct-k.startPct)*w).toString()),u.setAttribute("height",X.toString()),u.setAttribute("rx","1"),u.setAttribute("fill",k.color),N.insertBefore(u,J)}),z>0&&z<w){let k=document.createElementNS("http://www.w3.org/2000/svg","line");k.setAttribute("class","minimap-today"),k.setAttribute("x1",z.toString()),k.setAttribute("y1","0"),k.setAttribute("x2",z.toString()),k.setAttribute("y2",M.toString()),N.insertBefore(k,J)}});function Ie(){if(!O||!J||!w||!O.scrollWidth||!O.clientWidth)return;let T=Math.max(1,O.scrollWidth-O.clientWidth),k=Math.min(1,O.scrollLeft/T),oe=Math.min(1,O.clientWidth/O.scrollWidth),u=Math.max(20,oe*w),fe=k*(w-u);isNaN(fe)||isNaN(u)||(J.setAttribute("x",fe.toString()),J.setAttribute("width",u.toString()))}let ae=!1,R=0;function Ce(T,k=!1){if(!O||!N||!J)return;let oe=N.getBoundingClientRect(),fe=parseFloat(J.getAttribute("width")||"0")/w*oe.width,de=T.clientX-oe.left;k?de-=R:de-=fe/2;let Q=Math.max(0,Math.min(1,de/(oe.width-fe))),te=Math.max(0,O.scrollWidth-O.clientWidth);O.scrollLeft=Q*te}return N&&J&&(J.addEventListener("mousedown",T=>{T.stopPropagation(),ae=!0;let k=N.getBoundingClientRect(),u=parseFloat(J.getAttribute("x")||"0")/w*k.width;R=T.clientX-k.left-u}),N.addEventListener("mousedown",T=>{if(T.target===J)return;ae=!0;let k=N.getBoundingClientRect();R=parseFloat(J.getAttribute("width")||"0")/w*k.width/2,Ce(T,!0)}),V("mousemove",T=>{ae&&Ce(T,!0)}),V("mouseup",()=>{ae=!1})),{updateMinimapPosition:Y,updateMinimapViewport:Ie}}var qt=["blocks","precedes","finish_to_start","start_to_start","finish_to_finish","start_to_finish"];function Tt(w){return qt.includes(w)}function St({fromStartX:w,fromEndX:p,fromY:M,toStartX:X,toEndX:z,toY:O,relType:N,barHeight:J}){let V=Tt(N),Y=N==="start_to_start"||N==="start_to_finish",Ie=N==="finish_to_finish"||N==="start_to_finish",ae,R,Ce,T;if(V)ae=Y?w-2:p+2,R=M,Ce=Ie?z+2:X-2,T=O;else{ae=(w+p)/2,Ce=(X+z)/2;let k=O>M;Math.abs(M-O)<5?(R=M-J/2,T=O-J/2):(R=k?M+J/2:M-J/2,T=k?O-J/2:O+J/2)}return{x1:ae,y1:R,x2:Ce,y2:T,isScheduling:V,fromStart:Y,toEnd:Ie}}function mt(w,p){let M=/translate\(([-\d.]+)/.exec(w||"");return M?parseFloat(M[1]):p}function at(w,p){let M=/translate\([^,]+,\s*([-\d.]+)/.exec(w||"");return M?parseFloat(M[1]):p}function kt(w,p){for(let M of w)if(p>=M.y&&p<M.y+M.height)return M.key;return null}function Et(w){let{vscode:p,menuUndo:M,menuRedo:X,addDocListener:z,closeOnOutsideClick:O,announce:N,saveState:J,updateUndoRedoButtons:V,undoStack:Y,redoStack:Ie,selectedIssues:ae,clearSelection:R,allIssueBars:Ce,redmineBaseUrl:T,minDateMs:k,maxDateMs:oe,timelineWidth:u,dayWidth:fe,barHeight:de,ganttScroll:Q,snapToDay:te,focusOnDependencyChain:De,clearFocus:qe,getFocusedIssueId:Ae,scrollToAndHighlight:Xe,isDraftModeEnabled:ge,isPerfDebugEnabled:ke,getLookupMaps:Re}=w,y=[],D=[];function l(s,o,t){document.querySelector(".relation-picker")?.remove();let i=ae.size>1&&ae.has(t),a=i?Array.from(ae).map(x=>parseInt(x)):[parseInt(t)],B=document.createElement("div");B.className="relation-picker";let C=160,b=180,_=Math.min(s,window.innerWidth-C-10),I=Math.min(o,window.innerHeight-b-10);B.style.left=Math.max(10,_)+"px",B.style.top=Math.max(10,I)+"px";let P=document.createElement("div");P.style.padding="6px 12px",P.style.fontSize="11px",P.style.opacity="0.7",P.textContent=i?a.length+" issues selected":"#"+t,B.appendChild(P),(i?[{label:"Set % Done...",command:"bulkSetDoneRatio",bulk:!0},{label:"Clear Selection",command:"clearSelection",local:!0}]:[{label:"Update Issue...",command:"openIssue"},{label:"Open in Browser",command:"openInBrowser"},{label:"Show in Issues",command:"showInIssues"},{label:"Log Time",command:"logTime"},{label:"Set % Done",command:"setDoneRatio"},{label:"Set Internal Estimate",command:"setInternalEstimate"},{label:"Copy Link",command:"copyLink",local:!0},{label:"Copy URL",command:"copyUrl"}]).forEach(x=>{let v=document.createElement("button");v.textContent=x.label,v.addEventListener("click",async()=>{if(x.command==="copyLink"){let U=document.querySelector('.issue-bar[data-issue-id="'+t+'"]')?.dataset?.subject||"Issue #"+t,j=T+"/issues/"+t,Le=ne=>String(ne).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"),re='<a href="'+Le(j)+'">#'+t+" "+Le(U)+"</a>",se=j;try{await navigator.clipboard.write([new ClipboardItem({"text/plain":new Blob([se],{type:"text/plain"}),"text/html":new Blob([re],{type:"text/html"})})]),p.postMessage({command:"showStatus",message:"Copied #"+t+" link"})}catch{await navigator.clipboard.writeText(se),p.postMessage({command:"showStatus",message:"Copied #"+t+" URL"})}}else x.local?R():x.bulk?p.postMessage({command:x.command,issueIds:a}):p.postMessage({command:x.command,issueId:parseInt(t)});B.remove()}),B.appendChild(v)}),document.body.appendChild(B),O(B)}function g(s){let o=k+s/u*(oe-k);return new Date(o).toISOString().slice(0,10)}function r(s){let o=k+s/u*(oe-k)-864e5;return new Date(o).toISOString().slice(0,10)}let A=document.getElementById("dragDateTooltip"),S=null;function L(s){let o=new Date(s+"T00:00:00"),t=o.toLocaleDateString("en-US",{month:"short"}),i=o.getDate(),a=o.toLocaleDateString("en-US",{weekday:"short"});return t+" "+i+" ("+a+")"}function H(s,o){let t=new Date(s+"T00:00:00"),i=new Date(o+"T00:00:00"),a=t.toLocaleDateString("en-US",{month:"short"}),B=i.toLocaleDateString("en-US",{month:"short"});return a===B?a+" "+t.getDate()+"-"+i.getDate():a+" "+t.getDate()+"-"+B+" "+i.getDate()}function Z(s){A.textContent=s,A.style.display="block",S=s}function be(s){s!==S&&(A.textContent=s,S=s)}function Pe(s,o){let t=o-28,i=!1;t<40&&(t=o+20,i=!0),A.style.left=s+"px",A.style.top=t+"px",A.classList.toggle("flipped",i)}function pe(){A.style.display="none",S=null}let $=4,n=4;function we(s,o){ke&&ke()&&console.log("[Arrow Debug]",s,o)}function _e(s,o,t,i,a,B=!1,C=!1){let b=t>s,_=Math.abs(t-s),I=_<30,P=Math.abs(o-i)<5,E=i>o,x=B?-1:1,v=C?1:-1,Se=8+n,U;a?P&&b?U="sameRow-right":!P&&I&&(B===b||_<Se)?U="nearlyVertical":b?U="diffRow-right":P?U="sameRow-left":U="diffRow-left":U="non-scheduling";let j,Le;if(a)if(P&&b)j="M "+s+" "+o+" H "+t;else if(P&&!b){let re=o-de;j="M "+s+" "+o+" V "+(re+n)+" q 0 "+-n+" "+x*-n+" "+-n+" H "+(t+v*12-v*n)+" q "+v*-n+" 0 "+v*-n+" "+n+" V "+i+" H "+t}else if(!P&&I&&(B===b||_<Se)){let se=(o+i)/2;j="M "+s+" "+o+" H "+(s+x*8-x*n)+" q "+x*n+" 0 "+x*n+" "+(E?n:-n)+" V "+(se+(E?-n:n))+" q 0 "+(E?n:-n)+" "+-x*n+" "+(E?n:-n)+" H "+(t+v*8-v*n)+" q "+v*n+" 0 "+v*n+" "+(E?n:-n)+" V "+(i+(E?-n:n))+" q 0 "+(E?n:-n)+" "+-v*n+" "+(E?n:-n)+" H "+t}else if(b&&!B)j="M "+s+" "+o+" H "+(s+x*8-x*n)+" q "+x*n+" 0 "+x*n+" "+(E?n:-n)+" V "+(i+(E?-n:n))+" q 0 "+(E?n:-n)+" "+n+" "+(E?n:-n)+" H "+t;else if(b)j="M "+s+" "+o+" H "+(t+v*8-v*n)+" q "+v*n+" 0 "+v*n+" "+(E?n:-n)+" V "+(i+(E?-n:n))+" q 0 "+(E?n:-n)+" "+-v*n+" "+(E?n:-n)+" H "+t;else if(B)j="M "+s+" "+o+" H "+(t+v*8+n)+" q "+-n+" 0 "+-n+" "+(E?n:-n)+" V "+(i+(E?-n:n))+" q 0 "+(E?n:-n)+" "+n+" "+(E?n:-n)+" H "+t;else{let se=(o+i)/2;j="M "+s+" "+o+" H "+(s+x*8-x*n)+" q "+x*n+" 0 "+x*n+" "+(E?n:-n)+" V "+(se+(E?-n:n))+" q 0 "+(E?n:-n)+" "+-n+" "+(E?n:-n)+" H "+(t+v*8+n)+" q "+-n+" 0 "+-n+" "+(E?n:-n)+" V "+(i+(E?-n:n))+" q 0 "+(E?n:-n)+" "+n+" "+(E?n:-n)+" H "+t}else{let re=Math.abs(s-t)<5;if(P){let se=o-8;j="M "+s+" "+o+" V "+(se+n)+" q 0 "+-n+" "+(b?n:-n)+" "+-n+" H "+(t+(b?-n:n))+" q "+(b?n:-n)+" 0 "+(b?n:-n)+" "+n+" V "+i,Le="M "+(t-$*.6)+" "+(i-$)+" L "+t+" "+i+" L "+(t+$*.6)+" "+(i-$)}else if(re)j="M "+s+" "+o+" V "+i,Le=E?"M "+(t-$*.6)+" "+(i-$)+" L "+t+" "+i+" L "+(t+$*.6)+" "+(i-$):"M "+(t-$*.6)+" "+(i+$)+" L "+t+" "+i+" L "+(t+$*.6)+" "+(i+$);else{let se=(o+i)/2;j="M "+s+" "+o+" V "+(se+(E?-n:n))+" q 0 "+(E?n:-n)+" "+(b?n:-n)+" "+(E?n:-n)+" H "+(t+(b?-n:n))+" q "+(b?n:-n)+" 0 "+(b?n:-n)+" "+(E?n:-n)+" V "+i,Le=E?"M "+(t-$*.6)+" "+(i-$)+" L "+t+" "+i+" L "+(t+$*.6)+" "+(i-$):"M "+(t-$*.6)+" "+(i+$)+" L "+t+" "+i+" L "+(t+$*.6)+" "+(i+$)}}return a&&(Le=C?"M "+(t+$)+" "+(i-$*.6)+" L "+t+" "+i+" L "+(t+$)+" "+(i+$*.6):"M "+(t-$)+" "+(i-$*.6)+" L "+t+" "+i+" L "+(t-$)+" "+(i+$*.6)),we("calcArrowPath",{inputs:{x1:s,y1:o,x2:t,y2:i,isScheduling:a},conditions:{goingRight:b,horizontalDist:_,nearlyVertical:I,sameRow:P,goingDown:E},pathCase:U,path:j.substring(0,80)+(j.length>80?"...":"")}),{path:j,arrowHead:Le}}function We(s){let o=at(s.getAttribute("transform"),NaN);return Number.isNaN(o)?parseFloat(s.dataset.centerY):o+de/2}function Ke(s){let o='.dependency-arrow[data-from="'+s+'"], .dependency-arrow[data-to="'+s+'"]';return Oe(o)}function Oe(s){let o=[];return document.querySelectorAll(s).forEach(t=>{let i=t.getAttribute("data-from"),a=t.getAttribute("data-to"),C=(t.getAttribute("class")||"").match(/rel-(\w+)/),b=C?C[1]:"relates",_=["blocks","precedes","finish_to_start","start_to_start","finish_to_finish","start_to_finish"].includes(b),I=document.querySelector('.issue-bar[data-issue-id="'+i+'"]'),P=document.querySelector('.issue-bar[data-issue-id="'+a+'"]');!I||!P||o.push({element:t,fromId:i,toId:a,isScheduling:_,relType:b,fromBar:I,toBar:P,linePath:t.querySelector(".arrow-line"),hitPath:t.querySelector(".arrow-hit-area"),headPath:t.querySelector(".arrow-head")})}),o}function Te(s,o,t,i){s.forEach(a=>{let B=a.linePath?a.linePath.getAttribute("d"):null,C=a.fromId==o?t:parseFloat(a.fromBar.dataset.startX),b=a.fromId==o?i:parseFloat(a.fromBar.dataset.endX),_=We(a.fromBar),I=a.toId==o?t:parseFloat(a.toBar.dataset.startX),P=a.toId==o?i:parseFloat(a.toBar.dataset.endX),E=We(a.toBar),{x1:x,y1:v,x2:Se,y2:U,fromStart:j,toEnd:Le}=St({fromStartX:C,fromEndX:b,fromY:_,toStartX:I,toEndX:P,toY:E,relType:a.relType,barHeight:de});we("updateArrowPositions",{arrow:a.fromId+" -> "+a.toId,isScheduling:a.isScheduling,draggedId:o,barData:{fromStartX:a.fromBar.dataset.startX,fromEndX:a.fromBar.dataset.endX,fromY:a.fromBar.dataset.centerY,toStartX:a.toBar.dataset.startX,toEndX:a.toBar.dataset.endX,toY:a.toBar.dataset.centerY},computed:{fromStartX:C,fromEndX:b,fromY:_,toStartX:I,toEndX:P,toY:E},coords:{x1:x,y1:v,x2:Se,y2:U},originalPath:B?B.substring(0,60)+"...":null});let{path:re,arrowHead:se}=_e(x,v,Se,U,a.isScheduling,j,Le);a.linePath&&a.linePath.setAttribute("d",re),a.hitPath&&a.hitPath.setAttribute("d",re),a.headPath&&a.headPath.setAttribute("d",se)})}function Ge(){Te(Oe(".dependency-arrow"),null,null,null)}let Ne=document.getElementById("dragConfirmOverlay"),Ye=document.getElementById("dragConfirmMessage"),me=document.getElementById("dragConfirmOk"),rt=document.getElementById("dragConfirmCancel"),he=null;function nt(s,o,t){!Ne||!Ye||(Ye.textContent=s,he={onConfirm:o,onCancel:t},Ne.style.display="flex",me&&me.focus())}function q(){Ne&&(Ne.style.display="none"),he=null}function K(){Q&&ue&&(Q.scrollLeft=ue.left,Q.scrollTop=ue.top),ue=null}me?.addEventListener("click",()=>{he?.onConfirm&&he.onConfirm(),ue=null,q()}),rt?.addEventListener("click",()=>{he?.onCancel&&he.onCancel(),K(),q()}),Ne?.addEventListener("click",s=>{s.target===Ne&&(he?.onCancel&&he.onCancel(),K(),q())}),z("keydown",s=>{he&&(s.key==="Escape"?(s.preventDefault(),he.onCancel&&he.onCancel(),K(),q()):s.key==="Enter"&&(s.preventDefault(),he.onConfirm&&he.onConfirm(),ue=null,q()))});let f=null,ue=null,xe=!1;z("mousedown",s=>{let o=s.target.closest(".drag-handle");if(o){s.preventDefault(),s.stopPropagation(),ue={left:Q?.scrollLeft,top:Q?.scrollTop};{let t=o.closest(".issue-bar"),i=o.classList.contains("drag-left"),a=parseInt(t.dataset.issueId),B=parseFloat(t.dataset.startX),C=parseFloat(t.dataset.endX),b=t.dataset.startDate||null,_=t.dataset.dueDate||null,I=t.querySelector(".bar-outline"),P=t.querySelector(".bar-main"),E=t.querySelector(".drag-left"),x=t.querySelector(".drag-right");t.classList.add("dragging");let v=t.querySelector(".bar-labels"),Se=v?.classList.contains("labels-left"),U=Ke(a),j=t.querySelector(".link-handle");we("dragStart (resize)",{issueId:a,isLeft:i,connectedArrowCount:U.length,arrows:U.map(re=>({from:re.fromId,to:re.toId,isScheduling:re.isScheduling,currentPath:re.linePath?re.linePath.getAttribute("d")?.substring(0,60)+"...":null}))}),f={issueId:a,isLeft:i,isMove:!1,initialMouseX:s.clientX,startX:B,endX:C,oldStartDate:b,oldDueDate:_,barOutline:I,barMain:P,leftHandle:E,rightHandle:x,leftGripCircles:E?Array.from(E.querySelectorAll(".drag-grip circle")):[],rightGripCircles:x?Array.from(x.querySelectorAll(".drag-grip circle")):[],bar:t,barLabels:v,labelsOnLeft:Se,connectedArrows:U,linkHandle:j,linkHandleCircles:j?Array.from(j.querySelectorAll("circle")):[]};let Le=i?b:_;Le&&(Z((i?"Start: ":"Due: ")+L(Le)),Pe(s.clientX,s.clientY))}}}),z("mousedown",s=>{if(s.target.closest(".drag-handle")||s.ctrlKey||s.metaKey||s.shiftKey)return;let o=s.target.closest(".bar-outline");if(o){s.preventDefault(),s.stopPropagation(),ue={left:Q?.scrollLeft,top:Q?.scrollTop};{let t=o.closest(".issue-bar");if(!t)return;let i=t.dataset.issueId,a=ae.size>1&&ae.has(i),C=(a?Ce.filter(v=>ae.has(v.dataset.issueId)):[t]).map(v=>{let Se=v.querySelector(".drag-left"),U=v.querySelector(".drag-right");return{issueId:v.dataset.issueId,startX:parseFloat(v.dataset.startX),endX:parseFloat(v.dataset.endX),oldStartDate:v.dataset.startDate||null,oldDueDate:v.dataset.dueDate||null,barOutline:v.querySelector(".bar-outline"),barMain:v.querySelector(".bar-main"),leftHandle:Se,rightHandle:U,leftGripCircles:Se?Array.from(Se.querySelectorAll(".drag-grip circle")):[],rightGripCircles:U?Array.from(U.querySelectorAll(".drag-grip circle")):[],leftHandleRect:Se?.querySelector("rect"),rightHandleRect:U?.querySelector("rect"),bar:v,barLabels:v.querySelector(".bar-labels"),labelsOnLeft:v.querySelector(".bar-labels")?.classList.contains("labels-left"),connectedArrows:Ke(v.dataset.issueId),linkHandle:v.querySelector(".link-handle"),linkHandleCircles:v.querySelector(".link-handle")?Array.from(v.querySelector(".link-handle").querySelectorAll("circle")):[]}});C.forEach(v=>v.bar.classList.add("dragging"));let b=t.querySelector(".bar-labels"),_=b?.classList.contains("labels-left"),I=Ke(i),P=t.querySelector(".link-handle"),E=t.querySelector(".drag-left"),x=t.querySelector(".drag-right");we("dragStart (move)",{issueId:i,isBulkDrag:a,connectedArrowCount:I.length,arrows:I.map(v=>({from:v.fromId,to:v.toId,isScheduling:v.isScheduling,currentPath:v.linePath?v.linePath.getAttribute("d")?.substring(0,60)+"...":null}))}),f={issueId:parseInt(i),isLeft:!1,isMove:!0,isBulkDrag:a,bulkBars:C,initialMouseX:s.clientX,startX:parseFloat(t.dataset.startX),endX:parseFloat(t.dataset.endX),oldStartDate:t.dataset.startDate||null,oldDueDate:t.dataset.dueDate||null,barOutline:o,barMain:t.querySelector(".bar-main"),leftHandle:E,rightHandle:x,leftGripCircles:E?Array.from(E.querySelectorAll(".drag-grip circle")):[],rightGripCircles:x?Array.from(x.querySelectorAll(".drag-grip circle")):[],bar:t,barLabels:b,labelsOnLeft:_,connectedArrows:I,linkHandle:P,linkHandleCircles:P?Array.from(P.querySelectorAll("circle")):[]},!a&&t.dataset.startDate&&t.dataset.dueDate&&(Z(H(t.dataset.startDate,t.dataset.dueDate)),Pe(s.clientX,s.clientY))}}});let le=null,Ee=null,ye=null;function Ue(){le&&(le.fromBar.classList.remove("linking-source"),document.querySelectorAll(".link-target").forEach(s=>s.classList.remove("link-target")),Ee&&(Ee.remove(),Ee=null),le=null,ye=null,document.body.classList.remove("cursor-crosshair"))}function Je(s,o,t,i,a="end",B="start"){document.querySelector(".relation-picker")?.remove();let C=document.createElement("div");C.className="relation-picker";let b=180,_=200,I=Math.min(s,window.innerWidth-b-10),P=Math.min(o,window.innerHeight-_-10);C.style.left=Math.max(10,I)+"px",C.style.top=Math.max(10,P)+"px";let x={end_start:"finish_to_start",end_end:"finish_to_finish",start_start:"start_to_start",start_end:"start_to_finish"}[`${a}_${B}`]||"finish_to_start",Se=[{value:"blocks",label:"\u{1F6AB} Blocks",cssClass:"rel-line-blocks",tooltip:"Target cannot be closed until this issue is closed"},{value:"precedes",label:"\u27A1\uFE0F Precedes",cssClass:"rel-line-scheduling",tooltip:"This issue must complete before target can start"},{value:"relates",label:"\u{1F517} Relates to",cssClass:"rel-line-informational",tooltip:"Simple link between issues (no constraints)"},{value:"duplicates",label:"\u{1F4CB} Duplicates",cssClass:"rel-line-informational",tooltip:"Closing target will automatically close this issue"},{value:"copied_to",label:"\u{1F4C4} Copied to",cssClass:"rel-line-informational",tooltip:"This issue was copied to create the target issue"}],U=-1,j=document.createElement("div");j.className="delay-row";let Le=document.createElement("label");Le.textContent="Delay:",j.appendChild(Le);let re=document.createElement("button");re.className="delay-preset active",re.dataset.delay="-1",re.title="Start same day predecessor ends",re.textContent="Same day",j.appendChild(re);let se=document.createElement("button");se.className="delay-preset",se.dataset.delay="0",se.title="Start day after predecessor ends",se.textContent="+1 day",j.appendChild(se);let ne=document.createElement("input");ne.type="number",ne.className="delay-input",ne.value=U,ne.min="-30",ne.max="30",ne.title="Custom delay in days (-1=same day, 0=next day, 3=+4 days)",j.appendChild(ne),j.style.display="none",j.querySelectorAll(".delay-preset").forEach(F=>{F.addEventListener("click",G=>{G.stopPropagation(),U=parseInt(F.dataset.delay),ne.value=U,j.querySelectorAll(".delay-preset").forEach(Me=>Me.classList.remove("active")),F.classList.add("active")})}),ne.addEventListener("input",()=>{U=parseInt(ne.value)||0,j.querySelectorAll(".delay-preset").forEach(F=>{F.classList.toggle("active",parseInt(F.dataset.delay)===U)})}),ne.addEventListener("click",F=>F.stopPropagation()),Se.forEach(F=>{let G=document.createElement("button");F.value===x&&G.classList.add("suggested");let Me=document.createElement("span");Me.className="color-swatch "+F.cssClass,G.appendChild(Me),G.appendChild(document.createTextNode(F.label)),G.title=F.tooltip+(F.value===x?" (suggested based on anchors)":""),F.value==="precedes"&&(G.addEventListener("mouseenter",()=>{j.style.display="flex"}),G.addEventListener("focus",()=>{j.style.display="flex"})),G.addEventListener("click",()=>{J();let Ve={command:"createRelation",issueId:t,targetIssueId:i,relationType:F.value};F.value==="precedes"&&(Ve.delay=U),p.postMessage(Ve),C.remove()}),C.appendChild(G)}),C.appendChild(j),document.body.appendChild(C),O(C)}let lt=".drag-handle, .link-handle, .bar-outline, .blocks-badge-group, .blocker-badge, .progress-badge-group, .flex-badge-group";document.querySelectorAll(".issue-bar").forEach(s=>{s.addEventListener("click",o=>{o.target.closest(lt)||f||le||xe||(Ae()&&qe(),Xe(s.dataset.issueId))}),s.addEventListener("dblclick",o=>{f||le||xe||(o.preventDefault(),De(s.dataset.issueId))})});function ct(s,o){if(y.forEach(a=>a.classList.remove("selected")),y=[],D.forEach(a=>a.classList.remove("arrow-connected")),D=[],s.length===0)return;document.body.classList.add("arrow-selection-mode");let t=new Set;s.forEach(a=>{a.classList.add("selected"),y.push(a),t.add(a.dataset.from),t.add(a.dataset.to)});let i=Re?Re():null;t.forEach(a=>{if(i?.mapsReady){let B=i.issueBarsByIssueId.get(a)||[],C=i.issueLabelsByIssueId.get(a)||[];B.forEach(b=>{b.classList.add("arrow-connected"),D.push(b)}),C.forEach(b=>{b.classList.add("arrow-connected"),D.push(b)})}else document.querySelectorAll(`.issue-bar[data-issue-id="${a}"], .issue-label[data-issue-id="${a}"]`).forEach(B=>{B.classList.add("arrow-connected"),D.push(B)})}),N(`Highlighted ${s.length} dependency arrow(s) for #${o}`)}document.querySelectorAll(".blocks-badge-group").forEach(s=>{s.addEventListener("mousedown",o=>{o.preventDefault(),o.stopPropagation()}),s.addEventListener("click",o=>{o.preventDefault(),o.stopPropagation();let t=s.closest(".issue-bar");if(!t)return;let i=t.dataset.issueId,a=Array.from(document.querySelectorAll(`.dependency-arrow[data-from="${i}"]`));ct(a,i)})}),document.querySelectorAll(".blocker-badge").forEach(s=>{s.addEventListener("mousedown",o=>{o.preventDefault(),o.stopPropagation()}),s.addEventListener("click",o=>{o.preventDefault(),o.stopPropagation();let t=s.closest(".issue-bar");if(!t)return;let i=t.dataset.issueId,a=Array.from(document.querySelectorAll(`.dependency-arrow[data-to="${i}"]`));ct(a,i)})});let ee=Array.from(document.querySelectorAll(".issue-bar")),Ze=10;ee.forEach((s,o)=>{s.addEventListener("keydown",t=>{if(t.key==="Enter"||t.key===" ")t.preventDefault(),Xe(s.dataset.issueId);else if(t.key==="ArrowDown"&&o<ee.length-1)t.preventDefault(),ee[o+1].focus(),N(`Issue ${ee[o+1].getAttribute("aria-label")}`);else if(t.key==="ArrowUp"&&o>0)t.preventDefault(),ee[o-1].focus(),N(`Issue ${ee[o-1].getAttribute("aria-label")}`);else if(t.key==="Home")t.preventDefault(),ee[0].focus(),N(`First issue: ${ee[0].getAttribute("aria-label")}`);else if(t.key==="End")t.preventDefault(),ee[ee.length-1].focus(),N(`Last issue: ${ee[ee.length-1].getAttribute("aria-label")}`);else if(t.key==="PageDown"){t.preventDefault();let i=Math.min(o+Ze,ee.length-1);ee[i].focus(),N(`Issue ${ee[i].getAttribute("aria-label")}`)}else if(t.key==="PageUp"){t.preventDefault();let i=Math.max(o-Ze,0);ee[i].focus(),N(`Issue ${ee[i].getAttribute("aria-label")}`)}else if(t.key==="Tab"&&t.shiftKey){let i=s.dataset.issueId,a=document.querySelector(`.issue-label[data-issue-id="${i}"]`);a&&(t.preventDefault(),a.focus(),N(`Label for issue #${i}`))}})}),document.querySelectorAll(".link-handle").forEach(s=>{s.addEventListener("mousedown",o=>{o.stopPropagation(),o.preventDefault();let t=s.closest(".issue-bar"),i=parseInt(t.dataset.issueId),a=parseFloat(s.dataset.cx),B=parseFloat(s.dataset.cy);t.classList.add("linking-source"),document.body.classList.add("cursor-crosshair");let C=document.querySelector("#ganttTimeline svg");if(!document.getElementById("temp-arrow-head")){let _=document.createElementNS("http://www.w3.org/2000/svg","defs");_.innerHTML=`
+"use strict";
+(() => {
+  // src/webviews/gantt/gantt-minimap.js
+  function setupMinimap({
+    timelineWidth,
+    minimapBarsData,
+    minimapHeight,
+    minimapBarHeight,
+    minimapTodayX,
+    ganttScroll,
+    minimapSvg,
+    minimapViewport,
+    addDocListener
+  }) {
+    function updateMinimapPosition() {
+      const stickyLeft = document.querySelector(".gantt-body .gantt-sticky-left");
+      const ganttContainer = document.querySelector(".gantt-container");
+      if (stickyLeft && ganttContainer) {
+        ganttContainer.style.setProperty("--sticky-left-width", stickyLeft.offsetWidth + "px");
+      }
+    }
+    requestAnimationFrame(updateMinimapPosition);
+    if (minimapSvg) {
+      requestAnimationFrame(() => {
+        const barSpacing = minimapHeight / (minimapBarsData.length + 1);
+        minimapBarsData.forEach((bar, i) => {
+          const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          rect.setAttribute("class", bar.classes);
+          rect.setAttribute("x", (bar.startPct * timelineWidth).toString());
+          rect.setAttribute("y", (barSpacing * (i + 0.5)).toString());
+          rect.setAttribute("width", Math.max(2, (bar.endPct - bar.startPct) * timelineWidth).toString());
+          rect.setAttribute("height", minimapBarHeight.toString());
+          rect.setAttribute("rx", "1");
+          rect.setAttribute("fill", bar.color);
+          minimapSvg.insertBefore(rect, minimapViewport);
+        });
+        if (minimapTodayX > 0 && minimapTodayX < timelineWidth) {
+          const todayLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+          todayLine.setAttribute("class", "minimap-today");
+          todayLine.setAttribute("x1", minimapTodayX.toString());
+          todayLine.setAttribute("y1", "0");
+          todayLine.setAttribute("x2", minimapTodayX.toString());
+          todayLine.setAttribute("y2", minimapHeight.toString());
+          minimapSvg.insertBefore(todayLine, minimapViewport);
+        }
+      });
+    }
+    function updateMinimapViewport() {
+      if (!ganttScroll || !minimapViewport) return;
+      if (!timelineWidth || !ganttScroll.scrollWidth || !ganttScroll.clientWidth) return;
+      const scrollableRange = Math.max(1, ganttScroll.scrollWidth - ganttScroll.clientWidth);
+      const scrollRatio = Math.min(1, ganttScroll.scrollLeft / scrollableRange);
+      const viewportRatio = Math.min(1, ganttScroll.clientWidth / ganttScroll.scrollWidth);
+      const viewportWidth = Math.max(20, viewportRatio * timelineWidth);
+      const viewportX = scrollRatio * (timelineWidth - viewportWidth);
+      if (isNaN(viewportX) || isNaN(viewportWidth)) return;
+      minimapViewport.setAttribute("x", viewportX.toString());
+      minimapViewport.setAttribute("width", viewportWidth.toString());
+    }
+    let minimapDragging = false;
+    let minimapDragOffset = 0;
+    function scrollFromMinimap(e, useOffset = false) {
+      if (!ganttScroll || !minimapSvg || !minimapViewport) return;
+      const rect = minimapSvg.getBoundingClientRect();
+      const viewportWidth = parseFloat(minimapViewport.getAttribute("width") || "0");
+      const viewportWidthPx = viewportWidth / timelineWidth * rect.width;
+      let targetX = e.clientX - rect.left;
+      if (useOffset) {
+        targetX -= minimapDragOffset;
+      } else {
+        targetX -= viewportWidthPx / 2;
+      }
+      const clickRatio = Math.max(0, Math.min(1, targetX / (rect.width - viewportWidthPx)));
+      const scrollableRange = Math.max(0, ganttScroll.scrollWidth - ganttScroll.clientWidth);
+      ganttScroll.scrollLeft = clickRatio * scrollableRange;
+    }
+    if (minimapSvg && minimapViewport) {
+      minimapViewport.addEventListener("mousedown", (e) => {
+        e.stopPropagation();
+        minimapDragging = true;
+        const rect = minimapSvg.getBoundingClientRect();
+        const viewportX = parseFloat(minimapViewport.getAttribute("x") || "0");
+        const viewportXPx = viewportX / timelineWidth * rect.width;
+        minimapDragOffset = e.clientX - rect.left - viewportXPx;
+      });
+      minimapSvg.addEventListener("mousedown", (e) => {
+        if (e.target === minimapViewport) return;
+        minimapDragging = true;
+        const rect = minimapSvg.getBoundingClientRect();
+        const viewportWidth = parseFloat(minimapViewport.getAttribute("width") || "0");
+        minimapDragOffset = viewportWidth / timelineWidth * rect.width / 2;
+        scrollFromMinimap(e, true);
+      });
+      addDocListener("mousemove", (e) => {
+        if (minimapDragging) scrollFromMinimap(e, true);
+      });
+      addDocListener("mouseup", () => {
+        minimapDragging = false;
+      });
+    }
+    return { updateMinimapPosition, updateMinimapViewport };
+  }
+
+  // src/webviews/gantt/arrow-utils.js
+  var SCHEDULING_TYPES = ["blocks", "precedes", "finish_to_start", "start_to_start", "finish_to_finish", "start_to_finish"];
+  function isSchedulingRelation(relType) {
+    return SCHEDULING_TYPES.includes(relType);
+  }
+  function computeArrowEndpoints({ fromStartX, fromEndX, fromY, toStartX, toEndX, toY, relType, barHeight }) {
+    const isScheduling = isSchedulingRelation(relType);
+    const fromStart = relType === "start_to_start" || relType === "start_to_finish";
+    const toEnd = relType === "finish_to_finish" || relType === "start_to_finish";
+    let x1, y1, x2, y2;
+    if (isScheduling) {
+      x1 = fromStart ? fromStartX - 2 : fromEndX + 2;
+      y1 = fromY;
+      x2 = toEnd ? toEndX + 2 : toStartX - 2;
+      y2 = toY;
+    } else {
+      x1 = (fromStartX + fromEndX) / 2;
+      x2 = (toStartX + toEndX) / 2;
+      const goingDown = toY > fromY;
+      const sameRowCenter = Math.abs(fromY - toY) < 5;
+      if (sameRowCenter) {
+        y1 = fromY - barHeight / 2;
+        y2 = toY - barHeight / 2;
+      } else {
+        y1 = goingDown ? fromY + barHeight / 2 : fromY - barHeight / 2;
+        y2 = goingDown ? toY - barHeight / 2 : toY + barHeight / 2;
+      }
+    }
+    return { x1, y1, x2, y2, isScheduling, fromStart, toEnd };
+  }
+
+  // src/webviews/gantt/selection-utils.js
+  function parseTranslateX(transform, fallback) {
+    const match = /translate\(([-\d.]+)/.exec(transform || "");
+    return match ? parseFloat(match[1]) : fallback;
+  }
+  function parseTranslateY(transform, fallback) {
+    const match = /translate\([^,]+,\s*([-\d.]+)/.exec(transform || "");
+    return match ? parseFloat(match[1]) : fallback;
+  }
+  function pickRowKeyByY(rows, y) {
+    for (const row of rows) {
+      if (y >= row.y && y < row.y + row.height) return row.key;
+    }
+    return null;
+  }
+
+  // src/webviews/gantt/gantt-drag.js
+  function setupDrag(ctx) {
+    const {
+      vscode: vscode2,
+      menuUndo,
+      menuRedo,
+      addDocListener,
+      closeOnOutsideClick,
+      announce,
+      saveState,
+      updateUndoRedoButtons,
+      undoStack,
+      redoStack,
+      selectedIssues,
+      clearSelection,
+      allIssueBars,
+      redmineBaseUrl,
+      minDateMs,
+      maxDateMs,
+      timelineWidth,
+      dayWidth,
+      barHeight,
+      ganttScroll,
+      snapToDay,
+      focusOnDependencyChain,
+      clearFocus,
+      getFocusedIssueId,
+      scrollToAndHighlight,
+      isDraftModeEnabled,
+      isPerfDebugEnabled,
+      getLookupMaps
+    } = ctx;
+    let highlightedArrows = [];
+    let highlightedConnected = [];
+    function showIssueContextMenu(x, y, issueId) {
+      document.querySelector(".relation-picker")?.remove();
+      const isBulkMode = selectedIssues.size > 1 && selectedIssues.has(issueId);
+      const targetIds = isBulkMode ? Array.from(selectedIssues).map((id) => parseInt(id)) : [parseInt(issueId)];
+      const picker = document.createElement("div");
+      picker.className = "relation-picker";
+      const pickerWidth = 160;
+      const pickerHeight = 180;
+      const clampedX = Math.min(x, window.innerWidth - pickerWidth - 10);
+      const clampedY = Math.min(y, window.innerHeight - pickerHeight - 10);
+      picker.style.left = Math.max(10, clampedX) + "px";
+      picker.style.top = Math.max(10, clampedY) + "px";
+      const label = document.createElement("div");
+      label.style.padding = "6px 12px";
+      label.style.fontSize = "11px";
+      label.style.opacity = "0.7";
+      label.textContent = isBulkMode ? targetIds.length + " issues selected" : "#" + issueId;
+      picker.appendChild(label);
+      const options = isBulkMode ? [
+        { label: "Set % Done...", command: "bulkSetDoneRatio", bulk: true },
+        { label: "Clear Selection", command: "clearSelection", local: true }
+      ] : [
+        { label: "Update Issue...", command: "openIssue" },
+        { label: "Open in Browser", command: "openInBrowser" },
+        { label: "Show in Issues", command: "showInIssues" },
+        { label: "Log Time", command: "logTime" },
+        { label: "Set % Done", command: "setDoneRatio" },
+        { label: "Set Internal Estimate", command: "setInternalEstimate" },
+        { label: "Copy Link", command: "copyLink", local: true },
+        { label: "Copy URL", command: "copyUrl" }
+      ];
+      options.forEach((opt) => {
+        const btn = document.createElement("button");
+        btn.textContent = opt.label;
+        btn.addEventListener("click", async () => {
+          if (opt.command === "copyLink") {
+            const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
+            const subject = bar?.dataset?.subject || "Issue #" + issueId;
+            const url = redmineBaseUrl + "/issues/" + issueId;
+            const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+            const html = '<a href="' + esc(url) + '">#' + issueId + " " + esc(subject) + "</a>";
+            const plain = url;
+            try {
+              await navigator.clipboard.write([
+                new ClipboardItem({
+                  "text/plain": new Blob([plain], { type: "text/plain" }),
+                  "text/html": new Blob([html], { type: "text/html" })
+                })
+              ]);
+              vscode2.postMessage({ command: "showStatus", message: "Copied #" + issueId + " link" });
+            } catch (e) {
+              await navigator.clipboard.writeText(plain);
+              vscode2.postMessage({ command: "showStatus", message: "Copied #" + issueId + " URL" });
+            }
+          } else if (opt.local) {
+            clearSelection();
+          } else if (opt.bulk) {
+            vscode2.postMessage({ command: opt.command, issueIds: targetIds });
+          } else {
+            vscode2.postMessage({ command: opt.command, issueId: parseInt(issueId) });
+          }
+          picker.remove();
+        });
+        picker.appendChild(btn);
+      });
+      document.body.appendChild(picker);
+      closeOnOutsideClick(picker);
+    }
+    function xToDate(x) {
+      const ms = minDateMs + x / timelineWidth * (maxDateMs - minDateMs);
+      const d = new Date(ms);
+      return d.toISOString().slice(0, 10);
+    }
+    function xToDueDate(x) {
+      const ms = minDateMs + x / timelineWidth * (maxDateMs - minDateMs) - 864e5;
+      const d = new Date(ms);
+      return d.toISOString().slice(0, 10);
+    }
+    const dragTooltip = document.getElementById("dragDateTooltip");
+    let lastTooltipDate = null;
+    function formatDateShort(dateStr) {
+      const d = /* @__PURE__ */ new Date(dateStr + "T00:00:00");
+      const month = d.toLocaleDateString("en-US", { month: "short" });
+      const day = d.getDate();
+      const weekday = d.toLocaleDateString("en-US", { weekday: "short" });
+      return month + " " + day + " (" + weekday + ")";
+    }
+    function formatDateRange(startStr, endStr) {
+      const sd = /* @__PURE__ */ new Date(startStr + "T00:00:00"), ed = /* @__PURE__ */ new Date(endStr + "T00:00:00");
+      const sm = sd.toLocaleDateString("en-US", { month: "short" });
+      const em = ed.toLocaleDateString("en-US", { month: "short" });
+      return sm === em ? sm + " " + sd.getDate() + "-" + ed.getDate() : sm + " " + sd.getDate() + "-" + em + " " + ed.getDate();
+    }
+    function showDragTooltip(text) {
+      dragTooltip.textContent = text;
+      dragTooltip.style.display = "block";
+      lastTooltipDate = text;
+    }
+    function updateDragTooltip(text) {
+      if (text === lastTooltipDate) return;
+      dragTooltip.textContent = text;
+      lastTooltipDate = text;
+    }
+    function positionDragTooltip(clientX, clientY) {
+      let top = clientY - 28;
+      let flipped = false;
+      if (top < 40) {
+        top = clientY + 20;
+        flipped = true;
+      }
+      dragTooltip.style.left = clientX + "px";
+      dragTooltip.style.top = top + "px";
+      dragTooltip.classList.toggle("flipped", flipped);
+    }
+    function hideDragTooltip() {
+      dragTooltip.style.display = "none";
+      lastTooltipDate = null;
+    }
+    const arrowSize = 4;
+    const r = 4;
+    function logArrowDebug(label, data) {
+      if (isPerfDebugEnabled && isPerfDebugEnabled()) {
+        console.log("[Arrow Debug]", label, data);
+      }
+    }
+    function calcArrowPath(x1, y1, x2, y2, isScheduling, fromStart = false, toEnd = false) {
+      const goingRight = x2 > x1;
+      const horizontalDist = Math.abs(x2 - x1);
+      const nearlyVertical = horizontalDist < 30;
+      const sameRow = Math.abs(y1 - y2) < 5;
+      const goingDown = y2 > y1;
+      const jogDir = fromStart ? -1 : 1;
+      const approachDir = toEnd ? 1 : -1;
+      const minJogRoom = 8 + r;
+      let pathCase;
+      if (!isScheduling) pathCase = "non-scheduling";
+      else if (sameRow && goingRight) pathCase = "sameRow-right";
+      else if (!sameRow && nearlyVertical && (fromStart === goingRight || horizontalDist < minJogRoom)) pathCase = "nearlyVertical";
+      else if (goingRight) pathCase = "diffRow-right";
+      else if (sameRow) pathCase = "sameRow-left";
+      else pathCase = "diffRow-left";
+      let path;
+      let arrowHead;
+      if (!isScheduling) {
+        const centersAligned = Math.abs(x1 - x2) < 5;
+        if (sameRow) {
+          const routeY = y1 - 8;
+          path = "M " + x1 + " " + y1 + " V " + (routeY + r) + " q 0 " + -r + " " + (goingRight ? r : -r) + " " + -r + " H " + (x2 + (goingRight ? -r : r)) + " q " + (goingRight ? r : -r) + " 0 " + (goingRight ? r : -r) + " " + r + " V " + y2;
+          arrowHead = "M " + (x2 - arrowSize * 0.6) + " " + (y2 - arrowSize) + " L " + x2 + " " + y2 + " L " + (x2 + arrowSize * 0.6) + " " + (y2 - arrowSize);
+        } else if (centersAligned) {
+          path = "M " + x1 + " " + y1 + " V " + y2;
+          arrowHead = goingDown ? "M " + (x2 - arrowSize * 0.6) + " " + (y2 - arrowSize) + " L " + x2 + " " + y2 + " L " + (x2 + arrowSize * 0.6) + " " + (y2 - arrowSize) : "M " + (x2 - arrowSize * 0.6) + " " + (y2 + arrowSize) + " L " + x2 + " " + y2 + " L " + (x2 + arrowSize * 0.6) + " " + (y2 + arrowSize);
+        } else {
+          const midY = (y1 + y2) / 2;
+          path = "M " + x1 + " " + y1 + " V " + (midY + (goingDown ? -r : r)) + " q 0 " + (goingDown ? r : -r) + " " + (goingRight ? r : -r) + " " + (goingDown ? r : -r) + " H " + (x2 + (goingRight ? -r : r)) + " q " + (goingRight ? r : -r) + " 0 " + (goingRight ? r : -r) + " " + (goingDown ? r : -r) + " V " + y2;
+          arrowHead = goingDown ? "M " + (x2 - arrowSize * 0.6) + " " + (y2 - arrowSize) + " L " + x2 + " " + y2 + " L " + (x2 + arrowSize * 0.6) + " " + (y2 - arrowSize) : "M " + (x2 - arrowSize * 0.6) + " " + (y2 + arrowSize) + " L " + x2 + " " + y2 + " L " + (x2 + arrowSize * 0.6) + " " + (y2 + arrowSize);
+        }
+      } else if (sameRow && goingRight) {
+        path = "M " + x1 + " " + y1 + " H " + x2;
+      } else if (sameRow && !goingRight) {
+        const routeY = y1 - barHeight;
+        path = "M " + x1 + " " + y1 + " V " + (routeY + r) + " q 0 " + -r + " " + jogDir * -r + " " + -r + " H " + (x2 + approachDir * 12 - approachDir * r) + " q " + approachDir * -r + " 0 " + approachDir * -r + " " + r + " V " + y2 + " H " + x2;
+      } else if (!sameRow && nearlyVertical && (fromStart === goingRight || horizontalDist < minJogRoom)) {
+        const jogX = 8;
+        const midY = (y1 + y2) / 2;
+        path = "M " + x1 + " " + y1 + " H " + (x1 + jogDir * jogX - jogDir * r) + " q " + jogDir * r + " 0 " + jogDir * r + " " + (goingDown ? r : -r) + " V " + (midY + (goingDown ? -r : r)) + " q 0 " + (goingDown ? r : -r) + " " + -jogDir * r + " " + (goingDown ? r : -r) + " H " + (x2 + approachDir * jogX - approachDir * r) + " q " + approachDir * r + " 0 " + approachDir * r + " " + (goingDown ? r : -r) + " V " + (y2 + (goingDown ? -r : r)) + " q 0 " + (goingDown ? r : -r) + " " + -approachDir * r + " " + (goingDown ? r : -r) + " H " + x2;
+      } else if (goingRight && !fromStart) {
+        const jogX = 8;
+        path = "M " + x1 + " " + y1 + " H " + (x1 + jogDir * jogX - jogDir * r) + " q " + jogDir * r + " 0 " + jogDir * r + " " + (goingDown ? r : -r) + " V " + (y2 + (goingDown ? -r : r)) + " q 0 " + (goingDown ? r : -r) + " " + r + " " + (goingDown ? r : -r) + " H " + x2;
+      } else if (goingRight) {
+        const jogX = 8;
+        path = "M " + x1 + " " + y1 + " H " + (x2 + approachDir * jogX - approachDir * r) + " q " + approachDir * r + " 0 " + approachDir * r + " " + (goingDown ? r : -r) + " V " + (y2 + (goingDown ? -r : r)) + " q 0 " + (goingDown ? r : -r) + " " + -approachDir * r + " " + (goingDown ? r : -r) + " H " + x2;
+      } else if (fromStart) {
+        const jogX = 8;
+        path = "M " + x1 + " " + y1 + " H " + (x2 + approachDir * jogX + r) + " q " + -r + " 0 " + -r + " " + (goingDown ? r : -r) + " V " + (y2 + (goingDown ? -r : r)) + " q 0 " + (goingDown ? r : -r) + " " + r + " " + (goingDown ? r : -r) + " H " + x2;
+      } else {
+        const jogX = 8;
+        const midY = (y1 + y2) / 2;
+        path = "M " + x1 + " " + y1 + " H " + (x1 + jogDir * jogX - jogDir * r) + " q " + jogDir * r + " 0 " + jogDir * r + " " + (goingDown ? r : -r) + " V " + (midY + (goingDown ? -r : r)) + " q 0 " + (goingDown ? r : -r) + " " + -r + " " + (goingDown ? r : -r) + " H " + (x2 + approachDir * jogX + r) + " q " + -r + " 0 " + -r + " " + (goingDown ? r : -r) + " V " + (y2 + (goingDown ? -r : r)) + " q 0 " + (goingDown ? r : -r) + " " + r + " " + (goingDown ? r : -r) + " H " + x2;
+      }
+      if (isScheduling) {
+        arrowHead = toEnd ? "M " + (x2 + arrowSize) + " " + (y2 - arrowSize * 0.6) + " L " + x2 + " " + y2 + " L " + (x2 + arrowSize) + " " + (y2 + arrowSize * 0.6) : "M " + (x2 - arrowSize) + " " + (y2 - arrowSize * 0.6) + " L " + x2 + " " + y2 + " L " + (x2 - arrowSize) + " " + (y2 + arrowSize * 0.6);
+      }
+      logArrowDebug("calcArrowPath", {
+        inputs: { x1, y1, x2, y2, isScheduling },
+        conditions: { goingRight, horizontalDist, nearlyVertical, sameRow, goingDown },
+        pathCase,
+        path: path.substring(0, 80) + (path.length > 80 ? "..." : "")
+      });
+      return { path, arrowHead };
+    }
+    function barCenterY(bar) {
+      const transformY = parseTranslateY(bar.getAttribute("transform"), NaN);
+      return Number.isNaN(transformY) ? parseFloat(bar.dataset.centerY) : transformY + barHeight / 2;
+    }
+    function getConnectedArrows(issueId) {
+      const selector = '.dependency-arrow[data-from="' + issueId + '"], .dependency-arrow[data-to="' + issueId + '"]';
+      return collectArrows(selector);
+    }
+    function collectArrows(selector) {
+      const arrows = [];
+      document.querySelectorAll(selector).forEach((arrow) => {
+        const fromId = arrow.getAttribute("data-from");
+        const toId = arrow.getAttribute("data-to");
+        const classList = arrow.getAttribute("class") || "";
+        const relMatch = classList.match(/rel-(\w+)/);
+        const relType = relMatch ? relMatch[1] : "relates";
+        const isScheduling = ["blocks", "precedes", "finish_to_start", "start_to_start", "finish_to_finish", "start_to_finish"].includes(relType);
+        const fromBar = document.querySelector('.issue-bar[data-issue-id="' + fromId + '"]');
+        const toBar = document.querySelector('.issue-bar[data-issue-id="' + toId + '"]');
+        if (!fromBar || !toBar) return;
+        arrows.push({
+          element: arrow,
+          fromId,
+          toId,
+          isScheduling,
+          relType,
+          fromBar,
+          toBar,
+          linePath: arrow.querySelector(".arrow-line"),
+          hitPath: arrow.querySelector(".arrow-hit-area"),
+          headPath: arrow.querySelector(".arrow-head")
+        });
+      });
+      return arrows;
+    }
+    function updateArrowPositions(arrows, draggedIssueId, newStartX, newEndX) {
+      arrows.forEach((a) => {
+        const originalPath = a.linePath ? a.linePath.getAttribute("d") : null;
+        const fromStartX = a.fromId == draggedIssueId ? newStartX : parseFloat(a.fromBar.dataset.startX);
+        const fromEndX = a.fromId == draggedIssueId ? newEndX : parseFloat(a.fromBar.dataset.endX);
+        const fromY = barCenterY(a.fromBar);
+        const toStartX = a.toId == draggedIssueId ? newStartX : parseFloat(a.toBar.dataset.startX);
+        const toEndX = a.toId == draggedIssueId ? newEndX : parseFloat(a.toBar.dataset.endX);
+        const toY = barCenterY(a.toBar);
+        const { x1, y1, x2, y2, fromStart, toEnd } = computeArrowEndpoints({
+          fromStartX,
+          fromEndX,
+          fromY,
+          toStartX,
+          toEndX,
+          toY,
+          relType: a.relType,
+          barHeight
+        });
+        logArrowDebug("updateArrowPositions", {
+          arrow: a.fromId + " -> " + a.toId,
+          isScheduling: a.isScheduling,
+          draggedId: draggedIssueId,
+          barData: {
+            fromStartX: a.fromBar.dataset.startX,
+            fromEndX: a.fromBar.dataset.endX,
+            fromY: a.fromBar.dataset.centerY,
+            toStartX: a.toBar.dataset.startX,
+            toEndX: a.toBar.dataset.endX,
+            toY: a.toBar.dataset.centerY
+          },
+          computed: { fromStartX, fromEndX, fromY, toStartX, toEndX, toY },
+          coords: { x1, y1, x2, y2 },
+          originalPath: originalPath ? originalPath.substring(0, 60) + "..." : null
+        });
+        const { path, arrowHead } = calcArrowPath(x1, y1, x2, y2, a.isScheduling, fromStart, toEnd);
+        if (a.linePath) a.linePath.setAttribute("d", path);
+        if (a.hitPath) a.hitPath.setAttribute("d", path);
+        if (a.headPath) a.headPath.setAttribute("d", arrowHead);
+      });
+    }
+    function refreshArrowGeometry() {
+      updateArrowPositions(collectArrows(".dependency-arrow"), null, null, null);
+    }
+    const dragConfirmOverlay = document.getElementById("dragConfirmOverlay");
+    const dragConfirmMessage = document.getElementById("dragConfirmMessage");
+    const dragConfirmOk = document.getElementById("dragConfirmOk");
+    const dragConfirmCancel = document.getElementById("dragConfirmCancel");
+    let pendingDragConfirm = null;
+    function showDragConfirmModal(message, onConfirm, onCancel) {
+      if (!dragConfirmOverlay || !dragConfirmMessage) return;
+      dragConfirmMessage.textContent = message;
+      pendingDragConfirm = { onConfirm, onCancel };
+      dragConfirmOverlay.style.display = "flex";
+      if (dragConfirmOk) dragConfirmOk.focus();
+    }
+    function hideDragConfirmModal() {
+      if (dragConfirmOverlay) dragConfirmOverlay.style.display = "none";
+      pendingDragConfirm = null;
+    }
+    function restoreScrollPosition() {
+      if (ganttScroll && dragScrollSnapshot) {
+        ganttScroll.scrollLeft = dragScrollSnapshot.left;
+        ganttScroll.scrollTop = dragScrollSnapshot.top;
+      }
+      dragScrollSnapshot = null;
+    }
+    dragConfirmOk?.addEventListener("click", () => {
+      if (pendingDragConfirm?.onConfirm) pendingDragConfirm.onConfirm();
+      dragScrollSnapshot = null;
+      hideDragConfirmModal();
+    });
+    dragConfirmCancel?.addEventListener("click", () => {
+      if (pendingDragConfirm?.onCancel) pendingDragConfirm.onCancel();
+      restoreScrollPosition();
+      hideDragConfirmModal();
+    });
+    dragConfirmOverlay?.addEventListener("click", (e) => {
+      if (e.target === dragConfirmOverlay) {
+        if (pendingDragConfirm?.onCancel) pendingDragConfirm.onCancel();
+        restoreScrollPosition();
+        hideDragConfirmModal();
+      }
+    });
+    addDocListener("keydown", (e) => {
+      if (!pendingDragConfirm) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (pendingDragConfirm.onCancel) pendingDragConfirm.onCancel();
+        restoreScrollPosition();
+        hideDragConfirmModal();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (pendingDragConfirm.onConfirm) pendingDragConfirm.onConfirm();
+        dragScrollSnapshot = null;
+        hideDragConfirmModal();
+      }
+    });
+    let dragState = null;
+    let dragScrollSnapshot = null;
+    let justEndedDrag = false;
+    addDocListener("mousedown", (e) => {
+      const handle = e.target.closest(".drag-handle");
+      if (!handle) return;
+      e.preventDefault();
+      e.stopPropagation();
+      dragScrollSnapshot = { left: ganttScroll?.scrollLeft, top: ganttScroll?.scrollTop };
+      {
+        const bar = handle.closest(".issue-bar");
+        const isLeft = handle.classList.contains("drag-left");
+        const issueId = parseInt(bar.dataset.issueId);
+        const startX = parseFloat(bar.dataset.startX);
+        const endX = parseFloat(bar.dataset.endX);
+        const oldStartDate = bar.dataset.startDate || null;
+        const oldDueDate = bar.dataset.dueDate || null;
+        const barOutline = bar.querySelector(".bar-outline");
+        const barMain = bar.querySelector(".bar-main");
+        const leftHandle = bar.querySelector(".drag-left");
+        const rightHandle = bar.querySelector(".drag-right");
+        bar.classList.add("dragging");
+        const barLabels = bar.querySelector(".bar-labels");
+        const labelsOnLeft = barLabels?.classList.contains("labels-left");
+        const connectedArrows = getConnectedArrows(issueId);
+        const linkHandle = bar.querySelector(".link-handle");
+        logArrowDebug("dragStart (resize)", {
+          issueId,
+          isLeft,
+          connectedArrowCount: connectedArrows.length,
+          arrows: connectedArrows.map((a) => ({
+            from: a.fromId,
+            to: a.toId,
+            isScheduling: a.isScheduling,
+            currentPath: a.linePath ? a.linePath.getAttribute("d")?.substring(0, 60) + "..." : null
+          }))
+        });
+        dragState = {
+          issueId,
+          isLeft,
+          isMove: false,
+          initialMouseX: e.clientX,
+          startX,
+          endX,
+          oldStartDate,
+          oldDueDate,
+          barOutline,
+          barMain,
+          leftHandle,
+          rightHandle,
+          // Cache grip circles to avoid querySelectorAll per frame
+          leftGripCircles: leftHandle ? Array.from(leftHandle.querySelectorAll(".drag-grip circle")) : [],
+          rightGripCircles: rightHandle ? Array.from(rightHandle.querySelectorAll(".drag-grip circle")) : [],
+          bar,
+          barLabels,
+          labelsOnLeft,
+          connectedArrows,
+          linkHandle,
+          linkHandleCircles: linkHandle ? Array.from(linkHandle.querySelectorAll("circle")) : []
+        };
+        const currentDate = isLeft ? oldStartDate : oldDueDate;
+        if (currentDate) {
+          showDragTooltip((isLeft ? "Start: " : "Due: ") + formatDateShort(currentDate));
+          positionDragTooltip(e.clientX, e.clientY);
+        }
+      }
+    });
+    addDocListener("mousedown", (e) => {
+      if (e.target.closest(".drag-handle")) return;
+      if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const outline = e.target.closest(".bar-outline");
+      if (!outline) return;
+      e.preventDefault();
+      e.stopPropagation();
+      dragScrollSnapshot = { left: ganttScroll?.scrollLeft, top: ganttScroll?.scrollTop };
+      {
+        const bar = outline.closest(".issue-bar");
+        if (!bar) return;
+        const issueId = bar.dataset.issueId;
+        const isBulkDrag = selectedIssues.size > 1 && selectedIssues.has(issueId);
+        const barsToMove = isBulkDrag ? allIssueBars.filter((b) => selectedIssues.has(b.dataset.issueId)) : [bar];
+        const bulkBars = barsToMove.map((b) => {
+          const leftHandle = b.querySelector(".drag-left");
+          const rightHandle = b.querySelector(".drag-right");
+          return {
+            issueId: b.dataset.issueId,
+            startX: parseFloat(b.dataset.startX),
+            endX: parseFloat(b.dataset.endX),
+            oldStartDate: b.dataset.startDate || null,
+            oldDueDate: b.dataset.dueDate || null,
+            barOutline: b.querySelector(".bar-outline"),
+            barMain: b.querySelector(".bar-main"),
+            leftHandle,
+            rightHandle,
+            // Cache grip circles to avoid querySelectorAll per frame
+            leftGripCircles: leftHandle ? Array.from(leftHandle.querySelectorAll(".drag-grip circle")) : [],
+            rightGripCircles: rightHandle ? Array.from(rightHandle.querySelectorAll(".drag-grip circle")) : [],
+            leftHandleRect: leftHandle?.querySelector("rect"),
+            rightHandleRect: rightHandle?.querySelector("rect"),
+            bar: b,
+            barLabels: b.querySelector(".bar-labels"),
+            labelsOnLeft: b.querySelector(".bar-labels")?.classList.contains("labels-left"),
+            connectedArrows: getConnectedArrows(b.dataset.issueId),
+            linkHandle: b.querySelector(".link-handle"),
+            linkHandleCircles: b.querySelector(".link-handle") ? Array.from(b.querySelector(".link-handle").querySelectorAll("circle")) : []
+          };
+        });
+        bulkBars.forEach((b) => b.bar.classList.add("dragging"));
+        const singleBarLabels = bar.querySelector(".bar-labels");
+        const singleLabelsOnLeft = singleBarLabels?.classList.contains("labels-left");
+        const connectedArrows = getConnectedArrows(issueId);
+        const singleLinkHandle = bar.querySelector(".link-handle");
+        const singleLeftHandle = bar.querySelector(".drag-left");
+        const singleRightHandle = bar.querySelector(".drag-right");
+        logArrowDebug("dragStart (move)", {
+          issueId,
+          isBulkDrag,
+          connectedArrowCount: connectedArrows.length,
+          arrows: connectedArrows.map((a) => ({
+            from: a.fromId,
+            to: a.toId,
+            isScheduling: a.isScheduling,
+            currentPath: a.linePath ? a.linePath.getAttribute("d")?.substring(0, 60) + "..." : null
+          }))
+        });
+        dragState = {
+          issueId: parseInt(issueId),
+          isLeft: false,
+          isMove: true,
+          isBulkDrag,
+          bulkBars,
+          initialMouseX: e.clientX,
+          startX: parseFloat(bar.dataset.startX),
+          endX: parseFloat(bar.dataset.endX),
+          oldStartDate: bar.dataset.startDate || null,
+          oldDueDate: bar.dataset.dueDate || null,
+          barOutline: outline,
+          barMain: bar.querySelector(".bar-main"),
+          leftHandle: singleLeftHandle,
+          rightHandle: singleRightHandle,
+          // Cache grip circles to avoid querySelectorAll per frame
+          leftGripCircles: singleLeftHandle ? Array.from(singleLeftHandle.querySelectorAll(".drag-grip circle")) : [],
+          rightGripCircles: singleRightHandle ? Array.from(singleRightHandle.querySelectorAll(".drag-grip circle")) : [],
+          bar,
+          barLabels: singleBarLabels,
+          labelsOnLeft: singleLabelsOnLeft,
+          connectedArrows,
+          linkHandle: singleLinkHandle,
+          linkHandleCircles: singleLinkHandle ? Array.from(singleLinkHandle.querySelectorAll("circle")) : []
+        };
+        if (!isBulkDrag && bar.dataset.startDate && bar.dataset.dueDate) {
+          showDragTooltip(formatDateRange(bar.dataset.startDate, bar.dataset.dueDate));
+          positionDragTooltip(e.clientX, e.clientY);
+        }
+      }
+    });
+    let linkingState = null;
+    let tempArrow = null;
+    let currentTarget = null;
+    function cancelLinking() {
+      if (!linkingState) return;
+      linkingState.fromBar.classList.remove("linking-source");
+      document.querySelectorAll(".link-target").forEach((el) => el.classList.remove("link-target"));
+      if (tempArrow) {
+        tempArrow.remove();
+        tempArrow = null;
+      }
+      linkingState = null;
+      currentTarget = null;
+      document.body.classList.remove("cursor-crosshair");
+    }
+    function showRelationPicker(x, y, fromId, toId, fromAnchor = "end", toAnchor = "start") {
+      document.querySelector(".relation-picker")?.remove();
+      const picker = document.createElement("div");
+      picker.className = "relation-picker";
+      const pickerWidth = 180;
+      const pickerHeight = 200;
+      const clampedX = Math.min(x, window.innerWidth - pickerWidth - 10);
+      const clampedY = Math.min(y, window.innerHeight - pickerHeight - 10);
+      picker.style.left = Math.max(10, clampedX) + "px";
+      picker.style.top = Math.max(10, clampedY) + "px";
+      const anchorToRelation = {
+        "end_start": "finish_to_start",
+        "end_end": "finish_to_finish",
+        "start_start": "start_to_start",
+        "start_end": "start_to_finish"
+      };
+      const suggestedType = anchorToRelation[`${fromAnchor}_${toAnchor}`] || "finish_to_start";
+      const baseTypes = [
+        {
+          value: "blocks",
+          label: "\u{1F6AB} Blocks",
+          cssClass: "rel-line-blocks",
+          tooltip: "Target cannot be closed until this issue is closed"
+        },
+        {
+          value: "precedes",
+          label: "\u27A1\uFE0F Precedes",
+          cssClass: "rel-line-scheduling",
+          tooltip: "This issue must complete before target can start"
+        },
+        {
+          value: "relates",
+          label: "\u{1F517} Relates to",
+          cssClass: "rel-line-informational",
+          tooltip: "Simple link between issues (no constraints)"
+        },
+        {
+          value: "duplicates",
+          label: "\u{1F4CB} Duplicates",
+          cssClass: "rel-line-informational",
+          tooltip: "Closing target will automatically close this issue"
+        },
+        {
+          value: "copied_to",
+          label: "\u{1F4C4} Copied to",
+          cssClass: "rel-line-informational",
+          tooltip: "This issue was copied to create the target issue"
+        }
+      ];
+      const types = baseTypes;
+      let currentDelay = -1;
+      const delayRow = document.createElement("div");
+      delayRow.className = "delay-row";
+      const delayLabel = document.createElement("label");
+      delayLabel.textContent = "Delay:";
+      delayRow.appendChild(delayLabel);
+      const sameDayBtn = document.createElement("button");
+      sameDayBtn.className = "delay-preset active";
+      sameDayBtn.dataset.delay = "-1";
+      sameDayBtn.title = "Start same day predecessor ends";
+      sameDayBtn.textContent = "Same day";
+      delayRow.appendChild(sameDayBtn);
+      const nextDayBtn = document.createElement("button");
+      nextDayBtn.className = "delay-preset";
+      nextDayBtn.dataset.delay = "0";
+      nextDayBtn.title = "Start day after predecessor ends";
+      nextDayBtn.textContent = "+1 day";
+      delayRow.appendChild(nextDayBtn);
+      const delayInput = document.createElement("input");
+      delayInput.type = "number";
+      delayInput.className = "delay-input";
+      delayInput.value = currentDelay;
+      delayInput.min = "-30";
+      delayInput.max = "30";
+      delayInput.title = "Custom delay in days (-1=same day, 0=next day, 3=+4 days)";
+      delayRow.appendChild(delayInput);
+      delayRow.style.display = "none";
+      delayRow.querySelectorAll(".delay-preset").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          currentDelay = parseInt(btn.dataset.delay);
+          delayInput.value = currentDelay;
+          delayRow.querySelectorAll(".delay-preset").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+        });
+      });
+      delayInput.addEventListener("input", () => {
+        currentDelay = parseInt(delayInput.value) || 0;
+        delayRow.querySelectorAll(".delay-preset").forEach((b) => {
+          b.classList.toggle("active", parseInt(b.dataset.delay) === currentDelay);
+        });
+      });
+      delayInput.addEventListener("click", (e) => e.stopPropagation());
+      types.forEach((t) => {
+        const btn = document.createElement("button");
+        if (t.value === suggestedType) {
+          btn.classList.add("suggested");
+        }
+        const swatch = document.createElement("span");
+        swatch.className = "color-swatch " + t.cssClass;
+        btn.appendChild(swatch);
+        btn.appendChild(document.createTextNode(t.label));
+        btn.title = t.tooltip + (t.value === suggestedType ? " (suggested based on anchors)" : "");
+        if (t.value === "precedes") {
+          btn.addEventListener("mouseenter", () => {
+            delayRow.style.display = "flex";
+          });
+          btn.addEventListener("focus", () => {
+            delayRow.style.display = "flex";
+          });
+        }
+        btn.addEventListener("click", () => {
+          saveState();
+          const message = {
+            command: "createRelation",
+            issueId: fromId,
+            targetIssueId: toId,
+            relationType: t.value
+          };
+          if (t.value === "precedes") {
+            message.delay = currentDelay;
+          }
+          vscode2.postMessage(message);
+          picker.remove();
+        });
+        picker.appendChild(btn);
+      });
+      picker.appendChild(delayRow);
+      document.body.appendChild(picker);
+      closeOnOutsideClick(picker);
+    }
+    const interactiveSelector = ".drag-handle, .link-handle, .bar-outline, .blocks-badge-group, .blocker-badge, .progress-badge-group, .flex-badge-group";
+    document.querySelectorAll(".issue-bar").forEach((bar) => {
+      bar.addEventListener("click", (e) => {
+        if (e.target.closest(interactiveSelector)) return;
+        if (dragState || linkingState || justEndedDrag) return;
+        if (getFocusedIssueId()) {
+          clearFocus();
+        }
+        scrollToAndHighlight(bar.dataset.issueId);
+      });
+      bar.addEventListener("dblclick", (e) => {
+        if (dragState || linkingState || justEndedDrag) return;
+        e.preventDefault();
+        focusOnDependencyChain(bar.dataset.issueId);
+      });
+    });
+    function highlightArrows(arrows, issueId) {
+      highlightedArrows.forEach((a) => a.classList.remove("selected"));
+      highlightedArrows = [];
+      highlightedConnected.forEach((el) => el.classList.remove("arrow-connected"));
+      highlightedConnected = [];
+      if (arrows.length === 0) return;
+      document.body.classList.add("arrow-selection-mode");
+      const connectedIds = /* @__PURE__ */ new Set();
+      arrows.forEach((arrow) => {
+        arrow.classList.add("selected");
+        highlightedArrows.push(arrow);
+        connectedIds.add(arrow.dataset.from);
+        connectedIds.add(arrow.dataset.to);
+      });
+      const maps = getLookupMaps ? getLookupMaps() : null;
+      connectedIds.forEach((id) => {
+        if (maps?.mapsReady) {
+          const bars = maps.issueBarsByIssueId.get(id) || [];
+          const labels = maps.issueLabelsByIssueId.get(id) || [];
+          bars.forEach((el) => {
+            el.classList.add("arrow-connected");
+            highlightedConnected.push(el);
+          });
+          labels.forEach((el) => {
+            el.classList.add("arrow-connected");
+            highlightedConnected.push(el);
+          });
+        } else {
+          document.querySelectorAll(`.issue-bar[data-issue-id="${id}"], .issue-label[data-issue-id="${id}"]`).forEach((el) => {
+            el.classList.add("arrow-connected");
+            highlightedConnected.push(el);
+          });
+        }
+      });
+      announce(`Highlighted ${arrows.length} dependency arrow(s) for #${issueId}`);
+    }
+    document.querySelectorAll(".blocks-badge-group").forEach((badge) => {
+      badge.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      badge.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const issueBar = badge.closest(".issue-bar");
+        if (!issueBar) return;
+        const issueId = issueBar.dataset.issueId;
+        const arrows = Array.from(document.querySelectorAll(`.dependency-arrow[data-from="${issueId}"]`));
+        highlightArrows(arrows, issueId);
+      });
+    });
+    document.querySelectorAll(".blocker-badge").forEach((badge) => {
+      badge.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      badge.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const issueBar = badge.closest(".issue-bar");
+        if (!issueBar) return;
+        const issueId = issueBar.dataset.issueId;
+        const arrows = Array.from(document.querySelectorAll(`.dependency-arrow[data-to="${issueId}"]`));
+        highlightArrows(arrows, issueId);
+      });
+    });
+    const issueBars = Array.from(document.querySelectorAll(".issue-bar"));
+    const PAGE_JUMP = 10;
+    issueBars.forEach((bar, index) => {
+      bar.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          scrollToAndHighlight(bar.dataset.issueId);
+        } else if (e.key === "ArrowDown" && index < issueBars.length - 1) {
+          e.preventDefault();
+          issueBars[index + 1].focus();
+          announce(`Issue ${issueBars[index + 1].getAttribute("aria-label")}`);
+        } else if (e.key === "ArrowUp" && index > 0) {
+          e.preventDefault();
+          issueBars[index - 1].focus();
+          announce(`Issue ${issueBars[index - 1].getAttribute("aria-label")}`);
+        } else if (e.key === "Home") {
+          e.preventDefault();
+          issueBars[0].focus();
+          announce(`First issue: ${issueBars[0].getAttribute("aria-label")}`);
+        } else if (e.key === "End") {
+          e.preventDefault();
+          issueBars[issueBars.length - 1].focus();
+          announce(`Last issue: ${issueBars[issueBars.length - 1].getAttribute("aria-label")}`);
+        } else if (e.key === "PageDown") {
+          e.preventDefault();
+          const nextIdx = Math.min(index + PAGE_JUMP, issueBars.length - 1);
+          issueBars[nextIdx].focus();
+          announce(`Issue ${issueBars[nextIdx].getAttribute("aria-label")}`);
+        } else if (e.key === "PageUp") {
+          e.preventDefault();
+          const prevIdx = Math.max(index - PAGE_JUMP, 0);
+          issueBars[prevIdx].focus();
+          announce(`Issue ${issueBars[prevIdx].getAttribute("aria-label")}`);
+        } else if (e.key === "Tab" && e.shiftKey) {
+          const issueId = bar.dataset.issueId;
+          const label = document.querySelector(`.issue-label[data-issue-id="${issueId}"]`);
+          if (label) {
+            e.preventDefault();
+            label.focus();
+            announce(`Label for issue #${issueId}`);
+          }
+        }
+      });
+    });
+    document.querySelectorAll(".link-handle").forEach((handle) => {
+      handle.addEventListener("mousedown", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const bar = handle.closest(".issue-bar");
+        const issueId = parseInt(bar.dataset.issueId);
+        const cx = parseFloat(handle.dataset.cx);
+        const cy = parseFloat(handle.dataset.cy);
+        bar.classList.add("linking-source");
+        document.body.classList.add("cursor-crosshair");
+        const svg = document.querySelector("#ganttTimeline svg");
+        if (!document.getElementById("temp-arrow-head")) {
+          const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+          defs.innerHTML = `
             <marker id="temp-arrow-head" markerWidth="10" markerHeight="7"
                     refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth">
               <polygon points="0 0, 10 3.5, 0 7" fill="var(--vscode-focusBorder)"/>
-            </marker>`,C.insertBefore(_,C.firstChild)}Ee=document.createElementNS("http://www.w3.org/2000/svg","path"),Ee.classList.add("temp-link-arrow"),Ee.setAttribute("stroke","var(--vscode-focusBorder)"),Ee.setAttribute("stroke-width","2"),Ee.setAttribute("fill","none"),Ee.setAttribute("marker-end","url(#temp-arrow-head)"),C.appendChild(Ee);let b=s.dataset.anchor||"end";le={fromId:i,fromBar:t,startX:a,startY:B,fromAnchor:b}})}),z("keydown",s=>{if(s.key==="Escape"){let o=document.querySelector(".relation-picker");if(o){s.stopImmediatePropagation(),o.remove();return}if(le){s.stopImmediatePropagation(),Ue();return}Ae()&&(s.stopImmediatePropagation(),qe(),N("Focus cleared"))}});let et=!1,$e=null;z("mousemove",s=>{!f&&!le||($e=s,!et&&(et=!0,requestAnimationFrame(()=>{et=!1;let o=$e;if(o){if(f){let t=o.clientX-f.initialMouseX;if(f.isMove&&f.isBulkDrag&&f.bulkBars){let i=te(t)-te(0);f.bulkBars.forEach(a=>{let B=a.endX-a.startX,C=Math.max(0,Math.min(a.startX+i,u-B)),b=C+B,_=b-C;if(a.barOutline.setAttribute("x",C),a.barOutline.setAttribute("width",_),a.barMain&&(a.barMain.setAttribute("x",C),a.barMain.setAttribute("width",_)),a.leftHandleRect&&a.leftHandleRect.setAttribute("x",C),a.rightHandleRect&&a.rightHandleRect.setAttribute("x",b-14),a.leftGripCircles.forEach(I=>I.setAttribute("cx",C+9)),a.rightGripCircles.forEach(I=>I.setAttribute("cx",b-9)),a.newStartX=C,a.newEndX=b,a.barLabels){let I=a.labelsOnLeft?C-a.startX:b-a.endX;a.barLabels.setAttribute("transform","translate("+I+", 0)")}a.connectedArrows&&Te(a.connectedArrows,a.issueId,C,b),a.linkHandleCircles.forEach(I=>I.setAttribute("cx",String(b+8)))}),f.snappedDelta=i}else{let i=f.startX,a=f.endX,B=f.endX-f.startX;f.isMove?(i=te(Math.max(0,Math.min(f.startX+t,u-B))),a=i+B):f.isLeft?i=te(Math.max(0,Math.min(f.startX+t,f.endX-fe))):a=te(Math.max(f.startX+fe,Math.min(f.endX+t,u)));let C=a-i;f.barOutline.setAttribute("x",i),f.barOutline.setAttribute("width",C),f.barMain&&(f.barMain.setAttribute("x",i),f.barMain.setAttribute("width",C));let b=f.leftHandle.querySelector("rect"),_=f.rightHandle.querySelector("rect");if(b&&b.setAttribute("x",i),_&&_.setAttribute("x",a-14),f.leftGripCircles.forEach(I=>I.setAttribute("cx",i+9)),f.rightGripCircles.forEach(I=>I.setAttribute("cx",a-9)),f.newStartX=i,f.newEndX=a,f.barLabels){let I=f.labelsOnLeft?i-f.startX:a-f.endX;f.barLabels.setAttribute("transform","translate("+I+", 0)")}if(f.connectedArrows&&Te(f.connectedArrows,f.issueId,i,a),f.linkHandleCircles.forEach(I=>I.setAttribute("cx",String(a+8))),f.isMove&&!f.isBulkDrag){let I=g(i),P=r(a),x=I!==f.oldStartDate?H(f.oldStartDate,f.oldDueDate)+" \u2192 "+H(I,P):H(I,P);be(x),Pe(o.clientX,o.clientY)}else if(!f.isMove){let I=f.isLeft?i:a,P=f.isLeft?g(I):r(I);be((f.isLeft?"Start: ":"Due: ")+L(P)),Pe(o.clientX,o.clientY)}}}if(le&&Ee){let i=document.querySelector("#ganttTimeline svg").getBoundingClientRect(),a=o.clientX-i.left,B=o.clientY-i.top,C=`M ${le.startX} ${le.startY} L ${a} ${B}`;Ee.setAttribute("d",C);let b=document.elementFromPoint(o.clientX,o.clientY)?.closest(".issue-bar");ye&&ye!==b&&ye.classList.remove("link-target"),b&&b!==le.fromBar?(b.classList.add("link-target"),ye=b):ye=null}}})))});function je(s){if(!s)return;let{bar:o,barOutline:t,barMain:i,leftHandle:a,rightHandle:B,barLabels:C,startX:b,endX:_,connectedArrows:I,issueId:P,linkHandle:E}=s,x=_-b;if(t&&(t.setAttribute("x",String(b)),t.setAttribute("width",String(x))),i&&(i.setAttribute("x",String(b)),i.setAttribute("width",String(x))),a){let v=a.querySelector("rect");v&&v.setAttribute("x",String(b)),a.querySelectorAll(".drag-grip circle").forEach(Se=>Se.setAttribute("cx",b+9))}if(B){let v=B.querySelector("rect");v&&v.setAttribute("x",String(_-14)),B.querySelectorAll(".drag-grip circle").forEach(Se=>Se.setAttribute("cx",_-9))}C&&C.removeAttribute("transform"),I&&I.length>0&&Te(I,P,b,_),E&&E.querySelectorAll("circle").forEach(v=>v.setAttribute("cx",String(_+8))),o&&o.classList.remove("dragging")}return z("mouseup",s=>{if(f){let{issueId:o,isLeft:t,isMove:i,isBulkDrag:a,bulkBars:B,newStartX:C,newEndX:b,bar:_,startX:I,endX:P,oldStartDate:E,oldDueDate:x,barOutline:v,barMain:Se,leftHandle:U,rightHandle:j,barLabels:Le,connectedArrows:re}=f,se={...f};if(a&&B&&i){B.forEach(F=>F.bar.classList.remove("dragging"));let ne=[];if(B.forEach(F=>{if(F.newStartX!==void 0&&F.newStartX!==F.startX){let G=g(F.newStartX),Me=r(F.newEndX);(G!==F.oldStartDate||Me!==F.oldDueDate)&&ne.push({issueId:parseInt(F.issueId),oldStartDate:F.oldStartDate,oldDueDate:F.oldDueDate,newStartDate:G,newDueDate:Me,barData:F})}}),ne.length>0){pe();let F=()=>{Y.push({type:"bulk",changes:ne.map(G=>({issueId:G.issueId,oldStartDate:G.oldStartDate,oldDueDate:G.oldDueDate,newStartDate:G.newStartDate,newDueDate:G.newDueDate}))}),Ie.length=0,V(),J(),ne.forEach(G=>{p.postMessage({command:"updateDates",issueId:G.issueId,startDate:G.newStartDate,dueDate:G.newDueDate})})};if(ge&&ge())F();else{let G="Move "+ne.length+" issue(s) to new dates?";nt(G,F,()=>{B.forEach(Me=>je(Me))})}}else pe(),B.forEach(F=>je(F));f=null,xe=!0,requestAnimationFrame(()=>xe=!1);return}if(_.classList.remove("dragging"),pe(),C!==void 0||b!==void 0){let ne=null,F=null;i?C!==I&&(ne=g(C),F=r(b)):t?ne=C!==I?g(C):null:F=b!==P?r(b):null;let G=ne&&ne!==E?ne:null,Me=F&&F!==x?F:null;if(G||Me){let Ve=()=>{Y.push({issueId:o,oldStartDate:G?E:null,oldDueDate:Me?x:null,newStartDate:G,newDueDate:Me}),Ie.length=0,V(),J(),p.postMessage({command:"updateDates",issueId:o,startDate:G,dueDate:Me})};if(ge&&ge())Ve();else{let tt="Issue #"+o+": ";G&&Me?tt+=H(E,x)+" \u2192 "+H(G,Me):G?tt+="Start: "+L(E)+" \u2192 "+L(G):tt+="Due: "+L(x)+" \u2192 "+L(Me),nt(tt,Ve,()=>{je(se)})}}else je(se)}else je(se);f=null,xe=!0,requestAnimationFrame(()=>xe=!1)}if(le){let o=le.fromId,t=le.fromAnchor;if(ye){let i=parseInt(ye.dataset.issueId);if(o!==i){let B=document.querySelector("#ganttTimeline svg").getBoundingClientRect(),C=s.clientX-B.left,b=ye.querySelector(".bar-outline"),_=parseFloat(b.getAttribute("x")),I=_+parseFloat(b.getAttribute("width")),P=(_+I)/2,E=C<P?"start":"end";Je(s.clientX,s.clientY,o,i,t,E)}}Ue()}he||K()}),M?.addEventListener("click",()=>{if(M.hasAttribute("disabled")||Y.length===0)return;let s=Y.pop();if(Ie.push(s),V(),J(),s.type==="relation")s.operation==="create"?p.postMessage({command:"undoRelation",operation:"delete",relationId:s.relationId,datesBefore:s.datesBefore}):p.postMessage({command:"undoRelation",operation:"create",issueId:s.issueId,targetIssueId:s.targetIssueId,relationType:s.relationType,delay:s.delay});else if(s.type==="bulk"){let o=ge&&ge();s.changes.forEach(t=>{o?p.postMessage({command:"removeDraft",issueId:t.issueId,startDate:t.oldStartDate,dueDate:t.oldDueDate}):p.postMessage({command:"updateDates",issueId:t.issueId,startDate:t.oldStartDate,dueDate:t.oldDueDate})})}else ge&&ge()?p.postMessage({command:"removeDraft",issueId:s.issueId,startDate:s.oldStartDate,dueDate:s.oldDueDate}):p.postMessage({command:"updateDates",issueId:s.issueId,startDate:s.oldStartDate,dueDate:s.oldDueDate})}),X?.addEventListener("click",()=>{if(X.hasAttribute("disabled")||Ie.length===0)return;let s=Ie.pop();Y.push(s),V(),J(),s.type==="relation"?s.operation==="create"?p.postMessage({command:"redoRelation",operation:"create",issueId:s.issueId,targetIssueId:s.targetIssueId,relationType:s.relationType,delay:s.delay}):p.postMessage({command:"redoRelation",operation:"delete",relationId:s.relationId}):s.type==="bulk"?s.changes.forEach(o=>{p.postMessage({command:"updateDates",issueId:o.issueId,startDate:o.newStartDate,dueDate:o.newDueDate})}):p.postMessage({command:"updateDates",issueId:s.issueId,startDate:s.newStartDate,dueDate:s.newDueDate})}),{refreshArrowGeometry:Ge}}function Lt(w,p){let M=[],X=[w];for(;X.length>0;){let z=X.shift(),O=p.get(z);if(O)for(let N of O)M.push(N),X.push(N)}return M}function Dt(w,p,M){let X=[],z=[],O=N=>{let J=p.get(N);if(!J)return;let V=[...J];for(let Y=V.length-1;Y>=0;Y--)z.push(V[Y])};for(O(w);z.length>0;){let N=z.pop();X.push(N),M.get(N)&&O(N)}return X}function At(w){let{vscode:p,addDocListener:M,addWinListener:X,announce:z,barHeight:O,selectedCollapseKey:N,refreshArrowGeometry:J}=w;document.querySelectorAll(".collapse-toggle").forEach(l=>{l.addEventListener("click",g=>{g.stopPropagation();let A=l.closest("[data-collapse-key]")?.dataset.collapseKey;A&&D(A)})}),document.getElementById("menuExpand")?.addEventListener("click",()=>{let g=document.getElementById("ganttScroll")?.dataset.allExpandableKeys,r=g?JSON.parse(g):[];p.postMessage({command:"expandAll",keys:r})}),document.getElementById("menuCollapse")?.addEventListener("click",()=>{p.postMessage({command:"collapseAll"})});let V=Array.from(document.querySelectorAll(".project-label, .issue-label, .time-group-label")),Y=null,Ie=N??null;function ae(l){return!l.classList.contains("gantt-row-hidden")&&l.getAttribute("visibility")!=="hidden"}function R(l,g){let r=l+g;for(;r>=0&&r<V.length;){if(ae(V[r]))return{label:V[r],index:r};r+=g}return null}function Ce(l){let g=document.getElementById("ganttScroll"),r=document.querySelector(".gantt-header-row");if(!g||!l)return;let A=r?.getBoundingClientRect().height||60,S=l.closest(".gantt-row");if(!S)return;let L=S.getBoundingClientRect().top,H=S.getBoundingClientRect().height,Z=g.getBoundingClientRect(),be=Z.top+A,Pe=Z.bottom;L<be?g.scrollBy({top:L-be-4,behavior:"smooth"}):L+H>Pe&&g.scrollBy({top:L+H-Pe+4,behavior:"smooth"})}function T(l,g=!1,r=!1,A=!1){Y&&Y.classList.remove("active"),Y=l,l&&(l.classList.add("active"),A||l.focus({preventScroll:!0}),r&&Ce(l),g||p.postMessage({command:"setSelectedKey",collapseKey:l.dataset.collapseKey})),Xe()}X("focus",()=>{Y&&ae(Y)&&Y.focus()}),M("keydown",l=>{l.key==="Escape"&&Y&&(Y.classList.remove("active"),Y.blur(),Y=null,p.postMessage({command:"setSelectedKey",collapseKey:null}),Xe())});let k=new Map,oe=new Map,u=new Map,fe=new Map,de=new Map;function Q(l){let g=l.dataset.originalY;if(de.has(g))return de.get(g);let r=JSON.parse(l.dataset.rowContributions||"{}");return de.set(g,r),r}function te(){k.clear(),document.querySelectorAll("[data-collapse-key][data-original-y]").forEach(g=>{let r=g.dataset.collapseKey,A=parseFloat(g.dataset.originalY);k.has(r)||k.set(r,{originalY:A,elements:[]}),k.get(r).elements.push(g)})}function De(){oe.clear(),u.clear(),fe.clear(),document.querySelectorAll("[data-collapse-key][data-parent-key]").forEach(g=>{let r=g.dataset.collapseKey,A=g.dataset.parentKey;if(A&&(u.has(A)||u.set(A,new Set),u.get(A).add(r)),oe.has(r))return;let S=[],L=g.dataset.parentKey;for(;L;)S.push(L),L=document.querySelector('[data-collapse-key="'+L+'"]')?.dataset.parentKey||null;oe.set(r,S)}),document.querySelectorAll("[data-collapse-key][data-expanded]").forEach(g=>{fe.set(g.dataset.collapseKey,g.dataset.expanded==="true")})}te(),De();let qe="http://www.w3.org/2000/svg",Ae=[];[".gantt-labels svg",".gantt-col-status svg",".gantt-col-id svg",".gantt-col-start svg",".gantt-col-due svg",".gantt-col-assignee svg",".gantt-timeline svg"].forEach(l=>{let g=document.querySelector(l);if(!g)return;let r=document.createElementNS(qe,"rect");r.setAttribute("class","row-selection-overlay"),r.setAttribute("x","0"),r.setAttribute("width","100%"),r.setAttribute("height",String(O+2)),r.setAttribute("visibility","hidden"),g.insertBefore(r,g.firstChild),Ae.push(r)});function Xe(){let l=Y?.dataset.collapseKey,g=l?k.get(l):null;if(!g||!ae(Y)){Ae.forEach(S=>S.setAttribute("visibility","hidden"));return}let r=g.elements[0],A=at(r.getAttribute("transform"),g.originalY);Ae.forEach(S=>{S.setAttribute("y",String(A-1)),S.setAttribute("visibility","visible")})}function ge(l,g){g?(l.setAttribute("visibility","hidden"),l.classList.add("gantt-row-hidden")):(l.removeAttribute("visibility"),l.classList.remove("gantt-row-hidden"))}function ke(l,g){if(!l)return;let r=parseFloat(l.getAttribute("height")||"0");l.setAttribute("height",String(r+g))}function Re(l){return Lt(l,u)}function y(l){return Dt(l,u,fe)}function D(l,g){let r=document.querySelector('[data-collapse-key="'+l+'"].project-label, [data-collapse-key="'+l+'"].time-group-label, [data-collapse-key="'+l+'"].issue-label');if(!r||r.dataset.hasChildren!=="true")return;let A=r.dataset.expanded==="true",S=g==="expand"?!0:g==="collapse"?!1:!A;if(S===A)return;r.dataset.expanded=S?"true":"false",fe.set(l,S);let L=r.querySelector(".collapse-toggle");L&&L.classList.toggle("expanded",S);let H=Re(l),Z=S?y(l):[];if(H.length===0){p.postMessage({command:"collapseStateSync",collapseKey:l,isExpanded:S});return}let be=new Set(H),Pe=new Set(Z),pe=k.get(l),$=pe?.originalY??0,n=new Set,we=0,_e=0,We=S?Z:y(l),Ke=new Set(We),Oe=document.querySelectorAll(".zebra-stripe");if(Oe.forEach(q=>{let K=Q(q);l in K&&_e===0&&(_e=parseFloat(q.dataset.originalY||"0"));for(let[f,ue]of Object.entries(K))Ke.has(f)&&!n.has(f)&&(we+=parseFloat(ue),n.add(f))}),we===0&&We.length>0){p.postMessage({command:"collapseStateSync",collapseKey:l,isExpanded:S}),p.postMessage({command:"requestRerender"});return}let Te=S?we:-we,Ge=$;if(pe&&pe.elements.length>0){let q=pe.elements[0].getAttribute("transform");Ge=at(q,$)}let Ne=Ge+O;S?Z.forEach(q=>{let K=k.get(q);K&&(K.elements.forEach(f=>{let ue=mt(f.getAttribute("transform"),0);f.setAttribute("transform","translate("+ue+", "+Ne+")"),ge(f,!1)}),Ne+=O)}):H.forEach(q=>{let K=k.get(q);K&&K.elements.forEach(f=>{ge(f,!0)})}),k.forEach(({originalY:q,elements:K},f)=>{q>$&&!be.has(f)&&K.forEach(ue=>{let xe=ue.getAttribute("transform"),le=mt(xe,0),Ee=at(xe,q);ue.setAttribute("transform","translate("+le+", "+(Ee+Te)+")")})}),ke(document.querySelector(".gantt-labels svg"),Te),[".gantt-col-status svg",".gantt-col-id svg",".gantt-col-start svg",".gantt-col-due svg",".gantt-col-assignee svg"].forEach(q=>ke(document.querySelector(q),Te)),ke(document.querySelector(".gantt-timeline svg"),Te);let Ye=new Set;fe.forEach((q,K)=>{q||Ye.add(K)});let me=new Map;Oe.forEach(q=>{let K=parseFloat(q.dataset.originalY||"0");if(me.has(K))return;let f=Q(q),ue=Object.keys(f),xe=ue.length>0&&ue.every(ye=>be.has(ye)),le=ue.some(ye=>be.has(ye)),Ee=K>_e;if(xe)me.set(K,{action:"toggle-visibility",hide:!S});else if(le)if(S){let ye=0;for(let[Ue,Je]of Object.entries(f))(!be.has(Ue)||Pe.has(Ue))&&(ye+=parseFloat(Je));me.set(K,{action:"expand",newHeight:ye})}else{let ye=0;for(let[Ue,Je]of Object.entries(f))be.has(Ue)||(ye+=parseFloat(Je));me.set(K,{action:"shrink",newHeight:ye})}else if(Ee){let ye=parseFloat(q.getAttribute("y")||String(K));me.set(K,{action:"shift",newY:ye+Te})}}),Oe.forEach(q=>{let K=parseFloat(q.dataset.originalY||"0"),f=me.get(K);if(f)switch(f.action){case"toggle-visibility":ge(q,f.hide);break;case"shrink":q.setAttribute("height",String(f.newHeight));break;case"expand":q.setAttribute("height",String(f.newHeight));break;case"shift":q.setAttribute("y",String(f.newY));break}});let rt=Array.from(Oe).filter(q=>q.getAttribute("visibility")!=="hidden"),he=new Map;rt.forEach(q=>{let K=parseFloat(q.getAttribute("y")||"0");he.has(K)||he.set(K,[]),he.get(K).push(q)}),Array.from(he.keys()).sort((q,K)=>q-K).forEach((q,K)=>{let f=K%2===0?"0.03":"0.06";he.get(q).forEach(ue=>ue.setAttribute("opacity",f))}),document.querySelectorAll(".indent-guide-line").forEach(q=>{let K=q.dataset.forParent,f=oe.get(K)||[],ue=Ye.has(K)||f.some(xe=>Ye.has(xe));if(ge(q,ue),!ue){let xe=k.get(K);if(xe&&xe.originalY>$){let le=parseFloat(q.getAttribute("y1")||"0"),Ee=parseFloat(q.getAttribute("y2")||"0");q.setAttribute("y1",le+Te),q.setAttribute("y2",Ee+Te)}}}),document.querySelectorAll(".dependency-arrow").forEach(q=>{let K=q.dataset.from,f=q.dataset.to,ue=document.querySelector('.issue-bar[data-issue-id="'+K+'"]'),xe=document.querySelector('.issue-bar[data-issue-id="'+f+'"]'),le=ue?.classList.contains("gantt-row-hidden"),Ee=xe?.classList.contains("gantt-row-hidden");ge(q,le||Ee)}),J?.(),Xe(),p.postMessage({command:"collapseStateSync",collapseKey:l,isExpanded:S})}if(Ie){let l=V.find(g=>g.dataset.collapseKey===Ie);l&&T(l,!0)}V.forEach((l,g)=>{l.addEventListener("click",r=>{if(r.target.closest?.(".collapse-toggle")||r.target.closest?.(".chevron-hit-area"))return;let A=l.dataset.issueId,S=l.classList.contains("project-label"),L=l.classList.contains("time-group-label"),H=l.dataset.collapseKey;if((S||L)&&H){T(l),l.dataset.hasChildren==="true"&&D(H);return}let Z=r.target.classList?.contains("issue-text")||r.target.closest(".issue-text");A&&Z?T(l):l.dataset.hasChildren==="true"&&H?(T(l),D(H)):T(l)}),l.addEventListener("dblclick",r=>{if(r.target.closest?.(".collapse-toggle")||r.target.closest?.(".chevron-hit-area"))return;let A=l.dataset.issueId,S=r.target.classList?.contains("issue-text")||r.target.closest(".issue-text");A&&S&&(r.preventDefault(),p.postMessage({command:"openIssue",issueId:parseInt(A,10)}))}),l.addEventListener("keydown",r=>{let A=l.dataset.collapseKey,S=l.dataset.issueId?parseInt(l.dataset.issueId,10):NaN;switch(r.key){case"Enter":case" ":r.preventDefault(),isNaN(S)||p.postMessage({command:"openIssue",issueId:S});break;case"ArrowUp":{r.preventDefault();let L=R(g,-1);L&&T(L.label,!1,!0);break}case"ArrowDown":{r.preventDefault();let L=R(g,1);L&&T(L.label,!1,!0);break}case"ArrowLeft":if(r.preventDefault(),l.dataset.hasChildren==="true"&&l.dataset.expanded==="true")D(A,"collapse");else if(l.dataset.parentKey){let L=V.find(H=>H.dataset.collapseKey===l.dataset.parentKey);L&&T(L,!1,!0)}break;case"ArrowRight":if(r.preventDefault(),l.dataset.hasChildren==="true"&&l.dataset.expanded==="false")D(A,"expand");else if(l.dataset.hasChildren==="true"&&l.dataset.expanded==="true"){let L=V.find(H=>H.dataset.parentKey===A&&ae(H));L&&T(L,!1,!0)}break;case"Home":{r.preventDefault();let L=R(-1,1);L&&T(L.label,!1,!0);break}case"End":{r.preventDefault();let L=R(V.length,-1);L&&T(L.label,!1,!0);break}case"PageDown":{r.preventDefault();let L=g,H=0;for(;H<10&&L<V.length-1;){let Z=R(L,1);if(!Z)break;L=Z.index,H++}H>0&&T(V[L],!1,!0);break}case"PageUp":{r.preventDefault();let L=g,H=0;for(;H<10&&L>0;){let Z=R(L,-1);if(!Z)break;L=Z.index,H++}H>0&&T(V[L],!1,!0);break}case"Tab":if(!r.shiftKey&&!isNaN(S)){let L=document.querySelector(`.issue-bar[data-issue-id="${S}"]`);L&&(r.preventDefault(),L.focus(),z(`Timeline bar for issue #${S}`))}break}})}),M("mousedown",l=>{if(l.ctrlKey||l.metaKey||l.shiftKey||!l.target.closest("#ganttScroll")||l.target.closest(".collapse-toggle, .chevron-hit-area, .drag-handle, .link-handle, .blocks-badge-group, .blocker-badge, .progress-badge-group, .flex-badge-group, button, input, select"))return;let g=l.target.closest(".gantt-row[data-collapse-key]");if(g&&g.matches(".project-label, .issue-label, .time-group-label"))return;let r=g?.dataset.collapseKey||null;if(!r){if(!l.target.closest(".gantt-timeline"))return;let S=[];for(let L of V){if(!ae(L))continue;let H=L.getBoundingClientRect();S.push({key:L.dataset.collapseKey,y:H.top,height:H.height})}if(r=kt(S,l.clientY),!r)return}let A=V.find(S=>S.dataset.collapseKey===r);A&&T(A)}),M("keydown",l=>{if(l.defaultPrevented||!Y)return;let g=l.target.tagName;if(g==="INPUT"||g==="SELECT"||g==="TEXTAREA"||document.activeElement?.closest?.(".issue-bar"))return;let r=V.indexOf(Y);if(r<0)return;let A=Y.dataset.collapseKey,S=Y.dataset.hasChildren==="true",L=Y.dataset.expanded==="true",H=Z=>{Z&&(l.preventDefault(),T(Z.label,!1,!0))};switch(l.key){case"ArrowDown":H(R(r,1));break;case"ArrowUp":H(R(r,-1));break;case"Home":H(R(-1,1));break;case"End":H(R(V.length,-1));break;case"ArrowLeft":if(l.preventDefault(),S&&L&&A)D(A,"collapse");else if(Y.dataset.parentKey){let Z=V.find(be=>be.dataset.collapseKey===Y.dataset.parentKey);Z&&T(Z,!1,!0)}break;case"ArrowRight":if(l.preventDefault(),S&&!L&&A)D(A,"expand");else if(S&&L&&A){let Z=V.find(be=>be.dataset.parentKey===A&&ae(be));Z&&T(Z,!1,!0)}break;default:return}})}function It(w){let{vscode:p,addDocListener:M,menuUndo:X,menuRedo:z,undoStack:O,redoStack:N,saveState:J,updateUndoRedoButtons:V,announce:Y,scrollToAndHighlight:Ie,scrollToToday:ae}=w;M("keydown",u=>{let de=navigator.platform.toUpperCase().indexOf("MAC")>=0?u.metaKey:u.ctrlKey;if(!(u.target.tagName==="INPUT"||u.target.tagName==="SELECT"||u.target.tagName==="TEXTAREA"))if(de&&u.key==="z"&&!u.shiftKey)u.preventDefault(),X?.click();else if(de&&u.key==="z"&&u.shiftKey)u.preventDefault(),z?.click();else if(de&&u.key==="y")u.preventDefault(),z?.click();else if(u.key>="1"&&u.key<="5"&&!de&&!u.altKey){let Q=document.getElementById("zoomSelect");if(Q){let te=["day","week","month","quarter","year"];Q.value=te[parseInt(u.key)-1],Q.dispatchEvent(new Event("change"))}}else if(u.key.toLowerCase()==="y")document.getElementById("menuCapacity")?.click();else if(u.key.toLowerCase()==="i")document.getElementById("menuIntensity")?.click();else if(u.key.toLowerCase()==="d")document.getElementById("menuDeps")?.click();else if(u.key.toLowerCase()==="v"){let Q=document.getElementById("viewFocusSelect");Q.value=Q.value==="project"?"person":"project",Q.dispatchEvent(new Event("change"))}else if(u.key.toLowerCase()==="r")document.getElementById("refreshBtn")?.click();else if(u.key.toLowerCase()==="t")ae();else if(u.key.toLowerCase()==="e")document.getElementById("menuExpand")?.click();else if(u.key.toLowerCase()==="c"&&!de)document.getElementById("menuCollapse")?.click();else if(u.key.toLowerCase()==="b")document.getElementById("menuBadges")?.click();else if(u.key==="ArrowLeft"||u.key==="ArrowRight"){let Q=document.activeElement?.closest(".issue-bar:not(.parent-bar)");if(!Q)return;u.preventDefault();let te=parseInt(Q.dataset.issueId),De=Q.dataset.startDate,qe=Q.dataset.dueDate;if(!De&&!qe)return;let Ae=u.key==="ArrowRight"?1:-1,Xe=(Re,y)=>{let D=new Date(Re+"T00:00:00");D.setDate(D.getDate()+y);let l=g=>String(g).padStart(2,"0");return D.getFullYear()+"-"+l(D.getMonth()+1)+"-"+l(D.getDate())},ge=null,ke=null;u.shiftKey&&qe?ke=Xe(qe,Ae):u.altKey&&De?ge=Xe(De,Ae):(De&&(ge=Xe(De,Ae)),qe&&(ke=Xe(qe,Ae))),(ge||ke)&&(J(),O.push({issueId:te,oldStartDate:ge?De:null,oldDueDate:ke?qe:null,newStartDate:ge,newDueDate:ke}),N.length=0,V(),p.postMessage({command:"updateDates",issueId:te,startDate:ge,dueDate:ke}))}else u.key==="/"&&!de?(u.preventDefault(),Ce()):(u.key==="?"||u.shiftKey&&u.key==="/")&&(u.preventDefault(),oe())});let R=null;function Ce(){R&&R.remove(),R=document.createElement("div"),R.className="quick-search",R.innerHTML=`
+            </marker>`;
+          svg.insertBefore(defs, svg.firstChild);
+        }
+        tempArrow = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        tempArrow.classList.add("temp-link-arrow");
+        tempArrow.setAttribute("stroke", "var(--vscode-focusBorder)");
+        tempArrow.setAttribute("stroke-width", "2");
+        tempArrow.setAttribute("fill", "none");
+        tempArrow.setAttribute("marker-end", "url(#temp-arrow-head)");
+        svg.appendChild(tempArrow);
+        const fromAnchor = handle.dataset.anchor || "end";
+        linkingState = { fromId: issueId, fromBar: bar, startX: cx, startY: cy, fromAnchor };
+      });
+    });
+    addDocListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        const picker = document.querySelector(".relation-picker");
+        if (picker) {
+          e.stopImmediatePropagation();
+          picker.remove();
+          return;
+        }
+        if (linkingState) {
+          e.stopImmediatePropagation();
+          cancelLinking();
+          return;
+        }
+        if (getFocusedIssueId()) {
+          e.stopImmediatePropagation();
+          clearFocus();
+          announce("Focus cleared");
+        }
+      }
+    });
+    let dragRafPending = false;
+    let lastMouseEvent = null;
+    addDocListener("mousemove", (e) => {
+      if (!dragState && !linkingState) return;
+      lastMouseEvent = e;
+      if (dragRafPending) return;
+      dragRafPending = true;
+      requestAnimationFrame(() => {
+        dragRafPending = false;
+        const evt = lastMouseEvent;
+        if (!evt) return;
+        if (dragState) {
+          const delta = evt.clientX - dragState.initialMouseX;
+          if (dragState.isMove && dragState.isBulkDrag && dragState.bulkBars) {
+            const snappedDelta = snapToDay(delta) - snapToDay(0);
+            dragState.bulkBars.forEach((b) => {
+              const barWidth = b.endX - b.startX;
+              const newStartX = Math.max(0, Math.min(b.startX + snappedDelta, timelineWidth - barWidth));
+              const newEndX = newStartX + barWidth;
+              const width = newEndX - newStartX;
+              b.barOutline.setAttribute("x", newStartX);
+              b.barOutline.setAttribute("width", width);
+              if (b.barMain) {
+                b.barMain.setAttribute("x", newStartX);
+                b.barMain.setAttribute("width", width);
+              }
+              if (b.leftHandleRect) b.leftHandleRect.setAttribute("x", newStartX);
+              if (b.rightHandleRect) b.rightHandleRect.setAttribute("x", newEndX - 14);
+              b.leftGripCircles.forEach((c) => c.setAttribute("cx", newStartX + 9));
+              b.rightGripCircles.forEach((c) => c.setAttribute("cx", newEndX - 9));
+              b.newStartX = newStartX;
+              b.newEndX = newEndX;
+              if (b.barLabels) {
+                const labelDelta = b.labelsOnLeft ? newStartX - b.startX : newEndX - b.endX;
+                b.barLabels.setAttribute("transform", "translate(" + labelDelta + ", 0)");
+              }
+              if (b.connectedArrows) {
+                updateArrowPositions(b.connectedArrows, b.issueId, newStartX, newEndX);
+              }
+              b.linkHandleCircles.forEach((c) => c.setAttribute("cx", String(newEndX + 8)));
+            });
+            dragState.snappedDelta = snappedDelta;
+          } else {
+            let newStartX = dragState.startX;
+            let newEndX = dragState.endX;
+            const barWidth = dragState.endX - dragState.startX;
+            if (dragState.isMove) {
+              newStartX = snapToDay(Math.max(0, Math.min(dragState.startX + delta, timelineWidth - barWidth)));
+              newEndX = newStartX + barWidth;
+            } else if (dragState.isLeft) {
+              newStartX = snapToDay(Math.max(0, Math.min(dragState.startX + delta, dragState.endX - dayWidth)));
+            } else {
+              newEndX = snapToDay(Math.max(dragState.startX + dayWidth, Math.min(dragState.endX + delta, timelineWidth)));
+            }
+            const width = newEndX - newStartX;
+            dragState.barOutline.setAttribute("x", newStartX);
+            dragState.barOutline.setAttribute("width", width);
+            if (dragState.barMain) {
+              dragState.barMain.setAttribute("x", newStartX);
+              dragState.barMain.setAttribute("width", width);
+            }
+            const leftRect = dragState.leftHandle.querySelector("rect");
+            const rightRect = dragState.rightHandle.querySelector("rect");
+            if (leftRect) leftRect.setAttribute("x", newStartX);
+            if (rightRect) rightRect.setAttribute("x", newEndX - 14);
+            dragState.leftGripCircles.forEach((c) => c.setAttribute("cx", newStartX + 9));
+            dragState.rightGripCircles.forEach((c) => c.setAttribute("cx", newEndX - 9));
+            dragState.newStartX = newStartX;
+            dragState.newEndX = newEndX;
+            if (dragState.barLabels) {
+              const labelDelta = dragState.labelsOnLeft ? newStartX - dragState.startX : newEndX - dragState.endX;
+              dragState.barLabels.setAttribute("transform", "translate(" + labelDelta + ", 0)");
+            }
+            if (dragState.connectedArrows) {
+              updateArrowPositions(dragState.connectedArrows, dragState.issueId, newStartX, newEndX);
+            }
+            dragState.linkHandleCircles.forEach((c) => c.setAttribute("cx", String(newEndX + 8)));
+            if (dragState.isMove && !dragState.isBulkDrag) {
+              const newStartDate = xToDate(newStartX);
+              const newDueDate = xToDueDate(newEndX);
+              const changed = newStartDate !== dragState.oldStartDate;
+              const text = changed ? formatDateRange(dragState.oldStartDate, dragState.oldDueDate) + " \u2192 " + formatDateRange(newStartDate, newDueDate) : formatDateRange(newStartDate, newDueDate);
+              updateDragTooltip(text);
+              positionDragTooltip(evt.clientX, evt.clientY);
+            } else if (!dragState.isMove) {
+              const edgeX = dragState.isLeft ? newStartX : newEndX;
+              const newDate = dragState.isLeft ? xToDate(edgeX) : xToDueDate(edgeX);
+              updateDragTooltip((dragState.isLeft ? "Start: " : "Due: ") + formatDateShort(newDate));
+              positionDragTooltip(evt.clientX, evt.clientY);
+            }
+          }
+        }
+        if (linkingState && tempArrow) {
+          const svg = document.querySelector("#ganttTimeline svg");
+          const rect = svg.getBoundingClientRect();
+          const endX = evt.clientX - rect.left;
+          const endY = evt.clientY - rect.top;
+          const path = `M ${linkingState.startX} ${linkingState.startY} L ${endX} ${endY}`;
+          tempArrow.setAttribute("d", path);
+          const targetBar = document.elementFromPoint(evt.clientX, evt.clientY)?.closest(".issue-bar");
+          if (currentTarget && currentTarget !== targetBar) {
+            currentTarget.classList.remove("link-target");
+          }
+          if (targetBar && targetBar !== linkingState.fromBar) {
+            targetBar.classList.add("link-target");
+            currentTarget = targetBar;
+          } else {
+            currentTarget = null;
+          }
+        }
+      });
+    });
+    function restoreBarPosition(state) {
+      if (!state) return;
+      const { bar, barOutline, barMain, leftHandle, rightHandle, barLabels, startX, endX, connectedArrows, issueId, linkHandle } = state;
+      const width = endX - startX;
+      if (barOutline) {
+        barOutline.setAttribute("x", String(startX));
+        barOutline.setAttribute("width", String(width));
+      }
+      if (barMain) {
+        barMain.setAttribute("x", String(startX));
+        barMain.setAttribute("width", String(width));
+      }
+      if (leftHandle) {
+        const rect = leftHandle.querySelector("rect");
+        if (rect) rect.setAttribute("x", String(startX));
+        leftHandle.querySelectorAll(".drag-grip circle").forEach((c) => c.setAttribute("cx", startX + 9));
+      }
+      if (rightHandle) {
+        const rect = rightHandle.querySelector("rect");
+        if (rect) rect.setAttribute("x", String(endX - 14));
+        rightHandle.querySelectorAll(".drag-grip circle").forEach((c) => c.setAttribute("cx", endX - 9));
+      }
+      if (barLabels) barLabels.removeAttribute("transform");
+      if (connectedArrows && connectedArrows.length > 0) {
+        updateArrowPositions(connectedArrows, issueId, startX, endX);
+      }
+      if (linkHandle) {
+        linkHandle.querySelectorAll("circle").forEach((c) => c.setAttribute("cx", String(endX + 8)));
+      }
+      if (bar) bar.classList.remove("dragging");
+    }
+    addDocListener("mouseup", (e) => {
+      if (dragState) {
+        const { issueId, isLeft, isMove, isBulkDrag, bulkBars, newStartX, newEndX, bar, startX, endX, oldStartDate, oldDueDate, barOutline, barMain, leftHandle, rightHandle, barLabels, connectedArrows } = dragState;
+        const savedState = { ...dragState };
+        if (isBulkDrag && bulkBars && isMove) {
+          bulkBars.forEach((b) => b.bar.classList.remove("dragging"));
+          const changes = [];
+          bulkBars.forEach((b) => {
+            if (b.newStartX !== void 0 && b.newStartX !== b.startX) {
+              const newStart = xToDate(b.newStartX);
+              const newDue = xToDueDate(b.newEndX);
+              if (newStart !== b.oldStartDate || newDue !== b.oldDueDate) {
+                changes.push({
+                  issueId: parseInt(b.issueId),
+                  oldStartDate: b.oldStartDate,
+                  oldDueDate: b.oldDueDate,
+                  newStartDate: newStart,
+                  newDueDate: newDue,
+                  barData: b
+                });
+              }
+            }
+          });
+          if (changes.length > 0) {
+            hideDragTooltip();
+            const confirmBulk = () => {
+              undoStack.push({ type: "bulk", changes: changes.map((c) => ({ issueId: c.issueId, oldStartDate: c.oldStartDate, oldDueDate: c.oldDueDate, newStartDate: c.newStartDate, newDueDate: c.newDueDate })) });
+              redoStack.length = 0;
+              updateUndoRedoButtons();
+              saveState();
+              changes.forEach((c) => {
+                vscode2.postMessage({ command: "updateDates", issueId: c.issueId, startDate: c.newStartDate, dueDate: c.newDueDate });
+              });
+            };
+            if (isDraftModeEnabled && isDraftModeEnabled()) {
+              confirmBulk();
+            } else {
+              const message = "Move " + changes.length + " issue(s) to new dates?";
+              showDragConfirmModal(message, confirmBulk, () => {
+                bulkBars.forEach((b) => restoreBarPosition(b));
+              });
+            }
+          } else {
+            hideDragTooltip();
+            bulkBars.forEach((b) => restoreBarPosition(b));
+          }
+          dragState = null;
+          justEndedDrag = true;
+          requestAnimationFrame(() => justEndedDrag = false);
+          return;
+        }
+        bar.classList.remove("dragging");
+        hideDragTooltip();
+        if (newStartX !== void 0 || newEndX !== void 0) {
+          let calcStartDate = null;
+          let calcDueDate = null;
+          if (isMove) {
+            if (newStartX !== startX) {
+              calcStartDate = xToDate(newStartX);
+              calcDueDate = xToDueDate(newEndX);
+            }
+          } else if (isLeft) {
+            calcStartDate = newStartX !== startX ? xToDate(newStartX) : null;
+          } else {
+            calcDueDate = newEndX !== endX ? xToDueDate(newEndX) : null;
+          }
+          const newStartDate = calcStartDate && calcStartDate !== oldStartDate ? calcStartDate : null;
+          const newDueDate = calcDueDate && calcDueDate !== oldDueDate ? calcDueDate : null;
+          if (newStartDate || newDueDate) {
+            const confirmSingle = () => {
+              undoStack.push({
+                issueId,
+                oldStartDate: newStartDate ? oldStartDate : null,
+                oldDueDate: newDueDate ? oldDueDate : null,
+                newStartDate,
+                newDueDate
+              });
+              redoStack.length = 0;
+              updateUndoRedoButtons();
+              saveState();
+              vscode2.postMessage({ command: "updateDates", issueId, startDate: newStartDate, dueDate: newDueDate });
+            };
+            if (isDraftModeEnabled && isDraftModeEnabled()) {
+              confirmSingle();
+            } else {
+              let message = "Issue #" + issueId + ": ";
+              if (newStartDate && newDueDate) {
+                message += formatDateRange(oldStartDate, oldDueDate) + " \u2192 " + formatDateRange(newStartDate, newDueDate);
+              } else if (newStartDate) {
+                message += "Start: " + formatDateShort(oldStartDate) + " \u2192 " + formatDateShort(newStartDate);
+              } else {
+                message += "Due: " + formatDateShort(oldDueDate) + " \u2192 " + formatDateShort(newDueDate);
+              }
+              showDragConfirmModal(message, confirmSingle, () => {
+                restoreBarPosition(savedState);
+              });
+            }
+          } else {
+            restoreBarPosition(savedState);
+          }
+        } else {
+          restoreBarPosition(savedState);
+        }
+        dragState = null;
+        justEndedDrag = true;
+        requestAnimationFrame(() => justEndedDrag = false);
+      }
+      if (linkingState) {
+        const fromId = linkingState.fromId;
+        const fromAnchor = linkingState.fromAnchor;
+        if (currentTarget) {
+          const toId = parseInt(currentTarget.dataset.issueId);
+          if (fromId !== toId) {
+            const svg = document.querySelector("#ganttTimeline svg");
+            const rect = svg.getBoundingClientRect();
+            const dropX = e.clientX - rect.left;
+            const targetOutline = currentTarget.querySelector(".bar-outline");
+            const targetStartX = parseFloat(targetOutline.getAttribute("x"));
+            const targetEndX = targetStartX + parseFloat(targetOutline.getAttribute("width"));
+            const targetCenterX = (targetStartX + targetEndX) / 2;
+            const toAnchor = dropX < targetCenterX ? "start" : "end";
+            showRelationPicker(e.clientX, e.clientY, fromId, toId, fromAnchor, toAnchor);
+          }
+        }
+        cancelLinking();
+      }
+      if (!pendingDragConfirm) {
+        restoreScrollPosition();
+      }
+    });
+    menuUndo?.addEventListener("click", () => {
+      if (menuUndo.hasAttribute("disabled")) return;
+      if (undoStack.length === 0) return;
+      const action = undoStack.pop();
+      redoStack.push(action);
+      updateUndoRedoButtons();
+      saveState();
+      if (action.type === "relation") {
+        if (action.operation === "create") {
+          vscode2.postMessage({
+            command: "undoRelation",
+            operation: "delete",
+            relationId: action.relationId,
+            datesBefore: action.datesBefore
+          });
+        } else {
+          vscode2.postMessage({
+            command: "undoRelation",
+            operation: "create",
+            issueId: action.issueId,
+            targetIssueId: action.targetIssueId,
+            relationType: action.relationType,
+            delay: action.delay
+          });
+        }
+      } else if (action.type === "bulk") {
+        const inDraftMode = isDraftModeEnabled && isDraftModeEnabled();
+        action.changes.forEach((c) => {
+          if (inDraftMode) {
+            vscode2.postMessage({
+              command: "removeDraft",
+              issueId: c.issueId,
+              startDate: c.oldStartDate,
+              dueDate: c.oldDueDate
+            });
+          } else {
+            vscode2.postMessage({
+              command: "updateDates",
+              issueId: c.issueId,
+              startDate: c.oldStartDate,
+              dueDate: c.oldDueDate
+            });
+          }
+        });
+      } else {
+        const inDraftMode = isDraftModeEnabled && isDraftModeEnabled();
+        if (inDraftMode) {
+          vscode2.postMessage({
+            command: "removeDraft",
+            issueId: action.issueId,
+            startDate: action.oldStartDate,
+            dueDate: action.oldDueDate
+          });
+        } else {
+          vscode2.postMessage({
+            command: "updateDates",
+            issueId: action.issueId,
+            startDate: action.oldStartDate,
+            dueDate: action.oldDueDate
+          });
+        }
+      }
+    });
+    menuRedo?.addEventListener("click", () => {
+      if (menuRedo.hasAttribute("disabled")) return;
+      if (redoStack.length === 0) return;
+      const action = redoStack.pop();
+      undoStack.push(action);
+      updateUndoRedoButtons();
+      saveState();
+      if (action.type === "relation") {
+        if (action.operation === "create") {
+          vscode2.postMessage({
+            command: "redoRelation",
+            operation: "create",
+            issueId: action.issueId,
+            targetIssueId: action.targetIssueId,
+            relationType: action.relationType,
+            delay: action.delay
+          });
+        } else {
+          vscode2.postMessage({
+            command: "redoRelation",
+            operation: "delete",
+            relationId: action.relationId
+          });
+        }
+      } else if (action.type === "bulk") {
+        action.changes.forEach((c) => {
+          vscode2.postMessage({
+            command: "updateDates",
+            issueId: c.issueId,
+            startDate: c.newStartDate,
+            dueDate: c.newDueDate
+          });
+        });
+      } else {
+        vscode2.postMessage({
+          command: "updateDates",
+          issueId: action.issueId,
+          startDate: action.newStartDate,
+          dueDate: action.newDueDate
+        });
+      }
+    });
+    return { refreshArrowGeometry };
+  }
+
+  // src/webviews/gantt/collapse-utils.js
+  function findDescendants(parentKey, childrenCache) {
+    const result = [];
+    const queue = [parentKey];
+    while (queue.length > 0) {
+      const current = queue.shift();
+      const children = childrenCache.get(current);
+      if (children) {
+        for (const child of children) {
+          result.push(child);
+          queue.push(child);
+        }
+      }
+    }
+    return result;
+  }
+  function findVisibleDescendants(parentKey, childrenCache, expandedStateCache) {
+    const result = [];
+    const stack = [];
+    const pushChildren = (key) => {
+      const children = childrenCache.get(key);
+      if (!children) return;
+      const arr = [...children];
+      for (let i = arr.length - 1; i >= 0; i--) {
+        stack.push(arr[i]);
+      }
+    };
+    pushChildren(parentKey);
+    while (stack.length > 0) {
+      const current = stack.pop();
+      result.push(current);
+      if (expandedStateCache.get(current)) {
+        pushChildren(current);
+      }
+    }
+    return result;
+  }
+  function buildAncestorChains(pairs) {
+    const parentOf = /* @__PURE__ */ new Map();
+    const childrenCache = /* @__PURE__ */ new Map();
+    for (const { key, parentKey } of pairs) {
+      if (!key || !parentKey) continue;
+      if (!parentOf.has(key)) parentOf.set(key, parentKey);
+      let children = childrenCache.get(parentKey);
+      if (!children) {
+        children = /* @__PURE__ */ new Set();
+        childrenCache.set(parentKey, children);
+      }
+      children.add(key);
+    }
+    const ancestorCache = /* @__PURE__ */ new Map();
+    for (const key of parentOf.keys()) {
+      const ancestors = [];
+      const seen = /* @__PURE__ */ new Set();
+      let p = parentOf.get(key);
+      while (p && !seen.has(p)) {
+        seen.add(p);
+        ancestors.push(p);
+        p = parentOf.get(p);
+      }
+      ancestorCache.set(key, ancestors);
+    }
+    return { ancestorCache, childrenCache };
+  }
+
+  // src/webviews/gantt/gantt-collapse.js
+  function setupCollapse(ctx) {
+    const { vscode: vscode2, addDocListener, addWinListener, announce, barHeight, selectedCollapseKey, refreshArrowGeometry } = ctx;
+    document.querySelectorAll(".collapse-toggle").forEach((el) => {
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const label = el.closest("[data-collapse-key]");
+        const collapseKey = label?.dataset.collapseKey;
+        if (collapseKey) {
+          toggleCollapseClientSide(collapseKey);
+        }
+      });
+    });
+    document.getElementById("menuExpand")?.addEventListener("click", () => {
+      const ganttScroll = document.getElementById("ganttScroll");
+      const allKeys = ganttScroll?.dataset.allExpandableKeys;
+      const keys = allKeys ? JSON.parse(allKeys) : [];
+      vscode2.postMessage({ command: "expandAll", keys });
+    });
+    document.getElementById("menuCollapse")?.addEventListener("click", () => {
+      vscode2.postMessage({ command: "collapseAll" });
+    });
+    const allLabels = Array.from(document.querySelectorAll(".project-label, .issue-label, .time-group-label"));
+    let activeLabel = null;
+    const savedSelectedKey = selectedCollapseKey ?? null;
+    function isLabelVisible(label) {
+      return !label.classList.contains("gantt-row-hidden") && label.getAttribute("visibility") !== "hidden";
+    }
+    function findVisibleLabel(fromIndex, direction) {
+      let i = fromIndex + direction;
+      while (i >= 0 && i < allLabels.length) {
+        if (isLabelVisible(allLabels[i])) return { label: allLabels[i], index: i };
+        i += direction;
+      }
+      return null;
+    }
+    function scrollLabelIntoView(label) {
+      const scrollContainer = document.getElementById("ganttScroll");
+      const headerRow = document.querySelector(".gantt-header-row");
+      if (!scrollContainer || !label) return;
+      const headerHeight = headerRow?.getBoundingClientRect().height || 60;
+      const labelRow = label.closest(".gantt-row");
+      if (!labelRow) return;
+      const rowTop = labelRow.getBoundingClientRect().top;
+      const rowHeight = labelRow.getBoundingClientRect().height;
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const visibleTop = containerRect.top + headerHeight;
+      const visibleBottom = containerRect.bottom;
+      if (rowTop < visibleTop) {
+        scrollContainer.scrollBy({ top: rowTop - visibleTop - 4, behavior: "smooth" });
+      } else if (rowTop + rowHeight > visibleBottom) {
+        scrollContainer.scrollBy({ top: rowTop + rowHeight - visibleBottom + 4, behavior: "smooth" });
+      }
+    }
+    function setActiveLabel(label, skipNotify = false, scrollIntoView = false, skipFocus = false) {
+      if (activeLabel) activeLabel.classList.remove("active");
+      activeLabel = label;
+      if (label) {
+        label.classList.add("active");
+        if (!skipFocus) label.focus({ preventScroll: true });
+        if (scrollIntoView) scrollLabelIntoView(label);
+        if (!skipNotify) {
+          vscode2.postMessage({ command: "setSelectedKey", collapseKey: label.dataset.collapseKey });
+        }
+      }
+      updateRowSelectionOverlays();
+    }
+    addWinListener("focus", () => {
+      if (activeLabel && isLabelVisible(activeLabel)) {
+        activeLabel.focus();
+      }
+    });
+    addDocListener("keydown", (e) => {
+      if (e.key === "Escape" && activeLabel) {
+        activeLabel.classList.remove("active");
+        activeLabel.blur();
+        activeLabel = null;
+        vscode2.postMessage({ command: "setSelectedKey", collapseKey: null });
+        updateRowSelectionOverlays();
+      }
+    });
+    const rowIndex = /* @__PURE__ */ new Map();
+    const ancestorCache = /* @__PURE__ */ new Map();
+    const childrenCache = /* @__PURE__ */ new Map();
+    const expandedStateCache = /* @__PURE__ */ new Map();
+    const stripeContributionsCache = /* @__PURE__ */ new Map();
+    function getStripeContributions(stripe) {
+      const originalY = stripe.dataset.originalY;
+      if (stripeContributionsCache.has(originalY)) {
+        return stripeContributionsCache.get(originalY);
+      }
+      const contributions = JSON.parse(stripe.dataset.rowContributions || "{}");
+      stripeContributionsCache.set(originalY, contributions);
+      return contributions;
+    }
+    function buildRowIndex() {
+      rowIndex.clear();
+      const elements = document.querySelectorAll("[data-collapse-key][data-original-y]");
+      elements.forEach((el) => {
+        const key = el.dataset.collapseKey;
+        const originalY = parseFloat(el.dataset.originalY);
+        if (!rowIndex.has(key)) {
+          rowIndex.set(key, { originalY, elements: [] });
+        }
+        rowIndex.get(key).elements.push(el);
+      });
+    }
+    function buildAncestorCache() {
+      ancestorCache.clear();
+      childrenCache.clear();
+      expandedStateCache.clear();
+      const pairs = [];
+      document.querySelectorAll("[data-collapse-key][data-parent-key]").forEach((el) => {
+        pairs.push({ key: el.dataset.collapseKey, parentKey: el.dataset.parentKey });
+      });
+      const built = buildAncestorChains(pairs);
+      built.ancestorCache.forEach((ancestors, key) => ancestorCache.set(key, ancestors));
+      built.childrenCache.forEach((children, parentKey) => childrenCache.set(parentKey, children));
+      document.querySelectorAll("[data-collapse-key][data-expanded]").forEach((el) => {
+        expandedStateCache.set(el.dataset.collapseKey, el.dataset.expanded === "true");
+      });
+    }
+    buildRowIndex();
+    buildAncestorCache();
+    const SVG_NS = "http://www.w3.org/2000/svg";
+    const selectionOverlays = [];
+    [
+      ".gantt-labels svg",
+      ".gantt-col-status svg",
+      ".gantt-col-id svg",
+      ".gantt-col-start svg",
+      ".gantt-col-due svg",
+      ".gantt-col-assignee svg",
+      ".gantt-timeline svg"
+    ].forEach((selector) => {
+      const svg = document.querySelector(selector);
+      if (!svg) return;
+      const rect = document.createElementNS(SVG_NS, "rect");
+      rect.setAttribute("class", "row-selection-overlay");
+      rect.setAttribute("x", "0");
+      rect.setAttribute("width", "100%");
+      rect.setAttribute("height", String(barHeight + 2));
+      rect.setAttribute("visibility", "hidden");
+      svg.insertBefore(rect, svg.firstChild);
+      selectionOverlays.push(rect);
+    });
+    function updateRowSelectionOverlays() {
+      const key = activeLabel?.dataset.collapseKey;
+      const entry = key ? rowIndex.get(key) : null;
+      if (!entry || !isLabelVisible(activeLabel)) {
+        selectionOverlays.forEach((rect) => rect.setAttribute("visibility", "hidden"));
+        return;
+      }
+      const el = entry.elements[0];
+      const y = parseTranslateY(el.getAttribute("transform"), entry.originalY);
+      selectionOverlays.forEach((rect) => {
+        rect.setAttribute("y", String(y - 1));
+        rect.setAttribute("visibility", "visible");
+      });
+    }
+    function setSvgVisibility(el, hidden) {
+      if (hidden) {
+        el.setAttribute("visibility", "hidden");
+        el.classList.add("gantt-row-hidden");
+      } else {
+        el.removeAttribute("visibility");
+        el.classList.remove("gantt-row-hidden");
+      }
+    }
+    function growSvgHeight(svg, delta) {
+      if (!svg) return;
+      const currentHeight = parseFloat(svg.getAttribute("height") || "0");
+      svg.setAttribute("height", String(currentHeight + delta));
+    }
+    function findDescendants2(parentKey) {
+      return findDescendants(parentKey, childrenCache);
+    }
+    function findVisibleDescendants2(parentKey) {
+      return findVisibleDescendants(parentKey, childrenCache, expandedStateCache);
+    }
+    function toggleCollapseClientSide(collapseKey, action) {
+      const parentLabel = document.querySelector('[data-collapse-key="' + collapseKey + '"].project-label, [data-collapse-key="' + collapseKey + '"].time-group-label, [data-collapse-key="' + collapseKey + '"].issue-label');
+      if (!parentLabel || parentLabel.dataset.hasChildren !== "true") {
+        return;
+      }
+      const wasExpanded = parentLabel.dataset.expanded === "true";
+      const shouldExpand = action === "expand" ? true : action === "collapse" ? false : !wasExpanded;
+      if (shouldExpand === wasExpanded) {
+        return;
+      }
+      parentLabel.dataset.expanded = shouldExpand ? "true" : "false";
+      expandedStateCache.set(collapseKey, shouldExpand);
+      const chevron = parentLabel.querySelector(".collapse-toggle");
+      if (chevron) chevron.classList.toggle("expanded", shouldExpand);
+      const allDescendants = findDescendants2(collapseKey);
+      const visibleDescendants = shouldExpand ? findVisibleDescendants2(collapseKey) : [];
+      if (allDescendants.length === 0) {
+        vscode2.postMessage({ command: "collapseStateSync", collapseKey, isExpanded: shouldExpand });
+        return;
+      }
+      const descendantSet = new Set(allDescendants);
+      const visibleSet = new Set(visibleDescendants);
+      const parentEntry = rowIndex.get(collapseKey);
+      const parentRowY = parentEntry?.originalY ?? 0;
+      const countedKeys = /* @__PURE__ */ new Set();
+      let actualDelta = 0;
+      let parentStripeY = 0;
+      const deltaDescendants = shouldExpand ? visibleDescendants : findVisibleDescendants2(collapseKey);
+      const deltaSet = new Set(deltaDescendants);
+      const allStripes = document.querySelectorAll(".zebra-stripe");
+      allStripes.forEach((stripe) => {
+        const contributions = getStripeContributions(stripe);
+        if (collapseKey in contributions && parentStripeY === 0) {
+          parentStripeY = parseFloat(stripe.dataset.originalY || "0");
+        }
+        for (const [key, contribution] of Object.entries(contributions)) {
+          if (deltaSet.has(key) && !countedKeys.has(key)) {
+            actualDelta += parseFloat(contribution);
+            countedKeys.add(key);
+          }
+        }
+      });
+      if (actualDelta === 0 && deltaDescendants.length > 0) {
+        vscode2.postMessage({ command: "collapseStateSync", collapseKey, isExpanded: shouldExpand });
+        vscode2.postMessage({ command: "requestRerender" });
+        return;
+      }
+      const delta = shouldExpand ? actualDelta : -actualDelta;
+      let parentCurrentY = parentRowY;
+      if (parentEntry && parentEntry.elements.length > 0) {
+        const parentTransform = parentEntry.elements[0].getAttribute("transform");
+        parentCurrentY = parseTranslateY(parentTransform, parentRowY);
+      }
+      let nextY = parentCurrentY + barHeight;
+      if (shouldExpand) {
+        visibleDescendants.forEach((key) => {
+          const entry = rowIndex.get(key);
+          if (entry) {
+            entry.elements.forEach((el) => {
+              const x = parseTranslateX(el.getAttribute("transform"), 0);
+              el.setAttribute("transform", "translate(" + x + ", " + nextY + ")");
+              setSvgVisibility(el, false);
+            });
+            nextY += barHeight;
+          }
+        });
+      } else {
+        allDescendants.forEach((key) => {
+          const entry = rowIndex.get(key);
+          if (entry) {
+            entry.elements.forEach((el) => {
+              setSvgVisibility(el, true);
+            });
+          }
+        });
+      }
+      rowIndex.forEach(({ originalY, elements }, key) => {
+        if (originalY > parentRowY && !descendantSet.has(key)) {
+          elements.forEach((el) => {
+            const transform = el.getAttribute("transform");
+            const x = parseTranslateX(transform, 0);
+            const currentY = parseTranslateY(transform, originalY);
+            el.setAttribute("transform", "translate(" + x + ", " + (currentY + delta) + ")");
+          });
+        }
+      });
+      growSvgHeight(document.querySelector(".gantt-labels svg"), delta);
+      [
+        ".gantt-col-status svg",
+        ".gantt-col-id svg",
+        ".gantt-col-start svg",
+        ".gantt-col-due svg",
+        ".gantt-col-assignee svg"
+      ].forEach((sel) => growSvgHeight(document.querySelector(sel), delta));
+      growSvgHeight(document.querySelector(".gantt-timeline svg"), delta);
+      const collapsedKeys = /* @__PURE__ */ new Set();
+      expandedStateCache.forEach((isExpanded, key) => {
+        if (!isExpanded) {
+          collapsedKeys.add(key);
+        }
+      });
+      const stripeActions = /* @__PURE__ */ new Map();
+      allStripes.forEach((stripe) => {
+        const originalY = parseFloat(stripe.dataset.originalY || "0");
+        if (stripeActions.has(originalY)) return;
+        const contributions = getStripeContributions(stripe);
+        const contributingKeys = Object.keys(contributions);
+        const coversOnlyDescendants = contributingKeys.length > 0 && contributingKeys.every((key) => descendantSet.has(key));
+        const coversAnyDescendant = contributingKeys.some((key) => descendantSet.has(key));
+        const isBelowParent = originalY > parentStripeY;
+        if (coversOnlyDescendants) {
+          stripeActions.set(originalY, { action: "toggle-visibility", hide: !shouldExpand });
+        } else if (coversAnyDescendant) {
+          if (!shouldExpand) {
+            let newHeight = 0;
+            for (const [key, contribution] of Object.entries(contributions)) {
+              if (!descendantSet.has(key)) {
+                newHeight += parseFloat(contribution);
+              }
+            }
+            stripeActions.set(originalY, { action: "shrink", newHeight });
+          } else {
+            let newHeight = 0;
+            for (const [key, contribution] of Object.entries(contributions)) {
+              if (!descendantSet.has(key) || visibleSet.has(key)) {
+                newHeight += parseFloat(contribution);
+              }
+            }
+            stripeActions.set(originalY, { action: "expand", newHeight });
+          }
+        } else if (isBelowParent) {
+          const currentY = parseFloat(stripe.getAttribute("y") || String(originalY));
+          stripeActions.set(originalY, { action: "shift", newY: currentY + delta });
+        }
+      });
+      allStripes.forEach((stripe) => {
+        const originalY = parseFloat(stripe.dataset.originalY || "0");
+        const action2 = stripeActions.get(originalY);
+        if (!action2) return;
+        switch (action2.action) {
+          case "toggle-visibility":
+            setSvgVisibility(stripe, action2.hide);
+            break;
+          case "shrink":
+            stripe.setAttribute("height", String(action2.newHeight));
+            break;
+          case "expand":
+            stripe.setAttribute("height", String(action2.newHeight));
+            break;
+          case "shift":
+            stripe.setAttribute("y", String(action2.newY));
+            break;
+        }
+      });
+      const visibleStripes = Array.from(allStripes).filter((s) => s.getAttribute("visibility") !== "hidden");
+      const stripesByY = /* @__PURE__ */ new Map();
+      visibleStripes.forEach((stripe) => {
+        const y = parseFloat(stripe.getAttribute("y") || "0");
+        if (!stripesByY.has(y)) stripesByY.set(y, []);
+        stripesByY.get(y).push(stripe);
+      });
+      const sortedYs = Array.from(stripesByY.keys()).sort((a, b) => a - b);
+      sortedYs.forEach((y, idx) => {
+        const opacity = idx % 2 === 0 ? "0.03" : "0.06";
+        stripesByY.get(y).forEach((stripe) => stripe.setAttribute("opacity", opacity));
+      });
+      document.querySelectorAll(".indent-guide-line").forEach((line) => {
+        const forParent = line.dataset.forParent;
+        const ancestors = ancestorCache.get(forParent) || [];
+        const shouldHide = collapsedKeys.has(forParent) || ancestors.some((a) => collapsedKeys.has(a));
+        setSvgVisibility(line, shouldHide);
+        if (!shouldHide) {
+          const parentOfGuide = rowIndex.get(forParent);
+          if (parentOfGuide && parentOfGuide.originalY > parentRowY) {
+            const y1 = parseFloat(line.getAttribute("y1") || "0");
+            const y2 = parseFloat(line.getAttribute("y2") || "0");
+            line.setAttribute("y1", y1 + delta);
+            line.setAttribute("y2", y2 + delta);
+          }
+        }
+      });
+      document.querySelectorAll(".dependency-arrow").forEach((arrow) => {
+        const fromId = arrow.dataset.from;
+        const toId = arrow.dataset.to;
+        const fromBar = document.querySelector('.issue-bar[data-issue-id="' + fromId + '"]');
+        const toBar = document.querySelector('.issue-bar[data-issue-id="' + toId + '"]');
+        const fromHidden = fromBar?.classList.contains("gantt-row-hidden");
+        const toHidden = toBar?.classList.contains("gantt-row-hidden");
+        setSvgVisibility(arrow, fromHidden || toHidden);
+      });
+      refreshArrowGeometry?.();
+      updateRowSelectionOverlays();
+      vscode2.postMessage({ command: "collapseStateSync", collapseKey, isExpanded: shouldExpand });
+    }
+    if (savedSelectedKey) {
+      const savedLabel = allLabels.find((el) => el.dataset.collapseKey === savedSelectedKey);
+      if (savedLabel) {
+        setActiveLabel(savedLabel, true);
+      }
+    }
+    allLabels.forEach((el, index) => {
+      el.addEventListener("click", (e) => {
+        if (e.target.closest?.(".collapse-toggle") || e.target.closest?.(".chevron-hit-area")) {
+          return;
+        }
+        const issueId = el.dataset.issueId;
+        const isProject = el.classList.contains("project-label");
+        const isTimeGroup = el.classList.contains("time-group-label");
+        const collapseKey = el.dataset.collapseKey;
+        if ((isProject || isTimeGroup) && collapseKey) {
+          setActiveLabel(el);
+          if (el.dataset.hasChildren === "true") {
+            toggleCollapseClientSide(collapseKey);
+          }
+          return;
+        }
+        const clickedOnText = e.target.classList?.contains("issue-text") || e.target.closest(".issue-text");
+        if (issueId && clickedOnText) {
+          setActiveLabel(el);
+        } else if (el.dataset.hasChildren === "true" && collapseKey) {
+          setActiveLabel(el);
+          toggleCollapseClientSide(collapseKey);
+        } else {
+          setActiveLabel(el);
+        }
+      });
+      el.addEventListener("dblclick", (e) => {
+        if (e.target.closest?.(".collapse-toggle") || e.target.closest?.(".chevron-hit-area")) {
+          return;
+        }
+        const issueId = el.dataset.issueId;
+        const clickedOnText = e.target.classList?.contains("issue-text") || e.target.closest(".issue-text");
+        if (issueId && clickedOnText) {
+          e.preventDefault();
+          vscode2.postMessage({ command: "openIssue", issueId: parseInt(issueId, 10) });
+        }
+      });
+      el.addEventListener("keydown", (e) => {
+        const collapseKey = el.dataset.collapseKey;
+        const issueId = el.dataset.issueId ? parseInt(el.dataset.issueId, 10) : NaN;
+        switch (e.key) {
+          case "Enter":
+          case " ":
+            e.preventDefault();
+            if (!isNaN(issueId)) {
+              vscode2.postMessage({ command: "openIssue", issueId });
+            }
+            break;
+          case "ArrowUp": {
+            e.preventDefault();
+            const prev = findVisibleLabel(index, -1);
+            if (prev) setActiveLabel(prev.label, false, true);
+            break;
+          }
+          case "ArrowDown": {
+            e.preventDefault();
+            const next = findVisibleLabel(index, 1);
+            if (next) setActiveLabel(next.label, false, true);
+            break;
+          }
+          case "ArrowLeft":
+            e.preventDefault();
+            if (el.dataset.hasChildren === "true" && el.dataset.expanded === "true") {
+              toggleCollapseClientSide(collapseKey, "collapse");
+            } else if (el.dataset.parentKey) {
+              const parent = allLabels.find((l) => l.dataset.collapseKey === el.dataset.parentKey);
+              if (parent) setActiveLabel(parent, false, true);
+            }
+            break;
+          case "ArrowRight":
+            e.preventDefault();
+            if (el.dataset.hasChildren === "true" && el.dataset.expanded === "false") {
+              toggleCollapseClientSide(collapseKey, "expand");
+            } else if (el.dataset.hasChildren === "true" && el.dataset.expanded === "true") {
+              const firstChild = allLabels.find((l) => l.dataset.parentKey === collapseKey && isLabelVisible(l));
+              if (firstChild) setActiveLabel(firstChild, false, true);
+            }
+            break;
+          case "Home": {
+            e.preventDefault();
+            const first = findVisibleLabel(-1, 1);
+            if (first) setActiveLabel(first.label, false, true);
+            break;
+          }
+          case "End": {
+            e.preventDefault();
+            const last = findVisibleLabel(allLabels.length, -1);
+            if (last) setActiveLabel(last.label, false, true);
+            break;
+          }
+          case "PageDown": {
+            e.preventDefault();
+            let target = index, count = 0;
+            while (count < 10 && target < allLabels.length - 1) {
+              const next = findVisibleLabel(target, 1);
+              if (!next) break;
+              target = next.index;
+              count++;
+            }
+            if (count > 0) setActiveLabel(allLabels[target], false, true);
+            break;
+          }
+          case "PageUp": {
+            e.preventDefault();
+            let target = index, count = 0;
+            while (count < 10 && target > 0) {
+              const prev = findVisibleLabel(target, -1);
+              if (!prev) break;
+              target = prev.index;
+              count++;
+            }
+            if (count > 0) setActiveLabel(allLabels[target], false, true);
+            break;
+          }
+          case "Tab":
+            if (!e.shiftKey && !isNaN(issueId)) {
+              const bar = document.querySelector(`.issue-bar[data-issue-id="${issueId}"]`);
+              if (bar) {
+                e.preventDefault();
+                bar.focus();
+                announce(`Timeline bar for issue #${issueId}`);
+              }
+            }
+            break;
+        }
+      });
+    });
+    addDocListener("mousedown", (e) => {
+      if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if (!e.target.closest("#ganttScroll")) return;
+      if (e.target.closest(".collapse-toggle, .chevron-hit-area, .drag-handle, .link-handle, .blocks-badge-group, .blocker-badge, .progress-badge-group, .flex-badge-group, button, input, select")) {
+        return;
+      }
+      const row = e.target.closest(".gantt-row[data-collapse-key]");
+      if (row && row.matches(".project-label, .issue-label, .time-group-label")) return;
+      let key = row?.dataset.collapseKey || null;
+      if (!key) {
+        if (!e.target.closest(".gantt-timeline")) return;
+        const rows = [];
+        for (const l of allLabels) {
+          if (!isLabelVisible(l)) continue;
+          const r = l.getBoundingClientRect();
+          rows.push({ key: l.dataset.collapseKey, y: r.top, height: r.height });
+        }
+        key = pickRowKeyByY(rows, e.clientY);
+        if (!key) return;
+      }
+      const label = allLabels.find((l) => l.dataset.collapseKey === key);
+      if (label) setActiveLabel(label);
+    });
+    addDocListener("keydown", (e) => {
+      if (e.defaultPrevented || !activeLabel) return;
+      const tag = e.target.tagName;
+      if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+      if (document.activeElement?.closest?.(".issue-bar")) return;
+      const index = allLabels.indexOf(activeLabel);
+      if (index < 0) return;
+      const collapseKey = activeLabel.dataset.collapseKey;
+      const hasChildren = activeLabel.dataset.hasChildren === "true";
+      const expanded = activeLabel.dataset.expanded === "true";
+      const navTo = (t) => {
+        if (t) {
+          e.preventDefault();
+          setActiveLabel(t.label, false, true);
+        }
+      };
+      switch (e.key) {
+        case "ArrowDown":
+          navTo(findVisibleLabel(index, 1));
+          break;
+        case "ArrowUp":
+          navTo(findVisibleLabel(index, -1));
+          break;
+        case "Home":
+          navTo(findVisibleLabel(-1, 1));
+          break;
+        case "End":
+          navTo(findVisibleLabel(allLabels.length, -1));
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          if (hasChildren && expanded && collapseKey) {
+            toggleCollapseClientSide(collapseKey, "collapse");
+          } else if (activeLabel.dataset.parentKey) {
+            const parent = allLabels.find((l) => l.dataset.collapseKey === activeLabel.dataset.parentKey);
+            if (parent) setActiveLabel(parent, false, true);
+          }
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          if (hasChildren && !expanded && collapseKey) {
+            toggleCollapseClientSide(collapseKey, "expand");
+          } else if (hasChildren && expanded && collapseKey) {
+            const firstChild = allLabels.find((l) => l.dataset.parentKey === collapseKey && isLabelVisible(l));
+            if (firstChild) setActiveLabel(firstChild, false, true);
+          }
+          break;
+        default:
+          return;
+      }
+    });
+  }
+
+  // src/webviews/gantt/gantt-keyboard.js
+  function setupKeyboard(ctx) {
+    const { vscode: vscode2, addDocListener, menuUndo, menuRedo, undoStack, redoStack, saveState, updateUndoRedoButtons, announce, scrollToAndHighlight, scrollToToday } = ctx;
+    addDocListener("keydown", (e) => {
+      const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+      const modKey = isMac ? e.metaKey : e.ctrlKey;
+      if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
+      if (modKey && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        menuUndo?.click();
+      } else if (modKey && e.key === "z" && e.shiftKey) {
+        e.preventDefault();
+        menuRedo?.click();
+      } else if (modKey && e.key === "y") {
+        e.preventDefault();
+        menuRedo?.click();
+      } else if (e.key >= "1" && e.key <= "5" && !modKey && !e.altKey) {
+        const zoomSelect = document.getElementById("zoomSelect");
+        if (zoomSelect) {
+          const levels = ["day", "week", "month", "quarter", "year"];
+          zoomSelect.value = levels[parseInt(e.key) - 1];
+          zoomSelect.dispatchEvent(new Event("change"));
+        }
+      } else if (e.key.toLowerCase() === "y") {
+        document.getElementById("menuCapacity")?.click();
+      } else if (e.key.toLowerCase() === "i") {
+        document.getElementById("menuIntensity")?.click();
+      } else if (e.key.toLowerCase() === "d") {
+        document.getElementById("menuDeps")?.click();
+      } else if (e.key.toLowerCase() === "v") {
+        const viewSelect = document.getElementById("viewFocusSelect");
+        viewSelect.value = viewSelect.value === "project" ? "person" : "project";
+        viewSelect.dispatchEvent(new Event("change"));
+      } else if (e.key.toLowerCase() === "r") {
+        document.getElementById("refreshBtn")?.click();
+      } else if (e.key.toLowerCase() === "t") {
+        scrollToToday();
+      } else if (e.key.toLowerCase() === "e") {
+        document.getElementById("menuExpand")?.click();
+      } else if (e.key.toLowerCase() === "c" && !modKey) {
+        document.getElementById("menuCollapse")?.click();
+      } else if (e.key.toLowerCase() === "b") {
+        document.getElementById("menuBadges")?.click();
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        const focusedBar = document.activeElement?.closest(".issue-bar:not(.parent-bar)");
+        if (!focusedBar) return;
+        e.preventDefault();
+        const issueId = parseInt(focusedBar.dataset.issueId);
+        const startDate = focusedBar.dataset.startDate;
+        const dueDate = focusedBar.dataset.dueDate;
+        if (!startDate && !dueDate) return;
+        const delta = e.key === "ArrowRight" ? 1 : -1;
+        const addDays = (dateStr, days) => {
+          const d = /* @__PURE__ */ new Date(dateStr + "T00:00:00");
+          d.setDate(d.getDate() + days);
+          const pad = (n) => String(n).padStart(2, "0");
+          return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+        };
+        let newStart = null, newDue = null;
+        if (e.shiftKey && dueDate) {
+          newDue = addDays(dueDate, delta);
+        } else if (e.altKey && startDate) {
+          newStart = addDays(startDate, delta);
+        } else {
+          if (startDate) newStart = addDays(startDate, delta);
+          if (dueDate) newDue = addDays(dueDate, delta);
+        }
+        if (newStart || newDue) {
+          saveState();
+          undoStack.push({
+            issueId,
+            oldStartDate: newStart ? startDate : null,
+            oldDueDate: newDue ? dueDate : null,
+            newStartDate: newStart,
+            newDueDate: newDue
+          });
+          redoStack.length = 0;
+          updateUndoRedoButtons();
+          vscode2.postMessage({ command: "updateDates", issueId, startDate: newStart, dueDate: newDue });
+        }
+      } else if (e.key === "/" && !modKey) {
+        e.preventDefault();
+        showQuickSearch();
+      } else if (e.key === "?" || e.shiftKey && e.key === "/") {
+        e.preventDefault();
+        toggleKeyboardHelp();
+      }
+    });
+    let quickSearchEl = null;
+    function showQuickSearch() {
+      if (quickSearchEl) {
+        quickSearchEl.remove();
+      }
+      quickSearchEl = document.createElement("div");
+      quickSearchEl.className = "quick-search";
+      quickSearchEl.innerHTML = `
       <input type="text" placeholder="Search issues..." autofocus />
-    `,document.body.appendChild(R);let u=R.querySelector("input");u.focus();let de=Array.from(document.querySelectorAll(".issue-label")).map(te=>({el:te,text:(te.getAttribute("aria-label")||"").toLowerCase()})),Q=null;u.addEventListener("input",()=>{Q&&clearTimeout(Q),Q=setTimeout(()=>{let te=u.value.toLowerCase();de.forEach(({el:De,text:qe})=>{let Ae=te&&qe.includes(te);De.classList.toggle("search-match",Ae)})},50)}),u.addEventListener("keydown",te=>{if(te.key==="Escape")T();else if(te.key==="Enter"){let De=document.querySelector(".issue-label.search-match");De&&(T(),De.focus(),Ie(De.dataset.issueId))}}),u.addEventListener("blur",()=>setTimeout(T,150))}function T(){R&&(R.remove(),R=null,document.querySelectorAll(".search-match").forEach(u=>u.classList.remove("search-match")))}let k=null;function oe(){if(k){k.remove(),k=null;return}k=document.createElement("div"),k.className="keyboard-help",k.innerHTML=`
+    `;
+      document.body.appendChild(quickSearchEl);
+      const input = quickSearchEl.querySelector("input");
+      input.focus();
+      const labels = Array.from(document.querySelectorAll(".issue-label"));
+      const labelData = labels.map((label) => ({
+        el: label,
+        text: (label.getAttribute("aria-label") || "").toLowerCase()
+      }));
+      let searchTimeout = null;
+      input.addEventListener("input", () => {
+        if (searchTimeout) clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+          const query = input.value.toLowerCase();
+          labelData.forEach(({ el, text }) => {
+            const match = query && text.includes(query);
+            el.classList.toggle("search-match", match);
+          });
+        }, 50);
+      });
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          closeQuickSearch();
+        } else if (e.key === "Enter") {
+          const match = document.querySelector(".issue-label.search-match");
+          if (match) {
+            closeQuickSearch();
+            match.focus();
+            scrollToAndHighlight(match.dataset.issueId);
+          }
+        }
+      });
+      input.addEventListener("blur", () => setTimeout(closeQuickSearch, 150));
+    }
+    function closeQuickSearch() {
+      if (quickSearchEl) {
+        quickSearchEl.remove();
+        quickSearchEl = null;
+        document.querySelectorAll(".search-match").forEach((el) => el.classList.remove("search-match"));
+      }
+    }
+    let keyboardHelpEl = null;
+    function toggleKeyboardHelp() {
+      if (keyboardHelpEl) {
+        keyboardHelpEl.remove();
+        keyboardHelpEl = null;
+        return;
+      }
+      keyboardHelpEl = document.createElement("div");
+      keyboardHelpEl.className = "keyboard-help";
+      keyboardHelpEl.innerHTML = `
       <div class="keyboard-help-content">
         <h3>Keyboard Shortcuts</h3>
         <div class="shortcut-grid">
@@ -42,11 +2199,1344 @@
         </div>
         <p class="keyboard-help-close">Press <kbd>?</kbd> or <kbd>Esc</kbd> to close</p>
       </div>
-    `,document.body.appendChild(k),k.addEventListener("click",u=>{u.target===k&&oe()})}M("keydown",u=>{u.key==="Escape"&&k&&(u.stopImmediatePropagation(),oe())})}var ce=acquireVsCodeApi(),it=!1;function ot(w){it&&typeof performance<"u"&&performance.mark(w)}function pt(w,p,M){if(it&&typeof performance<"u")try{performance.measure(w,p,M);let X=performance.getEntriesByName(w,"measure");X.length>0&&console.log(`[Gantt Perf] ${w}: ${X[X.length-1].duration.toFixed(2)}ms`),performance.clearMarks(p),performance.clearMarks(M),performance.clearMeasures(w)}catch{}}function xt(){if(it){let w=document.getElementById("ganttRoot"),p=w?w.querySelectorAll("*").length:0,M=w?w.querySelectorAll("svg *").length:0;console.log(`[Gantt Perf] DOM nodes: ${p}, SVG elements: ${M}`)}}function Ht(w){if(!w)return;let p=document.documentElement;p.style.setProperty("--gantt-header-height",`${w.headerHeight}px`),p.style.setProperty("--gantt-label-width",`${w.labelWidth}px`),p.style.setProperty("--gantt-id-column-width",`${w.idColumnWidth}px`),p.style.setProperty("--gantt-start-date-column-width",`${w.startDateColumnWidth}px`),p.style.setProperty("--gantt-status-column-width",`${w.statusColumnWidth}px`),p.style.setProperty("--gantt-due-date-column-width",`${w.dueDateColumnWidth}px`),p.style.setProperty("--gantt-assignee-column-width",`${w.assigneeColumnWidth}px`),p.style.setProperty("--gantt-sticky-left-width",`${w.stickyLeftWidth}px`)}function Rt({addDocListener:w,addWinListener:p}){let M=document.getElementById("ganttRoot"),X=document.getElementById("ganttTooltip"),z=X?.querySelector(".gantt-tooltip-content");if(!M||!X||!z)return;let O=y=>y?String(y).replace(/\r\n/g,`
-`).trimEnd():"";function N(){M.querySelectorAll("svg title").forEach(y=>{let D=y.parentElement,l=O(y.textContent);D&&l&&(D.dataset.tooltip=l),y.remove()})}function J(){M.querySelectorAll("[title]").forEach(y=>{if(y.tagName.toLowerCase()==="title")return;let D=O(y.getAttribute("title"));y.removeAttribute("title"),D&&(y.dataset.tooltip=D)})}function V(){M.querySelectorAll("[data-toolbar-tooltip]").forEach(y=>{let D=O(y.dataset.toolbarTooltip);delete y.dataset.toolbarTooltip,D&&(y.dataset.tooltip=D)})}function Y(){N(),J(),V()}function Ie(y){let D=y.findIndex(g=>g.trim().startsWith("#"));return D>=0?D:y.filter(g=>g.trim()).length>1?y.findIndex(g=>g.trim()):-1}function ae(y){z.textContent="";let D=O(y);if(!D)return;let l=D.split(`
-`),g=Ie(l),r=!1;l.forEach((S,L)=>{let H=S.trim();if(!H){if(!r){let pe=document.createElement("div");pe.className="gantt-tooltip-spacer",z.appendChild(pe),r=!0}return}if(H==="---"){let pe=document.createElement("div");pe.className="gantt-tooltip-divider",z.appendChild(pe),r=!1;return}let Z=H.match(/^cf:([^:]+):(.*)$/);if(Z){let pe=Z[1].trim(),$=Z[2].trim(),n=document.createElement("div");n.className="gantt-tooltip-line";let we=document.createElement("span");we.className="gantt-tooltip-key",we.textContent=`${pe}: `,n.appendChild(we),$&&n.appendChild(document.createTextNode($)),z.appendChild(n),r=!1;return}let be=document.createElement("div");be.className="gantt-tooltip-line",L===g&&be.classList.add("gantt-tooltip-title");let Pe=H.match(/^Open in Browser:\s*(\S+)/);if(Pe&&/^https?:\/\//i.test(Pe[1])){let pe=document.createElement("a");pe.href=Pe[1],pe.textContent="Open in Browser",pe.title=Pe[1],pe.target="_blank",pe.rel="noopener noreferrer",be.appendChild(pe)}else be.textContent=S;z.appendChild(be),r=!1});let A=z.lastElementChild;A&&A.classList.contains("gantt-tooltip-spacer")&&A.remove()}let R=null,Ce=null,T=null,k={x:0,y:0};function oe(y){k={x:y.clientX,y:y.clientY}}function u(){Ce&&(clearTimeout(Ce),Ce=null)}function fe(){T&&(clearTimeout(T),T=null)}function de(y){return y&&(y===X||X.contains(y))}function Q(y){return y&&R&&(y===R||R.contains(y))}function te(){if(!k)return!1;let y=document.elementFromPoint(k.x,k.y);return de(y)||Q(y)}let De=300;function qe(y){fe(),T=setTimeout(()=>{T=null,!(!R||R!==y)&&te()&&ge(y,k.x,k.y)},De)}function Ae(){u(),Ce=setTimeout(()=>{R&&(te()||ke())},300)}function Xe(y,D){let r=X.getBoundingClientRect(),A=y+8,S=D+8;A+r.width>window.innerWidth-8&&(A=y-r.width-8),S+r.height>window.innerHeight-8&&(S=D-r.height-8),A=Math.max(8,Math.min(A,window.innerWidth-r.width-8)),S=Math.max(8,Math.min(S,window.innerHeight-r.height-8)),X.style.left=`${Math.round(A)}px`,X.style.top=`${Math.round(S)}px`}function ge(y,D,l){let g=y.dataset.tooltip;if(!g)return;ae(g),X.classList.add("visible"),X.setAttribute("aria-hidden","false"),Xe(D,l);let r=y.dataset.projectId;r&&!y.dataset.membersRequested&&(y.dataset.membersRequested="1",ce.postMessage({command:"requestProjectMembers",projectId:Number(r)}))}function ke(y=!1){fe(),u(),X.classList.remove("visible"),X.setAttribute("aria-hidden","true"),y||(R=null)}function Re(y){if(!y||y===X||X.contains(y))return null;let D=y.closest?.("[data-tooltip], [title]");if(!D||!M.contains(D))return null;if(D.hasAttribute("title")){let l=O(D.getAttribute("title"));D.removeAttribute("title"),l&&(D.dataset.tooltip=l)}return D.dataset.tooltip?D:null}Y(),w("pointerover",y=>{if(oe(y),de(y.target)){u(),fe();return}let D=Re(y.target);if(!D){fe();return}u(),R!==D?(R=D,X.classList.contains("visible")&&ke(!0),qe(D)):X.classList.contains("visible")||qe(D)},!0),w("pointermove",y=>{R&&(oe(y),Ce&&te()&&u())},!0),w("pointerout",y=>{if(!R||(oe(y),fe(),!Q(y.target)&&!de(y.target)))return;let D=y.relatedTarget;de(D)||Q(D)||Ae()},!0),w("scroll",()=>{R&&ke()},!0),w("keydown",()=>{R&&ke()},!0),p("blur",()=>{R&&ke()})}function Mt(w){if(!w)return;w.state&&(it=w.state.perfDebug??!1),ot("render-start");let p=document.getElementById("ganttRoot");p&&(Ht(w.state),ot("innerHTML-start"),p.innerHTML=w.html||"",ot("innerHTML-end"),pt("innerHTML","innerHTML-start","innerHTML-end"),Xt(w.state),ot("render-end"),pt("render","render-start","render-end"),xt())}window.addEventListener("message",w=>{let p=w.data;if(p){if(p.command==="render"){Mt(p.payload);return}if(p.command==="appendProjectMembers"&&p.projectId&&p.memberLines?.length){let M=document.querySelector(`[data-project-id="${p.projectId}"]`);if(M){let X=(M.dataset.tooltip||"").trimEnd(),z=p.memberLines.join(`
-`);X.includes(z)||(M.dataset.tooltip=X+`
+    `;
+      document.body.appendChild(keyboardHelpEl);
+      keyboardHelpEl.addEventListener("click", (e) => {
+        if (e.target === keyboardHelpEl) toggleKeyboardHelp();
+      });
+    }
+    addDocListener("keydown", (e) => {
+      if (e.key === "Escape" && keyboardHelpEl) {
+        e.stopImmediatePropagation();
+        toggleKeyboardHelp();
+      }
+    });
+  }
 
----
-
-`+z)}return}window.__ganttHandleExtensionMessage&&window.__ganttHandleExtensionMessage(p)}});var Ct=window.__GANTT_INITIAL_PAYLOAD__;Ct&&Mt(Ct);ce.postMessage({command:"webviewReady"});function Xt(w){if(ot("initializeGantt-start"),!w)return;let{timelineWidth:p,minDateMs:M,maxDateMs:X,totalDays:z,redmineBaseUrl:O,minimapBarsData:N,minimapHeight:J,minimapBarHeight:V,minimapTodayX:Y,labelWidth:Ie,leftExtrasWidth:ae,sortBy:R,sortOrder:Ce,selectedCollapseKey:T,barHeight:k,todayX:oe,todayInRange:u,isDraftMode:fe,draftQueueCount:de}=w,Q=p/z;function te(e,d){e.textContent=d,e.dataset.tooltip=d===1?"1 change queued - click to review":d+" changes queued - click to review"}let De=fe,qe=document.getElementById("dragConfirmOk");qe&&(qe.textContent=fe?"Queue to Draft":"Save to Redmine");let Ae=document.getElementById("draftBadge");Ae&&(fe?(Ae.classList.remove("hidden"),te(Ae,de??0)):Ae.classList.add("hidden"),Ae.addEventListener("click",()=>{ce.postMessage({command:"openDraftReview"})}));let Xe=document.getElementById("draftModeToggle");Xe&&Xe.addEventListener("click",()=>{ce.postMessage({command:"toggleDraftMode"})}),window._ganttCleanup&&window._ganttCleanup();let ge=[],ke=[];function Re(e,d,c){document.addEventListener(e,d,c),ge.push({type:e,handler:d,options:c})}function y(e,d,c){window.addEventListener(e,d,c),ke.push({type:e,handler:d,options:c})}window._ganttCleanup=()=>{ge.forEach(e=>document.removeEventListener(e.type,e.handler,e.options)),ke.forEach(e=>window.removeEventListener(e.type,e.handler,e.options)),window.__ganttHandleExtensionMessage=null};function D(e){setTimeout(()=>{document.addEventListener("click",function d(c){e.contains(c.target)||(e.remove(),document.removeEventListener("click",d))})},0)}function l(e){return Math.round(e/Q)*Q}function g(e){let d=document.getElementById("liveRegion");d&&(d.textContent=e)}let r=document.getElementById("ganttScroll"),A=document.getElementById("ganttLeftHeader"),S=document.getElementById("ganttLabels"),L=document.getElementById("ganttTimeline"),H=document.getElementById("menuUndo"),Z=document.getElementById("menuRedo"),be=document.getElementById("minimapSvg"),Pe=document.getElementById("minimapViewport"),{updateMinimapPosition:pe,updateMinimapViewport:$}=wt({timelineWidth:p,minimapBarsData:N,minimapHeight:J,minimapBarHeight:V,minimapTodayX:Y,ganttScroll:r,minimapSvg:be,minimapViewport:Pe,addDocListener:Re}),n=200,we=ce.getState()||{undoStack:[],redoStack:[],labelWidth:Ie,scrollLeft:null,scrollTop:null,centerDateMs:null},_e=we.undoStack||[],We=we.redoStack||[];function Ke(e){e.length>n&&e.splice(0,e.length-n)}Ke(_e),Ke(We);let Oe=we.scrollLeft??null,Te=we.scrollTop??null,Ge=we.centerDateMs;function Ne(){if(!r)return null;let d=document.querySelector(".gantt-body .gantt-sticky-left")?.offsetWidth??0,c=r.clientWidth-d,m=(r.scrollLeft+c/2)/p;return M+m*(X-M)}function Ye(e){if(!r)return;let c=(e-M)/(X-M)*p,m=document.querySelector(".gantt-body .gantt-sticky-left")?.offsetWidth??0,W=r.clientWidth-m;r.scrollLeft=Math.max(0,c-W/2)}function me(){Ke(_e),Ke(We),ce.setState({undoStack:_e,redoStack:We,labelWidth:S?.offsetWidth||Ie,scrollLeft:null,scrollTop:r?.scrollTop??null,centerDateMs:Ne()})}let rt=me;function he(){H&&H.toggleAttribute("disabled",_e.length===0),Z&&Z.toggleAttribute("disabled",We.length===0),me()}if(we.labelWidth&&A&&S){A.style.width=we.labelWidth+"px",S.style.width=we.labelWidth+"px";let e=document.querySelector(".capacity-ribbon-label");e&&(e.style.width=we.labelWidth+ae+"px")}let nt=!0,q=null;r&&r.addEventListener("scroll",()=>{cancelAnimationFrame(q),q=requestAnimationFrame(()=>{$(),nt||me()})},{passive:!0}),requestAnimationFrame(()=>he());let K={setDependenciesState:{targetSel:".dependency-layer",menuId:"menuDeps",className:"hidden",addWhenEnabled:!1},setBadgesState:{targetSel:".gantt-container",menuId:"menuBadges",className:"hide-badges",addWhenEnabled:!1},setCapacityRibbonState:{targetSel:".capacity-ribbon",menuId:"menuCapacity",className:"hidden",addWhenEnabled:!1},setIntensityState:{targetSel:".gantt-container",menuId:"menuIntensity",className:"intensity-enabled",addWhenEnabled:!0}};function f(e,d){let c=document.querySelector(e.targetSel),h=document.getElementById(e.menuId),m=e.addWhenEnabled?d:!d;c&&c.classList.toggle(e.className,m),h&&h.classList.toggle("active",d)}window.__ganttHandleExtensionMessage=e=>{let d=K[e.command];if(d)f(d,e.enabled);else if(e.command==="setDraftModeState"){De=e.enabled;let c=document.getElementById("dragConfirmOk");c&&(c.textContent=e.enabled?"Queue to Draft":"Save to Redmine");let h=document.getElementById("draftModeToggle");h&&(h.classList.toggle("active",e.enabled),h.textContent=e.enabled?"Disable Draft Mode":"Enable Draft Mode");let m=document.getElementById("draftBadge");m&&(e.enabled?(m.classList.remove("hidden"),te(m,e.queueCount??0)):m.classList.add("hidden"))}else if(e.command==="setDraftQueueCount"){let c=document.getElementById("draftBadge");c&&te(c,e.count)}else if(e.command==="pushUndoAction")_e.push(e.action),Ke(_e),We.length=0,he(),me();else if(e.command==="updateRelationId"){let c=e.stack==="undo"?_e:We;if(c.length>0){let h=c[c.length-1];h.type==="relation"&&(h.relationId=e.newRelationId,me())}}else if(e.command==="scrollToIssue"){let c=e.issueId,h=document.querySelector('.issue-label[data-issue-id="'+c+'"]'),m=document.querySelector('.issue-bar[data-issue-id="'+c+'"]'),W=document.getElementById("ganttScroll"),ve=document.querySelector(".gantt-header-row")?.getBoundingClientRect().height||60;if(!W)return;let Be=W.scrollTop,Fe=W.scrollLeft;if(h){let He=h.closest(".gantt-row");if(He){let ze=He.offsetTop,Qe=He.getBoundingClientRect().height,st=W.clientHeight-ve;Be=Math.max(0,ze-ve-(st-Qe)/2)}h.focus(),h.classList.add("highlighted"),setTimeout(()=>h.classList.remove("highlighted"),2e3)}if(m){let He=parseFloat(m.getAttribute("data-start-x")||"0"),Qe=parseFloat(m.getAttribute("data-end-x")||"0")-He,st=W.clientWidth,Bt=document.querySelector(".gantt-sticky-left")?.getBoundingClientRect().width||0,vt=st-Bt;Qe<=vt-100?Fe=He-(vt-Qe)/2:Fe=He-50,Fe=Math.max(0,Fe),m.classList.add("highlighted"),setTimeout(()=>m.classList.remove("highlighted"),2e3)}W.scrollTo({left:Fe,top:Be,behavior:"smooth"})}},document.getElementById("lookbackSelect")?.addEventListener("change",e=>{ce.postMessage({command:"setLookback",years:e.target.value})}),document.getElementById("zoomSelect")?.addEventListener("change",e=>{rt(),ce.postMessage({command:"setZoom",zoomLevel:e.target.value})}),document.getElementById("viewFocusSelect")?.addEventListener("change",e=>{ce.postMessage({command:"setViewFocus",focus:e.target.value})}),document.getElementById("projectSelector")?.addEventListener("change",e=>{let d=e.target.value,c=d?parseInt(d,10):null;ce.postMessage({command:"setSelectedProject",projectId:c})}),document.getElementById("focusSelector")?.addEventListener("change",e=>{let d=e.target.value;ce.postMessage({command:"setSelectedAssignee",assignee:d||null})}),document.getElementById("filterAssignee")?.addEventListener("change",e=>{let d=e.target.value;ce.postMessage({command:"setFilter",filter:{assignee:d}})}),document.getElementById("filterStatus")?.addEventListener("change",e=>{let d=e.target.value;ce.postMessage({command:"setFilter",filter:{status:d}})}),document.getElementById("filterTaskType")?.addEventListener("change",e=>{ce.postMessage({command:"setTaskTypeFilter",taskType:e.target.value})}),document.querySelectorAll(".gantt-col-header.sortable").forEach(e=>{e.addEventListener("click",()=>{let d=e.dataset.sort;d===R?Ce==="asc"?ce.postMessage({command:"setSort",sortOrder:"desc"}):ce.postMessage({command:"setSort",sortBy:null}):ce.postMessage({command:"setSort",sortBy:d,sortOrder:"asc"})})}),document.getElementById("menuCapacity")?.addEventListener("click",()=>{document.getElementById("menuCapacity")?.hasAttribute("disabled")||(me(),ce.postMessage({command:"toggleCapacityRibbon"}))}),document.getElementById("menuIntensity")?.addEventListener("click",()=>{document.getElementById("menuIntensity")?.hasAttribute("disabled")||(me(),ce.postMessage({command:"toggleIntensity"}))}),document.getElementById("overloadBadge")?.addEventListener("click",e=>{e.stopPropagation();let d=e.currentTarget,c=parseInt(d.dataset.firstOverloadMs||"0",10);c>0&&(Ye(c),me())}),document.querySelectorAll(".capacity-day-bar-group").forEach(e=>{e.addEventListener("click",d=>{let c=parseInt(d.currentTarget.dataset.dateMs||"0",10);c>0&&(Ye(c),me())})}),document.getElementById("menuDeps")?.addEventListener("click",()=>{me(),ce.postMessage({command:"toggleDependencies"})}),document.getElementById("menuBadges")?.addEventListener("click",()=>{me(),ce.postMessage({command:"toggleBadges"})});let le=document.querySelector(".gantt-container");function Ee(){let e=new Map,d=new Map;return document.querySelectorAll(".dependency-arrow").forEach(c=>{if(!(c.classList.contains("rel-blocks")||c.classList.contains("rel-precedes")))return;let m=c.dataset.from,W=c.dataset.to;e.has(m)||e.set(m,[]),e.get(m).push(W),d.has(W)||d.set(W,[]),d.get(W).push(m)}),{graph:e,reverseGraph:d}}let ye=null;function Ue(e,d,c){let h=new Set([e]),m=[e];for(;m.length>0;){let ie=m.shift(),ve=d.get(ie)||[];for(let Be of ve)h.has(Be)||(h.add(Be),m.push(Be))}let W=[e];for(;W.length>0;){let ie=W.shift(),ve=c.get(ie)||[];for(let Be of ve)h.has(Be)||(h.add(Be),W.push(Be))}return h}function Je(e){if(lt(),!e)return;ye=e;let{graph:d,reverseGraph:c}=Ee(),h=Ue(e,d,c);le.classList.add("focus-mode"),document.querySelectorAll(".issue-bar").forEach(m=>{h.has(m.dataset.issueId)&&m.classList.add("focus-highlighted")}),document.querySelectorAll(".issue-label").forEach(m=>{h.has(m.dataset.issueId)&&m.classList.add("focus-highlighted")}),document.querySelectorAll(".dependency-arrow").forEach(m=>{h.has(m.dataset.from)&&h.has(m.dataset.to)&&m.classList.add("focus-highlighted")}),g(`Focus: ${h.size} issue${h.size!==1?"s":""} in dependency chain`)}function lt(){ye=null,le.classList.remove("focus-mode"),document.querySelectorAll(".focus-highlighted").forEach(e=>e.classList.remove("focus-highlighted"))}let ct=()=>ye,ee=new Set,Ze=null,et=document.getElementById("selectionCount"),$e=Array.from(document.querySelectorAll(".issue-bar")),je=new Map;$e.forEach(e=>{let d=e.dataset.issueId;d&&(je.has(d)||je.set(d,[]),je.get(d).push(e))});function s(){ee.size>0?(et.textContent=`${ee.size} selected`,et.classList.remove("hidden"),le.classList.add("multi-select-mode")):(et.classList.add("hidden"),le.classList.remove("multi-select-mode"))}function o(e){e.forEach(d=>{let c=je.get(d);c&&c.forEach(h=>h.classList.toggle("selected",ee.has(d)))}),s()}function t(){$e.forEach(e=>{e.classList.toggle("selected",ee.has(e.dataset.issueId))}),s()}function i(){let e=[...ee];ee.clear(),Ze=null,o(e)}function a(e){ee.has(e)?ee.delete(e):ee.add(e),Ze=e,o([e])}function B(e,d){let c=$e.findIndex(ve=>ve.dataset.issueId===e),h=$e.findIndex(ve=>ve.dataset.issueId===d);if(c===-1||h===-1)return;let m=Math.min(c,h),W=Math.max(c,h),ie=[];for(let ve=m;ve<=W;ve++){let Be=$e[ve].dataset.issueId;ee.has(Be)||(ee.add(Be),ie.push(Be))}o(ie)}function C(){$e.forEach(e=>ee.add(e.dataset.issueId)),t(),g(`Selected all ${ee.size} issues`)}Re("mousedown",e=>{if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey||e.target.closest(".drag-handle")||e.target.closest(".link-handle"))return;let d=e.target.closest(".issue-bar");if(!d)return;e.preventDefault(),e.stopPropagation();let c=d.dataset.issueId;e.shiftKey&&Ze?B(Ze,c):a(c)}),Re("keydown",e=>{(e.ctrlKey||e.metaKey)&&e.key==="a"&&(e.preventDefault(),C()),e.key==="Escape"&&ee.size>0&&(e.stopImmediatePropagation(),i(),g("Selection cleared"))}),document.getElementById("refreshBtn")?.addEventListener("click",()=>{document.getElementById("loadingOverlay")?.classList.add("visible"),ce.postMessage({command:"refresh"})});function b(e,d,c,h,m,W){document.querySelector(".relation-picker")?.remove();let ie=document.createElement("div");ie.className="relation-picker";let ve=150,Be=120,Fe=Math.min(e,window.innerWidth-ve-10),He=Math.min(d,window.innerHeight-Be-10);ie.style.left=Math.max(10,Fe)+"px",ie.style.top=Math.max(10,He)+"px";let ze=document.createElement("div");if(ze.style.padding="6px 12px",ze.style.fontSize="11px",ze.style.opacity="0.7",ze.textContent=`#${h} \u2192 #${m}`,ie.appendChild(ze),W==="precedes"||W==="follows"){let st=document.createElement("button");st.textContent="Update delay...",st.addEventListener("click",()=>{ie.remove(),ce.postMessage({command:"updateRelationDelay",relationId:c,fromId:h,toId:m})}),ie.appendChild(st)}let Qe=document.createElement("button");Qe.textContent="Delete relation",Qe.addEventListener("click",()=>{me(),ce.postMessage({command:"deleteRelation",relationId:c}),ie.remove()}),ie.appendChild(Qe),document.body.appendChild(ie),D(ie)}let _=new Map,I=new Map,P=new Map,E=new Map,x=new Map,v=!1;function Se(){document.querySelectorAll(".issue-bar, .issue-label, .dependency-arrow, .project-label, .aggregate-bars").forEach(e=>{let d=e.classList;if(d.contains("issue-bar")){let c=e.dataset.issueId;c&&(_.has(c)||_.set(c,[]),_.get(c).push(e))}else if(d.contains("issue-label")){let c=e.dataset.issueId;c&&(I.has(c)||I.set(c,[]),I.get(c).push(e))}else if(d.contains("dependency-arrow")){let c=e.dataset.from,h=e.dataset.to;c&&(P.has(c)||P.set(c,[]),P.get(c).push(e)),h&&(P.has(h)||P.set(h,[]),P.get(h).push(e))}else if(d.contains("project-label")){let c=e.dataset.collapseKey;c&&(E.has(c)||E.set(c,[]),E.get(c).push(e))}else if(d.contains("aggregate-bars")){let c=e.dataset.collapseKey;c&&(x.has(c)||x.set(c,[]),x.get(c).push(e))}}),v=!0}typeof requestIdleCallback<"u"?requestIdleCallback(()=>Se(),{timeout:100}):setTimeout(Se,0);let U=[];function j(){document.body.classList.remove("hover-focus","dependency-hover"),U.forEach(e=>e.classList.remove("hover-highlighted","hover-source")),U=[]}function Le(e){document.body.classList.add("hover-focus");let d=v?_.get(e)||[]:document.querySelectorAll('.issue-bar[data-issue-id="'+e+'"]'),c=v?I.get(e)||[]:document.querySelectorAll('.issue-label[data-issue-id="'+e+'"]'),h=v?P.get(e)||[]:document.querySelectorAll('.dependency-arrow[data-from="'+e+'"], .dependency-arrow[data-to="'+e+'"]');d.forEach(m=>{m.classList.add("hover-highlighted"),U.push(m)}),c.forEach(m=>{m.classList.add("hover-highlighted"),U.push(m)}),h.forEach(m=>{m.classList.add("hover-highlighted"),U.push(m)})}function re(e){document.body.classList.add("hover-focus");let d=v?E.get(e)||[]:document.querySelectorAll('.project-label[data-collapse-key="'+e+'"]'),c=v?x.get(e)||[]:document.querySelectorAll('.aggregate-bars[data-collapse-key="'+e+'"]');d.forEach(h=>{h.classList.add("hover-highlighted"),U.push(h)}),c.forEach(h=>{h.classList.add("hover-highlighted"),U.push(h)})}let se=document.querySelector(".gantt-timeline svg"),ne=document.querySelector(".gantt-labels svg");if(se&&(se.addEventListener("mouseenter",e=>{let d=e.target.closest(".issue-bar"),c=e.target.closest(".aggregate-bars"),h=e.target.closest(".dependency-arrow");if(d){let m=d.dataset.issueId;m&&Le(m)}else if(c){let m=c.dataset.collapseKey;m&&re(m)}else if(h){let m=h.dataset.from,W=h.dataset.to;document.body.classList.add("dependency-hover"),h.classList.add("hover-source"),U.push(h),m&&Le(m),W&&Le(W)}},!0),se.addEventListener("mouseleave",e=>{let d=e.target.closest(".issue-bar"),c=e.target.closest(".aggregate-bars"),h=e.target.closest(".dependency-arrow");(d||c||h)&&j()},!0)),ne&&(ne.addEventListener("mouseenter",e=>{let d=e.target.closest(".issue-label"),c=e.target.closest(".project-label");if(d){let h=d.dataset.issueId;h&&Le(h)}else if(c){let h=c.dataset.collapseKey;h&&re(h)}},!0),ne.addEventListener("mouseleave",e=>{let d=e.target.closest(".issue-label"),c=e.target.closest(".project-label");(d||c)&&j()},!0)),se){let h=function(){d.forEach(m=>m.classList.remove("selected")),d.length=0,document.body.classList.remove("arrow-selection-mode"),c.forEach(m=>m.classList.remove("arrow-connected")),c.length=0,e=null};var Pt=h;se.addEventListener("mousedown",m=>{if(m.button!==2)return;let W=m.target.closest(".dependency-arrow");if(!W)return;let ie=W.querySelector("title");ie&&ie.remove()}),se.addEventListener("contextmenu",m=>{let W=m.target.closest(".dependency-arrow");if(!W)return;m.preventDefault();let ie=parseInt(W.dataset.relationId),ve=W.dataset.from,Be=W.dataset.to,Fe=[...W.classList].find(ze=>ze.startsWith("rel-")),He=Fe?Fe.replace("rel-",""):null;b(m.clientX,m.clientY,ie,ve,Be,He)});let e=null,d=[],c=[];se.addEventListener("click",m=>{let W=m.target.closest(".dependency-arrow");if(e&&(e.classList.remove("selected"),document.body.classList.remove("arrow-selection-mode"),document.querySelectorAll(".arrow-connected").forEach(He=>He.classList.remove("arrow-connected")),e=null),!W)return;m.stopPropagation(),e=W,W.classList.add("selected"),d.push(W),document.body.classList.add("arrow-selection-mode");let ie=W.dataset.from,ve=W.dataset.to,Be=v?[..._.get(ie)||[],..._.get(ve)||[]]:document.querySelectorAll(`.issue-bar[data-issue-id="${ie}"], .issue-bar[data-issue-id="${ve}"]`),Fe=v?[...I.get(ie)||[],...I.get(ve)||[]]:document.querySelectorAll(`.issue-label[data-issue-id="${ie}"], .issue-label[data-issue-id="${ve}"]`);Be.forEach(He=>{He.classList.add("arrow-connected"),c.push(He)}),Fe.forEach(He=>{He.classList.add("arrow-connected"),c.push(He)}),g(`Selected relation from #${ie} to #${ve}`)}),window._ganttArrowClickHandler&&document.removeEventListener("click",window._ganttArrowClickHandler),window._ganttArrowClickHandler=m=>{(e||document.querySelector(".dependency-arrow.selected"))&&!m.target.closest(".dependency-arrow")&&!m.target.closest(".blocks-badge-group")&&!m.target.closest(".blocker-badge")&&h()},document.addEventListener("click",window._ganttArrowClickHandler),window._ganttArrowKeyHandler&&document.removeEventListener("keydown",window._ganttArrowKeyHandler),window._ganttArrowKeyHandler=m=>{let W=e||document.querySelector(".dependency-arrow.selected");m.key==="Escape"&&W&&(m.stopImmediatePropagation(),h())},document.addEventListener("keydown",window._ganttArrowKeyHandler)}let F=Et({vscode:ce,menuUndo:H,menuRedo:Z,addDocListener:Re,closeOnOutsideClick:D,announce:g,saveState:me,updateUndoRedoButtons:he,undoStack:_e,redoStack:We,selectedIssues:ee,clearSelection:i,allIssueBars:$e,redmineBaseUrl:O,minDateMs:M,maxDateMs:X,timelineWidth:p,dayWidth:Q,barHeight:k,ganttScroll:r,snapToDay:l,focusOnDependencyChain:Je,clearFocus:lt,getFocusedIssueId:ct,scrollToAndHighlight:Me,isDraftModeEnabled:()=>De,isPerfDebugEnabled:()=>it,getLookupMaps:()=>({mapsReady:v,issueBarsByIssueId:_,issueLabelsByIssueId:I})});At({vscode:ce,addDocListener:Re,addWinListener:y,announce:g,barHeight:k,selectedCollapseKey:T,refreshArrowGeometry:F.refreshArrowGeometry});function G(e=!0){if(!u){e?ce.postMessage({command:"todayOutOfRange"}):r&&(r.scrollLeft=oe<0?0:r.scrollWidth);return}if(r){let c=document.querySelector(".gantt-body .gantt-sticky-left")?.offsetWidth??0,h=r.clientWidth-c;r.scrollLeft=Math.max(0,oe-h/2)}}function Me(e){if(!e)return;let d=document.querySelector('.issue-label[data-issue-id="'+e+'"]'),c=document.querySelector('.issue-bar[data-issue-id="'+e+'"]');if(d&&(d.scrollIntoView({behavior:"smooth",block:"center"}),d.classList.add("highlighted"),setTimeout(()=>d.classList.remove("highlighted"),1500)),c&&r){let h=c.getBoundingClientRect(),m=r.getBoundingClientRect(),W=r.scrollLeft+h.left-m.left-100;r.scrollTo({left:Math.max(0,W),behavior:"smooth"}),c.classList.add("highlighted"),setTimeout(()=>c.classList.remove("highlighted"),1500)}}It({vscode:ce,addDocListener:Re,menuUndo:H,menuRedo:Z,undoStack:_e,redoStack:We,saveState:me,updateUndoRedoButtons:he,announce:g,scrollToAndHighlight:Me,scrollToToday:G}),Rt({addDocListener:Re,addWinListener:y,ganttScroll:r}),requestAnimationFrame(()=>{if(Ge!==null&&r){let e=Math.max(M,Math.min(X,Ge));Ye(e),Te!==null&&(r.scrollTop=Te),Ge=null,Te=null}else Oe!==null&&r?(r.scrollLeft=Oe,Te!==null&&(r.scrollTop=Te),Oe=null,Te=null):G(!1);$(),nt=!1}),document.getElementById("todayBtn")?.addEventListener("click",()=>G());let Ve=document.getElementById("resizeHandle"),tt=document.getElementById("resizeHandleHeader"),dt=!1,ht=0,yt=0,ut=null;function bt(e,d){dt=!0,ut=d,ht=e.clientX,yt=S.offsetWidth,d.classList.add("dragging"),document.body.classList.add("cursor-col-resize","user-select-none"),e.preventDefault()}Ve?.addEventListener("mousedown",e=>bt(e,Ve)),tt?.addEventListener("mousedown",e=>bt(e,tt));let ft=!1,gt=null;Re("mousemove",e=>{dt&&(gt=e,!ft&&(ft=!0,requestAnimationFrame(()=>{if(ft=!1,!gt)return;let d=gt.clientX-ht,c=Math.min(600,Math.max(120,yt+d));if(A&&(A.style.width=c+"px"),S){S.style.width=c+"px";let m=S.querySelector("svg");m&&m.setAttribute("width",String(c))}let h=document.querySelector(".capacity-ribbon-label");h&&(h.style.width=c+ae+"px"),pe()})))}),Re("mouseup",()=>{dt&&(dt=!1,ut?.classList.remove("dragging"),ut=null,document.body.classList.remove("cursor-col-resize","user-select-none"),me())}),requestAnimationFrame(()=>{document.getElementById("loadingOverlay")?.classList.remove("visible")}),ot("initializeGantt-end"),pt("initializeGantt","initializeGantt-start","initializeGantt-end")}})();
+  // src/webviews/gantt/index.js
+  var vscode = acquireVsCodeApi();
+  var PERF_DEBUG = false;
+  function perfMark(name) {
+    if (PERF_DEBUG && typeof performance !== "undefined") {
+      performance.mark(name);
+    }
+  }
+  function perfMeasure(name, startMark, endMark) {
+    if (PERF_DEBUG && typeof performance !== "undefined") {
+      try {
+        performance.measure(name, startMark, endMark);
+        const entries = performance.getEntriesByName(name, "measure");
+        if (entries.length > 0) {
+          console.log(`[Gantt Perf] ${name}: ${entries[entries.length - 1].duration.toFixed(2)}ms`);
+        }
+        performance.clearMarks(startMark);
+        performance.clearMarks(endMark);
+        performance.clearMeasures(name);
+      } catch (e) {
+      }
+    }
+  }
+  function logDomStats() {
+    if (PERF_DEBUG) {
+      const root = document.getElementById("ganttRoot");
+      const nodeCount = root ? root.querySelectorAll("*").length : 0;
+      const svgCount = root ? root.querySelectorAll("svg *").length : 0;
+      console.log(`[Gantt Perf] DOM nodes: ${nodeCount}, SVG elements: ${svgCount}`);
+    }
+  }
+  function applyCssVars(state) {
+    if (!state) return;
+    const root = document.documentElement;
+    root.style.setProperty("--gantt-header-height", `${state.headerHeight}px`);
+    root.style.setProperty("--gantt-label-width", `${state.labelWidth}px`);
+    root.style.setProperty("--gantt-id-column-width", `${state.idColumnWidth}px`);
+    root.style.setProperty("--gantt-start-date-column-width", `${state.startDateColumnWidth}px`);
+    root.style.setProperty("--gantt-status-column-width", `${state.statusColumnWidth}px`);
+    root.style.setProperty("--gantt-due-date-column-width", `${state.dueDateColumnWidth}px`);
+    root.style.setProperty("--gantt-assignee-column-width", `${state.assigneeColumnWidth}px`);
+    root.style.setProperty("--gantt-sticky-left-width", `${state.stickyLeftWidth}px`);
+  }
+  function setupTooltips({ addDocListener, addWinListener }) {
+    const root = document.getElementById("ganttRoot");
+    const tooltip = document.getElementById("ganttTooltip");
+    const tooltipContent = tooltip?.querySelector(".gantt-tooltip-content");
+    if (!root || !tooltip || !tooltipContent) return;
+    const normalizeTooltipText = (value) => {
+      if (!value) return "";
+      return String(value).replace(/\r\n/g, "\n").trimEnd();
+    };
+    function convertSvgTitles() {
+      root.querySelectorAll("svg title").forEach((title) => {
+        const parent = title.parentElement;
+        const text = normalizeTooltipText(title.textContent);
+        if (parent && text) {
+          parent.dataset.tooltip = text;
+        }
+        title.remove();
+      });
+    }
+    function convertTitleAttributes() {
+      root.querySelectorAll("[title]").forEach((el) => {
+        if (el.tagName.toLowerCase() === "title") return;
+        const text = normalizeTooltipText(el.getAttribute("title"));
+        el.removeAttribute("title");
+        if (text) {
+          el.dataset.tooltip = text;
+        }
+      });
+    }
+    function convertToolbarTooltips() {
+      root.querySelectorAll("[data-toolbar-tooltip]").forEach((el) => {
+        const text = normalizeTooltipText(el.dataset.toolbarTooltip);
+        delete el.dataset.toolbarTooltip;
+        if (text) {
+          el.dataset.tooltip = text;
+        }
+      });
+    }
+    function prepareTooltips() {
+      convertSvgTitles();
+      convertTitleAttributes();
+      convertToolbarTooltips();
+    }
+    function findHeaderIndex(lines) {
+      const headerIndex = lines.findIndex((line) => line.trim().startsWith("#"));
+      if (headerIndex >= 0) return headerIndex;
+      const nonEmptyLines = lines.filter((line) => line.trim());
+      if (nonEmptyLines.length > 1) {
+        return lines.findIndex((line) => line.trim());
+      }
+      return -1;
+    }
+    function buildTooltipContent(text) {
+      tooltipContent.textContent = "";
+      const normalized = normalizeTooltipText(text);
+      if (!normalized) return;
+      const lines = normalized.split("\n");
+      const headerIndex = findHeaderIndex(lines);
+      let lastWasSpacer = false;
+      lines.forEach((line, index) => {
+        const trimmed = line.trim();
+        if (!trimmed) {
+          if (!lastWasSpacer) {
+            const spacer = document.createElement("div");
+            spacer.className = "gantt-tooltip-spacer";
+            tooltipContent.appendChild(spacer);
+            lastWasSpacer = true;
+          }
+          return;
+        }
+        if (trimmed === "---") {
+          const divider = document.createElement("div");
+          divider.className = "gantt-tooltip-divider";
+          tooltipContent.appendChild(divider);
+          lastWasSpacer = false;
+          return;
+        }
+        const customMatch = trimmed.match(/^cf:([^:]+):(.*)$/);
+        if (customMatch) {
+          const key = customMatch[1].trim();
+          const value = customMatch[2].trim();
+          const lineEl2 = document.createElement("div");
+          lineEl2.className = "gantt-tooltip-line";
+          const keyEl = document.createElement("span");
+          keyEl.className = "gantt-tooltip-key";
+          keyEl.textContent = `${key}: `;
+          lineEl2.appendChild(keyEl);
+          if (value) {
+            lineEl2.appendChild(document.createTextNode(value));
+          }
+          tooltipContent.appendChild(lineEl2);
+          lastWasSpacer = false;
+          return;
+        }
+        const lineEl = document.createElement("div");
+        lineEl.className = "gantt-tooltip-line";
+        if (index === headerIndex) {
+          lineEl.classList.add("gantt-tooltip-title");
+        }
+        const openMatch = trimmed.match(/^Open in Browser:\s*(\S+)/);
+        if (openMatch && /^https?:\/\//i.test(openMatch[1])) {
+          const link = document.createElement("a");
+          link.href = openMatch[1];
+          link.textContent = "Open in Browser";
+          link.title = openMatch[1];
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          lineEl.appendChild(link);
+        } else {
+          lineEl.textContent = line;
+        }
+        tooltipContent.appendChild(lineEl);
+        lastWasSpacer = false;
+      });
+      const lastChild = tooltipContent.lastElementChild;
+      if (lastChild && lastChild.classList.contains("gantt-tooltip-spacer")) {
+        lastChild.remove();
+      }
+    }
+    let activeTarget = null;
+    let hideTimer = null;
+    let showTimer = null;
+    let lastPointer = { x: 0, y: 0 };
+    function updatePointer(event) {
+      lastPointer = { x: event.clientX, y: event.clientY };
+    }
+    function cancelHide() {
+      if (!hideTimer) return;
+      clearTimeout(hideTimer);
+      hideTimer = null;
+    }
+    function cancelShow() {
+      if (!showTimer) return;
+      clearTimeout(showTimer);
+      showTimer = null;
+    }
+    function isInTooltip(node) {
+      return node && (node === tooltip || tooltip.contains(node));
+    }
+    function isInActiveTarget(node) {
+      return node && activeTarget && (node === activeTarget || activeTarget.contains(node));
+    }
+    function isPointerOverTooltipOrTarget() {
+      if (!lastPointer) return false;
+      const hovered = document.elementFromPoint(lastPointer.x, lastPointer.y);
+      return isInTooltip(hovered) || isInActiveTarget(hovered);
+    }
+    const showDelay = 300;
+    function scheduleShow(target) {
+      cancelShow();
+      showTimer = setTimeout(() => {
+        showTimer = null;
+        if (!activeTarget || activeTarget !== target) return;
+        if (!isPointerOverTooltipOrTarget()) return;
+        showTooltip(target, lastPointer.x, lastPointer.y);
+      }, showDelay);
+    }
+    function scheduleHide() {
+      cancelHide();
+      hideTimer = setTimeout(() => {
+        if (!activeTarget) return;
+        if (isPointerOverTooltipOrTarget()) return;
+        hideTooltip();
+      }, 300);
+    }
+    function positionTooltip(x, y) {
+      const padding = 8;
+      const offset = 8;
+      const rect = tooltip.getBoundingClientRect();
+      let left = x + offset;
+      let top = y + offset;
+      if (left + rect.width > window.innerWidth - padding) {
+        left = x - rect.width - offset;
+      }
+      if (top + rect.height > window.innerHeight - padding) {
+        top = y - rect.height - offset;
+      }
+      left = Math.max(padding, Math.min(left, window.innerWidth - rect.width - padding));
+      top = Math.max(padding, Math.min(top, window.innerHeight - rect.height - padding));
+      tooltip.style.left = `${Math.round(left)}px`;
+      tooltip.style.top = `${Math.round(top)}px`;
+    }
+    function showTooltip(target, x, y) {
+      const text = target.dataset.tooltip;
+      if (!text) return;
+      buildTooltipContent(text);
+      tooltip.classList.add("visible");
+      tooltip.setAttribute("aria-hidden", "false");
+      positionTooltip(x, y);
+      const projectId = target.dataset.projectId;
+      if (projectId && !target.dataset.membersRequested) {
+        target.dataset.membersRequested = "1";
+        vscode.postMessage({ command: "requestProjectMembers", projectId: Number(projectId) });
+      }
+    }
+    function hideTooltip(keepTarget = false) {
+      cancelShow();
+      cancelHide();
+      tooltip.classList.remove("visible");
+      tooltip.setAttribute("aria-hidden", "true");
+      if (!keepTarget) {
+        activeTarget = null;
+      }
+    }
+    function resolveTooltipTarget(node) {
+      if (!node || node === tooltip || tooltip.contains(node)) return null;
+      const target = node.closest?.("[data-tooltip], [title]");
+      if (!target || !root.contains(target)) return null;
+      if (target.hasAttribute("title")) {
+        const title = normalizeTooltipText(target.getAttribute("title"));
+        target.removeAttribute("title");
+        if (title) {
+          target.dataset.tooltip = title;
+        }
+      }
+      if (!target.dataset.tooltip) return null;
+      return target;
+    }
+    prepareTooltips();
+    addDocListener("pointerover", (event) => {
+      updatePointer(event);
+      if (isInTooltip(event.target)) {
+        cancelHide();
+        cancelShow();
+        return;
+      }
+      const target = resolveTooltipTarget(event.target);
+      if (!target) {
+        cancelShow();
+        return;
+      }
+      cancelHide();
+      if (activeTarget !== target) {
+        activeTarget = target;
+        if (tooltip.classList.contains("visible")) {
+          hideTooltip(true);
+        }
+        scheduleShow(target);
+      } else if (!tooltip.classList.contains("visible")) {
+        scheduleShow(target);
+      }
+    }, true);
+    addDocListener("pointermove", (event) => {
+      if (!activeTarget) return;
+      updatePointer(event);
+      if (hideTimer && isPointerOverTooltipOrTarget()) {
+        cancelHide();
+      }
+    }, true);
+    addDocListener("pointerout", (event) => {
+      if (!activeTarget) return;
+      updatePointer(event);
+      cancelShow();
+      if (!isInActiveTarget(event.target) && !isInTooltip(event.target)) return;
+      const related = event.relatedTarget;
+      if (isInTooltip(related) || isInActiveTarget(related)) return;
+      scheduleHide();
+    }, true);
+    addDocListener("scroll", () => {
+      if (activeTarget) hideTooltip();
+    }, true);
+    addDocListener("keydown", () => {
+      if (activeTarget) hideTooltip();
+    }, true);
+    addWinListener("blur", () => {
+      if (activeTarget) hideTooltip();
+    });
+  }
+  function render(payload) {
+    if (!payload) return;
+    if (payload.state) {
+      PERF_DEBUG = payload.state.perfDebug ?? false;
+    }
+    perfMark("render-start");
+    const root = document.getElementById("ganttRoot");
+    if (!root) return;
+    applyCssVars(payload.state);
+    perfMark("innerHTML-start");
+    root.innerHTML = payload.html || "";
+    perfMark("innerHTML-end");
+    perfMeasure("innerHTML", "innerHTML-start", "innerHTML-end");
+    initializeGantt(payload.state);
+    perfMark("render-end");
+    perfMeasure("render", "render-start", "render-end");
+    logDomStats();
+  }
+  window.addEventListener("message", (event) => {
+    const message = event.data;
+    if (!message) return;
+    if (message.command === "render") {
+      render(message.payload);
+      return;
+    }
+    if (message.command === "appendProjectMembers" && message.projectId && message.memberLines?.length) {
+      const el = document.querySelector(`[data-project-id="${message.projectId}"]`);
+      if (el) {
+        const existing = (el.dataset.tooltip || "").trimEnd();
+        const memberText = message.memberLines.join("\n");
+        if (!existing.includes(memberText)) {
+          el.dataset.tooltip = existing + "\n\n---\n\n" + memberText;
+        }
+      }
+      return;
+    }
+    if (window.__ganttHandleExtensionMessage) {
+      window.__ganttHandleExtensionMessage(message);
+    }
+  });
+  var initialPayload = window.__GANTT_INITIAL_PAYLOAD__;
+  if (initialPayload) {
+    render(initialPayload);
+  }
+  vscode.postMessage({ command: "webviewReady" });
+  function initializeGantt(state) {
+    perfMark("initializeGantt-start");
+    if (!state) return;
+    const {
+      timelineWidth,
+      minDateMs,
+      maxDateMs,
+      totalDays,
+      redmineBaseUrl,
+      minimapBarsData,
+      minimapHeight,
+      minimapBarHeight,
+      minimapTodayX,
+      labelWidth,
+      leftExtrasWidth,
+      sortBy,
+      sortOrder,
+      selectedCollapseKey,
+      barHeight,
+      todayX,
+      todayInRange,
+      isDraftMode,
+      draftQueueCount
+    } = state;
+    const dayWidth = timelineWidth / totalDays;
+    function setDraftBadgeContent(badge, count) {
+      badge.textContent = count;
+      badge.dataset.tooltip = count === 1 ? "1 change queued - click to review" : count + " changes queued - click to review";
+    }
+    let currentDraftMode = isDraftMode;
+    const confirmBtn = document.getElementById("dragConfirmOk");
+    if (confirmBtn) {
+      confirmBtn.textContent = isDraftMode ? "Queue to Draft" : "Save to Redmine";
+    }
+    const draftBadge = document.getElementById("draftBadge");
+    if (draftBadge) {
+      if (isDraftMode) {
+        draftBadge.classList.remove("hidden");
+        setDraftBadgeContent(draftBadge, draftQueueCount ?? 0);
+      } else {
+        draftBadge.classList.add("hidden");
+      }
+      draftBadge.addEventListener("click", () => {
+        vscode.postMessage({ command: "openDraftReview" });
+      });
+    }
+    const draftModeToggle = document.getElementById("draftModeToggle");
+    if (draftModeToggle) {
+      draftModeToggle.addEventListener("click", () => {
+        vscode.postMessage({ command: "toggleDraftMode" });
+      });
+    }
+    if (window._ganttCleanup) {
+      window._ganttCleanup();
+    }
+    const docListeners = [];
+    const winListeners = [];
+    function addDocListener(type, handler, options) {
+      document.addEventListener(type, handler, options);
+      docListeners.push({ type, handler, options });
+    }
+    function addWinListener(type, handler, options) {
+      window.addEventListener(type, handler, options);
+      winListeners.push({ type, handler, options });
+    }
+    window._ganttCleanup = () => {
+      docListeners.forEach((l) => document.removeEventListener(l.type, l.handler, l.options));
+      winListeners.forEach((l) => window.removeEventListener(l.type, l.handler, l.options));
+      window.__ganttHandleExtensionMessage = null;
+    };
+    function closeOnOutsideClick(element) {
+      setTimeout(() => {
+        document.addEventListener("click", function closeHandler(e) {
+          if (!element.contains(e.target)) {
+            element.remove();
+            document.removeEventListener("click", closeHandler);
+          }
+        });
+      }, 0);
+    }
+    function snapToDay(x) {
+      return Math.round(x / dayWidth) * dayWidth;
+    }
+    function announce(message) {
+      const liveRegion = document.getElementById("liveRegion");
+      if (liveRegion) {
+        liveRegion.textContent = message;
+      }
+    }
+    const ganttScroll = document.getElementById("ganttScroll");
+    const ganttLeftHeader = document.getElementById("ganttLeftHeader");
+    const labelsColumn = document.getElementById("ganttLabels");
+    const timelineColumn = document.getElementById("ganttTimeline");
+    const menuUndo = document.getElementById("menuUndo");
+    const menuRedo = document.getElementById("menuRedo");
+    const minimapSvg = document.getElementById("minimapSvg");
+    const minimapViewport = document.getElementById("minimapViewport");
+    const { updateMinimapPosition, updateMinimapViewport } = setupMinimap({
+      timelineWidth,
+      minimapBarsData,
+      minimapHeight,
+      minimapBarHeight,
+      minimapTodayX,
+      ganttScroll,
+      minimapSvg,
+      minimapViewport,
+      addDocListener
+    });
+    const MAX_HISTORY_ACTIONS = 200;
+    const previousState = vscode.getState() || { undoStack: [], redoStack: [], labelWidth, scrollLeft: null, scrollTop: null, centerDateMs: null };
+    const undoStack = previousState.undoStack || [];
+    const redoStack = previousState.redoStack || [];
+    function trimHistoryStack(stack) {
+      if (stack.length > MAX_HISTORY_ACTIONS) {
+        stack.splice(0, stack.length - MAX_HISTORY_ACTIONS);
+      }
+    }
+    trimHistoryStack(undoStack);
+    trimHistoryStack(redoStack);
+    let savedScrollLeft = previousState.scrollLeft ?? null;
+    let savedScrollTop = previousState.scrollTop ?? null;
+    let savedCenterDateMs = previousState.centerDateMs;
+    function getCenterDateMs() {
+      if (!ganttScroll) return null;
+      const stickyLeft = document.querySelector(".gantt-body .gantt-sticky-left");
+      const stickyWidth = stickyLeft?.offsetWidth ?? 0;
+      const visibleTimelineWidth = ganttScroll.clientWidth - stickyWidth;
+      const centerX = ganttScroll.scrollLeft + visibleTimelineWidth / 2;
+      const ratio = centerX / timelineWidth;
+      return minDateMs + ratio * (maxDateMs - minDateMs);
+    }
+    function scrollToCenterDate(dateMs) {
+      if (!ganttScroll) return;
+      const ratio = (dateMs - minDateMs) / (maxDateMs - minDateMs);
+      const centerX = ratio * timelineWidth;
+      const stickyLeft = document.querySelector(".gantt-body .gantt-sticky-left");
+      const stickyWidth = stickyLeft?.offsetWidth ?? 0;
+      const visibleTimelineWidth = ganttScroll.clientWidth - stickyWidth;
+      ganttScroll.scrollLeft = Math.max(0, centerX - visibleTimelineWidth / 2);
+    }
+    function saveState() {
+      trimHistoryStack(undoStack);
+      trimHistoryStack(redoStack);
+      vscode.setState({
+        undoStack,
+        redoStack,
+        labelWidth: labelsColumn?.offsetWidth || labelWidth,
+        scrollLeft: null,
+        // Deprecated: use centerDateMs instead
+        scrollTop: ganttScroll?.scrollTop ?? null,
+        centerDateMs: getCenterDateMs()
+      });
+    }
+    const saveStateForZoom = saveState;
+    function updateUndoRedoButtons() {
+      if (menuUndo) menuUndo.toggleAttribute("disabled", undoStack.length === 0);
+      if (menuRedo) menuRedo.toggleAttribute("disabled", redoStack.length === 0);
+      saveState();
+    }
+    if (previousState.labelWidth && ganttLeftHeader && labelsColumn) {
+      ganttLeftHeader.style.width = previousState.labelWidth + "px";
+      labelsColumn.style.width = previousState.labelWidth + "px";
+      const capacityLabel = document.querySelector(".capacity-ribbon-label");
+      if (capacityLabel) {
+        capacityLabel.style.width = previousState.labelWidth + leftExtrasWidth + "px";
+      }
+    }
+    let restoringScroll = true;
+    let deferredScrollUpdate = null;
+    if (ganttScroll) {
+      ganttScroll.addEventListener("scroll", () => {
+        cancelAnimationFrame(deferredScrollUpdate);
+        deferredScrollUpdate = requestAnimationFrame(() => {
+          updateMinimapViewport();
+          if (!restoringScroll) saveState();
+        });
+      }, { passive: true });
+    }
+    requestAnimationFrame(() => updateUndoRedoButtons());
+    const viewToggleTable = {
+      setDependenciesState: { targetSel: ".dependency-layer", menuId: "menuDeps", className: "hidden", addWhenEnabled: false },
+      setBadgesState: { targetSel: ".gantt-container", menuId: "menuBadges", className: "hide-badges", addWhenEnabled: false },
+      setCapacityRibbonState: { targetSel: ".capacity-ribbon", menuId: "menuCapacity", className: "hidden", addWhenEnabled: false },
+      setIntensityState: { targetSel: ".gantt-container", menuId: "menuIntensity", className: "intensity-enabled", addWhenEnabled: true }
+    };
+    function applyViewToggle(cfg, enabled) {
+      const target = document.querySelector(cfg.targetSel);
+      const menu = document.getElementById(cfg.menuId);
+      const on = cfg.addWhenEnabled ? enabled : !enabled;
+      if (target) target.classList.toggle(cfg.className, on);
+      if (menu) menu.classList.toggle("active", enabled);
+    }
+    window.__ganttHandleExtensionMessage = (message) => {
+      const toggleCfg = viewToggleTable[message.command];
+      if (toggleCfg) {
+        applyViewToggle(toggleCfg, message.enabled);
+      } else if (message.command === "setDraftModeState") {
+        currentDraftMode = message.enabled;
+        const confirmBtn2 = document.getElementById("dragConfirmOk");
+        if (confirmBtn2) {
+          confirmBtn2.textContent = message.enabled ? "Queue to Draft" : "Save to Redmine";
+        }
+        const toggleBtn = document.getElementById("draftModeToggle");
+        if (toggleBtn) {
+          toggleBtn.classList.toggle("active", message.enabled);
+          toggleBtn.textContent = message.enabled ? "Disable Draft Mode" : "Enable Draft Mode";
+        }
+        const draftBadge2 = document.getElementById("draftBadge");
+        if (draftBadge2) {
+          if (message.enabled) {
+            draftBadge2.classList.remove("hidden");
+            setDraftBadgeContent(draftBadge2, message.queueCount ?? 0);
+          } else {
+            draftBadge2.classList.add("hidden");
+          }
+        }
+      } else if (message.command === "setDraftQueueCount") {
+        const draftBadge2 = document.getElementById("draftBadge");
+        if (draftBadge2) {
+          setDraftBadgeContent(draftBadge2, message.count);
+        }
+      } else if (message.command === "pushUndoAction") {
+        undoStack.push(message.action);
+        trimHistoryStack(undoStack);
+        redoStack.length = 0;
+        updateUndoRedoButtons();
+        saveState();
+      } else if (message.command === "updateRelationId") {
+        const stack = message.stack === "undo" ? undoStack : redoStack;
+        if (stack.length > 0) {
+          const lastAction = stack[stack.length - 1];
+          if (lastAction.type === "relation") {
+            lastAction.relationId = message.newRelationId;
+            saveState();
+          }
+        }
+      } else if (message.command === "scrollToIssue") {
+        const issueId = message.issueId;
+        const label = document.querySelector('.issue-label[data-issue-id="' + issueId + '"]');
+        const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
+        const scrollContainer = document.getElementById("ganttScroll");
+        const headerRow = document.querySelector(".gantt-header-row");
+        const headerHeight = headerRow?.getBoundingClientRect().height || 60;
+        if (!scrollContainer) return;
+        let targetScrollTop = scrollContainer.scrollTop;
+        let targetScrollLeft = scrollContainer.scrollLeft;
+        if (label) {
+          const labelRow = label.closest(".gantt-row");
+          if (labelRow) {
+            const rowTop = labelRow.offsetTop;
+            const rowHeight = labelRow.getBoundingClientRect().height;
+            const viewportHeight = scrollContainer.clientHeight - headerHeight;
+            targetScrollTop = Math.max(0, rowTop - headerHeight - (viewportHeight - rowHeight) / 2);
+          }
+          label.focus();
+          label.classList.add("highlighted");
+          setTimeout(() => label.classList.remove("highlighted"), 2e3);
+        }
+        if (bar) {
+          const startX = parseFloat(bar.getAttribute("data-start-x") || "0");
+          const endX = parseFloat(bar.getAttribute("data-end-x") || "0");
+          const barWidth = endX - startX;
+          const viewportWidth = scrollContainer.clientWidth;
+          const stickyLeftWidth = document.querySelector(".gantt-sticky-left")?.getBoundingClientRect().width || 0;
+          const availableWidth = viewportWidth - stickyLeftWidth;
+          if (barWidth <= availableWidth - 100) {
+            targetScrollLeft = startX - (availableWidth - barWidth) / 2;
+          } else {
+            targetScrollLeft = startX - 50;
+          }
+          targetScrollLeft = Math.max(0, targetScrollLeft);
+          bar.classList.add("highlighted");
+          setTimeout(() => bar.classList.remove("highlighted"), 2e3);
+        }
+        scrollContainer.scrollTo({ left: targetScrollLeft, top: targetScrollTop, behavior: "smooth" });
+      }
+    };
+    document.getElementById("lookbackSelect")?.addEventListener("change", (e) => {
+      vscode.postMessage({ command: "setLookback", years: e.target.value });
+    });
+    document.getElementById("zoomSelect")?.addEventListener("change", (e) => {
+      saveStateForZoom();
+      vscode.postMessage({ command: "setZoom", zoomLevel: e.target.value });
+    });
+    document.getElementById("viewFocusSelect")?.addEventListener("change", (e) => {
+      vscode.postMessage({ command: "setViewFocus", focus: e.target.value });
+    });
+    const projectSelector = document.getElementById("projectSelector");
+    projectSelector?.addEventListener("change", (e) => {
+      const value = e.target.value;
+      const projectId = value ? parseInt(value, 10) : null;
+      vscode.postMessage({ command: "setSelectedProject", projectId });
+    });
+    const focusSelector = document.getElementById("focusSelector");
+    focusSelector?.addEventListener("change", (e) => {
+      const value = e.target.value;
+      vscode.postMessage({
+        command: "setSelectedAssignee",
+        assignee: value || null
+      });
+    });
+    document.getElementById("filterAssignee")?.addEventListener("change", (e) => {
+      const value = e.target.value;
+      vscode.postMessage({ command: "setFilter", filter: { assignee: value } });
+    });
+    document.getElementById("filterStatus")?.addEventListener("change", (e) => {
+      const value = e.target.value;
+      vscode.postMessage({ command: "setFilter", filter: { status: value } });
+    });
+    document.getElementById("filterTaskType")?.addEventListener("change", (e) => {
+      vscode.postMessage({ command: "setTaskTypeFilter", taskType: e.target.value });
+    });
+    document.querySelectorAll(".gantt-col-header.sortable").forEach((header) => {
+      header.addEventListener("click", () => {
+        const sortField = header.dataset.sort;
+        const currentSort = sortBy;
+        const currentOrder = sortOrder;
+        if (sortField === currentSort) {
+          if (currentOrder === "asc") {
+            vscode.postMessage({ command: "setSort", sortOrder: "desc" });
+          } else {
+            vscode.postMessage({ command: "setSort", sortBy: null });
+          }
+        } else {
+          vscode.postMessage({ command: "setSort", sortBy: sortField, sortOrder: "asc" });
+        }
+      });
+    });
+    document.getElementById("menuCapacity")?.addEventListener("click", () => {
+      if (document.getElementById("menuCapacity")?.hasAttribute("disabled")) return;
+      saveState();
+      vscode.postMessage({ command: "toggleCapacityRibbon" });
+    });
+    document.getElementById("menuIntensity")?.addEventListener("click", () => {
+      if (document.getElementById("menuIntensity")?.hasAttribute("disabled")) return;
+      saveState();
+      vscode.postMessage({ command: "toggleIntensity" });
+    });
+    document.getElementById("overloadBadge")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const badge = e.currentTarget;
+      const firstOverloadMs = parseInt(badge.dataset.firstOverloadMs || "0", 10);
+      if (firstOverloadMs > 0) {
+        scrollToCenterDate(firstOverloadMs);
+        saveState();
+      }
+    });
+    document.querySelectorAll(".capacity-day-bar-group").forEach((group) => {
+      group.addEventListener("click", (e) => {
+        const dateMs = parseInt(e.currentTarget.dataset.dateMs || "0", 10);
+        if (dateMs > 0) {
+          scrollToCenterDate(dateMs);
+          saveState();
+        }
+      });
+    });
+    document.getElementById("menuDeps")?.addEventListener("click", () => {
+      saveState();
+      vscode.postMessage({ command: "toggleDependencies" });
+    });
+    document.getElementById("menuBadges")?.addEventListener("click", () => {
+      saveState();
+      vscode.postMessage({ command: "toggleBadges" });
+    });
+    const ganttContainer = document.querySelector(".gantt-container");
+    function buildBlockingGraph() {
+      const graph = /* @__PURE__ */ new Map();
+      const reverseGraph = /* @__PURE__ */ new Map();
+      document.querySelectorAll(".dependency-arrow").forEach((arrow) => {
+        const relType = arrow.classList.contains("rel-blocks") || arrow.classList.contains("rel-precedes");
+        if (!relType) return;
+        const fromId = arrow.dataset.from;
+        const toId = arrow.dataset.to;
+        if (!graph.has(fromId)) graph.set(fromId, []);
+        graph.get(fromId).push(toId);
+        if (!reverseGraph.has(toId)) reverseGraph.set(toId, []);
+        reverseGraph.get(toId).push(fromId);
+      });
+      return { graph, reverseGraph };
+    }
+    let focusedIssueId = null;
+    function getAllConnected(issueId, graph, reverseGraph) {
+      const connected = /* @__PURE__ */ new Set([issueId]);
+      const queue = [issueId];
+      while (queue.length > 0) {
+        const current = queue.shift();
+        const downstream = graph.get(current) || [];
+        for (const dep of downstream) {
+          if (!connected.has(dep)) {
+            connected.add(dep);
+            queue.push(dep);
+          }
+        }
+      }
+      const upQueue = [issueId];
+      while (upQueue.length > 0) {
+        const current = upQueue.shift();
+        const upstream = reverseGraph.get(current) || [];
+        for (const dep of upstream) {
+          if (!connected.has(dep)) {
+            connected.add(dep);
+            upQueue.push(dep);
+          }
+        }
+      }
+      return connected;
+    }
+    function focusOnDependencyChain(issueId) {
+      clearFocus();
+      if (!issueId) return;
+      focusedIssueId = issueId;
+      const { graph, reverseGraph } = buildBlockingGraph();
+      const connected = getAllConnected(issueId, graph, reverseGraph);
+      ganttContainer.classList.add("focus-mode");
+      document.querySelectorAll(".issue-bar").forEach((bar) => {
+        if (connected.has(bar.dataset.issueId)) {
+          bar.classList.add("focus-highlighted");
+        }
+      });
+      document.querySelectorAll(".issue-label").forEach((label) => {
+        if (connected.has(label.dataset.issueId)) {
+          label.classList.add("focus-highlighted");
+        }
+      });
+      document.querySelectorAll(".dependency-arrow").forEach((arrow) => {
+        if (connected.has(arrow.dataset.from) && connected.has(arrow.dataset.to)) {
+          arrow.classList.add("focus-highlighted");
+        }
+      });
+      announce(`Focus: ${connected.size} issue${connected.size !== 1 ? "s" : ""} in dependency chain`);
+    }
+    function clearFocus() {
+      focusedIssueId = null;
+      ganttContainer.classList.remove("focus-mode");
+      document.querySelectorAll(".focus-highlighted").forEach((el) => el.classList.remove("focus-highlighted"));
+    }
+    const getFocusedIssueId = () => focusedIssueId;
+    const selectedIssues = /* @__PURE__ */ new Set();
+    let lastClickedIssueId = null;
+    const selectionCountEl = document.getElementById("selectionCount");
+    const allIssueBars = Array.from(document.querySelectorAll(".issue-bar"));
+    const barsByIssueId = /* @__PURE__ */ new Map();
+    allIssueBars.forEach((bar) => {
+      const id = bar.dataset.issueId;
+      if (id) {
+        if (!barsByIssueId.has(id)) barsByIssueId.set(id, []);
+        barsByIssueId.get(id).push(bar);
+      }
+    });
+    function refreshSelectionChrome() {
+      if (selectedIssues.size > 0) {
+        selectionCountEl.textContent = `${selectedIssues.size} selected`;
+        selectionCountEl.classList.remove("hidden");
+        ganttContainer.classList.add("multi-select-mode");
+      } else {
+        selectionCountEl.classList.add("hidden");
+        ganttContainer.classList.remove("multi-select-mode");
+      }
+    }
+    function updateSelectionForIds(changedIds) {
+      changedIds.forEach((issueId) => {
+        const bars = barsByIssueId.get(issueId);
+        if (bars) {
+          bars.forEach((bar) => bar.classList.toggle("selected", selectedIssues.has(issueId)));
+        }
+      });
+      refreshSelectionChrome();
+    }
+    function updateSelectionUI() {
+      allIssueBars.forEach((bar) => {
+        bar.classList.toggle("selected", selectedIssues.has(bar.dataset.issueId));
+      });
+      refreshSelectionChrome();
+    }
+    function clearSelection() {
+      const changedIds = [...selectedIssues];
+      selectedIssues.clear();
+      lastClickedIssueId = null;
+      updateSelectionForIds(changedIds);
+    }
+    function toggleSelection(issueId) {
+      if (selectedIssues.has(issueId)) {
+        selectedIssues.delete(issueId);
+      } else {
+        selectedIssues.add(issueId);
+      }
+      lastClickedIssueId = issueId;
+      updateSelectionForIds([issueId]);
+    }
+    function selectRange(fromId, toId) {
+      const fromIndex = allIssueBars.findIndex((b) => b.dataset.issueId === fromId);
+      const toIndex = allIssueBars.findIndex((b) => b.dataset.issueId === toId);
+      if (fromIndex === -1 || toIndex === -1) return;
+      const start = Math.min(fromIndex, toIndex);
+      const end = Math.max(fromIndex, toIndex);
+      const changedIds = [];
+      for (let i = start; i <= end; i++) {
+        const id = allIssueBars[i].dataset.issueId;
+        if (!selectedIssues.has(id)) {
+          selectedIssues.add(id);
+          changedIds.push(id);
+        }
+      }
+      updateSelectionForIds(changedIds);
+    }
+    function selectAll() {
+      allIssueBars.forEach((bar) => selectedIssues.add(bar.dataset.issueId));
+      updateSelectionUI();
+      announce(`Selected all ${selectedIssues.size} issues`);
+    }
+    addDocListener("mousedown", (e) => {
+      if (!e.ctrlKey && !e.metaKey && !e.shiftKey) return;
+      if (e.target.closest(".drag-handle") || e.target.closest(".link-handle")) return;
+      const bar = e.target.closest(".issue-bar");
+      if (!bar) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const issueId = bar.dataset.issueId;
+      if (e.shiftKey && lastClickedIssueId) {
+        selectRange(lastClickedIssueId, issueId);
+      } else {
+        toggleSelection(issueId);
+      }
+    });
+    addDocListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "a") {
+        e.preventDefault();
+        selectAll();
+      }
+      if (e.key === "Escape" && selectedIssues.size > 0) {
+        e.stopImmediatePropagation();
+        clearSelection();
+        announce("Selection cleared");
+      }
+    });
+    document.getElementById("refreshBtn")?.addEventListener("click", () => {
+      document.getElementById("loadingOverlay")?.classList.add("visible");
+      vscode.postMessage({ command: "refresh" });
+    });
+    function showDeletePicker(x, y, relationId, fromId, toId, relationType) {
+      document.querySelector(".relation-picker")?.remove();
+      const picker = document.createElement("div");
+      picker.className = "relation-picker";
+      const pickerWidth = 150;
+      const pickerHeight = 120;
+      const clampedX = Math.min(x, window.innerWidth - pickerWidth - 10);
+      const clampedY = Math.min(y, window.innerHeight - pickerHeight - 10);
+      picker.style.left = Math.max(10, clampedX) + "px";
+      picker.style.top = Math.max(10, clampedY) + "px";
+      const label = document.createElement("div");
+      label.style.padding = "6px 12px";
+      label.style.fontSize = "11px";
+      label.style.opacity = "0.7";
+      label.textContent = `#${fromId} \u2192 #${toId}`;
+      picker.appendChild(label);
+      if (relationType === "precedes" || relationType === "follows") {
+        const delayBtn = document.createElement("button");
+        delayBtn.textContent = "Update delay...";
+        delayBtn.addEventListener("click", () => {
+          picker.remove();
+          vscode.postMessage({ command: "updateRelationDelay", relationId, fromId, toId });
+        });
+        picker.appendChild(delayBtn);
+      }
+      const deleteBtn = document.createElement("button");
+      deleteBtn.textContent = "Delete relation";
+      deleteBtn.addEventListener("click", () => {
+        saveState();
+        vscode.postMessage({ command: "deleteRelation", relationId });
+        picker.remove();
+      });
+      picker.appendChild(deleteBtn);
+      document.body.appendChild(picker);
+      closeOnOutsideClick(picker);
+    }
+    const issueBarsByIssueId = /* @__PURE__ */ new Map();
+    const issueLabelsByIssueId = /* @__PURE__ */ new Map();
+    const arrowsByIssueId = /* @__PURE__ */ new Map();
+    const projectLabelsByKey = /* @__PURE__ */ new Map();
+    const aggregateBarsByKey = /* @__PURE__ */ new Map();
+    let mapsReady = false;
+    function buildLookupMaps() {
+      document.querySelectorAll(".issue-bar, .issue-label, .dependency-arrow, .project-label, .aggregate-bars").forEach((el) => {
+        const classList = el.classList;
+        if (classList.contains("issue-bar")) {
+          const id = el.dataset.issueId;
+          if (id) {
+            if (!issueBarsByIssueId.has(id)) issueBarsByIssueId.set(id, []);
+            issueBarsByIssueId.get(id).push(el);
+          }
+        } else if (classList.contains("issue-label")) {
+          const id = el.dataset.issueId;
+          if (id) {
+            if (!issueLabelsByIssueId.has(id)) issueLabelsByIssueId.set(id, []);
+            issueLabelsByIssueId.get(id).push(el);
+          }
+        } else if (classList.contains("dependency-arrow")) {
+          const fromId = el.dataset.from;
+          const toId = el.dataset.to;
+          if (fromId) {
+            if (!arrowsByIssueId.has(fromId)) arrowsByIssueId.set(fromId, []);
+            arrowsByIssueId.get(fromId).push(el);
+          }
+          if (toId) {
+            if (!arrowsByIssueId.has(toId)) arrowsByIssueId.set(toId, []);
+            arrowsByIssueId.get(toId).push(el);
+          }
+        } else if (classList.contains("project-label")) {
+          const key = el.dataset.collapseKey;
+          if (key) {
+            if (!projectLabelsByKey.has(key)) projectLabelsByKey.set(key, []);
+            projectLabelsByKey.get(key).push(el);
+          }
+        } else if (classList.contains("aggregate-bars")) {
+          const key = el.dataset.collapseKey;
+          if (key) {
+            if (!aggregateBarsByKey.has(key)) aggregateBarsByKey.set(key, []);
+            aggregateBarsByKey.get(key).push(el);
+          }
+        }
+      });
+      mapsReady = true;
+    }
+    if (typeof requestIdleCallback !== "undefined") {
+      requestIdleCallback(() => buildLookupMaps(), { timeout: 100 });
+    } else {
+      setTimeout(buildLookupMaps, 0);
+    }
+    let highlightedElements = [];
+    function clearHoverHighlight() {
+      document.body.classList.remove("hover-focus", "dependency-hover");
+      highlightedElements.forEach((el) => el.classList.remove("hover-highlighted", "hover-source"));
+      highlightedElements = [];
+    }
+    function highlightIssue(issueId) {
+      document.body.classList.add("hover-focus");
+      const bars = mapsReady ? issueBarsByIssueId.get(issueId) || [] : document.querySelectorAll('.issue-bar[data-issue-id="' + issueId + '"]');
+      const labels = mapsReady ? issueLabelsByIssueId.get(issueId) || [] : document.querySelectorAll('.issue-label[data-issue-id="' + issueId + '"]');
+      const arrows = mapsReady ? arrowsByIssueId.get(issueId) || [] : document.querySelectorAll('.dependency-arrow[data-from="' + issueId + '"], .dependency-arrow[data-to="' + issueId + '"]');
+      bars.forEach((el) => {
+        el.classList.add("hover-highlighted");
+        highlightedElements.push(el);
+      });
+      labels.forEach((el) => {
+        el.classList.add("hover-highlighted");
+        highlightedElements.push(el);
+      });
+      arrows.forEach((el) => {
+        el.classList.add("hover-highlighted");
+        highlightedElements.push(el);
+      });
+    }
+    function highlightProject(collapseKey) {
+      document.body.classList.add("hover-focus");
+      const labels = mapsReady ? projectLabelsByKey.get(collapseKey) || [] : document.querySelectorAll('.project-label[data-collapse-key="' + collapseKey + '"]');
+      const bars = mapsReady ? aggregateBarsByKey.get(collapseKey) || [] : document.querySelectorAll('.aggregate-bars[data-collapse-key="' + collapseKey + '"]');
+      labels.forEach((el) => {
+        el.classList.add("hover-highlighted");
+        highlightedElements.push(el);
+      });
+      bars.forEach((el) => {
+        el.classList.add("hover-highlighted");
+        highlightedElements.push(el);
+      });
+    }
+    const timelineSvg = document.querySelector(".gantt-timeline svg");
+    const labelsSvg = document.querySelector(".gantt-labels svg");
+    if (timelineSvg) {
+      timelineSvg.addEventListener("mouseenter", (e) => {
+        const bar = e.target.closest(".issue-bar");
+        const aggBar = e.target.closest(".aggregate-bars");
+        const arrow = e.target.closest(".dependency-arrow");
+        if (bar) {
+          const issueId = bar.dataset.issueId;
+          if (issueId) highlightIssue(issueId);
+        } else if (aggBar) {
+          const key = aggBar.dataset.collapseKey;
+          if (key) highlightProject(key);
+        } else if (arrow) {
+          const fromId = arrow.dataset.from;
+          const toId = arrow.dataset.to;
+          document.body.classList.add("dependency-hover");
+          arrow.classList.add("hover-source");
+          highlightedElements.push(arrow);
+          if (fromId) highlightIssue(fromId);
+          if (toId) highlightIssue(toId);
+        }
+      }, true);
+      timelineSvg.addEventListener("mouseleave", (e) => {
+        const bar = e.target.closest(".issue-bar");
+        const aggBar = e.target.closest(".aggregate-bars");
+        const arrow = e.target.closest(".dependency-arrow");
+        if (bar || aggBar || arrow) {
+          clearHoverHighlight();
+        }
+      }, true);
+    }
+    if (labelsSvg) {
+      labelsSvg.addEventListener("mouseenter", (e) => {
+        const label = e.target.closest(".issue-label");
+        const projectLabel = e.target.closest(".project-label");
+        if (label) {
+          const issueId = label.dataset.issueId;
+          if (issueId) highlightIssue(issueId);
+        } else if (projectLabel) {
+          const key = projectLabel.dataset.collapseKey;
+          if (key) highlightProject(key);
+        }
+      }, true);
+      labelsSvg.addEventListener("mouseleave", (e) => {
+        const label = e.target.closest(".issue-label");
+        const projectLabel = e.target.closest(".project-label");
+        if (label || projectLabel) {
+          clearHoverHighlight();
+        }
+      }, true);
+    }
+    if (timelineSvg) {
+      let clearArrowSelection2 = function() {
+        selectedArrowElements.forEach((a) => a.classList.remove("selected"));
+        selectedArrowElements.length = 0;
+        document.body.classList.remove("arrow-selection-mode");
+        arrowConnectedElements.forEach((el) => el.classList.remove("arrow-connected"));
+        arrowConnectedElements.length = 0;
+        selectedArrow = null;
+      };
+      var clearArrowSelection = clearArrowSelection2;
+      timelineSvg.addEventListener("mousedown", (e) => {
+        if (e.button !== 2) return;
+        const arrow = e.target.closest(".dependency-arrow");
+        if (!arrow) return;
+        const title = arrow.querySelector("title");
+        if (title) title.remove();
+      });
+      timelineSvg.addEventListener("contextmenu", (e) => {
+        const arrow = e.target.closest(".dependency-arrow");
+        if (!arrow) return;
+        e.preventDefault();
+        const relationId = parseInt(arrow.dataset.relationId);
+        const fromId = arrow.dataset.from;
+        const toId = arrow.dataset.to;
+        const relTypeClass = [...arrow.classList].find((c) => c.startsWith("rel-"));
+        const relationType = relTypeClass ? relTypeClass.replace("rel-", "") : null;
+        showDeletePicker(e.clientX, e.clientY, relationId, fromId, toId, relationType);
+      });
+      let selectedArrow = null;
+      const selectedArrowElements = [];
+      const arrowConnectedElements = [];
+      timelineSvg.addEventListener("click", (e) => {
+        const arrow = e.target.closest(".dependency-arrow");
+        if (selectedArrow) {
+          selectedArrow.classList.remove("selected");
+          document.body.classList.remove("arrow-selection-mode");
+          document.querySelectorAll(".arrow-connected").forEach((el) => el.classList.remove("arrow-connected"));
+          selectedArrow = null;
+        }
+        if (!arrow) return;
+        e.stopPropagation();
+        selectedArrow = arrow;
+        arrow.classList.add("selected");
+        selectedArrowElements.push(arrow);
+        document.body.classList.add("arrow-selection-mode");
+        const fromId = arrow.dataset.from;
+        const toId = arrow.dataset.to;
+        const connectedBars = mapsReady ? [...issueBarsByIssueId.get(fromId) || [], ...issueBarsByIssueId.get(toId) || []] : document.querySelectorAll(`.issue-bar[data-issue-id="${fromId}"], .issue-bar[data-issue-id="${toId}"]`);
+        const connectedLabels = mapsReady ? [...issueLabelsByIssueId.get(fromId) || [], ...issueLabelsByIssueId.get(toId) || []] : document.querySelectorAll(`.issue-label[data-issue-id="${fromId}"], .issue-label[data-issue-id="${toId}"]`);
+        connectedBars.forEach((bar) => {
+          bar.classList.add("arrow-connected");
+          arrowConnectedElements.push(bar);
+        });
+        connectedLabels.forEach((label) => {
+          label.classList.add("arrow-connected");
+          arrowConnectedElements.push(label);
+        });
+        announce(`Selected relation from #${fromId} to #${toId}`);
+      });
+      if (window._ganttArrowClickHandler) {
+        document.removeEventListener("click", window._ganttArrowClickHandler);
+      }
+      window._ganttArrowClickHandler = (e) => {
+        const hasSelection = selectedArrow || document.querySelector(".dependency-arrow.selected");
+        if (hasSelection && !e.target.closest(".dependency-arrow") && !e.target.closest(".blocks-badge-group") && !e.target.closest(".blocker-badge")) {
+          clearArrowSelection2();
+        }
+      };
+      document.addEventListener("click", window._ganttArrowClickHandler);
+      if (window._ganttArrowKeyHandler) {
+        document.removeEventListener("keydown", window._ganttArrowKeyHandler);
+      }
+      window._ganttArrowKeyHandler = (e) => {
+        const hasSelection = selectedArrow || document.querySelector(".dependency-arrow.selected");
+        if (e.key === "Escape" && hasSelection) {
+          e.stopImmediatePropagation();
+          clearArrowSelection2();
+        }
+      };
+      document.addEventListener("keydown", window._ganttArrowKeyHandler);
+    }
+    const dragApi = setupDrag({
+      vscode,
+      menuUndo,
+      menuRedo,
+      addDocListener,
+      closeOnOutsideClick,
+      announce,
+      saveState,
+      updateUndoRedoButtons,
+      undoStack,
+      redoStack,
+      selectedIssues,
+      clearSelection,
+      allIssueBars,
+      redmineBaseUrl,
+      minDateMs,
+      maxDateMs,
+      timelineWidth,
+      dayWidth,
+      barHeight,
+      ganttScroll,
+      snapToDay,
+      focusOnDependencyChain,
+      clearFocus,
+      getFocusedIssueId,
+      scrollToAndHighlight,
+      isDraftModeEnabled: () => currentDraftMode,
+      isPerfDebugEnabled: () => PERF_DEBUG,
+      // Lookup maps for O(1) element access
+      getLookupMaps: () => ({ mapsReady, issueBarsByIssueId, issueLabelsByIssueId })
+    });
+    setupCollapse({
+      vscode,
+      addDocListener,
+      addWinListener,
+      announce,
+      barHeight,
+      selectedCollapseKey,
+      refreshArrowGeometry: dragApi.refreshArrowGeometry
+    });
+    function scrollToToday(announceOutOfRange = true) {
+      if (!todayInRange) {
+        if (announceOutOfRange) {
+          vscode.postMessage({ command: "todayOutOfRange" });
+        } else if (ganttScroll) {
+          ganttScroll.scrollLeft = todayX < 0 ? 0 : ganttScroll.scrollWidth;
+        }
+        return;
+      }
+      if (ganttScroll) {
+        const stickyLeft = document.querySelector(".gantt-body .gantt-sticky-left");
+        const stickyWidth = stickyLeft?.offsetWidth ?? 0;
+        const visibleTimelineWidth = ganttScroll.clientWidth - stickyWidth;
+        ganttScroll.scrollLeft = Math.max(0, todayX - visibleTimelineWidth / 2);
+      }
+    }
+    function scrollToAndHighlight(issueId) {
+      if (!issueId) return;
+      const label = document.querySelector('.issue-label[data-issue-id="' + issueId + '"]');
+      const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
+      if (label) {
+        label.scrollIntoView({ behavior: "smooth", block: "center" });
+        label.classList.add("highlighted");
+        setTimeout(() => label.classList.remove("highlighted"), 1500);
+      }
+      if (bar && ganttScroll) {
+        const barRect = bar.getBoundingClientRect();
+        const scrollRect = ganttScroll.getBoundingClientRect();
+        const scrollLeft = ganttScroll.scrollLeft + barRect.left - scrollRect.left - 100;
+        ganttScroll.scrollTo({ left: Math.max(0, scrollLeft), behavior: "smooth" });
+        bar.classList.add("highlighted");
+        setTimeout(() => bar.classList.remove("highlighted"), 1500);
+      }
+    }
+    setupKeyboard({
+      vscode,
+      addDocListener,
+      menuUndo,
+      menuRedo,
+      undoStack,
+      redoStack,
+      saveState,
+      updateUndoRedoButtons,
+      announce,
+      scrollToAndHighlight,
+      scrollToToday
+    });
+    setupTooltips({
+      addDocListener,
+      addWinListener,
+      ganttScroll
+    });
+    requestAnimationFrame(() => {
+      if (savedCenterDateMs !== null && ganttScroll) {
+        const clampedDateMs = Math.max(minDateMs, Math.min(maxDateMs, savedCenterDateMs));
+        scrollToCenterDate(clampedDateMs);
+        if (savedScrollTop !== null) {
+          ganttScroll.scrollTop = savedScrollTop;
+        }
+        savedCenterDateMs = null;
+        savedScrollTop = null;
+      } else if (savedScrollLeft !== null && ganttScroll) {
+        ganttScroll.scrollLeft = savedScrollLeft;
+        if (savedScrollTop !== null) {
+          ganttScroll.scrollTop = savedScrollTop;
+        }
+        savedScrollLeft = null;
+        savedScrollTop = null;
+      } else {
+        scrollToToday(false);
+      }
+      updateMinimapViewport();
+      restoringScroll = false;
+    });
+    document.getElementById("todayBtn")?.addEventListener("click", () => scrollToToday());
+    const resizeHandle = document.getElementById("resizeHandle");
+    const resizeHandleHeader = document.getElementById("resizeHandleHeader");
+    let isResizing = false;
+    let resizeStartX = 0;
+    let resizeStartWidth = 0;
+    let activeResizeHandle = null;
+    function startResize(e, handle) {
+      isResizing = true;
+      activeResizeHandle = handle;
+      resizeStartX = e.clientX;
+      resizeStartWidth = labelsColumn.offsetWidth;
+      handle.classList.add("dragging");
+      document.body.classList.add("cursor-col-resize", "user-select-none");
+      e.preventDefault();
+    }
+    resizeHandle?.addEventListener("mousedown", (e) => startResize(e, resizeHandle));
+    resizeHandleHeader?.addEventListener("mousedown", (e) => startResize(e, resizeHandleHeader));
+    let resizeRafPending = false;
+    let lastResizeEvent = null;
+    addDocListener("mousemove", (e) => {
+      if (!isResizing) return;
+      lastResizeEvent = e;
+      if (resizeRafPending) return;
+      resizeRafPending = true;
+      requestAnimationFrame(() => {
+        resizeRafPending = false;
+        if (!lastResizeEvent) return;
+        const delta = lastResizeEvent.clientX - resizeStartX;
+        const newWidth = Math.min(600, Math.max(120, resizeStartWidth + delta));
+        if (ganttLeftHeader) ganttLeftHeader.style.width = newWidth + "px";
+        if (labelsColumn) {
+          labelsColumn.style.width = newWidth + "px";
+          const labelsSvg2 = labelsColumn.querySelector("svg");
+          if (labelsSvg2) labelsSvg2.setAttribute("width", String(newWidth));
+        }
+        const capacityLabel = document.querySelector(".capacity-ribbon-label");
+        if (capacityLabel) {
+          capacityLabel.style.width = newWidth + leftExtrasWidth + "px";
+        }
+        updateMinimapPosition();
+      });
+    });
+    addDocListener("mouseup", () => {
+      if (isResizing) {
+        isResizing = false;
+        activeResizeHandle?.classList.remove("dragging");
+        activeResizeHandle = null;
+        document.body.classList.remove("cursor-col-resize", "user-select-none");
+        saveState();
+      }
+    });
+    requestAnimationFrame(() => {
+      document.getElementById("loadingOverlay")?.classList.remove("visible");
+    });
+    perfMark("initializeGantt-end");
+    perfMeasure("initializeGantt", "initializeGantt-start", "initializeGantt-end");
+  }
+})();
