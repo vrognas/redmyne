@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.28.5]
+
+### Fixed
+
+- **Zebra striping works again in By Project with "All Projects"** — the banding strategy was keyed on view focus and assumed By Project always meant a single hierarchy, so it looked for top-level *issue* rows to start bands. With many collapsed client roots there are no visible issue rows, producing one uniform stripe (no visible zebra). Banding now keys on root count: multiple roots (By Person, or All Projects) get one band per top-level block (client + descendants); a specifically selected project keeps issue-family bands
+
 ## [4.28.4]
 
 ### Fixed

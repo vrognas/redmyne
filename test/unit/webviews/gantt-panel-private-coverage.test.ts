@@ -982,6 +982,25 @@ describe("gantt project-view root rows (skipTopProjectRow)", () => {
     expect(html).toContain('data-collapse-key="project-2"'); // child project shown
   });
 
+  it("All Projects zebra-bands per top-level client block", () => {
+    const panel = setupTwoClients();
+    panel._selectedProjectId = null;
+    panel._expandAllOnNextRender = true; // expand everything so issues are visible
+    const html = panel._getRenderPayload().html as string;
+    // One band per depth-0 client (client + descendants), not per issue family
+    expect(html).toContain('data-first-row-key="project-1"');
+    expect(html).toContain('data-first-row-key="project-3"');
+    expect(html).not.toContain('data-first-row-key="issue-100"');
+  });
+
+  it("single selected project keeps issue-family zebra bands", () => {
+    const panel = setupTwoClients();
+    panel._selectedProjectId = 1;
+    panel._expandAllOnNextRender = true;
+    const html = panel._getRenderPayload().html as string;
+    expect(html).toContain('data-first-row-key="issue-100"'); // family band
+  });
+
   it("expand-all-on-first-render survives an early empty render", () => {
     const mock = createMockPanel();
     GanttPanel.restore(mock.panel, vscode.Uri.parse("file:///ext"));

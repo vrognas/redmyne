@@ -2304,19 +2304,21 @@ export class GanttPanel {
     interface GroupRange { startIdx: number; endIdx: number; groupIdx: number; }
     const groupRanges: GroupRange[] = [];
 
-    // Determine grouping strategy based on view mode:
-    // - "person" mode (By Person): group by projects (multiple unrelated projects)
-    // - "project" mode (By Project): group by issue families (focused on one hierarchy)
-    const useProjectGrouping = this._viewFocus === "person";
+    // Determine grouping strategy by ROOT COUNT, not view focus:
+    // - Multiple roots (By Person, or By Project with "All Projects"): one band
+    //   per depth-0 block (client/project/time-group + all its descendants)
+    // - Single hierarchy (a specific project selected, top row skipped): band
+    //   by top-level issue families
+    const useTopLevelGrouping = this._viewFocus === "person" || this._selectedProjectId === null;
 
     let currentGroupStart = 0;
     let currentGroupIdx = 0;
 
-    if (useProjectGrouping) {
-      // Multiple projects: group by project headers
+    if (useTopLevelGrouping) {
+      // Multiple roots: each depth-0 row starts a new band
       for (let i = 0; i < visibleRowCount; i++) {
         const row = visibleRows[i]!;
-        if ((row.type === "project" || row.type === "time-group") && i > 0) {
+        if (row.depth === 0 && i > 0) {
           groupRanges.push({ startIdx: currentGroupStart, endIdx: i - 1, groupIdx: currentGroupIdx });
           currentGroupStart = i;
           currentGroupIdx++;
