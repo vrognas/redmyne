@@ -21,6 +21,17 @@ Quick reference of key patterns. Details in sections below.
 - **A single-tree "skip innerHTML if render-key matches" webview guard can't help a real toggle** — between two renders of focus A, focus B is mounted, so the key never matches. Killing the residual `innerHTML` re-parse on toggle-back needs retained/detached per-focus DOM trees (or virtualization), not a skip guard.
 - **MEASURE before optimizing — the design doc was wrong by ~15×.** `perfDebug` on a real 1510-row / ~75K-node By-Project view showed `innerHTML` ≈ 350 ms but **`initializeGantt` ≈ 5–9 s** — the latter, not the HTML re-parse, was the bottleneck (see v4.28.2). By Person (one assignee, ~2–4K nodes) was ~30–100 ms total. The slowness was entirely the By-Project direction and entirely in webview init, not the extension or innerHTML.
 
+## v4.28.7 Review fixes: memo gaps, hidden arrows, dev bundle (2026-06-09)
+
+### Correctness
+
+- **A render-payload cache turns every "client-side only" state flip into a staleness bug.** The per-focus memo shipped with explicit clears for two no-re-render paths but missed four sibling display toggles — a max-effort review found them all in one pass. Pattern: anything baked into cached HTML that can change without `_updateContent` MUST clear `_payloadByFocus`. Structural fix (future): version-keyed memo (focus, dataRevision, collapseVersion, displayFlags, dateKey) instead of remember-to-clear.
+- **"Emit everything, toggle visibility" must be all-or-nothing.** Bars/labels were emitted for hidden rows but arrows and indent guides were not — fine while a fallback re-render papered over it; the instant-expand path exposed it. When adding a client-side fast path, enumerate every asset class the old slow path regenerated.
+
+### Tooling
+
+- **The extension debug session runs `node esbuild.cjs --watch` (dev profile, unminified, external sourcemaps) which silently overwrites `npm run compile` production output.** Three commits shipped the 3,516-line dev gantt.js instead of the 52-line production build. Before committing `media/*`: verify the bundle is minified (`head -c 80 media/gantt.js` should be one squashed line) and kill any `esbuild --watch` process first.
+
 ## v4.28.4 Gantt hidden rows + laggy toggles (2026-06-09)
 
 ### Correctness
