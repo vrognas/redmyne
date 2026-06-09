@@ -7,6 +7,15 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.28.8]
+
+### Fixed
+
+- **Zebra bands stay aligned across successive collapses** — band heights were recomputed from only the in-flight toggle's descendants, so rows already hidden under *other* collapsed parents kept counting (collapse a project after its sibling and the band stayed too tall, bleeding into the next family's band; the same miscount could visually merge family bands after the instant first-expand). Heights now sum only rows whose full ancestor chain is expanded
+- **Render cache can no longer serve stale charts** — cached per-focus payloads now carry a version key (data revision, collapse version, display flags, draft mode, today's date) instead of relying on every mutation site remembering to clear. Fixes the remaining staleness family: a chart cached before midnight served yesterday's today-line and past/future styling (capacity ribbon cache ignored the date too); toggling auto-update %done never invalidated (the marker is baked into row HTML); a view-focus toggle during a data refresh could serve the pre-refresh chart
+- **Project-member tooltips survive re-renders** — once memberships were cached, hovering a project after a re-render never re-sent the member lines, leaving tooltips permanently without them. Members are now re-sent on every hover (served from cache, no extra network; the webview append is idempotent)
+- **Expand-all is scoped to the view that armed it** — selecting a project/person arms expand-all for the next render; if that render came up empty, the surviving flag could fire later on the *other* focus
+
 ## [4.28.7]
 
 ### Fixed

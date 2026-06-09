@@ -11,6 +11,19 @@ Quick reference of key patterns. Details in sections below.
 
 ---
 
+## v4.28.8 Staleness family killed via version-keyed memo (2026-06-09)
+
+### Architecture
+
+- **Cache-invalidation whack-a-mole ends with a version key.** Three rounds of "found another path that must clear the memo" (4.28.1: 2 paths, 4.28.7: 4 more, review: 4 more) ended by keying each cached payload on the inputs that can change *without* a clearing re-render: `dataRevision | collapseVersion | display flags | draftEnabled | todayStr`. Clear-by-default stays the workhorse; the key guards the preserve-across-focus-toggle path. Mutation sites no longer need to know the cache exists (6 explicit `.clear()` calls deleted).
+- **Compute the storage key AFTER building the payload.** `_getRenderPayload` can consume `_expandAllOnNextRender`, mutating collapse state mid-build; keying with the pre-build version makes the very next lookup a guaranteed miss.
+- **Anything derived from "today" must put the date in its cache key.** Both the payload memo and `capacityCacheKey` survived midnight and served yesterday's today-line / past-future split.
+
+### Correctness
+
+- **Incremental client-side geometry must filter by GLOBAL visibility, not the in-flight toggle's delta.** Zebra band heights summed "everything not in this toggle's descendantSet", so rows hidden under *other* collapsed parents kept counting (collapse P after sibling Q → band too tall → bands visually merge). `computeVisibleStripeHeight` now checks each key's full ancestor chain against post-toggle collapsed state.
+- **An idempotent client patch beats a "send once" guard.** Member tooltip lines appended client-side were lost on every re-render because the extension refused to re-post once memberships were cached — the webview append was already idempotent; the guard was the bug.
+
 ## v4.28.1 Gantt view-switch perf (2026-06-09)
 
 ### Performance
@@ -25,7 +38,7 @@ Quick reference of key patterns. Details in sections below.
 
 ### Correctness
 
-- **A render-payload cache turns every "client-side only" state flip into a staleness bug.** The per-focus memo shipped with explicit clears for two no-re-render paths but missed four sibling display toggles — a max-effort review found them all in one pass. Pattern: anything baked into cached HTML that can change without `_updateContent` MUST clear `_payloadByFocus`. Structural fix (future): version-keyed memo (focus, dataRevision, collapseVersion, displayFlags, dateKey) instead of remember-to-clear.
+- **A render-payload cache turns every "client-side only" state flip into a staleness bug.** The per-focus memo shipped with explicit clears for two no-re-render paths but missed four sibling display toggles — a max-effort review found them all in one pass. Pattern: anything baked into cached HTML that can change without `_updateContent` MUST clear `_payloadByFocus`. Structural fix (future): version-keyed memo (focus, dataRevision, collapseVersion, displayFlags, dateKey) instead of remember-to-clear. (Landed in v4.28.8.)
 - **"Emit everything, toggle visibility" must be all-or-nothing.** Bars/labels were emitted for hidden rows but arrows and indent guides were not — fine while a fallback re-render papered over it; the instant-expand path exposed it. When adding a client-side fast path, enumerate every asset class the old slow path regenerated.
 
 ### Tooling
