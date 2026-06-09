@@ -741,19 +741,41 @@ export function setupCollapse(ctx) {
     if (e.defaultPrevented || !activeLabel) return;
     const tag = e.target.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    // If a bar holds focus, let its own handlers act (date nudge on Left/Right,
+    // bar-to-bar nav on Up/Down) rather than duplicating here.
+    if (document.activeElement?.closest?.('.issue-bar')) return;
     const index = allLabels.indexOf(activeLabel);
     if (index < 0) return;
-    let target = null;
+    const collapseKey = activeLabel.dataset.collapseKey;
+    const hasChildren = activeLabel.dataset.hasChildren === 'true';
+    const expanded = activeLabel.dataset.expanded === 'true';
+    const navTo = (t) => { if (t) { e.preventDefault(); setActiveLabel(t.label, false, true); } };
     switch (e.key) {
-      case 'ArrowDown': target = findVisibleLabel(index, 1); break;
-      case 'ArrowUp': target = findVisibleLabel(index, -1); break;
-      case 'Home': target = findVisibleLabel(-1, 1); break;
-      case 'End': target = findVisibleLabel(allLabels.length, -1); break;
+      case 'ArrowDown': navTo(findVisibleLabel(index, 1)); break;
+      case 'ArrowUp': navTo(findVisibleLabel(index, -1)); break;
+      case 'Home': navTo(findVisibleLabel(-1, 1)); break;
+      case 'End': navTo(findVisibleLabel(allLabels.length, -1)); break;
+      case 'ArrowLeft':
+        // Expanded → collapse; otherwise jump to parent (VS Code tree behaviour)
+        e.preventDefault();
+        if (hasChildren && expanded && collapseKey) {
+          toggleCollapseClientSide(collapseKey, 'collapse');
+        } else if (activeLabel.dataset.parentKey) {
+          const parent = allLabels.find(l => l.dataset.collapseKey === activeLabel.dataset.parentKey);
+          if (parent) setActiveLabel(parent, false, true);
+        }
+        break;
+      case 'ArrowRight':
+        // Collapsed → expand; if already expanded, jump to first visible child
+        e.preventDefault();
+        if (hasChildren && !expanded && collapseKey) {
+          toggleCollapseClientSide(collapseKey, 'expand');
+        } else if (hasChildren && expanded && collapseKey) {
+          const firstChild = allLabels.find(l => l.dataset.parentKey === collapseKey && isLabelVisible(l));
+          if (firstChild) setActiveLabel(firstChild, false, true);
+        }
+        break;
       default: return;
-    }
-    if (target) {
-      e.preventDefault();
-      setActiveLabel(target.label, false, true); // scrollIntoView
     }
   });
 }
