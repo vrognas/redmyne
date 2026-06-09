@@ -2,6 +2,7 @@ import {
   findDescendants as findDescendantsUtil,
   findVisibleDescendants as findVisibleDescendantsUtil,
   buildAncestorChains,
+  computeVisibleStripeHeight,
 } from './collapse-utils.js';
 import { parseTranslateX, parseTranslateY, pickRowKeyByY } from './selection-utils.js';
 
@@ -281,7 +282,6 @@ export function setupCollapse(ctx) {
     }
 
     const descendantSet = new Set(allDescendants);
-    const visibleSet = new Set(visibleDescendants);
     const parentEntry = rowIndex.get(collapseKey);
     const parentRowY = parentEntry?.originalY ?? 0; // Row coordinate system
 
@@ -422,44 +422,30 @@ export function setupCollapse(ctx) {
       }
     });
 
-    // Handle zebra stripes: hide stripes covering descendants, shift stripes below
-    // First pass: calculate actions for each unique stripe (by originalY)
-    const stripeActions = new Map(); // originalY -> { action, newHeight?, newY? }
-    // Reuse allStripes from earlier query
+    // Handle zebra stripes: resize bands touched by this toggle, shift bands
+    // below. Band height = sum of its currently-VISIBLE rows' contributions,
+    // where visibility checks each key's full ancestor chain (post-toggle
+    // state) — NOT just this toggle's descendantSet. Filtering only by
+    // descendantSet counted rows hidden under OTHER collapsed parents
+    // (collapse P after sibling Q -> Q's hidden children still counted ->
+    // band too tall, bleeding into the next band).
+    const stripeActions = new Map(); // originalY -> { action, newHeight?, newY?, hide? }
     allStripes.forEach((stripe) => {
       const originalY = parseFloat(stripe.dataset.originalY || '0');
       if (stripeActions.has(originalY)) return; // Skip duplicates
 
       const contributions = getStripeContributions(stripe);
       const contributingKeys = Object.keys(contributions);
-
-      // Check what this stripe covers
-      const coversOnlyDescendants = contributingKeys.length > 0 &&
-        contributingKeys.every(key => descendantSet.has(key));
       const coversAnyDescendant = contributingKeys.some(key => descendantSet.has(key));
       const isBelowParent = originalY > parentStripeY;
 
-      if (coversOnlyDescendants) {
-        stripeActions.set(originalY, { action: 'toggle-visibility', hide: !shouldExpand });
-      } else if (coversAnyDescendant) {
-        if (!shouldExpand) {
-          let newHeight = 0;
-          for (const [key, contribution] of Object.entries(contributions)) {
-            if (!descendantSet.has(key)) {
-              newHeight += parseFloat(contribution);
-            }
-          }
-          stripeActions.set(originalY, { action: 'shrink', newHeight });
+      if (coversAnyDescendant) {
+        const newHeight = computeVisibleStripeHeight(contributions, collapsedKeys, ancestorCache);
+        if (newHeight === 0) {
+          // Every row in the band is hidden (band fully inside a collapsed subtree)
+          stripeActions.set(originalY, { action: 'toggle-visibility', hide: true });
         } else {
-          // EXPANDING: calculate correct height based on visible descendants (not originalHeight)
-          // Include parent (not in descendantSet) + visible descendants
-          let newHeight = 0;
-          for (const [key, contribution] of Object.entries(contributions)) {
-            if (!descendantSet.has(key) || visibleSet.has(key)) {
-              newHeight += parseFloat(contribution);
-            }
-          }
-          stripeActions.set(originalY, { action: 'expand', newHeight });
+          stripeActions.set(originalY, { action: 'resize', newHeight });
         }
       } else if (isBelowParent) {
         const currentY = parseFloat(stripe.getAttribute('y') || String(originalY));
@@ -477,10 +463,8 @@ export function setupCollapse(ctx) {
         case 'toggle-visibility':
           setSvgVisibility(stripe, action.hide);
           break;
-        case 'shrink':
-          stripe.setAttribute('height', String(action.newHeight));
-          break;
-        case 'expand':
+        case 'resize':
+          setSvgVisibility(stripe, false); // band has visible rows again
           stripe.setAttribute('height', String(action.newHeight));
           break;
         case 'shift':

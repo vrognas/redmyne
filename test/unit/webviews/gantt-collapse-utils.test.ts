@@ -4,6 +4,7 @@ import {
   findVisibleDescendants,
   buildChildrenCache,
   buildAncestorChains,
+  computeVisibleStripeHeight,
 } from "../../../src/webviews/gantt/collapse-utils.js";
 
 describe("gantt collapse utilities", () => {
@@ -229,6 +230,36 @@ describe("gantt collapse utilities", () => {
       ]);
       expect(ancestorCache.get("a")).toEqual(["b", "a"]);
       expect(ancestorCache.get("b")).toEqual(["a", "b"]);
+    });
+  });
+
+  describe("computeVisibleStripeHeight", () => {
+    // band: client > P (p1), Q (q1) — all rows 22px
+    const contributions = { client: 22, P: 22, p1: 22, Q: 22, q1: 22 };
+    const ancestorCache = new Map<string, string[]>([
+      ["P", ["client"]],
+      ["Q", ["client"]],
+      ["p1", ["P", "client"]],
+      ["q1", ["Q", "client"]],
+    ]);
+
+    it("excludes rows hidden under OTHER collapsed parents (sibling overcount)", () => {
+      // Q collapsed first, then P: q1 AND p1 must both be excluded
+      const collapsedKeys = new Set(["P", "Q"]);
+      expect(computeVisibleStripeHeight(contributions, collapsedKeys, ancestorCache)).toBe(66); // client+P+Q
+    });
+
+    it("returns 0 when every contributing row is hidden (band fully collapsed away)", () => {
+      const collapsedKeys = new Set(["client"]);
+      expect(
+        computeVisibleStripeHeight({ P: 22, p1: 22 }, collapsedKeys, ancestorCache)
+      ).toBe(0);
+    });
+
+    it("counts keys without ancestor entries (band roots) as visible", () => {
+      expect(
+        computeVisibleStripeHeight({ client: 22, P: 22 }, new Set<string>(), ancestorCache)
+      ).toBe(44);
     });
   });
 });

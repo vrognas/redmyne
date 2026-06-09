@@ -105,6 +105,28 @@ export function buildAncestorChains(pairs) {
 }
 
 /**
+ * Sum the contributions of a zebra stripe's currently-VISIBLE rows. A row is
+ * visible iff none of its ancestors is collapsed. Filtering per-key (instead
+ * of by the in-flight toggle's descendant set) keeps rows hidden under OTHER
+ * collapsed parents out of the band height — counting them left the band too
+ * tall (e.g. collapsing P after sibling Q kept Q's hidden children counted).
+ * @param {Record<string, number|string>} contributions - collapseKey → px height
+ * @param {Set<string>} collapsedKeys - keys currently collapsed (post-toggle)
+ * @param {Map<string, string[]>} ancestorCache - key → [parent, grandparent, ...]
+ * @returns {number} total height of the band's visible rows
+ */
+export function computeVisibleStripeHeight(contributions, collapsedKeys, ancestorCache) {
+  let height = 0;
+  for (const [key, contribution] of Object.entries(contributions)) {
+    const ancestors = ancestorCache.get(key) || [];
+    if (!ancestors.some((a) => collapsedKeys.has(a))) {
+      height += parseFloat(contribution);
+    }
+  }
+  return height;
+}
+
+/**
  * Build children cache from ancestor cache.
  * @param {Map<string, string[]>} ancestorCache - Map of key → [parentKey, grandparentKey, ...]
  * @returns {Map<string, Set<string>>} Map of parentKey → Set of direct child keys
