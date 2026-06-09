@@ -37,8 +37,8 @@ export interface IssueFilter {
   assignee: "me" | "any";
   status: "open" | "closed" | "any";
   priority?: number | "any";
-  /** Task type (Redmine tracker) id, or "any" for no task-type filter. */
-  tracker?: number | "any";
+  /** Task-type custom-field value (e.g. "Data Management"), or "any" for none. */
+  taskType?: string | "any";
   showEmptyProjects?: boolean;
 }
 

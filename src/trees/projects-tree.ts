@@ -2,8 +2,8 @@ import * as vscode from "vscode";
 import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { RedmineProject } from "../redmine/redmine-project";
 import { Issue } from "../redmine/models/issue";
-import { IssueFilter, DEFAULT_ISSUE_FILTER, IssueSortField, SortConfig, NamedEntity } from "../redmine/models/common";
-import { deriveTrackers, filterIssuesByTracker } from "../utilities/issue-tracker-filter";
+import { IssueFilter, DEFAULT_ISSUE_FILTER, IssueSortField, SortConfig } from "../redmine/models/common";
+import { deriveTaskTypes, filterIssuesByTaskType } from "../utilities/issue-task-type-filter";
 import { createEnhancedIssueTreeItem, createProjectTooltip } from "../utilities/tree-item-factory";
 import { sortIssuesByRisk, sortIssuesByField } from "../utilities/issue-sorting";
 import {
@@ -75,7 +75,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   private issueSort: SortConfig<IssueSortField> | null = null; // null = use risk sorting
   private issuesByProject = new Map<number, Issue[]>();
   private issuesByParent = new Map<number, Issue[]>(); // parent issue ID → child issues
-  private availableTrackers: NamedEntity[] = []; // task types present in loaded issues
+  private availableTaskTypes: string[] = []; // task-type values present in loaded issues
   private projectsByParent = new Map<number, RedmineProject[]>(); // parent project ID → child projects
   private flexibilityCache = new Map<number, FlexibilityScore | null>();
   private globalState?: vscode.Memento;
@@ -374,15 +374,23 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
    * Apply issue-derived state. Called once per streamed page and again with
    * the final issue set after pagination completes.
    */
+  /** Name of the custom field used as the "task type" filter dimension. */
+  private taskTypeFieldName(): string {
+    return vscode.workspace
+      .getConfiguration("redmyne")
+      .get<string>("taskTypeField", "Task Type");
+  }
+
   private applyIssues(issues: Issue[]): void {
     this.assignedIssues = issues;
+    const field = this.taskTypeFieldName();
     // Task types come from the full fetched set so the picker stays complete
-    // even while a tracker filter is applied.
-    this.availableTrackers = deriveTrackers(issues);
+    // even while a task-type filter is applied.
+    this.availableTaskTypes = deriveTaskTypes(issues, field);
     buildFlexibilityCache(issues, this.flexibilityCache, getWeeklySchedule());
     // Apply the task-type filter client-side before grouping; the project/
     // parent-child structure then derives from the visible set.
-    const visible = filterIssuesByTracker(issues, this.issueFilter.tracker);
+    const visible = filterIssuesByTaskType(issues, field, this.issueFilter.taskType);
     this.issuesByProject = groupBy(
       visible.filter((i) => i.project?.id),
       (issue) => issue.project!.id
@@ -591,7 +599,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   setFilter(filter: IssueFilter): void {
     // Preserve the task-type dimension across assignee/status changes unless the
     // caller sets it explicitly (it's an orthogonal, client-side filter).
-    this.issueFilter = { tracker: this.issueFilter.tracker, ...filter };
+    this.issueFilter = { taskType: this.issueFilter.taskType, ...filter };
     this.globalState?.update(FILTER_KEY, this.issueFilter);
     this.clearProjects();
     this.refresh();
@@ -604,22 +612,22 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
     return { ...this.issueFilter };
   }
 
-  /** Task types present in the currently-loaded issues (for the filter picker). */
-  getAvailableTrackers(): NamedEntity[] {
-    return [...this.availableTrackers];
+  /** Task-type values present in the currently-loaded issues (for the picker). */
+  getAvailableTaskTypes(): string[] {
+    return [...this.availableTaskTypes];
   }
 
   /** Current task-type filter ("any" = no filter). */
-  getTrackerFilter(): number | "any" {
-    return this.issueFilter.tracker ?? "any";
+  getTaskTypeFilter(): string | "any" {
+    return this.issueFilter.taskType ?? "any";
   }
 
   /**
-   * Set the task-type (tracker) filter. Re-groups from the cached issue set —
-   * no server refetch, since tracker is filtered client-side.
+   * Set the task-type filter. Re-groups from the cached issue set — no server
+   * refetch, since task type is filtered client-side from custom fields.
    */
-  setTrackerFilter(tracker: number | "any"): void {
-    this.issueFilter = { ...this.issueFilter, tracker };
+  setTaskTypeFilter(taskType: string | "any"): void {
+    this.issueFilter = { ...this.issueFilter, taskType };
     this.globalState?.update(FILTER_KEY, this.issueFilter);
     this.applyIssues(this.assignedIssues);
     this.refresh();
@@ -668,7 +676,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
         const parentIssue = this.assignedIssues.find(i => i.id === element.parent!.id);
         // Only reveal under the parent if it passes the task-type filter;
         // otherwise the child renders at the project root (see filterRootIssues).
-        if (parentIssue && filterIssuesByTracker([parentIssue], this.issueFilter.tracker).length > 0) {
+        if (parentIssue && filterIssuesByTaskType([parentIssue], this.taskTypeFieldName(), this.issueFilter.taskType).length > 0) {
           return parentIssue;
         }
       }

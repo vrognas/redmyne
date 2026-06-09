@@ -107,27 +107,27 @@ export function registerViewCommands(
     }),
 
     vscode.commands.registerCommand("redmyne.filterByTaskType", async () => {
-      const trackers = deps.projectsTree.getAvailableTrackers();
-      if (trackers.length === 0) {
-        showStatusBarMessage("$(info) No task types in the loaded issues yet", 2000);
+      const taskTypes = deps.projectsTree.getAvailableTaskTypes();
+      if (taskTypes.length === 0) {
+        const field = vscode.workspace.getConfiguration("redmyne").get<string>("taskTypeField", "Task Type");
+        showStatusBarMessage(`$(info) No "${field}" values in the loaded issues`, 3000);
         return;
       }
-      const current = deps.projectsTree.getTrackerFilter();
-      const items: (vscode.QuickPickItem & { trackerId: number | "any" })[] = [
-        { label: "All Task Types", trackerId: "any", description: current === "any" ? "current" : undefined },
-        ...trackers.map((t) => ({
-          label: t.name,
-          trackerId: t.id,
-          description: current === t.id ? "current" : undefined,
+      const current = deps.projectsTree.getTaskTypeFilter();
+      const items: (vscode.QuickPickItem & { value: string | "any" })[] = [
+        { label: "All Task Types", value: "any", description: current === "any" ? "current" : undefined },
+        ...taskTypes.map((t) => ({
+          label: t,
+          value: t,
+          description: current === t ? "current" : undefined,
         })),
       ];
       const pick = await vscode.window.showQuickPick(items, {
         placeHolder: "Filter Issues by task type",
       });
       if (!pick) return;
-      deps.projectsTree.setTrackerFilter(pick.trackerId);
-      const name = pick.trackerId === "any" ? "All" : trackers.find((t) => t.id === pick.trackerId)?.name;
-      showStatusBarMessage(`$(filter) Task type: ${name}`, 2000);
+      deps.projectsTree.setTaskTypeFilter(pick.value);
+      showStatusBarMessage(`$(filter) Task type: ${pick.value === "any" ? "All" : pick.value}`, 2000);
     }),
 
     // Time entries filter commands

@@ -2075,6 +2075,11 @@
           "default": true,
           "markdownDescription": "**Show project members in tooltips**\n\nDisplay team members and their roles when hovering over projects in the Issues tree and Gantt view."
         },
+        "redmyne.taskTypeField": {
+          "type": "string",
+          "default": "Task Type",
+          "markdownDescription": "**Task-type custom field**\n\nName of the Redmine issue custom field used by the Issues-pane \"Filter by Task Type\" command (e.g. a field labelled `Task Type` with values like `Data Management`). Must match the custom field's label exactly."
+        },
         "redmyne.hideProjectMembersFor": {
           "type": "array",
           "items": { "type": "number" },
