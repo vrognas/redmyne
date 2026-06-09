@@ -688,41 +688,31 @@ export function setupCollapse(ctx) {
     });
   });
 
-  // Click-to-select: delegated handler for NON-label row clicks (column cells,
-  // bars, aggregate bars) and empty timeline lanes. Labels keep their own
-  // per-element handlers (which already call setActiveLabel). Additive: no
-  // stopPropagation, existing click actions still fire.
-  const DRAG_CLICK_THRESHOLD = 4;
-  let lastMouseDown = null;
+  // Click-to-select: delegated handler for NON-label rows (column cells, bars,
+  // aggregate bars) and empty timeline lanes. Select on MOUSEDOWN, not click:
+  // a bar mousedown starts a move-drag that swallows the subsequent click, so a
+  // click handler never fires for bars. Mousedown always fires, and "pressing a
+  // bar selects its row" is the expected behaviour (a drag then proceeds
+  // normally). Labels keep their own click handlers (skipped here). No
+  // stopPropagation — the drag/existing handlers still run.
   addDocListener('mousedown', (e) => {
-    lastMouseDown = { x: e.clientX, y: e.clientY };
-  });
-  addDocListener('click', (e) => {
-    // Drag-release click (bar move/resize/link): pointer travelled — skip.
-    // (dragState lives module-local in gantt-drag.js; movement threshold is
-    // the self-contained equivalent.)
-    const downAt = lastMouseDown;
-    lastMouseDown = null; // consume: stale/absent mousedown can't affect later synthetic clicks
-    if (downAt && (Math.abs(e.clientX - downAt.x) > DRAG_CLICK_THRESHOLD ||
-        Math.abs(e.clientY - downAt.y) > DRAG_CLICK_THRESHOLD)) {
-      return;
-    }
-    // Only clicks inside the gantt body (excludes toolbar, minimap, modals,
-    // relation picker — those live outside #ganttScroll)
+    // Leave modifier gestures to the multi-select handler
+    if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+    // Only inside the gantt body (excludes toolbar, minimap, modals, pickers)
     if (!e.target.closest('#ganttScroll')) return;
-    // Skip interactive elements
+    // Skip interactive elements (drag handles, link handle, badges, form fields)
     if (e.target.closest('.collapse-toggle, .chevron-hit-area, .drag-handle, ' +
         '.link-handle, .blocks-badge-group, .blocker-badge, .progress-badge-group, ' +
         '.flex-badge-group, button, input, select')) {
       return;
     }
     const row = e.target.closest('.gantt-row[data-collapse-key]');
-    // Labels already select via their own handlers — avoid double setSelectedKey
+    // Labels already select via their own click handlers — avoid double-firing
     if (row && row.matches('.project-label, .issue-label, .time-group-label')) return;
 
     let key = row?.dataset.collapseKey || null;
     if (!key) {
-      // Empty timeline lane: resolve row from click Y over visible label bands
+      // Empty timeline lane: resolve row from press Y over visible label bands
       if (!e.target.closest('.gantt-timeline')) return;
       const rows = [];
       for (const l of allLabels) {
@@ -735,8 +725,8 @@ export function setupCollapse(ctx) {
     }
     const label = allLabels.find(l => l.dataset.collapseKey === key);
     // Focus the row's label (same as a label click) so the row is clearly
-    // selected (bright :focus highlight) and arrow keys navigate rows. Bars
-    // can't hold focus anyway — the drag mousedown calls preventDefault.
+    // selected (bright :focus highlight) and arrow keys navigate rows. The drag
+    // mousedown's preventDefault blocks bar focus, so we focus the label here.
     if (label) setActiveLabel(label);
   });
 }
