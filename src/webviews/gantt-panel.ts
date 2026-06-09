@@ -2029,9 +2029,10 @@ export class GanttPanel {
         this._cachedHierarchy = buildProjectHierarchy(sortedIssues, this._flexibilityCache, projectsForHierarchy, true, blockedIds);
       }
     }
-    // Auto-expand all when switching project/person (before flattening)
+    // Auto-expand all when switching project/person (before flattening).
+    // Only consume the flag once keys actually exist — an early render before
+    // issues load must not eat the first-open expand-all.
     if (this._expandAllOnNextRender) {
-      this._expandAllOnNextRender = false;
       const collectKeys = (nodes: HierarchyNode[]): string[] => {
         const keys: string[] = [];
         for (const n of nodes) {
@@ -2041,7 +2042,10 @@ export class GanttPanel {
         return keys;
       };
       const allKeys = collectKeys(this._cachedHierarchy);
-      if (allKeys.length > 0) this._collapseState.expandAll(allKeys);
+      if (allKeys.length > 0) {
+        this._collapseState.expandAll(allKeys);
+        this._expandAllOnNextRender = false;
+      }
     }
     // Get ALL nodes with visibility flags for client-side collapse management
     const expandedKeys = this._collapseState.getExpandedKeys();
@@ -2211,8 +2215,11 @@ export class GanttPanel {
 
     // Filter visible rows ONCE upfront (avoid multiple .filter() calls)
     // Also apply health filter if set (issues only - projects/time-groups always pass)
-    // In per-project view, skip the top-level project row (show issues directly)
-    const skipTopProjectRow = this._viewFocus === "project";
+    // When a SPECIFIC project is selected, its top-level row is redundant (the
+    // whole chart IS that project) — skip it and show children directly. With
+    // "All Projects" there are many roots; they must stay, or collapsed
+    // children have no parent row to expand from.
+    const skipTopProjectRow = this._viewFocus === "project" && this._selectedProjectId !== null;
     // Find the top-level project's collapseKey to clear parent references
     const topProjectKey = skipTopProjectRow ? rows.find(r => r.type === "project" && r.depth === 0)?.collapseKey : null;
 

@@ -926,6 +926,73 @@ describe("gantt panel private coverage", () => {
   });
 });
 
+describe("gantt project-view root rows (skipTopProjectRow)", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+    GanttPanel.currentPanel = undefined;
+    vi.spyOn(vscode.workspace, "getConfiguration").mockImplementation(
+      () =>
+        ({
+          get: vi.fn((_key: string, fallback?: unknown) => fallback),
+          update: vi.fn(),
+        }) as unknown as vscode.WorkspaceConfiguration
+    );
+    (vscode.Uri as unknown as { joinPath: (...parts: unknown[]) => string }).joinPath = vi.fn(
+      (...parts: unknown[]) => parts.map((p) => String(p)).join("/")
+    );
+  });
+
+  function setupTwoClients() {
+    const mock = createMockPanel();
+    GanttPanel.restore(mock.panel, vscode.Uri.parse("file:///ext"));
+    const panel = GanttPanel.currentPanel as any;
+    panel._webviewReady = true;
+    panel._viewFocus = "project";
+    panel._projects = [
+      { id: 1, name: "ClientA", identifier: "client-a" },
+      { id: 2, name: "ProjA1", identifier: "proj-a1", parent: { id: 1, name: "ClientA" } },
+      { id: 3, name: "ClientB", identifier: "client-b" },
+      { id: 4, name: "ProjB1", identifier: "proj-b1", parent: { id: 3, name: "ClientB" } },
+    ];
+    const issues = [
+      createIssue({ id: 100, projectId: 2 }),
+      createIssue({ id: 200, projectId: 4 }),
+    ];
+    panel._issues = issues;
+    panel._issueById = new Map(issues.map((i: any) => [i.id, i]));
+    panel._flexibilityCache = new Map();
+    panel._expandAllOnNextRender = false; // simulate collapsed-by-default regime
+    return panel;
+  }
+
+  it("All Projects keeps every depth-0 client row (not just the first root's subtree)", () => {
+    const panel = setupTwoClients();
+    panel._selectedProjectId = null;
+    const html = panel._getRenderPayload().html as string;
+    expect(html).toContain('data-collapse-key="project-1"'); // ClientA row present
+    expect(html).toContain('data-collapse-key="project-3"'); // ClientB row present
+  });
+
+  it("single selected project still skips its redundant top row", () => {
+    const panel = setupTwoClients();
+    panel._selectedProjectId = 1;
+    const html = panel._getRenderPayload().html as string;
+    expect(html).not.toContain('data-collapse-key="project-1"'); // top row skipped
+    expect(html).toContain('data-collapse-key="project-2"'); // child project shown
+  });
+
+  it("expand-all-on-first-render survives an early empty render", () => {
+    const mock = createMockPanel();
+    GanttPanel.restore(mock.panel, vscode.Uri.parse("file:///ext"));
+    const panel = GanttPanel.currentPanel as any;
+    panel._webviewReady = true;
+    expect(panel._expandAllOnNextRender).toBe(true);
+    panel._getRenderPayload(); // no issues loaded yet
+    expect(panel._expandAllOnNextRender).toBe(true); // flag not consumed by empty render
+  });
+});
+
 describe("gantt view-focus toggle perf (per-focus payload memo)", () => {
   beforeEach(() => {
     vi.restoreAllMocks();

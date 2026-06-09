@@ -331,6 +331,21 @@ export function setupDrag(ctx) {
 
     function collectArrows(selector) {
       const arrows = [];
+      // Bar lookup must be O(1): a per-arrow document.querySelector was an
+      // O(arrows × DOM) full-tree scan on every collapse/expand and drag start.
+      const { mapsReady, issueBarsByIssueId } = getLookupMaps();
+      let localBars = null; // fallback: one scan if the idle-built maps aren't ready yet
+      const barFor = (id) => {
+        if (mapsReady) return issueBarsByIssueId.get(id)?.[0] ?? null;
+        if (!localBars) {
+          localBars = new Map();
+          document.querySelectorAll('.issue-bar').forEach(b => {
+            const bid = b.dataset.issueId;
+            if (bid && !localBars.has(bid)) localBars.set(bid, b);
+          });
+        }
+        return localBars.get(id) ?? null;
+      };
       document.querySelectorAll(selector).forEach(arrow => {
         const fromId = arrow.getAttribute('data-from');
         const toId = arrow.getAttribute('data-to');
@@ -339,8 +354,8 @@ export function setupDrag(ctx) {
         const relType = relMatch ? relMatch[1] : 'relates';
         const isScheduling = ['blocks', 'precedes', 'finish_to_start', 'start_to_start', 'finish_to_finish', 'start_to_finish'].includes(relType);
         // Get source/target bar positions
-        const fromBar = document.querySelector('.issue-bar[data-issue-id="' + fromId + '"]');
-        const toBar = document.querySelector('.issue-bar[data-issue-id="' + toId + '"]');
+        const fromBar = barFor(fromId);
+        const toBar = barFor(toId);
         if (!fromBar || !toBar) return;
         arrows.push({
           element: arrow,

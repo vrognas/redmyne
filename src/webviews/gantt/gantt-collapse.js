@@ -247,8 +247,12 @@ export function setupCollapse(ctx) {
   // All rows are rendered in DOM (hidden rows have visibility:hidden)
   // This enables instant toggle without VS Code re-render roundtrip
   function toggleCollapseClientSide(collapseKey, action) {
-    // Find the parent label element (must be a label with hasChildren)
-    const parentLabel = document.querySelector('[data-collapse-key="' + collapseKey + '"].project-label, [data-collapse-key="' + collapseKey + '"].time-group-label, [data-collapse-key="' + collapseKey + '"].issue-label');
+    // Find the parent label element (must be a label with hasChildren).
+    // rowIndex already holds the row's elements — avoids a full-tree query.
+    const parentLabel = rowIndex.get(collapseKey)?.elements.find(el =>
+      el.classList.contains('project-label') ||
+      el.classList.contains('time-group-label') ||
+      el.classList.contains('issue-label'));
     if (!parentLabel || parentLabel.dataset.hasChildren !== 'true') {
       return;
     }
@@ -496,15 +500,15 @@ export function setupCollapse(ctx) {
       }
     });
 
-    // Toggle dependency arrows
+    // Toggle dependency arrows. Row hidden-state comes from rowIndex (all of a
+    // row's elements share the gantt-row-hidden class) — a per-arrow
+    // document.querySelector here was an O(arrows × DOM) full-tree scan.
+    const isRowHidden = (issueId) => {
+      const entry = rowIndex.get('issue-' + issueId);
+      return entry ? entry.elements[0].classList.contains('gantt-row-hidden') : false;
+    };
     document.querySelectorAll('.dependency-arrow').forEach(arrow => {
-      const fromId = arrow.dataset.from;
-      const toId = arrow.dataset.to;
-      const fromBar = document.querySelector('.issue-bar[data-issue-id="' + fromId + '"]');
-      const toBar = document.querySelector('.issue-bar[data-issue-id="' + toId + '"]');
-      const fromHidden = fromBar?.classList.contains('gantt-row-hidden');
-      const toHidden = toBar?.classList.contains('gantt-row-hidden');
-      setSvgVisibility(arrow, fromHidden || toHidden);
+      setSvgVisibility(arrow, isRowHidden(arrow.dataset.from) || isRowHidden(arrow.dataset.to));
     });
 
     // Arrow paths were computed at render time — re-anchor them to the

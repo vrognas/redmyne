@@ -21,6 +21,17 @@ Quick reference of key patterns. Details in sections below.
 - **A single-tree "skip innerHTML if render-key matches" webview guard can't help a real toggle** — between two renders of focus A, focus B is mounted, so the key never matches. Killing the residual `innerHTML` re-parse on toggle-back needs retained/detached per-focus DOM trees (or virtualization), not a skip guard.
 - **MEASURE before optimizing — the design doc was wrong by ~15×.** `perfDebug` on a real 1510-row / ~75K-node By-Project view showed `innerHTML` ≈ 350 ms but **`initializeGantt` ≈ 5–9 s** — the latter, not the HTML re-parse, was the bottleneck (see v4.28.2). By Person (one assignee, ~2–4K nodes) was ~30–100 ms total. The slowness was entirely the By-Project direction and entirely in webview init, not the extension or innerHTML.
 
+## v4.28.4 Gantt hidden rows + laggy toggles (2026-06-09)
+
+### Correctness
+
+- **A "skip the redundant root row" optimization must check there IS exactly one root.** `skipTopProjectRow` keyed only on view focus, so "All Projects" (~15 roots) dropped every depth-0 client row; the compensating `rows.find(depth===0)` then force-showed only the FIRST root's children. Symptom: chart shows 2 rows (alphabetically-first client's projects) and collapsed children elsewhere are unreachable (no parent row to expand). Lesson: when special-casing "the single X", gate on the condition that makes X single (`selectedProjectId !== null`), not on the mode.
+- **One-shot flags must be consumed by the action, not the attempt.** `_expandAllOnNextRender` was cleared before checking whether any keys existed, so an early render before issues loaded ate the first-open expand-all. Consume inside the success branch.
+
+### Performance
+
+- **Same O(rows×DOM) disease, third instance:** per-arrow `document.querySelector('.issue-bar[data-issue-id=…]')` in the collapse toggle (×2) and `collectArrows` (×2) = ~4×arrows full-tree scans per chevron click. Fixed via existing O(1) indexes (`rowIndex`, `getLookupMaps().issueBarsByIssueId`) with a one-scan fallback. Pattern to grep for after any webview change: `querySelector` inside a `forEach` over rows/arrows.
+
 ## v4.28.2 initializeGantt O(N²) ancestor walk (2026-06-09)
 
 ### Performance

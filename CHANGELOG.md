@@ -7,6 +7,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.28.4]
+
+### Fixed
+
+- **By Project with "All Projects" no longer hides almost everything** — the top-level row skip (meant for the single-selected-project view, where the lone root is redundant) was dropping *every* depth-0 client row, and only the alphabetically-first client's children were force-shown. Collapsed children of all other clients had no parent row left to expand them, so the chart looked empty unless you ran Expand All. Top rows are now only skipped when a specific project is selected. Also, the first-open auto-expand no longer gets consumed by an early render that happens before issues load
+- **Collapse/expand chevron toggles are fast on large boards** — each toggle ran up to 4 full-tree DOM queries *per dependency arrow* (arrow visibility + arrow re-anchoring), hundreds of ~75K-node scans per click. Arrow endpoints now resolve through O(1) row/bar indexes (one scan total), and the toggled row's label is found via the row index instead of a document-wide selector
+
 ## [4.28.3]
 
 ### Changed
