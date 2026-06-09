@@ -311,6 +311,35 @@ export function setupCollapse(ctx) {
       }
     });
 
+    // Adopt rows that were hidden at render time: stripes are built from
+    // render-time-VISIBLE rows only, so first-expanding a collapsed block found
+    // no contributions and fell back to a full re-render. Every row is a
+    // uniform barHeight with no gaps, so credit each missing row to the
+    // parent's band and persist it — this and all future toggles stay
+    // client-side.
+    if (shouldExpand && countedKeys.size < deltaDescendants.length) {
+      const missing = deltaDescendants.filter(key => !countedKeys.has(key));
+      const parentStripes = Array.from(allStripes)
+        .filter(stripe => collapseKey in getStripeContributions(stripe));
+      if (parentStripes.length > 0) {
+        missing.forEach(key => {
+          actualDelta += barHeight;
+          countedKeys.add(key);
+        });
+        // Column-SVG duplicates of a band share one cached contributions object
+        // (keyed by originalY) — mutate it once, rewrite each stripe's dataset
+        const mutated = new Set();
+        parentStripes.forEach(stripe => {
+          const contributions = getStripeContributions(stripe);
+          if (!mutated.has(contributions)) {
+            missing.forEach(key => { contributions[key] = barHeight; });
+            mutated.add(contributions);
+          }
+          stripe.dataset.rowContributions = JSON.stringify(contributions);
+        });
+      }
+    }
+
     // Fallback: if no contributions found, use re-render
     if (actualDelta === 0 && deltaDescendants.length > 0) {
       vscode.postMessage({ command: 'collapseStateSync', collapseKey, isExpanded: shouldExpand });

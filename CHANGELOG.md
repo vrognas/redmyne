@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.28.6]
+
+### Fixed
+
+- **First expand of a collapsed block is instant** — zebra stripes only carried per-row geometry for rows visible at render time, so expanding a block that was collapsed when the chart rendered found no geometry and fell back to a full re-render (~0.5–1s). The toggle now adopts newly revealed rows into the parent's band on the fly (every row is a uniform height), so the first expand — and everything after it — stays client-side
+
 ## [4.28.5]
 
 ### Fixed

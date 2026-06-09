@@ -1608,6 +1608,27 @@
           }
         }
       });
+      if (shouldExpand && countedKeys.size < deltaDescendants.length) {
+        const missing = deltaDescendants.filter((key) => !countedKeys.has(key));
+        const parentStripes = Array.from(allStripes).filter((stripe) => collapseKey in getStripeContributions(stripe));
+        if (parentStripes.length > 0) {
+          missing.forEach((key) => {
+            actualDelta += barHeight;
+            countedKeys.add(key);
+          });
+          const mutated = /* @__PURE__ */ new Set();
+          parentStripes.forEach((stripe) => {
+            const contributions = getStripeContributions(stripe);
+            if (!mutated.has(contributions)) {
+              missing.forEach((key) => {
+                contributions[key] = barHeight;
+              });
+              mutated.add(contributions);
+            }
+            stripe.dataset.rowContributions = JSON.stringify(contributions);
+          });
+        }
+      }
       if (actualDelta === 0 && deltaDescendants.length > 0) {
         vscode2.postMessage({ command: "collapseStateSync", collapseKey, isExpanded: shouldExpand });
         vscode2.postMessage({ command: "requestRerender" });
