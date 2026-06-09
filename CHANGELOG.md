@@ -7,6 +7,17 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.28.0]
+
+### Added
+
+- **Filter the Issues pane by task type** — a "Filter by Task Type…" entry in the Issues-pane filter menu lets you narrow issues to one Redmine tracker (e.g. "Data Management"). The picker offers only the task types present in your loaded issues; the filter is applied client-side (no refetch), combines with the assignee/status filter, and persists across sessions
+
+### Fixed
+
+- **Gantt row selection works from the chart** — clicking a bar, column cell, or empty timeline lane now selects the row (it's done on mousedown, since a bar's drag was swallowing the click). With a row selected, **↑/↓** move the selection, **Home/End** jump to first/last, and **←/→** collapse/expand (or move to parent/first-child); with nothing selected the arrows scroll the chart as before
+- **No more "Today is outside the timeline range" pop-up on every open** — opening a Gantt of a past-dated project no longer shows a blocking modal; it silently rests at the nearest edge. The Today button/`T` still reports it, now as a dismissible toast
+
 ## [4.27.1]
 
 ### Fixed
