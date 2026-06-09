@@ -9,10 +9,20 @@ import * as vscode from "vscode";
  */
 export class CollapseStateManager {
   private _expandedKeys = new Set<string>();
+  private _version = 0;
   private _onDidChange = new vscode.EventEmitter<{ key: string; collapsed: boolean }>();
 
   /** Event fired when collapse state changes */
   readonly onDidChange = this._onDidChange.event;
+
+  /**
+   * Monotonic counter, bumped on every effective mutation. Render caches
+   * (e.g. the Gantt payload memo) key on it to detect collapse changes that
+   * happened without a re-render.
+   */
+  get version(): number {
+    return this._version;
+  }
 
   /** Check if a key is collapsed (not in expanded set = collapsed) */
   isCollapsed(key: string): boolean {
@@ -39,6 +49,7 @@ export class CollapseStateManager {
     } else {
       this._expandedKeys.add(key);
     }
+    this._version++;
     this._onDidChange.fire({ key, collapsed });
   }
 
@@ -62,18 +73,21 @@ export class CollapseStateManager {
     if (keys) {
       keys.forEach((key) => this._expandedKeys.add(key));
     }
+    this._version++;
     this._onDidChange.fire({ key: "*", collapsed: false });
   }
 
   /** Collapse all (clear expanded set) */
   collapseAll(): void {
     this._expandedKeys.clear();
+    this._version++;
     this._onDidChange.fire({ key: "*", collapsed: true });
   }
 
   /** Clear all expand state (everything becomes collapsed) */
   clear(): void {
     this._expandedKeys.clear();
+    this._version++;
   }
 
   dispose(): void {

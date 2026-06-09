@@ -509,7 +509,7 @@ describe("gantt panel private coverage", () => {
     panel.showProject(77);
     expect(panel._viewFocus).toBe("project");
     expect(panel._selectedProjectId).toBe(77);
-    expect(panel._expandAllOnNextRender).toBe(true);
+    expect(panel._expandAllOnNextRender).toBe("project");
     expect(globalState.update).toHaveBeenCalledWith("redmyne.gantt.viewFocus", "project");
     expect(globalState.update).toHaveBeenCalledWith("redmyne.gantt.selectedProject", 77);
     expect(panel._updateContent).toHaveBeenCalledTimes(1);
@@ -985,7 +985,7 @@ describe("gantt project-view root rows (skipTopProjectRow)", () => {
   it("All Projects zebra-bands per top-level client block", () => {
     const panel = setupTwoClients();
     panel._selectedProjectId = null;
-    panel._expandAllOnNextRender = true; // expand everything so issues are visible
+    panel._expandAllOnNextRender = "any"; // expand everything so issues are visible
     const html = panel._getRenderPayload().html as string;
     // One band per depth-0 client (client + descendants), not per issue family
     expect(html).toContain('data-first-row-key="project-1"');
@@ -996,7 +996,7 @@ describe("gantt project-view root rows (skipTopProjectRow)", () => {
   it("single selected project keeps issue-family zebra bands", () => {
     const panel = setupTwoClients();
     panel._selectedProjectId = 1;
-    panel._expandAllOnNextRender = true;
+    panel._expandAllOnNextRender = "any";
     const html = panel._getRenderPayload().html as string;
     expect(html).toContain('data-first-row-key="issue-100"'); // family band
   });
@@ -1021,19 +1021,49 @@ describe("gantt project-view root rows (skipTopProjectRow)", () => {
 
     // Expanded: same arrow visible (no hidden marker)
     panel._cachedHierarchy = undefined;
-    panel._expandAllOnNextRender = true;
+    panel._expandAllOnNextRender = "any";
     const expandedHtml = panel._getRenderPayload().html as string;
     expect(expandedHtml).toContain('dependency-arrow rel-blocks cursor-pointer"');
     expect(expandedHtml).not.toContain("dependency-arrow rel-blocks cursor-pointer gantt-row-hidden");
   });
 
-  it("display toggles invalidate the per-focus payload memo", () => {
+  it("display toggles invalidate the per-focus payload memo via version key", () => {
     const panel = setupTwoClients();
     for (const command of ["toggleDependencies", "toggleBadges", "toggleCapacityRibbon", "toggleIntensity"]) {
-      panel._payloadByFocus.set("project", { html: "x", state: panel._getFallbackState() });
+      panel._payloadByFocus.set("project", {
+        key: panel._payloadVersionKey(),
+        payload: { html: "stale", state: panel._getFallbackState() },
+      });
       panel._handleMessage({ command });
-      expect(panel._payloadByFocus.size, command).toBe(0);
+      // Flag flipped -> stored key no longer matches -> preserved serve rebuilds
+      panel._preserveFocusCacheOnce = true;
+      panel._updateContent();
+      expect(panel._payloadByFocus.get("project").payload.html, command).not.toBe("stale");
     }
+  });
+
+  it("capacity cache key includes today's date (midnight invalidation)", () => {
+    const panel = setupTwoClients();
+    panel._viewFocus = "person";
+    panel._getRenderPayload();
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    expect(panel._capacityCache.key).toContain(todayStr);
+  });
+
+  it("expand-all flag only fires on the focus that set it", () => {
+    const panel = setupTwoClients();
+    panel._expandAllOnNextRender = "project";
+    panel._viewFocus = "person";
+    panel._getRenderPayload(); // wrong focus: neither consumed nor applied
+    expect(panel._expandAllOnNextRender).toBe("project");
+    expect(panel._collapseState.getExpandedKeys().size).toBe(0);
+
+    panel._viewFocus = "project";
+    panel._cachedHierarchy = undefined;
+    panel._getRenderPayload(); // matching focus: consumed
+    expect(panel._expandAllOnNextRender).toBe(false);
+    expect(panel._collapseState.getExpandedKeys().size).toBeGreaterThan(0);
   });
 
   it("expand-all-on-first-render survives an early empty render", () => {
@@ -1041,9 +1071,9 @@ describe("gantt project-view root rows (skipTopProjectRow)", () => {
     GanttPanel.restore(mock.panel, vscode.Uri.parse("file:///ext"));
     const panel = GanttPanel.currentPanel as any;
     panel._webviewReady = true;
-    expect(panel._expandAllOnNextRender).toBe(true);
+    expect(panel._expandAllOnNextRender).toBe("any");
     panel._getRenderPayload(); // no issues loaded yet
-    expect(panel._expandAllOnNextRender).toBe(true); // flag not consumed by empty render
+    expect(panel._expandAllOnNextRender).toBe("any"); // flag not consumed by empty render
   });
 });
 
@@ -1120,10 +1150,28 @@ describe("gantt view-focus toggle perf (per-focus payload memo)", () => {
 
     panel._updateContent(); // h0 (project)
     panel._handleMessage({ command: "setViewFocus", focus: "person" }); // h1 (person)
-    panel._handleMessage({ command: "collapseStateSync", collapseKey: "k", isExpanded: false }); // clears memo
+    // Real state change (expand) bumps the collapse version in the memo key
+    panel._handleMessage({ command: "collapseStateSync", collapseKey: "k", isExpanded: true });
     panel._handleMessage({ command: "setViewFocus", focus: "project" }); // miss -> h2 (fresh)
 
     expect(panel._getRenderPayload).toHaveBeenCalledTimes(3);
     expect(lastRenderHtml(mock)).toBe("h2"); // not the stale h0
+  });
+
+  it("does not serve a memo entry built on a previous day", () => {
+    const { mock, panel } = setup();
+    let n = 0;
+    panel._getRenderPayload = vi.fn(() => ({ html: `h${n++}`, state: panel._getFallbackState() }));
+    panel._viewFocus = "project";
+
+    panel._updateContent(); // h0 cached for project
+    // Pretend the entry was built yesterday (date is the key's last segment)
+    const entry = panel._payloadByFocus.get("project");
+    entry.key = entry.key.replace(/[^|]+$/, "2000-01-01");
+    panel._handleMessage({ command: "setViewFocus", focus: "person" }); // h1
+    panel._handleMessage({ command: "setViewFocus", focus: "project" }); // stale date -> miss -> h2
+
+    expect(panel._getRenderPayload).toHaveBeenCalledTimes(3);
+    expect(lastRenderHtml(mock)).toBe("h2");
   });
 });

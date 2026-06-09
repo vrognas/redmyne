@@ -221,11 +221,16 @@ export class GanttPanel {
   private _pendingRender?: GanttRenderPayload;
   // Per-focus render payload memo: a project<->person view-focus toggle reuses
   // the other focus's already-built payload so toggle-back is instant. Every
-  // non-toggle re-render path invalidates it (it clears in _updateContent
-  // because only setViewFocus sets _preserveFocusCacheOnce); collapse-sync and
-  // draft-mode-enable changes (which mutate render state without a re-render)
-  // clear it explicitly.
-  private _payloadByFocus = new Map<"project" | "person", GanttRenderPayload>();
+  // non-toggle re-render path still clears it in _updateContent (only
+  // setViewFocus sets _preserveFocusCacheOnce). Each entry also carries the
+  // _payloadVersionKey() it was built under, so state that changes WITHOUT a
+  // clearing re-render (client-side collapse syncs, display toggles, draft
+  // enable, data-revision bumps, date rollover) can never be served stale —
+  // a key mismatch rebuilds.
+  private _payloadByFocus = new Map<
+    "project" | "person",
+    { key: string; payload: GanttRenderPayload }
+  >();
   private _preserveFocusCacheOnce = false;
   private _contributionsLoading = false; // Prevent duplicate contribution fetches
   private _versionsLoading = false; // Prevent duplicate version fetches
@@ -253,8 +258,10 @@ export class GanttPanel {
   private _isUpdatingDates = false; // Skip queue-triggered refresh during our own updates
   // Keyboard navigation state
   private _selectedCollapseKey: string | null = null;
-  // Expand all on first render and when switching project/person
-  private _expandAllOnNextRender = true;
+  // Expand all on first render ("any") and when switching project/person.
+  // Scoped to the focus that set it so a flag surviving an empty render
+  // can't fire on the other focus's next render.
+  private _expandAllOnNextRender: "project" | "person" | "any" | false = "any";
   // Ad-hoc budget contribution tracking
   private _contributionData?: ContributionData;
   private _contributionSources?: Map<number, { fromIssueId: number; hours: number }[]>;
@@ -304,9 +311,8 @@ export class GanttPanel {
     this._draftModeSubscribed = true;
     this._disposables.push(
       this._draftModeManager.onDidChangeEnabled(() => {
-        // Toolbar HTML embeds draft-mode state, so the cached payloads are now
-        // stale; drop them (the button is updated client-side below).
-        this._payloadByFocus.clear();
+        // Toolbar HTML embeds draft-mode state; the enabled flag is part of
+        // the payload memo's version key, so cached payloads self-invalidate.
         this._panel.webview.postMessage({
           command: "setDraftModeState",
           enabled: this._draftModeManager?.isEnabled ?? false,
@@ -1067,7 +1073,7 @@ export class GanttPanel {
     // Select the project
     this._selectedProjectId = projectId;
     this._bumpRevision();
-    this._expandAllOnNextRender = true;
+    this._expandAllOnNextRender = "project";
     GanttPanel._globalState?.update(SELECTED_PROJECT_KEY, this._selectedProjectId);
 
     this._updateContent();
@@ -1179,6 +1185,24 @@ export class GanttPanel {
     this._cachedHierarchy = undefined;
   }
 
+  /**
+   * Validity key for cached render payloads: the render inputs that can
+   * change WITHOUT passing through a memo-clearing _updateContent. A cached
+   * payload is served only while its stored key matches the current one.
+   */
+  private _payloadVersionKey(): string {
+    return [
+      this._dataRevision,
+      this._collapseState.version,
+      this._showDependencies,
+      this._showBadges,
+      this._showCapacityRibbon,
+      this._showIntensity,
+      this._draftModeManager?.isEnabled ?? false,
+      getTodayStr(), // today line / past-future styling move at midnight
+    ].join("|");
+  }
+
   private _updateContent(): void {
     refreshPerfDebugFlag(); // Pin perfDebug for this render's many call sites
     perfStart("_updateContent");
@@ -1191,16 +1215,25 @@ export class GanttPanel {
     } else {
       this._payloadByFocus.clear();
     }
-    let payload = this._payloadByFocus.get(this._viewFocus);
+    const cached = this._payloadByFocus.get(this._viewFocus);
+    let payload = cached !== undefined && cached.key === this._payloadVersionKey()
+      ? cached.payload
+      : undefined;
     if (payload === undefined) {
       payload = this._getRenderPayload();
-      this._payloadByFocus.set(this._viewFocus, payload);
+      // Key computed AFTER building: _getRenderPayload may consume the
+      // expand-all flag, mutating the collapse version mid-build.
+      this._payloadByFocus.set(this._viewFocus, {
+        key: this._payloadVersionKey(),
+        payload,
+      });
     }
     // Dynamic per-serve state that must stay fresh even on a cache hit (applied
     // client-side, not baked into the cached HTML): keyboard-selection restore
-    // hint and the perf-debug flag (so measurements still fire on toggle-back).
+    // hint, the perf-debug flag, and the draft queue badge count.
     payload.state.selectedCollapseKey = this._selectedCollapseKey;
     payload.state.perfDebug = isPerfDebugEnabled();
+    payload.state.draftQueueCount = this._draftModeManager?.queue?.count ?? 0;
     this._queueRender(payload);
     this._isRefreshing = false; // Reset after render
     perfEnd("_updateContent");
@@ -1297,14 +1330,14 @@ export class GanttPanel {
       case "setSelectedProject":
         this._selectedProjectId = message.projectId ?? null;
         this._bumpRevision();
-        this._expandAllOnNextRender = true;
+        this._expandAllOnNextRender = "project";
         GanttPanel._globalState?.update(SELECTED_PROJECT_KEY, this._selectedProjectId);
         this._updateContent();
         break;
       case "setSelectedAssignee":
         this._selectedAssignee = message.assignee ?? null;
         this._bumpRevision();
-        this._expandAllOnNextRender = true;
+        this._expandAllOnNextRender = "person";
         GanttPanel._globalState?.update(SELECTED_ASSIGNEE_KEY, this._selectedAssignee);
         this._updateContent();
         break;
@@ -1324,10 +1357,9 @@ export class GanttPanel {
         }
         break;
       case "toggleDependencies":
+        // Display flags are baked into rendered html, but they're part of the
+        // payload memo's version key — cached payloads self-invalidate.
         this._showDependencies = !this._showDependencies;
-        // These display flags are baked into the rendered html — drop the
-        // per-focus payload memo or a focus toggle-back reverts the toggle
-        this._payloadByFocus.clear();
         this._panel.webview.postMessage({
           command: "setDependenciesState",
           enabled: this._showDependencies,
@@ -1335,7 +1367,6 @@ export class GanttPanel {
         break;
       case "toggleBadges":
         this._showBadges = !this._showBadges;
-        this._payloadByFocus.clear();
         this._panel.webview.postMessage({
           command: "setBadgesState",
           enabled: this._showBadges,
@@ -1343,7 +1374,6 @@ export class GanttPanel {
         break;
       case "toggleCapacityRibbon":
         this._showCapacityRibbon = !this._showCapacityRibbon;
-        this._payloadByFocus.clear();
         this._panel.webview.postMessage({
           command: "setCapacityRibbonState",
           enabled: this._showCapacityRibbon,
@@ -1351,7 +1381,6 @@ export class GanttPanel {
         break;
       case "toggleIntensity":
         this._showIntensity = !this._showIntensity;
-        this._payloadByFocus.clear();
         // CSS-only toggle: send message to webview to flip classes (no re-render)
         this._panel.webview.postMessage({
           command: "setIntensityState",
@@ -1407,14 +1436,14 @@ export class GanttPanel {
         // Client-side collapse already done, just sync state for persistence
         // Set flag to skip re-render since client already updated UI
         if (message.collapseKey) {
+          // Collapse version is part of the payload memo's version key, so a
+          // later focus toggle rebuilds with the new state — no explicit
+          // invalidation needed.
           if (message.isExpanded) {
             this._collapseState.expand(message.collapseKey);
           } else {
             this._collapseState.collapse(message.collapseKey);
           }
-          // Collapse state changed without a re-render; drop the per-focus
-          // payload memo so a later focus toggle rebuilds with the new state.
-          this._payloadByFocus.clear();
         }
         break;
       case "requestRerender":
@@ -1478,6 +1507,9 @@ export class GanttPanel {
       case "toggleAutoUpdate":
         if (message.issueId) {
           autoUpdateTracker.toggle(message.issueId).then((nowEnabled) => {
+            // The auto-update marker is baked into row HTML — invalidate
+            // render caches so the next render/memo serve shows the new tag
+            this._bumpRevision();
             showStatusBarMessage(
               nowEnabled ? `$(check) Auto-update %done enabled for #${message.issueId}` : `$(x) Auto-update %done disabled for #${message.issueId}`,
               2000
@@ -1557,9 +1589,11 @@ export class GanttPanel {
           const cfg = vscode.workspace.getConfiguration("redmyne");
           const show = cfg.get<boolean>("showProjectMembers", true);
           const exclude = cfg.get<number[]>("hideProjectMembersFor", []);
-          // Server already caches + dedupes in-flight requests; just call
-          // getMemberships and let it short-circuit on cache hit.
-          if (show && !exclude.includes(pid) && !this._server.getCachedMemberships(pid)) {
+          // Server caches + dedupes in-flight requests (cache hit = no
+          // network) and the webview append is idempotent, so re-post on
+          // every hover: a re-render (e.g. a memo-served payload) rebuilds
+          // tooltips without the previously appended member lines.
+          if (show && !exclude.includes(pid)) {
             this._server.getMemberships(pid).then((members) => {
               if (this._disposed) return; // Panel closed mid-fetch
               // Send members back; webview appends to tooltip
@@ -2037,8 +2071,12 @@ export class GanttPanel {
     }
     // Auto-expand all when switching project/person (before flattening).
     // Only consume the flag once keys actually exist — an early render before
-    // issues load must not eat the first-open expand-all.
-    if (this._expandAllOnNextRender) {
+    // issues load must not eat the first-open expand-all. Focus-scoped: a
+    // flag set for one focus must not fire on the other's render.
+    if (
+      this._expandAllOnNextRender === "any" ||
+      this._expandAllOnNextRender === this._viewFocus
+    ) {
       const collectKeys = (nodes: HierarchyNode[]): string[] => {
         const keys: string[] = [];
         for (const n of nodes) {
@@ -2852,7 +2890,9 @@ export class GanttPanel {
     if (this._viewFocus === "person") {
       // _currentUserId omitted: it's pinned for the session, so _dataRevision
       // already covers any cross-user invalidation that could matter.
-      const capacityCacheKey = `${this._dataRevision}-${this._viewFocus}-${this._selectedAssignee}-${filterKey}-${minDateStr}-${maxDateStr}-${capacityZoomLevel}-${JSON.stringify(this._schedule)}`;
+      // getTodayStr() leads the key: the simulator's past/future split moves
+      // at midnight, so a day-old entry must miss.
+      const capacityCacheKey = `${getTodayStr()}-${this._dataRevision}-${this._viewFocus}-${this._selectedAssignee}-${filterKey}-${minDateStr}-${maxDateStr}-${capacityZoomLevel}-${JSON.stringify(this._schedule)}`;
       if (this._capacityCache?.key === capacityCacheKey) {
         capacityData = this._capacityCache.data;
       } else {
