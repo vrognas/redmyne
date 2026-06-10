@@ -51,10 +51,22 @@ src/
 - Dependency arrows, workload heatmap
 - Multi-select, minimap, critical path
 - Undo/redo, keyboard navigation
-- Modular HTML generation (`src/webviews/gantt/`):
-  - `gantt-html-generator.ts`: labels, cells, bars
+- **Windowed (virtualized) rendering** (v4.29.0): the extension ships a chrome
+  skeleton + per-row SVG fragments (generated at y=0) + relation data; the
+  webview mounts only viewport-intersecting rows (±10 buffer). A collapse
+  toggle is a data operation: flip a key in the expanded set, recompute the
+  visible list, remount ~40 rows. Zebra bands, indent guides, and dependency
+  arrows are recomputed from data per refresh. Collapse state syncs back via
+  `collapseStateSync`/`collapseStateSyncBulk` (no re-render); the extension's
+  payload memo is version-keyed on data revision + collapse version + display
+  flags + date.
+- Modular generation (`src/webviews/gantt/`):
+  - `gantt-html-generator.ts`: per-row label/cell/bar fragments
   - `gantt-toolbar-generator.ts`: toolbar controls
   - `gantt-render-types.ts`: shared interfaces
+  - `row-window.js`: windowed mounting + data-computed layers (webview)
+  - `row-window-utils.js`: pure visible-list/band/span/range functions
+  - `arrow-svg.js`: dependency-arrow path builder (webview)
 
 ### Timer (`src/timer/`)
 - State machine: idle → working → paused → logging → break

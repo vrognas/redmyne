@@ -7,6 +7,16 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.29.0]
+
+### Changed
+
+- **Gantt rows are virtualized (windowed SVG)** — the chart mounts only the rows intersecting the viewport (±10 buffer) instead of every row. Measured on a 1,529-row board: live DOM 77,431 → ~5,200 nodes; full render 480–840 ms → ~55 ms; collapse/expand ~380 ms → 20–50 ms to painted frame; Expand All / Collapse All are now client-side (~30 ms, previously a ~350 ms extension re-render). The extension ships per-row SVG fragments plus relation data; the webview derives the visible row list from collapse state and recomputes zebra bands, indent guides, and dependency arrows from data on every refresh. Selection and keyboard navigation are key-based and survive row remounting (navigating to an off-screen row scrolls the window first); the dragged row stays mounted while a drag is in progress
+
+### Removed
+
+- The emit-everything machinery: hidden-row markup, stripe contribution tracking/adoption, client-side row shifting, per-arrow visibility toggling, and the `toggleCollapse`/`expandAll`/`collapseAll`/`requestRerender` webview messages (collapse syncs via `collapseStateSync`/`collapseStateSyncBulk`)
+
 ## [4.28.9]
 
 ### Fixed

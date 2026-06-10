@@ -11,6 +11,16 @@ Quick reference of key patterns. Details in sections below.
 
 ---
 
+## v4.29.0 Gantt windowed-SVG virtualization (2026-06-10)
+
+### Architecture
+
+- **Windowed SVG beat a canvas rewrite on risk×reward.** Same end perf class (77K → 5.2K live nodes; toggles 380 → 20–50 ms painted; renders 0.5–0.8 s → 55 ms) while keeping ~90% of the battle-tested interaction layer (drag, link handles, multi-select, tooltips, CSS theming, a11y DOM). Built in a day vs the canvas spec's weeks. Reserve canvas for when windowing measurably can't keep up.
+- **Phase around incompatibilities, not around components.** The legacy collapse machinery (transform shifting, stripe contributions, `data-original-y` identity) could not coexist with y=0 fragments or partial mounting — so phase 1 was purely mechanical (same bytes, new transport, visual-parity gate with the user), and windowing + collapse-on-data + computed layers landed as ONE atomic commit. Trying to land them separately would have shipped broken intermediates.
+- **Fragments must be position-independent and stateless.** Generate at y=0 and translate at mount; bake NO live state (the window overrides `data-expanded`/chevron on every mount). Every fragment being single-rooted (`<g class="gantt-row" transform=…>`) made wrapperless mounting + element recycling trivial.
+- **MOVE code, don't rewrite it.** The 200-line arrow-routing block was transplanted verbatim from the extension into a webview module (inputs renamed only); its smoke tests passed first try. A rewrite would have re-derived every corner-radius case.
+- **When elements churn, identity lives in keys.** Selection, keyboard nav, and event handling became key-based with delegated listeners; the active element is re-resolved after every window refresh. Per-element listeners + cached element arrays (the old `allLabels`) are incompatible with mounting/unmounting.
+
 ## v4.28.8 Staleness family killed via version-keyed memo (2026-06-09)
 
 ### Architecture
