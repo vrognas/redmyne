@@ -290,10 +290,17 @@ export function setupCollapse(ctx) {
   // Row navigation when a row is selected but its label doesn't hold DOM
   // focus (e.g. selected via a chart/bar press). The delegated handler above
   // preventDefaults for the focused case, so bail on defaultPrevented.
+  // Whitelisted to pure nav keys: handling Enter/Space/Tab at document level
+  // would cancel button activation and yank focus out of modals.
+  const DOC_NAV_KEYS = new Set([
+    'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+    'Home', 'End', 'PageUp', 'PageDown'
+  ]);
   addDocListener('keydown', (e) => {
     if (e.defaultPrevented || !activeKey) return;
+    if (!DOC_NAV_KEYS.has(e.key)) return;
     const tag = e.target.tagName;
-    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
     // If a bar holds focus, its own handlers act (date nudge, bar nav)
     if (document.activeElement?.closest?.('.issue-bar')) return;
     if (isLabel(e.target.closest?.('.project-label, .issue-label, .time-group-label'))) return;
