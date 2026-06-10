@@ -25,6 +25,11 @@ Deep review of the v4.29.0 windowed renderer found 14 places where code still as
 - **During a drag, arrows to off-screen partners stayed anchored** at the pre-drag position — unmounted endpoints now get position stubs from row meta
 - **Stale hover highlights** on recycled rows (an unmounted element never gets its `mouseleave`) — hover state clears on window refresh
 - **Loading skeleton lost its zebra stripes** — the row window no longer wipes decorative layers of chrome payloads with no rows
+- **Rich tooltips died on late-mounted bars and on all dependency arrows after the first collapse toggle** — the one-shot SVG `<title>` → `data-tooltip` conversion only reached initially mounted rows; conversion is now lazy at hover time
+- **Project-member tooltip lines could be permanently lost** — a reply arriving while the label was scrolled out of the window was dropped, and the request latch on the recycled element blocked retrying; replies now cache by project id and merge at display time
+- **Enter/Space/Tab went dead on a selected row after scrolling it out of view and back** — unmounting the focused label dropped focus to `<body>`; focus is restored on remount
+- **Bulk drag silently skipped selected issues hidden under a collapsed parent** — the confirm modal counted fewer issues than the selection; hidden issues now commit from row data (dates ride in the payload). Pinning the selection is also batched: mousedown after Ctrl+A no longer does per-row remount cascades
+- **Stale renders left zombie callbacks** — the replaced row window now disposes (queued scroll frames no-op) and the deferred lookup-map build is cancelled on re-render
 
 ## [4.29.0]
 
