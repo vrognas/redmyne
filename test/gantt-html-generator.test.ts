@@ -13,6 +13,8 @@ import {
   generateDueDateCell,
   generateAssigneeCell,
   generateIssueBar,
+  buildRowsPayload,
+  buildArrowsPayload,
 } from "../src/webviews/gantt/gantt-html-generator";
 import type { GanttRow } from "../src/webviews/gantt-model";
 
@@ -437,6 +439,114 @@ describe("gantt-html-generator", () => {
       expect(generateDueDateCell(noDates, { ...baseCtx, today: new Date("2025-01-01") })).toContain("—");
       expect(generateStatusCell(noDates, baseCtx)).toContain("var(--vscode-charts-green)");
       expect(generateAssigneeCell(noDates, baseCtx)).toContain("—");
+    });
+  });
+
+  describe("payload assembly", () => {
+    const ctx = {
+      barHeight: 22,
+      barPadding: 3,
+      barContentHeight: 16,
+      indentSize: 8,
+      chevronWidth: 10,
+      timelineWidth: 1000,
+      minDate: new Date("2025-01-01"),
+      maxDate: new Date("2025-01-31"),
+      today: new Date("2025-01-15"),
+      viewFocus: "project" as const,
+      currentUserId: null,
+      schedule: { Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0, Sun: 0 },
+      issueScheduleMap: new Map(),
+      getStatusColor: () => "var(--vscode-charts-blue)",
+      getStatusTextColor: () => "white",
+      getStatusOpacity: () => 0.6,
+      getStatusDescription: () => "On track",
+      getInternalEstimate: () => null,
+      hasPrecedence: () => false,
+      isAutoUpdateEnabled: () => true,
+      buildProjectTooltip: () => "Project tooltip",
+    } as any;
+
+    const issueRow: GanttRow = {
+      type: "issue",
+      id: 456,
+      label: "Bar Test",
+      depth: 1,
+      collapseKey: "issue-456",
+      parentKey: "project-1",
+      isVisible: true,
+      isExpanded: false,
+      hasChildren: false,
+      issue: {
+        id: 456,
+        subject: "Bar Test",
+        project: "Project",
+        projectId: 1,
+        parentId: null,
+        start_date: "2025-01-10",
+        due_date: "2025-01-20",
+        done_ratio: 30,
+        estimated_hours: 16,
+        spent_hours: 5,
+        status: "on-track",
+        statusName: "In Progress",
+        isClosed: false,
+        isExternal: false,
+        isAdHoc: false,
+        assignee: null,
+        assigneeId: null,
+        flexibilityPercent: 10,
+        relations: [
+          { id: 9, targetId: 99, type: "blocks" },
+          { id: 10, targetId: 88, type: "relates" },
+        ],
+        blocks: [],
+        blockedBy: [],
+      } as any,
+    };
+
+    const projectRow: GanttRow = {
+      type: "project",
+      id: 1,
+      label: "Proj",
+      depth: 0,
+      collapseKey: "project-1",
+      parentKey: "",
+      isVisible: true,
+      isExpanded: true,
+      hasChildren: true,
+    };
+
+    it("buildRowsPayload maps rows to y=0 fragments with meta", () => {
+      const payload = buildRowsPayload([projectRow, issueRow], ctx);
+      expect(payload).toHaveLength(2);
+      expect(payload[1]).toMatchObject({
+        key: "issue-456",
+        parentKey: "project-1",
+        type: "issue",
+        issueId: 456,
+        startDate: "2025-01-10",
+        dueDate: "2025-01-20",
+      });
+      expect(typeof payload[1]!.barStartX).toBe("number");
+      expect(typeof payload[1]!.barEndX).toBe("number");
+      for (const p of ["status", "id", "labels", "start", "due", "assignee", "timeline"] as const) {
+        expect(typeof payload[1]!.panels[p], p).toBe("string");
+      }
+      // Non-issue rows carry no bar geometry or dates
+      expect(payload[0]).toMatchObject({
+        key: "project-1",
+        issueId: null,
+        barStartX: null,
+        startDate: null,
+      });
+      // Fragments are position-independent: no baked transform
+      expect(payload[1]!.panels.labels).not.toContain("translate(");
+    });
+
+    it("buildArrowsPayload filters by visible relation types", () => {
+      const arrows = buildArrowsPayload([projectRow, issueRow], new Set(["blocks"]));
+      expect(arrows).toEqual([{ relationId: 9, fromId: 456, toId: 99, type: "blocks" }]);
     });
   });
 

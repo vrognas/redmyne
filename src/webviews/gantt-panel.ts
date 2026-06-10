@@ -32,19 +32,9 @@ import { parseLocalDate, getLocalToday, formatLocalDate } from "../utilities/dat
 import { getNonce } from "../utilities/webview-nonce";
 import { GanttWebviewMessage, parseLookbackYears } from "./gantt-webview-messages";
 import { escapeAttr, escapeHtml } from "./gantt-html-escape";
-import { CreatableRelationType, GanttIssue, GanttRow, nodeToGanttRow } from "./gantt-model";
-import {
-  generateIdCell,
-  generateStartDateCell,
-  generateStatusCell,
-  generateDueDateCell,
-  generateAssigneeCell,
-  generateProjectLabel,
-  generateTimeGroupLabel,
-  generateIssueLabel,
-  generateIssueBar,
-} from "./gantt/gantt-html-generator";
-import type { GanttRenderContext } from "./gantt/gantt-render-types";
+import { CreatableRelationType, GanttRow, nodeToGanttRow } from "./gantt-model";
+import { buildRowsPayload, buildArrowsPayload } from "./gantt/gantt-html-generator";
+import type { GanttRenderContext, GanttRowPayload, GanttArrowPayload } from "./gantt/gantt-render-types";
 import { generateHeader, type GanttToolbarContext } from "./gantt/gantt-toolbar-generator";
 import { deriveAssigneeState, filterIssuesForView } from "./gantt-view-filter";
 import { deriveTaskTypes, filterIssuesByTaskType } from "../utilities/issue-task-type-filter";
@@ -129,44 +119,6 @@ interface GanttRenderState {
   expandedKeys: string[];
   /** Zebra banding rule: depth-0 blocks (multi-root) vs top-level issue families */
   useTopLevelGrouping: boolean;
-}
-
-/**
- * Per-row SVG fragments + meta for the webview row-window. One entry per
- * hierarchy row (rows hidden under collapsed parents included). Fragments are
- * complete row markup for each of the 7 panel SVGs.
- */
-interface GanttRowPayload {
-  key: string;
-  parentKey: string | null;
-  depth: number;
-  type: GanttRow["type"];
-  hasChildren: boolean;
-  issueId: number | null;
-  /** Timeline bar x-range (issue rows) — arrow geometry anchors */
-  barStartX: number | null;
-  barEndX: number | null;
-  /** Issue dates (issue rows) — bulk drag commits collapse-hidden selected
-   *  issues from data, since they have no DOM element to read from */
-  startDate: string | null;
-  dueDate: string | null;
-  panels: {
-    status: string;
-    id: string;
-    labels: string;
-    start: string;
-    due: string;
-    assignee: string;
-    timeline: string;
-  };
-}
-
-/** Relation shipped as data — the webview builds arrow SVG at virtual Ys */
-interface GanttArrowPayload {
-  relationId: number;
-  fromId: number;
-  toId: number;
-  type: string;
 }
 
 interface GanttRenderPayload {
@@ -2382,62 +2334,10 @@ export class GanttPanel {
       isAutoUpdateEnabled: (issueId: number) => autoUpdateTracker.isEnabled(issueId),
     } as GanttRenderContext;
 
-    // Per-row fragments for the webview row-window: ONE loop builds all 7
-    // panel fragments per row. Fragments are position-independent — generated
-    // at y=0 (the row-window translates each mounted row to its virtual Y)
-    // and always "visible" (an unmounted row has no DOM at all, so no
-    // hidden-row markup exists anymore).
-    const rowsPayload: GanttRowPayload[] = filteredRows.map((row) => {
-      const labelFragment =
-        row.type === "project" ? generateProjectLabel(row, renderContext)
-        : row.type === "time-group" ? generateTimeGroupLabel(row, renderContext)
-        : generateIssueLabel(row, renderContext);
-      // Timeline bar x-range for dependency-arrow geometry. UTC parsing to
-      // match the UTC-anchored x-axis (bars use new Date(dateStr)).
-      let barStartX: number | null = null;
-      let barEndX: number | null = null;
-      if (row.type === "issue" && row.issue) {
-        const issue = row.issue;
-        const start = issue.start_date ? new Date(issue.start_date) : new Date(issue.due_date!);
-        const end = issue.due_date ? new Date(issue.due_date) : new Date(issue.start_date!);
-        barStartX = dateToX(start.getTime(), minDate.getTime(), maxDate.getTime(), timelineWidth);
-        barEndX = endExclusiveX(end, minDate.getTime(), maxDate.getTime(), timelineWidth);
-      }
-      return {
-        key: row.collapseKey,
-        parentKey: row.parentKey,
-        depth: row.depth,
-        type: row.type,
-        hasChildren: row.hasChildren,
-        issueId: row.type === "issue" && row.issue ? row.issue.id : null,
-        barStartX,
-        barEndX,
-        startDate: row.type === "issue" && row.issue ? (row.issue.start_date ?? null) : null,
-        dueDate: row.type === "issue" && row.issue ? (row.issue.due_date ?? null) : null,
-        panels: {
-          status: generateStatusCell(row, renderContext),
-          id: generateIdCell(row, renderContext),
-          labels: labelFragment,
-          start: generateStartDateCell(row, renderContext),
-          due: generateDueDateCell(row, renderContext),
-          assignee: generateAssigneeCell(row, renderContext),
-          timeline: generateIssueBar(row, renderContext),
-        },
-      };
-    });
-
-    // Dependency relations as data — the webview row-window renders arrow SVG
-    // (arrow-svg.js) from these plus per-row bar geometry at virtual Ys.
-    // Source rows = all rows (an endpoint outside the board resolves to null
-    // client-side and the arrow is skipped, matching the old behaviour).
-    const visibleRelTypes = this._visibleRelationTypes;
-    const arrowsPayload: GanttArrowPayload[] = rows
-      .filter((row): row is GanttRow & { issue: GanttIssue } => row.type === "issue" && !!row.issue)
-      .flatMap((row) =>
-        row.issue.relations
-          .filter((rel) => visibleRelTypes.has(rel.type))
-          .map((rel) => ({ relationId: rel.id, fromId: row.issue.id, toId: rel.targetId, type: rel.type }))
-      );
+    // Row fragments + relation data for the webview row-window (assembled
+    // beside the fragment generators — see gantt-html-generator.ts).
+    const rowsPayload = buildRowsPayload(filteredRows, renderContext);
+    const arrowsPayload = buildArrowsPayload(rows, this._visibleRelationTypes);
 
     // Generate milestone markers (diamond shapes with vertical dashed lines)
     const milestoneMarkers = this._versions

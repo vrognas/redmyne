@@ -3,7 +3,7 @@
  * Stateless rendering functions - all data passed explicitly
  */
 
-import type { GanttRenderContext, AvatarColors } from "./gantt-render-types";
+import type { GanttRenderContext, AvatarColors, GanttRowPayload, GanttArrowPayload } from "./gantt-render-types";
 import type { GanttRow, GanttIssue } from "../gantt-model";
 import { escapeAttr, escapeHtml } from "../gantt-html-escape";
 import { parseLocalDate, formatLocalDate } from "../../utilities/date-utils";
@@ -924,3 +924,76 @@ function generateBarBadges(
   </g>` : ""}`;
 }
 
+
+// ============================================================================
+// Webview Payload Assembly
+// ============================================================================
+
+/**
+ * Per-row fragments + meta for the webview row-window: ONE loop builds all 7
+ * panel fragments per row. Fragments are position-independent — generated at
+ * y=0 (the row-window translates each mounted row to its virtual Y) and
+ * always "visible" (an unmounted row has no DOM at all).
+ */
+export function buildRowsPayload(
+  filteredRows: GanttRow[],
+  ctx: GanttRenderContext
+): GanttRowPayload[] {
+  return filteredRows.map((row) => {
+    const labelFragment =
+      row.type === "project" ? generateProjectLabel(row, ctx)
+      : row.type === "time-group" ? generateTimeGroupLabel(row, ctx)
+      : generateIssueLabel(row, ctx);
+    // Timeline bar x-range for dependency-arrow geometry. UTC parsing to
+    // match the UTC-anchored x-axis (bars use new Date(dateStr)).
+    let barStartX: number | null = null;
+    let barEndX: number | null = null;
+    if (row.type === "issue" && row.issue) {
+      const issue = row.issue;
+      const start = issue.start_date ? new Date(issue.start_date) : new Date(issue.due_date!);
+      const end = issue.due_date ? new Date(issue.due_date) : new Date(issue.start_date!);
+      barStartX = dateToX(start.getTime(), ctx.minDate.getTime(), ctx.maxDate.getTime(), ctx.timelineWidth);
+      barEndX = endExclusiveX(end, ctx.minDate.getTime(), ctx.maxDate.getTime(), ctx.timelineWidth);
+    }
+    return {
+      key: row.collapseKey,
+      parentKey: row.parentKey,
+      depth: row.depth,
+      type: row.type,
+      hasChildren: row.hasChildren,
+      issueId: row.type === "issue" && row.issue ? row.issue.id : null,
+      barStartX,
+      barEndX,
+      startDate: row.type === "issue" && row.issue ? (row.issue.start_date ?? null) : null,
+      dueDate: row.type === "issue" && row.issue ? (row.issue.due_date ?? null) : null,
+      panels: {
+        status: generateStatusCell(row, ctx),
+        id: generateIdCell(row, ctx),
+        labels: labelFragment,
+        start: generateStartDateCell(row, ctx),
+        due: generateDueDateCell(row, ctx),
+        assignee: generateAssigneeCell(row, ctx),
+        timeline: generateIssueBar(row, ctx),
+      },
+    };
+  });
+}
+
+/**
+ * Dependency relations as data — the webview row-window renders arrow SVG
+ * from these plus per-row bar geometry at virtual Ys. Source rows = all rows
+ * (an endpoint outside the board resolves to null client-side and the arrow
+ * is skipped).
+ */
+export function buildArrowsPayload(
+  rows: GanttRow[],
+  visibleRelTypes: ReadonlySet<string>
+): GanttArrowPayload[] {
+  return rows
+    .filter((row): row is GanttRow & { issue: GanttIssue } => row.type === "issue" && !!row.issue)
+    .flatMap((row) =>
+      row.issue.relations
+        .filter((rel) => visibleRelTypes.has(rel.type))
+        .map((rel) => ({ relationId: rel.id, fromId: row.issue.id, toId: rel.targetId, type: rel.type }))
+    );
+}
