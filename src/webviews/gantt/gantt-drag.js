@@ -28,7 +28,7 @@ export function setupDrag(ctx) {
       getFocusedIssueId,
       scrollToAndHighlight,
       isDraftModeEnabled,
-      getLookupMaps,
+      lookupMaps,
       rowWindow
     } = ctx;
 
@@ -350,10 +350,9 @@ export function setupDrag(ctx) {
       const arrows = [];
       // Bar lookup must be O(1): a per-arrow document.querySelector was an
       // O(arrows × DOM) full-tree scan on every collapse/expand and drag start.
-      const { mapsReady, issueBarsByIssueId } = getLookupMaps();
       let localBars = null; // fallback: one scan if the idle-built maps aren't ready yet
       const barFor = (id) => {
-        if (mapsReady) return issueBarsByIssueId.get(id)?.[0] ?? null;
+        if (lookupMaps?.isReady()) return lookupMaps.getIssueBars(id)[0] ?? null;
         if (!localBars) {
           localBars = new Map();
           document.querySelectorAll('.issue-bar').forEach(b => {
@@ -368,7 +367,7 @@ export function setupDrag(ctx) {
       // Synthesize a position stub from row meta (same dataset/transform
       // contract updateArrowPositions reads) so the arrow tracks the drag.
       const stubFor = (id) => {
-        const meta = rowWindow?.getRowMeta('issue-' + id);
+        const meta = rowWindow?.getRowMetaByIssueId(id);
         if (!meta || meta.barStartX === null || meta.barEndX === null) return null;
         const y = rowWindow.getVirtualY(meta.key);
         if (y === null) return null; // hidden under a collapsed parent
@@ -421,12 +420,6 @@ export function setupDrag(ctx) {
         if (a.hitPath) a.hitPath.setAttribute('d', path);
         if (a.headPath) a.headPath.setAttribute('d', arrowHead);
       });
-    }
-
-    // Recompute ALL arrow paths from current bar positions (called after
-    // collapse/expand toggles shift rows — render-time paths go stale)
-    function refreshArrowGeometry() {
-      updateArrowPositions(collectArrows('.dependency-arrow'), null, null, null);
     }
 
     // Drag confirmation modal
@@ -529,7 +522,7 @@ export function setupDrag(ctx) {
         const linkHandle = bar.querySelector('.link-handle');
 
         // Keep the dragged row mounted if the user scrolls mid-drag
-        ctx.pinRow?.('issue-' + issueId);
+        ctx.pinRow?.(bar.dataset.collapseKey);
         dragState = {
           issueId,
           isLeft,
@@ -588,7 +581,7 @@ export function setupDrag(ctx) {
           // so its element is mounted for the visual move AND the commit
           const keys = [];
           selectedIssues.forEach(id => {
-            const meta = rowWindow?.getRowMeta('issue-' + id);
+            const meta = rowWindow?.getRowMetaByIssueId(id);
             if (meta) keys.push(meta.key);
           });
           ctx.pinRows?.(keys);
@@ -632,7 +625,7 @@ export function setupDrag(ctx) {
           const mountedIds = new Set(barsToMove.map(b => b.dataset.issueId));
           selectedIssues.forEach(id => {
             if (mountedIds.has(id)) return;
-            const meta = rowWindow?.getRowMeta('issue-' + id);
+            const meta = rowWindow?.getRowMetaByIssueId(id);
             if (!meta || meta.barStartX === null || meta.barEndX === null) return;
             bulkBars.push({
               issueId: id,
@@ -669,7 +662,7 @@ export function setupDrag(ctx) {
         const singleRightHandle = bar.querySelector('.drag-right');
 
         // Keep the dragged row mounted if the user scrolls mid-drag
-        ctx.pinRow?.('issue-' + issueId);
+        ctx.pinRow?.(bar.dataset.collapseKey);
         dragState = {
           issueId: parseInt(issueId),
           isLeft: false,
@@ -895,13 +888,10 @@ export function setupDrag(ctx) {
       });
 
       // Highlight connected bars and labels (use lookup maps if available)
-      const maps = getLookupMaps ? getLookupMaps() : null;
       connectedIds.forEach(id => {
-        if (maps?.mapsReady) {
-          const bars = maps.issueBarsByIssueId.get(id) || [];
-          const labels = maps.issueLabelsByIssueId.get(id) || [];
-          bars.forEach(el => { el.classList.add('arrow-connected'); highlightedConnected.push(el); });
-          labels.forEach(el => { el.classList.add('arrow-connected'); highlightedConnected.push(el); });
+        if (lookupMaps?.isReady()) {
+          lookupMaps.getIssueBars(id).forEach(el => { el.classList.add('arrow-connected'); highlightedConnected.push(el); });
+          lookupMaps.getIssueLabels(id).forEach(el => { el.classList.add('arrow-connected'); highlightedConnected.push(el); });
         } else {
           document.querySelectorAll(`.issue-bar[data-issue-id="${id}"], .issue-label[data-issue-id="${id}"]`)
             .forEach(el => { el.classList.add('arrow-connected'); highlightedConnected.push(el); });
@@ -938,7 +928,7 @@ export function setupDrag(ctx) {
     // whole board including unmounted rows)
     const PAGE_JUMP = 10;
     function focusBarByIssueId(issueId, prefix) {
-      const meta = rowWindow?.getRowMeta('issue-' + issueId);
+      const meta = rowWindow?.getRowMetaByIssueId(issueId);
       if (meta) rowWindow.scrollToKey(meta.key); // mounts the target row
       const target = document.querySelector(`.issue-bar[data-issue-id="${issueId}"]`);
       if (!target) return;
@@ -1534,5 +1524,4 @@ export function setupDrag(ctx) {
       }
     });
 
-    return { refreshArrowGeometry };
 }

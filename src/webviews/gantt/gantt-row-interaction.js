@@ -10,7 +10,7 @@
  * listeners are delegated on the scroll container, and the active element is
  * re-resolved through the row-window after every refresh.
  */
-export function setupCollapse(ctx) {
+export function setupRowInteraction(ctx) {
   const { vscode, addDocListener, addWinListener, announce, barHeight, selectedCollapseKey, allExpandableKeys, rowWindow, perfLog = () => {} } = ctx;
 
   const scrollEl = document.getElementById('ganttScroll');
@@ -54,13 +54,9 @@ export function setupCollapse(ctx) {
   let activeKey = null;
   let activeEl = null; // last element that got the 'active' class (may be recycled)
 
-  function isLabel(el) {
-    return el && (
-      el.classList.contains('project-label') ||
-      el.classList.contains('issue-label') ||
-      el.classList.contains('time-group-label')
-    );
-  }
+  // Single spelling of "what counts as a row label" — all sites must agree
+  // (click select, focused/unfocused keydown split, mousedown double-fire guard)
+  const LABEL_SELECTOR = '.project-label, .issue-label, .time-group-label';
 
   function setActiveKey(key, { notify = true, focus = true, scroll = false } = {}) {
     if (activeEl) activeEl.classList.remove('active');
@@ -81,20 +77,11 @@ export function setupCollapse(ctx) {
   }
 
   // Full-row selection overlays: ONE rect per column SVG + timeline (7 nodes
-  // total). Inserted as first child so they render under row content.
+  // total). Inserted as first child so they render under row content. The
+  // SVG set comes from the row window — the same nodes whose heights it owns.
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const selectionOverlays = [];
-  [
-    '.gantt-labels svg',
-    '.gantt-col-status svg',
-    '.gantt-col-id svg',
-    '.gantt-col-start svg',
-    '.gantt-col-due svg',
-    '.gantt-col-assignee svg',
-    '.gantt-timeline svg'
-  ].forEach(selector => {
-    const svg = document.querySelector(selector);
-    if (!svg) return;
+  rowWindow.getBodySvgs().forEach(svg => {
     const rect = document.createElementNS(SVG_NS, 'rect');
     rect.setAttribute('class', 'row-selection-overlay');
     rect.setAttribute('x', '0');
@@ -163,7 +150,7 @@ export function setupCollapse(ctx) {
       }
       return;
     }
-    const label = e.target.closest('.project-label, .issue-label, .time-group-label');
+    const label = e.target.closest(LABEL_SELECTOR);
     if (!label) return;
     const key = label.dataset.collapseKey;
     const issueId = label.dataset.issueId;
@@ -312,8 +299,8 @@ export function setupCollapse(ctx) {
 
   // Focused-label keydown (delegated — labels mount and unmount)
   scrollEl.addEventListener('keydown', (e) => {
-    const label = e.target.closest?.('.project-label, .issue-label, .time-group-label');
-    if (!isLabel(label)) return;
+    const label = e.target.closest?.(LABEL_SELECTOR);
+    if (!label) return;
     handleNavKeydown(e, label.dataset.collapseKey);
   });
 
@@ -333,7 +320,7 @@ export function setupCollapse(ctx) {
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
     // If a bar holds focus, its own handlers act (date nudge, bar nav)
     if (document.activeElement?.closest?.('.issue-bar')) return;
-    if (isLabel(e.target.closest?.('.project-label, .issue-label, .time-group-label'))) return;
+    if (e.target.closest?.(LABEL_SELECTOR)) return;
     handleNavKeydown(e, activeKey);
   });
 
@@ -351,7 +338,7 @@ export function setupCollapse(ctx) {
     }
     const row = e.target.closest('.gantt-row[data-collapse-key]');
     // Labels already select via their own click handler — avoid double-firing
-    if (row && row.matches('.project-label, .issue-label, .time-group-label')) return;
+    if (row && row.matches(LABEL_SELECTOR)) return;
 
     let key = row?.dataset.collapseKey || null;
     if (!key) {

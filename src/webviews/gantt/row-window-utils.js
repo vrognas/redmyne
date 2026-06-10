@@ -14,25 +14,21 @@
  * @returns {Array} subset of rows
  */
 export function computeVisibleList(rows, expandedSet) {
-  const byKey = new Map(rows.map((r) => [r.key, r]));
+  // Single O(N) pass exploiting document order (parents precede children —
+  // the same module invariant computeIndentSpans relies on). A row is visible
+  // iff its parent is visible AND expanded; unknown parents (e.g. the skipped
+  // top-project row) count as roots.
   const visibleByKey = new Map();
-  const isVisible = (r) => {
-    const cached = visibleByKey.get(r.key);
-    if (cached !== undefined) return cached;
-    let result = true;
-    let p = r.parentKey ? byKey.get(r.parentKey) : undefined;
-    let hops = 0; // malformed-cycle guard
-    while (p && hops++ < 100) {
-      if (!expandedSet.has(p.key)) {
-        result = false;
-        break;
-      }
-      p = p.parentKey ? byKey.get(p.parentKey) : undefined;
-    }
-    visibleByKey.set(r.key, result);
-    return result;
-  };
-  return rows.filter(isVisible);
+  const out = [];
+  for (const row of rows) {
+    const p = row.parentKey;
+    const isVisible = !p || !visibleByKey.has(p)
+      ? true
+      : visibleByKey.get(p) && expandedSet.has(p);
+    visibleByKey.set(row.key, isVisible);
+    if (isVisible) out.push(row);
+  }
+  return out;
 }
 
 /**

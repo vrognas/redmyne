@@ -7,13 +7,9 @@
  * Pure string building — no DOM.
  */
 
-const escapeAttr = (s) =>
-  String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+// Canonical escaper (the deleted extension arrow block used the same one) —
+// a local copy with the same name but weaker escaping invited divergence.
+import { escapeAttr } from '../gantt-html-escape';
 
 // Relation type styling - only forward types (reverse types are filtered out)
 // blocks/precedes/relates/duplicates/copied_to are shown

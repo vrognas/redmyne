@@ -273,9 +273,11 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
       expandedSet = new Set(keys);
       refresh();
     },
-    getExpandedKeys: () => Array.from(expandedSet),
     // lookups
     getRowMeta: (key) => rowByKey.get(key),
+    // Resolve by issue id — keeps the extension's collapse-key format
+    // ('issue-{id}') out of consumer code
+    getRowMetaByIssueId: (issueId) => rowByIssueId.get(Number(issueId)),
     getVisibleList: () => visibleList,
     // Full document order (includes collapse-hidden rows) for select-all/range
     getAllIssueIds: () =>
@@ -290,6 +292,9 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
     },
     getLabelElement: (key) =>
       mountedKeys.has(key) ? elementCache.get(key)?.labels ?? null : null,
+    // The 7 column/timeline body SVGs — single source for overlay/height
+    // consumers (a second hand-enumerated selector list would drift)
+    getBodySvgs: () => (layerEls ? layerEls.svgs : []),
     // window control
     scrollToKey,
     // Pinned rows must be mounted immediately (drag reads their elements).

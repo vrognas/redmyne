@@ -1,6 +1,7 @@
 import { setupMinimap } from './gantt-minimap.js';
 import { setupDrag } from './gantt-drag.js';
-import { setupCollapse } from './gantt-collapse.js';
+import { setupRowInteraction } from './gantt-row-interaction.js';
+import { createLookupMaps } from './lookup-maps.js';
 import { setupKeyboard } from './gantt-keyboard.js';
 import { createRowWindow } from './row-window.js';
 
@@ -426,7 +427,7 @@ function render(payload) {
   rowWindow.setData(payload);
   perfMark('mountRows-end');
   perfMeasure('mountRows', 'mountRows-start', 'mountRows-end');
-  initializeGantt(payload.state);
+  initializeGantt(payload.state, rowWindow);
   perfMark('render-end');
   perfMeasure('render', 'render-start', 'render-end');
   logDomStats();
@@ -457,7 +458,7 @@ if (initialPayload) {
 }
 vscode.postMessage({ command: 'webviewReady' });
 
-function initializeGantt(state) {
+function initializeGantt(state, rowWindow) {
   perfMark('initializeGantt-start');
   if (!state) return;
   const {
@@ -755,7 +756,7 @@ function initializeGantt(state) {
         const issueId = message.issueId;
         const scrollContainer = document.getElementById('ganttScroll');
         if (!scrollContainer) return;
-        const meta = rowWindow?.getRowMeta('issue-' + issueId);
+        const meta = rowWindow?.getRowMetaByIssueId(issueId);
         if (meta) rowWindow.scrollToKey(meta.key);
 
         const label = document.querySelector('.issue-label[data-issue-id="' + issueId + '"]');
@@ -1016,8 +1017,8 @@ function initializeGantt(state) {
     const selectionCountEl = document.getElementById('selectionCount');
 
     function barsForIssueId(issueId) {
-      return mapsReady
-        ? (issueBarsByIssueId.get(issueId) || [])
+      return lookupMaps.isReady()
+        ? lookupMaps.getIssueBars(issueId)
         : document.querySelectorAll(`.issue-bar[data-issue-id="${issueId}"]`);
     }
 
@@ -1180,79 +1181,22 @@ function initializeGantt(state) {
       closeOnOutsideClick(picker);
     }
 
-    // Build lookup maps for O(1) hover highlight (instead of repeated querySelectorAll)
-    // Deferred to avoid blocking initial render
-    const issueBarsByIssueId = new Map();
-    const issueLabelsByIssueId = new Map();
-    const arrowsByIssueId = new Map(); // arrows connected to an issue
-    const projectLabelsByKey = new Map();
-    const aggregateBarsByKey = new Map();
-    let mapsReady = false;
-
-    function buildLookupMaps() {
-      // Rebuilt after every row-window refresh (mounted rows churn)
-      issueBarsByIssueId.clear();
-      issueLabelsByIssueId.clear();
-      arrowsByIssueId.clear();
-      projectLabelsByKey.clear();
-      aggregateBarsByKey.clear();
-      // Single query for all indexable elements (reduces DOM traversals from 5 to 1)
-      document.querySelectorAll('.issue-bar, .issue-label, .dependency-arrow, .project-label, .aggregate-bars').forEach(el => {
-        const classList = el.classList;
-        if (classList.contains('issue-bar')) {
-          const id = el.dataset.issueId;
-          if (id) {
-            if (!issueBarsByIssueId.has(id)) issueBarsByIssueId.set(id, []);
-            issueBarsByIssueId.get(id).push(el);
-          }
-        } else if (classList.contains('issue-label')) {
-          const id = el.dataset.issueId;
-          if (id) {
-            if (!issueLabelsByIssueId.has(id)) issueLabelsByIssueId.set(id, []);
-            issueLabelsByIssueId.get(id).push(el);
-          }
-        } else if (classList.contains('dependency-arrow')) {
-          const fromId = el.dataset.from;
-          const toId = el.dataset.to;
-          if (fromId) {
-            if (!arrowsByIssueId.has(fromId)) arrowsByIssueId.set(fromId, []);
-            arrowsByIssueId.get(fromId).push(el);
-          }
-          if (toId) {
-            if (!arrowsByIssueId.has(toId)) arrowsByIssueId.set(toId, []);
-            arrowsByIssueId.get(toId).push(el);
-          }
-        } else if (classList.contains('project-label')) {
-          const key = el.dataset.collapseKey;
-          if (key) {
-            if (!projectLabelsByKey.has(key)) projectLabelsByKey.set(key, []);
-            projectLabelsByKey.get(key).push(el);
-          }
-        } else if (classList.contains('aggregate-bars')) {
-          const key = el.dataset.collapseKey;
-          if (key) {
-            if (!aggregateBarsByKey.has(key)) aggregateBarsByKey.set(key, []);
-            aggregateBarsByKey.get(key).push(el);
-          }
-        }
-      });
-      mapsReady = true;
-    }
-
-    // Defer map building to after initial render (cancelled on re-render —
-    // a zombie callback would scan the new document into unreachable maps)
+    // Mounted-element lookup maps (lookup-maps.js). First build deferred to
+    // idle (cancelled on re-render — a zombie callback would scan the new
+    // document into unreachable maps).
+    const lookupMaps = createLookupMaps();
     if (typeof requestIdleCallback !== 'undefined') {
-      const idleHandle = requestIdleCallback(() => buildLookupMaps(), { timeout: 100 });
+      const idleHandle = requestIdleCallback(() => lookupMaps.rebuild(), { timeout: 100 });
       extraCleanups.push(() => cancelIdleCallback(idleHandle));
     } else {
-      const timeoutHandle = setTimeout(buildLookupMaps, 0);
+      const timeoutHandle = setTimeout(() => lookupMaps.rebuild(), 0);
       extraCleanups.push(() => clearTimeout(timeoutHandle));
     }
     // Mounted rows change on scroll/collapse — keep the maps in sync, and
     // re-sync state-driven classes (recycled elements keep stale classes
     // across unmount/remount; freshly materialized ones lack them)
     rowWindow?.onRefresh(() => {
-      if (mapsReady) buildLookupMaps();
+      lookupMaps.rebuildIfReady();
       updateSelectionUI();
       applyFocusClasses();
       // A hovered element that unmounts never gets its mouseleave — drop the
@@ -1281,11 +1225,11 @@ function initializeGantt(state) {
     // style invalidation.
     function highlightIssue(issueId) {
       // Use cached lookups if ready, otherwise fall back to DOM query
-      const bars = mapsReady ? (issueBarsByIssueId.get(issueId) || [])
+      const bars = lookupMaps.isReady() ? lookupMaps.getIssueBars(issueId)
         : document.querySelectorAll('.issue-bar[data-issue-id="' + issueId + '"]');
-      const labels = mapsReady ? (issueLabelsByIssueId.get(issueId) || [])
+      const labels = lookupMaps.isReady() ? lookupMaps.getIssueLabels(issueId)
         : document.querySelectorAll('.issue-label[data-issue-id="' + issueId + '"]');
-      const arrows = mapsReady ? (arrowsByIssueId.get(issueId) || [])
+      const arrows = lookupMaps.isReady() ? lookupMaps.getArrows(issueId)
         : document.querySelectorAll('.dependency-arrow[data-from="' + issueId + '"], .dependency-arrow[data-to="' + issueId + '"]');
       bars.forEach(el => { el.classList.add('hover-highlighted'); highlightedElements.push(el); });
       labels.forEach(el => { el.classList.add('hover-highlighted'); highlightedElements.push(el); });
@@ -1293,9 +1237,9 @@ function initializeGantt(state) {
     }
 
     function highlightProject(collapseKey) {
-      const labels = mapsReady ? (projectLabelsByKey.get(collapseKey) || [])
+      const labels = lookupMaps.isReady() ? lookupMaps.getProjectLabels(collapseKey)
         : document.querySelectorAll('.project-label[data-collapse-key="' + collapseKey + '"]');
-      const bars = mapsReady ? (aggregateBarsByKey.get(collapseKey) || [])
+      const bars = lookupMaps.isReady() ? lookupMaps.getAggregateBars(collapseKey)
         : document.querySelectorAll('.aggregate-bars[data-collapse-key="' + collapseKey + '"]');
       labels.forEach(el => { el.classList.add('hover-highlighted'); highlightedElements.push(el); });
       bars.forEach(el => { el.classList.add('hover-highlighted'); highlightedElements.push(el); });
@@ -1426,11 +1370,11 @@ function initializeGantt(state) {
         // Highlight connected bars and labels (use lookup maps if ready)
         const fromId = arrow.dataset.from;
         const toId = arrow.dataset.to;
-        const connectedBars = mapsReady
-          ? [...(issueBarsByIssueId.get(fromId) || []), ...(issueBarsByIssueId.get(toId) || [])]
+        const connectedBars = lookupMaps.isReady()
+          ? [...lookupMaps.getIssueBars(fromId), ...lookupMaps.getIssueBars(toId)]
           : document.querySelectorAll(`.issue-bar[data-issue-id="${fromId}"], .issue-bar[data-issue-id="${toId}"]`);
-        const connectedLabels = mapsReady
-          ? [...(issueLabelsByIssueId.get(fromId) || []), ...(issueLabelsByIssueId.get(toId) || [])]
+        const connectedLabels = lookupMaps.isReady()
+          ? [...lookupMaps.getIssueLabels(fromId), ...lookupMaps.getIssueLabels(toId)]
           : document.querySelectorAll(`.issue-label[data-issue-id="${fromId}"], .issue-label[data-issue-id="${toId}"]`);
         connectedBars.forEach(bar => { bar.classList.add('arrow-connected'); arrowConnectedElements.push(bar); });
         connectedLabels.forEach(label => { label.classList.add('arrow-connected'); arrowConnectedElements.push(label); });
@@ -1501,7 +1445,7 @@ function initializeGantt(state) {
       document.addEventListener('keydown', window._ganttArrowKeyHandler);
     }
 
-    const dragApi = setupDrag({
+    setupDrag({
       vscode,
       menuUndo,
       menuRedo,
@@ -1532,12 +1476,11 @@ function initializeGantt(state) {
       scrollToAndHighlight,
       isDraftModeEnabled: () => currentDraftMode,
       isPerfDebugEnabled: () => PERF_DEBUG,
-      // Lookup maps for O(1) element access
-      getLookupMaps: () => ({ mapsReady, issueBarsByIssueId, issueLabelsByIssueId }),
+      lookupMaps,
       rowWindow
     });
 
-    setupCollapse({
+    setupRowInteraction({
       vscode,
       addDocListener,
       addWinListener,
@@ -1575,7 +1518,7 @@ function initializeGantt(state) {
     // it, so the element queries below can succeed.
     function scrollToAndHighlight(issueId) {
       if (!issueId) return;
-      const meta = rowWindow?.getRowMeta('issue-' + issueId);
+      const meta = rowWindow?.getRowMetaByIssueId(issueId);
       if (meta) rowWindow.scrollToKey(meta.key);
       const label = document.querySelector('.issue-label[data-issue-id="' + issueId + '"]');
       const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
