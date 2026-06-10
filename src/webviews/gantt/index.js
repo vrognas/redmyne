@@ -57,6 +57,11 @@ function applyCssVars(state) {
   root.style.setProperty('--gantt-sticky-left-width', `${state.stickyLeftWidth}px`);
 }
 
+// Lazily-fetched project member lines, keyed by project id. A Map (not a DOM
+// dataset write) because the reply can arrive while the target label is
+// unmounted — windowed rows — and the cache must survive remounts/re-renders.
+const projectMembersById = new Map();
+
 function setupTooltips({ addDocListener, addWinListener }) {
   const root = document.getElementById('ganttRoot');
   const tooltip = document.getElementById('ganttTooltip');
@@ -273,19 +278,29 @@ function setupTooltips({ addDocListener, addWinListener }) {
   }
 
   function showTooltip(target, x, y) {
+    // Merge cached member lines / request them for project tooltips. Merging
+    // at show time (instead of writing the reply to the DOM) handles replies
+    // that arrived while the label was unmounted.
+    const projectId = target.dataset.projectId;
+    if (projectId) {
+      const memberText = projectMembersById.get(String(projectId));
+      if (memberText) {
+        const existing = (target.dataset.tooltip || '').trimEnd();
+        if (existing && !existing.includes(memberText)) {
+          target.dataset.tooltip = existing + '\n\n---\n\n' + memberText;
+        }
+      } else if (!target.dataset.membersRequested) {
+        target.dataset.membersRequested = '1';
+        vscode.postMessage({ command: 'requestProjectMembers', projectId: Number(projectId) });
+      }
+    }
+
     const text = target.dataset.tooltip;
     if (!text) return;
     buildTooltipContent(text);
     tooltip.classList.add('visible');
     tooltip.setAttribute('aria-hidden', 'false');
     positionTooltip(x, y);
-
-    // Request lazy-loaded members for project tooltips
-    const projectId = target.dataset.projectId;
-    if (projectId && !target.dataset.membersRequested) {
-      target.dataset.membersRequested = '1';
-      vscode.postMessage({ command: 'requestProjectMembers', projectId: Number(projectId) });
-    }
   }
 
   function hideTooltip(keepTarget = false) {
@@ -300,13 +315,34 @@ function setupTooltips({ addDocListener, addWinListener }) {
 
   function resolveTooltipTarget(node) {
     if (!node || node === tooltip || tooltip.contains(node)) return null;
-    const target = node.closest?.('[data-tooltip], [title]');
+    let target = node.closest?.('[data-tooltip], [title]');
+    if (!target) {
+      // Windowed fragments and rebuilt arrow layers carry their tooltip as an
+      // SVG <title> CHILD element, which attribute selectors can't see — the
+      // one-time init conversion only reached initially-mounted rows
+      let el = node;
+      while (el && el !== root) {
+        if (el.querySelector?.(':scope > title')) {
+          target = el;
+          break;
+        }
+        el = el.parentElement;
+      }
+    }
     if (!target || !root.contains(target)) return null;
     if (target.hasAttribute('title')) {
       const title = normalizeTooltipText(target.getAttribute('title'));
       target.removeAttribute('title');
       if (title) {
         target.dataset.tooltip = title;
+      }
+    }
+    const childTitle = target.querySelector?.(':scope > title');
+    if (childTitle) {
+      const text = normalizeTooltipText(childTitle.textContent);
+      childTitle.remove();
+      if (text && !target.dataset.tooltip) {
+        target.dataset.tooltip = text;
       }
     }
     if (!target.dataset.tooltip) return null;
@@ -385,6 +421,7 @@ function render(payload) {
   perfMark('innerHTML-end');
   perfMeasure('innerHTML', 'innerHTML-start', 'innerHTML-end');
   perfMark('mountRows-start');
+  rowWindow?.dispose(); // kill queued scroll-rAFs / listeners on the old instance
   rowWindow = createRowWindow({ perfLog });
   rowWindow.setData(payload);
   perfMark('mountRows-end');
@@ -403,16 +440,10 @@ window.addEventListener('message', event => {
     return;
   }
   if (message.command === 'appendProjectMembers' && message.projectId && message.memberLines?.length) {
-    // Append members to data-tooltip; shows on next hover
-    const el = document.querySelector(`[data-project-id="${message.projectId}"]`);
-    if (el) {
-      const existing = (el.dataset.tooltip || '').trimEnd();
-      const memberText = message.memberLines.join('\n');
-      // Skip if already appended (e.g. after re-render)
-      if (!existing.includes(memberText)) {
-        el.dataset.tooltip = existing + '\n\n---\n\n' + memberText;
-      }
-    }
+    // Cache by project id; showTooltip merges at display time. The target
+    // label may be unmounted (windowed rows) when the reply arrives, so a
+    // DOM write here could be lost — the cache can't be.
+    projectMembersById.set(String(message.projectId), message.memberLines.join('\n'));
     return;
   }
   if (window.__ganttHandleExtensionMessage) {
@@ -503,9 +534,11 @@ function initializeGantt(state) {
     window.addEventListener(type, handler, options);
     winListeners.push({ type, handler, options });
   }
+  const extraCleanups = [];
   window._ganttCleanup = () => {
     docListeners.forEach(l => document.removeEventListener(l.type, l.handler, l.options));
     winListeners.forEach(l => window.removeEventListener(l.type, l.handler, l.options));
+    extraCleanups.forEach(fn => fn());
     window.__ganttHandleExtensionMessage = null;
   };
 
@@ -1206,11 +1239,14 @@ function initializeGantt(state) {
       mapsReady = true;
     }
 
-    // Defer map building to after initial render
+    // Defer map building to after initial render (cancelled on re-render —
+    // a zombie callback would scan the new document into unreachable maps)
     if (typeof requestIdleCallback !== 'undefined') {
-      requestIdleCallback(() => buildLookupMaps(), { timeout: 100 });
+      const idleHandle = requestIdleCallback(() => buildLookupMaps(), { timeout: 100 });
+      extraCleanups.push(() => cancelIdleCallback(idleHandle));
     } else {
-      setTimeout(buildLookupMaps, 0);
+      const timeoutHandle = setTimeout(buildLookupMaps, 0);
+      extraCleanups.push(() => clearTimeout(timeoutHandle));
     }
     // Mounted rows change on scroll/collapse — keep the maps in sync, and
     // re-sync state-driven classes (recycled elements keep stale classes
@@ -1472,8 +1508,9 @@ function initializeGantt(state) {
       addDocListener,
       closeOnOutsideClick,
       announce,
-      // Keep the dragged row mounted while a drag is in progress
+      // Keep the dragged row(s) mounted while a drag is in progress
       pinRow: (key) => rowWindow?.pin(key),
+      pinRows: (keys) => rowWindow?.pinAll(keys),
       unpinRow: () => rowWindow?.unpin(),
       saveState,
       updateUndoRedoButtons,

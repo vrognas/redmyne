@@ -37,6 +37,7 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
   let pinnedKeys = new Set();
   let lastRange = { first: -1, last: -2 };
   let rafPending = false;
+  let disposed = false; // re-render replaces the instance; zombie rAFs must no-op
   const refreshListeners = [];
 
   function collectLayers() {
@@ -63,6 +64,7 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
       rafPending = true;
       requestAnimationFrame(() => {
         rafPending = false;
+        if (disposed) return; // queued before a re-render; DOM is detached
         const range = currentRange();
         if (range.first !== lastRange.first || range.last !== lastRange.last) {
           remountWindow();
@@ -134,7 +136,7 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
   }
 
   function remountWindow(layersRebuilt = false) {
-    if (!layerEls) return;
+    if (disposed || !layerEls) return;
     const range = currentRange();
     lastRange = range;
     const wanted = new Set();
@@ -199,6 +201,7 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
   }
 
   function refresh() {
+    if (disposed) return;
     const t0 = performance.now();
     visibleList = computeVisibleList(rows, expandedSet);
     indexByKey = new Map(visibleList.map((r, i) => [r.key, i]));
@@ -289,15 +292,26 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
       mountedKeys.has(key) ? elementCache.get(key)?.labels ?? null : null,
     // window control
     scrollToKey,
+    // Pinned rows must be mounted immediately (drag reads their elements).
+    // pinAll batches: ONE remount + listener cascade for N keys — per-key
+    // remounts made bulk-drag mousedown O(N) full rebuilds.
     pin: (key) => {
       pinnedKeys.add(key);
-      remountWindow(); // a pinned row must be mounted immediately (drag reads its element)
+      remountWindow();
+    },
+    pinAll: (keys) => {
+      keys.forEach((key) => pinnedKeys.add(key));
+      remountWindow();
     },
     unpin: () => {
       pinnedKeys.clear();
     },
     onRefresh: (cb) => {
       refreshListeners.push(cb);
+    },
+    dispose: () => {
+      disposed = true;
+      refreshListeners.length = 0;
     },
   };
 }

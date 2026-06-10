@@ -128,6 +128,12 @@ export function setupCollapse(ctx) {
       el.classList.add('active');
       activeEl = el;
     }
+    // Unmounting the focused label dropped DOM focus to <body> (Enter/Space/
+    // Tab go through the focused-label handler) — restore it on remount.
+    // Only when focus actually fell to body: never steal from inputs/buttons.
+    if (el && (document.activeElement === document.body || document.activeElement === document.documentElement)) {
+      el.focus({ preventScroll: true });
+    }
     updateRowSelectionOverlays();
   });
 
