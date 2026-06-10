@@ -39,6 +39,6 @@ export function filterIssuesByTaskType<T extends HasCustomFields>(
   fieldName: string,
   value: string | "any" | undefined
 ): T[] {
-  if (value == null || value === "any") return [...issues];
+  if (value === undefined || value === null || value === "any") return [...issues];
   return issues.filter((i) => taskTypeValue(i, fieldName) === value);
 }

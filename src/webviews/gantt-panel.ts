@@ -1255,6 +1255,7 @@ export class GanttPanel {
       // Trace which webview messages precede each render — distinguishes
       // client-side toggles (collapseStateSync) from full-render triggers
       // (requestRerender fallback, expandAll/collapseAll, filters...)
+      // eslint-disable-next-line no-console
       console.log(`[Gantt Perf] msg: ${message.command}`);
     }
     switch (message.command) {
