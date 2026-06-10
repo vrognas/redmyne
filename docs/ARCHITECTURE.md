@@ -57,9 +57,15 @@ src/
   toggle is a data operation: flip a key in the expanded set, recompute the
   visible list, remount ~40 rows. Zebra bands, indent guides, and dependency
   arrows are recomputed from data per refresh. Collapse state syncs back via
-  `collapseStateSync`/`collapseStateSyncBulk` (no re-render); the extension's
-  payload memo is version-keyed on data revision + collapse version + display
-  flags + date.
+  `collapseStateSync`/`collapseStateSyncBulk` (bulk expand is additive — the
+  webview only knows the current board's keys); the extension's payload memo
+  is version-keyed on data revision + collapse version + display flags + date.
+  Because elements churn (recycled with their classes, or materialized fresh
+  without them), ALL interaction handlers are delegated and state-driven
+  classes (selection, focus chain, arrow selection) re-sync from state in
+  row-window refresh listeners; "find then act" paths resolve the key from
+  row data and `scrollToKey` (scroll + mount) before querying the element
+  (v4.29.1).
 - Modular generation (`src/webviews/gantt/`):
   - `gantt-html-generator.ts`: per-row label/cell/bar fragments
   - `gantt-toolbar-generator.ts`: toolbar controls

@@ -11,6 +11,17 @@ Quick reference of key patterns. Details in sections below.
 
 ---
 
+## v4.29.1 Windowing broke every init-time DOM assumption (2026-06-10)
+
+Deep multi-agent review of v4.29.0 found 14 confirmed bugs — all one root cause: code written when every row always had a DOM element. The audit checklist for any future "elements now churn" change:
+
+- **Grep for `querySelectorAll(...).forEach(... addEventListener)` and init-time element arrays.** Five interaction sites (bar click/dblclick, two badges, bar keydown, link handle) and two snapshots (`allIssueBars`, quick-search labels) were silently dead for late-mounted rows. Everything must be delegated (`closest()` at event time) or resolved through the row window at use time.
+- **State-driven classes need a single re-sync point.** Recycled elements KEEP classes across unmount/remount; fresh materializations LACK them. One `onRefresh` hook that toggles `selected`/`focus-highlighted` from state (toggle adds AND strips) fixes both directions; one-time class stamps cannot work.
+- **Element refs into innerHTML-rebuilt layers must re-resolve by stable id** (arrow selection by `data-relation-id`) or clear. The refresh listener now passes `{layersRebuilt}` so scroll remounts (elements survive) and full refreshes (layers rewritten) can be told apart.
+- **"Find then act" paths must mount first.** Reveal/search/keyboard-nav resolve the key from data, call `scrollToKey` (scrolls + mounts), THEN query the element. Also: virtual row Y is body-relative — add the in-flow header/ribbon offset before comparing with `scrollTop`.
+- **A document-level keydown fallback needs a key whitelist.** Forwarding all keys hijacked Enter/Space/Tab from buttons and modals; main's fallback was nav-keys-only for a reason.
+- **Bulk-sync messages must preserve off-board state.** The webview only knows the current board's keys; wholesale-replacing a shared set (expand state) wipes the other view-focus. Union on expand, clear on collapse.
+
 ## v4.29.0 Gantt windowed-SVG virtualization (2026-06-10)
 
 ### Architecture

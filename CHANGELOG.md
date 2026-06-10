@@ -7,6 +7,25 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.29.1]
+
+### Fixed
+
+Deep review of the v4.29.0 windowed renderer found 14 places where code still assumed every row had a DOM element. All fixed:
+
+- **Rows materialized after scrolling were inert** — bar click/dblclick, blocks/blocker badges, bar keyboard navigation, and the link handle (the only way to drag-create relations) were wired per element at init over only the initially mounted rows. All five sites are now delegated; bar navigation orders over the visible row list and mounts its target first
+- **Selection operated on an init-time bar snapshot** — Ctrl+A selected only part of the board, Shift+click range silently no-opped on later-mounted endpoints, Ctrl+click selected without a visual, and a bulk drag moved/saved only the mounted subset of the selection. Bars now resolve at use time; bulk drag pins every selected row mounted; selection visuals re-sync on every window refresh
+- **Keyboard navigation scrolled the focused row out of view** — `scrollToKey` ignored the in-flow header/ribbon offset, landing the row ~14 px below the fold
+- **Enter/Space/Tab were hijacked while a row was selected** — the document-level navigation fallback forwarded every key: toolbar buttons opened the issue quick-pick instead of activating, and Tab escaped the drag-confirm modal. Now whitelisted to Arrow/Home/End/Page keys
+- **Quick search (`/`) and "reveal in Gantt" couldn't find off-screen issues** — both resolved targets via the mounted DOM. They now resolve through row data and mount-then-highlight
+- **Expand All wiped the other view-focus's expand state** — the bulk sync replaced the whole expanded set where it should union (the webview only knows the current board's keys)
+- **Arrow keys from a collapse-hidden selection teleported to the board extremes** (inverted, too) — navigation now resumes from the nearest visible ancestor, and a hidden selection survives re-renders instead of going keyboard-dead
+- **Focus mode (dependency chain)** — the blocking graph is now built from relation data (chains no longer truncate through collapsed subtrees); highlights re-apply on every refresh (chain members scrolled into view were rendered dimmed; collapse toggles wiped arrow highlights; stale highlights leaked into later focus sessions)
+- **Arrow click-selection survived collapse toggles dimming everything** — the selected arrow re-resolves by relation id after the dependency layer rebuilds, or the mode clears if the arrow is gone
+- **During a drag, arrows to off-screen partners stayed anchored** at the pre-drag position — unmounted endpoints now get position stubs from row meta
+- **Stale hover highlights** on recycled rows (an unmounted element never gets its `mouseleave`) — hover state clears on window refresh
+- **Loading skeleton lost its zebra stripes** — the row window no longer wipes decorative layers of chrome payloads with no rows
+
 ## [4.29.0]
 
 ### Changed

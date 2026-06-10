@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "4.29.0",
+  "version": "4.29.1",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -2082,25 +2082,33 @@
         },
         "redmyne.hideProjectMembersFor": {
           "type": "array",
-          "items": { "type": "number" },
+          "items": {
+            "type": "number"
+          },
           "default": [],
           "markdownDescription": "**Hide members for specific projects**\n\nList of project IDs to exclude from member display. Useful for large umbrella projects with many members.\n\nExample: `[464, 825]`"
         },
         "redmyne.autoUpdateIssues": {
           "type": "array",
-          "items": { "type": "number" },
+          "items": {
+            "type": "number"
+          },
           "default": [],
           "markdownDescription": "**Auto-update % Done issues**\n\nIssue IDs that auto-update %done when logging time. Requires `redmyne.autoUpdateDonePercent` enabled.\n\nExample: `[101, 205]`"
         },
         "redmyne.adHocBudgetIssues": {
           "type": "array",
-          "items": { "type": "number" },
+          "items": {
+            "type": "number"
+          },
           "default": [],
           "markdownDescription": "**Ad-hoc budget pool issues**\n\nIssue IDs tagged as ad-hoc budget pools. Time on these can contribute hours to other issues.\n\nExample: `[42, 300]`"
         },
         "redmyne.precedenceIssues": {
           "type": "array",
-          "items": { "type": "number" },
+          "items": {
+            "type": "number"
+          },
           "default": [],
           "markdownDescription": "**Precedence priority issues**\n\nIssue IDs scheduled before all others in the Gantt view.\n\nExample: `[7, 15]`"
         },
