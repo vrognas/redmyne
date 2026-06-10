@@ -226,6 +226,10 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
     pinnedKeys = new Set();
     lastRange = { first: -1, last: -2 };
     collectLayers();
+    // Loading/empty chrome ships rows: [] and no row-layer panels, but DOES
+    // carry pre-rendered zebra stripes in its markup — refresh() would wipe
+    // them (computeZebraBands([]) is empty) before the skeleton ever paints
+    if (rows.length === 0 && Object.keys(layerEls.panels).length === 0) return;
     attachScroll();
     refresh();
   }
