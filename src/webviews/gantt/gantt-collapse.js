@@ -11,7 +11,7 @@
  * re-resolved through the row-window after every refresh.
  */
 export function setupCollapse(ctx) {
-  const { vscode, addDocListener, addWinListener, announce, barHeight, selectedCollapseKey, rowWindow, perfLog = () => {} } = ctx;
+  const { vscode, addDocListener, addWinListener, announce, barHeight, selectedCollapseKey, allExpandableKeys, rowWindow, perfLog = () => {} } = ctx;
 
   const scrollEl = document.getElementById('ganttScroll');
   if (!scrollEl || !rowWindow) return;
@@ -24,8 +24,7 @@ export function setupCollapse(ctx) {
     perfLog(`${label}: ${(performance.now() - t0).toFixed(1)}ms windowed (${keys.length} expanded)`);
   }
   document.getElementById('menuExpand')?.addEventListener('click', () => {
-    const allKeys = scrollEl.dataset.allExpandableKeys;
-    setAllExpanded(allKeys ? JSON.parse(allKeys) : [], 'expand-all');
+    setAllExpanded(allExpandableKeys ?? [], 'expand-all');
   });
   document.getElementById('menuCollapse')?.addEventListener('click', () => {
     setAllExpanded([], 'collapse-all');

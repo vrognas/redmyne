@@ -45,6 +45,12 @@ import { DRAFT_COMMAND_SOURCE } from "../draft-mode/draft-change-sources";
 // Performance instrumentation (gated behind redmyne.gantt.perfDebug config).
 // The flag is read once at render entry and pinned for the duration of the
 // render so the 17-ish perfStart/perfEnd call sites inside hot loops don't
+// Layout constants shared by the skeleton, fallback state, and render payload
+// (the webview reads indentSize from state; the 600px floor is mirrored as
+// MIN_CONTENT_HEIGHT in row-window.js).
+const INDENT_SIZE = 8; // VS Code native tree indent
+const MIN_BODY_HEIGHT = 600;
+
 // pay a vscode config lookup each. Reset between renders so toggling the
 // setting takes effect on the next render with no listener plumbing.
 const perfTimers: Map<string, number> = new Map();
@@ -117,6 +123,10 @@ interface GanttRenderState {
   indentSize: number;
   /** Keys currently expanded — the webview derives the visible row list from these */
   expandedKeys: string[];
+  /** Keys of every row with children — the Expand All payload. Computed from
+   *  UNFILTERED rows (includes the skipped top-project key) so the persisted
+   *  set stays valid across view switches. */
+  allExpandableKeys: string[];
   /** Zebra banding rule: depth-0 blocks (multi-root) vs top-level issue families */
   useTopLevelGrouping: boolean;
 }
@@ -398,7 +408,7 @@ export class GanttPanel {
     const headerHeight = 40;
     const barHeight = 22; // VS Code native tree row height
     const barGap = 0;
-    const indentSize = 8;
+    const indentSize = INDENT_SIZE;
     const rowCount = 10;
     const timelineWidth = 600;
     const idColumnWidth = 50;
@@ -475,7 +485,7 @@ export class GanttPanel {
       .map(r => `<rect x="0" y="${r.y}" width="100%" height="${barHeight}" fill="var(--vscode-list-hoverBackground)" opacity="0.15"/>`)
       .join("");
 
-    const bodyHeight = Math.max(rowCount * barHeight + barGap, 600);
+    const bodyHeight = Math.max(rowCount * barHeight + barGap, MIN_BODY_HEIGHT);
 
     const html = `
   <div class="gantt-header">
@@ -686,8 +696,9 @@ export class GanttPanel {
       perfDebug,
       isDraftMode: this._draftModeManager?.isEnabled ?? false,
       draftQueueCount: this._draftModeManager?.queue?.count ?? 0,
-      indentSize: 8,
+      indentSize: INDENT_SIZE,
       expandedKeys: [],
+      allExpandableKeys: [],
       useTopLevelGrouping: true,
     };
 
@@ -2238,7 +2249,7 @@ export class GanttPanel {
     const barContentHeight = barHeight - barPadding * 2; // 16px
     const barGap = 10;
     const headerHeight = 40;
-    const indentSize = 8; // VS Code native tree indent
+    const indentSize = INDENT_SIZE;
 
     // All projects are visible - no hidden project filtering
     const rows = allRows;
@@ -2283,8 +2294,7 @@ export class GanttPanel {
     const cumulativeY = visibleRowCount * barHeight;
 
     // Ensure minimum height to fill viewport
-    const minContentHeight = 600;
-    const contentHeight = Math.max(cumulativeY > 0 ? cumulativeY + barGap : 0, minContentHeight);
+    const contentHeight = Math.max(cumulativeY > 0 ? cumulativeY + barGap : 0, MIN_BODY_HEIGHT);
 
     const chevronWidth = 10;
 
@@ -2570,7 +2580,7 @@ export class GanttPanel {
     <div class="gantt-container${this._showIntensity ? " intensity-enabled" : ""}">
     <!-- Wrapper clips horizontal scrollbar -->
     <div class="gantt-scroll-wrapper">
-      <div class="gantt-scroll" id="ganttScroll" data-render-key="${this._renderKey}" data-all-expandable-keys='${JSON.stringify(allExpandableKeys)}'>
+      <div class="gantt-scroll" id="ganttScroll" data-render-key="${this._renderKey}">
       <!-- Header row - sticky at top -->
       <div class="gantt-header-row">
         <div class="gantt-sticky-left gantt-corner">
@@ -2723,8 +2733,9 @@ export class GanttPanel {
       perfDebug: isPerfDebugEnabled(),
       isDraftMode: this._draftModeManager?.isEnabled ?? false,
       draftQueueCount: this._draftModeManager?.queue?.count ?? 0,
-      indentSize: 8,
+      indentSize,
       expandedKeys: Array.from(expandedKeys),
+      allExpandableKeys,
       useTopLevelGrouping,
     };
 

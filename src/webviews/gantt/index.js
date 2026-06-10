@@ -1544,6 +1544,7 @@ function initializeGantt(state) {
       announce,
       barHeight,
       selectedCollapseKey,
+      allExpandableKeys: state.allExpandableKeys,
       rowWindow,
       perfLog
     });

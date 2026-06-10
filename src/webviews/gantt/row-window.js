@@ -163,7 +163,7 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
   }
 
   function renderZebra() {
-    const bands = computeZebraBands(visibleList, state.useTopLevelGrouping ?? true);
+    const bands = computeZebraBands(visibleList, state.useTopLevelGrouping);
     const markup = bands
       .map((b) => {
         const y = b.startIdx * barHeight;
@@ -179,7 +179,7 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
 
   function renderIndent() {
     if (!layerEls.indentLayer) return;
-    const indentSize = (state && state.indentSize) || 8;
+    const indentSize = state.indentSize; // always shipped in state (no silent fallback)
     layerEls.indentLayer.innerHTML = computeIndentSpans(visibleList)
       .map((s) => {
         const x = 8 + s.depth * indentSize;
