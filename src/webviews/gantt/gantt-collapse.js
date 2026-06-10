@@ -194,13 +194,38 @@ export function setupCollapse(ctx) {
     setActiveKey(key, { scroll: true });
   }
 
+  // A selected row hidden by collapse navigates from its nearest visible
+  // ancestor (up lands ON the ancestor, down lands just past its collapsed
+  // subtree) — clamping to the board extremes would teleport the selection.
+  function nearestVisibleAncestorIndex(fromKey) {
+    let key = rowWindow.getRowMeta(fromKey)?.parentKey;
+    let hops = 0;
+    while (key && hops < 100) {
+      const idx = rowWindow.visibleIndexOf(key);
+      if (idx >= 0) return idx;
+      key = rowWindow.getRowMeta(key)?.parentKey;
+      hops++;
+    }
+    return -1;
+  }
+
   function navRelative(fromKey, delta) {
     const list = rowWindow.getVisibleList();
     if (list.length === 0) return null;
-    const idx = rowWindow.visibleIndexOf(fromKey);
-    const target = idx < 0
-      ? (delta > 0 ? 0 : list.length - 1)
-      : Math.max(0, Math.min(list.length - 1, idx + delta));
+    let idx = rowWindow.visibleIndexOf(fromKey);
+    if (idx < 0) {
+      const anchor = nearestVisibleAncestorIndex(fromKey);
+      if (anchor < 0) {
+        return (delta > 0 ? list[0] : list[list.length - 1])?.key ?? null;
+      }
+      // Treat the hidden row as sitting at the anchor: up by 1 reaches the
+      // ancestor itself, down by 1 the first row after its collapsed subtree
+      const target = delta < 0
+        ? Math.max(0, anchor + delta + 1)
+        : Math.min(list.length - 1, anchor + delta);
+      return list[target]?.key ?? null;
+    }
+    const target = Math.max(0, Math.min(list.length - 1, idx + delta));
     return list[target]?.key ?? null;
   }
 
@@ -338,8 +363,11 @@ export function setupCollapse(ctx) {
     setActiveKey(key);
   });
 
-  // Restore selection from the previous render
-  if (selectedCollapseKey && rowWindow.visibleIndexOf(selectedCollapseKey) >= 0) {
+  // Restore selection from the previous render. Collapse-hidden keys restore
+  // too — setActiveKey tolerates them (no element, overlays hidden) and
+  // keyboard nav resumes from the nearest visible ancestor; skipping the
+  // restore left Escape/arrows/overlays dead until the next click.
+  if (selectedCollapseKey && rowWindow.getRowMeta(selectedCollapseKey)) {
     setActiveKey(selectedCollapseKey, { notify: false, focus: false });
   }
 }
