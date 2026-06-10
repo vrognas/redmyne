@@ -497,6 +497,8 @@ export function setupDrag(ctx) {
         const connectedArrows = getConnectedArrows(issueId);
         const linkHandle = bar.querySelector('.link-handle');
 
+        // Keep the dragged row mounted if the user scrolls mid-drag
+        ctx.pinRow?.('issue-' + issueId);
         dragState = {
           issueId,
           isLeft,
@@ -592,6 +594,8 @@ export function setupDrag(ctx) {
         const singleLeftHandle = bar.querySelector('.drag-left');
         const singleRightHandle = bar.querySelector('.drag-right');
 
+        // Keep the dragged row mounted if the user scrolls mid-drag
+        ctx.pinRow?.('issue-' + issueId);
         dragState = {
           issueId: parseInt(issueId),
           isLeft: false,
@@ -1219,6 +1223,7 @@ export function setupDrag(ctx) {
             bulkBars.forEach(b => restoreBarPosition(b));
           }
           dragState = null;
+          ctx.unpinRow?.();
           justEndedDrag = true;
           requestAnimationFrame(() => justEndedDrag = false);
           return;
@@ -1289,6 +1294,7 @@ export function setupDrag(ctx) {
           restoreBarPosition(savedState);
         }
         dragState = null;
+        ctx.unpinRow?.();
         justEndedDrag = true;
         requestAnimationFrame(() => justEndedDrag = false);
       }

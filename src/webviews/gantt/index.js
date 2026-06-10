@@ -1445,6 +1445,9 @@ function initializeGantt(state) {
       addDocListener,
       closeOnOutsideClick,
       announce,
+      // Keep the dragged row mounted while a drag is in progress
+      pinRow: (key) => rowWindow?.pin(key),
+      unpinRow: () => rowWindow?.unpin(),
       saveState,
       updateUndoRedoButtons,
       undoStack,
