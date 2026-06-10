@@ -1204,17 +1204,26 @@ function initializeGantt(state) {
       setTimeout(buildLookupMaps, 0);
     }
 
-    // Track currently highlighted elements for fast clear
+    // Track currently highlighted elements for fast clear, plus the logical
+    // hover target. mouseenter/mouseleave with capture fire on EVERY internal
+    // element boundary (rect -> text -> grip) — without the key, each
+    // crossing did a full clear + re-apply, and each body-class flip
+    // invalidates style for the whole ~77K-node tree.
     let highlightedElements = [];
+    let currentHoverKey = null;
 
     function clearHoverHighlight() {
+      if (currentHoverKey === null && highlightedElements.length === 0) return;
+      currentHoverKey = null;
       document.body.classList.remove('hover-focus', 'dependency-hover');
       highlightedElements.forEach(el => el.classList.remove('hover-highlighted', 'hover-source'));
       highlightedElements = [];
     }
 
+    // NOTE: plain bar/label hovers deliberately do NOT touch document.body —
+    // only arrow hovers (the dim-everything effect) pay that document-wide
+    // style invalidation.
     function highlightIssue(issueId) {
-      document.body.classList.add('hover-focus');
       // Use cached lookups if ready, otherwise fall back to DOM query
       const bars = mapsReady ? (issueBarsByIssueId.get(issueId) || [])
         : document.querySelectorAll('.issue-bar[data-issue-id="' + issueId + '"]');
@@ -1228,7 +1237,6 @@ function initializeGantt(state) {
     }
 
     function highlightProject(collapseKey) {
-      document.body.classList.add('hover-focus');
       const labels = mapsReady ? (projectLabelsByKey.get(collapseKey) || [])
         : document.querySelectorAll('.project-label[data-collapse-key="' + collapseKey + '"]');
       const bars = mapsReady ? (aggregateBarsByKey.get(collapseKey) || [])
@@ -1248,14 +1256,24 @@ function initializeGantt(state) {
         const arrow = e.target.closest('.dependency-arrow');
         if (bar) {
           const issueId = bar.dataset.issueId;
-          if (issueId) highlightIssue(issueId);
+          if (!issueId || currentHoverKey === 'issue:' + issueId) return;
+          clearHoverHighlight();
+          currentHoverKey = 'issue:' + issueId;
+          highlightIssue(issueId);
         } else if (aggBar) {
           const key = aggBar.dataset.collapseKey;
-          if (key) highlightProject(key);
+          if (!key || currentHoverKey === 'project:' + key) return;
+          clearHoverHighlight();
+          currentHoverKey = 'project:' + key;
+          highlightProject(key);
         } else if (arrow) {
           const fromId = arrow.dataset.from;
           const toId = arrow.dataset.to;
-          document.body.classList.add('dependency-hover');
+          const hoverKey = 'arrow:' + fromId + '-' + toId;
+          if (currentHoverKey === hoverKey) return;
+          clearHoverHighlight();
+          currentHoverKey = hoverKey;
+          document.body.classList.add('hover-focus', 'dependency-hover');
           arrow.classList.add('hover-source');
           highlightedElements.push(arrow);
           if (fromId) highlightIssue(fromId);
@@ -1264,12 +1282,12 @@ function initializeGantt(state) {
       }, true); // capture phase for delegation
 
       timelineSvg.addEventListener('mouseleave', (e) => {
-        const bar = e.target.closest('.issue-bar');
-        const aggBar = e.target.closest('.aggregate-bars');
-        const arrow = e.target.closest('.dependency-arrow');
-        if (bar || aggBar || arrow) {
-          clearHoverHighlight();
-        }
+        const container = e.target.closest('.issue-bar, .aggregate-bars, .dependency-arrow');
+        if (!container) return;
+        // Crossing an INTERNAL boundary fires mouseleave too — only clear
+        // when the pointer actually exits the element
+        if (e.relatedTarget && container.contains(e.relatedTarget)) return;
+        clearHoverHighlight();
       }, true);
     }
 
@@ -1279,19 +1297,24 @@ function initializeGantt(state) {
         const projectLabel = e.target.closest('.project-label');
         if (label) {
           const issueId = label.dataset.issueId;
-          if (issueId) highlightIssue(issueId);
+          if (!issueId || currentHoverKey === 'issue:' + issueId) return;
+          clearHoverHighlight();
+          currentHoverKey = 'issue:' + issueId;
+          highlightIssue(issueId);
         } else if (projectLabel) {
           const key = projectLabel.dataset.collapseKey;
-          if (key) highlightProject(key);
+          if (!key || currentHoverKey === 'project:' + key) return;
+          clearHoverHighlight();
+          currentHoverKey = 'project:' + key;
+          highlightProject(key);
         }
       }, true);
 
       labelsSvg.addEventListener('mouseleave', (e) => {
-        const label = e.target.closest('.issue-label');
-        const projectLabel = e.target.closest('.project-label');
-        if (label || projectLabel) {
-          clearHoverHighlight();
-        }
+        const container = e.target.closest('.issue-label, .project-label');
+        if (!container) return;
+        if (e.relatedTarget && container.contains(e.relatedTarget)) return;
+        clearHoverHighlight();
       }, true);
     }
 

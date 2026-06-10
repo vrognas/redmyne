@@ -1293,8 +1293,10 @@ svg {
   opacity: 1 !important;
 }
 
-/* Highlight hovered bar */
-.hover-focus .issue-bar.hover-highlighted .bar-outline {
+/* Highlight hovered bar. No body-class guard: hover-highlighted only exists
+   while hovering, and plain hovers must not flip body-level classes (a
+   document-wide style invalidation on a ~77K-node tree). */
+.issue-bar.hover-highlighted .bar-outline {
   stroke: var(--vscode-focusBorder);
   stroke-width: 2;
 }
@@ -1838,11 +1840,15 @@ svg .gantt-row-hidden,
   font-weight: bold;
 }
 
-/* Base transitions for dependency focus fade-back */
-.issue-bar,
-.issue-label,
-.project-label,
-.aggregate-bars {
+/* Dim-in transition for dependency focus — scoped to dependency-hover
+   sessions. As a base rule this put an opacity transition on EVERY bar and
+   label, turning any opacity-affecting recalc into a 150ms multi-frame
+   animation across thousands of SVG nodes. (Un-dim is instant: the class is
+   removed at the same moment opacity returns.) */
+.dependency-hover .issue-bar,
+.dependency-hover .issue-label,
+.dependency-hover .project-label,
+.dependency-hover .aggregate-bars {
   transition: opacity 0.15s ease-out;
 }
 
@@ -1873,10 +1879,10 @@ svg .gantt-row-hidden,
     transition: none;
   }
 
-  .issue-bar,
-  .issue-label,
-  .project-label,
-  .aggregate-bars {
+  .dependency-hover .issue-bar,
+  .dependency-hover .issue-label,
+  .dependency-hover .project-label,
+  .dependency-hover .aggregate-bars {
     transition: none;
   }
 }

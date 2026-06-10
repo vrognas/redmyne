@@ -541,6 +541,11 @@ export function setupCollapse(ctx) {
     const perfEnd = performance.now();
     perfLog(`toggle ${collapseKey} ${shouldExpand ? 'expand' : 'collapse'}: ${(perfEnd - perfT0).toFixed(1)}ms `
       + `client-side (delta=${delta}px, rows=${deltaDescendants.length}, arrows=${(perfEnd - perfTArrows).toFixed(1)}ms)`);
+    // Script time excludes the browser's style/layout/paint pass over the
+    // ~77K-node SVG — double-rAF lands after the first frame paints
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      perfLog(`toggle ${collapseKey}: frame painted ${(performance.now() - perfT0).toFixed(1)}ms after click`);
+    }));
   }
 
   // Restore selection from previous render
