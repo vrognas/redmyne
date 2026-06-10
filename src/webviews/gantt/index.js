@@ -366,6 +366,20 @@ function setupTooltips({ addDocListener, addWinListener }) {
   });
 }
 
+// Join per-row fragments into each panel's row-layer. Phase 1 of the
+// windowed-SVG migration mounts ALL rows (visual parity with the old
+// joined-document render); scroll windowing lands next.
+function mountRowLayers(rows) {
+  document.querySelectorAll('.row-layer[data-panel]').forEach((layer) => {
+    const panel = layer.dataset.panel;
+    let html = '';
+    for (const row of rows) {
+      html += row.panels[panel] || '';
+    }
+    layer.innerHTML = html;
+  });
+}
+
 function render(payload) {
   if (!payload) return;
   // Update perf debug flag from config (passed via state)
@@ -380,6 +394,10 @@ function render(payload) {
   root.innerHTML = payload.html || '';
   perfMark('innerHTML-end');
   perfMeasure('innerHTML', 'innerHTML-start', 'innerHTML-end');
+  perfMark('mountRows-start');
+  mountRowLayers(payload.rows || []);
+  perfMark('mountRows-end');
+  perfMeasure('mountRows', 'mountRows-start', 'mountRows-end');
   initializeGantt(payload.state);
   perfMark('render-end');
   perfMeasure('render', 'render-start', 'render-end');

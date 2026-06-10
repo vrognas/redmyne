@@ -126,8 +126,32 @@ interface GanttRenderState {
   draftQueueCount: number;
 }
 
+/**
+ * Per-row SVG fragments + meta for the webview row-window. One entry per
+ * hierarchy row (rows hidden under collapsed parents included). Fragments are
+ * complete row markup for each of the 7 panel SVGs.
+ */
+interface GanttRowPayload {
+  key: string;
+  parentKey: string | null;
+  depth: number;
+  type: GanttRow["type"];
+  hasChildren: boolean;
+  issueId: number | null;
+  panels: {
+    status: string;
+    id: string;
+    labels: string;
+    start: string;
+    due: string;
+    assignee: string;
+    timeline: string;
+  };
+}
+
 interface GanttRenderPayload {
   html: string;
+  rows: GanttRowPayload[];
   state: GanttRenderState;
 }
 
@@ -590,7 +614,7 @@ export class GanttPanel {
       stickyLeftWidth,
     });
 
-    this._queueRender({ html, state });
+    this._queueRender({ html, rows: [], state });
   }
 
   private _getBaseHtml(): string {
@@ -2528,43 +2552,36 @@ export class GanttPanel {
       isAutoUpdateEnabled: (issueId: number) => autoUpdateTracker.isEnabled(issueId),
     } as GanttRenderContext;
 
-    // Generate labels using delegated functions
-    const labels = filteredRows
-      .map((row, idx) => {
-        const y = initialYPositions[idx]!;
-        const originalY = filteredRowYPositions[idx]!;
-        if (row.type === "project") return generateProjectLabel(row, y, originalY, renderContext);
-        if (row.type === "time-group") return generateTimeGroupLabel(row, y, originalY, renderContext);
-        return generateIssueLabel(row, y, originalY, renderContext);
-      })
-      .join("");
-
-    // Column cells - delegate to generator functions
-    const idCells = filteredRows
-      .map((row, idx) => generateIdCell(row, initialYPositions[idx]!, filteredRowYPositions[idx]!, renderContext))
-      .join("");
-
-    const startDateCells = filteredRows
-      .map((row, idx) => generateStartDateCell(row, initialYPositions[idx]!, filteredRowYPositions[idx]!, renderContext))
-      .join("");
-
-    const statusCells = filteredRows
-      .map((row, idx) => generateStatusCell(row, initialYPositions[idx]!, filteredRowYPositions[idx]!, renderContext))
-      .join("");
-
-    const dueCells = filteredRows
-      .map((row, idx) => generateDueDateCell(row, initialYPositions[idx]!, filteredRowYPositions[idx]!, renderContext))
-      .join("");
-
-    const assigneeCells = filteredRows
-      .map((row, idx) => generateAssigneeCell(row, initialYPositions[idx]!, filteredRowYPositions[idx]!, renderContext))
-      .join("");
-
-    // Right bars (scrollable timeline) - render all rows for instant toggle
-    // Generate bars for all rows (hidden rows have visibility:hidden)
-    const bars = filteredRows
-      .map((row, idx) => generateIssueBar(row, initialYPositions[idx]!, filteredRowYPositions[idx]!, renderContext))
-      .join("");
+    // Per-row fragments for the webview row-window: ONE loop builds all 7
+    // panel fragments per row (replaces 7 separate map/join pipelines). The
+    // skeleton below ships empty <g class="row-layer"> groups; the webview
+    // joins these fragments into them. Phase 1 of the windowed-SVG migration:
+    // same bytes as the old joined document, new transport.
+    const rowsPayload: GanttRowPayload[] = filteredRows.map((row, idx) => {
+      const y = initialYPositions[idx]!;
+      const originalY = filteredRowYPositions[idx]!;
+      const labelFragment =
+        row.type === "project" ? generateProjectLabel(row, y, originalY, renderContext)
+        : row.type === "time-group" ? generateTimeGroupLabel(row, y, originalY, renderContext)
+        : generateIssueLabel(row, y, originalY, renderContext);
+      return {
+        key: row.collapseKey,
+        parentKey: row.parentKey,
+        depth: row.depth,
+        type: row.type,
+        hasChildren: row.hasChildren,
+        issueId: row.type === "issue" && row.issue ? row.issue.id : null,
+        panels: {
+          status: generateStatusCell(row, y, originalY, renderContext),
+          id: generateIdCell(row, y, originalY, renderContext),
+          labels: labelFragment,
+          start: generateStartDateCell(row, y, originalY, renderContext),
+          due: generateDueDateCell(row, y, originalY, renderContext),
+          assignee: generateAssigneeCell(row, y, originalY, renderContext),
+          timeline: generateIssueBar(row, y, originalY, renderContext),
+        },
+      };
+    });
 
     // Dependency arrows - draw from end of source to start of target.
     // Positions cover ALL rows (hidden included, at their initial collapsed-state
@@ -3104,39 +3121,39 @@ export class GanttPanel {
           <div class="gantt-col-status">
             <svg width="${statusColumnWidth}" height="${bodyHeight}">
               ${zebraStripes}
-              ${statusCells}
+              <g class="row-layer" data-panel="status"></g>
             </svg>
           </div>
           <div class="gantt-col-id">
             <svg width="${idColumnWidth}" height="${bodyHeight}">
               ${zebraStripes}
-              ${idCells}
+              <g class="row-layer" data-panel="id"></g>
             </svg>
           </div>
           <div class="gantt-labels" id="ganttLabels">
             <svg width="${labelWidth * 2}" height="${bodyHeight}" data-render-key="${this._renderKey}">
               ${zebraStripes}
               ${indentGuidesLayer}
-              ${labels}
+              <g class="row-layer" data-panel="labels"></g>
             </svg>
           </div>
           <div class="gantt-resize-handle" id="resizeHandle"></div>
           <div class="gantt-col-start">
             <svg width="${startDateColumnWidth}" height="${bodyHeight}">
               ${zebraStripes}
-              ${startDateCells}
+              <g class="row-layer" data-panel="start"></g>
             </svg>
           </div>
           <div class="gantt-col-due">
             <svg width="${dueDateColumnWidth}" height="${bodyHeight}">
               ${zebraStripes}
-              ${dueCells}
+              <g class="row-layer" data-panel="due"></g>
             </svg>
           </div>
           <div class="gantt-col-assignee">
             <svg width="${assigneeColumnWidth}" height="${bodyHeight}">
               ${zebraStripes}
-              ${assigneeCells}
+              <g class="row-layer" data-panel="assignee"></g>
             </svg>
           </div>
         </div>
@@ -3153,7 +3170,7 @@ export class GanttPanel {
             ${zebraStripes}
             ${dateMarkers.body}
             <g class="dependency-layer${this._showDependencies ? "" : " hidden"}">${dependencyArrows}</g>
-            ${bars}
+            <g class="row-layer" data-panel="timeline"></g>
             <g class="milestone-layer">${milestoneMarkers}</g>
             ${dateMarkers.todayMarker}
           </svg>
@@ -3216,7 +3233,7 @@ export class GanttPanel {
     };
 
     perfEnd("_getRenderPayload", `issues=${this._issues.length}, rows=${filteredRowCount}, days=${totalDays}`);
-    return { html, state: renderState };
+    return { html, rows: rowsPayload, state: renderState };
   }
 
   private _getEmptyPayload(): GanttRenderPayload {
@@ -3227,7 +3244,7 @@ export class GanttPanel {
     <p>${message}</p>
   </div>
 `;
-    return { html, state: this._getFallbackState() };
+    return { html, rows: [], state: this._getFallbackState() };
   }
 
   /** Status colors using VS Code theme variables with opacity for 60-30-10 UX rule */

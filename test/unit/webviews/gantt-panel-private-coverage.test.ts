@@ -969,17 +969,45 @@ describe("gantt project-view root rows (skipTopProjectRow)", () => {
   it("All Projects keeps every depth-0 client row (not just the first root's subtree)", () => {
     const panel = setupTwoClients();
     panel._selectedProjectId = null;
-    const html = panel._getRenderPayload().html as string;
-    expect(html).toContain('data-collapse-key="project-1"'); // ClientA row present
-    expect(html).toContain('data-collapse-key="project-3"'); // ClientB row present
+    const keys = panel._getRenderPayload().rows.map((r: any) => r.key);
+    expect(keys).toContain("project-1"); // ClientA row present
+    expect(keys).toContain("project-3"); // ClientB row present
   });
 
   it("single selected project still skips its redundant top row", () => {
     const panel = setupTwoClients();
     panel._selectedProjectId = 1;
-    const html = panel._getRenderPayload().html as string;
-    expect(html).not.toContain('data-collapse-key="project-1"'); // top row skipped
-    expect(html).toContain('data-collapse-key="project-2"'); // child project shown
+    const keys = panel._getRenderPayload().rows.map((r: any) => r.key);
+    expect(keys).not.toContain("project-1"); // top row skipped
+    expect(keys).toContain("project-2"); // child project shown
+  });
+
+  it("ships per-row fragments for every hierarchy row", () => {
+    const panel = setupTwoClients();
+    panel._selectedProjectId = null;
+    const payload = panel._getRenderPayload();
+    expect(payload.rows.map((r: any) => r.key)).toEqual(
+      expect.arrayContaining(["project-1", "project-2", "project-3", "project-4", "issue-100", "issue-200"])
+    );
+    const issueRow = payload.rows.find((r: any) => r.key === "issue-100");
+    expect(issueRow).toMatchObject({
+      parentKey: "project-2",
+      type: "issue",
+      issueId: 100,
+      hasChildren: false,
+    });
+    for (const p of ["status", "id", "labels", "start", "due", "assignee", "timeline"]) {
+      expect(typeof issueRow.panels[p], p).toBe("string");
+    }
+    expect(issueRow.panels.labels).toContain('data-collapse-key="issue-100"');
+  });
+
+  it("skeleton ships empty row-layers; row markup rides in payload.rows", () => {
+    const panel = setupTwoClients();
+    const payload = panel._getRenderPayload();
+    expect((payload.html.match(/class="row-layer"/g) || []).length).toBe(7);
+    // Row markup no longer joined into the document
+    expect(payload.html).not.toContain("data-collapse-key");
   });
 
   it("All Projects zebra-bands per top-level client block", () => {
