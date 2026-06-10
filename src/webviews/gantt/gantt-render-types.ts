@@ -33,11 +33,6 @@ export interface GanttRenderContext {
   // Data
   rows: GanttRow[];
   filteredRows: GanttRow[];
-  visibleRows: GanttRow[];
-  initialYPositions: number[];
-  filteredRowYPositions: number[];
-  rowYPositions: number[];
-  rowHeights: number[];
 
   // View settings
   viewFocus: "project" | "person";

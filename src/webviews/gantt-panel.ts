@@ -2304,8 +2304,9 @@ export class GanttPanel {
     // Find the top-level project's collapseKey to clear parent references
     const topProjectKey = skipTopProjectRow ? rows.find(r => r.type === "project" && r.depth === 0)?.collapseKey : null;
 
-    // Render ALL rows (including hidden) for instant client-side expand/collapse
-    // Hidden rows exist in DOM with visibility:hidden, allowing instant toggle
+    // Ship ALL rows (including collapse-hidden) — the webview row-window
+    // derives the visible list from collapse state and mounts only the
+    // viewport; rows hidden under a collapsed parent simply have no DOM.
     const filteredRows = rows.filter(r => {
       // Skip top-level project row in per-project view
       if (skipTopProjectRow && r.type === "project" && r.depth === 0) return false;
@@ -2324,53 +2325,10 @@ export class GanttPanel {
       }
       return r;
     });
-    const filteredRowCount = filteredRows.length;
-
-    // Calculate Y positions for ALL rows (fully expanded state)
-    // Each row at index * barHeight
-    const filteredRowYPositions: number[] = [];
-    for (let i = 0; i < filteredRowCount; i++) {
-      filteredRowYPositions.push(i * barHeight);
-    }
-
-    // Track visible rows for stripe calculations
-    const visibleRows = filteredRows.filter(r => r.isVisible);
-    const visibleRowCount = visibleRows.length;
-
-    // Calculate Y positions for visible rows (for stripes and initial collapsed layout)
-    const rowYPositions: number[] = [];
-    const rowHeights: number[] = [];
-    for (let i = 0; i < visibleRowCount; i++) {
-      rowYPositions.push(i * barHeight);
-      rowHeights.push(barHeight);
-    }
+    // Initial skeleton height only — the row-window recomputes panel heights
+    // from the live visible list on every refresh
+    const visibleRowCount = filteredRows.filter(r => r.isVisible).length;
     const cumulativeY = visibleRowCount * barHeight;
-
-    // Calculate initial Y for each row (collapsed state)
-    // Visible rows: sequential positions
-    // Hidden rows: positioned right after their nearest visible ancestor
-    const initialYPositions: number[] = [];
-    let visibleIdx = 0;
-    // Track last visible row's Y for positioning hidden children
-    let lastVisibleY = 0;
-    // Map parentKey to its visible Y position
-    const parentYMap = new Map<string, number>();
-    for (let i = 0; i < filteredRowCount; i++) {
-      const row = filteredRows[i]!;
-      if (row.isVisible) {
-        const y = visibleIdx * barHeight;
-        initialYPositions.push(y);
-        lastVisibleY = y;
-        parentYMap.set(row.collapseKey, y);
-        visibleIdx++;
-      } else {
-        // Hidden rows: position at parent's Y (they're invisible, will be moved on expand)
-        const parentY = row.parentKey ? (parentYMap.get(row.parentKey) ?? lastVisibleY) : lastVisibleY;
-        initialYPositions.push(parentY);
-        // Also register this row's Y in case it has hidden children
-        parentYMap.set(row.collapseKey, parentY);
-      }
-    }
 
     // Ensure minimum height to fill viewport
     const minContentHeight = 600;
@@ -2403,11 +2361,6 @@ export class GanttPanel {
       todayStr: getTodayStr(),
       rows,
       filteredRows,
-      visibleRows,
-      initialYPositions,
-      filteredRowYPositions,
-      rowYPositions,
-      rowHeights,
       viewFocus: this._viewFocus,
       showIntensity: this._showIntensity,
       showDependencies: this._showDependencies,
@@ -2875,7 +2828,7 @@ export class GanttPanel {
       useTopLevelGrouping,
     };
 
-    perfEnd("_getRenderPayload", `issues=${this._issues.length}, rows=${filteredRowCount}, days=${totalDays}`);
+    perfEnd("_getRenderPayload", `issues=${this._issues.length}, rows=${filteredRows.length}, days=${totalDays}`);
     return { html, rows: rowsPayload, arrows: arrowsPayload, state: renderState };
   }
 
