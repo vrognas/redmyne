@@ -716,31 +716,21 @@ function initializeGantt(state) {
           }
         }
       } else if (message.command === 'scrollToIssue') {
-        // Scroll to, focus, and highlight a specific issue
+        // Scroll to, focus, and highlight a specific issue. The target row is
+        // usually outside the mounted window (that's why the user asked to
+        // reveal it) — scrollToKey scrolls vertically and mounts it first.
         const issueId = message.issueId;
+        const scrollContainer = document.getElementById('ganttScroll');
+        if (!scrollContainer) return;
+        const meta = rowWindow?.getRowMeta('issue-' + issueId);
+        if (meta) rowWindow.scrollToKey(meta.key);
+
         const label = document.querySelector('.issue-label[data-issue-id="' + issueId + '"]');
         const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
-        const scrollContainer = document.getElementById('ganttScroll');
-        const headerRow = document.querySelector('.gantt-header-row');
-        const headerHeight = headerRow?.getBoundingClientRect().height || 60;
-
-        if (!scrollContainer) return;
-
-        // Calculate target scroll positions
-        let targetScrollTop = scrollContainer.scrollTop;
         let targetScrollLeft = scrollContainer.scrollLeft;
 
         if (label) {
-          // Calculate vertical scroll position within container (not scrollIntoView which affects document)
-          const labelRow = label.closest('.gantt-row');
-          if (labelRow) {
-            const rowTop = labelRow.offsetTop;
-            const rowHeight = labelRow.getBoundingClientRect().height;
-            const viewportHeight = scrollContainer.clientHeight - headerHeight;
-            // Center the row vertically in the visible area below header
-            targetScrollTop = Math.max(0, rowTop - headerHeight - (viewportHeight - rowHeight) / 2);
-          }
-          label.focus();
+          label.focus({ preventScroll: true });
           label.classList.add('highlighted');
           setTimeout(() => label.classList.remove('highlighted'), 2000);
         }
@@ -767,8 +757,7 @@ function initializeGantt(state) {
           setTimeout(() => bar.classList.remove('highlighted'), 2000);
         }
 
-        // Single combined scroll call
-        scrollContainer.scrollTo({ left: targetScrollLeft, top: targetScrollTop, behavior: 'smooth' });
+        scrollContainer.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
       }
     };
 
@@ -1507,13 +1496,16 @@ function initializeGantt(state) {
       }
     }
 
-    // Scroll to and highlight an issue (for click/keyboard navigation)
+    // Scroll to and highlight an issue (for click/keyboard navigation).
+    // The row may be unmounted — scrollToKey scrolls vertically AND mounts
+    // it, so the element queries below can succeed.
     function scrollToAndHighlight(issueId) {
       if (!issueId) return;
+      const meta = rowWindow?.getRowMeta('issue-' + issueId);
+      if (meta) rowWindow.scrollToKey(meta.key);
       const label = document.querySelector('.issue-label[data-issue-id="' + issueId + '"]');
       const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
       if (label) {
-        label.scrollIntoView({ behavior: 'smooth', block: 'center' });
         label.classList.add('highlighted');
         setTimeout(() => label.classList.remove('highlighted'), 1500);
       }
@@ -1538,7 +1530,8 @@ function initializeGantt(state) {
       updateUndoRedoButtons,
       announce,
       scrollToAndHighlight,
-      scrollToToday
+      scrollToToday,
+      rowWindow
     });
 
     setupTooltips({

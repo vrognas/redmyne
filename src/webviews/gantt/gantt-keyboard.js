@@ -1,5 +1,5 @@
 export function setupKeyboard(ctx) {
-  const { vscode, addDocListener, menuUndo, menuRedo, undoStack, redoStack, saveState, updateUndoRedoButtons, announce, scrollToAndHighlight, scrollToToday } = ctx;
+  const { vscode, addDocListener, menuUndo, menuRedo, undoStack, redoStack, saveState, updateUndoRedoButtons, announce, scrollToAndHighlight, scrollToToday, rowWindow } = ctx;
 
   // Keyboard shortcuts
   addDocListener('keydown', (e) => {
@@ -114,21 +114,23 @@ export function setupKeyboard(ctx) {
     const input = quickSearchEl.querySelector('input');
     input.focus();
 
-    const labels = Array.from(document.querySelectorAll('.issue-label'));
-    // Pre-cache aria-labels to avoid repeated getAttribute calls
-    const labelData = labels.map(label => ({
-      el: label,
-      text: (label.getAttribute('aria-label') || '').toLowerCase()
-    }));
+    // Search payload data, not mounted labels — rows are windowed, so most
+    // of the board has no DOM. Text mirrors the label aria-label
+    // ("Open issue #id") so the searchable vocabulary matches pre-windowing.
+    const searchRows = (rowWindow?.getVisibleList() ?? [])
+      .filter(r => r.issueId !== null && r.issueId !== undefined)
+      .map(r => ({ key: r.key, issueId: String(r.issueId), text: 'open issue #' + r.issueId }));
+    let matchedRows = [];
     let searchTimeout = null;
     input.addEventListener('input', () => {
       // Debounce search to avoid CPU spikes on rapid typing
       if (searchTimeout) clearTimeout(searchTimeout);
       searchTimeout = setTimeout(() => {
         const query = input.value.toLowerCase();
-        labelData.forEach(({ el, text }) => {
-          const match = query && text.includes(query);
-          el.classList.toggle('search-match', match);
+        matchedRows = query ? searchRows.filter(r => r.text.includes(query)) : [];
+        const matchedIds = new Set(matchedRows.map(r => r.issueId));
+        document.querySelectorAll('.issue-label').forEach(el => {
+          el.classList.toggle('search-match', matchedIds.has(el.dataset.issueId));
         });
       }, 50); // 50ms debounce - fast enough to feel responsive
     });
@@ -137,11 +139,13 @@ export function setupKeyboard(ctx) {
       if (e.key === 'Escape') {
         closeQuickSearch();
       } else if (e.key === 'Enter') {
-        const match = document.querySelector('.issue-label.search-match');
+        const match = matchedRows[0];
         if (match) {
           closeQuickSearch();
-          match.focus();
-          scrollToAndHighlight(match.dataset.issueId);
+          rowWindow?.scrollToKey(match.key); // mounts the target row
+          document.querySelector(`.issue-label[data-issue-id="${match.issueId}"]`)
+            ?.focus({ preventScroll: true });
+          scrollToAndHighlight(match.issueId);
         }
       }
     });
