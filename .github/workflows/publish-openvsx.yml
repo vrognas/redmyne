@@ -47,12 +47,14 @@ jobs:
         id: get_version
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "VERSION=${{ inputs.tag }}" >> $GITHUB_OUTPUT
-            echo "TAG=${{ inputs.tag }}" >> $GITHUB_OUTPUT
+            TAG="${{ inputs.tag }}"
           else
-            echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+            TAG="${GITHUB_REF#refs/tags/}"
           fi
+          # VERSION must be bare (4.29.1) — changelog headers and the release
+          # title don't carry the v prefix
+          echo "VERSION=${TAG#v}" >> $GITHUB_OUTPUT
+          echo "TAG=$TAG" >> $GITHUB_OUTPUT
 
       - name: Extract changelog for version
         id: changelog
