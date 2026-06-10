@@ -1474,13 +1474,11 @@ export class GanttPanel {
           this._updateContent();
         }
         break;
-      case "expandAll":
-                this._collapseState.expandAll(message.keys);
-        this._updateContent();
-        break;
-      case "collapseAll":
-        this._collapseState.collapseAll();
-        this._updateContent();
+      case "collapseStateSyncBulk":
+        // Client-side expand/collapse-all already updated the UI — sync the
+        // whole expanded set for persistence (no re-render; the bumped
+        // collapse version invalidates the payload memo).
+        this._collapseState.setExpandedKeys(message.expandedKeys ?? []);
         break;
       case "collapseStateSync":
         // Client-side collapse already done, just sync state for persistence

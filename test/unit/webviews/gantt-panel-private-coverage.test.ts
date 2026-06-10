@@ -1188,6 +1188,18 @@ describe("gantt view-focus toggle perf (per-focus payload memo)", () => {
     expect(lastRenderHtml(mock)).toBe("h2"); // not the stale h0
   });
 
+  it("collapseStateSyncBulk applies the whole expanded set without re-rendering", () => {
+    const { panel } = setup();
+    panel._updateContent = vi.fn();
+    const vBefore = panel._collapseState.version;
+
+    panel._handleMessage({ command: "collapseStateSyncBulk", expandedKeys: ["project-1", "issue-9"] });
+
+    expect(panel._collapseState.getExpandedKeys()).toEqual(new Set(["project-1", "issue-9"]));
+    expect(panel._collapseState.version).toBeGreaterThan(vBefore); // memo key invalidated
+    expect(panel._updateContent).not.toHaveBeenCalled(); // client already updated the UI
+  });
+
   it("does not serve a memo entry built on a previous day", () => {
     const { mock, panel } = setup();
     let n = 0;

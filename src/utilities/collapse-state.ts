@@ -84,6 +84,13 @@ export class CollapseStateManager {
     this._onDidChange.fire({ key: "*", collapsed: true });
   }
 
+  /** Replace the whole expanded set (client-side expand/collapse-all sync) */
+  setExpandedKeys(keys: string[]): void {
+    this._expandedKeys = new Set(keys);
+    this._version++;
+    this._onDidChange.fire({ key: "*", collapsed: keys.length === 0 });
+  }
+
   /** Clear all expand state (everything becomes collapsed) */
   clear(): void {
     this._expandedKeys.clear();

@@ -50,4 +50,18 @@ describe("CollapseStateManager", () => {
     expect(events).toContainEqual({ key: "*", collapsed: true });
     sub.dispose();
   });
+
+  it("setExpandedKeys replaces the set wholesale and bumps the version", () => {
+    const manager = new CollapseStateManager();
+    manager.expandAll(["old-1", "old-2"]);
+    const vBefore = manager.version;
+
+    manager.setExpandedKeys(["new-1"]);
+    expect(Array.from(manager.getExpandedKeys())).toEqual(["new-1"]);
+    expect(manager.version).toBeGreaterThan(vBefore);
+
+    manager.setExpandedKeys([]);
+    expect(manager.getExpandedKeys().size).toBe(0);
+    manager.dispose();
+  });
 });

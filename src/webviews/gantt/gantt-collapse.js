@@ -16,14 +16,19 @@ export function setupCollapse(ctx) {
   const scrollEl = document.getElementById('ganttScroll');
   if (!scrollEl || !rowWindow) return;
 
-  // Expand/collapse all menu items (extension-side wholesale update + render)
+  // Expand/collapse all: client-side window refresh + one bulk sync message
+  function setAllExpanded(keys, label) {
+    const t0 = performance.now();
+    rowWindow.setAllExpanded(keys);
+    vscode.postMessage({ command: 'collapseStateSyncBulk', expandedKeys: keys });
+    perfLog(`${label}: ${(performance.now() - t0).toFixed(1)}ms windowed (${keys.length} expanded)`);
+  }
   document.getElementById('menuExpand')?.addEventListener('click', () => {
     const allKeys = scrollEl.dataset.allExpandableKeys;
-    const keys = allKeys ? JSON.parse(allKeys) : [];
-    vscode.postMessage({ command: 'expandAll', keys });
+    setAllExpanded(allKeys ? JSON.parse(allKeys) : [], 'expand-all');
   });
   document.getElementById('menuCollapse')?.addEventListener('click', () => {
-    vscode.postMessage({ command: 'collapseAll' });
+    setAllExpanded([], 'collapse-all');
   });
 
   // ---------- collapse toggle (data op) ----------
