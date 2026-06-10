@@ -15,7 +15,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Fixed
 
-Deep review of the v4.29.0 windowed renderer found 14 places where code still assumed every row had a DOM element. All fixed:
+Deep review of the v4.29.0 windowed renderer found 20 confirmed bugs, all one root cause: code that still assumed every row had a DOM element. All fixed:
 
 - **Rows materialized after scrolling were inert** — bar click/dblclick, blocks/blocker badges, bar keyboard navigation, and the link handle (the only way to drag-create relations) were wired per element at init over only the initially mounted rows. All five sites are now delegated; bar navigation orders over the visible row list and mounts its target first
 - **Selection operated on an init-time bar snapshot** — Ctrl+A selected only part of the board, Shift+click range silently no-opped on later-mounted endpoints, Ctrl+click selected without a visual, and a bulk drag moved/saved only the mounted subset of the selection. Bars now resolve at use time; bulk drag pins every selected row mounted; selection visuals re-sync on every window refresh
