@@ -1010,26 +1010,22 @@ describe("gantt project-view root rows (skipTopProjectRow)", () => {
     expect(payload.html).not.toContain("data-collapse-key");
   });
 
-  it("All Projects zebra-bands per top-level client block", () => {
+  it("state ships the zebra grouping flag per board shape", () => {
     const panel = setupTwoClients();
     panel._selectedProjectId = null;
-    panel._expandAllOnNextRender = "any"; // expand everything so issues are visible
-    const html = panel._getRenderPayload().html as string;
-    // One band per depth-0 client (client + descendants), not per issue family
-    expect(html).toContain('data-first-row-key="project-1"');
-    expect(html).toContain('data-first-row-key="project-3"');
-    expect(html).not.toContain('data-first-row-key="issue-100"');
-  });
-
-  it("single selected project keeps issue-family zebra bands", () => {
-    const panel = setupTwoClients();
+    expect(panel._getRenderPayload().state.useTopLevelGrouping).toBe(true);
     panel._selectedProjectId = 1;
-    panel._expandAllOnNextRender = "any";
-    const html = panel._getRenderPayload().html as string;
-    expect(html).toContain('data-first-row-key="issue-100"'); // family band
+    panel._cachedHierarchy = undefined;
+    expect(panel._getRenderPayload().state.useTopLevelGrouping).toBe(false);
   });
 
-  it("emits dependency arrows for render-time-hidden rows, marked hidden", () => {
+  it("state ships expanded keys for the client-side visible list", () => {
+    const panel = setupTwoClients();
+    panel._collapseState.expandAll(["project-1"]);
+    expect(panel._getRenderPayload().state.expandedKeys).toContain("project-1");
+  });
+
+  it("ships relations as arrow data plus per-row bar geometry", () => {
     const panel = setupTwoClients();
     panel._selectedProjectId = null;
     // Relation between two issues in the same (collapsed) project
@@ -1043,16 +1039,22 @@ describe("gantt project-view root rows (skipTopProjectRow)", () => {
     panel._issues = issues;
     panel._issueById = new Map(issues.map((i: any) => [i.id, i]));
 
-    // Collapsed: arrow must exist in the DOM, marked hidden (client unhides on expand)
-    const collapsedHtml = panel._getRenderPayload().html as string;
-    expect(collapsedHtml).toContain("dependency-arrow rel-blocks cursor-pointer gantt-row-hidden");
+    const payload = panel._getRenderPayload();
+    // Arrow data present regardless of collapse state (rows are collapsed here)
+    expect(payload.arrows).toContainEqual({ relationId: 500, fromId: 100, toId: 101, type: "blocks" });
+    const r = payload.rows.find((x: any) => x.key === "issue-100");
+    expect(typeof r.barStartX).toBe("number");
+    expect(typeof r.barEndX).toBe("number");
+    // No arrow markup in the document — the row-window renders it
+    expect(payload.html).not.toContain("dependency-arrow rel-blocks");
+  });
 
-    // Expanded: same arrow visible (no hidden marker)
-    panel._cachedHierarchy = undefined;
-    panel._expandAllOnNextRender = "any";
-    const expandedHtml = panel._getRenderPayload().html as string;
-    expect(expandedHtml).toContain('dependency-arrow rel-blocks cursor-pointer"');
-    expect(expandedHtml).not.toContain("dependency-arrow rel-blocks cursor-pointer gantt-row-hidden");
+  it("fragments carry no hidden-row markup (visibility is the window's job)", () => {
+    const panel = setupTwoClients(); // collapsed-by-default: issues are hidden rows
+    const payload = panel._getRenderPayload();
+    const issueRow = payload.rows.find((r: any) => r.key === "issue-100");
+    expect(issueRow.panels.labels).not.toContain("gantt-row-hidden");
+    expect(issueRow.panels.timeline).not.toContain("gantt-row-hidden");
   });
 
   it("display toggles invalidate the per-focus payload memo via version key", () => {

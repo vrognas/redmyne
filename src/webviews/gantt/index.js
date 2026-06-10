@@ -2,8 +2,12 @@ import { setupMinimap } from './gantt-minimap.js';
 import { setupDrag } from './gantt-drag.js';
 import { setupCollapse } from './gantt-collapse.js';
 import { setupKeyboard } from './gantt-keyboard.js';
+import { createRowWindow } from './row-window.js';
 
 const vscode = acquireVsCodeApi();
+
+// Windowed row renderer — recreated per render (the skeleton is replaced)
+let rowWindow = null;
 
 // Performance instrumentation (controlled by redmyne.gantt.perfDebug setting)
 let PERF_DEBUG = false; // Updated from state.perfDebug on render
@@ -366,20 +370,6 @@ function setupTooltips({ addDocListener, addWinListener }) {
   });
 }
 
-// Join per-row fragments into each panel's row-layer. Phase 1 of the
-// windowed-SVG migration mounts ALL rows (visual parity with the old
-// joined-document render); scroll windowing lands next.
-function mountRowLayers(rows) {
-  document.querySelectorAll('.row-layer[data-panel]').forEach((layer) => {
-    const panel = layer.dataset.panel;
-    let html = '';
-    for (const row of rows) {
-      html += row.panels[panel] || '';
-    }
-    layer.innerHTML = html;
-  });
-}
-
 function render(payload) {
   if (!payload) return;
   // Update perf debug flag from config (passed via state)
@@ -395,7 +385,8 @@ function render(payload) {
   perfMark('innerHTML-end');
   perfMeasure('innerHTML', 'innerHTML-start', 'innerHTML-end');
   perfMark('mountRows-start');
-  mountRowLayers(payload.rows || []);
+  rowWindow = createRowWindow({ perfLog });
+  rowWindow.setData(payload);
   perfMark('mountRows-end');
   perfMeasure('mountRows', 'mountRows-start', 'mountRows-end');
   initializeGantt(payload.state);
@@ -1172,6 +1163,12 @@ function initializeGantt(state) {
     let mapsReady = false;
 
     function buildLookupMaps() {
+      // Rebuilt after every row-window refresh (mounted rows churn)
+      issueBarsByIssueId.clear();
+      issueLabelsByIssueId.clear();
+      arrowsByIssueId.clear();
+      projectLabelsByKey.clear();
+      aggregateBarsByKey.clear();
       // Single query for all indexable elements (reduces DOM traversals from 5 to 1)
       document.querySelectorAll('.issue-bar, .issue-label, .dependency-arrow, .project-label, .aggregate-bars').forEach(el => {
         const classList = el.classList;
@@ -1221,6 +1218,10 @@ function initializeGantt(state) {
     } else {
       setTimeout(buildLookupMaps, 0);
     }
+    // Mounted rows change on scroll/collapse — keep the maps in sync
+    rowWindow?.onRefresh(() => {
+      if (mapsReady) buildLookupMaps();
+    });
 
     // Track currently highlighted elements for fast clear, plus the logical
     // hover target. mouseenter/mouseleave with capture fire on EVERY internal
@@ -1476,7 +1477,7 @@ function initializeGantt(state) {
       announce,
       barHeight,
       selectedCollapseKey,
-      refreshArrowGeometry: dragApi.refreshArrowGeometry,
+      rowWindow,
       perfLog
     });
 

@@ -124,6 +124,11 @@ interface GanttRenderState {
   perfDebug: boolean;
   isDraftMode: boolean;
   draftQueueCount: number;
+  indentSize: number;
+  /** Keys currently expanded — the webview derives the visible row list from these */
+  expandedKeys: string[];
+  /** Zebra banding rule: depth-0 blocks (multi-root) vs top-level issue families */
+  useTopLevelGrouping: boolean;
 }
 
 /**
@@ -138,6 +143,9 @@ interface GanttRowPayload {
   type: GanttRow["type"];
   hasChildren: boolean;
   issueId: number | null;
+  /** Timeline bar x-range (issue rows) — arrow geometry anchors */
+  barStartX: number | null;
+  barEndX: number | null;
   panels: {
     status: string;
     id: string;
@@ -149,9 +157,18 @@ interface GanttRowPayload {
   };
 }
 
+/** Relation shipped as data — the webview builds arrow SVG at virtual Ys */
+interface GanttArrowPayload {
+  relationId: number;
+  fromId: number;
+  toId: number;
+  type: string;
+}
+
 interface GanttRenderPayload {
   html: string;
   rows: GanttRowPayload[];
+  arrows: GanttArrowPayload[];
   state: GanttRenderState;
 }
 
@@ -551,45 +568,45 @@ export class GanttPanel {
           <div class="gantt-sticky-left">
             <div class="gantt-col-status">
               <svg width="${statusColumnWidth}" height="${bodyHeight}">
-                ${zebraStripes}
+                <g class="zebra-layer">${zebraStripes}</g>
                 ${statusSvg}
               </svg>
             </div>
             <div class="gantt-col-id">
               <svg width="${idColumnWidth}" height="${bodyHeight}">
-                ${zebraStripes}
+                <g class="zebra-layer">${zebraStripes}</g>
                 ${idSvg}
               </svg>
             </div>
             <div class="gantt-labels" id="ganttLabels">
               <svg width="${labelWidth * 2}" height="${bodyHeight}">
-                ${zebraStripes}
+                <g class="zebra-layer">${zebraStripes}</g>
                 ${labelsSvg}
               </svg>
             </div>
             <div class="gantt-resize-handle" id="resizeHandle"></div>
             <div class="gantt-col-start">
               <svg width="${startDateColumnWidth}" height="${bodyHeight}">
-                ${zebraStripes}
+                <g class="zebra-layer">${zebraStripes}</g>
                 ${startSvg}
               </svg>
             </div>
             <div class="gantt-col-due">
               <svg width="${dueDateColumnWidth}" height="${bodyHeight}">
-                ${zebraStripes}
+                <g class="zebra-layer">${zebraStripes}</g>
                 ${dueSvg}
               </svg>
             </div>
             <div class="gantt-col-assignee">
               <svg width="${assigneeColumnWidth}" height="${bodyHeight}">
-                ${zebraStripes}
+                <g class="zebra-layer">${zebraStripes}</g>
                 ${assigneeSvg}
               </svg>
             </div>
           </div>
           <div class="gantt-timeline" id="ganttTimeline">
             <svg width="${timelineWidth + TIMELINE_RIGHT_PADDING}" height="${bodyHeight}">
-              ${zebraStripes}
+              <g class="zebra-layer">${zebraStripes}</g>
               ${barsSvg}
             </svg>
           </div>
@@ -614,7 +631,7 @@ export class GanttPanel {
       stickyLeftWidth,
     });
 
-    this._queueRender({ html, rows: [], state });
+    this._queueRender({ html, rows: [], arrows: [], state });
   }
 
   private _getBaseHtml(): string {
@@ -713,6 +730,9 @@ export class GanttPanel {
       perfDebug,
       isDraftMode: this._draftModeManager?.isEnabled ?? false,
       draftQueueCount: this._draftModeManager?.queue?.count ?? 0,
+      indentSize: 8,
+      expandedKeys: [],
+      useTopLevelGrouping: true,
     };
 
     return { ...baseState, ...overrides };
@@ -2371,140 +2391,10 @@ export class GanttPanel {
 
     const chevronWidth = 10;
 
-    // Generate FULL-HEIGHT group backgrounds (Gestalt "common region" / enclosure)
-    // Adaptive grouping strategy:
-    // - Multiple projects → group by project (each project + children = one group)
-    // - Single project → group by top-level issue families (each depth-1 issue + children = one group)
-    interface GroupRange { startIdx: number; endIdx: number; groupIdx: number; }
-    const groupRanges: GroupRange[] = [];
-
-    // Determine grouping strategy by ROOT COUNT, not view focus:
-    // - Multiple roots (By Person, or By Project with "All Projects"): one band
-    //   per depth-0 block (client/project/time-group + all its descendants)
-    // - Single hierarchy (a specific project selected, top row skipped): band
-    //   by top-level issue families
+    // Zebra banding rule for the webview band computation: multi-root boards
+    // band per depth-0 block; a single selected project bands by top-level
+    // issue families. Bands and indent guides render client-side (row-window).
     const useTopLevelGrouping = this._viewFocus === "person" || this._selectedProjectId === null;
-
-    let currentGroupStart = 0;
-    let currentGroupIdx = 0;
-
-    if (useTopLevelGrouping) {
-      // Multiple roots: each depth-0 row starts a new band
-      for (let i = 0; i < visibleRowCount; i++) {
-        const row = visibleRows[i]!;
-        if (row.depth === 0 && i > 0) {
-          groupRanges.push({ startIdx: currentGroupStart, endIdx: i - 1, groupIdx: currentGroupIdx });
-          currentGroupStart = i;
-          currentGroupIdx++;
-        }
-      }
-    } else {
-      // Single project: group by top-level issue families
-      // Find the minimum depth among issues (this is the "top level" for this view)
-      const issueRows = visibleRows.filter(r => r.type === "issue");
-      const minIssueDepth = issueRows.length > 0
-        ? Math.min(...issueRows.map(r => r.depth))
-        : 1;
-
-      for (let i = 0; i < visibleRowCount; i++) {
-        const row = visibleRows[i]!;
-        // New family starts at each top-level issue (at minIssueDepth)
-        if (row.type === "issue" && row.depth === minIssueDepth) {
-          if (currentGroupStart < i) {
-            groupRanges.push({ startIdx: currentGroupStart, endIdx: i - 1, groupIdx: currentGroupIdx });
-            currentGroupIdx++;
-          }
-          currentGroupStart = i;
-        }
-      }
-    }
-
-    // Close final group
-    if (visibleRowCount > 0 && currentGroupStart < visibleRowCount) {
-      groupRanges.push({ startIdx: currentGroupStart, endIdx: visibleRowCount - 1, groupIdx: currentGroupIdx });
-    }
-
-    // Helper to calculate gap before a row (for stripe height calculations)
-    const getGapBefore = (_row: typeof visibleRows[0], idx: number): number => {
-      if (idx === 0) return rowYPositions[0]!; // Gap from top of chart to first row
-      // Gap = current row Y - (previous row Y + previous row height)
-      return rowYPositions[idx]! - (rowYPositions[idx - 1]! + rowHeights[idx - 1]!);
-    };
-
-    // All groups get visual enclosure, alternating between two subtle treatments
-    // This creates consistent rhythm without leaving any group "bare"
-    const zebraStripes = groupRanges
-      .map(g => {
-        // Include the gap BEFORE the first row in the zebra stripe
-        // This makes the gap visually "belong" to this group
-        const firstRow = visibleRows[g.startIdx]!;
-        const gapBeforeFirst = getGapBefore(firstRow, g.startIdx);
-        const startY = rowYPositions[g.startIdx]! - gapBeforeFirst;
-        const endY = rowYPositions[g.endIdx]! + rowHeights[g.endIdx]!;
-        const height = endY - startY;
-        // Alternate: even groups (including first) = lower alpha, odd groups = higher alpha
-        const opacity = g.groupIdx % 2 === 0 ? 0.03 : 0.06;
-
-        // Build row contributions map: { collapseKey: heightContribution }
-        // Each row owns gap BEFORE it + its height (not gap AFTER)
-        // This ensures collapse correctly removes hidden rows' gaps
-        const rowContributions: Record<string, number> = {};
-        for (let i = g.startIdx; i <= g.endIdx; i++) {
-          const row = visibleRows[i]!;
-          // Gap owned: first row includes stripe-leading gap, others own their preceding gap
-          const gapOwned = i === g.startIdx ? gapBeforeFirst : getGapBefore(row, i);
-          rowContributions[row.collapseKey] = gapOwned + rowHeights[i]!;
-        }
-
-        return `<rect class="zebra-stripe" x="0" y="${startY}" width="100%" height="${height}" opacity="${opacity}" data-first-row-key="${firstRow.collapseKey}" data-original-y="${startY}" data-original-height="${height}" data-row-contributions='${JSON.stringify(rowContributions)}' />`;
-      })
-      .join("");
-
-    // Left labels (fixed column) - visible rows only for performance
-
-    // Compute continuous vertical indent guide lines (rendered as single layer)
-    // For each parent row, draw ONE continuous line covering ALL descendants (not just direct children)
-    const subtreeEndIndex = new Array<number>(visibleRows.length);
-    const parentStack: number[] = [];
-    for (let i = 0; i < visibleRows.length; i++) {
-      const depth = visibleRows[i]!.depth;
-      while (parentStack.length > 0 && depth <= visibleRows[parentStack[parentStack.length - 1]!]!.depth) {
-        const idx = parentStack.pop()!;
-        subtreeEndIndex[idx] = i - 1;
-      }
-      parentStack.push(i);
-    }
-    while (parentStack.length > 0) {
-      const idx = parentStack.pop()!;
-      subtreeEndIndex[idx] = visibleRows.length - 1;
-    }
-
-    const continuousIndentLines: string[] = [];
-    for (let i = 0; i < visibleRows.length; i++) {
-      const row = visibleRows[i]!;
-
-      // Only process parent rows (rows that have children)
-      if (!row.hasChildren) continue;
-
-      const parentDepth = row.depth;
-      const firstDescendantIndex = i + 1;
-      if (firstDescendantIndex >= visibleRows.length) continue;
-      if (visibleRows[firstDescendantIndex]!.depth <= parentDepth) continue;
-      const lastDescendantIndex = subtreeEndIndex[i]!;
-      if (lastDescendantIndex <= i) continue;
-
-      // Draw line at parent's depth position (guides appear inside children's indent area)
-      const lineX = 8 + parentDepth * indentSize;
-      const startY = rowYPositions[firstDescendantIndex]!;
-      const endY = rowYPositions[lastDescendantIndex]! + barHeight;
-
-      continuousIndentLines.push(
-        `<line class="indent-guide-line" data-for-parent="${row.collapseKey}" x1="${lineX}" y1="${startY}" x2="${lineX}" y2="${endY}" stroke="var(--vscode-tree-indentGuidesStroke)" stroke-width="1" opacity="0.4"/>`
-      );
-    }
-    const indentGuidesLayer = continuousIndentLines.length > 0
-      ? `<g class="indent-guides-layer">${continuousIndentLines.join("")}</g>`
-      : "";
 
     // Build render context for label/cell/bar generation
     const renderContext = {
@@ -2553,17 +2443,27 @@ export class GanttPanel {
     } as GanttRenderContext;
 
     // Per-row fragments for the webview row-window: ONE loop builds all 7
-    // panel fragments per row (replaces 7 separate map/join pipelines). The
-    // skeleton below ships empty <g class="row-layer"> groups; the webview
-    // joins these fragments into them. Phase 1 of the windowed-SVG migration:
-    // same bytes as the old joined document, new transport.
-    const rowsPayload: GanttRowPayload[] = filteredRows.map((row, idx) => {
-      const y = initialYPositions[idx]!;
-      const originalY = filteredRowYPositions[idx]!;
+    // panel fragments per row. Fragments are position-independent — generated
+    // at y=0 (the row-window translates each mounted row to its virtual Y)
+    // and always "visible" (an unmounted row has no DOM at all, so no
+    // hidden-row markup exists anymore).
+    const rowsPayload: GanttRowPayload[] = filteredRows.map((row) => {
+      const renderRow = { ...row, isVisible: true };
       const labelFragment =
-        row.type === "project" ? generateProjectLabel(row, y, originalY, renderContext)
-        : row.type === "time-group" ? generateTimeGroupLabel(row, y, originalY, renderContext)
-        : generateIssueLabel(row, y, originalY, renderContext);
+        row.type === "project" ? generateProjectLabel(renderRow, 0, 0, renderContext)
+        : row.type === "time-group" ? generateTimeGroupLabel(renderRow, 0, 0, renderContext)
+        : generateIssueLabel(renderRow, 0, 0, renderContext);
+      // Timeline bar x-range for dependency-arrow geometry. UTC parsing to
+      // match the UTC-anchored x-axis (bars use new Date(dateStr)).
+      let barStartX: number | null = null;
+      let barEndX: number | null = null;
+      if (row.type === "issue" && row.issue) {
+        const issue = row.issue;
+        const start = issue.start_date ? new Date(issue.start_date) : new Date(issue.due_date!);
+        const end = issue.due_date ? new Date(issue.due_date) : new Date(issue.start_date!);
+        barStartX = dateToX(start.getTime(), minDate.getTime(), maxDate.getTime(), timelineWidth);
+        barEndX = endExclusiveX(end, minDate.getTime(), maxDate.getTime(), timelineWidth);
+      }
       return {
         key: row.collapseKey,
         parentKey: row.parentKey,
@@ -2571,280 +2471,32 @@ export class GanttPanel {
         type: row.type,
         hasChildren: row.hasChildren,
         issueId: row.type === "issue" && row.issue ? row.issue.id : null,
+        barStartX,
+        barEndX,
         panels: {
-          status: generateStatusCell(row, y, originalY, renderContext),
-          id: generateIdCell(row, y, originalY, renderContext),
+          status: generateStatusCell(renderRow, 0, 0, renderContext),
+          id: generateIdCell(renderRow, 0, 0, renderContext),
           labels: labelFragment,
-          start: generateStartDateCell(row, y, originalY, renderContext),
-          due: generateDueDateCell(row, y, originalY, renderContext),
-          assignee: generateAssigneeCell(row, y, originalY, renderContext),
-          timeline: generateIssueBar(row, y, originalY, renderContext),
+          start: generateStartDateCell(renderRow, 0, 0, renderContext),
+          due: generateDueDateCell(renderRow, 0, 0, renderContext),
+          assignee: generateAssigneeCell(renderRow, 0, 0, renderContext),
+          timeline: generateIssueBar(renderRow, 0, 0, renderContext),
         },
       };
     });
 
-    // Dependency arrows - draw from end of source to start of target.
-    // Positions cover ALL rows (hidden included, at their initial collapsed-state
-    // Y) so arrows exist in the DOM for rows revealed by client-side expand —
-    // the toggle unhides them and refreshArrowGeometry re-anchors the paths.
-    const issuePositions = new Map<number, { startX: number; endX: number; y: number }>();
-    const hiddenIssueIds = new Set<number>();
-    filteredRows.forEach((row, idx) => {
-      if (row.type === "issue" && row.issue) {
-        const issue = row.issue;
-        // UTC parsing to match the UTC-anchored x-axis (bars use new Date(dateStr));
-        // parseLocalDate would offset arrow endpoints from bar edges by the tz fraction.
-        const start = issue.start_date
-          ? new Date(issue.start_date)
-          : new Date(issue.due_date!);
-        const end = issue.due_date
-          ? new Date(issue.due_date)
-          : new Date(issue.start_date!);
-        // Add 1 day to end to match bar width calculation
-        const startX = dateToX(start.getTime(), minDate.getTime(), maxDate.getTime(), timelineWidth);
-        const endX = endExclusiveX(end, minDate.getTime(), maxDate.getTime(), timelineWidth);
-        const y = initialYPositions[idx]! + barHeight / 2;
-        issuePositions.set(issue.id, { startX, endX, y });
-        if (!row.isVisible) hiddenIssueIds.add(issue.id);
-      }
-    });
-
-    // Relation type styling - only forward types (reverse types are filtered out)
-    // blocks/precedes/relates/duplicates/copied_to are shown
-    // blocked/follows/duplicated/copied_from are auto-generated reverses, filtered
-    // Colors use CSS classes for VS Code theming; dash patterns differentiate within color groups
-    const relationStyles: Record<string, { dash: string; label: string; tip: string }> = {
-      blocks: { dash: "", label: "blocks",
-        tip: "Target cannot be closed until source is closed" },
-      precedes: { dash: "", label: "precedes",
-        tip: "Source must complete before target can start" },
-      relates: { dash: "4,3", label: "relates to",
-        tip: "Simple link (no constraints)" },
-      duplicates: { dash: "2,2", label: "duplicates",
-        tip: "Closing target auto-closes source" },
-      copied_to: { dash: "6,2", label: "copied to",
-        tip: "Source was copied to create target" },
-      // Extended scheduling types (requires Gantt plugin)
-      finish_to_start: { dash: "4,2", label: "FS",
-        tip: "Finish-to-Start: Target starts after source finishes" },
-      start_to_start: { dash: "4,2", label: "SS",
-        tip: "Start-to-Start: Target starts when source starts" },
-      finish_to_finish: { dash: "4,2", label: "FF",
-        tip: "Finish-to-Finish: Target finishes when source finishes" },
-      start_to_finish: { dash: "2,4", label: "SF",
-        tip: "Start-to-Finish: Target finishes when source starts" },
-    };
-
-    // Use rows (which have GanttIssue) for dependency arrows
+    // Dependency relations as data — the webview row-window renders arrow SVG
+    // (arrow-svg.js) from these plus per-row bar geometry at virtual Ys.
+    // Source rows = all rows (an endpoint outside the board resolves to null
+    // client-side and the arrow is skipped, matching the old behaviour).
     const visibleRelTypes = this._visibleRelationTypes;
-    const dependencyArrows = rows
+    const arrowsPayload: GanttArrowPayload[] = rows
       .filter((row): row is GanttRow & { issue: GanttIssue } => row.type === "issue" && !!row.issue)
       .flatMap((row) =>
         row.issue.relations
           .filter((rel) => visibleRelTypes.has(rel.type))
-          .map((rel): { svg: string; hasDash: boolean } | null => {
-          const issue = row.issue;
-          const source = issuePositions.get(issue.id);
-          const target = issuePositions.get(rel.targetId);
-          if (!source || !target) return null;
-
-          const style = (relationStyles[rel.type] || relationStyles.relates)!;
-          const arrowSize = 4;
-          const sameRow = Math.abs(source.y - target.y) < 5;
-
-          // Temporal relations: end → start (or based on type for extended)
-          // Non-temporal relations (relates, duplicates, copied_to): center → center
-          const isScheduling = ["blocks", "precedes", "finish_to_start", "start_to_start", "finish_to_finish", "start_to_finish"].includes(rel.type);
-
-          // Arrow anchor points: fromStart/toEnd determine which side of bars to connect
-          // SS = start→start, SF = start→finish, FS = finish→start, FF = finish→finish
-          const fromStart = rel.type === "start_to_start" || rel.type === "start_to_finish";
-          const toEnd = rel.type === "finish_to_finish" || rel.type === "start_to_finish";
-
-          let x1: number, y1: number, x2: number, y2: number;
-          let path = "";
-          const r = 4; // corner radius for rounded turns
-
-          if (!isScheduling) {
-            // Non-scheduling (relates, duplicates, copied_to): center-to-center with border anchors
-            const centerX1 = (source.startX + source.endX) / 2;
-            const centerX2 = (target.startX + target.endX) / 2;
-            const goingDown = target.y > source.y;
-            const sameRowCenter = Math.abs(source.y - target.y) < 5;
-
-            const centersAligned = Math.abs(centerX1 - centerX2) < 5;
-
-            if (sameRowCenter) {
-              // Same row: route above the bars
-              x1 = centerX1;
-              y1 = source.y - barHeight / 2; // top border
-              x2 = centerX2;
-              y2 = target.y - barHeight / 2; // top border
-              const routeY = y1 - 8; // above bars
-              path = `M ${x1} ${y1} V ${routeY + r}` +
-                ` q 0 ${-r} ${x2 > x1 ? r : -r} ${-r}` +
-                ` H ${x2 + (x2 > x1 ? -r : r)}` +
-                ` q ${x2 > x1 ? r : -r} 0 ${x2 > x1 ? r : -r} ${r}` +
-                ` V ${y2}`;
-            } else if (centersAligned) {
-              // Centers aligned: straight vertical line
-              x1 = centerX1;
-              y1 = goingDown ? source.y + barHeight / 2 : source.y - barHeight / 2;
-              x2 = centerX1; // use same x for straight line
-              y2 = goingDown ? target.y - barHeight / 2 : target.y + barHeight / 2;
-              path = `M ${x1} ${y1} V ${y2}`;
-            } else {
-              // Different rows: vertical first, then horizontal, then vertical
-              x1 = centerX1;
-              y1 = goingDown ? source.y + barHeight / 2 : source.y - barHeight / 2; // bottom or top border
-              x2 = centerX2;
-              y2 = goingDown ? target.y - barHeight / 2 : target.y + barHeight / 2; // top or bottom border
-              const midY = (source.y + target.y) / 2;
-              path = `M ${x1} ${y1} V ${midY + (goingDown ? -r : r)}` +
-                ` q 0 ${goingDown ? r : -r} ${x2 > x1 ? r : -r} ${goingDown ? r : -r}` +
-                ` H ${x2 + (x2 > x1 ? -r : r)}` +
-                ` q ${x2 > x1 ? r : -r} 0 ${x2 > x1 ? r : -r} ${goingDown ? r : -r}` +
-                ` V ${y2}`;
-            }
-          } else {
-            // Scheduling relations: edge-to-edge anchors
-            x1 = fromStart ? source.startX - 2 : source.endX + 2;
-            y1 = source.y;
-            x2 = toEnd ? target.endX + 2 : target.startX - 2;
-            y2 = target.y;
-          }
-
-          // Variables for scheduling arrow routing
-          const goingRight = x2 > x1;
-          const horizontalDist = Math.abs(x2 - x1);
-          const nearlyVertical = horizontalDist < 30;
-          const jogDir = fromStart ? -1 : 1;
-          const approachDir = toEnd ? 1 : -1;
-          const minJogRoom = 8 + r; // jogX + r = minimum room for simple jog path
-
-          if (!isScheduling) {
-            // Path already computed above
-          } else if (sameRow && goingRight) {
-            // Same row, target to right: straight horizontal line
-            path = `M ${x1} ${y1} H ${x2}`;
-          } else if (sameRow && !goingRight) {
-            // Same row, target to left: route above with rounded corners
-            const routeY = y1 - barHeight;
-            path = `M ${x1} ${y1} V ${routeY + r}` +
-              ` q 0 ${-r} ${jogDir * -r} ${-r}` +
-              ` H ${x2 + approachDir * 12 - approachDir * r}` +
-              ` q ${approachDir * -r} 0 ${approachDir * -r} ${r}` +
-              ` V ${y2} H ${x2}`;
-          } else if (!sameRow && nearlyVertical && (fromStart === goingRight || horizontalDist < minJogRoom)) {
-            // Nearly vertical: S-curve with 90° turns when:
-            // 1. Direction conflict (jog opposite to target direction), OR
-            // 2. Not enough horizontal room for simple jog path (< 12px)
-            // jogDir: which way to jog from source (-1=left, +1=right)
-            // approachDir: which side to approach target from (-1=left, +1=right)
-            const jogX = 8;
-            const midY = (y1 + y2) / 2;
-            const goingDown = y2 > y1;
-            path = `M ${x1} ${y1} H ${x1 + jogDir * jogX - jogDir * r}` +
-              ` q ${jogDir * r} 0 ${jogDir * r} ${goingDown ? r : -r}` +
-              ` V ${midY + (goingDown ? -r : r)}` +
-              ` q 0 ${goingDown ? r : -r} ${-jogDir * r} ${goingDown ? r : -r}` +
-              ` H ${x2 + approachDir * jogX - approachDir * r}` +
-              ` q ${approachDir * r} 0 ${approachDir * r} ${goingDown ? r : -r}` +
-              ` V ${y2 + (goingDown ? -r : r)}` +
-              ` q 0 ${goingDown ? r : -r} ${-approachDir * r} ${goingDown ? r : -r}` +
-              ` H ${x2}`;
-          } else if (goingRight && !fromStart) {
-            // FS/FF with target to right: small jog, vertical to target level, horizontal approach
-            const jogX = 8;
-            const goingDown = y2 > y1;
-            // Second curve turns toward target (right), not back toward source
-            path = `M ${x1} ${y1} H ${x1 + jogDir * jogX - jogDir * r}` +
-              ` q ${jogDir * r} 0 ${jogDir * r} ${goingDown ? r : -r}` +
-              ` V ${y2 + (goingDown ? -r : r)}` +
-              ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
-              ` H ${x2}`;
-          } else if (goingRight) {
-            // SS/SF with target to right: horizontal at source level, then down, then approach
-            const jogX = 8;
-            const goingDown = y2 > y1;
-            path = `M ${x1} ${y1} H ${x2 + approachDir * jogX - approachDir * r}` +
-              ` q ${approachDir * r} 0 ${approachDir * r} ${goingDown ? r : -r}` +
-              ` V ${y2 + (goingDown ? -r : r)}` +
-              ` q 0 ${goingDown ? r : -r} ${-approachDir * r} ${goingDown ? r : -r}` +
-              ` H ${x2}`;
-          } else if (fromStart) {
-            // SS/SF going left: horizontal at source level, then down, then approach
-            const jogX = 8;
-            const goingDown = y2 > y1;
-            path = `M ${x1} ${y1} H ${x2 + approachDir * jogX + r}` +
-              ` q ${-r} 0 ${-r} ${goingDown ? r : -r}` +
-              ` V ${y2 + (goingDown ? -r : r)}` +
-              ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
-              ` H ${x2}`;
-          } else {
-            // FS/FF going left: S-curve with horizontal between rows
-            const jogX = 8;
-            const midY = (y1 + y2) / 2;
-            const goingDown = y2 > y1;
-            path = `M ${x1} ${y1} H ${x1 + jogDir * jogX - jogDir * r}` +
-              ` q ${jogDir * r} 0 ${jogDir * r} ${goingDown ? r : -r}` +
-              ` V ${midY + (goingDown ? -r : r)}` +
-              ` q 0 ${goingDown ? r : -r} ${-r} ${goingDown ? r : -r}` +
-              ` H ${x2 + approachDir * jogX + r}` +
-              ` q ${-r} 0 ${-r} ${goingDown ? r : -r}` +
-              ` V ${y2 + (goingDown ? -r : r)}` +
-              ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
-              ` H ${x2}`;
-          }
-
-          // Chevron arrowhead - direction depends on approach
-          let arrowHead: string;
-          if (!isScheduling) {
-            // Non-scheduling: vertical approach, arrowhead points down or up
-            const goingDown = target.y > source.y;
-            const sameRowCenter = Math.abs(source.y - target.y) < 5;
-            if (sameRowCenter) {
-              // Same row routed above: arrowhead points down
-              arrowHead = `M ${x2 - arrowSize * 0.6} ${y2 - arrowSize} L ${x2} ${y2} L ${x2 + arrowSize * 0.6} ${y2 - arrowSize}`;
-            } else {
-              arrowHead = goingDown
-                ? `M ${x2 - arrowSize * 0.6} ${y2 - arrowSize} L ${x2} ${y2} L ${x2 + arrowSize * 0.6} ${y2 - arrowSize}`
-                : `M ${x2 - arrowSize * 0.6} ${y2 + arrowSize} L ${x2} ${y2} L ${x2 + arrowSize * 0.6} ${y2 + arrowSize}`;
-            }
-          } else {
-            // Scheduling: horizontal approach
-            // toStart: arrow comes from left, points right (wings at x2-size)
-            // toEnd: arrow comes from right, points left (wings at x2+size)
-            arrowHead = toEnd
-              ? `M ${x2 + arrowSize} ${y2 - arrowSize * 0.6} L ${x2} ${y2} L ${x2 + arrowSize} ${y2 + arrowSize * 0.6}`
-              : `M ${x2 - arrowSize} ${y2 - arrowSize * 0.6} L ${x2} ${y2} L ${x2 - arrowSize} ${y2 + arrowSize * 0.6}`;
-          }
-
-
-          const dashAttr = style.dash ? `stroke-dasharray="${style.dash}"` : "";
-
-          const arrowTooltip = `#${issue.id} ${style.label} #${rel.targetId}\n${style.tip}\n(right-click to delete)`;
-          // Same hidden markers as setSvgVisibility (class + attribute) so the
-          // client-side collapse toggle can unhide the arrow when both rows show
-          const arrowHidden = hiddenIssueIds.has(issue.id) || hiddenIssueIds.has(rel.targetId);
-          return {
-            svg: `
-            <g class="dependency-arrow rel-${rel.type} cursor-pointer${arrowHidden ? " gantt-row-hidden" : ""}"${arrowHidden ? ' visibility="hidden"' : ""} data-relation-id="${rel.id}" data-from="${issue.id}" data-to="${rel.targetId}">
-              <title>${escapeAttr(arrowTooltip)}</title>
-              <!-- Wide invisible hit area for easier clicking -->
-              <path class="arrow-hit-area" d="${path}" stroke="transparent" stroke-width="24" fill="none"/>
-              <path class="arrow-line" d="${path}" stroke-width="2" fill="none" ${dashAttr}/>
-              <path class="arrow-head" d="${arrowHead}" fill="none"/>
-            </g>
-          `,
-            hasDash: !!style.dash
-          };
-        })
-      )
-      .filter((item): item is { svg: string; hasDash: boolean } => item !== null)
-      .sort((a, b) => (a.hasDash === b.hasDash ? 0 : a.hasDash ? 1 : -1))
-      .map(item => item.svg)
-      .join("");
+          .map((rel) => ({ relationId: rel.id, fromId: row.issue.id, toId: rel.targetId, type: rel.type }))
+      );
 
     // Generate milestone markers (diamond shapes with vertical dashed lines)
     const milestoneMarkers = this._versions
@@ -2864,7 +2516,7 @@ export class GanttPanel {
           <g class="milestone-marker" data-version-id="${version.id}">
             <title>${escapeAttr(tooltip)}</title>
             <!-- Vertical dashed line spanning the entire height -->
-            <line class="milestone-line" x1="${x}" y1="0" x2="${x}" y2="${contentHeight}"
+            <line class="milestone-line" x1="${x}" y1="0" x2="${x}" y2="100%"
                   stroke="var(--vscode-charts-purple)" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.6"/>
             <!-- Diamond marker at top of body -->
             <polygon class="milestone-diamond" points="${x},${diamondSize} ${x + diamondSize},${diamondSize * 2} ${x},${diamondSize * 3} ${x - diamondSize},${diamondSize * 2}"
@@ -3120,39 +2772,39 @@ export class GanttPanel {
         <div class="gantt-sticky-left">
           <div class="gantt-col-status">
             <svg width="${statusColumnWidth}" height="${bodyHeight}">
-              ${zebraStripes}
+              <g class="zebra-layer"></g>
               <g class="row-layer" data-panel="status"></g>
             </svg>
           </div>
           <div class="gantt-col-id">
             <svg width="${idColumnWidth}" height="${bodyHeight}">
-              ${zebraStripes}
+              <g class="zebra-layer"></g>
               <g class="row-layer" data-panel="id"></g>
             </svg>
           </div>
           <div class="gantt-labels" id="ganttLabels">
             <svg width="${labelWidth * 2}" height="${bodyHeight}" data-render-key="${this._renderKey}">
-              ${zebraStripes}
-              ${indentGuidesLayer}
+              <g class="zebra-layer"></g>
+              <g class="indent-layer"></g>
               <g class="row-layer" data-panel="labels"></g>
             </svg>
           </div>
           <div class="gantt-resize-handle" id="resizeHandle"></div>
           <div class="gantt-col-start">
             <svg width="${startDateColumnWidth}" height="${bodyHeight}">
-              ${zebraStripes}
+              <g class="zebra-layer"></g>
               <g class="row-layer" data-panel="start"></g>
             </svg>
           </div>
           <div class="gantt-col-due">
             <svg width="${dueDateColumnWidth}" height="${bodyHeight}">
-              ${zebraStripes}
+              <g class="zebra-layer"></g>
               <g class="row-layer" data-panel="due"></g>
             </svg>
           </div>
           <div class="gantt-col-assignee">
             <svg width="${assigneeColumnWidth}" height="${bodyHeight}">
-              ${zebraStripes}
+              <g class="zebra-layer"></g>
               <g class="row-layer" data-panel="assignee"></g>
             </svg>
           </div>
@@ -3167,9 +2819,9 @@ export class GanttPanel {
                 <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.3"/>
               </filter>
             </defs>
-            ${zebraStripes}
+            <g class="zebra-layer"></g>
             ${dateMarkers.body}
-            <g class="dependency-layer${this._showDependencies ? "" : " hidden"}">${dependencyArrows}</g>
+            <g class="dependency-layer${this._showDependencies ? "" : " hidden"}"></g>
             <g class="row-layer" data-panel="timeline"></g>
             <g class="milestone-layer">${milestoneMarkers}</g>
             ${dateMarkers.todayMarker}
@@ -3230,10 +2882,13 @@ export class GanttPanel {
       perfDebug: isPerfDebugEnabled(),
       isDraftMode: this._draftModeManager?.isEnabled ?? false,
       draftQueueCount: this._draftModeManager?.queue?.count ?? 0,
+      indentSize: 8,
+      expandedKeys: Array.from(expandedKeys),
+      useTopLevelGrouping,
     };
 
     perfEnd("_getRenderPayload", `issues=${this._issues.length}, rows=${filteredRowCount}, days=${totalDays}`);
-    return { html, rows: rowsPayload, state: renderState };
+    return { html, rows: rowsPayload, arrows: arrowsPayload, state: renderState };
   }
 
   private _getEmptyPayload(): GanttRenderPayload {
@@ -3244,7 +2899,7 @@ export class GanttPanel {
     <p>${message}</p>
   </div>
 `;
-    return { html, rows: [], state: this._getFallbackState() };
+    return { html, rows: [], arrows: [], state: this._getFallbackState() };
   }
 
   /** Status colors using VS Code theme variables with opacity for 60-30-10 UX rule */
