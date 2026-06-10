@@ -584,12 +584,14 @@ export function setupDrag(ctx) {
         // Check if this bar is part of a selection for bulk drag
         const isBulkDrag = selectedIssues.size > 1 && selectedIssues.has(issueId);
         if (isBulkDrag) {
-          // Bars are windowed: pin every selected row so its element is
-          // mounted for the visual move AND the mouseup commit
+          // Bars are windowed: pin every selected row (one batched remount)
+          // so its element is mounted for the visual move AND the commit
+          const keys = [];
           selectedIssues.forEach(id => {
             const meta = rowWindow?.getRowMeta('issue-' + id);
-            if (meta) ctx.pinRow?.(meta.key);
+            if (meta) keys.push(meta.key);
           });
+          ctx.pinRows?.(keys);
         }
         const barsToMove = isBulkDrag
           ? Array.from(document.querySelectorAll('.issue-bar')).filter(b => selectedIssues.has(b.dataset.issueId))
@@ -623,7 +625,40 @@ export function setupDrag(ctx) {
           };
         });
 
-        bulkBars.forEach(b => b.bar.classList.add('dragging'));
+        // Selected issues hidden under a collapsed parent cannot mount (no
+        // virtual position) but MUST still commit — the selection chrome
+        // counts them. Data-only entries: no visuals, dates from row meta.
+        if (isBulkDrag) {
+          const mountedIds = new Set(barsToMove.map(b => b.dataset.issueId));
+          selectedIssues.forEach(id => {
+            if (mountedIds.has(id)) return;
+            const meta = rowWindow?.getRowMeta('issue-' + id);
+            if (!meta || meta.barStartX === null || meta.barEndX === null) return;
+            bulkBars.push({
+              issueId: id,
+              startX: meta.barStartX,
+              endX: meta.barEndX,
+              oldStartDate: meta.startDate || null,
+              oldDueDate: meta.dueDate || null,
+              barOutline: null,
+              barMain: null,
+              leftHandle: null,
+              rightHandle: null,
+              leftGripCircles: [],
+              rightGripCircles: [],
+              leftHandleRect: null,
+              rightHandleRect: null,
+              bar: null,
+              barLabels: null,
+              labelsOnLeft: false,
+              connectedArrows: [],
+              linkHandle: null,
+              linkHandleCircles: []
+            });
+          });
+        }
+
+        bulkBars.forEach(b => b.bar?.classList.add('dragging'));
 
         const singleBarLabels = bar.querySelector('.bar-labels');
         const singleLabelsOnLeft = singleBarLabels?.classList.contains('labels-left');
@@ -1053,8 +1088,12 @@ export function setupDrag(ctx) {
             const newStartX = Math.max(0, Math.min(b.startX + snappedDelta, timelineWidth - barWidth));
             const newEndX = newStartX + barWidth;
             const width = newEndX - newStartX;
-            b.barOutline.setAttribute('x', newStartX);
-            b.barOutline.setAttribute('width', width);
+            // Collapse-hidden entries are data-only (no elements) — they
+            // still get newStartX/newEndX below for the commit
+            if (b.barOutline) {
+              b.barOutline.setAttribute('x', newStartX);
+              b.barOutline.setAttribute('width', width);
+            }
             if (b.barMain) {
               b.barMain.setAttribute('x', newStartX);
               b.barMain.setAttribute('width', width);
@@ -1217,8 +1256,8 @@ export function setupDrag(ctx) {
 
         // Handle bulk drag end
         if (isBulkDrag && bulkBars && isMove) {
-          // Remove dragging class from all bars
-          bulkBars.forEach(b => b.bar.classList.remove('dragging'));
+          // Remove dragging class from all bars (data-only entries have none)
+          bulkBars.forEach(b => b.bar?.classList.remove('dragging'));
 
           // Collect all date changes
           const changes = [];

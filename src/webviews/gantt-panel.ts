@@ -146,6 +146,10 @@ interface GanttRowPayload {
   /** Timeline bar x-range (issue rows) — arrow geometry anchors */
   barStartX: number | null;
   barEndX: number | null;
+  /** Issue dates (issue rows) — bulk drag commits collapse-hidden selected
+   *  issues from data, since they have no DOM element to read from */
+  startDate: string | null;
+  dueDate: string | null;
   panels: {
     status: string;
     id: string;
@@ -2455,6 +2459,8 @@ export class GanttPanel {
         issueId: row.type === "issue" && row.issue ? row.issue.id : null,
         barStartX,
         barEndX,
+        startDate: row.type === "issue" && row.issue ? (row.issue.start_date ?? null) : null,
+        dueDate: row.type === "issue" && row.issue ? (row.issue.due_date ?? null) : null,
         panels: {
           status: generateStatusCell(row, 0, 0, renderContext),
           id: generateIdCell(row, 0, 0, renderContext),

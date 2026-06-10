@@ -995,7 +995,14 @@ describe("gantt project-view root rows (skipTopProjectRow)", () => {
       type: "issue",
       issueId: 100,
       hasChildren: false,
+      // Dates ride in row meta so bulk drag can commit collapse-hidden
+      // selected issues (no DOM element to read them from)
+      startDate: "2025-12-01",
+      dueDate: "2025-12-10",
     });
+    const projectRow = payload.rows.find((r: any) => r.key === "project-2");
+    expect(projectRow.startDate).toBeNull();
+    expect(projectRow.dueDate).toBeNull();
     for (const p of ["status", "id", "labels", "start", "due", "assignee", "timeline"]) {
       expect(typeof issueRow.panels[p], p).toBe("string");
     }
