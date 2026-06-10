@@ -363,6 +363,20 @@ export function setupDrag(ctx) {
         }
         return localBars.get(id) ?? null;
       };
+      // Arrows render for ALL visible rows, but bars mount only around the
+      // viewport — an endpoint scrolled out of the window has no element.
+      // Synthesize a position stub from row meta (same dataset/transform
+      // contract updateArrowPositions reads) so the arrow tracks the drag.
+      const stubFor = (id) => {
+        const meta = rowWindow?.getRowMeta('issue-' + id);
+        if (!meta || meta.barStartX === null || meta.barEndX === null) return null;
+        const y = rowWindow.getVirtualY(meta.key);
+        if (y === null) return null; // hidden under a collapsed parent
+        return {
+          dataset: { startX: String(meta.barStartX), endX: String(meta.barEndX) },
+          getAttribute: () => `translate(0, ${y})`
+        };
+      };
       document.querySelectorAll(selector).forEach(arrow => {
         const fromId = arrow.getAttribute('data-from');
         const toId = arrow.getAttribute('data-to');
@@ -371,8 +385,8 @@ export function setupDrag(ctx) {
         const relType = relMatch ? relMatch[1] : 'relates';
         const isScheduling = ['blocks', 'precedes', 'finish_to_start', 'start_to_start', 'finish_to_finish', 'start_to_finish'].includes(relType);
         // Get source/target bar positions
-        const fromBar = barFor(fromId);
-        const toBar = barFor(toId);
+        const fromBar = barFor(fromId) ?? stubFor(fromId);
+        const toBar = barFor(toId) ?? stubFor(toId);
         if (!fromBar || !toBar) return;
         arrows.push({
           element: arrow,
