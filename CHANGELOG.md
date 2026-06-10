@@ -7,6 +7,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.28.9]
+
+### Fixed
+
+- **Hover highlight follows the mouse on large boards** — three compounding costs on every mouse movement: (1) the delegated `mouseenter`/`mouseleave` handlers fire for every *internal* element boundary inside a bar (rect → text → grip), and each pair did a full highlight clear + re-apply; (2) every one of those flipped a class on `<body>`, invalidating style for the whole ~77K-node SVG tree; (3) a base CSS rule put `transition: opacity 0.15s` on every bar and label, turning each invalidation into a multi-frame animation. Hover handlers now dedupe by logical target and only clear when the pointer actually exits the element; plain bar/label hovers no longer touch `<body>` (only dependency-arrow hovers, which dim the chart, do); the opacity transition is scoped to dim sessions
+- **perfDebug: toggle paint probe** — client-side collapse/expand now also logs when the first frame after the toggle actually painted (script time excludes the browser's style/layout/paint pass, which is the dominant cost on ~77K-node boards)
+
 ## [4.28.8]
 
 ### Fixed
