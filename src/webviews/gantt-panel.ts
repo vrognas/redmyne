@@ -1457,23 +1457,6 @@ export class GanttPanel {
           });
         });
         break;
-      case "toggleCollapse":
-        if (message.collapseKey) {
-          const key = message.collapseKey as string;
-          // Skip the debounced update from onDidChange - we'll update directly
-                    // Use shared collapse state (syncs with Issues pane)
-          // action: 'collapse' = only collapse, 'expand' = only expand, undefined = toggle
-          if (message.action === "collapse") {
-            this._collapseState.collapse(key);
-          } else if (message.action === "expand") {
-            this._collapseState.expand(key);
-          } else {
-            this._collapseState.toggle(key);
-          }
-          // Immediate update to ensure zebra stripes align with new visible rows
-          this._updateContent();
-        }
-        break;
       case "collapseStateSyncBulk":
         // Client-side expand/collapse-all already updated the UI — sync the
         // whole expanded set for persistence (no re-render; the bumped
@@ -1493,10 +1476,6 @@ export class GanttPanel {
             this._collapseState.collapse(message.collapseKey);
           }
         }
-        break;
-      case "requestRerender":
-        // Re-render requested (e.g., to fix zebra stripes after fallback toggle)
-        this._updateContent();
         break;
       case "undoRelation":
         if (this._server && message.operation) {
@@ -2446,11 +2425,10 @@ export class GanttPanel {
     // and always "visible" (an unmounted row has no DOM at all, so no
     // hidden-row markup exists anymore).
     const rowsPayload: GanttRowPayload[] = filteredRows.map((row) => {
-      const renderRow = { ...row, isVisible: true };
       const labelFragment =
-        row.type === "project" ? generateProjectLabel(renderRow, 0, 0, renderContext)
-        : row.type === "time-group" ? generateTimeGroupLabel(renderRow, 0, 0, renderContext)
-        : generateIssueLabel(renderRow, 0, 0, renderContext);
+        row.type === "project" ? generateProjectLabel(row, 0, 0, renderContext)
+        : row.type === "time-group" ? generateTimeGroupLabel(row, 0, 0, renderContext)
+        : generateIssueLabel(row, 0, 0, renderContext);
       // Timeline bar x-range for dependency-arrow geometry. UTC parsing to
       // match the UTC-anchored x-axis (bars use new Date(dateStr)).
       let barStartX: number | null = null;
@@ -2472,13 +2450,13 @@ export class GanttPanel {
         barStartX,
         barEndX,
         panels: {
-          status: generateStatusCell(renderRow, 0, 0, renderContext),
-          id: generateIdCell(renderRow, 0, 0, renderContext),
+          status: generateStatusCell(row, 0, 0, renderContext),
+          id: generateIdCell(row, 0, 0, renderContext),
           labels: labelFragment,
-          start: generateStartDateCell(renderRow, 0, 0, renderContext),
-          due: generateDueDateCell(renderRow, 0, 0, renderContext),
-          assignee: generateAssigneeCell(renderRow, 0, 0, renderContext),
-          timeline: generateIssueBar(renderRow, 0, 0, renderContext),
+          start: generateStartDateCell(row, 0, 0, renderContext),
+          due: generateDueDateCell(row, 0, 0, renderContext),
+          assignee: generateAssigneeCell(row, 0, 0, renderContext),
+          timeline: generateIssueBar(row, 0, 0, renderContext),
         },
       };
     });

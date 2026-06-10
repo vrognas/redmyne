@@ -24,10 +24,8 @@ export type GanttWebviewMessage =
   | { command: "refresh" }
   | { command: "openDraftReview" }
   | { command: "toggleDraftMode" }
-  | { command: "toggleCollapse"; collapseKey: string; action?: "collapse" | "expand" }
   | { command: "collapseStateSync"; collapseKey?: string; isExpanded?: boolean }
   | { command: "collapseStateSyncBulk"; expandedKeys?: string[] }
-  | { command: "requestRerender" }
   | { command: "undoRelation"; operation: string; relationId?: number; issueId?: number; targetIssueId?: number; relationType?: string; delay?: number }
   | { command: "redoRelation"; operation: string; relationId?: number; issueId?: number; targetIssueId?: number; relationType?: string; delay?: number }
   | { command: "openInBrowser"; issueId: number }

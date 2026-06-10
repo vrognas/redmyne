@@ -1678,22 +1678,6 @@ button:focus {
   cursor: pointer;
 }
 
-/* Client-side collapse: hide descendants of collapsed rows */
-.gantt-row-hidden,
-g.gantt-row-hidden,
-svg .gantt-row-hidden,
-.issue-label.gantt-row-hidden,
-.project-label.gantt-row-hidden,
-.time-group-label.gantt-row-hidden,
-.issue-bar.gantt-row-hidden,
-.aggregate-bars.gantt-row-hidden,
-.indent-guide-line.gantt-row-hidden,
-.dependency-arrow.gantt-row-hidden {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-}
-
 /* Screen reader only class */
 .sr-only {
   position: absolute;

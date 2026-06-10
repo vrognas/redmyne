@@ -288,10 +288,11 @@ function generateChevron(indent: number, barHeight: number, isExpanded: boolean)
 // Column Cell Generation
 // ============================================================================
 
-function rowVisibility(row: GanttRow): { hiddenAttr: string; hiddenClass: string } {
-  const hiddenAttr = row.isVisible ? "" : ' visibility="hidden"';
-  const hiddenClass = row.isVisible ? "" : " gantt-row-hidden";
-  return { hiddenAttr, hiddenClass };
+function rowVisibility(_row: GanttRow): { hiddenAttr: string; hiddenClass: string } {
+  // Windowed rendering: rows hidden under a collapsed parent simply aren't
+  // mounted, so fragments never carry hidden markup. Kept as a seam so the
+  // template sites stay uniform.
+  return { hiddenAttr: "", hiddenClass: "" };
 }
 
 function emptyCellRow(row: GanttRow, y: number, originalY: number, hiddenAttr: string, hiddenClass: string): string {
