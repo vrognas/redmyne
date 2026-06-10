@@ -31,18 +31,6 @@ jobs:
           node-version: "22"
           cache: "npm"
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run tests
-        run: npm run test:coverage
-
-      - name: Run lint
-        run: npm run lint
-
-      - name: Compile TypeScript
-        run: npm run compile
-
       - name: Get version from tag
         id: get_version
         run: |
@@ -55,6 +43,28 @@ jobs:
           # title don't carry the v prefix
           echo "VERSION=${TAG#v}" >> $GITHUB_OUTPUT
           echo "TAG=$TAG" >> $GITHUB_OUTPUT
+
+      # Fail fast before the test run: a tag pushed without bumping
+      # package.json would otherwise publish the wrong version
+      - name: Verify package.json matches tag
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$PKG_VERSION" != "${{ steps.get_version.outputs.VERSION }}" ]; then
+            echo "::error::package.json version ($PKG_VERSION) does not match tag version (${{ steps.get_version.outputs.VERSION }})"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test:coverage
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Compile TypeScript
+        run: npm run compile
 
       - name: Extract changelog for version
         id: changelog
