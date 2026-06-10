@@ -231,12 +231,19 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
   function scrollToKey(key) {
     const idx = indexByKey.get(key);
     if (idx === undefined || !scrollEl) return;
+    // Rows do NOT start at scroll-content y=0: the sticky-but-in-flow header
+    // row (and capacity ribbon, when visible) precede .gantt-body, and the
+    // same sticky stack occludes the top of the viewport.
     const headerH = document.querySelector('.gantt-header-row')?.getBoundingClientRect().height || 60;
-    const y = idx * barHeight;
+    const bodyEl = document.querySelector('.gantt-body');
+    const bodyTop = bodyEl
+      ? bodyEl.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top + scrollEl.scrollTop
+      : headerH;
+    const y = bodyTop + idx * barHeight; // row top in scroll-content space
     const viewTop = scrollEl.scrollTop;
     const viewBottom = viewTop + scrollEl.clientHeight;
-    if (y < viewTop + headerH) {
-      scrollEl.scrollTop = Math.max(0, y - headerH - 4);
+    if (y < viewTop + bodyTop) {
+      scrollEl.scrollTop = Math.max(0, y - bodyTop - 4);
     } else if (y + barHeight > viewBottom) {
       scrollEl.scrollTop = y + barHeight - scrollEl.clientHeight + 4;
     }
