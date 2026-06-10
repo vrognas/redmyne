@@ -152,17 +152,14 @@ function getScheduledIntensity(
 /** Generate SVG for issue label row */
 export function generateIssueLabel(
   row: GanttRow,
-  y: number,
-  originalY: number,
   ctx: GanttRenderContext
 ): string {
   const issue = row.issue!;
-  const { hiddenAttr, hiddenClass } = rowVisibility(row);
   const indent = row.depth * ctx.indentSize;
   const textOffset = ctx.chevronWidth;
 
   const chevron = row.hasChildren
-    ? generateChevron(indent, ctx.barHeight, row.isExpanded)
+    ? generateChevron(indent, ctx.barHeight)
     : "";
 
   const escapedSubject = escapeHtml(issue.subject);
@@ -210,7 +207,7 @@ export function generateIssueLabel(
   const taskOpacity = issue.isClosed ? "0.5" : "1";
 
   return `
-    <g class="issue-label gantt-row cursor-pointer${hiddenClass}" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${originalY}" data-tooltip="${escapeAttr(tooltip)}" data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}' transform="translate(0, ${y})"${hiddenAttr} tabindex="0" role="button" aria-label="Open issue #${issue.id}">
+    <g class="issue-label gantt-row cursor-pointer" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-has-children="${row.hasChildren}" data-tooltip="${escapeAttr(tooltip)}" data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}' tabindex="0" role="button" aria-label="Open issue #${issue.id}">
       <rect class="row-hit-area" x="0" y="-1" width="100%" height="${ctx.barHeight + 2}" fill="transparent" pointer-events="all"/>
       ${chevron}
       <text class="issue-text" x="${10 + indent + textOffset}" y="${ctx.barHeight / 2 + 5}" fill="${issue.isExternal ? "var(--vscode-descriptionForeground)" : "var(--vscode-foreground)"}" font-size="13" opacity="${taskOpacity}">
@@ -223,22 +220,19 @@ export function generateIssueLabel(
 /** Generate SVG for project label row */
 export function generateProjectLabel(
   row: GanttRow,
-  y: number,
-  originalY: number,
   ctx: GanttRenderContext
 ): string {
-  const { hiddenAttr, hiddenClass } = rowVisibility(row);
   const indent = row.depth * ctx.indentSize;
 
   const chevron = row.hasChildren
-    ? generateChevron(indent, ctx.barHeight, row.isExpanded)
+    ? generateChevron(indent, ctx.barHeight)
     : "";
 
   const labelX = 10 + indent + ctx.chevronWidth;
   const tooltip = ctx.buildProjectTooltip(row);
 
   return `
-    <g class="project-label gantt-row cursor-pointer${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${originalY}" data-tooltip="${escapeAttr(tooltip)}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}' transform="translate(0, ${y})"${hiddenAttr} tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
+    <g class="project-label gantt-row cursor-pointer" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-has-children="${row.hasChildren}" data-tooltip="${escapeAttr(tooltip)}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}' tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
       <rect class="row-hit-area" x="0" y="-1" width="100%" height="${ctx.barHeight + 2}" fill="transparent" pointer-events="all"/>
       ${chevron}
       <text x="${labelX}" y="${ctx.barHeight / 2 + 5}" fill="var(--vscode-descriptionForeground)" font-size="13" font-weight="bold" pointer-events="none">
@@ -251,22 +245,19 @@ export function generateProjectLabel(
 /** Generate SVG for time-group label row */
 export function generateTimeGroupLabel(
   row: GanttRow,
-  y: number,
-  originalY: number,
   ctx: GanttRenderContext
 ): string {
-  const { hiddenAttr, hiddenClass } = rowVisibility(row);
   const indent = row.depth * ctx.indentSize;
 
   const chevron = row.hasChildren
-    ? generateChevron(indent, ctx.barHeight, row.isExpanded)
+    ? generateChevron(indent, ctx.barHeight)
     : "";
 
   const timeGroupClass = `time-group-${row.timeGroup}`;
   const countBadge = row.childCount ? ` (${row.childCount})` : "";
 
   return `
-    <g class="time-group-label gantt-row ${timeGroupClass}${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-time-group="${row.timeGroup}" data-expanded="${row.isExpanded}" data-has-children="${row.hasChildren}" data-original-y="${originalY}" data-tooltip="${escapeAttr(row.label)}" transform="translate(0, ${y})"${hiddenAttr} tabindex="0" role="button" aria-label="Toggle ${escapeHtml(row.label)}">
+    <g class="time-group-label gantt-row ${timeGroupClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-time-group="${row.timeGroup}" data-has-children="${row.hasChildren}" data-tooltip="${escapeAttr(row.label)}" tabindex="0" role="button" aria-label="Toggle ${escapeHtml(row.label)}">
       <rect class="row-hit-area" x="0" y="-1" width="100%" height="${ctx.barHeight + 2}" fill="transparent" pointer-events="all"/>
       ${chevron}
       <text x="${10 + indent + ctx.chevronWidth}" y="${ctx.barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="13" font-weight="bold" pointer-events="none">
@@ -277,40 +268,30 @@ export function generateTimeGroupLabel(
 }
 
 /** Generate chevron SVG */
-function generateChevron(indent: number, barHeight: number, isExpanded: boolean): string {
+function generateChevron(indent: number, barHeight: number): string {
   const chevronX = 10 + indent;
   const chevronY = barHeight / 2;
   const hitAreaSize = 18;
-  return `<g class="collapse-toggle user-select-none${isExpanded ? " expanded" : ""}" transform-origin="${chevronX} ${chevronY}"><rect x="${chevronX - hitAreaSize / 2}" y="${chevronY - hitAreaSize / 2}" width="${hitAreaSize}" height="${hitAreaSize}" fill="transparent" class="chevron-hit-area"/><path d="M${chevronX - 3},${chevronY - 4} L${chevronX + 2},${chevronY} L${chevronX - 3},${chevronY + 4}" fill="none" stroke="var(--vscode-foreground)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></g>`;
+  return `<g class="collapse-toggle user-select-none" transform-origin="${chevronX} ${chevronY}"><rect x="${chevronX - hitAreaSize / 2}" y="${chevronY - hitAreaSize / 2}" width="${hitAreaSize}" height="${hitAreaSize}" fill="transparent" class="chevron-hit-area"/><path d="M${chevronX - 3},${chevronY - 4} L${chevronX + 2},${chevronY} L${chevronX - 3},${chevronY + 4}" fill="none" stroke="var(--vscode-foreground)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></g>`;
 }
 
 // ============================================================================
 // Column Cell Generation
 // ============================================================================
 
-function rowVisibility(_row: GanttRow): { hiddenAttr: string; hiddenClass: string } {
-  // Windowed rendering: rows hidden under a collapsed parent simply aren't
-  // mounted, so fragments never carry hidden markup. Kept as a seam so the
-  // template sites stay uniform.
-  return { hiddenAttr: "", hiddenClass: "" };
-}
-
-function emptyCellRow(row: GanttRow, y: number, originalY: number, hiddenAttr: string, hiddenClass: string): string {
-  return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
+function emptyCellRow(row: GanttRow): string {
+  return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"></g>`;
 }
 
 /** Generate ID column cell */
 export function generateIdCell(
   row: GanttRow,
-  y: number,
-  originalY: number,
   ctx: GanttRenderContext
 ): string {
-  const { hiddenAttr, hiddenClass } = rowVisibility(row);
-  if (row.type !== "issue") return emptyCellRow(row, y, originalY, hiddenAttr, hiddenClass);
+  if (row.type !== "issue") return emptyCellRow(row);
 
   const issue = row.issue!;
-  return `<g class="gantt-row cursor-pointer${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr} data-vscode-context='{"webviewSection":"issueIdColumn","issueId":${issue.id},"preventDefaultContextMenuItems":true}'>
+  return `<g class="gantt-row cursor-pointer" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-vscode-context='{"webviewSection":"issueIdColumn","issueId":${issue.id},"preventDefaultContextMenuItems":true}'>
     <text class="gantt-col-cell" x="${ctx.idColumnWidth / 2}" y="${ctx.barHeight / 2 + 4}" text-anchor="middle">#${issue.id}</text>
   </g>`;
 }
@@ -318,22 +299,19 @@ export function generateIdCell(
 /** Generate start date column cell */
 export function generateStartDateCell(
   row: GanttRow,
-  y: number,
-  originalY: number,
   ctx: GanttRenderContext
 ): string {
-  const { hiddenAttr, hiddenClass } = rowVisibility(row);
-  if (row.type !== "issue") return emptyCellRow(row, y, originalY, hiddenAttr, hiddenClass);
+  if (row.type !== "issue") return emptyCellRow(row);
 
   const issue = row.issue!;
   if (!issue.start_date) {
-    return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}><text class="gantt-col-cell" x="4" y="${ctx.barHeight / 2 + 4}" text-anchor="start">—</text></g>`;
+    return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"><text class="gantt-col-cell" x="4" y="${ctx.barHeight / 2 + 4}" text-anchor="start">—</text></g>`;
   }
 
   const startDate = parseLocalDate(issue.start_date);
   const displayDate = startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
-  return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}>
+  return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}">
     <title>${escapeAttr(issue.start_date)}</title>
     <text class="gantt-col-cell" x="4" y="${ctx.barHeight / 2 + 4}" text-anchor="start">${displayDate}</text>
   </g>`;
@@ -342,12 +320,9 @@ export function generateStartDateCell(
 /** Generate status column cell */
 export function generateStatusCell(
   row: GanttRow,
-  y: number,
-  originalY: number,
   ctx: GanttRenderContext
 ): string {
-  const { hiddenAttr, hiddenClass } = rowVisibility(row);
-  if (row.type !== "issue") return emptyCellRow(row, y, originalY, hiddenAttr, hiddenClass);
+  if (row.type !== "issue") return emptyCellRow(row);
 
   const issue = row.issue!;
   const statusName = issue.statusName ?? "Unknown";
@@ -362,7 +337,7 @@ export function generateStatusCell(
   const cx = ctx.statusColumnWidth / 2;
   const cy = ctx.barHeight / 2;
 
-  return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}>
+  return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}">
     <title>${escapeAttr(statusName)}</title>
     <circle cx="${cx}" cy="${cy}" r="5" fill="${dotColor}"/>
   </g>`;
@@ -371,16 +346,13 @@ export function generateStatusCell(
 /** Generate due date column cell */
 export function generateDueDateCell(
   row: GanttRow,
-  y: number,
-  originalY: number,
   ctx: GanttRenderContext
 ): string {
-  const { hiddenAttr, hiddenClass } = rowVisibility(row);
-  if (row.type !== "issue") return emptyCellRow(row, y, originalY, hiddenAttr, hiddenClass);
+  if (row.type !== "issue") return emptyCellRow(row);
 
   const issue = row.issue!;
   if (!issue.due_date) {
-    return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}><text class="gantt-col-cell" x="4" y="${ctx.barHeight / 2 + 4}" text-anchor="start">—</text></g>`;
+    return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"><text class="gantt-col-cell" x="4" y="${ctx.barHeight / 2 + 4}" text-anchor="start">—</text></g>`;
   }
 
   const dueDate = parseLocalDate(issue.due_date);
@@ -403,7 +375,7 @@ export function generateDueDateCell(
     dueTooltip = daysUntilDue === 0 ? `${issue.due_date} (Due today)` : `${issue.due_date} (Due in ${daysUntilDue} day${daysUntilDue === 1 ? "" : "s"})`;
   }
 
-  return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}>
+  return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}">
     <title>${escapeAttr(dueTooltip)}</title>
     <text class="gantt-col-cell ${dueClass}" x="4" y="${ctx.barHeight / 2 + 4}" text-anchor="start">${displayDate}</text>
   </g>`;
@@ -412,16 +384,13 @@ export function generateDueDateCell(
 /** Generate assignee column cell */
 export function generateAssigneeCell(
   row: GanttRow,
-  y: number,
-  originalY: number,
   ctx: GanttRenderContext
 ): string {
-  const { hiddenAttr, hiddenClass } = rowVisibility(row);
-  if (row.type !== "issue") return emptyCellRow(row, y, originalY, hiddenAttr, hiddenClass);
+  if (row.type !== "issue") return emptyCellRow(row);
 
   const issue = row.issue!;
   if (!issue.assignee) {
-    return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}><text class="gantt-col-cell" x="${ctx.assigneeColumnWidth / 2}" y="${ctx.barHeight / 2 + 4}" text-anchor="middle">—</text></g>`;
+    return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"><text class="gantt-col-cell" x="${ctx.assigneeColumnWidth / 2}" y="${ctx.barHeight / 2 + 4}" text-anchor="middle">—</text></g>`;
   }
 
   const initials = getInitials(issue.assignee);
@@ -431,7 +400,7 @@ export function generateAssigneeCell(
   const cx = ctx.assigneeColumnWidth / 2;
   const cy = ctx.barHeight / 2;
 
-  return `<g class="gantt-row assignee-badge${isCurrentUser ? " current-user" : ""}${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}>
+  return `<g class="gantt-row assignee-badge${isCurrentUser ? " current-user" : ""}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}">
     <title>${escapeAttr(issue.assignee)}</title>
     <circle class="avatar-fill-${colors.fill} avatar-stroke-${colors.stroke}" cx="${cx}" cy="${cy}" r="${radius}"/>
     <text x="${cx}" y="${cy + 3}" text-anchor="middle" fill="var(--vscode-editor-background)" font-size="9" font-weight="600">${escapeHtml(initials)}</text>
@@ -445,20 +414,17 @@ export function generateAssigneeCell(
 /** Generate issue bar SVG */
 export function generateIssueBar(
   row: GanttRow,
-  y: number,
-  originalY: number,
   ctx: GanttRenderContext
 ): string {
-  const { hiddenAttr, hiddenClass } = rowVisibility(row);
 
   // Project aggregate bars
   if (row.type === "project") {
-    return generateProjectAggregateBar(row, y, originalY, hiddenAttr, hiddenClass, ctx);
+    return generateProjectAggregateBar(row, ctx);
   }
 
   // Time-group aggregate bars
   if (row.type === "time-group") {
-    return generateTimeGroupAggregateBar(row, y, originalY, hiddenAttr, hiddenClass, ctx);
+    return generateTimeGroupAggregateBar(row, ctx);
   }
 
   // Issue bars
@@ -494,24 +460,20 @@ export function generateIssueBar(
 
   // Parent issue: summary bar
   if (isParent) {
-    return generateParentBar(row, issue, y, originalY, startX, endX, width, barY, color, hiddenAttr, hiddenClass, ctx);
+    return generateParentBar(row, issue, startX, endX, width, barY, color, ctx);
   }
 
   // Regular issue bar
-  return generateRegularBar(row, issue, y, originalY, startX, endX, width, barY, color, textColor, fillOpacity, isPast, isOverdue, hasOnlyStart, hiddenAttr, hiddenClass, ctx);
+  return generateRegularBar(row, issue, startX, endX, width, barY, color, textColor, fillOpacity, isPast, isOverdue, hasOnlyStart, ctx);
 }
 
 /** Generate project aggregate bar */
 function generateProjectAggregateBar(
   row: GanttRow,
-  y: number,
-  originalY: number,
-  hiddenAttr: string,
-  hiddenClass: string,
   ctx: GanttRenderContext
 ): string {
   if (!row.childDateRanges || row.childDateRanges.length === 0) {
-    return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
+    return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"></g>`;
   }
 
   const tooltip = ctx.buildProjectTooltip(row);
@@ -534,20 +496,16 @@ function generateProjectAggregateBar(
     })
     .join("");
 
-  return `<g class="aggregate-bars gantt-row${hiddenClass}" data-project-id="${row.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" data-tooltip="${escapeAttr(tooltip)}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}' transform="translate(0, ${y})"${hiddenAttr}><title>${escapeAttr(tooltip)}</title>${aggregateBars}</g>`;
+  return `<g class="aggregate-bars gantt-row" data-project-id="${row.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-tooltip="${escapeAttr(tooltip)}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}'><title>${escapeAttr(tooltip)}</title>${aggregateBars}</g>`;
 }
 
 /** Generate time-group aggregate bar */
 function generateTimeGroupAggregateBar(
   row: GanttRow,
-  y: number,
-  originalY: number,
-  hiddenAttr: string,
-  hiddenClass: string,
   ctx: GanttRenderContext
 ): string {
   if (!row.childDateRanges || row.childDateRanges.length === 0) {
-    return `<g class="gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}></g>`;
+    return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"></g>`;
   }
 
   const barY = ctx.barPadding;
@@ -573,22 +531,18 @@ function generateTimeGroupAggregateBar(
     })
     .join("");
 
-  return `<g class="aggregate-bars time-group-bars gantt-row${hiddenClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-time-group="${row.timeGroup}" data-original-y="${originalY}" transform="translate(0, ${y})"${hiddenAttr}>${aggregateBars}</g>`;
+  return `<g class="aggregate-bars time-group-bars gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-time-group="${row.timeGroup}">${aggregateBars}</g>`;
 }
 
 /** Generate parent (summary) bar */
 function generateParentBar(
   row: GanttRow,
   issue: GanttIssue,
-  y: number,
-  originalY: number,
   startX: number,
   endX: number,
   _width: number,
   barY: number,
   color: string,
-  hiddenAttr: string,
-  hiddenClass: string,
   ctx: GanttRenderContext
 ): string {
   const escapedSubject = escapeHtml(issue.subject);
@@ -598,16 +552,14 @@ function generateParentBar(
   const barTooltip = `#${issue.id} ${escapedSubject}\n(Parent issue - ${doneRatio}% aggregated progress)`;
 
   return `
-    <g class="issue-bar parent-bar gantt-row${hiddenClass}" data-issue-id="${issue.id}"
+    <g class="issue-bar parent-bar gantt-row" data-issue-id="${issue.id}"
        data-project-id="${issue.projectId}"
        data-subject="${escapedSubject}"
        data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
-       data-original-y="${originalY}"
        data-start-date="${issue.start_date || ""}"
        data-due-date="${issue.due_date || ""}"
-       data-start-x="${startX}" data-end-x="${endX}" data-center-y="${y + ctx.barHeight / 2}"
+       data-start-x="${startX}" data-end-x="${endX}" data-center-y="${ctx.barHeight / 2}"
        data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}'
-       transform="translate(0, ${y})"${hiddenAttr}
        tabindex="0" role="button" aria-label="#${issue.id} ${escapedSubject} (parent, ${doneRatio}% done)">
       <title>${escapeAttr(barTooltip)}</title>
       <rect class="parent-hit-area" x="${startX}" y="0" width="${endX - startX}" height="${ctx.barHeight}" fill="transparent" pointer-events="all"/>
@@ -633,8 +585,6 @@ function generateParentBar(
 function generateRegularBar(
   row: GanttRow,
   issue: GanttIssue,
-  y: number,
-  originalY: number,
   startX: number,
   endX: number,
   width: number,
@@ -645,8 +595,6 @@ function generateRegularBar(
   isPast: boolean,
   isOverdue: boolean,
   hasOnlyStart: boolean,
-  hiddenAttr: string,
-  hiddenClass: string,
   ctx: GanttRenderContext
 ): string {
   const escapedSubject = escapeHtml(issue.subject);
@@ -783,16 +731,14 @@ function generateRegularBar(
   const badges = generateBarBadges(issue, startX, endX, barY, flexPct, visualDoneRatio, isFallbackProgress, progressTooltip, flexTooltip, blocksTooltip, blockerTooltip, ctx);
 
   return `
-    <g class="issue-bar gantt-row${hiddenClass}${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${issue.isAdHoc ? " bar-adhoc" : ""}${isCriticalPath ? " bar-critical" : ""}" data-issue-id="${issue.id}"
+    <g class="issue-bar gantt-row${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${issue.isAdHoc ? " bar-adhoc" : ""}${isCriticalPath ? " bar-critical" : ""}" data-issue-id="${issue.id}"
        data-project-id="${issue.projectId}"
        data-subject="${escapedSubject}"
        data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
-       data-original-y="${originalY}"
        data-start-date="${issue.start_date || ""}"
        data-due-date="${issue.due_date || ""}"
-       data-start-x="${startX}" data-end-x="${endX}" data-center-y="${y + ctx.barHeight / 2}"
+       data-start-x="${startX}" data-end-x="${endX}" data-center-y="${ctx.barHeight / 2}"
        data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}'
-       transform="translate(0, ${y})"${hiddenAttr}
        tabindex="0" role="button" aria-label="#${issue.id} ${escapedSubject}${isOverdue ? " (overdue)" : ""}">
       <title>${escapeAttr(barTooltip)}</title>
       <defs>
@@ -831,12 +777,12 @@ function generateRegularBar(
           <circle cx="${startX + width - 9}" cy="${ctx.barHeight / 2 + 4}" r="1.5"/>
         </g>
       </g>
-      <g class="link-handle link-handle-start cursor-crosshair" data-anchor="start" data-cx="${startX - 8}" data-cy="${y + barY + ctx.barContentHeight / 2}">
+      <g class="link-handle link-handle-start cursor-crosshair" data-anchor="start" data-cx="${startX - 8}" data-cy="${barY + ctx.barContentHeight / 2}">
         <title>Drag to link (from start)</title>
         <circle cx="${startX - 8}" cy="${barY + ctx.barContentHeight / 2}" r="12" fill="transparent" pointer-events="all"/>
         <circle class="link-handle-visual" cx="${startX - 8}" cy="${barY + ctx.barContentHeight / 2}" r="4" fill="var(--vscode-button-background)" stroke="var(--vscode-button-foreground)" stroke-width="1" pointer-events="none"/>
       </g>
-      <g class="link-handle link-handle-end cursor-crosshair" data-anchor="end" data-cx="${endX + 8}" data-cy="${y + barY + ctx.barContentHeight / 2}">
+      <g class="link-handle link-handle-end cursor-crosshair" data-anchor="end" data-cx="${endX + 8}" data-cy="${barY + ctx.barContentHeight / 2}">
         <title>Drag to link (from end)</title>
         <circle cx="${endX + 8}" cy="${barY + ctx.barContentHeight / 2}" r="12" fill="transparent" pointer-events="all"/>
         <circle class="link-handle-visual" cx="${endX + 8}" cy="${barY + ctx.barContentHeight / 2}" r="4" fill="var(--vscode-button-background)" stroke="var(--vscode-button-foreground)" stroke-width="1" pointer-events="none"/>

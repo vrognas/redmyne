@@ -2436,9 +2436,9 @@ export class GanttPanel {
     // hidden-row markup exists anymore).
     const rowsPayload: GanttRowPayload[] = filteredRows.map((row) => {
       const labelFragment =
-        row.type === "project" ? generateProjectLabel(row, 0, 0, renderContext)
-        : row.type === "time-group" ? generateTimeGroupLabel(row, 0, 0, renderContext)
-        : generateIssueLabel(row, 0, 0, renderContext);
+        row.type === "project" ? generateProjectLabel(row, renderContext)
+        : row.type === "time-group" ? generateTimeGroupLabel(row, renderContext)
+        : generateIssueLabel(row, renderContext);
       // Timeline bar x-range for dependency-arrow geometry. UTC parsing to
       // match the UTC-anchored x-axis (bars use new Date(dateStr)).
       let barStartX: number | null = null;
@@ -2462,13 +2462,13 @@ export class GanttPanel {
         startDate: row.type === "issue" && row.issue ? (row.issue.start_date ?? null) : null,
         dueDate: row.type === "issue" && row.issue ? (row.issue.due_date ?? null) : null,
         panels: {
-          status: generateStatusCell(row, 0, 0, renderContext),
-          id: generateIdCell(row, 0, 0, renderContext),
+          status: generateStatusCell(row, renderContext),
+          id: generateIdCell(row, renderContext),
           labels: labelFragment,
-          start: generateStartDateCell(row, 0, 0, renderContext),
-          due: generateDueDateCell(row, 0, 0, renderContext),
-          assignee: generateAssigneeCell(row, 0, 0, renderContext),
-          timeline: generateIssueBar(row, 0, 0, renderContext),
+          start: generateStartDateCell(row, renderContext),
+          due: generateDueDateCell(row, renderContext),
+          assignee: generateAssigneeCell(row, renderContext),
+          timeline: generateIssueBar(row, renderContext),
         },
       };
     });

@@ -331,9 +331,9 @@ export function setupDrag(ctx) {
       return { path, arrowHead };
     }
 
-    // Bar center Y from CURRENT transform (rows shift on collapse/expand;
-    // data-center-y is render-time only). Generator contract:
-    // data-center-y = transformY + barHeight / 2.
+    // Bar center Y from CURRENT transform (rows shift on collapse/expand).
+    // Generator contract: fragments are generated at y=0, so
+    // data-center-y = barHeight / 2 (the mount transform supplies the row Y).
     function barCenterY(bar) {
       const transformY = parseTranslateY(bar.getAttribute('transform'), NaN);
       return Number.isNaN(transformY)
