@@ -7,7 +7,7 @@ import {
 import { parseTranslateX, parseTranslateY, pickRowKeyByY } from './selection-utils.js';
 
 export function setupCollapse(ctx) {
-  const { vscode, addDocListener, addWinListener, announce, barHeight, selectedCollapseKey, refreshArrowGeometry } = ctx;
+  const { vscode, addDocListener, addWinListener, announce, barHeight, selectedCollapseKey, refreshArrowGeometry, perfLog = () => {} } = ctx;
 
   // Collapse toggle click (before issue-label handler to stop propagation)
   document.querySelectorAll('.collapse-toggle').forEach(el => {
@@ -263,6 +263,7 @@ export function setupCollapse(ctx) {
     if (shouldExpand === wasExpanded) {
       return;
     }
+    const perfT0 = performance.now();
 
     // Update chevron state FIRST (before findVisibleDescendants checks it)
     parentLabel.dataset.expanded = shouldExpand ? 'true' : 'false';
@@ -342,6 +343,9 @@ export function setupCollapse(ctx) {
 
     // Fallback: if no contributions found, use re-render
     if (actualDelta === 0 && deltaDescendants.length > 0) {
+      perfLog(`toggle ${collapseKey} ${shouldExpand ? 'expand' : 'collapse'}: FALLBACK full re-render `
+        + `(deltaRows=${deltaDescendants.length}, counted=${countedKeys.size}, bands=${allStripes.length}, `
+        + `parentInBand=${Array.from(allStripes).some(s => collapseKey in getStripeContributions(s))})`);
       vscode.postMessage({ command: 'collapseStateSync', collapseKey, isExpanded: shouldExpand });
       vscode.postMessage({ command: 'requestRerender' });
       return;
@@ -526,6 +530,7 @@ export function setupCollapse(ctx) {
 
     // Arrow paths were computed at render time — re-anchor them to the
     // rows' current (shifted) positions
+    const perfTArrows = performance.now();
     refreshArrowGeometry?.();
 
     // Selected row may have shifted or been hidden by this toggle
@@ -533,6 +538,9 @@ export function setupCollapse(ctx) {
 
     // Sync state to extension for persistence (no re-render)
     vscode.postMessage({ command: 'collapseStateSync', collapseKey, isExpanded: shouldExpand });
+    const perfEnd = performance.now();
+    perfLog(`toggle ${collapseKey} ${shouldExpand ? 'expand' : 'collapse'}: ${(perfEnd - perfT0).toFixed(1)}ms `
+      + `client-side (delta=${delta}px, rows=${deltaDescendants.length}, arrows=${(perfEnd - perfTArrows).toFixed(1)}ms)`);
   }
 
   // Restore selection from previous render

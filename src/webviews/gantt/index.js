@@ -26,6 +26,11 @@ function perfMeasure(name, startMark, endMark) {
     } catch (e) { /* ignore */ }
   }
 }
+function perfLog(message) {
+  if (PERF_DEBUG) {
+    console.log(`[Gantt Perf] ${message}`);
+  }
+}
 function logDomStats() {
   if (PERF_DEBUG) {
     const root = document.getElementById('ganttRoot');
@@ -1430,7 +1435,8 @@ function initializeGantt(state) {
       announce,
       barHeight,
       selectedCollapseKey,
-      refreshArrowGeometry: dragApi.refreshArrowGeometry
+      refreshArrowGeometry: dragApi.refreshArrowGeometry,
+      perfLog
     });
 
     // Scroll to today marker (centered in visible timeline area)

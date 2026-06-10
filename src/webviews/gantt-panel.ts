@@ -1240,6 +1240,12 @@ export class GanttPanel {
   }
 
   private _handleMessage(message: GanttWebviewMessage): void {
+    if (isPerfDebugEnabled()) {
+      // Trace which webview messages precede each render — distinguishes
+      // client-side toggles (collapseStateSync) from full-render triggers
+      // (requestRerender fallback, expandAll/collapseAll, filters...)
+      console.log(`[Gantt Perf] msg: ${message.command}`);
+    }
     switch (message.command) {
       case "webviewReady":
         this._webviewReady = true;
