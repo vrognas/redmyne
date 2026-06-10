@@ -1458,10 +1458,16 @@ export class GanttPanel {
         });
         break;
       case "collapseStateSyncBulk":
-        // Client-side expand/collapse-all already updated the UI — sync the
-        // whole expanded set for persistence (no re-render; the bumped
-        // collapse version invalidates the payload memo).
-        this._collapseState.setExpandedKeys(message.expandedKeys ?? []);
+        // Client-side expand/collapse-all already updated the UI — sync for
+        // persistence (no re-render; the bumped collapse version invalidates
+        // the payload memo). Expand-all is ADDITIVE: the webview only knows
+        // the current board's keys, and replacing the set would wipe the
+        // other view-focus's expand state.
+        if (message.expandedKeys?.length) {
+          this._collapseState.expandAll(message.expandedKeys);
+        } else {
+          this._collapseState.collapseAll();
+        }
         break;
       case "collapseStateSync":
         // Client-side collapse already done, just sync state for persistence

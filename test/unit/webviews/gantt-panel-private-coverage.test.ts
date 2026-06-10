@@ -1188,16 +1188,32 @@ describe("gantt view-focus toggle perf (per-focus payload memo)", () => {
     expect(lastRenderHtml(mock)).toBe("h2"); // not the stale h0
   });
 
-  it("collapseStateSyncBulk applies the whole expanded set without re-rendering", () => {
+  it("collapseStateSyncBulk expand-all is additive (preserves off-board keys)", () => {
     const { panel } = setup();
     panel._updateContent = vi.fn();
+    // Key expanded in the OTHER view focus — not on the current board, so the
+    // webview's expand-all payload won't include it. It must survive.
+    panel._collapseState.expandAll(["time-group-1"]);
     const vBefore = panel._collapseState.version;
 
     panel._handleMessage({ command: "collapseStateSyncBulk", expandedKeys: ["project-1", "issue-9"] });
 
-    expect(panel._collapseState.getExpandedKeys()).toEqual(new Set(["project-1", "issue-9"]));
+    expect(panel._collapseState.getExpandedKeys()).toEqual(
+      new Set(["time-group-1", "project-1", "issue-9"])
+    );
     expect(panel._collapseState.version).toBeGreaterThan(vBefore); // memo key invalidated
     expect(panel._updateContent).not.toHaveBeenCalled(); // client already updated the UI
+  });
+
+  it("collapseStateSyncBulk with no keys collapses everything", () => {
+    const { panel } = setup();
+    panel._updateContent = vi.fn();
+    panel._collapseState.expandAll(["project-1", "time-group-1"]);
+
+    panel._handleMessage({ command: "collapseStateSyncBulk", expandedKeys: [] });
+
+    expect(panel._collapseState.getExpandedKeys()).toEqual(new Set());
+    expect(panel._updateContent).not.toHaveBeenCalled();
   });
 
   it("does not serve a memo entry built on a previous day", () => {
