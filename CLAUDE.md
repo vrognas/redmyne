@@ -5,6 +5,12 @@
 - The startup hook creates `ghcli` symlink automatically
 - Example: `ghcli pr create`, `ghcli issue list`, `~/.local/bin/gh api`
 
+## Releases
+
+- Fully automated: bump version + changelog, `npm run lint` (the workflow gates on it), commit, `git tag vX.Y.Z`, `git push origin main vX.Y.Z`
+- `.github/workflows/release.yml` then tests, packages, publishes Open VSX + VS Code Marketplace, and creates the GitHub release (tokens in repo Actions secrets — never publish locally)
+- Tag must match package.json version (workflow rejects mismatch); if a tagged commit fails the gate, fix on main and `gh workflow run release.yml -f tag=vX.Y.Z`
+
 ---
 
 - In all interactions and commit messages, be extremely concise and sacrifice grammar for the sake of concision.
