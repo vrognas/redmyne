@@ -73,6 +73,8 @@ src/
   - `row-window.js`: windowed mounting + data-computed layers (webview)
   - `row-window-utils.js`: pure visible-list/band/span/range functions
   - `arrow-svg.js`: dependency-arrow path builder (webview)
+  - `lookup-maps.js`: mounted-element lookup maps, rebuilt per refresh (webview)
+  - `gantt-row-interaction.js`: collapse toggles, row selection, keyboard nav (webview)
 
 ### Timer (`src/timer/`)
 - State machine: idle → working → paused → logging → break

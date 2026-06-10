@@ -9,6 +9,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [4.29.1]
 
+### Changed
+
+- **Post-virtualization cleanup** (18 verified review findings): deleted the dead emit-everything remnants the windowed renderer obsoleted — `rowVisibility()`/hidden-markup threading through ~20 template sites, always-zero `y`/`originalY` generator params (with the baked transform and `data-original-y` they emitted into every fragment), ~50 lines of unconsumed Y-position tables in the render payload, `refreshArrowGeometry`, write-only `data-expanded`, and a handful of unused exports. Payload assembly (`buildRowsPayload`/`buildArrowsPayload`) moved beside the fragment generators with direct unit tests; lookup maps extracted to their own module; `gantt-collapse.js` renamed `gantt-row-interaction.js` (selection/keyboard nav was 90% of it); expand-all keys ride `payload.state` instead of a JSON-in-HTML-attribute roundtrip; the arrow tooltip escaper is the canonical one again; the `issue-{id}` key format is no longer rebuilt outside the row window
+
 ### Fixed
 
 Deep review of the v4.29.0 windowed renderer found 14 places where code still assumed every row had a DOM element. All fixed:
