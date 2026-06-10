@@ -15,7 +15,6 @@ export function setupDrag(ctx) {
       redoStack,
       selectedIssues,
       clearSelection,
-      allIssueBars,
       redmineBaseUrl,
       minDateMs,
       maxDateMs,
@@ -553,8 +552,16 @@ export function setupDrag(ctx) {
 
         // Check if this bar is part of a selection for bulk drag
         const isBulkDrag = selectedIssues.size > 1 && selectedIssues.has(issueId);
+        if (isBulkDrag) {
+          // Bars are windowed: pin every selected row so its element is
+          // mounted for the visual move AND the mouseup commit
+          selectedIssues.forEach(id => {
+            const meta = rowWindow?.getRowMeta('issue-' + id);
+            if (meta) ctx.pinRow?.(meta.key);
+          });
+        }
         const barsToMove = isBulkDrag
-          ? allIssueBars.filter(b => selectedIssues.has(b.dataset.issueId))
+          ? Array.from(document.querySelectorAll('.issue-bar')).filter(b => selectedIssues.has(b.dataset.issueId))
           : [bar];
 
         // Collect data for all bars to move (cache DOM refs to avoid per-frame queries)

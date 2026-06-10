@@ -34,7 +34,7 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
   let mountedKeys = new Set();
   let layerEls = null;
   let scrollEl = null;
-  let pinnedKey = null;
+  let pinnedKeys = new Set();
   let lastRange = { first: -1, last: -2 };
   let rafPending = false;
   const refreshListeners = [];
@@ -141,7 +141,9 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
     for (let i = range.first; i <= range.last; i++) {
       wanted.add(visibleList[i].key);
     }
-    if (pinnedKey && indexByKey.has(pinnedKey)) wanted.add(pinnedKey);
+    pinnedKeys.forEach((key) => {
+      if (indexByKey.has(key)) wanted.add(key);
+    });
     for (const key of Array.from(mountedKeys)) {
       if (!wanted.has(key)) unmountKey(key);
     }
@@ -219,7 +221,7 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
     });
     elementCache = new Map();
     mountedKeys = new Set();
-    pinnedKey = null;
+    pinnedKeys = new Set();
     lastRange = { first: -1, last: -2 };
     collectLayers();
     attachScroll();
@@ -259,6 +261,9 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
     // lookups
     getRowMeta: (key) => rowByKey.get(key),
     getVisibleList: () => visibleList,
+    // Full document order (includes collapse-hidden rows) for select-all/range
+    getAllIssueIds: () =>
+      rows.filter((r) => r.issueId !== null && r.issueId !== undefined).map((r) => String(r.issueId)),
     visibleIndexOf: (key) => (indexByKey.has(key) ? indexByKey.get(key) : -1),
     keyAtIndex: (i) => (i >= 0 && i < visibleList.length ? visibleList[i].key : null),
     getVirtualY: (key) => {
@@ -270,10 +275,11 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
     // window control
     scrollToKey,
     pin: (key) => {
-      pinnedKey = key;
+      pinnedKeys.add(key);
+      remountWindow(); // a pinned row must be mounted immediately (drag reads its element)
     },
     unpin: () => {
-      pinnedKey = null;
+      pinnedKeys.clear();
     },
     onRefresh: (cb) => {
       refreshListeners.push(cb);

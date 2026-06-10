@@ -979,20 +979,19 @@ function initializeGantt(state) {
     }
     const getFocusedIssueId = () => focusedIssueId;
 
-    // Multi-select state with O(1) bar lookup for efficient selection updates
+    // Multi-select state. Bars are resolved at USE time (mounted rows churn
+    // with the window — an init snapshot misses later-materialized bars):
+    // element access goes through the refresh-synced lookup maps, ordering
+    // through the full payload row list.
     const selectedIssues = new Set();
     let lastClickedIssueId = null;
     const selectionCountEl = document.getElementById('selectionCount');
-    const allIssueBars = Array.from(document.querySelectorAll('.issue-bar'));
-    // Build bar lookup map for O(1) selection updates
-    const barsByIssueId = new Map();
-    allIssueBars.forEach(bar => {
-      const id = bar.dataset.issueId;
-      if (id) {
-        if (!barsByIssueId.has(id)) barsByIssueId.set(id, []);
-        barsByIssueId.get(id).push(bar);
-      }
-    });
+
+    function barsForIssueId(issueId) {
+      return mapsReady
+        ? (issueBarsByIssueId.get(issueId) || [])
+        : document.querySelectorAll(`.issue-bar[data-issue-id="${issueId}"]`);
+    }
 
     function refreshSelectionChrome() {
       if (selectedIssues.size > 0) {
@@ -1008,17 +1007,16 @@ function initializeGantt(state) {
     // Update selection for specific changed IDs (O(changed) instead of O(all))
     function updateSelectionForIds(changedIds) {
       changedIds.forEach(issueId => {
-        const bars = barsByIssueId.get(issueId);
-        if (bars) {
-          bars.forEach(bar => bar.classList.toggle('selected', selectedIssues.has(issueId)));
-        }
+        barsForIssueId(issueId).forEach(bar =>
+          bar.classList.toggle('selected', selectedIssues.has(issueId)));
       });
       refreshSelectionChrome();
     }
 
-    // Full UI update (for bulk operations like selectAll or clearSelection)
+    // Full UI sync over MOUNTED bars (bulk ops + window-refresh re-sync:
+    // recycled elements keep their classes across unmount/remount)
     function updateSelectionUI() {
-      allIssueBars.forEach(bar => {
+      document.querySelectorAll('.issue-bar').forEach(bar => {
         bar.classList.toggle('selected', selectedIssues.has(bar.dataset.issueId));
       });
       refreshSelectionChrome();
@@ -1042,14 +1040,15 @@ function initializeGantt(state) {
     }
 
     function selectRange(fromId, toId) {
-      const fromIndex = allIssueBars.findIndex(b => b.dataset.issueId === fromId);
-      const toIndex = allIssueBars.findIndex(b => b.dataset.issueId === toId);
+      const ids = rowWindow?.getAllIssueIds() ?? [];
+      const fromIndex = ids.indexOf(fromId);
+      const toIndex = ids.indexOf(toId);
       if (fromIndex === -1 || toIndex === -1) return;
       const start = Math.min(fromIndex, toIndex);
       const end = Math.max(fromIndex, toIndex);
       const changedIds = [];
       for (let i = start; i <= end; i++) {
-        const id = allIssueBars[i].dataset.issueId;
+        const id = ids[i];
         if (!selectedIssues.has(id)) {
           selectedIssues.add(id);
           changedIds.push(id);
@@ -1059,7 +1058,7 @@ function initializeGantt(state) {
     }
 
     function selectAll() {
-      allIssueBars.forEach(bar => selectedIssues.add(bar.dataset.issueId));
+      (rowWindow?.getAllIssueIds() ?? []).forEach(id => selectedIssues.add(id));
       updateSelectionUI();
       announce(`Selected all ${selectedIssues.size} issues`);
     }
@@ -1218,9 +1217,12 @@ function initializeGantt(state) {
     } else {
       setTimeout(buildLookupMaps, 0);
     }
-    // Mounted rows change on scroll/collapse — keep the maps in sync
+    // Mounted rows change on scroll/collapse — keep the maps in sync, and
+    // re-sync state-driven classes (recycled elements keep stale classes
+    // across unmount/remount; freshly materialized ones lack them)
     rowWindow?.onRefresh(() => {
       if (mapsReady) buildLookupMaps();
+      updateSelectionUI();
     });
 
     // Track currently highlighted elements for fast clear, plus the logical
@@ -1454,7 +1456,6 @@ function initializeGantt(state) {
       redoStack,
       selectedIssues,
       clearSelection,
-      allIssueBars,
       redmineBaseUrl,
       minDateMs,
       maxDateMs,
