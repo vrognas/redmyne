@@ -133,7 +133,7 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
     mountedKeys.delete(key);
   }
 
-  function remountWindow() {
+  function remountWindow(layersRebuilt = false) {
     if (!layerEls) return;
     const range = currentRange();
     lastRange = range;
@@ -150,7 +150,9 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
     // mountKey also refreshes transforms of already-mounted rows (indices
     // shift when collapse state changes)
     wanted.forEach((key) => mountKey(key, indexByKey.get(key)));
-    refreshListeners.forEach((cb) => cb());
+    // layersRebuilt: true when zebra/indent/dependency layers were rewritten
+    // (full refresh) — listeners holding arrow element refs must re-resolve
+    refreshListeners.forEach((cb) => cb({ layersRebuilt }));
   }
 
   function updateHeights() {
@@ -204,7 +206,7 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
     renderZebra();
     renderIndent();
     renderArrows();
-    remountWindow();
+    remountWindow(true);
     perfLog(`rowWindow refresh: ${(performance.now() - t0).toFixed(1)}ms (visible=${visibleList.length}, mounted=${mountedKeys.size})`);
   }
 
@@ -271,6 +273,8 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
     // Full document order (includes collapse-hidden rows) for select-all/range
     getAllIssueIds: () =>
       rows.filter((r) => r.issueId !== null && r.issueId !== undefined).map((r) => String(r.issueId)),
+    // All relations as data (arrows under collapsed rows have no DOM)
+    getArrows: () => arrows,
     visibleIndexOf: (key) => (indexByKey.has(key) ? indexByKey.get(key) : -1),
     keyAtIndex: (i) => (i >= 0 && i < visibleList.length ? visibleList[i].key : null),
     getVirtualY: (key) => {

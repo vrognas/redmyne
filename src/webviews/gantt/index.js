@@ -879,15 +879,16 @@ function initializeGantt(state) {
 
     const ganttContainer = document.querySelector('.gantt-container');
 
-    // Build blocking graph from dependency arrows (used by focus mode)
+    // Build blocking graph from relation DATA (used by focus mode). Arrow
+    // DOM is incomplete: relations whose endpoint sits under a collapsed
+    // parent are never mounted, and a DOM-built graph truncates chains there.
     function buildBlockingGraph() {
       const graph = new Map(); // issueId -> [targetIds that this issue blocks/precedes]
       const reverseGraph = new Map(); // issueId -> [sourceIds that block/precede this issue]
-      document.querySelectorAll('.dependency-arrow').forEach(arrow => {
-        const relType = arrow.classList.contains('rel-blocks') || arrow.classList.contains('rel-precedes');
-        if (!relType) return;
-        const fromId = arrow.dataset.from;
-        const toId = arrow.dataset.to;
+      (rowWindow?.getArrows() ?? []).forEach(rel => {
+        if (rel.type !== 'blocks' && rel.type !== 'precedes') return;
+        const fromId = String(rel.fromId);
+        const toId = String(rel.toId);
         if (!graph.has(fromId)) graph.set(fromId, []);
         graph.get(fromId).push(toId);
         if (!reverseGraph.has(toId)) reverseGraph.set(toId, []);
@@ -896,8 +897,12 @@ function initializeGantt(state) {
       return { graph, reverseGraph };
     }
 
-    // Focus mode: click on issue to highlight its dependency chain
+    // Focus mode: click on issue to highlight its dependency chain.
+    // The connected set lives in state and is RE-APPLIED on every window
+    // refresh: freshly materialized chain members need the class, and
+    // recycled elements may carry a stale one.
     let focusedIssueId = null;
+    let focusedConnectedIds = null; // Set<string> while focus mode is active
 
     function getAllConnected(issueId, graph, reverseGraph) {
       const connected = new Set([issueId]);
@@ -928,6 +933,23 @@ function initializeGantt(state) {
       return connected;
     }
 
+    // Sync focus-highlighted over all MOUNTED bars/labels/arrows from the
+    // connected set (toggle both adds missing and strips stale classes)
+    function applyFocusClasses() {
+      if (!focusedConnectedIds) return;
+      document.querySelectorAll('.issue-bar').forEach(bar => {
+        bar.classList.toggle('focus-highlighted', focusedConnectedIds.has(bar.dataset.issueId));
+      });
+      document.querySelectorAll('.issue-label').forEach(label => {
+        label.classList.toggle('focus-highlighted', focusedConnectedIds.has(label.dataset.issueId));
+      });
+      // Arrows highlight only between connected issues
+      document.querySelectorAll('.dependency-arrow').forEach(arrow => {
+        arrow.classList.toggle('focus-highlighted',
+          focusedConnectedIds.has(arrow.dataset.from) && focusedConnectedIds.has(arrow.dataset.to));
+      });
+    }
+
     function focusOnDependencyChain(issueId) {
       // Clear previous focus
       clearFocus();
@@ -935,34 +957,18 @@ function initializeGantt(state) {
 
       focusedIssueId = issueId;
       const { graph, reverseGraph } = buildBlockingGraph();
-      const connected = getAllConnected(issueId, graph, reverseGraph);
+      focusedConnectedIds = getAllConnected(String(issueId), graph, reverseGraph);
 
       // Add focus mode class to container
       ganttContainer.classList.add('focus-mode');
+      applyFocusClasses();
 
-      // Highlight connected issues
-      document.querySelectorAll('.issue-bar').forEach(bar => {
-        if (connected.has(bar.dataset.issueId)) {
-          bar.classList.add('focus-highlighted');
-        }
-      });
-      document.querySelectorAll('.issue-label').forEach(label => {
-        if (connected.has(label.dataset.issueId)) {
-          label.classList.add('focus-highlighted');
-        }
-      });
-      // Highlight arrows between connected issues
-      document.querySelectorAll('.dependency-arrow').forEach(arrow => {
-        if (connected.has(arrow.dataset.from) && connected.has(arrow.dataset.to)) {
-          arrow.classList.add('focus-highlighted');
-        }
-      });
-
-      announce(`Focus: ${connected.size} issue${connected.size !== 1 ? 's' : ''} in dependency chain`);
+      announce(`Focus: ${focusedConnectedIds.size} issue${focusedConnectedIds.size !== 1 ? 's' : ''} in dependency chain`);
     }
 
     function clearFocus() {
       focusedIssueId = null;
+      focusedConnectedIds = null;
       ganttContainer.classList.remove('focus-mode');
       document.querySelectorAll('.focus-highlighted').forEach(el => el.classList.remove('focus-highlighted'));
     }
@@ -1212,6 +1218,10 @@ function initializeGantt(state) {
     rowWindow?.onRefresh(() => {
       if (mapsReady) buildLookupMaps();
       updateSelectionUI();
+      applyFocusClasses();
+      // A hovered element that unmounts never gets its mouseleave — drop the
+      // hover state; the next pointer move re-applies it
+      clearHoverHighlight();
     });
 
     // Track currently highlighted elements for fast clear, plus the logical
@@ -1402,6 +1412,32 @@ function initializeGantt(state) {
         arrowConnectedElements.length = 0;
         selectedArrow = null;
       }
+
+      // Window refreshes rebuild the dependency layer (collapse toggles) and
+      // mount/recycle bars (scroll): re-resolve the selected arrow by its
+      // stable relation id and re-apply connected highlights — or drop the
+      // selection mode entirely if the arrow is no longer rendered.
+      rowWindow?.onRefresh(() => {
+        if (!selectedArrow) return;
+        const relationId = selectedArrow.dataset.relationId;
+        const fresh = relationId
+          ? document.querySelector(`.dependency-arrow[data-relation-id="${relationId}"]`)
+          : null;
+        if (!fresh) {
+          clearArrowSelection(); // endpoint collapsed away — nothing to highlight
+          return;
+        }
+        selectedArrow = fresh;
+        selectedArrowElements.length = 0;
+        selectedArrowElements.push(fresh);
+        fresh.classList.add('selected');
+        arrowConnectedElements.forEach(el => el.classList.remove('arrow-connected'));
+        arrowConnectedElements.length = 0;
+        [fresh.dataset.from, fresh.dataset.to].forEach(id => {
+          document.querySelectorAll(`.issue-bar[data-issue-id="${id}"], .issue-label[data-issue-id="${id}"]`)
+            .forEach(el => { el.classList.add('arrow-connected'); arrowConnectedElements.push(el); });
+        });
+      });
 
       // Click elsewhere to deselect arrows (cleanup previous handlers)
       if (window._ganttArrowClickHandler) {
