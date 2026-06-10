@@ -29,7 +29,8 @@ export function setupDrag(ctx) {
       getFocusedIssueId,
       scrollToAndHighlight,
       isDraftModeEnabled,
-      getLookupMaps
+      getLookupMaps,
+      rowWindow
     } = ctx;
 
     // Track highlighted elements for fast clearing (avoid DOM queries)
@@ -776,24 +777,28 @@ export function setupDrag(ctx) {
 
     // Handle click on bar - scroll to issue start date and highlight
     // Double-click enters focus mode (highlights dependency chain)
+    // Delegated: rows materialize on scroll, so per-element listeners would
+    // miss every bar mounted after init.
     const interactiveSelector = '.drag-handle, .link-handle, .bar-outline, ' +
       '.blocks-badge-group, .blocker-badge, .progress-badge-group, .flex-badge-group';
-    document.querySelectorAll('.issue-bar').forEach(bar => {
-      bar.addEventListener('click', (e) => {
-        // Ignore clicks on interactive elements (handles, badges, outline)
-        if (e.target.closest(interactiveSelector)) return;
-        if (dragState || linkingState || justEndedDrag) return;
-        // Clear focus mode on single click
-        if (getFocusedIssueId()) {
-          clearFocus();
-        }
-        scrollToAndHighlight(bar.dataset.issueId);
-      });
-      bar.addEventListener('dblclick', (e) => {
-        if (dragState || linkingState || justEndedDrag) return;
-        e.preventDefault();
-        focusOnDependencyChain(bar.dataset.issueId);
-      });
+    addDocListener('click', (e) => {
+      // Ignore clicks on interactive elements (handles, badges, outline)
+      if (e.target.closest(interactiveSelector)) return;
+      const bar = e.target.closest('.issue-bar');
+      if (!bar) return;
+      if (dragState || linkingState || justEndedDrag) return;
+      // Clear focus mode on single click
+      if (getFocusedIssueId()) {
+        clearFocus();
+      }
+      scrollToAndHighlight(bar.dataset.issueId);
+    });
+    addDocListener('dblclick', (e) => {
+      const bar = e.target.closest('.issue-bar');
+      if (!bar) return;
+      if (dragState || linkingState || justEndedDrag) return;
+      e.preventDefault();
+      focusOnDependencyChain(bar.dataset.issueId);
     });
 
     // Helper to highlight multiple arrows and their connected issues
@@ -833,92 +838,93 @@ export function setupDrag(ctx) {
       announce(`Highlighted ${arrows.length} dependency arrow(s) for #${issueId}`);
     }
 
-    // Blocks badge click - highlight arrows FROM this issue (issues it blocks)
-    document.querySelectorAll('.blocks-badge-group').forEach(badge => {
+    // Badge clicks highlight this issue's arrows: blocks-badge = arrows FROM
+    // (issues it blocks), blocker-badge = arrows TO (no scroll). Delegated —
+    // badges mount and unmount with the row window.
+    addDocListener('mousedown', (e) => {
       // Prevent focus on mousedown (before click fires)
-      badge.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      });
-      badge.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const issueBar = badge.closest('.issue-bar');
-        if (!issueBar) return;
-        const issueId = issueBar.dataset.issueId;
-        const arrows = Array.from(document.querySelectorAll(`.dependency-arrow[data-from="${issueId}"]`));
-        highlightArrows(arrows, issueId);
-      });
+      if (!e.target.closest('.blocks-badge-group, .blocker-badge')) return;
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    addDocListener('click', (e) => {
+      const badge = e.target.closest('.blocks-badge-group, .blocker-badge');
+      if (!badge) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const issueBar = badge.closest('.issue-bar');
+      if (!issueBar) return;
+      const issueId = issueBar.dataset.issueId;
+      const attr = badge.classList.contains('blocks-badge-group') ? 'data-from' : 'data-to';
+      const arrows = Array.from(document.querySelectorAll(`.dependency-arrow[${attr}="${issueId}"]`));
+      highlightArrows(arrows, issueId);
     });
 
-    // Blocker badge click - highlight arrows TO this issue (no scroll, like blocks-badge)
-    document.querySelectorAll('.blocker-badge').forEach(badge => {
-      // Prevent focus on mousedown (before click fires)
-      badge.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      });
-      badge.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const issueBar = badge.closest('.issue-bar');
-        if (!issueBar) return;
-        const issueId = issueBar.dataset.issueId;
-        const arrows = Array.from(document.querySelectorAll(`.dependency-arrow[data-to="${issueId}"]`));
-        highlightArrows(arrows, issueId);
-      });
-    });
-
-    // Keyboard navigation for issue bars
-    const issueBars = Array.from(document.querySelectorAll('.issue-bar'));
+    // Keyboard navigation for issue bars (delegated — order comes from the
+    // row window's visible list, not a DOM snapshot, so navigation spans the
+    // whole board including unmounted rows)
     const PAGE_JUMP = 10;
-    issueBars.forEach((bar, index) => {
-      bar.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+    function focusBarByIssueId(issueId, prefix) {
+      const meta = rowWindow?.getRowMeta('issue-' + issueId);
+      if (meta) rowWindow.scrollToKey(meta.key); // mounts the target row
+      const target = document.querySelector(`.issue-bar[data-issue-id="${issueId}"]`);
+      if (!target) return;
+      target.focus();
+      announce(`${prefix}${target.getAttribute('aria-label')}`);
+    }
+    addDocListener('keydown', (e) => {
+      const bar = e.target.closest?.('.issue-bar');
+      if (!bar) return;
+      const issueId = bar.dataset.issueId;
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        scrollToAndHighlight(issueId);
+        return;
+      }
+      if (e.key === 'Tab' && e.shiftKey) {
+        // Jump back to corresponding label
+        const label = document.querySelector(`.issue-label[data-issue-id="${issueId}"]`);
+        if (label) {
           e.preventDefault();
-          scrollToAndHighlight(bar.dataset.issueId);
-        } else if (e.key === 'ArrowDown' && index < issueBars.length - 1) {
-          e.preventDefault();
-          issueBars[index + 1].focus();
-          announce(`Issue ${issueBars[index + 1].getAttribute('aria-label')}`);
-        } else if (e.key === 'ArrowUp' && index > 0) {
-          e.preventDefault();
-          issueBars[index - 1].focus();
-          announce(`Issue ${issueBars[index - 1].getAttribute('aria-label')}`);
-        } else if (e.key === 'Home') {
-          e.preventDefault();
-          issueBars[0].focus();
-          announce(`First issue: ${issueBars[0].getAttribute('aria-label')}`);
-        } else if (e.key === 'End') {
-          e.preventDefault();
-          issueBars[issueBars.length - 1].focus();
-          announce(`Last issue: ${issueBars[issueBars.length - 1].getAttribute('aria-label')}`);
-        } else if (e.key === 'PageDown') {
-          e.preventDefault();
-          const nextIdx = Math.min(index + PAGE_JUMP, issueBars.length - 1);
-          issueBars[nextIdx].focus();
-          announce(`Issue ${issueBars[nextIdx].getAttribute('aria-label')}`);
-        } else if (e.key === 'PageUp') {
-          e.preventDefault();
-          const prevIdx = Math.max(index - PAGE_JUMP, 0);
-          issueBars[prevIdx].focus();
-          announce(`Issue ${issueBars[prevIdx].getAttribute('aria-label')}`);
-        } else if (e.key === 'Tab' && e.shiftKey) {
-          // Jump back to corresponding label
-          const issueId = bar.dataset.issueId;
-          const label = document.querySelector(`.issue-label[data-issue-id="${issueId}"]`);
-          if (label) {
-            e.preventDefault();
-            label.focus();
-            announce(`Label for issue #${issueId}`);
-          }
+          label.focus();
+          announce(`Label for issue #${issueId}`);
         }
-      });
+        return;
+      }
+      const issueIds = (rowWindow?.getVisibleList() ?? [])
+        .filter(r => r.issueId !== null && r.issueId !== undefined)
+        .map(r => String(r.issueId));
+      const index = issueIds.indexOf(issueId);
+      if (index === -1) return;
+      let nextIdx = null;
+      let prefix = 'Issue ';
+      if (e.key === 'ArrowDown' && index < issueIds.length - 1) {
+        nextIdx = index + 1;
+      } else if (e.key === 'ArrowUp' && index > 0) {
+        nextIdx = index - 1;
+      } else if (e.key === 'Home') {
+        nextIdx = 0;
+        prefix = 'First issue: ';
+      } else if (e.key === 'End') {
+        nextIdx = issueIds.length - 1;
+        prefix = 'Last issue: ';
+      } else if (e.key === 'PageDown') {
+        nextIdx = Math.min(index + PAGE_JUMP, issueIds.length - 1);
+      } else if (e.key === 'PageUp') {
+        nextIdx = Math.max(index - PAGE_JUMP, 0);
+      }
+      if (nextIdx === null) return;
+      e.preventDefault();
+      focusBarByIssueId(issueIds[nextIdx], prefix);
     });
 
-    // Handle link handle mousedown to start linking
-    document.querySelectorAll('.link-handle').forEach(handle => {
-      handle.addEventListener('mousedown', (e) => {
+    // Handle link handle mousedown to start linking (delegated — the link
+    // handle is the only entry point for drag-created relations, and must
+    // work on rows materialized after init)
+    addDocListener('mousedown', (e) => {
+      const handle = e.target.closest('.link-handle');
+      if (!handle) return;
+      {
         e.stopPropagation();
         e.preventDefault();
         const bar = handle.closest('.issue-bar');
@@ -953,7 +959,7 @@ export function setupDrag(ctx) {
 
         const fromAnchor = handle.dataset.anchor || 'end'; // 'start' or 'end'
         linkingState = { fromId: issueId, fromBar: bar, startX: cx, startY: cy, fromAnchor };
-      });
+      }
     });
 
     // Escape to cancel linking mode, close pickers, and clear focus

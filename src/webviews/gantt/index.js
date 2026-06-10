@@ -1470,7 +1470,8 @@ function initializeGantt(state) {
       isDraftModeEnabled: () => currentDraftMode,
       isPerfDebugEnabled: () => PERF_DEBUG,
       // Lookup maps for O(1) element access
-      getLookupMaps: () => ({ mapsReady, issueBarsByIssueId, issueLabelsByIssueId })
+      getLookupMaps: () => ({ mapsReady, issueBarsByIssueId, issueLabelsByIssueId }),
+      rowWindow
     });
 
     setupCollapse({
