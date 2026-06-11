@@ -661,16 +661,17 @@ function generateRegularBar(
   const isManualDone = !ctx.isAutoUpdateEnabled(issue.id);
   const issuePrecedence = ctx.hasPrecedence(issue.id);
 
-  // Overdue projection: the question for late work is "how much time does
-  // the rest of it need from TODAY, and what does it collide with" — so
-  // re-plant the remaining effort at today as a ghost segment.
+  // Spillover projection: re-plant the remaining effort at today and see
+  // where it actually ends under the schedule. Overdue tasks get a ghost
+  // from today; tasks with negative flexibility (due in the future but
+  // remaining work doesn't fit) get a ghost extending past their due date.
   // A consumed budget with done_ratio 0 (not maintained) counts as done —
   // same heuristic as the visual ~100% progress fallback — so an
   // "essentially finished, just not closed" task gets no late badge/ghost.
   const dueMs = new Date(issue.due_date ?? issue.start_date!).getTime();
   let ghostHours = 0;
   let effectivelyDone = false;
-  if (isOverdue) {
+  if (!issue.isClosed && doneRatio < 100) {
     const estHours = issue.estimated_hours ?? 0;
     const spentH = issue.spent_hours ?? 0;
     const budgetRemaining = estHours > 0
@@ -686,6 +687,13 @@ function generateRegularBar(
     ? Math.max(1, Math.round((ctx.today.getTime() - dueMs) / 86400000))
     : 0;
   const ghostDays = ghostHours > 0 ? projectDaysForHours(ctx.today, ghostHours, ctx.schedule) : 0;
+  const projectedEndMs = ghostDays > 0 ? ctx.today.getTime() + ghostDays * 86400000 : 0;
+  // Days the projection runs past the (exclusive) end of the due date —
+  // only meaningful when a real due date exists and the task isn't
+  // already overdue (overdue has its own line).
+  const overrunDays = ghostDays > 0 && !isOverdue && issue.due_date
+    ? Math.max(0, Math.round((projectedEndMs - (dueMs + 86400000)) / 86400000))
+    : 0;
 
   // Build bar tooltip with full details
   const barTooltip = [
@@ -708,7 +716,9 @@ function generateRegularBar(
       : `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
     daysLate > 0
       ? `⏰ Overdue ${daysLate}d${ghostDays > 0 ? ` — ~${formatHoursAsTime(ghostHours)} left needs ${ghostDays} day${ghostDays === 1 ? "" : "s"} from today` : ""}`
-      : flexibilityLine(flexPct),
+      : overrunDays > 0
+        ? `⚠ Projected ${overrunDays}d past due — ~${formatHoursAsTime(ghostHours)} left needs ${ghostDays} day${ghostDays === 1 ? "" : "s"} from today`
+        : flexibilityLine(flexPct),
   ].filter(Boolean).join("\n");
 
   // Progress badge tooltip (carries flexibility too — hover-only signal)
@@ -768,18 +778,20 @@ function generateRegularBar(
   }
 
   // Subject text on bar
-  // Ghost segment: remaining effort of overdue work re-planted at today,
-  // dashed and non-interactive — shows what the late work collides with.
+  // Ghost segment: where the remaining effort actually lands. Starts at
+  // today for overdue bars, or at the bar's end for negative-flexibility
+  // bars (the spillover past due). Dashed and non-interactive. No segment
+  // when the projection fits inside the bar (positive flexibility).
   const ghostSegment = (() => {
     if (ghostDays <= 0) return "";
     const minMs = ctx.minDate.getTime();
     const maxMs = ctx.maxDate.getTime();
-    const ghostStartX = Math.max(0, dateToX(ctx.today.getTime(), minMs, maxMs, ctx.timelineWidth));
+    const ghostStartX = Math.max(0, Math.max(todayX, endX));
     const ghostEndX = Math.min(
       ctx.timelineWidth,
-      dateToX(ctx.today.getTime() + ghostDays * 86400000, minMs, maxMs, ctx.timelineWidth)
+      dateToX(projectedEndMs, minMs, maxMs, ctx.timelineWidth)
     );
-    if (ghostEndX <= ghostStartX) return "";
+    if (ghostEndX <= ghostStartX + 1) return "";
     const ghostW = Math.max(6, ghostEndX - ghostStartX);
     return `<g class="ghost-projection" pointer-events="none">
       <rect x="${ghostStartX}" y="${barY}" width="${ghostW}" height="${ctx.barContentHeight}" rx="6" ry="6"

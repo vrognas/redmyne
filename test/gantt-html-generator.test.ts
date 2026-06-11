@@ -274,6 +274,23 @@ describe("gantt-html-generator", () => {
       expect(svg).toContain("ghost-projection"); // remaining work from today
       expect(svg).toContain("Overdue 5d");
 
+      // Negative flexibility (due in the future, work doesn't fit): ghost
+      // shows the spillover past the due date, no late badge.
+      const negativeFlex: GanttRow = {
+        ...row,
+        issue: {
+          ...(row.issue as object),
+          due_date: "2025-01-20", // 5 days ahead of ctx.today
+          done_ratio: 0,
+          estimated_hours: 80, // 80h left needs 14 calendar days
+          spent_hours: 0,
+        } as never,
+      };
+      const flexSvg = generateIssueBar(negativeFlex, ctx as never);
+      expect(flexSvg).toContain("ghost-projection");
+      expect(flexSvg).toContain("Projected 8d past due");
+      expect(flexSvg).not.toContain("d late");
+
       // Essentially-done task: budget consumed, done_ratio never maintained
       // (0) — must NOT read as late work even though it is past due.
       const essentiallyDone: GanttRow = {
