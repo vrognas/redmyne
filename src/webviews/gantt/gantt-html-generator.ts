@@ -928,19 +928,21 @@ function generateBarBadges(
   const progressBadgeW = showProgress
     ? (visualDoneRatio >= 100 ? 36 : visualDoneRatio >= 10 ? 28 : 22)
     : 0;
-  // Badge color = health at a glance: red when over budget, green with
-  // ample flexibility (>100% buffer), orange when the buffer is thinning.
-  // The BACKGROUND tints with the same color (translucent, like the
-  // late/flex pills) — the theme's solid badge-background can be any hue
-  // and made same-color text unreadable.
+  // Badge health lives in the FILL color (red over budget, green above
+  // 100% flexibility, orange below); the text is always the theme
+  // foreground. Same-color text-on-tint depended on each chart color's
+  // contrast against the theme background and went invisible on warm
+  // themes — foreground text is contrast-guaranteed (same recipe as the
+  // blocks/waiting badges).
   const hasHealth = isOverBudget || flexPct !== null;
-  const progressColor = isOverBudget
+  const healthColor = isOverBudget
     ? "var(--vscode-charts-red)"
-    : flexPct !== null
-      ? (flexPct > 100 ? "var(--vscode-charts-green)" : "var(--vscode-charts-orange)")
-      : "var(--vscode-badge-foreground)";
-  const progressBg = hasHealth ? progressColor : "var(--vscode-badge-background)";
-  const progressBgOpacity = hasHealth ? "0.25" : "0.9";
+    : flexPct !== null && flexPct > 100
+      ? "var(--vscode-charts-green)"
+      : "var(--vscode-charts-orange)";
+  const progressColor = hasHealth ? "var(--vscode-foreground)" : "var(--vscode-badge-foreground)";
+  const progressBg = hasHealth ? healthColor : "var(--vscode-badge-background)";
+  const progressBgOpacity = hasHealth ? "0.4" : "0.9";
 
   // Flexibility badge — attention-worthy buffers only (<100%). Overdue
   // tasks swap it for "Nd late": once the due date passes, the percentage
