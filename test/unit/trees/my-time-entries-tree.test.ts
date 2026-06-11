@@ -252,6 +252,43 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     expect(todayChildren[1].description).toBe("1:30 [Testing] Test Issue 124");
   });
 
+  it("discards stale in-flight responses when refresh is called", async () => {
+    let releaseStale: (v: unknown) => void = () => {};
+    const stalePending = new Promise((resolve) => {
+      releaseStale = resolve;
+    });
+
+    mockServer.getTimeEntries
+      .mockReturnValueOnce(stalePending) // load 1 (old filter) hangs
+      .mockResolvedValue({ time_entries: [] }); // load 2 + month preloads
+
+    provider.refresh(); // starts load 1
+    provider.refresh(); // must start load 2 even though load 1 is in-flight
+    await waitForLoad();
+
+    // stale response arrives last, carrying an entry from the old filter
+    releaseStale({
+      time_entries: [
+        {
+          id: 9,
+          issue_id: 999,
+          activity_id: 1,
+          activity: { id: 1, name: "Dev" },
+          hours: "1",
+          comments: "stale",
+          spent_on: getTodayStr(),
+        },
+      ],
+    });
+    await waitForLoad();
+
+    const groups = await getLoadedGroups();
+    const todayChildren = await provider.getChildren(groups[0]);
+    expect(
+      todayChildren.every((n) => !String(n.label).includes("#999"))
+    ).toBe(true);
+  });
+
   it("scopes tooltip trust and escapes server text", async () => {
     const todayEntries: TimeEntry[] = [
       {

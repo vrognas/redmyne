@@ -28,7 +28,12 @@ export interface ConfiguredContextUpdaterDeps {
 export function createConfiguredContextUpdater(
   deps: ConfiguredContextUpdaterDeps
 ): () => Promise<void> {
+  // Rapid reconfigurations (URL then key) each spawn an async draft-queue
+  // load; without sequencing, a stale identity's load can win and drafts
+  // recorded against the old server would flush to the new one.
+  let generation = 0;
   return async () => {
+    const gen = ++generation;
     const config = vscode.workspace.getConfiguration("redmyne");
     const serverUrl = config.get<string>("serverUrl");
     const hasUrl = !!serverUrl;
@@ -64,8 +69,10 @@ export function createConfiguredContextUpdater(
         // Load draft queue with server identity check (async, non-blocking).
         void hashString(serverUrl! + apiKey!).then(async (serverIdentity) => {
           try {
+            if (gen !== generation) return; // superseded by a newer config
             const conflict =
               await deps.draftQueue.checkServerConflict(serverIdentity);
+            if (gen !== generation) return;
             if (conflict) {
               const action = await vscode.window.showWarningMessage(
                 `Server changed. ${conflict.count} draft${
@@ -75,6 +82,7 @@ export function createConfiguredContextUpdater(
                 "Discard Drafts",
                 "Cancel"
               );
+              if (gen !== generation) return;
               if (action !== "Discard Drafts") {
                 // User cancelled: do not load queue for this server.
                 return;

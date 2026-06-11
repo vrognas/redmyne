@@ -131,6 +131,10 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   private static readonly LOAD_BATCH_SIZE = 3;
 
   private isLoading = false;
+  // Bumped on refresh/setServer so in-flight loads (sent with the OLD
+  // filter/server) discard their results instead of repopulating the
+  // just-cleared caches.
+  private loadToken = 0;
   server?: IRedmineServer;
   private issueCache = new Map<number, { id: number; subject: string; projectId?: number; project: string; client?: string }>();
   private expandedIds = new Set<string>();
@@ -217,8 +221,9 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   setServer(server: IRedmineServer | undefined): void {
     this.server = server;
     // Clear cache when server changes
+    this.loadToken++;
     this.issueCache.clear();
-        this.loadedMonthEntries.clear();
+    this.loadedMonthEntries.clear();
     this.loadingMonths.clear();
     this.todayEntries = undefined;
     this.weekEntries = undefined;
@@ -246,14 +251,18 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     this.issueCache.clear();
     this.loadedMonthEntries.clear();
     this.loadingMonths.clear();
+    // Invalidate in-flight loads — their responses carry the old
+    // filter/server and must not repopulate the caches just cleared.
+    this.loadToken++;
     // Fetch new data in background (old todayEntries/weekEntries stay visible)
-    if (!this.isLoading && this.server) {
+    if (this.server) {
       this.isLoading = true;
       void this.loadTodayAndThisWeek();
     }
   }
 
   private async loadTodayAndThisWeek(): Promise<void> {
+    const token = this.loadToken;
     if (!this.server) {
       this.isLoading = false;
       return;
@@ -270,17 +279,21 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         allUsers: this.showAllUsers,
       });
 
+      if (token !== this.loadToken) return; // superseded — discard
       const allEntries = result.time_entries;
       this.todayEntries = allEntries.filter((e) => e.spent_on === today);
       this.weekEntries = allEntries;
     } catch {
+      if (token !== this.loadToken) return;
       this.todayEntries = [];
       this.weekEntries = [];
     } finally {
-      this.isLoading = false;
-      this._onDidChangeTreeData.fire(undefined);
-      // Preload visible months in background
-      this.preloadVisibleMonths();
+      if (token === this.loadToken) {
+        this.isLoading = false;
+        this._onDidChangeTreeData.fire(undefined);
+        // Preload visible months in background
+        this.preloadVisibleMonths();
+      }
     }
   }
 
@@ -390,6 +403,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     }
 
     this.loadingMonths.add(monthKey);
+    const token = this.loadToken;
     try {
       const { start, end } = this.getMonthDateRange(monthYear);
       const result = await this.server.getTimeEntries({
@@ -397,10 +411,13 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         to: end,
         allUsers: this.showAllUsers,
       });
+      if (token !== this.loadToken) return []; // stale filter — discard
       this.loadedMonthEntries.set(monthKey, result.time_entries);
       return result.time_entries;
     } catch {
-      this.loadedMonthEntries.set(monthKey, []);
+      if (token === this.loadToken) {
+        this.loadedMonthEntries.set(monthKey, []);
+      }
       return [];
     } finally {
       this.loadingMonths.delete(monthKey);
