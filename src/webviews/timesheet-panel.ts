@@ -370,7 +370,7 @@ export class TimeSheetPanel {
         break;
 
       case "restoreRow":
-        this._restoreRow(message.row);
+        await this._restoreRow(message.row);
         break;
 
       case "duplicateRow":
@@ -911,9 +911,17 @@ export class TimeSheetPanel {
           const dayIndex = this._currentWeek.dayDates.indexOf(spentOn);
           if (dayIndex < 0) continue; // Not in current week
 
-          // Find existing row with same issue/activity/comments, or create new one
+          // Find existing row with same issue/activity/comments, or create new one.
+          // Never merge into a row whose target cell is already saved
+          // (entryId set): the combined figure would be PUT onto the saved
+          // entry while the pasted create op also flushes — hours would
+          // land twice on the server.
           let row = this._rows.find(
-            (r) => r.issueId === issueId && r.activityId === activityId && (r.comments || "") === comments
+            (r) =>
+              r.issueId === issueId &&
+              r.activityId === activityId &&
+              (r.comments || "") === comments &&
+              !r.days[dayIndex]?.entryId
           );
 
           if (!row) {
@@ -1183,18 +1191,37 @@ export class TimeSheetPanel {
     await this._loadWeek(this._currentWeek);
   }
 
-  private _restoreRow(row: TimeSheetRow): void {
+  private async _restoreRow(row: TimeSheetRow): Promise<void> {
     // Remove queued delete operations for this row's entries
     if (!row.isNew && this._draftQueue) {
       for (const cell of Object.values(row.days)) {
         if (cell.entryId) {
-          void this._draftQueue.removeByKey(`ts:timeentry:${cell.entryId}`, TIMESHEET_SOURCE);
+          await this._draftQueue.removeByKey(`ts:timeentry:${cell.entryId}`, TIMESHEET_SOURCE);
         }
       }
     }
 
     // Re-add the row to the list
     this._rows.push(row);
+
+    // _deleteRow removed the row's backing ops (creates for new rows; a
+    // delete op REPLACED any pending update via shared resourceKey for
+    // saved rows). Without re-queueing, the restored cells render hours
+    // that Save All would never write.
+    for (const [dayIndexStr, cell] of Object.entries(row.days)) {
+      const dayIndex = Number(dayIndexStr);
+      if (row.isNew) {
+        if (cell.hours > 0) {
+          await this._queueCellOperation(row, dayIndex, cell.hours, null, true);
+        }
+      } else if (cell.entryId && cell.hours !== cell.originalHours) {
+        await this._queueCellOperation(row, dayIndex, cell.hours, cell.entryId, true);
+      }
+    }
+    if (row.isNew) {
+      this._saveIncompleteRows();
+    }
+
     this._postRenderMessage();
   }
 

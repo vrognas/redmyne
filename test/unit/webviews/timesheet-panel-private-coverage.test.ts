@@ -386,6 +386,67 @@ describe("timesheet panel private coverage", () => {
     expect(queue.removeByKey).toHaveBeenCalled();
   });
 
+  it("restoring a deleted new row re-queues its create ops", async () => {
+    const queue = createQueue();
+    const setup = setupPanel({ server: createServer(), queue, draftEnabled: true });
+    const panel = setup.panel;
+    panel._currentWeek = buildWeekInfo(new Date(2026, 1, 2));
+
+    const row = panel._createEmptyRow();
+    row.isNew = true;
+    row.issueId = 5;
+    row.activityId = 9;
+    row.days[2] = { hours: 3, originalHours: 0, entryId: null, isDirty: true };
+
+    await panel._restoreRow(row);
+
+    const createOps = queue.add.mock.calls
+      .map((c: unknown[]) => c[0] as { type: string })
+      .filter((op) => op.type === "createTimeEntry");
+    expect(createOps).toHaveLength(1);
+    expect(panel._rows).toContain(row);
+  });
+
+  it("pasted draft ops never merge into a saved cell", () => {
+    const queue = createQueue();
+    const setup = setupPanel({ server: createServer(), queue, draftEnabled: true });
+    const panel = setup.panel;
+    panel._currentWeek = buildWeekInfo(new Date(2026, 1, 2));
+
+    const saved = panel._createEmptyRow();
+    saved.issueId = 5;
+    saved.activityId = 9;
+    saved.comments = "";
+    saved.days[0] = { hours: 2, originalHours: 2, entryId: 77, isDirty: false };
+    panel._rows = [saved];
+
+    const date = panel._currentWeek.dayDates[0];
+    queue.getAll.mockReturnValue([
+      {
+        id: "p1",
+        type: "createTimeEntry",
+        tempId: "draft-timeentry-abc",
+        timestamp: 0,
+        description: "",
+        resourceKey: "x",
+        http: {
+          method: "POST",
+          path: "/time_entries.json",
+          data: {
+            time_entry: { issue_id: 5, activity_id: 9, hours: 1.5, spent_on: date, comments: "" },
+          },
+        },
+      },
+    ]);
+
+    panel._applyPendingDraftChanges();
+
+    // saved cell untouched; pasted hours land on a separate draft row
+    expect(saved.days[0].hours).toBe(2);
+    expect(panel._rows).toHaveLength(2);
+    expect(panel._rows[1].days[0].hours).toBe(1.5);
+  });
+
   it("queued update ops carry issue_id so reassignment reaches the server", async () => {
     const queue = createQueue();
     const server = createServer();
