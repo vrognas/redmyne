@@ -7,6 +7,28 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.29.2]
+
+### Fixed
+
+Whole-codebase deep review (142 verified findings; report in `docs/reviews/2026-06-11-deep-review.md`). This release fixes the 2 critical and 29 high-severity bugs:
+
+- **Timesheet wrote to the wrong issue on re-target** (critical) — changing a saved row's Task/Project queued a PUT without `issue_id`; hours/comments saved onto the old issue and the row snapped back on reload
+- **Draft batch apply could duplicate writes** (critical) — applied ops stayed queued until the whole batch ended, so a mid-batch error toast (panel still clickable) or window reload replayed them as duplicate POSTs. Ops dequeue per-op now, and a single-flight guard blocks concurrent applies
+- **Drafts created against draft-created issues/versions/relations can now apply** — creates record their stub ID and apply rewrites dependent ops to the real server ID (the designed-but-never-built remap)
+- **Toggling draft mode off no longer orphans pending drafts** when apply/discard was cancelled or partially failed
+- **Both "Update Issue…" entry points were broken** — the Gantt context menu threw on its `{id}` payload; the sidebar menu forwarded to an unregistered command and silently did nothing
+- **Change detection was silently dead** — the probe used `updated_on=>…`, not a Redmine filter operator (422 on issues/time entries; unfiltered count on projects). Now `>=`, verified against a live server
+- **Command-URI injection in tooltips** — issue/project/time-entry tooltips interpolated raw server text into trusted MarkdownStrings; a crafted subject/comment could execute commands on click. Untrusted + escaped now (time-entries trust only its own browser-link command)
+- **Quick update on unassigned issues** sent `assigned_to_id: 0` and always reported a spurious "Couldn't assign user"; status-only changes now refresh the trees; status/priority/time-entry pickers no longer swallow fetch failures
+- **Status presets never write a guessed status** — on localized servers the "In Progress" preset wrote whatever status was second in the open list; unmatched patterns fall back to the picker
+- **Dependency edges owned by filtered-out issues were dropped** — external blockers were invisible to the graph, the My Work view, and capacity scheduling (blocked work scheduled too early)
+- **Reopened issues were counted closed** (stale `closed_on`) in project health, capacity, and blocker lists — closed-ness now checks `status.is_closed` via a shared helper; genuinely closed blockers also unblock dependents regardless of `done_ratio`
+- **Gantt**: today marker / current-period highlight drew one gridline right of the true today west of UTC; relation-delay edit (delete+recreate) now rolls back when the recreate fails instead of silently destroying the relation; open-ended bars' payload geometry matches the render (arrows no longer jump when rows mount); move-drag on parent bars no longer throws every frame
+- **Timesheet**: undo of a row delete re-queues the backing ops (restored hours were never saved and vanished on reload); pasted hours never merge into a saved cell (double-counted on save); `1:30`-style input validates (NaN/negatives clamped); quarter-hours display exactly (2.25 no longer shows 2.3 — and undo no longer wrote the rounded value back); extension errors surface as toasts instead of dying in the console
+- **Kanban**: done tasks stop ticking (no more completion prompt for finished work); the configured break duration is honored (was always 15 min); deferred minutes survive window reloads (billable time was silently lost)
+- **Misc**: ad-hoc contribute/remove no longer eats comment prose after `#NNN` refs; date input rejects rollover dates (`2026-02-30`) and accepts "today" east of UTC; rapid server reconfigurations can't load the draft queue under a stale identity; the time-entries tree discards stale-filter responses (was stuck on the wrong user scope)
+
 ## [4.29.1]
 
 ### Changed
