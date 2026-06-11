@@ -208,6 +208,71 @@ describe("gantt-html-generator", () => {
       expect(svg).toContain('data-due-date="2025-01-20"');
       expect(svg).toContain("bar-main"); // solid bar
       expect(svg).toContain("drag-handle"); // resize handles
+      expect(svg).not.toContain("ghost-projection"); // not overdue
+    });
+
+    it("overdue bars get a days-late badge and a ghost projection from today", () => {
+      const row: GanttRow = {
+        type: "issue",
+        id: 457,
+        label: "Late",
+        depth: 0,
+        collapseKey: "issue-457",
+        parentKey: "",
+        isVisible: true,
+        isExpanded: false,
+        hasChildren: false,
+        issue: {
+          id: 457,
+          subject: "Late task",
+          project: "Project",
+          projectId: 1,
+          parentId: null,
+          start_date: "2025-01-02",
+          due_date: "2025-01-10", // 5 days before ctx.today
+          done_ratio: 50,
+          estimated_hours: 16,
+          spent_hours: 5, // 11h remaining → 2 working days
+          status: "on-track",
+          statusName: "In Progress",
+          isClosed: false,
+          isExternal: false,
+          isAdHoc: false,
+          assignee: null,
+          assigneeId: null,
+          flexibilityPercent: -100,
+          relations: [],
+          blocks: [],
+          blockedBy: [],
+        } as never,
+      };
+      const ctx = {
+        barHeight: 22,
+        barPadding: 3,
+        barContentHeight: 16,
+        timelineWidth: 1000,
+        minDate: new Date("2025-01-01"),
+        maxDate: new Date("2025-01-31"),
+        today: new Date("2025-01-15"),
+        viewFocus: "project" as const,
+        currentUserId: null,
+        schedule: { Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0, Sun: 0 },
+        issueScheduleMap: new Map(),
+        getStatusColor: () => "blue",
+        getStatusTextColor: () => "white",
+        getStatusOpacity: () => 0.6,
+        getStatusDescription: () => "On track",
+        getInternalEstimate: () => null,
+        hasPrecedence: () => false,
+        isAutoUpdateEnabled: () => true,
+      };
+
+      const svg = generateIssueBar(row, ctx as never);
+
+      expect(svg).toContain("5d late"); // badge replaces the constant -100%
+      expect(svg).not.toContain(">-100%<"); // no percent badge rendered
+      expect(svg).toContain("ghost-projection"); // remaining work from today
+      expect(svg).toContain("Overdue 5d");
     });
 
     it("generateIssueBar handles project and time-group aggregate bars", () => {

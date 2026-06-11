@@ -238,6 +238,7 @@ export function generateToolbar(ctx: GanttToolbarContext): string {
               <span class="help-item"><span style="color:var(--vscode-charts-orange)">⛔N</span> blocks N issues</span>
               <span class="help-item"><span style="color:var(--vscode-charts-yellow)">⏳N</span> waiting on N issues</span>
               <span class="help-item"><span style="color:var(--vscode-charts-green)">✓</span> closed</span>
+              <span class="help-item"><span style="color:var(--vscode-charts-red)">Nd late</span> overdue; dashed ghost = remaining work from today</span>
               <span class="help-item">hover a bar for flexibility &amp; hours</span>
             </div>
             <div class="help-section">

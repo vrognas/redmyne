@@ -82,6 +82,27 @@ function getDayKey(date: Date): keyof WeeklySchedule {
   return keys[date.getDay()]!;
 }
 
+/**
+ * Calendar days needed from `from` (inclusive) to fit `hours` of work
+ * under the weekly schedule. Drives the overdue ghost projection. Capped
+ * so an all-zero schedule cannot loop forever.
+ */
+function projectDaysForHours(
+  from: Date,
+  hours: number,
+  schedule: WeeklySchedule,
+  maxDays = 180
+): number {
+  const d = new Date(from);
+  let acc = 0;
+  for (let i = 1; i <= maxDays; i++) {
+    acc += schedule[getDayKey(d)];
+    if (acc >= hours) return i;
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return maxDays;
+}
+
 // ============================================================================
 // Intensity Calculation
 // ============================================================================
@@ -640,6 +661,24 @@ function generateRegularBar(
   const isManualDone = !ctx.isAutoUpdateEnabled(issue.id);
   const issuePrecedence = ctx.hasPrecedence(issue.id);
 
+  // Overdue projection: the question for late work is "how much time does
+  // the rest of it need from TODAY, and what does it collide with" — so
+  // re-plant the remaining effort at today as a ghost segment.
+  const dueMs = new Date(issue.due_date ?? issue.start_date!).getTime();
+  const daysLate = isOverdue
+    ? Math.max(1, Math.round((ctx.today.getTime() - dueMs) / 86400000))
+    : 0;
+  let ghostHours = 0;
+  if (isOverdue) {
+    const estHours = issue.estimated_hours ?? 0;
+    const spentH = issue.spent_hours ?? 0;
+    const budgetRemaining = estHours > 0
+      ? (spentH >= estHours ? estHours * (1 - doneRatio / 100) : estHours - spentH)
+      : 0;
+    ghostHours = issueInternalEstimate?.hoursRemaining ?? budgetRemaining;
+  }
+  const ghostDays = ghostHours > 0 ? projectDaysForHours(ctx.today, ghostHours, ctx.schedule) : 0;
+
   // Build bar tooltip with full details
   const barTooltip = [
     issuePrecedence ? "⏫ PRECEDENCE PRIORITY" : null,
@@ -659,7 +698,9 @@ function generateRegularBar(
     contributedHours > 0
       ? `Spent: ${formatHoursAsTime(issue.spent_hours)} + ${formatHoursAsTime(contributedHours)} contributed = ${formatHoursAsTime(effectiveSpentHours)}`
       : `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
-    flexibilityLine(flexPct),
+    isOverdue
+      ? `⏰ Overdue ${daysLate}d${ghostDays > 0 ? ` — ~${formatHoursAsTime(ghostHours)} left needs ${ghostDays} day${ghostDays === 1 ? "" : "s"} from today` : ""}`
+      : flexibilityLine(flexPct),
   ].filter(Boolean).join("\n");
 
   // Progress badge tooltip (carries flexibility too — hover-only signal)
@@ -719,6 +760,27 @@ function generateRegularBar(
   }
 
   // Subject text on bar
+  // Ghost segment: remaining effort of overdue work re-planted at today,
+  // dashed and non-interactive — shows what the late work collides with.
+  const ghostSegment = (() => {
+    if (ghostDays <= 0) return "";
+    const minMs = ctx.minDate.getTime();
+    const maxMs = ctx.maxDate.getTime();
+    const ghostStartX = Math.max(0, dateToX(ctx.today.getTime(), minMs, maxMs, ctx.timelineWidth));
+    const ghostEndX = Math.min(
+      ctx.timelineWidth,
+      dateToX(ctx.today.getTime() + ghostDays * 86400000, minMs, maxMs, ctx.timelineWidth)
+    );
+    if (ghostEndX <= ghostStartX) return "";
+    const ghostW = Math.max(6, ghostEndX - ghostStartX);
+    return `<g class="ghost-projection" pointer-events="none">
+      <rect x="${ghostStartX}" y="${barY}" width="${ghostW}" height="${ctx.barContentHeight}" rx="6" ry="6"
+            fill="var(--vscode-charts-red)" opacity="0.08"/>
+      <rect x="${ghostStartX}" y="${barY}" width="${ghostW}" height="${ctx.barContentHeight}" rx="6" ry="6"
+            fill="none" stroke="var(--vscode-charts-red)" stroke-width="1" stroke-dasharray="4,3" opacity="0.6"/>
+    </g>`;
+  })();
+
   const subjectOnBar = (() => {
     const padding = 12;
     const availableWidth = width - padding * 2;
@@ -731,8 +793,8 @@ function generateRegularBar(
     return `<text class="bar-subject" x="${startX + padding}" y="${barY + ctx.barContentHeight / 2 + 3}" fill="${textColor}" font-size="9" font-weight="500" pointer-events="none">${escapeHtml(displaySubject)}</text>`;
   })();
 
-  // Generate badges
-  const badges = generateBarBadges(issue, startX, endX, barY, flexPct, visualDoneRatio, isFallbackProgress, progressTooltip, blocksTooltip, blockerTooltip, ctx);
+  // Generate badges (daysLate > 0 swaps the flexibility pill for "Nd late")
+  const badges = generateBarBadges(issue, startX, endX, barY, flexPct, daysLate, visualDoneRatio, isFallbackProgress, progressTooltip, blocksTooltip, blockerTooltip, ctx);
 
   return `
     <g class="issue-bar gantt-row${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${issue.isAdHoc ? " bar-adhoc" : ""}${isCriticalPath ? " bar-critical" : ""}" data-issue-id="${issue.id}"
@@ -764,6 +826,7 @@ function generateRegularBar(
         ` : ""}
       </g>
       <rect class="bar-outline cursor-move" x="${startX}" y="${barY}" width="${width}" height="${ctx.barContentHeight}" fill="none" stroke="var(--vscode-panel-border)" stroke-width="1" rx="6" ry="6" pointer-events="all"/>
+      ${ghostSegment}
       ${subjectOnBar}
       <g class="drag-handle drag-left cursor-ew-resize">
         <rect x="${startX}" y="0" width="${handleWidth}" height="${ctx.barHeight}" fill="transparent"/>
@@ -806,6 +869,7 @@ function generateBarBadges(
   endX: number,
   barY: number,
   flexPct: number | null,
+  daysLate: number,
   visualDoneRatio: number,
   isFallbackProgress: boolean,
   progressTooltip: string,
@@ -819,16 +883,27 @@ function generateBarBadges(
     ? (visualDoneRatio === 100 ? 32 : visualDoneRatio >= 10 ? 28 : 22)
     : 0;
 
-  // Flexibility badge — attention-worthy buffers only (<100%)
-  const showFlex = flexPct !== null && flexPct < 100 && !issue.isClosed;
-  const flexLabel = showFlex ? (flexPct > 0 ? `+${flexPct}%` : `${flexPct}%`) : "";
-  const flexBadgeW = showFlex ? (Math.abs(flexPct) >= 100 ? 38 : Math.abs(flexPct) >= 10 ? 32 : 26) : 0;
-  const flexColor = showFlex
-    ? (flexPct >= 50 ? "var(--vscode-charts-green)"
-      : flexPct > 0 ? "var(--vscode-charts-yellow)"
-      : "var(--vscode-charts-red)")
+  // Flexibility badge — attention-worthy buffers only (<100%). Overdue
+  // tasks swap it for "Nd late": once the due date passes, the percentage
+  // is a constant -100% and says nothing.
+  const isLate = daysLate > 0;
+  const showFlex = !isLate && flexPct !== null && flexPct < 100 && !issue.isClosed;
+  const flexLabel = isLate ? `${daysLate}d late`
+    : showFlex ? (flexPct > 0 ? `+${flexPct}%` : `${flexPct}%`)
     : "";
-  const flexTooltip = showFlex ? flexibilityLine(flexPct) ?? "" : "";
+  const flexBadgeW = isLate ? (daysLate >= 100 ? 56 : daysLate >= 10 ? 50 : 44)
+    : showFlex ? (Math.abs(flexPct!) >= 100 ? 38 : Math.abs(flexPct!) >= 10 ? 32 : 26)
+    : 0;
+  const flexColor = isLate ? "var(--vscode-charts-red)"
+    : showFlex
+      ? (flexPct! >= 50 ? "var(--vscode-charts-green)"
+        : flexPct! > 0 ? "var(--vscode-charts-yellow)"
+        : "var(--vscode-charts-red)")
+      : "";
+  const showFlexSlot = isLate || showFlex;
+  const flexTooltip = isLate
+    ? `Overdue by ${daysLate} day${daysLate === 1 ? "" : "s"} (due ${issue.due_date ?? "?"})`
+    : showFlex ? flexibilityLine(flexPct) ?? "" : "";
 
   // Blocks badge (downstream - at END of bar). Orange even at count 1 —
   // descriptionForeground over a 0.15 fill was nearly invisible.
@@ -880,7 +955,7 @@ function generateBarBadges(
   const progressX = cursorX;
   if (showProgress) cursorX += progressBadgeW + 4;
   const flexBadgeX = cursorX;
-  if (showFlex) cursorX += flexBadgeW + 4;
+  if (showFlexSlot) cursorX += flexBadgeW + 4;
   const impactBadgeX = cursorX;
   if (showBlocks) cursorX += impactBadgeW + 4;
   const assigneeX = cursorX;
@@ -898,7 +973,7 @@ function generateBarBadges(
       <text class="status-badge" x="${progressCenterX}" y="${ctx.barHeight / 2 + 4}"
             text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${isFallbackProgress ? "~" : ""}${visualDoneRatio}%</text>
     </g>` : ""}
-    ${showFlex ? `<g class="flex-badge-group">
+    ${showFlexSlot ? `<g class="flex-badge-group">
       <title>${escapeAttr(flexTooltip)}</title>
       <rect class="flex-badge-bg" x="${flexBadgeX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${flexBadgeW}" height="12" rx="2"
             fill="${flexColor}" opacity="0.15"/>
