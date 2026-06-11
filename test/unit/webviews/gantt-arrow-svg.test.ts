@@ -39,33 +39,28 @@ describe("arrow-svg", () => {
     expect(svg).toContain("H 298"); // approach stub to target.startX − 2
   });
 
-  it("near-aligned stubs route one clean vertical (no doubling back)", () => {
+  it("near-aligned anchors land vertically on the target bar's edge", () => {
     // FS arrow where the target's start sits just right of the source's
-    // end: exit stub (endX+2+8) and approach stub (startX-2-8) nearly
-    // coincide — the old fallback curled here.
+    // end — side lanes graze the source or poke into the target, so the
+    // path drops at the anchor x and lands on the bar top (y2 − bh/2 + 2)
+    // with a downward arrowhead.
     const { svg } = buildArrowSvg(
       pos(0, 100, 11), pos(118, 200, 55),
       { relationId: 11, fromId: 1, toId: 2, type: "blocks" }, BAR
     );
-    // single vertical at the approach x (116-8=108), direction-aware corners
-    expect(svg).toContain("V 51");
-    expect(svg).toContain("H 116");
-    // no segment may travel right then immediately back left past its origin
-    expect(svg).not.toMatch(/q -?\d+ 0 -?\d+ -?\d+ q/); // no back-to-back corners
+    expect(svg).toContain("V 46"); // lands on bar top edge, not row center
+    expect(svg).toContain(`L 116 46`); // arrowhead tip at the landing point
+    expect(svg).not.toContain("H 116\""); // no horizontal approach stub
   });
 
-  it("flips lane and arrowhead when the vertical would graze the source", () => {
-    // FS where target.startX - 2 - 8 lands within a corner radius of the
-    // source exit: lane must flip to the far side of the target and the
-    // head must point the way the path arrives (leftward here).
+  it("vertical arrival also covers anchors grazing the source exit", () => {
     const src = pos(0, 100, 11); // exit at 102
-    const tgt = pos(112, 200, 55); // default lane 102 → collides
+    const tgt = pos(112, 200, 55); // anchor at 110, 8px from the exit
     const { svg } = buildArrowSvg(
       src, tgt, { relationId: 12, fromId: 1, toId: 2, type: "blocks" }, BAR
     );
-    expect(svg).toContain("H 114"); // corner start before vx = 110+4+... lane right of target start
-    // head points LEFT (wings at x2 + size): M 114 ... L 110 55
-    expect(svg).toContain(`M 114 ${55 - 2.4} L 110 55`);
+    expect(svg).toContain("V 46");
+    expect(svg).toContain("L 110 46"); // downward head at the anchor x
   });
 
   it("buildArrowsMarkup skips null endpoints and sorts solid before dashed", () => {

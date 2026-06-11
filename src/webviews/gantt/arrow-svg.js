@@ -123,8 +123,12 @@ export function buildArrowSvg(source, target, rel, barHeight) {
   const jogDir = fromStart ? -1 : 1;
   const approachDir = toEnd ? 1 : -1;
   // Horizontal direction of the FINAL segment into the target anchor —
-  // the arrowhead must point the way the path actually arrives.
+  // the arrowhead must point the way the path actually arrives. A
+  // vertical arrival (near-aligned anchors land on the bar's top/bottom
+  // edge) sets verticalArrivalY instead.
   let arrivalX = -approachDir;
+  let verticalArrival = false;
+  let verticalArrivalY = 0;
 
   if (!isScheduling) {
     // Path already computed above
@@ -152,22 +156,20 @@ export function buildArrowSvg(source, target, rel, barHeight) {
     const ax = x2 + approachDir * jogX; // target approach stub start
 
     if (Math.abs(ax - ex) < 2 * r + 2) {
-      // Stubs nearly aligned: a gutter run (or any middle horizontal)
-      // degenerates into a curl. Route ONE vertical at the approach-stub
-      // x with direction-aware corners.
-      let vx = ax;
-      // If the lane collides with the source end, flip to the OTHER side
-      // of the target (never between them — a between-lane leaves the
-      // final stub shorter than the corner radius and the head detaches).
-      if (Math.abs(vx - x1) < r + 2) vx = x2 - approachDir * jogX;
-      const dH1 = vx > x1 ? 1 : -1;
-      const dH2 = x2 > vx ? 1 : -1;
-      arrivalX = dH2;
-      path = `M ${x1} ${y1} H ${vx - dH1 * r}` +
-        ` q ${dH1 * r} 0 ${dH1 * r} ${vdir * r}` +
-        ` V ${y2 - vdir * r}` +
-        ` q 0 ${vdir * r} ${dH2 * r} ${vdir * r}` +
-        ` H ${x2}`;
+      // Anchors nearly aligned horizontally: any side-lane either grazes
+      // the source, pokes into the target bar, or leaves a sub-radius
+      // final stub. Drop a single vertical at the anchor x and land ON
+      // the target bar's edge with a vertical arrowhead.
+      verticalArrival = true;
+      verticalArrivalY = y2 - vdir * (barHeight / 2 - 2);
+      if (Math.abs(x2 - x1) < r + 2) {
+        path = `M ${x2} ${y1} V ${verticalArrivalY}`;
+      } else {
+        const dH1 = x2 > x1 ? 1 : -1;
+        path = `M ${x1} ${y1} H ${x2 - dH1 * r}` +
+          ` q ${dH1 * r} 0 ${dH1 * r} ${vdir * r}` +
+          ` V ${verticalArrivalY}`;
+      }
     } else {
       const hdir = ax > ex ? 1 : -1;
       path = `M ${x1} ${y1} H ${ex - jogDir * r}` +
@@ -197,12 +199,17 @@ export function buildArrowSvg(source, target, rel, barHeight) {
         : `M ${x2 - arrowSize * 0.6} ${y2 + arrowSize} L ${x2} ${y2} L ${x2 + arrowSize * 0.6} ${y2 + arrowSize}`;
     }
   } else {
-    // Scheduling: horizontal approach. Wings sit on the side the path
-    // arrives FROM (arrivalX = +1 means the path travels rightward into
-    // the anchor, so the head points right).
-    arrowHead = arrivalX > 0
-      ? `M ${x2 - arrowSize} ${y2 - arrowSize * 0.6} L ${x2} ${y2} L ${x2 - arrowSize} ${y2 + arrowSize * 0.6}`
-      : `M ${x2 + arrowSize} ${y2 - arrowSize * 0.6} L ${x2} ${y2} L ${x2 + arrowSize} ${y2 + arrowSize * 0.6}`;
+    // Scheduling: wings sit on the side the path arrives FROM.
+    if (verticalArrival) {
+      const goingDown = target.y > source.y;
+      arrowHead = goingDown
+        ? `M ${x2 - arrowSize * 0.6} ${verticalArrivalY - arrowSize} L ${x2} ${verticalArrivalY} L ${x2 + arrowSize * 0.6} ${verticalArrivalY - arrowSize}`
+        : `M ${x2 - arrowSize * 0.6} ${verticalArrivalY + arrowSize} L ${x2} ${verticalArrivalY} L ${x2 + arrowSize * 0.6} ${verticalArrivalY + arrowSize}`;
+    } else {
+      arrowHead = arrivalX > 0
+        ? `M ${x2 - arrowSize} ${y2 - arrowSize * 0.6} L ${x2} ${y2} L ${x2 - arrowSize} ${y2 + arrowSize * 0.6}`
+        : `M ${x2 + arrowSize} ${y2 - arrowSize * 0.6} L ${x2} ${y2} L ${x2 + arrowSize} ${y2 + arrowSize * 0.6}`;
+    }
   }
 
   const dashAttr = style.dash ? `stroke-dasharray="${style.dash}"` : "";
