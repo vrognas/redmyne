@@ -40,6 +40,19 @@ describe("open-actions + timesheet commands", () => {
 
       expect(openSpy).toHaveBeenCalledWith(server, "456");
     });
+
+    it("accepts context-menu { id } payloads without prompting", async () => {
+      const server = {} as never;
+      const openSpy = vi
+        .spyOn(openActionsForIssueIdModule, "default")
+        .mockResolvedValue(undefined);
+      const inputSpy = vi.spyOn(vscode.window, "showInputBox");
+
+      await openActionsForIssue({ server, config: {} }, { id: 42 });
+
+      expect(inputSpy).not.toHaveBeenCalled();
+      expect(openSpy).toHaveBeenCalledWith(server, "42");
+    });
   });
 
   describe("openActionsForIssueUnderCursor", () => {

@@ -190,17 +190,16 @@ describe("registerContextProxyCommands", () => {
     });
   });
 
-  it("forwards updateIssue to legacy issueActions signature", () => {
+  it("forwards updateIssue to openActionsForIssue with id payload", () => {
     registerContextProxyCommands();
 
     handlers.get("redmyne.updateIssue")?.({ id: 99 });
     handlers.get("redmyne.updateIssue")?.({});
 
+    expect(vscode.commands.executeCommand).toHaveBeenCalledTimes(1);
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "redmyne.issueActions",
-      false,
-      {},
-      "99"
+      "redmyne.openActionsForIssue",
+      { id: 99 }
     );
   });
 });

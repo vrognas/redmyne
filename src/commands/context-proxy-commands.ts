@@ -326,7 +326,7 @@ export function registerContextProxyCommands(): vscode.Disposable[] {
     ),
     vscode.commands.registerCommand("redmyne.updateIssue", (issue: IssueContext | undefined) => {
       if (hasIssue(issue)) {
-        vscode.commands.executeCommand("redmyne.issueActions", false, {}, `${issue.id}`);
+        vscode.commands.executeCommand("redmyne.openActionsForIssue", { id: issue.id });
       }
     })
   );
