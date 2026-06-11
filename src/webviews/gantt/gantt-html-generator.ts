@@ -510,7 +510,11 @@ function generateProjectAggregateBar(
   }
 
   const tooltip = ctx.buildProjectTooltip(row);
-  const barY = ctx.barPadding;
+  // Background chrome, not data: a thin centered strip at low opacity.
+  // Child ranges all stack at the same Y, so per-rect opacity compounds —
+  // full-height rects at 0.5 rendered as a solid slab across the board.
+  const stripH = Math.max(4, Math.round(ctx.barContentHeight * 0.4));
+  const stripY = ctx.barPadding + (ctx.barContentHeight - stripH) / 2;
 
   const aggregateBars = row.childDateRanges
     .filter(range => range.startDate || range.dueDate)
@@ -525,7 +529,7 @@ function generateProjectAggregateBar(
       const endX = endExclusiveX(end, minMs, maxMs, ctx.timelineWidth);
       const width = Math.max(4, endX - startX);
 
-      return `<rect class="aggregate-bar" x="${startX}" y="${barY}" width="${width}" height="${ctx.barContentHeight}" fill="var(--vscode-descriptionForeground)" opacity="0.5" rx="2" ry="2"><title>${escapeAttr(tooltip)}</title></rect>`;
+      return `<rect class="aggregate-bar" x="${startX}" y="${stripY}" width="${width}" height="${stripH}" fill="var(--vscode-descriptionForeground)" opacity="0.15" rx="2" ry="2"><title>${escapeAttr(tooltip)}</title></rect>`;
     })
     .join("");
 
@@ -541,7 +545,8 @@ function generateTimeGroupAggregateBar(
     return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"></g>`;
   }
 
-  const barY = ctx.barPadding;
+  const stripH = Math.max(4, Math.round(ctx.barContentHeight * 0.4));
+  const stripY = ctx.barPadding + (ctx.barContentHeight - stripH) / 2;
   const timeGroupColor = row.timeGroup === "overdue" ? "var(--vscode-charts-red)"
     : row.timeGroup === "this-week" ? "var(--vscode-charts-yellow)"
     : row.timeGroup === "later" ? "var(--vscode-charts-green)"
@@ -560,7 +565,7 @@ function generateTimeGroupAggregateBar(
       const endX = endExclusiveX(end, minMs, maxMs, ctx.timelineWidth);
       const width = Math.max(4, endX - startX);
 
-      return `<rect class="aggregate-bar" x="${startX}" y="${barY}" width="${width}" height="${ctx.barContentHeight}" fill="${timeGroupColor}" opacity="0.4" rx="2" ry="2"/>`;
+      return `<rect class="aggregate-bar" x="${startX}" y="${stripY}" width="${width}" height="${stripH}" fill="${timeGroupColor}" opacity="0.15" rx="2" ry="2"/>`;
     })
     .join("");
 
@@ -634,13 +639,19 @@ function generateRegularBar(
   const escapedProject = escapeHtml(issue.project);
   const doneRatio = issue.done_ratio;
 
-  // Calculate visual progress
+  // Calculate visual progress. Over budget (spent > estimate) is a "the
+  // timeline may need to shift" signal: show the REAL time-derived ratio
+  // (113%, not clamped to 100) and let the badge render it red.
   const contributedHours = ctx.contributionSources?.get(issue.id)?.reduce((sum, c) => sum + c.hours, 0) ?? 0;
   const effectiveSpentHours = (issue.spent_hours ?? 0) + contributedHours;
+  const timeRatio = issue.estimated_hours && issue.estimated_hours > 0 && effectiveSpentHours > 0
+    ? Math.round((effectiveSpentHours / issue.estimated_hours) * 100)
+    : null;
+  const isOverBudget = timeRatio !== null && timeRatio > 100;
   let visualDoneRatio = doneRatio;
   let isFallbackProgress = false;
-  if (doneRatio === 0 && effectiveSpentHours > 0 && issue.estimated_hours && issue.estimated_hours > 0) {
-    visualDoneRatio = Math.min(100, Math.round((effectiveSpentHours / issue.estimated_hours) * 100));
+  if (timeRatio !== null && (doneRatio === 0 || isOverBudget) && timeRatio > doneRatio) {
+    visualDoneRatio = timeRatio;
     isFallbackProgress = true;
   }
 
@@ -797,9 +808,17 @@ function generateRegularBar(
     );
     if (ghostEndX <= ghostStartX + 1) return "";
     const ghostW = Math.max(6, ghostEndX - ghostStartX);
+    // Overdue ghosts start at today, often far right of a small past bar —
+    // a dotted leader ties the segment back to its owner.
+    const midY = barY + ctx.barContentHeight / 2;
+    const leader = ghostStartX > endX + 4
+      ? `<line x1="${endX + 2}" y1="${midY}" x2="${ghostStartX}" y2="${midY}"
+            stroke="var(--vscode-charts-red)" stroke-width="1" stroke-dasharray="2,3" opacity="0.45"/>`
+      : "";
     return `<g class="ghost-projection" pointer-events="none">
+      ${leader}
       <rect x="${ghostStartX}" y="${barY}" width="${ghostW}" height="${ctx.barContentHeight}" rx="6" ry="6"
-            fill="var(--vscode-charts-red)" opacity="0.08"/>
+            fill="var(--vscode-charts-red)" opacity="0.14"/>
       <rect x="${ghostStartX}" y="${barY}" width="${ghostW}" height="${ctx.barContentHeight}" rx="6" ry="6"
             fill="none" stroke="var(--vscode-charts-red)" stroke-width="1" stroke-dasharray="4,3" opacity="0.6"/>
     </g>`;
@@ -818,7 +837,7 @@ function generateRegularBar(
   })();
 
   // Generate badges (daysLate > 0 swaps the flexibility pill for "Nd late")
-  const badges = generateBarBadges(issue, startX, endX, barY, flexPct, daysLate, visualDoneRatio, isFallbackProgress, progressTooltip, blocksTooltip, blockerTooltip, ctx);
+  const badges = generateBarBadges(issue, startX, endX, barY, flexPct, daysLate, visualDoneRatio, isFallbackProgress, isOverBudget, progressTooltip, blocksTooltip, blockerTooltip, ctx);
 
   return `
     <g class="issue-bar gantt-row${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${issue.isAdHoc ? " bar-adhoc" : ""}${isCriticalPath ? " bar-critical" : ""}" data-issue-id="${issue.id}"
@@ -896,16 +915,22 @@ function generateBarBadges(
   daysLate: number,
   visualDoneRatio: number,
   isFallbackProgress: boolean,
+  isOverBudget: boolean,
   progressTooltip: string,
   blocksTooltip: string,
   blockerTooltip: string,
   ctx: GanttRenderContext
 ): string {
-  // Progress badge — hidden at 0% (it was pure noise on untouched boards)
+  // Progress badge — hidden at 0% (it was pure noise on untouched boards).
+  // Over budget renders red: more time spent than estimated means the
+  // estimate (and possibly the timeline) needs attention.
   const showProgress = visualDoneRatio > 0;
   const progressBadgeW = showProgress
-    ? (visualDoneRatio === 100 ? 32 : visualDoneRatio >= 10 ? 28 : 22)
+    ? (visualDoneRatio >= 100 ? 36 : visualDoneRatio >= 10 ? 28 : 22)
     : 0;
+  const progressColor = isOverBudget
+    ? "var(--vscode-charts-red)"
+    : "var(--vscode-badge-foreground)";
 
   // Flexibility badge — attention-worthy buffers only (<100%). Overdue
   // tasks swap it for "Nd late": once the due date passes, the percentage
@@ -995,7 +1020,7 @@ function generateBarBadges(
             fill="var(--vscode-badge-background)" opacity="0.9"/>
       <rect x="${progressX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${progressBadgeW}" height="12" fill="transparent"/>
       <text class="status-badge" x="${progressCenterX}" y="${ctx.barHeight / 2 + 4}"
-            text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10"${isFallbackProgress ? ' font-style="italic"' : ""}>${visualDoneRatio}%</text>
+            text-anchor="middle" fill="${progressColor}" font-size="10"${isOverBudget ? ' font-weight="600"' : ""}${isFallbackProgress ? ' font-style="italic"' : ""}>${visualDoneRatio}%</text>
     </g>` : ""}
     ${showFlexSlot ? `<g class="flex-badge-group">
       <title>${escapeAttr(flexTooltip)}</title>
