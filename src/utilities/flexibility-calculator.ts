@@ -97,13 +97,16 @@ export function calculateFlexibility(
   // If the budget is consumed (spent >= estimate) but the task isn't done,
   // use done_ratio to estimate remaining work — `>` alone let spent ==
   // estimate fall through to hoursRemaining 0 and read as completed.
+  // done_ratio 0 usually means "not maintained": with the budget fully
+  // consumed, treat time-derived progress as done (same heuristic as the
+  // visual ~100% fallback) instead of "all work remains".
   let hoursRemaining: number;
   if (doneRatio === 100) {
     hoursRemaining = 0;
   } else if (spentHours >= issue.estimated_hours) {
     // Budget consumed: estimate remaining based on done_ratio
     // e.g., 80% done with 32h estimate → 32 × 0.2 = 6.4h remaining
-    hoursRemaining = issue.estimated_hours * (1 - doneRatio / 100);
+    hoursRemaining = doneRatio > 0 ? issue.estimated_hours * (1 - doneRatio / 100) : 0;
   } else {
     hoursRemaining = Math.max(issue.estimated_hours - spentHours, 0);
   }

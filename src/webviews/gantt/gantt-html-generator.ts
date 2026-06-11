@@ -664,19 +664,27 @@ function generateRegularBar(
   // Overdue projection: the question for late work is "how much time does
   // the rest of it need from TODAY, and what does it collide with" — so
   // re-plant the remaining effort at today as a ghost segment.
+  // A consumed budget with done_ratio 0 (not maintained) counts as done —
+  // same heuristic as the visual ~100% progress fallback — so an
+  // "essentially finished, just not closed" task gets no late badge/ghost.
   const dueMs = new Date(issue.due_date ?? issue.start_date!).getTime();
-  const daysLate = isOverdue
-    ? Math.max(1, Math.round((ctx.today.getTime() - dueMs) / 86400000))
-    : 0;
   let ghostHours = 0;
+  let effectivelyDone = false;
   if (isOverdue) {
     const estHours = issue.estimated_hours ?? 0;
     const spentH = issue.spent_hours ?? 0;
     const budgetRemaining = estHours > 0
-      ? (spentH >= estHours ? estHours * (1 - doneRatio / 100) : estHours - spentH)
+      ? (spentH >= estHours
+          ? (doneRatio > 0 ? estHours * (1 - doneRatio / 100) : 0)
+          : estHours - spentH)
       : 0;
     ghostHours = issueInternalEstimate?.hoursRemaining ?? budgetRemaining;
+    effectivelyDone =
+      (issueInternalEstimate !== null || estHours > 0) && ghostHours <= 0;
   }
+  const daysLate = isOverdue && !effectivelyDone
+    ? Math.max(1, Math.round((ctx.today.getTime() - dueMs) / 86400000))
+    : 0;
   const ghostDays = ghostHours > 0 ? projectDaysForHours(ctx.today, ghostHours, ctx.schedule) : 0;
 
   // Build bar tooltip with full details
@@ -698,7 +706,7 @@ function generateRegularBar(
     contributedHours > 0
       ? `Spent: ${formatHoursAsTime(issue.spent_hours)} + ${formatHoursAsTime(contributedHours)} contributed = ${formatHoursAsTime(effectiveSpentHours)}`
       : `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
-    isOverdue
+    daysLate > 0
       ? `⏰ Overdue ${daysLate}d${ghostDays > 0 ? ` — ~${formatHoursAsTime(ghostHours)} left needs ${ghostDays} day${ghostDays === 1 ? "" : "s"} from today` : ""}`
       : flexibilityLine(flexPct),
   ].filter(Boolean).join("\n");

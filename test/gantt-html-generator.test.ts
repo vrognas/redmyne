@@ -273,6 +273,22 @@ describe("gantt-html-generator", () => {
       expect(svg).not.toContain(">-100%<"); // no percent badge rendered
       expect(svg).toContain("ghost-projection"); // remaining work from today
       expect(svg).toContain("Overdue 5d");
+
+      // Essentially-done task: budget consumed, done_ratio never maintained
+      // (0) — must NOT read as late work even though it is past due.
+      const essentiallyDone: GanttRow = {
+        ...row,
+        issue: {
+          ...(row.issue as object),
+          done_ratio: 0,
+          estimated_hours: 16,
+          spent_hours: 18,
+        } as never,
+      };
+      const doneSvg = generateIssueBar(essentiallyDone, ctx as never);
+      expect(doneSvg).not.toContain("d late");
+      expect(doneSvg).not.toContain("ghost-projection");
+      expect(doneSvg).toContain('font-style="italic"'); // ~100% time-derived
     });
 
     it("generateIssueBar handles project and time-group aggregate bars", () => {

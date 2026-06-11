@@ -152,6 +152,24 @@ describe("calculateFlexibility", () => {
     expect(result!.remaining).toBeLessThan(0); // no time left → negative
   });
 
+  it("consumed budget with unmaintained done_ratio counts as done", () => {
+    vi.setSystemTime(new Date("2025-11-20")); // overdue
+
+    const issue = createMockIssue({
+      start_date: "2025-11-03",
+      due_date: "2025-11-15",
+      estimated_hours: 16,
+      spent_hours: 18, // over budget
+    });
+    // done_ratio stays 0 (nobody maintains it) — essentially finished
+
+    const result = calculateFlexibility(issue, defaultSchedule);
+
+    expect(result).not.toBeNull();
+    expect(result!.hoursRemaining).toBe(0);
+    expect(result!.remaining).toBe(100);
+  });
+
   it("returns completed status for done issues", () => {
     vi.setSystemTime(new Date("2025-11-10"));
 
