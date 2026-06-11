@@ -544,6 +544,23 @@ describe("gantt-html-generator", () => {
       expect(payload[1]!.panels.labels).not.toContain("translate(");
     });
 
+    it("buildRowsPayload extends open-ended bars to maxDate like the render", () => {
+      const openEnded: GanttRow = {
+        ...issueRow,
+        issue: { ...(issueRow.issue as object), due_date: null } as never,
+      };
+      const closedAtMax: GanttRow = {
+        ...issueRow,
+        issue: { ...(issueRow.issue as object), due_date: "2025-01-31" } as never,
+      };
+
+      const [open, closed] = buildRowsPayload([openEnded, closedAtMax], ctx);
+      // Open-ended bars render to the timeline's right edge — payload
+      // geometry must match or arrows jump when the row mounts.
+      expect(open!.barEndX).toBe(closed!.barEndX);
+      expect(open!.barEndX!).toBeGreaterThan(open!.barStartX!);
+    });
+
     it("buildArrowsPayload filters by visible relation types", () => {
       const arrows = buildArrowsPayload([projectRow, issueRow], new Set(["blocks"]));
       expect(arrows).toEqual([{ relationId: 9, fromId: 456, toId: 99, type: "blocks" }]);

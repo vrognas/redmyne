@@ -1769,9 +1769,16 @@ export class GanttPanel {
 
     if (newDelay === currentDelay) return;
 
+    // Redmine doesn't support updating delay directly - must delete and recreate
     try {
-      // Redmine doesn't support updating delay directly - must delete and recreate
       await this._server.deleteRelation(relationId);
+    } catch (error) {
+      // Nothing changed on the server — safe to just report.
+      vscode.window.showErrorMessage(`Failed to update delay: ${errorToString(error)}`);
+      return;
+    }
+
+    try {
       const response = await this._server.createRelation(
         parseInt(fromId),
         parseInt(toId),
@@ -1784,7 +1791,27 @@ export class GanttPanel {
       this._addRelationLocally(parseInt(fromId), parseInt(toId), relationType, response.relation.id);
       showStatusBarMessage(`$(check) Delay updated to ${newDelay}`, 2000);
     } catch (error) {
-      vscode.window.showErrorMessage(`Failed to update delay: ${errorToString(error)}`);
+      // The relation is already gone on the server. Best-effort rollback
+      // with the original delay; if that also fails, drop it locally so
+      // the chart stops drawing an arrow that no longer exists.
+      try {
+        const restored = await this._server.createRelation(
+          parseInt(fromId),
+          parseInt(toId),
+          relationType as "precedes" | "follows",
+          currentDelay
+        );
+        this._removeRelationLocally(relationId);
+        this._addRelationLocally(parseInt(fromId), parseInt(toId), relationType, restored.relation.id);
+        vscode.window.showErrorMessage(
+          `Failed to update delay (relation kept with old delay): ${errorToString(error)}`
+        );
+      } catch {
+        this._removeRelationLocally(relationId);
+        vscode.window.showErrorMessage(
+          `Failed to update delay — the relation was removed on the server and could not be restored: ${errorToString(error)}`
+        );
+      }
     }
   }
 
@@ -2822,27 +2849,28 @@ export class GanttPanel {
     let todayMarkerSvg = "";
     let currentPeriodHighlight = "";
     const current = new Date(minDate);
-    // Use local today for user's perspective (user expects today = their local date)
+    // The x-axis maps calendar dates to UTC-midnight instants, so every
+    // today/period comparison must live in the UTC frame too. todayUTC is
+    // the UTC midnight of the user's LOCAL calendar day — comparing via
+    // formatLocalDate shifted the marker one gridline right west of UTC.
     const todayLocal = getTodayStr();
-
-    // Calculate current period range for highlight based on zoom level
-    const today = getLocalToday();
-    const todayYear = today.getFullYear();
-    const todayMonth = today.getMonth();
+    const todayUTC = new Date(todayLocal);
+    const todayYear = todayUTC.getUTCFullYear();
+    const todayMonth = todayUTC.getUTCMonth();
     const todayQuarter = Math.floor(todayMonth / 3);
-    const todayDayOfWeek = today.getDay();
+    const todayDayOfWeek = todayUTC.getUTCDay();
 
     // Get start of current period (for highlight)
     let periodStart: Date;
     let periodDays: number;
     switch (zoomLevel) {
       case "day":
-        periodStart = today;
+        periodStart = new Date(todayUTC);
         periodDays = 1;
         break;
       case "week": {
         // Start of week (Monday)
-        periodStart = new Date(today);
+        periodStart = new Date(todayUTC);
         const daysFromMonday = todayDayOfWeek === 0 ? 6 : todayDayOfWeek - 1;
         periodStart.setUTCDate(periodStart.getUTCDate() - daysFromMonday);
         periodDays = 7;
@@ -2865,7 +2893,8 @@ export class GanttPanel {
         periodDays = (todayYear % 4 === 0 && (todayYear % 100 !== 0 || todayYear % 400 === 0)) ? 366 : 365;
         break;
     }
-    const periodStartStr = formatLocalDate(periodStart);
+    // UTC string — compared against UTC-frame `current` in the loop below.
+    const periodStartStr = periodStart.toISOString().slice(0, 10);
 
     const dayWidth =
       (svgWidth - leftMargin) /
@@ -3006,9 +3035,11 @@ export class GanttPanel {
         `);
       }
 
-      // Current period highlight (zoom-level dependent)
-      const currentLocal = formatLocalDate(current);
-      if (currentLocal === periodStartStr) {
+      // Current period highlight (zoom-level dependent).
+      // `current` is a UTC-midnight instant for a calendar day — format it
+      // in UTC so the comparison stays timezone-independent.
+      const currentStr = current.toISOString().slice(0, 10);
+      if (currentStr === periodStartStr) {
         const highlightWidth = dayWidth * periodDays;
         // Header highlight for current period
         currentPeriodHighlight = `
@@ -3017,7 +3048,7 @@ export class GanttPanel {
       }
 
       // Today marker line (all zoom levels) - always on current day, only in body (not header)
-      if (currentLocal === todayLocal) {
+      if (currentStr === todayLocal) {
         // Separate today-marker for highest z-index (rendered after all bars/milestones)
         todayMarkerSvg = `
           <line x1="${x}" y1="0" x2="${x}" y2="100%" class="today-marker"/>

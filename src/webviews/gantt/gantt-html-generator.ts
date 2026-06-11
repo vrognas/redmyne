@@ -945,15 +945,20 @@ export function buildRowsPayload(
       : row.type === "time-group" ? generateTimeGroupLabel(row, ctx)
       : generateIssueLabel(row, ctx);
     // Timeline bar x-range for dependency-arrow geometry. UTC parsing to
-    // match the UTC-anchored x-axis (bars use new Date(dateStr)).
+    // match the UTC-anchored x-axis (bars use new Date(dateStr)). MUST
+    // mirror generateIssueBar's date fallbacks exactly — this payload is
+    // the geometry source for unmounted rows, and a mismatch makes arrows
+    // jump when the row scrolls into the window.
     let barStartX: number | null = null;
     let barEndX: number | null = null;
-    if (row.type === "issue" && row.issue) {
+    if (row.type === "issue" && row.issue && (row.issue.start_date || row.issue.due_date)) {
       const issue = row.issue;
-      const start = issue.start_date ? new Date(issue.start_date) : new Date(issue.due_date!);
-      const end = issue.due_date ? new Date(issue.due_date) : new Date(issue.start_date!);
-      barStartX = dateToX(start.getTime(), ctx.minDate.getTime(), ctx.maxDate.getTime(), ctx.timelineWidth);
-      barEndX = endExclusiveX(end, ctx.minDate.getTime(), ctx.maxDate.getTime(), ctx.timelineWidth);
+      const hasOnlyStart = Boolean(issue.start_date && !issue.due_date);
+      const startDate = issue.start_date ?? issue.due_date!;
+      // Open-ended bars render to the timeline's right edge (maxDate).
+      const dueDate = issue.due_date ?? (hasOnlyStart ? ctx.maxDate.toISOString().slice(0, 10) : issue.start_date!);
+      barStartX = dateToX(new Date(startDate).getTime(), ctx.minDate.getTime(), ctx.maxDate.getTime(), ctx.timelineWidth);
+      barEndX = endExclusiveX(new Date(dueDate), ctx.minDate.getTime(), ctx.maxDate.getTime(), ctx.timelineWidth);
     }
     return {
       key: row.collapseKey,
