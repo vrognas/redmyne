@@ -3,6 +3,11 @@ import {
   RedmineServer,
   RedmineOptionsError,
 } from "../../../src/redmine/redmine-server";
+import {
+  QuickUpdate,
+  Membership,
+  IssueStatus as DomainIssueStatus,
+} from "../../../src/controllers/domain";
 import * as http from "http";
 import { EventEmitter } from "events";
 
@@ -1086,6 +1091,37 @@ describe("RedmineServer", () => {
       await expect(server.doRequest("/test.json", "GET")).rejects.toThrow(
         'redmyne.caFile: cannot read "/nonexistent/path/ca.pem"'
       );
+    });
+  });
+
+  describe("applyQuickUpdate", () => {
+    it("omits assigned_to_id for no-change on an unassigned issue", async () => {
+      const server = new RedmineServer({
+        address: "https://localhost:3000",
+        key: "test-api-key",
+        requestFn: vi.fn() as never,
+      });
+      const doRequestSpy = vi
+        .spyOn(server, "doRequest")
+        .mockResolvedValue(null as never);
+      vi.spyOn(server, "getIssueById").mockResolvedValue({
+        issue: { id: 7, status: { id: 2, name: "Open" }, assigned_to: undefined },
+      } as never);
+
+      const result = await server.applyQuickUpdate(
+        new QuickUpdate(
+          7,
+          "",
+          new Membership(0, "_unassigned_", true),
+          new DomainIssueStatus(2, "Open")
+        )
+      );
+
+      const body = JSON.parse(
+        (doRequestSpy.mock.calls[0][2] as Buffer).toString()
+      );
+      expect("assigned_to_id" in body.issue).toBe(false);
+      expect(result.isSuccessful()).toBe(true);
     });
   });
 });

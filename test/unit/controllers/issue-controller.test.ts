@@ -632,7 +632,8 @@ describe("IssueController", () => {
   it("changeIssueStatus success and failure paths", async () => {
     const issue = createIssue();
     const server = createMockServer();
-    const controller = new IssueController(issue, server as never);
+    const onUpdated = vi.fn();
+    const controller = new IssueController(issue, server as never, onUpdated);
     const statuses: RedmineIssueStatus[] = [
       { id: 1, name: "Open", is_closed: false },
       { id: 2, name: "Closed", is_closed: true },
@@ -648,6 +649,10 @@ describe("IssueController", () => {
     } as never);
     await controller.changeIssueStatus(statuses);
     expect(server.setIssueStatus).toHaveBeenCalledWith(issue, 2);
+    expect(onUpdated).toHaveBeenCalled();
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      "redmyne.refreshAfterIssueUpdate"
+    );
 
     vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
       label: "Closed",

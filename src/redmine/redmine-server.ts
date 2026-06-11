@@ -1434,9 +1434,15 @@ export class RedmineServer implements IRedmineServer {
     // Build issue payload with optional date fields
     const issuePayload: Record<string, unknown> = {
       status_id: quickUpdate.status.statusId,
-      assigned_to_id: quickUpdate.assignee.id,
       notes: quickUpdate.message,
     };
+
+    // id 0 means "keep unassigned" (no Redmine user has id 0): sending
+    // assigned_to_id: 0 is rejected or clears, and the verification below
+    // would always report a spurious "Couldn't assign user".
+    if (quickUpdate.assignee.id !== 0) {
+      issuePayload.assigned_to_id = quickUpdate.assignee.id;
+    }
 
     // Only include dates if they were explicitly set (not undefined)
     if (quickUpdate.startDate !== undefined) {
@@ -1458,7 +1464,10 @@ export class RedmineServer implements IRedmineServer {
     // Fetch updated issue to verify changes
     const { issue } = await this.getIssueById(quickUpdate.issueId);
     const updateResult = new QuickUpdateResult();
-    if (issue.assigned_to?.id !== quickUpdate.assignee.id) {
+    if (
+      quickUpdate.assignee.id !== 0 &&
+      issue.assigned_to?.id !== quickUpdate.assignee.id
+    ) {
       updateResult.addDifference("Couldn't assign user");
     }
     if (issue.status.id !== quickUpdate.status.statusId) {

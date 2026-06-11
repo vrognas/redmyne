@@ -121,6 +121,8 @@ export class IssueController {
         `$(check) #${this.issue.id} → ${stat.fullIssue.name}`,
         2000
       );
+      this.onIssueUpdated?.();
+      vscode.commands.executeCommand("redmyne.refreshAfterIssueUpdate");
     } catch (error) {
       vscode.window.showErrorMessage(errorToString(error));
     }
@@ -167,21 +169,33 @@ export class IssueController {
   }
 
   private async changeStatus() {
-    const statuses = await this.redmine.getIssueStatuses();
-    void this.changeIssueStatus(statuses.issue_statuses);
+    try {
+      const statuses = await this.redmine.getIssueStatuses();
+      void this.changeIssueStatus(statuses.issue_statuses);
+    } catch (error) {
+      vscode.window.showErrorMessage(errorToString(error));
+    }
   }
 
   private async changePriority() {
-    const { issue_priorities } = await this.redmine.getIssuePriorities();
-    void this.changeIssuePriority(issue_priorities);
+    try {
+      const { issue_priorities } = await this.redmine.getIssuePriorities();
+      void this.changeIssuePriority(issue_priorities);
+    } catch (error) {
+      vscode.window.showErrorMessage(errorToString(error));
+    }
   }
 
   private async addTimeEntry() {
-    // Use project-specific activities (falls back to global if not restricted)
-    const activities = await this.redmine.getProjectTimeEntryActivities(
-      this.issue.project.id
-    );
-    void this.chooseTimeEntryType(activities);
+    try {
+      // Use project-specific activities (falls back to global if not restricted)
+      const activities = await this.redmine.getProjectTimeEntryActivities(
+        this.issue.project.id
+      );
+      void this.chooseTimeEntryType(activities);
+    } catch (error) {
+      vscode.window.showErrorMessage(errorToString(error));
+    }
   }
 
   private async quickUpdate() {
