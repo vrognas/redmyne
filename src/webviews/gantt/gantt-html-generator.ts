@@ -1017,7 +1017,7 @@ function generateBarBadges(
     ${showProgress ? `<g class="progress-badge-group">
       <title>${escapeAttr(progressTooltip)}</title>
       <rect class="status-badge-bg" x="${progressX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${progressBadgeW}" height="12" rx="2"
-            fill="var(--vscode-badge-background)" opacity="0.9"/>
+            fill="${isOverBudget ? "var(--vscode-charts-red)" : "var(--vscode-badge-background)"}" opacity="${isOverBudget ? "0.25" : "0.9"}"/>
       <rect x="${progressX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${progressBadgeW}" height="12" fill="transparent"/>
       <text class="status-badge" x="${progressCenterX}" y="${ctx.barHeight / 2 + 4}"
             text-anchor="middle" fill="${progressColor}" font-size="10"${isOverBudget ? ' font-weight="600"' : ""}${isFallbackProgress ? ' font-style="italic"' : ""}>${visualDoneRatio}%</text>
@@ -1033,10 +1033,10 @@ function generateBarBadges(
     ${showBlocks ? `<g class="blocks-badge-group" style="cursor: pointer;">
       <title>${escapeAttr(blocksTooltip)}</title>
       <rect class="blocks-badge-bg" x="${impactBadgeX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${impactBadgeW}" height="12" rx="2"
-            fill="${impactColor}" opacity="0.3"/>
+            fill="${impactColor}" opacity="0.4"/>
       <rect x="${impactBadgeX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${impactBadgeW}" height="12" fill="transparent"/>
       <text class="blocks-badge" x="${impactBadgeCenterX}" y="${ctx.barHeight / 2 + 4}"
-            text-anchor="middle" fill="${impactColor}" font-size="10" font-weight="500">${impactLabel}</text>
+            text-anchor="middle" fill="var(--vscode-foreground)" font-size="10" font-weight="600">${impactLabel}</text>
     </g>` : ""}
     ${issue.assignee ? `<g class="bar-assignee-group">
       <title>${escapeAttr(issue.assignee)}</title>
@@ -1047,10 +1047,10 @@ function generateBarBadges(
   ${showBlocker ? `<g class="blocker-badge" data-blocker-id="${firstBlockerId}" style="cursor: pointer;">
     <title>${escapeAttr(blockerTooltip)}</title>
     <rect x="${blockerBadgeStartX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${blockerBadgeW}" height="12" rx="2"
-          fill="${blockerColor}" opacity="0.3"/>
+          fill="${blockerColor}" opacity="0.4"/>
     <rect x="${blockerBadgeStartX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${blockerBadgeW}" height="12" fill="transparent"/>
     <text x="${blockerBadgeCenterX}" y="${ctx.barHeight / 2 + 4}"
-          text-anchor="middle" fill="${blockerColor}" font-size="10" font-weight="600">${blockerLabel}</text>
+          text-anchor="middle" fill="var(--vscode-foreground)" font-size="10" font-weight="600">${blockerLabel}</text>
   </g>` : ""}`;
 }
 
