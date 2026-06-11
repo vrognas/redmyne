@@ -971,7 +971,7 @@ function generateBarBadges(
             fill="var(--vscode-badge-background)" opacity="0.9"/>
       <rect x="${progressX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${progressBadgeW}" height="12" fill="transparent"/>
       <text class="status-badge" x="${progressCenterX}" y="${ctx.barHeight / 2 + 4}"
-            text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${isFallbackProgress ? "~" : ""}${visualDoneRatio}%</text>
+            text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10"${isFallbackProgress ? ' font-style="italic"' : ""}>${visualDoneRatio}%</text>
     </g>` : ""}
     ${showFlexSlot ? `<g class="flex-badge-group">
       <title>${escapeAttr(flexTooltip)}</title>
