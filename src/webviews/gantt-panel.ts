@@ -38,7 +38,7 @@ import type { GanttRenderContext, GanttRowPayload, GanttArrowPayload } from "./g
 import { generateHeader, type GanttToolbarContext } from "./gantt/gantt-toolbar-generator";
 import { deriveAssigneeState, filterIssuesForView } from "./gantt-view-filter";
 import { deriveTaskTypes, filterIssuesByTaskType } from "../utilities/issue-task-type-filter";
-import { dateToX, endExclusiveX } from "./gantt/gantt-coords";
+import { dateToX, endExclusiveX, clampMinDateToLookback } from "./gantt/gantt-coords";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
 import { DRAFT_COMMAND_SOURCE } from "../draft-mode/draft-change-sources";
 
@@ -2181,6 +2181,10 @@ export class GanttPanel {
       const paddingDays = { day: 1, week: 7, month: 30, quarter: 90, year: 365 }[this._zoomLevel] || 7;
       minDate.setUTCDate(minDate.getUTCDate() - paddingDays);
       maxDate.setUTCDate(maxDate.getUTCDate() + paddingDays);
+      // The lookback selector clamps the AXIS too, not just the data
+      // fetch — one ancient still-open issue otherwise stretches the
+      // timeline years into the past.
+      minDate = clampMinDateToLookback(minDate, maxDate, todayUTC, this._lookbackYears);
     }
 
     // String format for open-ended bars (issues with start but no due date)

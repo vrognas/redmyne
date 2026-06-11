@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { dateToX, endExclusiveX } from "../../../src/webviews/gantt/gantt-coords";
+import {
+  dateToX,
+  endExclusiveX,
+  clampMinDateToLookback,
+} from "../../../src/webviews/gantt/gantt-coords";
 
 describe("dateToX", () => {
   const minMs = new Date("2026-01-01T00:00:00Z").getTime();
@@ -40,5 +44,30 @@ describe("endExclusiveX", () => {
     const original = end.getTime();
     endExclusiveX(end, minMs, maxMs, width);
     expect(end.getTime()).toBe(original);
+  });
+});
+
+describe("clampMinDateToLookback", () => {
+  const todayUTC = new Date("2026-06-11T00:00:00Z");
+  const maxDate = new Date("2026-12-01T00:00:00Z");
+
+  it("clamps an ancient minDate to today minus lookback years", () => {
+    const ancient = new Date("2016-03-01T00:00:00Z");
+    const clamped = clampMinDateToLookback(ancient, maxDate, todayUTC, 2);
+    expect(clamped.toISOString().slice(0, 10)).toBe("2024-06-11");
+  });
+
+  it("leaves minDate alone when within the horizon or unlimited", () => {
+    const recent = new Date("2026-01-01T00:00:00Z");
+    expect(clampMinDateToLookback(recent, maxDate, todayUTC, 2)).toBe(recent);
+
+    const ancient = new Date("2016-03-01T00:00:00Z");
+    expect(clampMinDateToLookback(ancient, maxDate, todayUTC, null)).toBe(ancient);
+  });
+
+  it("never inverts the range when the whole board predates the horizon", () => {
+    const oldMin = new Date("2015-01-01T00:00:00Z");
+    const oldMax = new Date("2016-01-01T00:00:00Z");
+    expect(clampMinDateToLookback(oldMin, oldMax, todayUTC, 2)).toBe(oldMin);
   });
 });

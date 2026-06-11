@@ -46,3 +46,23 @@ export function endExclusiveX(
   clone.setUTCDate(clone.getUTCDate() + 1);
   return dateToX(clone.getTime(), minDateMs, maxDateMs, timelineWidth);
 }
+
+/**
+ * Clamp the timeline's left edge to the lookback horizon (today minus
+ * lookbackYears). One ancient still-open issue must not stretch the axis
+ * years into the past — bars starting before the horizon simply render
+ * clipped at the left edge. No-ops when lookback is unlimited (null) or
+ * when the whole board lies before the horizon (clamping would invert
+ * the range). Inputs are not mutated.
+ */
+export function clampMinDateToLookback(
+  minDate: Date,
+  maxDate: Date,
+  todayUTC: Date,
+  lookbackYears: number | null
+): Date {
+  if (lookbackYears === null) return minDate;
+  const horizon = new Date(todayUTC);
+  horizon.setUTCFullYear(horizon.getUTCFullYear() - lookbackYears);
+  return minDate < horizon && horizon < maxDate ? horizon : minDate;
+}
