@@ -117,6 +117,41 @@ describe("calculateFlexibility", () => {
     expect(result!.status).toBe("at-risk");
   });
 
+  it("overdue unfinished issues never get positive remaining flexibility", () => {
+    vi.setSystemTime(new Date("2025-11-20")); // due date passed 5 days ago
+
+    const issue = createMockIssue({
+      start_date: "2025-11-03",
+      due_date: "2025-11-15",
+      estimated_hours: 40,
+      spent_hours: 10,
+    });
+
+    const result = calculateFlexibility(issue, defaultSchedule);
+
+    expect(result).not.toBeNull();
+    expect(result!.remaining).toBeLessThan(0);
+    expect(result!.status).toBe("overbooked");
+  });
+
+  it("spent == estimated with work left is not treated as completed", () => {
+    vi.setSystemTime(new Date("2025-11-20")); // overdue too
+
+    const issue = createMockIssue({
+      start_date: "2025-11-03",
+      due_date: "2025-11-15",
+      estimated_hours: 40,
+      spent_hours: 40, // budget consumed exactly
+    });
+    (issue as { done_ratio: number }).done_ratio = 50; // but only half done
+
+    const result = calculateFlexibility(issue, defaultSchedule);
+
+    expect(result).not.toBeNull();
+    expect(result!.hoursRemaining).toBe(20); // 40h × remaining 50%
+    expect(result!.remaining).toBeLessThan(0); // no time left → negative
+  });
+
   it("returns completed status for done issues", () => {
     vi.setSystemTime(new Date("2025-11-10"));
 

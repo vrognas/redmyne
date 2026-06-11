@@ -41,7 +41,7 @@ describe("gantt model", () => {
       ],
     });
     const flexibility = new Map([
-      [100, { status: "on-track", initial: 25 }],
+      [100, { status: "on-track", remaining: 25 }],
     ]) as unknown as Map<number, import("../../../src/utilities/flexibility-calculator").FlexibilityScore | null>;
 
     const result = toGanttIssue(issue, flexibility, new Set([2]), null, null, true);

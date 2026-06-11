@@ -94,10 +94,14 @@ export function calculateFlexibility(
   const doneRatio = issue.done_ratio ?? 0;
 
   // Calculate remaining work hours
-  // If over budget but not done, use done_ratio to estimate remaining work
+  // If the budget is consumed (spent >= estimate) but the task isn't done,
+  // use done_ratio to estimate remaining work — `>` alone let spent ==
+  // estimate fall through to hoursRemaining 0 and read as completed.
   let hoursRemaining: number;
-  if (spentHours > issue.estimated_hours && doneRatio < 100) {
-    // Over budget: estimate remaining based on done_ratio
+  if (doneRatio === 100) {
+    hoursRemaining = 0;
+  } else if (spentHours >= issue.estimated_hours) {
+    // Budget consumed: estimate remaining based on done_ratio
     // e.g., 80% done with 32h estimate → 32 × 0.2 = 6.4h remaining
     hoursRemaining = issue.estimated_hours * (1 - doneRatio / 100);
   } else {

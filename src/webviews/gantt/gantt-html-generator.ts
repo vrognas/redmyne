@@ -830,15 +830,15 @@ function generateBarBadges(
     : "";
   const flexTooltip = showFlex ? flexibilityLine(flexPct) ?? "" : "";
 
-  // Blocks badge (downstream - at END of bar)
+  // Blocks badge (downstream - at END of bar). Orange even at count 1 —
+  // descriptionForeground over a 0.15 fill was nearly invisible.
   const blocksCount = issue.blocks.length;
   const showBlocks = blocksCount > 0 && !issue.isClosed;
   const impactBadgeW = showBlocks ? 28 : 0;
   const impactLabel = showBlocks ? `⛔${blocksCount}` : "";
   const impactColor = showBlocks
     ? (blocksCount >= 5 ? "var(--vscode-charts-red)"
-      : blocksCount >= 2 ? "var(--vscode-charts-orange)"
-      : "var(--vscode-descriptionForeground)")
+      : "var(--vscode-charts-orange)")
     : "";
 
   // Blocker badge (upstream - at START of bar)
@@ -909,7 +909,7 @@ function generateBarBadges(
     ${showBlocks ? `<g class="blocks-badge-group" style="cursor: pointer;">
       <title>${escapeAttr(blocksTooltip)}</title>
       <rect class="blocks-badge-bg" x="${impactBadgeX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${impactBadgeW}" height="12" rx="2"
-            fill="${impactColor}" opacity="0.15"/>
+            fill="${impactColor}" opacity="0.3"/>
       <rect x="${impactBadgeX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${impactBadgeW}" height="12" fill="transparent"/>
       <text class="blocks-badge" x="${impactBadgeCenterX}" y="${ctx.barHeight / 2 + 4}"
             text-anchor="middle" fill="${impactColor}" font-size="10" font-weight="500">${impactLabel}</text>
@@ -923,7 +923,7 @@ function generateBarBadges(
   ${showBlocker ? `<g class="blocker-badge" data-blocker-id="${firstBlockerId}" style="cursor: pointer;">
     <title>${escapeAttr(blockerTooltip)}</title>
     <rect x="${blockerBadgeStartX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${blockerBadgeW}" height="12" rx="2"
-          fill="${blockerColor}" opacity="0.15"/>
+          fill="${blockerColor}" opacity="0.3"/>
     <rect x="${blockerBadgeStartX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${blockerBadgeW}" height="12" fill="transparent"/>
     <text x="${blockerBadgeCenterX}" y="${ctx.barHeight / 2 + 4}"
           text-anchor="middle" fill="${blockerColor}" font-size="10" font-weight="600">${blockerLabel}</text>

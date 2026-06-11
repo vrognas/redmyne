@@ -150,9 +150,11 @@ export function toGanttIssue(
     due_date: issue.due_date || null,
     status: flexibility?.status ?? null,
     statusName: issue.status?.name ?? "Unknown",
-    // Flexibility as percentage: ((available - estimated) / estimated) * 100
-    // 0% = exactly enough time, 100% = double the time needed, -50% = need 50% more time
-    flexibilityPercent: flexibility?.initial ?? null,
+    // CURRENT risk (remaining time vs remaining work), not `initial`
+    // planning quality — initial never decays, so an overdue unfinished
+    // task kept showing a rosy positive buffer forever.
+    // 0% = exactly enough time left, -50% = need 50% more time
+    flexibilityPercent: flexibility?.remaining ?? null,
     isClosed: isClosedById || isClosedByName,
     project: issue.project?.name ?? "Unknown",
     projectId: issue.project?.id ?? 0,
