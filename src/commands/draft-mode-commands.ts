@@ -32,7 +32,7 @@ export interface ApplyDraftsResult {
  */
 export async function applyDraftsWithTracking(
   server: DraftModeServer,
-  queue: Pick<DraftQueue, "remove"> & Partial<Pick<DraftQueue, "removeMany">>,
+  queue: Pick<DraftQueue, "remove">,
   operations: DraftOperation[],
   onError: (op: DraftOperation, error: string) => boolean | Promise<boolean>,
   onProgress?: (current: number, total: number, description: string) => void
@@ -43,17 +43,15 @@ export async function applyDraftsWithTracking(
     skipped: [],
   };
 
-  const successfulOperationIds: string[] = [];
-
   for (let i = 0; i < operations.length; i++) {
     const op = operations[i];
     if (!op) continue;
     onProgress?.(i + 1, operations.length, op.description);
 
+    let applied = false;
     try {
       await executeOperation(server, op);
-      result.succeeded.push(op);
-      successfulOperationIds.push(op.id);
+      applied = true;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       result.failed.push({ operation: op, error: msg });
@@ -67,21 +65,16 @@ export async function applyDraftsWithTracking(
         break;
       }
     }
-  }
 
-  if (successfulOperationIds.length > 0) {
-    if (queue.removeMany) {
+    if (applied) {
+      result.succeeded.push(op);
+      // Remove immediately: a mid-batch pause (error toast) or window
+      // reload must not leave an already-applied op replayable.
       try {
-        await queue.removeMany(successfulOperationIds, DRAFT_COMMAND_SOURCE);
+        await queue.remove(op.id, DRAFT_COMMAND_SOURCE);
       } catch {
-        // Fallback to per-item removal if batch persistence fails.
-        for (const id of successfulOperationIds) {
-          await queue.remove(id, DRAFT_COMMAND_SOURCE);
-        }
-      }
-    } else {
-      for (const id of successfulOperationIds) {
-        await queue.remove(id, DRAFT_COMMAND_SOURCE);
+        // The op reached the server; failing the batch here would
+        // misreport it as not applied. Removal is best-effort.
       }
     }
   }
@@ -129,6 +122,10 @@ export function registerDraftModeCommands(
   const managerSub = manager.onDidChangeEnabled(() => updateContexts());
   const queueSub = queue.onDidChange(() => updateContexts());
 
+  // Single-flight guard: a batch apply pauses on its (non-modal) error
+  // toast, during which panel buttons stay clickable — block re-entry.
+  let applyInFlight = false;
+
   const toggleDraftMode = vscode.commands.registerCommand(
     "redmyne.toggleDraftMode",
     async () => {
@@ -165,6 +162,10 @@ export function registerDraftModeCommands(
   const applyDrafts = vscode.commands.registerCommand(
     "redmyne.applyDrafts",
     async () => {
+      if (applyInFlight) {
+        vscode.window.showInformationMessage("A draft apply is already in progress");
+        return;
+      }
       const server = getServerOrShowError(deps.getServer);
       if (!server) return;
 
@@ -183,35 +184,41 @@ export function registerDraftModeCommands(
       if (confirm !== "Apply All") return;
       // Re-read queue after confirm dialog — ops may have changed while dialog was open
       const operations = queue.getAll();
-      const result = await vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: "Applying drafts",
-          cancellable: false,
-        },
-        async (progress) => {
-          return applyDraftsWithTracking(
-            server,
-            queue,
-            operations,
-            async (op, msg) => {
-              const action = await vscode.window.showErrorMessage(
-                `Failed to apply: ${op.description}
+      applyInFlight = true;
+      let result: ApplyDraftsResult;
+      try {
+        result = await vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: "Applying drafts",
+            cancellable: false,
+          },
+          async (progress) => {
+            return applyDraftsWithTracking(
+              server,
+              queue,
+              operations,
+              async (op, msg) => {
+                const action = await vscode.window.showErrorMessage(
+                  `Failed to apply: ${op.description}
 ${msg}`,
-                "Continue",
-                "Stop"
-              );
-              return action === "Continue";
-            },
-            (current, total, description) => {
-              progress.report({
-                message: `${current}/${total}: ${description}`,
-                increment: 100 / total,
-              });
-            }
-          );
-        }
-      );
+                  "Continue",
+                  "Stop"
+                );
+                return action === "Continue";
+              },
+              (current, total, description) => {
+                progress.report({
+                  message: `${current}/${total}: ${description}`,
+                  increment: 100 / total,
+                });
+              }
+            );
+          }
+        );
+      } finally {
+        applyInFlight = false;
+      }
 
       refreshTrees();
 
@@ -276,6 +283,10 @@ Skipped (not attempted): ${skippedNames}`;
   const applySingleDraft = vscode.commands.registerCommand(
     "redmyne.applySingleDraft",
     async (draftId: string) => {
+      if (applyInFlight) {
+        vscode.window.showInformationMessage("A draft apply is already in progress");
+        return;
+      }
       const server = getServerOrShowError(deps.getServer);
       if (!server) return;
 
@@ -286,6 +297,7 @@ Skipped (not attempted): ${skippedNames}`;
         return;
       }
 
+      applyInFlight = true;
       try {
         await executeOperation(server, op);
         await queue.remove(op.id, DRAFT_COMMAND_SOURCE);
@@ -294,6 +306,8 @@ Skipped (not attempted): ${skippedNames}`;
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         vscode.window.showErrorMessage(`Failed to apply: ${op.description}\n${msg}`);
+      } finally {
+        applyInFlight = false;
       }
     }
   );

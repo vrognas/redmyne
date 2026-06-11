@@ -120,8 +120,16 @@ describe("applyDraftsWithTracking", () => {
     expect(result.skipped[0].id).toBe("3");
   });
 
-  it("removes successful operations from queue", async () => {
-    const ops = [createOp("1", "Op 1")];
+  it("removes each applied op from the queue before executing the next", async () => {
+    const ops = [createOp("1", "Op 1"), createOp("2", "Op 2")];
+    const calls: string[] = [];
+    mockServer.setIssueStatus.mockImplementation(async () => {
+      calls.push("exec");
+      return {};
+    });
+    mockQueue.remove.mockImplementation(async (id: string) => {
+      calls.push(`remove:${id}`);
+    });
 
     await applyDraftsWithTracking(
       mockServer as never,
@@ -130,8 +138,25 @@ describe("applyDraftsWithTracking", () => {
       () => true
     );
 
-    expect(mockQueue.removeMany).toHaveBeenCalledWith(["1"], DRAFT_COMMAND_SOURCE);
-    expect(mockQueue.remove).not.toHaveBeenCalled();
+    expect(calls).toEqual(["exec", "remove:1", "exec", "remove:2"]);
+  });
+
+  it("keeps already-applied ops removed when a later op fails and stops", async () => {
+    const ops = [createOp("1", "Op 1"), createOp("2", "Op 2")];
+    mockServer.setIssueStatus
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(new Error("boom"));
+
+    const result = await applyDraftsWithTracking(
+      mockServer as never,
+      mockQueue as never,
+      ops,
+      () => false
+    );
+
+    expect(mockQueue.remove).toHaveBeenCalledWith("1", DRAFT_COMMAND_SOURCE);
+    expect(result.succeeded).toHaveLength(1);
+    expect(result.failed).toHaveLength(1);
   });
 
   it("does not remove failed operations from queue", async () => {
@@ -149,20 +174,21 @@ describe("applyDraftsWithTracking", () => {
     expect(mockQueue.remove).not.toHaveBeenCalled();
   });
 
-  it("falls back to remove when removeMany is unavailable", async () => {
-    const ops = [createOp("1", "Op 1"), createOp("2", "Op 2")];
-    delete mockQueue.removeMany;
+  it("does not report apply failure when queue removal throws", async () => {
+    const ops = [createOp("1", "Op 1")];
+    mockQueue.remove.mockRejectedValue(new Error("persist fail"));
+    const onError = vi.fn().mockReturnValue(true);
 
-    await applyDraftsWithTracking(
+    const result = await applyDraftsWithTracking(
       mockServer as never,
       mockQueue as never,
       ops,
-      () => true
+      onError
     );
 
-    expect(mockQueue.remove).toHaveBeenCalledTimes(2);
-    expect(mockQueue.remove).toHaveBeenNthCalledWith(1, "1", DRAFT_COMMAND_SOURCE);
-    expect(mockQueue.remove).toHaveBeenNthCalledWith(2, "2", DRAFT_COMMAND_SOURCE);
+    expect(result.succeeded).toHaveLength(1);
+    expect(result.failed).toHaveLength(0);
+    expect(onError).not.toHaveBeenCalled();
   });
 
   it("fails operation when issueId is missing for issue-based drafts", async () => {
@@ -326,22 +352,6 @@ describe("applyDraftsWithTracking", () => {
     expect(mockServer.createVersion).toHaveBeenCalledWith("ops", { name: "v1" }, { _bypassDraft: true });
     expect(mockServer.createRelation).toHaveBeenCalledWith(123, 200, "blocks", 1, { _bypassDraft: true });
     expect(mockServer.deleteRelation).toHaveBeenCalledWith(101, { _bypassDraft: true });
-  });
-
-  it("falls back to per-item removal when removeMany throws", async () => {
-    const ops = [createOp("1", "Op 1"), createOp("2", "Op 2")];
-    mockQueue.removeMany = vi.fn().mockRejectedValue(new Error("persist fail"));
-
-    await applyDraftsWithTracking(
-      mockServer as never,
-      mockQueue as never,
-      ops,
-      () => true
-    );
-
-    expect(mockQueue.remove).toHaveBeenCalledTimes(2);
-    expect(mockQueue.remove).toHaveBeenNthCalledWith(1, "1", DRAFT_COMMAND_SOURCE);
-    expect(mockQueue.remove).toHaveBeenNthCalledWith(2, "2", DRAFT_COMMAND_SOURCE);
   });
 
   it("reports unknown operation type as failure", async () => {
