@@ -1094,6 +1094,33 @@ describe("RedmineServer", () => {
     });
   });
 
+  describe("hasChanges", () => {
+    it("probes with the supported >= operator, url-encoded", async () => {
+      const server = new RedmineServer({
+        address: "https://localhost:3000",
+        key: "test-api-key",
+        requestFn: vi.fn() as never,
+      });
+      const spy = vi
+        .spyOn(server, "doRequest")
+        .mockResolvedValue({ total_count: 1 } as never);
+
+      const changed = await (
+        server as unknown as {
+          hasChanges(endpoint: string, since: string): Promise<boolean | null>;
+        }
+      ).hasChanges("/issues.json", "2026-06-01T00:00:00Z");
+
+      expect(changed).toBe(true);
+      const url = spy.mock.calls[0][0] as string;
+      // bare ">" is not a Redmine filter operator (server answers 422)
+      expect(url).toContain(
+        `updated_on=${encodeURIComponent(">=2026-06-01T00:00:00Z")}`
+      );
+      expect(url).not.toContain("updated_on=>");
+    });
+  });
+
   describe("applyQuickUpdate", () => {
     it("omits assigned_to_id for no-change on an unassigned issue", async () => {
       const server = new RedmineServer({
