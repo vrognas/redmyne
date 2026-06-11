@@ -55,6 +55,7 @@ function createController(tasks: KanbanTask[] = []) {
     getDeferredMinutes: vi.fn(() => 0),
     consumeDeferredMinutes: vi.fn(),
     setWorkDurationSeconds: vi.fn(),
+    setBreakDurationSeconds: vi.fn(),
     moveUp: vi.fn(),
     moveDown: vi.fn(),
   };

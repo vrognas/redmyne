@@ -101,6 +101,7 @@ describe("setupKanban", () => {
 
     expect(hoisted.controllerCtor).toHaveBeenCalledWith(context.globalState, {
       workDurationSeconds: 2700,
+      breakDurationSeconds: 900,
     });
     expect(hoisted.statusBarCtor).toHaveBeenCalledWith(
       hoisted.controller,
@@ -157,6 +158,7 @@ describe("setupKanban", () => {
 
     expect(hoisted.controllerCtor).toHaveBeenCalledWith(context.globalState, {
       workDurationSeconds: 60,
+      breakDurationSeconds: 1740,
     });
   });
 });

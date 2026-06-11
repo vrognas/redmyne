@@ -24,6 +24,47 @@ describe("KanbanController", () => {
     controller = new KanbanController(mockState);
   });
 
+  describe("deep-review fixes", () => {
+    it("markDone stops a running timer and clears timer state", async () => {
+      vi.useFakeTimers();
+      try {
+        const onComplete = vi.fn();
+        controller.onTimerComplete(onComplete);
+
+        const task = await controller.addTask("Work", 1, "Issue", 1, "P");
+        await controller.startTimer(task.id, 9, "Dev");
+        await controller.markDone(task.id);
+
+        expect(controller.getActiveTask()).toBeUndefined();
+        expect(controller.getTaskById(task.id)?.timerPhase).toBeUndefined();
+        expect(controller.getTaskById(task.id)?.timerSecondsLeft).toBeUndefined();
+
+        // a done task must never fire a completion prompt
+        vi.advanceTimersByTime(46 * 60 * 1000);
+        expect(onComplete).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("honors a configured break duration via setter", () => {
+      controller.setBreakDurationSeconds(10 * 60);
+      controller.startBreak();
+      expect(controller.getBreakSecondsLeft()).toBe(10 * 60);
+      controller.skipBreak();
+    });
+
+    it("persists deferred minutes across reloads", async () => {
+      controller.addDeferredMinutes(12);
+      const reloaded = new KanbanController(mockState);
+      expect(reloaded.getDeferredMinutes()).toBe(12);
+
+      expect(reloaded.consumeDeferredMinutes()).toBe(12);
+      const reloadedAgain = new KanbanController(mockState);
+      expect(reloadedAgain.getDeferredMinutes()).toBe(0);
+    });
+  });
+
   describe("CRUD operations", () => {
     it("creates a task and persists it", async () => {
       const task = await controller.addTask(

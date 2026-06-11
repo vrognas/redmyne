@@ -8,6 +8,7 @@ import {
 } from "./kanban-state";
 
 const STORAGE_KEY = "redmyne.kanban";
+const DEFERRED_MINUTES_KEY = "redmyne.kanban.deferredMinutes";
 
 /**
  * Interface for globalState-like storage
@@ -34,7 +35,7 @@ export class KanbanController {
   private breakIntervalId: ReturnType<typeof setInterval> | null = null;
   private disposed = false;
   private workDurationSeconds: number;
-  private readonly breakDurationSeconds: number;
+  private breakDurationSeconds: number;
   private breakSecondsLeft: number = 0;
   private deferredMinutes: number = 0;
 
@@ -117,6 +118,13 @@ export class KanbanController {
   }
 
   /**
+   * Update break duration (for settings changes)
+   */
+  setBreakDurationSeconds(seconds: number): void {
+    this.breakDurationSeconds = seconds;
+  }
+
+  /**
    * Get deferred minutes (accumulated from previous tasks)
    */
   getDeferredMinutes(): number {
@@ -124,10 +132,13 @@ export class KanbanController {
   }
 
   /**
-   * Add deferred minutes (called when deferring a task)
+   * Add deferred minutes (called when deferring a task).
+   * Persisted: deferred time is the ONLY record of that work until it is
+   * logged — losing it on reload silently drops billable time.
    */
   addDeferredMinutes(minutes: number): void {
     this.deferredMinutes += minutes;
+    void this.globalState.update(DEFERRED_MINUTES_KEY, this.deferredMinutes);
     this._onTasksChange.fire();
   }
 
@@ -137,6 +148,7 @@ export class KanbanController {
   consumeDeferredMinutes(): number {
     const deferred = this.deferredMinutes;
     this.deferredMinutes = 0;
+    void this.globalState.update(DEFERRED_MINUTES_KEY, 0);
     return deferred;
   }
 
@@ -228,8 +240,17 @@ export class KanbanController {
     const task = this.tasks[index];
     if (!task) return;
 
+    // A done task must not keep ticking: it would stay getActiveTask()
+    // and eventually fire a completion prompt to log time again.
+    if (task.timerPhase === "working") {
+      this.stopInterval();
+    }
+
     this.tasks[index] = {
       ...task,
+      timerPhase: undefined,
+      timerSecondsLeft: undefined,
+      lastActiveAt: undefined,
       completedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -645,6 +666,9 @@ export class KanbanController {
   private restore(): void {
     const stored = this.globalState.get<unknown[]>(STORAGE_KEY, []);
     this.tasks = this.validateAndFilter(stored);
+
+    const deferred = this.globalState.get<number>(DEFERRED_MINUTES_KEY, 0);
+    this.deferredMinutes = typeof deferred === "number" && deferred > 0 ? deferred : 0;
 
     // Session recovery: adjust timer for elapsed time since last active
     const now = Date.now();

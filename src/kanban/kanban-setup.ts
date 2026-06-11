@@ -36,6 +36,8 @@ export function setupKanban(deps: KanbanSetupDeps): KanbanSetupResult {
 
   const controller = new KanbanController(deps.context.globalState, {
     workDurationSeconds: workDuration * 60,
+    // Break is the rest of the unit (configureTimer's "Break = Unit - Work")
+    breakDurationSeconds: (unitDuration - workDuration) * 60,
   });
 
   const statusBar = new KanbanStatusBar(controller, deps.context.globalState);
