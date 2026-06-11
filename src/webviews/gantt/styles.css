@@ -1220,14 +1220,24 @@ svg {
   pointer-events: none;
 }
 
+/* Arrows recede at rest (the elbow tangle was the dominant visual on dense
+   boards) and light up when relevant: hovering a BAR adds .hover-highlighted
+   to its connected arrows, hovering/selecting the arrow itself emphasizes
+   it further. */
 .dependency-arrow .arrow-line {
   transition: stroke-width 0.15s, filter 0.15s, opacity 0.15s;
-  opacity: 0.7;
+  opacity: 0.35;
 }
 
 .dependency-arrow .arrow-head {
   transition: filter 0.15s, opacity 0.15s;
-  opacity: 0.7;
+  opacity: 0.35;
+}
+
+.dependency-arrow.hover-highlighted .arrow-line,
+.dependency-arrow.hover-highlighted .arrow-head {
+  stroke-width: 2.5;
+  opacity: 1;
 }
 
 .dependency-arrow:hover .arrow-line,
@@ -2129,6 +2139,12 @@ button:focus {
 .focus-mode .dependency-arrow.focus-highlighted {
   opacity: 1;
   stroke-width: 2.5;
+}
+
+/* children rest at 0.35 — chain members must render at full strength */
+.focus-mode .dependency-arrow.focus-highlighted .arrow-line,
+.focus-mode .dependency-arrow.focus-highlighted .arrow-head {
+  opacity: 1;
 }
 
 .focus-mode .issue-bar.focus-highlighted .bar-outline {

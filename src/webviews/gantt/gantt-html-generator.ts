@@ -64,6 +64,18 @@ function formatDateWithWeekday(dateStr: string | null): string {
   return `${dateStr} (${WEEKDAYS[d.getUTCDay()]})`;
 }
 
+/**
+ * One self-explanatory flexibility line for tooltips. Flexibility lives in
+ * hover tooltips only (no resting badge) — a bare "+550%"/"-41%" pill next
+ * to every bar read like a stock ticker and said nothing about meaning.
+ */
+function flexibilityLine(flexPct: number | null): string | null {
+  if (flexPct === null) return null;
+  if (flexPct > 0) return `Flexibility: +${flexPct}% schedule buffer`;
+  if (flexPct === 0) return "Flexibility: 0% — no schedule buffer";
+  return `Flexibility: ${flexPct}% — remaining work exceeds time left`;
+}
+
 /** Get day name key for WeeklySchedule lookup */
 function getDayKey(date: Date): keyof WeeklySchedule {
   const keys: (keyof WeeklySchedule)[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -165,14 +177,10 @@ export function generateIssueLabel(
   const escapedSubject = escapeHtml(issue.subject);
   const escapedProject = escapeHtml(issue.project);
 
-  // Build tooltip
+  // Build tooltip (flexibilityLine: hover-only, self-explanatory wording)
   const leftEffectiveStatus = issue.isClosed ? "completed" : (issue.status ?? "unknown");
   const leftStatusDesc = ctx.getStatusDescription(leftEffectiveStatus);
-  const leftFlexPct = issue.flexibilityPercent;
-  const leftFlexText = leftFlexPct === null ? null
-    : leftFlexPct > 0 ? `Flexibility: +${leftFlexPct}%`
-    : leftFlexPct === 0 ? `Flexibility: 0% (no buffer)`
-    : `Flexibility: ${leftFlexPct}%`;
+  const leftFlexText = flexibilityLine(issue.flexibilityPercent);
 
   const tooltipLines = [
     issue.isAdHoc ? "🎲 AD-HOC BUDGET POOL" : null,
@@ -651,9 +659,10 @@ function generateRegularBar(
     contributedHours > 0
       ? `Spent: ${formatHoursAsTime(issue.spent_hours)} + ${formatHoursAsTime(contributedHours)} contributed = ${formatHoursAsTime(effectiveSpentHours)}`
       : `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
+    flexibilityLine(flexPct),
   ].filter(Boolean).join("\n");
 
-  // Progress badge tooltip
+  // Progress badge tooltip (carries flexibility too — hover-only signal)
   const progressTooltip = [
     `Progress: ${doneRatio}%${isFallbackProgress ? ` (~${visualDoneRatio}% from time)` : ""}${isManualDone && doneRatio > 0 ? " (manual)" : ""}`,
     `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
@@ -661,13 +670,8 @@ function generateRegularBar(
     contributedHours > 0
       ? `Spent: ${formatHoursAsTime(issue.spent_hours)} + ${formatHoursAsTime(contributedHours)} contributed`
       : `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
+    flexibilityLine(flexPct),
   ].filter(Boolean).join("\n");
-
-  // Flexibility tooltip
-  const flexTooltip = flexPct === null ? ""
-    : flexPct > 0 ? `Flexibility: +${flexPct}%`
-    : flexPct === 0 ? `Flexibility: 0% (no buffer)`
-    : `Flexibility: ${flexPct}%`;
 
   // Blocks tooltip (issues blocked by this one)
   const blocksTooltip = issue.blocks.length > 0
@@ -728,7 +732,7 @@ function generateRegularBar(
   })();
 
   // Generate badges
-  const badges = generateBarBadges(issue, startX, endX, barY, flexPct, visualDoneRatio, isFallbackProgress, progressTooltip, flexTooltip, blocksTooltip, blockerTooltip, ctx);
+  const badges = generateBarBadges(issue, startX, endX, barY, visualDoneRatio, isFallbackProgress, progressTooltip, blocksTooltip, blockerTooltip, ctx);
 
   return `
     <g class="issue-bar gantt-row${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${issue.isAdHoc ? " bar-adhoc" : ""}${isCriticalPath ? " bar-critical" : ""}" data-issue-id="${issue.id}"
@@ -792,33 +796,22 @@ function generateRegularBar(
   `;
 }
 
-/** Generate bar badges (progress, flex, blocks, blocker, assignee) */
+/** Generate bar badges (progress, blocks, blocker, assignee). Flexibility
+ * is hover-only — it rides the bar/progress tooltips, not a resting badge. */
 function generateBarBadges(
   issue: GanttIssue,
   startX: number,
   endX: number,
   barY: number,
-  flexPct: number | null,
   visualDoneRatio: number,
   isFallbackProgress: boolean,
   progressTooltip: string,
-  flexTooltip: string,
   blocksTooltip: string,
   blockerTooltip: string,
   ctx: GanttRenderContext
 ): string {
   // Progress badge width (varies by digit count)
   const progressBadgeW = visualDoneRatio === 100 ? 32 : visualDoneRatio >= 10 ? 28 : 22;
-
-  // Flexibility badge
-  const showFlex = flexPct !== null && !issue.isClosed;
-  const flexLabel = showFlex ? (flexPct > 0 ? `+${flexPct}%` : `${flexPct}%`) : "";
-  const flexBadgeW = showFlex ? (Math.abs(flexPct) >= 100 ? 38 : Math.abs(flexPct) >= 10 ? 32 : 26) : 0;
-  const flexColor = showFlex
-    ? (flexPct >= 50 ? "var(--vscode-charts-green)"
-      : flexPct > 0 ? "var(--vscode-charts-yellow)"
-      : "var(--vscode-charts-red)")
-    : "";
 
   // Blocks badge (downstream - at END of bar)
   const blocksCount = issue.blocks.length;
@@ -868,19 +861,13 @@ function generateBarBadges(
   // Progress badge position
   const progressCenterX = labelX + progressBadgeW / 2;
 
-  // Flex badge position
-  const flexBadgeX = labelX + progressBadgeW + 4;
-  const flexBadgeCenterX = flexBadgeX + flexBadgeW / 2;
-
   // Impact badge position
-  const afterProgressX = showFlex ? flexBadgeX : labelX;
-  const afterProgressW = showFlex ? flexBadgeW : progressBadgeW;
-  const impactBadgeX = afterProgressX + afterProgressW + 4;
+  const impactBadgeX = labelX + progressBadgeW + 4;
   const impactBadgeCenterX = impactBadgeX + impactBadgeW / 2;
 
   // Assignee position
-  const afterImpactX = showBlocks ? impactBadgeX : afterProgressX;
-  const afterImpactW = showBlocks ? impactBadgeW : afterProgressW;
+  const afterImpactX = showBlocks ? impactBadgeX : labelX;
+  const afterImpactW = showBlocks ? impactBadgeW : progressBadgeW;
   const assigneeX = afterImpactX + afterImpactW + 4;
 
   return `<g class="bar-labels">
@@ -892,14 +879,6 @@ function generateBarBadges(
       <text class="status-badge" x="${progressCenterX}" y="${ctx.barHeight / 2 + 4}"
             text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${isFallbackProgress ? "~" : ""}${visualDoneRatio}%</text>
     </g>
-    ${showFlex ? `<g class="flex-badge-group">
-      <title>${escapeAttr(flexTooltip)}</title>
-      <rect class="flex-badge-bg" x="${flexBadgeX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${flexBadgeW}" height="12" rx="2"
-            fill="${flexColor}" opacity="0.15"/>
-      <rect x="${flexBadgeX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${flexBadgeW}" height="12" fill="transparent"/>
-      <text class="flex-badge" x="${flexBadgeCenterX}" y="${ctx.barHeight / 2 + 4}"
-            text-anchor="middle" fill="${flexColor}" font-size="10" font-weight="500">${flexLabel}</text>
-    </g>` : ""}
     ${showBlocks ? `<g class="blocks-badge-group" style="cursor: pointer;">
       <title>${escapeAttr(blocksTooltip)}</title>
       <rect class="blocks-badge-bg" x="${impactBadgeX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${impactBadgeW}" height="12" rx="2"

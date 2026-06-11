@@ -234,11 +234,11 @@ export function generateToolbar(ctx: GanttToolbarContext): string {
         <div class="help-tooltip">
             <div class="help-section">
               <div class="help-title">Bar Badges</div>
-              <span class="help-item"><span style="color:var(--vscode-charts-green)">+Nd</span> days of slack</span>
-              <span class="help-item"><span style="color:var(--vscode-charts-red)">-Nd</span> days late</span>
-              <span class="help-item">🚧N blocked by this</span>
-              <span class="help-item"><span style="color:var(--vscode-charts-red)">⛔N</span> blockers</span>
-              <span class="help-item"><span style="color:var(--vscode-charts-purple)">◆</span> milestone</span>
+              <span class="help-item">N% progress</span>
+              <span class="help-item"><span style="color:var(--vscode-charts-orange)">⛔N</span> blocks N issues</span>
+              <span class="help-item"><span style="color:var(--vscode-charts-yellow)">⏳N</span> waiting on N issues</span>
+              <span class="help-item"><span style="color:var(--vscode-charts-green)">✓</span> closed</span>
+              <span class="help-item">hover a bar for flexibility &amp; hours</span>
             </div>
             <div class="help-section">
               <div class="help-title">Relations</div>
