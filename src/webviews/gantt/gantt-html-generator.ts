@@ -930,11 +930,17 @@ function generateBarBadges(
     : 0;
   // Badge color = health at a glance: red when over budget, green with
   // ample flexibility (>100% buffer), orange when the buffer is thinning.
+  // The BACKGROUND tints with the same color (translucent, like the
+  // late/flex pills) — the theme's solid badge-background can be any hue
+  // and made same-color text unreadable.
+  const hasHealth = isOverBudget || flexPct !== null;
   const progressColor = isOverBudget
     ? "var(--vscode-charts-red)"
     : flexPct !== null
       ? (flexPct > 100 ? "var(--vscode-charts-green)" : "var(--vscode-charts-orange)")
       : "var(--vscode-badge-foreground)";
+  const progressBg = hasHealth ? progressColor : "var(--vscode-badge-background)";
+  const progressBgOpacity = hasHealth ? "0.25" : "0.9";
 
   // Flexibility badge — attention-worthy buffers only (<100%). Overdue
   // tasks swap it for "Nd late": once the due date passes, the percentage
@@ -1021,7 +1027,7 @@ function generateBarBadges(
     ${showProgress ? `<g class="progress-badge-group">
       <title>${escapeAttr(progressTooltip)}</title>
       <rect class="status-badge-bg" x="${progressX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${progressBadgeW}" height="12" rx="2"
-            fill="${isOverBudget ? "var(--vscode-charts-red)" : "var(--vscode-badge-background)"}" opacity="${isOverBudget ? "0.25" : "0.9"}"/>
+            fill="${progressBg}" opacity="${progressBgOpacity}"/>
       <rect x="${progressX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${progressBadgeW}" height="12" fill="transparent"/>
       <text class="status-badge" x="${progressCenterX}" y="${ctx.barHeight / 2 + 4}"
             text-anchor="middle" fill="${progressColor}" font-size="10"${isOverBudget ? ' font-weight="600"' : ""}${isFallbackProgress ? ' font-style="italic"' : ""}>${visualDoneRatio}%</text>
