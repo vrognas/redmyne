@@ -275,15 +275,37 @@ describe("registerIssueContextCommands", () => {
         }),
       setIssueStatus: vi.fn().mockResolvedValue(undefined),
     };
+    vi.mocked(vscode.window.showQuickPick).mockResolvedValue(undefined);
 
     registerCommands({ getProjectsServer: () => mockServer });
     await handlers.get("redmyne.setIssueStatus")?.({ id: 55, statusPattern: "in_progress" });
     await handlers.get("redmyne.setIssueStatus")?.({ id: 56, statusPattern: "closed" });
 
+    expect(mockServer.setIssueStatus).toHaveBeenCalledTimes(1);
     expect(mockServer.setIssueStatus).toHaveBeenCalledWith({ id: 55 }, 2);
-    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
-      "No matching status found for pattern: closed"
-    );
+    // Unmatched pattern falls back to the picker instead of erroring
+    expect(vscode.window.showQuickPick).toHaveBeenCalled();
+  });
+
+  it("setIssueStatus never writes a guessed status when pattern has no match", async () => {
+    const mockServer = {
+      // Localized server: no status name contains "progress"
+      getIssueStatuses: vi.fn().mockResolvedValue({
+        issue_statuses: [
+          { id: 1, name: "Neu", is_closed: false },
+          { id: 4, name: "Feedback", is_closed: false },
+          { id: 5, name: "Erledigt", is_closed: true },
+        ],
+      }),
+      setIssueStatus: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.mocked(vscode.window.showQuickPick).mockResolvedValue(undefined);
+
+    registerCommands({ getProjectsServer: () => mockServer });
+    await handlers.get("redmyne.setIssueStatus")?.({ id: 55, statusPattern: "in_progress" });
+
+    expect(mockServer.setIssueStatus).not.toHaveBeenCalled();
+    expect(vscode.window.showQuickPick).toHaveBeenCalled();
   });
 
   it("reveals issue and project in tree when nodes exist", async () => {

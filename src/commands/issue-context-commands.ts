@@ -217,24 +217,21 @@ export function registerIssueContextCommands(
           const statuses = (await server.getIssueStatuses()).issue_statuses;
           let targetStatus: { id: number; name: string; is_closed: boolean } | undefined;
 
-          if (issue.statusPattern) {
-            if (issue.statusPattern === "new") {
-              targetStatus = statuses.find((s) => s.name.toLowerCase() === "new")
-                ?? statuses.find((s) => !s.is_closed);
-            } else if (issue.statusPattern === "in_progress") {
-              targetStatus = statuses.find((s) => s.name.toLowerCase() === "in progress")
-                ?? statuses.find((s) => !s.is_closed && s.name.toLowerCase().includes("progress"))
-                ?? statuses.filter((s) => !s.is_closed)[1];
-            } else if (issue.statusPattern === "closed") {
-              targetStatus = statuses.find((s) => s.name.toLowerCase() === "closed")
-                ?? statuses.find((s) => s.is_closed);
-            }
+          if (issue.statusPattern === "new") {
+            targetStatus = statuses.find((s) => s.name.toLowerCase() === "new")
+              ?? statuses.find((s) => !s.is_closed);
+          } else if (issue.statusPattern === "in_progress") {
+            targetStatus = statuses.find((s) => s.name.toLowerCase() === "in progress")
+              ?? statuses.find((s) => !s.is_closed && s.name.toLowerCase().includes("progress"));
+          } else if (issue.statusPattern === "closed") {
+            targetStatus = statuses.find((s) => s.name.toLowerCase() === "closed")
+              ?? statuses.find((s) => s.is_closed);
+          }
 
-            if (!targetStatus) {
-              vscode.window.showErrorMessage(`No matching status found for pattern: ${issue.statusPattern}`);
-              return;
-            }
-          } else {
+          if (!targetStatus) {
+            // No pattern, or the pattern matched none of this server's
+            // status names (e.g. localized Redmine) — never write a
+            // guessed status id; let the user pick.
             const options = statuses.map((s) => ({
               label: s.name,
               description: s.is_closed ? "(closed)" : "",
