@@ -99,6 +99,19 @@ describe("calculateProjectHealth", () => {
       expect(result.status).toBe("yellow");
     });
 
+    it("treats reopened issues (stale closed_on, open status) as open", () => {
+      const issues = [
+        createMockIssue({
+          id: 1,
+          due_date: "2025-01-10", // overdue
+          closed_on: "2025-01-05T00:00:00Z", // stale — issue was reopened
+          status: { id: 1, name: "Open", is_closed: false },
+        }),
+      ];
+      const result = calculateProjectHealth(issues, new Set());
+      expect(result.status).toBe("red");
+    });
+
     it("ignores closed issues for overdue check", () => {
       const issues = [
         createMockIssue({

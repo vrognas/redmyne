@@ -183,8 +183,21 @@ export function validateDateInput(
 ): string | null {
   if (!value) return "Date required";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Use YYYY-MM-DD format";
-  const parsed = new Date(value);
-  if (isNaN(parsed.getTime())) return "Invalid date";
-  if (!allowFuture && parsed > new Date()) return "Cannot log time in the future";
+  // Round-trip the calendar date: new Date("2026-02-30") silently rolls
+  // over to March 2, letting nonexistent dates through to the API.
+  const [y, m, d] = value.split("-").map(Number);
+  const parsed = new Date(Date.UTC(y!, m! - 1, d!));
+  if (
+    parsed.getUTCFullYear() !== y ||
+    parsed.getUTCMonth() !== m! - 1 ||
+    parsed.getUTCDate() !== d
+  ) {
+    return "Invalid date";
+  }
+  // Compare date strings, not instants: UTC-midnight vs now falsely
+  // rejected "today" for users east of UTC.
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  if (!allowFuture && value > todayStr) return "Cannot log time in the future";
   return null;
 }

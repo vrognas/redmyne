@@ -14,9 +14,21 @@ describe("date-picker", () => {
 
     const future = new Date();
     future.setDate(future.getDate() + 1);
-    const futureStr = future.toISOString().slice(0, 10);
+    const futureStr = `${future.getFullYear()}-${String(future.getMonth() + 1).padStart(2, "0")}-${String(future.getDate()).padStart(2, "0")}`;
     expect(validateDateInput(futureStr)).toBe("Cannot log time in the future");
     expect(validateDateInput(futureStr, true)).toBeNull();
+  });
+
+  it("rejects nonexistent calendar dates and accepts today in local time", () => {
+    expect(validateDateInput("2026-02-30")).toBe("Invalid date");
+    expect(validateDateInput("2025-13-01")).toBe("Invalid date");
+    expect(validateDateInput("2026-00-10")).toBe("Invalid date");
+
+    // Today must validate regardless of timezone offset (UTC-instant
+    // comparison falsely rejected "today" east of UTC).
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    expect(validateDateInput(todayStr)).toBeNull();
   });
 
   it("pickDate returns preset and custom values", async () => {

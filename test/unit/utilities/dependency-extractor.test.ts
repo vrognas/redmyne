@@ -52,6 +52,24 @@ describe("extractSchedulingDependencyIds", () => {
     expect(result).toEqual(new Set([10, 11, 12, 13]));
   });
 
+  it("collects external owners of relations (blocked by an external issue)", () => {
+    // External issue 99 blocks our issue 1 — the relation record keeps its
+    // owner orientation inside 1's relations array.
+    const issues = [
+      createMockIssue({
+        id: 1,
+        relations: [
+          { id: 100, issue_id: 99, issue_to_id: 1, relation_type: "blocks" },
+        ],
+      }),
+    ];
+
+    const result = extractSchedulingDependencyIds(issues);
+
+    expect(result.has(99)).toBe(true);
+    expect(result.has(1)).toBe(false);
+  });
+
   it("ignores non-scheduling relations (relates, duplicates)", () => {
     const issues = [
       createMockIssue({

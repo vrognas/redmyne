@@ -37,9 +37,14 @@ export function extractSchedulingDependencyIds(issues: Issue[]): Set<number> {
       // Only scheduling relations
       if (!SCHEDULING_RELATION_TYPES.includes(rel.relation_type)) continue;
 
-      // Target is external (not in our set)
+      // Either side may be external: relation records keep their owner
+      // orientation, so an external issue that owns the relation appears
+      // as issue_id, not issue_to_id.
       if (!ownIds.has(rel.issue_to_id)) {
         dependencyIds.add(rel.issue_to_id);
+      }
+      if (!ownIds.has(rel.issue_id)) {
+        dependencyIds.add(rel.issue_id);
       }
     }
   }

@@ -7,6 +7,7 @@
  */
 
 import { Issue } from "../redmine/models/issue";
+import { isIssueClosed } from "./issue-status";
 import { WeeklySchedule, countWorkingDays } from "./flexibility-calculator";
 import { parseLocalDate, getISOWeekNumber, getISOWeekYear, formatLocalDate } from "./date-utils";
 import { DependencyGraph, countDownstream } from "./dependency-graph";
@@ -117,8 +118,8 @@ export function calculateDailyCapacity(
   endDate: string
 ): DailyCapacity[] {
   // Filter to leaf issues only (no children) to avoid double-counting
-  // Also exclude closed issues (closed_on set)
-  const leafIssues = issues.filter(i => (!i.children || i.children.length === 0) && !i.closed_on);
+  // Also exclude closed issues (status-based: reopened keep closed_on)
+  const leafIssues = issues.filter(i => (!i.children || i.children.length === 0) && !isIssueClosed(i));
 
   if (leafIssues.length === 0) {
     // Still generate capacity entries for the range
@@ -481,7 +482,7 @@ export function calculateScheduledCapacity(
   const schedulableIssues = issues.filter(
     (i) =>
       i.start_date &&
-      !i.closed_on && // Exclude closed issues
+      !isIssueClosed(i) && // Exclude closed issues (status-based)
       i.done_ratio !== 100 && // Exclude 100% done issues
       ((i.estimated_hours && i.estimated_hours > 0) || internalEstimates.has(i.id))
   );
@@ -539,8 +540,10 @@ export function calculateScheduledCapacity(
   // Track completed issues for blocker resolution (start with fully done issues)
   const completedIssues = new Set<number>();
   for (const issue of issues) {
-    // Treat 100% done issues as completed for blocking purposes
-    if (issue.done_ratio === 100) {
+    // Treat 100% done AND genuinely closed issues as completed for
+    // blocking purposes — a closed blocker with done_ratio < 100 must
+    // not keep blocking its dependents forever.
+    if (issue.done_ratio === 100 || isIssueClosed(issue)) {
       completedIssues.add(issue.id);
     }
   }

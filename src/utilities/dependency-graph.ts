@@ -1,4 +1,5 @@
 import type { Issue } from "../redmine/models/issue";
+import { isIssueClosed } from "./issue-status";
 
 /**
  * Dependency graph node with upstream (blockers) and downstream (dependents)
@@ -50,10 +51,11 @@ export function buildDependencyGraph(issues: Issue[]): DependencyGraph {
       // rel.issue_id is the "owner" of the relation, rel.issue_to_id is the target
       // relation_type describes: issue_id <relation_type> issue_to_id
       // e.g., "blocks" means issue_id blocks issue_to_id
-
-      // Only process relations where current issue is the owner (issue_id)
-      // This ensures each relation is processed exactly once
-      if (rel.issue_id !== issue.id) continue;
+      //
+      // Process the relation regardless of which side is being iterated:
+      // when the owner is outside the fetched set (filtered out), its
+      // iteration never happens and skipping here would drop the edge.
+      // Seeing the same record twice is harmless — the Sets dedupe.
 
       const fromId = rel.issue_id;
       const toId = rel.issue_to_id;
@@ -61,7 +63,10 @@ export function buildDependencyGraph(issues: Issue[]): DependencyGraph {
       // Skip self-references (malformed data)
       if (toId === fromId) continue;
 
-      // Ensure target node exists (may be external)
+      // Ensure both endpoints exist (either may be external)
+      if (!graph.has(fromId)) {
+        graph.set(fromId, { upstream: new Set(), downstream: new Set() });
+      }
       if (!graph.has(toId)) {
         graph.set(toId, { upstream: new Set(), downstream: new Set() });
       }
@@ -167,8 +172,8 @@ export function getDownstream(
       continue;
     }
 
-    // Skip closed issues
-    if (blocked.closed_on !== null) continue;
+    // Skip closed issues (status-based: reopened issues keep closed_on)
+    if (isIssueClosed(blocked)) continue;
 
     downstream.push({
       id: blocked.id,
@@ -214,8 +219,8 @@ export function getBlockers(
       continue;
     }
 
-    // Skip closed blockers
-    if (blocker.closed_on !== null) continue;
+    // Skip closed blockers (status-based: reopened issues keep closed_on)
+    if (isIssueClosed(blocker)) continue;
 
     blockers.push({
       id: blocker.id,

@@ -1,4 +1,5 @@
 import type { Issue } from "../redmine/models/issue";
+import { isIssueClosed } from "./issue-status";
 import { formatLocalDate } from "./date-utils";
 
 /**
@@ -88,7 +89,7 @@ export function calculateProjectHealth(
   for (const issue of issues) {
     total++;
 
-    const isClosed = issue.closed_on !== null;
+    const isClosed = isIssueClosed(issue);
 
     // Count by status
     if (isClosed) {

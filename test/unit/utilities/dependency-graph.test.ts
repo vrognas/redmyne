@@ -115,12 +115,27 @@ describe("buildDependencyGraph", () => {
     expect(graph.get(1)!.upstream.size).toBe(0);
   });
 
-  it("ignores relations where issue_id != current issue (prevents self-blocking)", () => {
-    // Redmine returns relations from both perspectives
-    // When fetching issue 1 blocked by 2, we get:
-    //   {issue_id: 1, issue_to_id: 2, relation_type: "blocked"} - owned by 1
-    //   {issue_id: 2, issue_to_id: 1, relation_type: "blocks"} - owned by 2
-    // Without the fix, the second relation would create self-reference (1→1)
+  it("keeps edges owned by issues outside the fetched set", () => {
+    // External issue 99 blocks fetched issue 1. The relation record keeps
+    // its owner orientation in 1's relations array; if processing required
+    // the owner to be iterated, this edge would be silently dropped.
+    const issues = [
+      createMockIssue({
+        id: 1,
+        relations: [
+          { id: 100, issue_id: 99, issue_to_id: 1, relation_type: "blocks" },
+        ],
+      }),
+    ];
+    const graph = buildDependencyGraph(issues);
+
+    expect(graph.get(1)!.upstream.has(99)).toBe(true);
+    expect(graph.get(99)!.downstream.has(1)).toBe(true);
+  });
+
+  it("dedupes the same relation seen from both perspectives without self-edges", () => {
+    // Both encodings of "2 blocks 1" may appear; processing both must
+    // yield one edge and never a self-reference.
     const issues = [
       createMockIssue({
         id: 1,
