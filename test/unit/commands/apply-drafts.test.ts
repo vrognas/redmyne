@@ -354,6 +354,50 @@ describe("applyDraftsWithTracking", () => {
     expect(mockServer.deleteRelation).toHaveBeenCalledWith(101, { _bypassDraft: true });
   });
 
+  it("remaps negative stub ids once their create applies", async () => {
+    mockServer.createIssue.mockResolvedValue({ issue: { id: 777 } });
+    mockServer.createRelation.mockResolvedValue({ relation: { id: 9 } });
+
+    const ops: DraftOperation[] = [
+      {
+        ...createOp("create", "Create issue"),
+        type: "createIssue",
+        issueId: undefined,
+        stubId: -500,
+        http: { method: "POST", path: "/issues.json", data: { issue: { project_id: 1, subject: "X" } } },
+      },
+      {
+        // queued against the stub returned by the draft create
+        ...createOp("status", "Set status on draft issue"),
+        issueId: -500,
+        http: { method: "PUT", path: "/issues/-500.json", data: { issue: { status_id: 2 } } },
+      },
+      {
+        ...createOp("relation", "Relate to draft issue"),
+        type: "createRelation",
+        issueId: 123,
+        http: {
+          method: "POST",
+          path: "/issues/123/relations.json",
+          data: { relation: { issue_to_id: -500, relation_type: "blocks" } },
+        },
+      },
+    ];
+
+    const result = await applyDraftsWithTracking(
+      mockServer as never,
+      mockQueue as never,
+      ops,
+      () => true
+    );
+
+    expect(result.failed).toHaveLength(0);
+    expect(mockServer.setIssueStatus).toHaveBeenCalledWith({ id: 777 }, 2, { _bypassDraft: true });
+    expect(mockServer.createRelation).toHaveBeenCalledWith(123, 777, "blocks", undefined, { _bypassDraft: true });
+    // queued ops must not be mutated by the remap
+    expect(ops[1].issueId).toBe(-500);
+  });
+
   it("reports unknown operation type as failure", async () => {
     const unknownOp = {
       ...createOp("unknown", "Unknown op"),

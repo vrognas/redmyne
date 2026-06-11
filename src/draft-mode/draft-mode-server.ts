@@ -149,7 +149,7 @@ export class DraftModeServer implements IRedmineServer {
           path: "/issues.json",
           data: { issue },
         },
-        { tempId: tempIdStr }
+        { tempId: tempIdStr, stubId: tempId }
       )
     );
 
@@ -406,7 +406,7 @@ export class DraftModeServer implements IRedmineServer {
           path: "/time_entries.json",
           data: { time_entry: entryData },
         },
-        { issueId, tempId: tempIdStr }
+        { issueId, tempId: tempIdStr, stubId: tempId }
       )
     );
 
@@ -495,7 +495,7 @@ export class DraftModeServer implements IRedmineServer {
           path: `/projects/${projectId}/versions.json`,
           data: { version },
         },
-        { tempId: tempIdStr }
+        { tempId: tempIdStr, stubId: tempId }
       )
     );
 
@@ -592,7 +592,7 @@ export class DraftModeServer implements IRedmineServer {
           path: `/issues/${issueId}/relations.json`,
           data: { relation: relationData },
         },
-        { issueId, tempId: tempIdStr }
+        { issueId, tempId: tempIdStr, stubId: tempId }
       )
     );
 

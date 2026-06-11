@@ -43,6 +43,12 @@ export interface DraftOperation {
   resourceId?: number;
   /** Temp ID for create operations (draft-issue-xxx, draft-version-xxx) */
   tempId?: string;
+  /**
+   * Negative numeric stub ID handed to the caller by a draft create.
+   * Dependent ops queue against this ID; apply remaps it to the real
+   * server-assigned ID once the create succeeds.
+   */
+  stubId?: number;
   /** Human-readable description (e.g., "Set #123 status to In Progress") */
   description: string;
   /** HTTP payload for replay */

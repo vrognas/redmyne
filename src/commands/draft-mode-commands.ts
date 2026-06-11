@@ -43,14 +43,19 @@ export async function applyDraftsWithTracking(
     skipped: [],
   };
 
+  // Stub (negative) ID → real server ID, filled in as creates apply.
+  // Creates precede their dependents in queue order.
+  const stubIdMap = new Map<number, number>();
+
   for (let i = 0; i < operations.length; i++) {
     const op = operations[i];
     if (!op) continue;
     onProgress?.(i + 1, operations.length, op.description);
 
     let applied = false;
+    let realId: number | undefined;
     try {
-      await executeOperation(server, op);
+      realId = await executeOperation(server, remapStubIds(op, stubIdMap));
       applied = true;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -67,6 +72,9 @@ export async function applyDraftsWithTracking(
     }
 
     if (applied) {
+      if (op.stubId !== undefined && realId !== undefined) {
+        stubIdMap.set(op.stubId, realId);
+      }
       result.succeeded.push(op);
       // Remove immediately: a mid-batch pause (error toast) or window
       // reload must not leave an already-applied op replayable.
@@ -145,6 +153,15 @@ export function registerDraftModeCommands(
           await vscode.commands.executeCommand("redmyne.discardDrafts");
         } else {
           // Cancel (closed dialog) - keep draft mode on
+          return;
+        }
+
+        if (queue.count > 0) {
+          // Apply/discard was cancelled or partially failed — disabling
+          // draft mode now would orphan the remaining drafts.
+          vscode.window.showInformationMessage(
+            "Draft mode stays on: drafts are still pending"
+          );
           return;
         }
       }
@@ -324,6 +341,43 @@ Skipped (not attempted): ${skippedNames}`;
   ];
 }
 
+/**
+ * Rewrite negative draft stub IDs to the real server IDs assigned by
+ * creates earlier in the batch. Returns a clone — queued ops must stay
+ * untouched so a failed batch can be retried.
+ */
+function remapStubIds(
+  op: DraftOperation,
+  stubIdMap: Map<number, number>
+): DraftOperation {
+  if (stubIdMap.size === 0) return op;
+
+  const clone = structuredClone(op);
+  if (clone.issueId !== undefined && stubIdMap.has(clone.issueId)) {
+    clone.issueId = stubIdMap.get(clone.issueId);
+  }
+  if (clone.resourceId !== undefined && stubIdMap.has(clone.resourceId)) {
+    clone.resourceId = stubIdMap.get(clone.resourceId);
+  }
+  clone.http.path = clone.http.path.replace(/-\d+/g, (m) => {
+    const real = stubIdMap.get(parseInt(m, 10));
+    return real !== undefined ? String(real) : m;
+  });
+  if (clone.http.data) {
+    for (const wrapper of Object.values(clone.http.data)) {
+      if (!wrapper || typeof wrapper !== "object") continue;
+      const record = wrapper as Record<string, unknown>;
+      for (const key of ["issue_id", "issue_to_id", "parent_issue_id", "fixed_version_id"]) {
+        const v = record[key];
+        if (typeof v === "number" && stubIdMap.has(v)) {
+          record[key] = stubIdMap.get(v);
+        }
+      }
+    }
+  }
+  return clone;
+}
+
 // Execute a draft operation by calling the inner server directly
 function requireOperationIssueId(op: DraftOperation): number {
   if (!op.issueId) {
@@ -339,10 +393,14 @@ function requireOperationResourceId(op: DraftOperation): number {
   return op.resourceId;
 }
 
+/**
+ * Execute one draft op against the inner server. Returns the real ID
+ * assigned by the server for create operations (undefined otherwise).
+ */
 async function executeOperation(
   server: DraftModeServer,
   op: DraftOperation
-): Promise<void> {
+): Promise<number | undefined> {
   const { http } = op;
 
   // Route based on operation type and HTTP path
@@ -385,8 +443,8 @@ async function executeOperation(
     }
     case "createIssue": {
       const issueData = (http.data as { issue: Parameters<typeof server.createIssue>[0] }).issue;
-      await server.createIssue(issueData, { _bypassDraft: true });
-      break;
+      const created = await server.createIssue(issueData, { _bypassDraft: true });
+      return created?.issue?.id;
     }
     case "createTimeEntry": {
       const entry = (http.data as { time_entry: {
@@ -397,7 +455,7 @@ async function executeOperation(
         spent_on?: string;
         custom_fields?: Array<{ id: number; value: string | string[] }>;
       } }).time_entry;
-      await server.addTimeEntry(
+      const created = await server.addTimeEntry(
         entry.issue_id,
         entry.activity_id,
         entry.hours,
@@ -406,7 +464,7 @@ async function executeOperation(
         entry.custom_fields,
         { _bypassDraft: true }
       );
-      break;
+      return created?.time_entry?.id;
     }
     case "updateTimeEntry": {
       const id = requireOperationResourceId(op);
@@ -424,8 +482,8 @@ async function executeOperation(
       if (!match || !match[1]) throw new Error("Invalid version path");
       const projectId = match[1];
       const versionData = (http.data as { version: Parameters<typeof server.createVersion>[1] }).version;
-      await server.createVersion(projectId, versionData, { _bypassDraft: true });
-      break;
+      const created = await server.createVersion(projectId, versionData, { _bypassDraft: true });
+      return created?.id;
     }
     case "updateVersion": {
       const id = requireOperationResourceId(op);
@@ -443,14 +501,14 @@ async function executeOperation(
       if (!match || !match[1]) throw new Error("Invalid relation path");
       const issueId = parseInt(match[1], 10);
       const relationData = (http.data as { relation: { issue_to_id: number; relation_type: string; delay?: number } }).relation;
-      await server.createRelation(
+      const created = await server.createRelation(
         issueId,
         relationData.issue_to_id,
         relationData.relation_type as Parameters<typeof server.createRelation>[2],
         relationData.delay,
         { _bypassDraft: true }
       );
-      break;
+      return created?.relation?.id;
     }
     case "deleteRelation": {
       const id = requireOperationResourceId(op);
@@ -460,4 +518,5 @@ async function executeOperation(
     default:
       throw new Error(`Unknown operation type: ${op.type}`);
   }
+  return undefined;
 }
