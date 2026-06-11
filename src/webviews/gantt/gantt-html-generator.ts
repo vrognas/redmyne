@@ -1037,10 +1037,10 @@ function generateBarBadges(
     ${showFlexSlot ? `<g class="flex-badge-group">
       <title>${escapeAttr(flexTooltip)}</title>
       <rect class="flex-badge-bg" x="${flexBadgeX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${flexBadgeW}" height="12" rx="2"
-            fill="${flexColor}" opacity="0.15"/>
+            fill="${flexColor}" opacity="0.4"/>
       <rect x="${flexBadgeX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${flexBadgeW}" height="12" fill="transparent"/>
       <text class="flex-badge" x="${flexBadgeCenterX}" y="${ctx.barHeight / 2 + 4}"
-            text-anchor="middle" fill="${flexColor}" font-size="10" font-weight="500">${flexLabel}</text>
+            text-anchor="middle" fill="var(--vscode-foreground)" font-size="10" font-weight="${isLate ? "600" : "500"}">${flexLabel}</text>
     </g>` : ""}
     ${showBlocks ? `<g class="blocks-badge-group" style="cursor: pointer;">
       <title>${escapeAttr(blocksTooltip)}</title>
