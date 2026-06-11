@@ -104,6 +104,14 @@ describe("gantt-html-generator", () => {
       expect(svg).toContain('data-issue-id="123"');
       expect(svg).toContain('data-collapse-key="issue-123"');
       expect(svg).toContain("Test Issue");
+      // assigneeId 1 === ctx.currentUserId 1 → tagged for the blue highlight
+      expect(svg).toContain("my-issue");
+
+      const othersRow = {
+        ...row,
+        issue: { ...(row.issue as object), assigneeId: 2 },
+      } as GanttRow;
+      expect(generateIssueLabel(othersRow, baseContext as any)).not.toContain("my-issue");
     });
 
     it("generateProjectLabel creates project header SVG", () => {

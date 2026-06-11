@@ -177,6 +177,7 @@ const FILTER_ASSIGNEE_KEY = "redmyne.gantt.filterAssignee";
 const FILTER_STATUS_KEY = "redmyne.gantt.filterStatus";
 const FILTER_TASK_TYPE_KEY = "redmyne.gantt.filterTaskType";
 const FILTER_LATE_KEY = "redmyne.gantt.filterLateOnly";
+const HIGHLIGHT_MINE_KEY = "redmyne.gantt.highlightMyIssues";
 const LOOKBACK_YEARS_KEY = "redmyne.gantt.lookbackYears";
 
 export class GanttPanel {
@@ -246,6 +247,7 @@ export class GanttPanel {
   private _currentFilter: IssueFilter = { ...DEFAULT_ISSUE_FILTER };
   private _taskTypeFilter: string | "any" = "any"; // task-type custom-field value (gantt-local)
   private _lateOnly = false; // show only late tasks (gantt-local)
+  private _highlightMyIssues = true; // color my issues blue in the task list
   private _filterChangeCallback?: (filter: IssueFilter) => void;
   private _viewMode: GanttViewMode = "projects";
   private _viewFocus: "project" | "person" = "project"; // Toggle: view by project or person
@@ -306,6 +308,7 @@ export class GanttPanel {
       if (savedStatus) this._currentFilter.status = savedStatus;
       this._taskTypeFilter = GanttPanel._globalState.get<string | "any">(FILTER_TASK_TYPE_KEY, "any");
       this._lateOnly = GanttPanel._globalState.get<boolean>(FILTER_LATE_KEY, false);
+      this._highlightMyIssues = GanttPanel._globalState.get<boolean>(HIGHLIGHT_MINE_KEY, true);
       this._lookbackYears = GanttPanel._globalState.get<2 | 5 | 10 | null>(LOOKBACK_YEARS_KEY, 2);
     }
 
@@ -1573,6 +1576,15 @@ export class GanttPanel {
         this._bumpRevision(); // invalidate hierarchy/capacity caches
         this._updateContent();
         break;
+      case "toggleMyIssuesHighlight":
+        // CSS-only: webview flips .hide-my-issues on the container
+        this._highlightMyIssues = !this._highlightMyIssues;
+        GanttPanel._globalState?.update(HIGHLIGHT_MINE_KEY, this._highlightMyIssues);
+        this._panel.webview.postMessage({
+          command: "setMyIssuesHighlightState",
+          enabled: this._highlightMyIssues,
+        });
+        break;
       case "toggleLateFilter":
         this._lateOnly = !this._lateOnly;
         GanttPanel._globalState?.update(FILTER_LATE_KEY, this._lateOnly);
@@ -2629,13 +2641,14 @@ export class GanttPanel {
       draftQueueCount: this._draftModeManager?.queue?.count ?? 0,
       lateCount,
       lateFilterActive: this._lateOnly,
+      highlightMyIssues: this._highlightMyIssues,
     };
 
     const html = `
 <div id="loadingOverlay" class="loading-overlay${this._isRefreshing ? " visible" : ""}"><div class="loading-spinner"></div></div>
   <div id="liveRegion" role="status" aria-live="polite" aria-atomic="true" class="sr-only"></div>
     ${generateHeader(toolbarCtx)}
-    <div class="gantt-container${this._showIntensity ? " intensity-enabled" : ""}">
+    <div class="gantt-container${this._showIntensity ? " intensity-enabled" : ""}${this._highlightMyIssues ? "" : " hide-my-issues"}">
     <!-- Wrapper clips horizontal scrollbar -->
     <div class="gantt-scroll-wrapper">
       <div class="gantt-scroll" id="ganttScroll" data-render-key="${this._renderKey}">

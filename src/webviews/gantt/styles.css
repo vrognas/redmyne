@@ -464,6 +464,11 @@ body {
   fill: currentColor;
 }
 
+/* My issues colored blue in the task list (toggle: ⋮ menu) */
+.gantt-container:not(.hide-my-issues) .issue-label.my-issue .issue-text {
+  fill: var(--vscode-textLink-foreground);
+}
+
 /* Late-tasks chip: count + filter toggle in one */
 .gantt-actions .late-filter-btn {
   color: var(--vscode-charts-red);

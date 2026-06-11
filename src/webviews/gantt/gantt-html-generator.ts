@@ -235,8 +235,12 @@ export function generateIssueLabel(
     : "";
   const taskOpacity = issue.isClosed ? "0.5" : "1";
 
+  // Class is always baked; the highlight itself is gated by a container
+  // class (hide-my-issues) so the toggle is CSS-only, no re-render.
+  const isMine = ctx.currentUserId !== null && issue.assigneeId === ctx.currentUserId;
+
   return `
-    <g class="issue-label gantt-row cursor-pointer" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-has-children="${row.hasChildren}" data-tooltip="${escapeAttr(tooltip)}" data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}' tabindex="0" role="button" aria-label="Open issue #${issue.id}">
+    <g class="issue-label gantt-row cursor-pointer${isMine ? " my-issue" : ""}" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-has-children="${row.hasChildren}" data-tooltip="${escapeAttr(tooltip)}" data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}' tabindex="0" role="button" aria-label="Open issue #${issue.id}">
       <rect class="row-hit-area" x="0" y="-1" width="100%" height="${ctx.barHeight + 2}" fill="transparent" pointer-events="all"/>
       ${chevron}
       <text class="issue-text" x="${10 + indent + textOffset}" y="${ctx.barHeight / 2 + 5}" fill="${issue.isExternal ? "var(--vscode-descriptionForeground)" : "var(--vscode-foreground)"}" font-size="13" opacity="${taskOpacity}">

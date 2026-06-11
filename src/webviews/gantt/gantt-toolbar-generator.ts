@@ -54,6 +54,9 @@ export interface GanttToolbarContext {
   // Late tasks (past due, open, with remaining work)
   lateCount: number;
   lateFilterActive: boolean;
+
+  // Color my issues blue in the task list
+  highlightMyIssues: boolean;
 }
 
 /**
@@ -197,6 +200,10 @@ export function generateToolbar(ctx: GanttToolbarContext): string {
               <span class="icon">⏳</span>
               <span>Badges</span>
               <span class="shortcut">B</span>
+            </div>
+            <div class="toolbar-dropdown-item${ctx.highlightMyIssues ? " active" : ""}" id="menuMyIssues">
+              <span class="icon">●</span>
+              <span>My issues in blue</span>
             </div>
             <div class="toolbar-dropdown-item${ctx.showCapacityRibbon && ctx.viewFocus === "person" ? " active" : ""}" id="menuCapacity"${ctx.viewFocus !== "person" ? " disabled" : ""}>
               <span class="icon">▤</span>

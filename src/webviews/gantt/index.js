@@ -687,6 +687,7 @@ function initializeGantt(state, rowWindow) {
     const viewToggleTable = {
       setDependenciesState:  { targetSel: '.dependency-layer', menuId: 'menuDeps',      className: 'hidden',           addWhenEnabled: false },
       setBadgesState:        { targetSel: '.gantt-container',  menuId: 'menuBadges',    className: 'hide-badges',      addWhenEnabled: false },
+      setMyIssuesHighlightState: { targetSel: '.gantt-container', menuId: 'menuMyIssues', className: 'hide-my-issues', addWhenEnabled: false },
       setCapacityRibbonState:{ targetSel: '.capacity-ribbon',  menuId: 'menuCapacity',  className: 'hidden',           addWhenEnabled: false },
       setIntensityState:     { targetSel: '.gantt-container',  menuId: 'menuIntensity', className: 'intensity-enabled', addWhenEnabled: true  },
     };
@@ -912,6 +913,12 @@ function initializeGantt(state, rowWindow) {
     document.getElementById('menuBadges')?.addEventListener('click', () => {
       saveState();
       vscode.postMessage({ command: 'toggleBadges' });
+    });
+
+    // My-issues highlight toggle (menu item, CSS-only)
+    document.getElementById('menuMyIssues')?.addEventListener('click', () => {
+      saveState();
+      vscode.postMessage({ command: 'toggleMyIssuesHighlight' });
     });
 
     const ganttContainer = document.querySelector('.gantt-container');
