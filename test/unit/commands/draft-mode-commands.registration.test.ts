@@ -97,11 +97,29 @@ describe("registerDraftModeCommands", () => {
 
     vi.clearAllMocks();
     vi.mocked(vscode.window.showWarningMessage).mockResolvedValue("Apply All" as never);
+    vi.mocked(vscode.commands.executeCommand).mockImplementation(async (cmd: string) => {
+      if (cmd === "redmyne.applyDrafts") queue.count = 0; // apply drained the queue
+      return undefined as never;
+    });
 
     await (handlers.get("redmyne.toggleDraftMode") as () => Promise<void>)();
 
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.applyDrafts");
     expect(manager.toggle).toHaveBeenCalledTimes(1);
+  });
+
+  it("toggle keeps draft mode on when drafts remain after apply", async () => {
+    manager.isEnabled = true;
+    queue.count = 2;
+    register();
+
+    vi.clearAllMocks();
+    vi.mocked(vscode.window.showWarningMessage).mockResolvedValue("Apply All" as never);
+    // executeCommand mock leaves queue.count at 2 (apply cancelled/failed)
+
+    await (handlers.get("redmyne.toggleDraftMode") as () => Promise<void>)();
+
+    expect(manager.toggle).not.toHaveBeenCalled();
   });
 
   it("review/remove commands call their deps", async () => {
@@ -190,7 +208,8 @@ describe("registerDraftModeCommands", () => {
 
     await (handlers.get("redmyne.applyDrafts") as () => Promise<void>)();
 
-    expect(queue.removeMany).toHaveBeenCalledWith(["ok-1"], DRAFT_COMMAND_SOURCE);
+    expect(queue.remove).toHaveBeenCalledWith("ok-1", DRAFT_COMMAND_SOURCE);
+    expect(queue.removeMany).not.toHaveBeenCalled();
     expect(refreshTrees).toHaveBeenCalled();
     expect(vscode.window.showWarningMessage).toHaveBeenCalledWith(
       expect.stringContaining("Drafts: 1 applied, 1 failed, 1 skipped"),

@@ -572,6 +572,10 @@ export function setupDrag(ctx) {
       {
         const bar = outline.closest('.issue-bar');
         if (!bar) return;
+        // Parent bars have an outline but NO drag handles — starting a
+        // drag would deref null handles every mousemove frame. Keyboard
+        // nav excludes them too (.issue-bar:not(.parent-bar)).
+        if (bar.classList.contains('parent-bar')) return;
         const issueId = bar.dataset.issueId;
 
         // Check if this bar is part of a selection for bulk drag
@@ -1133,13 +1137,13 @@ export function setupDrag(ctx) {
             dragState.barMain.setAttribute('width', width);
           }
           // Handles are now <g> groups - update via rect inside
-          const leftRect = dragState.leftHandle.querySelector('rect');
-          const rightRect = dragState.rightHandle.querySelector('rect');
+          const leftRect = dragState.leftHandle?.querySelector('rect');
+          const rightRect = dragState.rightHandle?.querySelector('rect');
           if (leftRect) leftRect.setAttribute('x', newStartX);
           if (rightRect) rightRect.setAttribute('x', newEndX - 14);
           // Update grip dot positions - use cached circle refs
-          dragState.leftGripCircles.forEach(c => c.setAttribute('cx', newStartX + 9));
-          dragState.rightGripCircles.forEach(c => c.setAttribute('cx', newEndX - 9));
+          (dragState.leftGripCircles || []).forEach(c => c.setAttribute('cx', newStartX + 9));
+          (dragState.rightGripCircles || []).forEach(c => c.setAttribute('cx', newEndX - 9));
           dragState.newStartX = newStartX;
           dragState.newEndX = newEndX;
 

@@ -13,5 +13,5 @@ export function isIssueClosed(
   if (typeof issue.status?.is_closed === "boolean") {
     return issue.status.is_closed;
   }
-  return issue.closed_on != null;
+  return issue.closed_on !== null && issue.closed_on !== undefined;
 }

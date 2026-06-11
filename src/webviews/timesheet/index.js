@@ -313,11 +313,14 @@
     return `W${String(week.weekNumber).padStart(2, "0")} (${startStr} - ${endStr} ${week.year})`;
   }
 
-  // Format hours for display (decimal)
+  // Format hours for display (decimal). Two decimals without trailing
+  // zeros: quarter-hour values (2.25) must round-trip exactly — the focus
+  // handler re-parses the display into dataset.oldValue, so a rounded
+  // display would write the rounded figure back via undo.
   function formatHours(hours) {
     if (hours === 0) return "";
     if (hours === Math.floor(hours)) return hours.toString();
-    return hours.toFixed(1);
+    return String(Number(hours.toFixed(2)));
   }
 
   // Format decimal hours as H:MM (e.g., 1.5 → "1:30", 0.75 → "0:45")
@@ -334,8 +337,11 @@
     if (!str) return 0;
     // Support formats: 1, 1.5, 1:30 (1h 30min), 1h30, 1h 30m
     if (str.includes(":")) {
+      // Same NaN/negative clamp as the other branches — unvalidated NaN
+      // would flow into updateCell and the draft queue.
       const [h, m] = str.split(":").map(Number);
-      return h + (m || 0) / 60;
+      if (!Number.isFinite(h)) return 0;
+      return Math.max(0, h + (Number.isFinite(m) ? m : 0) / 60);
     }
     const match = str.match(/^(\d+(?:\.\d+)?)\s*h?\s*(\d+)?\s*m?$/i);
     if (match) {
@@ -1317,7 +1323,7 @@
 
       case "showError":
         console.error(message.message);
-        // Could show a toast notification
+        showToast(message.message, null, 8000);
         break;
 
       case "draftModeChanged":
