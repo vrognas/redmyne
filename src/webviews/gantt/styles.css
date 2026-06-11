@@ -464,9 +464,10 @@ body {
   fill: currentColor;
 }
 
-/* My issues colored blue in the task list (toggle: ⋮ menu) */
+/* My issues colored blue in the task list (toggle: ⋮ menu) — same
+   theme-aware blue as the current user's name on bar labels */
 .gantt-container:not(.hide-my-issues) .issue-label.my-issue .issue-text {
-  fill: var(--vscode-textLink-foreground);
+  fill: var(--vscode-charts-blue);
 }
 
 /* Late-tasks chip: count + filter toggle in one */
