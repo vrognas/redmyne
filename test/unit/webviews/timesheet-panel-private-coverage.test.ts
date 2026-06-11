@@ -386,6 +386,24 @@ describe("timesheet panel private coverage", () => {
     expect(queue.removeByKey).toHaveBeenCalled();
   });
 
+  it("queued update ops carry issue_id so reassignment reaches the server", async () => {
+    const queue = createQueue();
+    const server = createServer();
+    const setup = setupPanel({ server, queue, draftEnabled: true });
+    const panel = setup.panel;
+
+    const row = panel._createEmptyRow();
+    row.issueId = 42; // user re-targeted a saved entry to issue 42
+    row.activityId = 9;
+    panel._currentWeek = buildWeekInfo(new Date(2026, 1, 2));
+
+    await panel._queueCellOperation(row, 0, 2, 11, true);
+
+    const op = queue.add.mock.calls.at(-1)[0];
+    expect(op.type).toBe("updateTimeEntry");
+    expect(op.http.data.time_entry.issue_id).toBe(42);
+  });
+
   it("covers saveAll copy/paste undo and draft-mode requirements", async () => {
     const queue = createQueue();
     const server = createServer();

@@ -1345,6 +1345,10 @@ export class TimeSheetPanel {
             path: `/time_entries/${entryId}.json`,
             data: {
               time_entry: {
+                // issue_id must ride along: the user may have re-targeted a
+                // saved entry via the Task dropdown, and Redmine only
+                // reassigns when the PUT body names the new issue.
+                issue_id: row.issueId,
                 hours,
                 activity_id: row.activityId,
                 comments: row.comments ?? "",
