@@ -149,17 +149,17 @@ export function buildArrowSvg(source, target, rel, barHeight) {
     const ax = x2 + approachDir * jogX; // target approach stub start
 
     if (Math.abs(ax - ex) < 2 * r + 2) {
-      // Stubs nearly aligned: the gutter run would degenerate — compact
-      // S-jog with its horizontal snapped to a gutter.
-      const midY = snapGutter((y1 + y2) / 2);
-      path = `M ${x1} ${y1} H ${ex - jogDir * r}` +
-        ` q ${jogDir * r} 0 ${jogDir * r} ${vdir * r}` +
-        ` V ${midY - vdir * r}` +
-        ` q 0 ${vdir * r} ${-jogDir * r} ${vdir * r}` +
-        ` H ${ax - approachDir * r}` +
-        ` q ${approachDir * r} 0 ${approachDir * r} ${vdir * r}` +
+      // Stubs nearly aligned: a gutter run (or any middle horizontal)
+      // degenerates into a curl. Route ONE vertical at the approach-stub
+      // x with direction-aware corners.
+      let vx = ax;
+      if (Math.abs(vx - x1) < r + 2) vx = x1 + jogDir * jogX;
+      const dH1 = vx > x1 ? 1 : -1;
+      const dH2 = x2 > vx ? 1 : -1;
+      path = `M ${x1} ${y1} H ${vx - dH1 * r}` +
+        ` q ${dH1 * r} 0 ${dH1 * r} ${vdir * r}` +
         ` V ${y2 - vdir * r}` +
-        ` q 0 ${vdir * r} ${-approachDir * r} ${vdir * r}` +
+        ` q 0 ${vdir * r} ${dH2 * r} ${vdir * r}` +
         ` H ${x2}`;
     } else {
       const hdir = ax > ex ? 1 : -1;

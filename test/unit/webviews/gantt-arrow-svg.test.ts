@@ -39,6 +39,21 @@ describe("arrow-svg", () => {
     expect(svg).toContain("H 298"); // approach stub to target.startX − 2
   });
 
+  it("near-aligned stubs route one clean vertical (no doubling back)", () => {
+    // FS arrow where the target's start sits just right of the source's
+    // end: exit stub (endX+2+8) and approach stub (startX-2-8) nearly
+    // coincide — the old fallback curled here.
+    const { svg } = buildArrowSvg(
+      pos(0, 100, 11), pos(118, 200, 55),
+      { relationId: 11, fromId: 1, toId: 2, type: "blocks" }, BAR
+    );
+    // single vertical at the approach x (116-8=108), direction-aware corners
+    expect(svg).toContain("V 51");
+    expect(svg).toContain("H 116");
+    // no segment may travel right then immediately back left past its origin
+    expect(svg).not.toMatch(/q -?\d+ 0 -?\d+ -?\d+ q/); // no back-to-back corners
+  });
+
   it("buildArrowsMarkup skips null endpoints and sorts solid before dashed", () => {
     const positions = new Map([
       [1, pos(0, 100, 11)],
