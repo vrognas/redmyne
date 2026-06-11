@@ -9,7 +9,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [4.29.2]
 
+### Changed
+
+- **Gantt declutter**: the flexibility badge no longer trails every bar as a bare green/red percent pill — a self-explanatory line (`+N% schedule buffer` / `-N% — remaining work exceeds time left`) now rides the bar, progress-badge, and row-label hover tooltips. Dependency arrows recede to 35% opacity at rest and light up when their bar is hovered, when hovered directly, when selected, and in focus mode. The `?` help legend now describes the badges that actually render (it listed days-of-slack and milestone badges that don't exist)
+
 ### Fixed
+
+- **Gantt lookback now clamps the timeline axis** — the selector only limited data fetching, so one ancient still-open issue stretched the axis a decade into the past
 
 Whole-codebase deep review (142 verified findings; report in `docs/reviews/2026-06-11-deep-review.md`). This release fixes the 2 critical and 29 high-severity bugs:
 
