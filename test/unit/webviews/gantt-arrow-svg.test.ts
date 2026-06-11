@@ -54,6 +54,20 @@ describe("arrow-svg", () => {
     expect(svg).not.toMatch(/q -?\d+ 0 -?\d+ -?\d+ q/); // no back-to-back corners
   });
 
+  it("flips lane and arrowhead when the vertical would graze the source", () => {
+    // FS where target.startX - 2 - 8 lands within a corner radius of the
+    // source exit: lane must flip to the far side of the target and the
+    // head must point the way the path arrives (leftward here).
+    const src = pos(0, 100, 11); // exit at 102
+    const tgt = pos(112, 200, 55); // default lane 102 → collides
+    const { svg } = buildArrowSvg(
+      src, tgt, { relationId: 12, fromId: 1, toId: 2, type: "blocks" }, BAR
+    );
+    expect(svg).toContain("H 114"); // corner start before vx = 110+4+... lane right of target start
+    // head points LEFT (wings at x2 + size): M 114 ... L 110 55
+    expect(svg).toContain(`M 114 ${55 - 2.4} L 110 55`);
+  });
+
   it("buildArrowsMarkup skips null endpoints and sorts solid before dashed", () => {
     const positions = new Map([
       [1, pos(0, 100, 11)],

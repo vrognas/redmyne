@@ -122,6 +122,9 @@ export function buildArrowSvg(source, target, rel, barHeight) {
   const goingRight = x2 > x1;
   const jogDir = fromStart ? -1 : 1;
   const approachDir = toEnd ? 1 : -1;
+  // Horizontal direction of the FINAL segment into the target anchor —
+  // the arrowhead must point the way the path actually arrives.
+  let arrivalX = -approachDir;
 
   if (!isScheduling) {
     // Path already computed above
@@ -153,9 +156,13 @@ export function buildArrowSvg(source, target, rel, barHeight) {
       // degenerates into a curl. Route ONE vertical at the approach-stub
       // x with direction-aware corners.
       let vx = ax;
-      if (Math.abs(vx - x1) < r + 2) vx = x1 + jogDir * jogX;
+      // If the lane collides with the source end, flip to the OTHER side
+      // of the target (never between them — a between-lane leaves the
+      // final stub shorter than the corner radius and the head detaches).
+      if (Math.abs(vx - x1) < r + 2) vx = x2 - approachDir * jogX;
       const dH1 = vx > x1 ? 1 : -1;
       const dH2 = x2 > vx ? 1 : -1;
+      arrivalX = dH2;
       path = `M ${x1} ${y1} H ${vx - dH1 * r}` +
         ` q ${dH1 * r} 0 ${dH1 * r} ${vdir * r}` +
         ` V ${y2 - vdir * r}` +
@@ -190,12 +197,12 @@ export function buildArrowSvg(source, target, rel, barHeight) {
         : `M ${x2 - arrowSize * 0.6} ${y2 + arrowSize} L ${x2} ${y2} L ${x2 + arrowSize * 0.6} ${y2 + arrowSize}`;
     }
   } else {
-    // Scheduling: horizontal approach
-    // toStart: arrow comes from left, points right (wings at x2-size)
-    // toEnd: arrow comes from right, points left (wings at x2+size)
-    arrowHead = toEnd
-      ? `M ${x2 + arrowSize} ${y2 - arrowSize * 0.6} L ${x2} ${y2} L ${x2 + arrowSize} ${y2 + arrowSize * 0.6}`
-      : `M ${x2 - arrowSize} ${y2 - arrowSize * 0.6} L ${x2} ${y2} L ${x2 - arrowSize} ${y2 + arrowSize * 0.6}`;
+    // Scheduling: horizontal approach. Wings sit on the side the path
+    // arrives FROM (arrivalX = +1 means the path travels rightward into
+    // the anchor, so the head points right).
+    arrowHead = arrivalX > 0
+      ? `M ${x2 - arrowSize} ${y2 - arrowSize * 0.6} L ${x2} ${y2} L ${x2 - arrowSize} ${y2 + arrowSize * 0.6}`
+      : `M ${x2 + arrowSize} ${y2 - arrowSize * 0.6} L ${x2} ${y2} L ${x2 + arrowSize} ${y2 + arrowSize * 0.6}`;
   }
 
   const dashAttr = style.dash ? `stroke-dasharray="${style.dash}"` : "";
