@@ -928,9 +928,13 @@ function generateBarBadges(
   const progressBadgeW = showProgress
     ? (visualDoneRatio >= 100 ? 36 : visualDoneRatio >= 10 ? 28 : 22)
     : 0;
+  // Badge color = health at a glance: red when over budget, green with
+  // ample flexibility (>100% buffer), orange when the buffer is thinning.
   const progressColor = isOverBudget
     ? "var(--vscode-charts-red)"
-    : "var(--vscode-badge-foreground)";
+    : flexPct !== null
+      ? (flexPct > 100 ? "var(--vscode-charts-green)" : "var(--vscode-charts-orange)")
+      : "var(--vscode-badge-foreground)";
 
   // Flexibility badge — attention-worthy buffers only (<100%). Overdue
   // tasks swap it for "Nd late": once the due date passes, the percentage

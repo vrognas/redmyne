@@ -51,6 +51,10 @@ export function buildArrowSvg(source, target, rel, barHeight) {
   const style = RELATION_STYLES[rel.type] || RELATION_STYLES.relates;
   const arrowSize = 4;
   const sameRow = Math.abs(source.y - target.y) < 5;
+  // Long horizontal runs travel in the GUTTER between rows (row boundaries
+  // fall on multiples of barHeight; bar content has vertical padding, so a
+  // line on the boundary crosses no bars, badges or labels).
+  const snapGutter = (y) => Math.round(y / barHeight) * barHeight;
 
   // Temporal relations: end → start (or based on type for extended)
   // Non-temporal relations (relates, duplicates, copied_to): center → center
@@ -99,7 +103,7 @@ export function buildArrowSvg(source, target, rel, barHeight) {
       y1 = goingDown ? source.y + barHeight / 2 : source.y - barHeight / 2; // bottom or top border
       x2 = centerX2;
       y2 = goingDown ? target.y - barHeight / 2 : target.y + barHeight / 2; // top or bottom border
-      const midY = (source.y + target.y) / 2;
+      const midY = snapGutter((source.y + target.y) / 2);
       path = `M ${x1} ${y1} V ${midY + (goingDown ? -r : r)}` +
         ` q 0 ${goingDown ? r : -r} ${x2 > x1 ? r : -r} ${goingDown ? r : -r}` +
         ` H ${x2 + (x2 > x1 ? -r : r)}` +
@@ -116,11 +120,8 @@ export function buildArrowSvg(source, target, rel, barHeight) {
 
   // Variables for scheduling arrow routing
   const goingRight = x2 > x1;
-  const horizontalDist = Math.abs(x2 - x1);
-  const nearlyVertical = horizontalDist < 30;
   const jogDir = fromStart ? -1 : 1;
   const approachDir = toEnd ? 1 : -1;
-  const minJogRoom = 8 + r; // jogX + r = minimum room for simple jog path
 
   if (!isScheduling) {
     // Path already computed above
@@ -135,66 +136,43 @@ export function buildArrowSvg(source, target, rel, barHeight) {
       ` H ${x2 + approachDir * 12 - approachDir * r}` +
       ` q ${approachDir * -r} 0 ${approachDir * -r} ${r}` +
       ` V ${y2} H ${x2}`;
-  } else if (!sameRow && nearlyVertical && (fromStart === goingRight || horizontalDist < minJogRoom)) {
-    // Nearly vertical: S-curve with 90° turns when:
-    // 1. Direction conflict (jog opposite to target direction), OR
-    // 2. Not enough horizontal room for simple jog path (< 12px)
-    // jogDir: which way to jog from source (-1=left, +1=right)
-    // approachDir: which side to approach target from (-1=left, +1=right)
-    const jogX = 8;
-    const midY = (y1 + y2) / 2;
-    const goingDown = y2 > y1;
-    path = `M ${x1} ${y1} H ${x1 + jogDir * jogX - jogDir * r}` +
-      ` q ${jogDir * r} 0 ${jogDir * r} ${goingDown ? r : -r}` +
-      ` V ${midY + (goingDown ? -r : r)}` +
-      ` q 0 ${goingDown ? r : -r} ${-jogDir * r} ${goingDown ? r : -r}` +
-      ` H ${x2 + approachDir * jogX - approachDir * r}` +
-      ` q ${approachDir * r} 0 ${approachDir * r} ${goingDown ? r : -r}` +
-      ` V ${y2 + (goingDown ? -r : r)}` +
-      ` q 0 ${goingDown ? r : -r} ${-approachDir * r} ${goingDown ? r : -r}` +
-      ` H ${x2}`;
-  } else if (goingRight && !fromStart) {
-    // FS/FF with target to right: small jog, vertical to target level, horizontal approach
-    const jogX = 8;
-    const goingDown = y2 > y1;
-    // Second curve turns toward target (right), not back toward source
-    path = `M ${x1} ${y1} H ${x1 + jogDir * jogX - jogDir * r}` +
-      ` q ${jogDir * r} 0 ${jogDir * r} ${goingDown ? r : -r}` +
-      ` V ${y2 + (goingDown ? -r : r)}` +
-      ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
-      ` H ${x2}`;
-  } else if (goingRight) {
-    // SS/SF with target to right: horizontal at source level, then down, then approach
-    const jogX = 8;
-    const goingDown = y2 > y1;
-    path = `M ${x1} ${y1} H ${x2 + approachDir * jogX - approachDir * r}` +
-      ` q ${approachDir * r} 0 ${approachDir * r} ${goingDown ? r : -r}` +
-      ` V ${y2 + (goingDown ? -r : r)}` +
-      ` q 0 ${goingDown ? r : -r} ${-approachDir * r} ${goingDown ? r : -r}` +
-      ` H ${x2}`;
-  } else if (fromStart) {
-    // SS/SF going left: horizontal at source level, then down, then approach
-    const jogX = 8;
-    const goingDown = y2 > y1;
-    path = `M ${x1} ${y1} H ${x2 + approachDir * jogX + r}` +
-      ` q ${-r} 0 ${-r} ${goingDown ? r : -r}` +
-      ` V ${y2 + (goingDown ? -r : r)}` +
-      ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
-      ` H ${x2}`;
   } else {
-    // FS/FF going left: S-curve with horizontal between rows
+    // Cross-row scheduling arrows: gutter routing. Exit the source with a
+    // short stub, dive to the row boundary adjacent to the TARGET row,
+    // travel the long horizontal there (between rows, crossing no
+    // content), then a short final descent and approach stub.
     const jogX = 8;
-    const midY = (y1 + y2) / 2;
     const goingDown = y2 > y1;
-    path = `M ${x1} ${y1} H ${x1 + jogDir * jogX - jogDir * r}` +
-      ` q ${jogDir * r} 0 ${jogDir * r} ${goingDown ? r : -r}` +
-      ` V ${midY + (goingDown ? -r : r)}` +
-      ` q 0 ${goingDown ? r : -r} ${-r} ${goingDown ? r : -r}` +
-      ` H ${x2 + approachDir * jogX + r}` +
-      ` q ${-r} 0 ${-r} ${goingDown ? r : -r}` +
-      ` V ${y2 + (goingDown ? -r : r)}` +
-      ` q 0 ${goingDown ? r : -r} ${r} ${goingDown ? r : -r}` +
-      ` H ${x2}`;
+    const vdir = goingDown ? 1 : -1;
+    const gutterY = y2 - vdir * (barHeight / 2);
+    const ex = x1 + jogDir * jogX; // source exit stub end
+    const ax = x2 + approachDir * jogX; // target approach stub start
+
+    if (Math.abs(ax - ex) < 2 * r + 2) {
+      // Stubs nearly aligned: the gutter run would degenerate — compact
+      // S-jog with its horizontal snapped to a gutter.
+      const midY = snapGutter((y1 + y2) / 2);
+      path = `M ${x1} ${y1} H ${ex - jogDir * r}` +
+        ` q ${jogDir * r} 0 ${jogDir * r} ${vdir * r}` +
+        ` V ${midY - vdir * r}` +
+        ` q 0 ${vdir * r} ${-jogDir * r} ${vdir * r}` +
+        ` H ${ax - approachDir * r}` +
+        ` q ${approachDir * r} 0 ${approachDir * r} ${vdir * r}` +
+        ` V ${y2 - vdir * r}` +
+        ` q 0 ${vdir * r} ${-approachDir * r} ${vdir * r}` +
+        ` H ${x2}`;
+    } else {
+      const hdir = ax > ex ? 1 : -1;
+      path = `M ${x1} ${y1} H ${ex - jogDir * r}` +
+        ` q ${jogDir * r} 0 ${jogDir * r} ${vdir * r}` +
+        ` V ${gutterY - vdir * r}` +
+        ` q 0 ${vdir * r} ${hdir * r} ${vdir * r}` +
+        ` H ${ax - hdir * r}` +
+        ` q ${hdir * r} 0 ${hdir * r} ${vdir * r}` +
+        ` V ${y2 - vdir * r}` +
+        ` q 0 ${vdir * r} ${-approachDir * r} ${vdir * r}` +
+        ` H ${x2}`;
+    }
   }
 
   // Chevron arrowhead - direction depends on approach
