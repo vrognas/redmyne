@@ -128,12 +128,15 @@ export async function contributeToIssue(
   const targetRef = `#${targetId} ${targetIssue.subject}`;
 
   let newComment: string;
-  // The feature appends its ref at the END of the comment, so only replace a
-  // TRAILING "#<id> ..." segment — a mid-text "#NNN" the user typed (with
-  // prose after it) must not be consumed to end-of-line.
-  const trailingRef = /#\d+[^\n]*$/;
-  if (existingTarget && trailingRef.test(currentComment)) {
-    newComment = currentComment.replace(trailingRef, targetRef).trim();
+  if (existingTarget) {
+    // Replace the trailing "#<id> ..." segment ONLY when it is the parsed
+    // target and no later ref follows ([^\n#]* can't cross another "#NNN")
+    // — that is the shape this feature appends. Anything else is user
+    // text: swap just the token so surrounding prose survives.
+    const trailingRef = new RegExp(`#${existingTarget}\\b[^\\n#]*$`);
+    newComment = trailingRef.test(currentComment)
+      ? currentComment.replace(trailingRef, targetRef).trim()
+      : currentComment.replace(new RegExp(`#${existingTarget}\\b`), targetRef).trim();
   } else {
     // Append target reference
     newComment = currentComment ? `${currentComment} ${targetRef}` : targetRef;
@@ -170,13 +173,14 @@ export async function removeContribution(
     return;
   }
 
-  // Remove the TRAILING "#<id> ..." ref this feature appended; for a mid-text
-  // "#NNN" (free-text reference), remove only the token itself so the user's
+  // Remove the TRAILING "#<id> ..." ref this feature appended — only when
+  // it is the parsed target and no later ref follows. For a mid-text "#NNN"
+  // (free-text reference), remove only the token itself so the user's
   // trailing prose survives.
-  const trailingRef = /#\d+[^\n]*$/;
+  const trailingRef = new RegExp(`#${targetId}\\b[^\\n#]*$`);
   const newComment = (trailingRef.test(currentComment)
     ? currentComment.replace(trailingRef, "")
-    : currentComment.replace(new RegExp(`#${targetId}\\b`), "")
+    : currentComment.replace(new RegExp(`#${targetId}\\b ?`), "")
   ).trim();
 
   try {

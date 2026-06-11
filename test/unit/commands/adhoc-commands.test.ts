@@ -58,6 +58,35 @@ describe("contributeToIssue", () => {
     expect(refreshCallback).toHaveBeenCalled();
   });
 
+  it("preserves prose after a mid-text ref when retargeting", async () => {
+    const item = {
+      _entry: {
+        id: 1,
+        issue: { id: 100 },
+        issue_id: 100,
+        // existing target #150 mid-text, then a second ref the user typed
+        comments: "Setup #150 then #250 review",
+      },
+    } as unknown as TimeEntryNode;
+
+    mockServer.getIssueById
+      .mockResolvedValueOnce({ issue: { id: 100, project: { id: 1 } } })
+      .mockResolvedValueOnce({ issue: { id: 300, project: { id: 1, name: "Proj" }, subject: "New target" } });
+
+    vi.spyOn(issuePicker, "pickIssue").mockResolvedValue({
+      id: 300,
+      subject: "New target",
+      project: { id: 1, name: "Test Project" },
+    });
+
+    await contributeToIssue(item, mockServer as any, refreshCallback);
+
+    // Only the #150 token is swapped — "#250 review" must survive
+    expect(mockServer.updateTimeEntry).toHaveBeenCalledWith(1, {
+      comments: "Setup #300 New target then #250 review",
+    });
+  });
+
   it("prevents contributing to self", async () => {
     const item = {
       _entry: { id: 1, issue: { id: 100 }, issue_id: 100, comments: "" },
