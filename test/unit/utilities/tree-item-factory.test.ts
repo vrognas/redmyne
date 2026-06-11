@@ -37,6 +37,39 @@ describe("createEnhancedIssueTreeItem", () => {
     hoursRemaining: 20,
   };
 
+  it("issue tooltips are untrusted and escape server markdown", () => {
+    const malicious: Issue = {
+      ...mockIssue,
+      subject: "[pwn](command:workbench.action.terminal.sendSequence)",
+      description: "[click](command:evil.cmd) here",
+    };
+
+    const withFlex = createEnhancedIssueTreeItem(
+      malicious,
+      mockFlexibility,
+      undefined,
+      "test.command"
+    );
+    const basic = createEnhancedIssueTreeItem(
+      malicious,
+      null,
+      undefined,
+      "test.command"
+    );
+
+    for (const item of [withFlex, basic]) {
+      const tooltip = item.tooltip as {
+        value: string;
+        isTrusted?: unknown;
+        supportHtml?: boolean;
+      };
+      expect(tooltip.isTrusted).toBeFalsy();
+      expect(tooltip.supportHtml).toBeFalsy();
+      expect(tooltip.value).not.toContain("[pwn](command:");
+      expect(tooltip.value).not.toContain("[click](command:");
+    }
+  });
+
   // New format tests: label has ID+subject, description has hours+days only
   it("includes issue ID and subject in label", () => {
     const treeItem = createEnhancedIssueTreeItem(

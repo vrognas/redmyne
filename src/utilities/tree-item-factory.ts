@@ -6,6 +6,7 @@ import { FlexibilityScore } from "./flexibility-calculator";
 import { formatHoursAsHHMM } from "./time-input";
 import { formatCustomFieldValue } from "./custom-field-formatter";
 import { Membership, groupMembersByRole } from "../controllers/domain";
+import { escapeMarkdown } from "./markdown-escape";
 
 /**
  * Status display text for flexibility scores (used in tooltips)
@@ -96,19 +97,20 @@ function createFlexibilityTooltip(
   const estHours = issue.estimated_hours ?? 0;
   const progress = estHours > 0 ? Math.round((spentHours / estHours) * 100) : 0;
 
+  // Untrusted + no HTML: subject/description/custom fields are
+  // server-controlled; with trust, an embedded [x](command:...) link
+  // would execute commands from a tooltip.
   const md = new vscode.MarkdownString();
-  md.isTrusted = true;
-  md.supportHtml = true;
   md.supportThemeIcons = true;
 
-  const subject = issue.subject?.trim() || "Unknown";
+  const subject = escapeMarkdown(issue.subject?.trim() || "Unknown");
 
   // Title
   md.appendMarkdown(`**#${issue.id}: ${subject}**\n\n`);
 
   // Core metadata (tight spacing with soft breaks)
-  md.appendMarkdown(`**Tracker:** ${issue.tracker?.name?.trim() ?? "Unknown"}  \n`);
-  md.appendMarkdown(`**Priority:** ${issue.priority?.name?.trim() ?? "Unknown"}  \n`);
+  md.appendMarkdown(`**Tracker:** ${escapeMarkdown(issue.tracker?.name?.trim() ?? "Unknown")}  \n`);
+  md.appendMarkdown(`**Priority:** ${escapeMarkdown(issue.priority?.name?.trim() ?? "Unknown")}  \n`);
   md.appendMarkdown(`**Status:** ${statusText}  \n`);
   if (issue.due_date) {
     md.appendMarkdown(`**Due:** ${issue.due_date}  \n`);
@@ -121,7 +123,7 @@ function createFlexibilityTooltip(
 
   // Description section
   if (issue.description?.trim()) {
-    md.appendMarkdown(`---\n\n${issue.description.trim()}\n\n`);
+    md.appendMarkdown(`---\n\n${escapeMarkdown(issue.description.trim())}\n\n`);
   }
 
   // Relations section
@@ -138,7 +140,7 @@ function createFlexibilityTooltip(
     for (const cf of issue.custom_fields) {
       const val = formatCustomFieldValue(cf.value);
       if (val !== "") {
-        md.appendMarkdown(`**${cf.name}:** ${val}  \n`);
+        md.appendMarkdown(`**${escapeMarkdown(cf.name)}:** ${escapeMarkdown(val)}  \n`);
       }
     }
     md.appendMarkdown("\n");
@@ -164,20 +166,19 @@ function createBasicTooltip(
   const spentHours = issue.spent_hours ?? 0;
   const estHours = issue.estimated_hours ?? 0;
 
+  // Untrusted + no HTML — see createFlexibilityTooltip.
   const md = new vscode.MarkdownString();
-  md.isTrusted = true;
-  md.supportHtml = true;
   md.supportThemeIcons = true;
 
-  const subject = issue.subject?.trim() || "Unknown";
+  const subject = escapeMarkdown(issue.subject?.trim() || "Unknown");
 
   // Title
   md.appendMarkdown(`**#${issue.id}: ${subject}**\n\n`);
 
   // Core metadata (tight spacing with soft breaks)
-  md.appendMarkdown(`**Tracker:** ${issue.tracker?.name?.trim() ?? "Unknown"}  \n`);
-  md.appendMarkdown(`**Priority:** ${issue.priority?.name?.trim() ?? "Unknown"}  \n`);
-  md.appendMarkdown(`**Status:** ${issue.status?.name?.trim() ?? "Unknown"}  \n`);
+  md.appendMarkdown(`**Tracker:** ${escapeMarkdown(issue.tracker?.name?.trim() ?? "Unknown")}  \n`);
+  md.appendMarkdown(`**Priority:** ${escapeMarkdown(issue.priority?.name?.trim() ?? "Unknown")}  \n`);
+  md.appendMarkdown(`**Status:** ${escapeMarkdown(issue.status?.name?.trim() ?? "Unknown")}  \n`);
   if (issue.due_date) {
     md.appendMarkdown(`**Due:** ${issue.due_date}  \n`);
   }
@@ -188,7 +189,7 @@ function createBasicTooltip(
 
   // Description section
   if (issue.description?.trim()) {
-    md.appendMarkdown(`---\n\n${issue.description.trim()}\n\n`);
+    md.appendMarkdown(`---\n\n${escapeMarkdown(issue.description.trim())}\n\n`);
   }
 
   // Relations section
@@ -205,7 +206,7 @@ function createBasicTooltip(
     for (const cf of issue.custom_fields) {
       const val = formatCustomFieldValue(cf.value);
       if (val !== "") {
-        md.appendMarkdown(`**${cf.name}:** ${val}  \n`);
+        md.appendMarkdown(`**${escapeMarkdown(cf.name)}:** ${escapeMarkdown(val)}  \n`);
       }
     }
     md.appendMarkdown("\n");
@@ -271,9 +272,9 @@ export function createProjectTooltip(
   server: IRedmineServer | undefined,
   members?: Membership[]
 ): vscode.MarkdownString {
+  // Untrusted + no HTML — server-controlled text must not smuggle
+  // command links or markup into the tooltip.
   const md = new vscode.MarkdownString();
-  md.isTrusted = true;
-  md.supportHtml = true;
   md.supportThemeIcons = true;
 
   md.appendMarkdown("**");
@@ -281,7 +282,7 @@ export function createProjectTooltip(
   md.appendMarkdown("**\n\n");
 
   if (project.description?.trim()) {
-    md.appendMarkdown(`${project.description.trim()}\n\n---\n\n`);
+    md.appendMarkdown(`${escapeMarkdown(project.description.trim())}\n\n---\n\n`);
   }
 
   // Non-empty custom fields only

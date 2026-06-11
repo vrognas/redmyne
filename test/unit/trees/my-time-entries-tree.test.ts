@@ -252,6 +252,40 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     expect(todayChildren[1].description).toBe("1:30 [Testing] Test Issue 124");
   });
 
+  it("scopes tooltip trust and escapes server text", async () => {
+    const todayEntries: TimeEntry[] = [
+      {
+        id: 1,
+        issue_id: 123,
+        activity_id: 9,
+        activity: { id: 9, name: "Development" },
+        hours: "2.5",
+        comments: "[pwn](command:workbench.action.terminal.sendSequence)",
+        spent_on: getTodayStr(),
+      },
+    ];
+
+    mockServer.getTimeEntries
+      .mockResolvedValueOnce({ time_entries: todayEntries })
+      .mockResolvedValueOnce({ time_entries: todayEntries })
+      .mockResolvedValueOnce({ time_entries: todayEntries })
+      .mockResolvedValueOnce({ time_entries: [] });
+
+    const groups = await getLoadedGroups();
+    const [node] = await provider.getChildren(groups[0]);
+
+    const tooltip = node.tooltip as {
+      value: string;
+      isTrusted?: unknown;
+    };
+    expect(tooltip.isTrusted).toEqual({
+      enabledCommands: ["redmyne.openTimeEntryInBrowser"],
+    });
+    expect(tooltip.value).not.toContain("[pwn](command:");
+    // the extension's own browser link must keep working
+    expect(tooltip.value).toContain("command:redmyne.openTimeEntryInBrowser");
+  });
+
   it("calculates correct totals for groups", async () => {
     const todayEntries: TimeEntry[] = [
       {

@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { TimeEntry } from "../redmine/models/time-entry";
 import { formatHoursAsHHMM } from "../utilities/time-input";
+import { escapeMarkdown } from "../utilities/markdown-escape";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
 import { adHocTracker } from "../utilities/adhoc-tracker";
 import { isDraftEntry } from "../utilities/time-entry-clipboard";
@@ -828,24 +829,27 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
 
       // Encode command arguments as JSON array for VS Code command URI
       const commandArgs = encodeURIComponent(JSON.stringify([issueId]));
-      const userLine = this.showAllUsers && entry.user?.name ? `**User:** ${entry.user.name}\n\n` : "";
+      const userLine = this.showAllUsers && entry.user?.name ? `**User:** ${escapeMarkdown(entry.user.name)}\n\n` : "";
       const draftLine = isDraft ? `**⚠️ DRAFT** - Not yet saved to server\n\n` :
         isDraftModified ? `**✏️ MODIFIED** - Changes pending save\n\n` : "";
       const entryIdLine = isDraft ? "" : `**Entry ID:** ${entry.id}\n\n`;
       const tooltip = new vscode.MarkdownString(
         draftLine +
-        `**Issue:** #${issueId} ${issueSubject}\n\n` +
+        `**Issue:** #${issueId} ${escapeMarkdown(issueSubject)}\n\n` +
           userLine +
-          (clientName ? `**Client:** ${clientName}\n\n` : "") +
-          (projectName ? `**Project:** ${projectName}\n\n` : "") +
+          (clientName ? `**Client:** ${escapeMarkdown(clientName)}\n\n` : "") +
+          (projectName ? `**Project:** ${escapeMarkdown(projectName)}\n\n` : "") +
           `**Hours:** ${formatHoursAsHHMM(parseFloat(entry.hours))}\n\n` +
-          `**Activity:** ${entry.activity?.name || "Unknown"}\n\n` +
+          `**Activity:** ${escapeMarkdown(entry.activity?.name || "Unknown")}\n\n` +
           `**Date:** ${entry.spent_on}\n\n` +
-          `**Comments:** ${entry.comments || "(none)"}\n\n` +
+          `**Comments:** ${escapeMarkdown(entry.comments || "(none)")}\n\n` +
           entryIdLine +
           (isDraft ? "" : `---\n\n[Open Issue in Browser](command:redmyne.openTimeEntryInBrowser?${commandArgs})`)
       );
-      tooltip.isTrusted = true;
+      // Trust ONLY our own browser-link command: server text (comments,
+      // subjects) is interpolated above, and blanket trust would let a
+      // crafted comment execute arbitrary commands on click.
+      tooltip.isTrusted = { enabledCommands: ["redmyne.openTimeEntryInBrowser"] };
       tooltip.supportHtml = false;
       tooltip.supportThemeIcons = true;
 

@@ -176,7 +176,7 @@ export class Selection {
 
 export class MarkdownString {
   value: string;
-  isTrusted?: boolean;
+  isTrusted?: boolean | { readonly enabledCommands: readonly string[] };
   supportHtml?: boolean;
 
   constructor(value = "") {
