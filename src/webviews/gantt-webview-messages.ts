@@ -10,6 +10,7 @@ export type GanttWebviewMessage =
   | { command: "setZoom"; zoomLevel: GanttZoomLevel }
   | { command: "setLookback"; years?: string }
   | { command: "setTaskTypeFilter"; taskType?: string }
+  | { command: "toggleLateFilter" }
   | { command: "setViewMode"; viewMode: GanttViewMode }
   | { command: "setViewFocus"; focus: "project" | "person" }
   | { command: "setSelectedProject"; projectId?: number | null }

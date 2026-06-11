@@ -1,6 +1,38 @@
 import { Issue } from "../redmine/models/issue";
 import { IssueFilter } from "../redmine/models/common";
 import { RedmineProject } from "../redmine/redmine-project";
+import { isIssueClosed } from "../utilities/issue-status";
+import type { InternalEstimates } from "../utilities/internal-estimates";
+
+/**
+ * Whether an issue counts as LATE: past due, open, unfinished, with real
+ * work remaining. Mirrors the bar badge/ghost rule exactly — internal
+ * estimate first, else budget heuristic where a consumed budget with an
+ * unmaintained done_ratio (0) counts as done. No estimate at all still
+ * counts late (past due and open is all we know).
+ */
+export function isLateIssue(
+  issue: Issue,
+  internalEstimates: InternalEstimates,
+  todayStr: string
+): boolean {
+  if (!issue.due_date || issue.due_date >= todayStr) return false;
+  if (isIssueClosed(issue)) return false;
+  const doneRatio = issue.done_ratio ?? 0;
+  if (doneRatio >= 100) return false;
+
+  const internal = internalEstimates.get(issue.id);
+  const est = issue.estimated_hours ?? 0;
+  if (internal === undefined && est <= 0) return true;
+
+  const spent = issue.spent_hours ?? 0;
+  const remaining = internal !== undefined
+    ? internal.hoursRemaining
+    : spent >= est
+      ? (doneRatio > 0 ? est * (1 - doneRatio / 100) : 0)
+      : est - spent;
+  return remaining > 0;
+}
 
 export interface AssigneeState {
   uniqueAssignees: string[];

@@ -36,7 +36,7 @@ import { CreatableRelationType, GanttRow, nodeToGanttRow } from "./gantt-model";
 import { buildRowsPayload, buildArrowsPayload } from "./gantt/gantt-html-generator";
 import type { GanttRenderContext, GanttRowPayload, GanttArrowPayload } from "./gantt/gantt-render-types";
 import { generateHeader, type GanttToolbarContext } from "./gantt/gantt-toolbar-generator";
-import { deriveAssigneeState, filterIssuesForView } from "./gantt-view-filter";
+import { deriveAssigneeState, filterIssuesForView, isLateIssue } from "./gantt-view-filter";
 import { deriveTaskTypes, filterIssuesByTaskType } from "../utilities/issue-task-type-filter";
 import { dateToX, endExclusiveX, clampMinDateToLookback } from "./gantt/gantt-coords";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
@@ -176,6 +176,7 @@ const SELECTED_ASSIGNEE_KEY = "redmyne.gantt.selectedAssignee";
 const FILTER_ASSIGNEE_KEY = "redmyne.gantt.filterAssignee";
 const FILTER_STATUS_KEY = "redmyne.gantt.filterStatus";
 const FILTER_TASK_TYPE_KEY = "redmyne.gantt.filterTaskType";
+const FILTER_LATE_KEY = "redmyne.gantt.filterLateOnly";
 const LOOKBACK_YEARS_KEY = "redmyne.gantt.lookbackYears";
 
 export class GanttPanel {
@@ -244,6 +245,7 @@ export class GanttPanel {
   private _supplementalLoadId = 0; // Monotonic id to ignore stale async loads
   private _currentFilter: IssueFilter = { ...DEFAULT_ISSUE_FILTER };
   private _taskTypeFilter: string | "any" = "any"; // task-type custom-field value (gantt-local)
+  private _lateOnly = false; // show only late tasks (gantt-local)
   private _filterChangeCallback?: (filter: IssueFilter) => void;
   private _viewMode: GanttViewMode = "projects";
   private _viewFocus: "project" | "person" = "project"; // Toggle: view by project or person
@@ -303,6 +305,7 @@ export class GanttPanel {
       if (savedAssignee) this._currentFilter.assignee = savedAssignee;
       if (savedStatus) this._currentFilter.status = savedStatus;
       this._taskTypeFilter = GanttPanel._globalState.get<string | "any">(FILTER_TASK_TYPE_KEY, "any");
+      this._lateOnly = GanttPanel._globalState.get<boolean>(FILTER_LATE_KEY, false);
       this._lookbackYears = GanttPanel._globalState.get<2 | 5 | 10 | null>(LOOKBACK_YEARS_KEY, 2);
     }
 
@@ -1570,6 +1573,12 @@ export class GanttPanel {
         this._bumpRevision(); // invalidate hierarchy/capacity caches
         this._updateContent();
         break;
+      case "toggleLateFilter":
+        this._lateOnly = !this._lateOnly;
+        GanttPanel._globalState?.update(FILTER_LATE_KEY, this._lateOnly);
+        this._bumpRevision(); // invalidate hierarchy/capacity caches
+        this._updateContent();
+        break;
       case "setSelectedKey":
         // Preserve keyboard selection across re-renders
         this._selectedCollapseKey = message.collapseKey ?? null;
@@ -2023,9 +2032,24 @@ export class GanttPanel {
     // dependencies/capacity all recompute on the filtered subset. The dropdown's
     // available values are derived separately (from the full set) in the toolbar.
     const taskTypeField = this._taskTypeFieldName();
-    const filteredIssues = taskTypeField
+    const taskTypeFiltered = taskTypeField
       ? filterIssuesByTaskType(viewFilter.filteredIssues, taskTypeField, this._taskTypeFilter)
       : viewFilter.filteredIssues;
+
+    // Late count + optional late-only narrowing (same rule as the bar
+    // badge/ghost). Count reflects the current view BEFORE this filter so
+    // the toolbar chip stays meaningful while the filter is active.
+    const lateTodayStr = getTodayStr();
+    const lateEstimates: InternalEstimates = GanttPanel._globalState
+      ? getInternalEstimates(GanttPanel._globalState)
+      : new Map();
+    const lateCount = taskTypeFiltered.reduce(
+      (n, i) => n + (isLateIssue(i, lateEstimates, lateTodayStr) ? 1 : 0),
+      0
+    );
+    const filteredIssues = this._lateOnly
+      ? taskTypeFiltered.filter((i) => isLateIssue(i, lateEstimates, lateTodayStr))
+      : taskTypeFiltered;
 
     // Sort issues before building hierarchy (null = no sorting, keep natural order)
     const sortedIssues = this._sortBy === null ? [...filteredIssues] : [...filteredIssues].sort((a, b) => {
@@ -2603,6 +2627,8 @@ export class GanttPanel {
       todayInRange,
       draftModeEnabled: this._draftModeManager?.isEnabled ?? false,
       draftQueueCount: this._draftModeManager?.queue?.count ?? 0,
+      lateCount,
+      lateFilterActive: this._lateOnly,
     };
 
     const html = `

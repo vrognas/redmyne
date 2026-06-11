@@ -50,6 +50,10 @@ export interface GanttToolbarContext {
   // Draft mode
   draftModeEnabled: boolean;
   draftQueueCount: number;
+
+  // Late tasks (past due, open, with remaining work)
+  lateCount: number;
+  lateFilterActive: boolean;
 }
 
 /**
@@ -175,6 +179,7 @@ export function generateToolbar(ctx: GanttToolbarContext): string {
         <option value="any"${ctx.selectedTaskType === "any" ? " selected" : ""}>All task types</option>
         ${ctx.taskTypeValues.map((t) => `<option value="${escapeAttr(t)}"${ctx.selectedTaskType === t ? " selected" : ""}>${escapeHtml(t)}</option>`).join("")}
       </select>` : ""}
+      ${ctx.lateCount > 0 || ctx.lateFilterActive ? `<button id="lateFilterBtn" class="toggle-btn text-btn late-filter-btn${ctx.lateFilterActive ? " active" : ""}" data-toolbar-tooltip="${ctx.lateFilterActive ? "Showing late tasks only — click to show all" : "Show only late tasks"}">⏰ ${ctx.lateCount} late</button>` : ""}
       <!-- Primary actions -->
       <button id="refreshBtn" class="toggle-btn text-btn" data-toolbar-tooltip="Refresh (R)">↻</button>
       <button id="todayBtn" class="toggle-btn text-btn" data-toolbar-tooltip="${ctx.todayInRange ? "Today (T)" : "Today is outside timeline range"}"${ctx.todayInRange ? "" : " disabled"}>T</button>

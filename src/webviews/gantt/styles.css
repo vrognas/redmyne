@@ -464,6 +464,19 @@ body {
   fill: currentColor;
 }
 
+/* Late-tasks chip: count + filter toggle in one */
+.gantt-actions .late-filter-btn {
+  color: var(--vscode-charts-red);
+  white-space: nowrap;
+}
+
+.gantt-actions .late-filter-btn.active {
+  background: var(--vscode-toolbar-activeBackground);
+  color: var(--vscode-charts-red);
+  outline: 1px solid var(--vscode-charts-red);
+  outline-offset: -1px;
+}
+
 /* Dropdown menus (help, overflow) */
 .toolbar-dropdown {
   position: relative;

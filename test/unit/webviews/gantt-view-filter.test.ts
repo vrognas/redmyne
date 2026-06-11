@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { deriveAssigneeState, filterIssuesForView } from "../../../src/webviews/gantt-view-filter";
+import { deriveAssigneeState, filterIssuesForView, isLateIssue } from "../../../src/webviews/gantt-view-filter";
 import { RedmineProject } from "../../../src/redmine/redmine-project";
 import { Issue } from "../../../src/redmine/models/issue";
 
@@ -172,5 +172,45 @@ describe("filterIssuesForView", () => {
     // Should fall back to first project (ID 10)
     expect(result.selectedProjectId).toBe(10);
     expect(result.filteredIssues.map((i) => i.id)).toEqual([1]);
+  });
+});
+
+describe("isLateIssue", () => {
+  const today = "2026-06-11";
+  const noEstimates = new Map();
+
+  it("flags past-due open work with remaining hours", () => {
+    const late = createIssue({
+      due_date: "2026-05-20",
+      estimated_hours: 16,
+      spent_hours: 5,
+    } as Partial<Issue>);
+    expect(isLateIssue(late, noEstimates, today)).toBe(true);
+  });
+
+  it("ignores future-due, closed, done, and effectively-done issues", () => {
+    expect(isLateIssue(createIssue({ due_date: "2026-07-01" }), noEstimates, today)).toBe(false);
+    expect(isLateIssue(createIssue({
+      due_date: "2026-05-20",
+      status: { id: 5, name: "Closed", is_closed: true },
+    }), noEstimates, today)).toBe(false);
+    expect(isLateIssue(createIssue({ due_date: "2026-05-20", done_ratio: 100 }), noEstimates, today)).toBe(false);
+    // consumed budget + unmaintained done_ratio = essentially done
+    expect(isLateIssue(createIssue({
+      due_date: "2026-05-20",
+      estimated_hours: 16,
+      spent_hours: 18,
+    } as Partial<Issue>), noEstimates, today)).toBe(false);
+  });
+
+  it("internal estimate overrides the budget heuristic", () => {
+    const issue = createIssue({
+      id: 7,
+      due_date: "2026-05-20",
+      estimated_hours: 16,
+      spent_hours: 18, // budget says done...
+    } as Partial<Issue>);
+    const estimates = new Map([[7, { hoursRemaining: 4, updatedAt: "2026-06-01" }]]);
+    expect(isLateIssue(issue, estimates, today)).toBe(true); // ...internal says 4h left
   });
 });
