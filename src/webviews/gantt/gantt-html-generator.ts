@@ -732,7 +732,7 @@ function generateRegularBar(
   })();
 
   // Generate badges
-  const badges = generateBarBadges(issue, startX, endX, barY, visualDoneRatio, isFallbackProgress, progressTooltip, blocksTooltip, blockerTooltip, ctx);
+  const badges = generateBarBadges(issue, startX, endX, barY, flexPct, visualDoneRatio, isFallbackProgress, progressTooltip, blocksTooltip, blockerTooltip, ctx);
 
   return `
     <g class="issue-bar gantt-row${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${issue.isAdHoc ? " bar-adhoc" : ""}${isCriticalPath ? " bar-critical" : ""}" data-issue-id="${issue.id}"
@@ -796,13 +796,16 @@ function generateRegularBar(
   `;
 }
 
-/** Generate bar badges (progress, blocks, blocker, assignee). Flexibility
- * is hover-only — it rides the bar/progress tooltips, not a resting badge. */
+/** Generate bar badges (progress, flex, blocks, blocker, assignee).
+ * Resting badges show only when they carry signal: progress hides at 0%,
+ * flexibility shows only below 100% buffer (ample slack is the default
+ * state). Full details always available in the hover tooltips. */
 function generateBarBadges(
   issue: GanttIssue,
   startX: number,
   endX: number,
   barY: number,
+  flexPct: number | null,
   visualDoneRatio: number,
   isFallbackProgress: boolean,
   progressTooltip: string,
@@ -810,8 +813,22 @@ function generateBarBadges(
   blockerTooltip: string,
   ctx: GanttRenderContext
 ): string {
-  // Progress badge width (varies by digit count)
-  const progressBadgeW = visualDoneRatio === 100 ? 32 : visualDoneRatio >= 10 ? 28 : 22;
+  // Progress badge — hidden at 0% (it was pure noise on untouched boards)
+  const showProgress = visualDoneRatio > 0;
+  const progressBadgeW = showProgress
+    ? (visualDoneRatio === 100 ? 32 : visualDoneRatio >= 10 ? 28 : 22)
+    : 0;
+
+  // Flexibility badge — attention-worthy buffers only (<100%)
+  const showFlex = flexPct !== null && flexPct < 100 && !issue.isClosed;
+  const flexLabel = showFlex ? (flexPct > 0 ? `+${flexPct}%` : `${flexPct}%`) : "";
+  const flexBadgeW = showFlex ? (Math.abs(flexPct) >= 100 ? 38 : Math.abs(flexPct) >= 10 ? 32 : 26) : 0;
+  const flexColor = showFlex
+    ? (flexPct >= 50 ? "var(--vscode-charts-green)"
+      : flexPct > 0 ? "var(--vscode-charts-yellow)"
+      : "var(--vscode-charts-red)")
+    : "";
+  const flexTooltip = showFlex ? flexibilityLine(flexPct) ?? "" : "";
 
   // Blocks badge (downstream - at END of bar)
   const blocksCount = issue.blocks.length;
@@ -858,27 +875,37 @@ function generateBarBadges(
     </g>`;
   }
 
-  // Progress badge position
-  const progressCenterX = labelX + progressBadgeW / 2;
+  // Lay visible badges out left-to-right: [progress][flex][blocks][assignee]
+  let cursorX = labelX;
+  const progressX = cursorX;
+  if (showProgress) cursorX += progressBadgeW + 4;
+  const flexBadgeX = cursorX;
+  if (showFlex) cursorX += flexBadgeW + 4;
+  const impactBadgeX = cursorX;
+  if (showBlocks) cursorX += impactBadgeW + 4;
+  const assigneeX = cursorX;
 
-  // Impact badge position
-  const impactBadgeX = labelX + progressBadgeW + 4;
+  const progressCenterX = progressX + progressBadgeW / 2;
+  const flexBadgeCenterX = flexBadgeX + flexBadgeW / 2;
   const impactBadgeCenterX = impactBadgeX + impactBadgeW / 2;
 
-  // Assignee position
-  const afterImpactX = showBlocks ? impactBadgeX : labelX;
-  const afterImpactW = showBlocks ? impactBadgeW : progressBadgeW;
-  const assigneeX = afterImpactX + afterImpactW + 4;
-
   return `<g class="bar-labels">
-    <g class="progress-badge-group">
+    ${showProgress ? `<g class="progress-badge-group">
       <title>${escapeAttr(progressTooltip)}</title>
-      <rect class="status-badge-bg" x="${labelX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${progressBadgeW}" height="12" rx="2"
+      <rect class="status-badge-bg" x="${progressX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${progressBadgeW}" height="12" rx="2"
             fill="var(--vscode-badge-background)" opacity="0.9"/>
-      <rect x="${labelX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${progressBadgeW}" height="12" fill="transparent"/>
+      <rect x="${progressX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${progressBadgeW}" height="12" fill="transparent"/>
       <text class="status-badge" x="${progressCenterX}" y="${ctx.barHeight / 2 + 4}"
             text-anchor="middle" fill="var(--vscode-badge-foreground)" font-size="10">${isFallbackProgress ? "~" : ""}${visualDoneRatio}%</text>
-    </g>
+    </g>` : ""}
+    ${showFlex ? `<g class="flex-badge-group">
+      <title>${escapeAttr(flexTooltip)}</title>
+      <rect class="flex-badge-bg" x="${flexBadgeX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${flexBadgeW}" height="12" rx="2"
+            fill="${flexColor}" opacity="0.15"/>
+      <rect x="${flexBadgeX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${flexBadgeW}" height="12" fill="transparent"/>
+      <text class="flex-badge" x="${flexBadgeCenterX}" y="${ctx.barHeight / 2 + 4}"
+            text-anchor="middle" fill="${flexColor}" font-size="10" font-weight="500">${flexLabel}</text>
+    </g>` : ""}
     ${showBlocks ? `<g class="blocks-badge-group" style="cursor: pointer;">
       <title>${escapeAttr(blocksTooltip)}</title>
       <rect class="blocks-badge-bg" x="${impactBadgeX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${impactBadgeW}" height="12" rx="2"
