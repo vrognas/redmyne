@@ -11,6 +11,18 @@ Quick reference of key patterns. Details in sections below.
 
 ---
 
+## v4.29.2 Whole-codebase deep review themes (2026-06-11)
+
+142 verified findings (report: `docs/reviews/2026-06-11-deep-review.md`); 31 critical/high bugs fixed. Transferable patterns:
+
+- **Encode invariants as helpers, not comments.** flexibility-calculator carried an explicit "check status.is_closed, NOT closed_on (reopened issues keep closed_on!)" warning — five OTHER sites still used `closed_on`. A comment can't stop the next call site; `isIssueClosed()` can.
+- **Trusted MarkdownString + server text = command execution.** Any `isTrusted = true` tooltip interpolating subjects/comments lets a crafted `[x](command:...)` run on click. Default untrusted + `escapeMarkdown()`; when a command link is needed, scope trust: `isTrusted = { enabledCommands: [...] }`.
+- **Dequeue at success time, not batch end.** Ops that stay queued after applying are replayable (paused batch with clickable UI, crash mid-batch + persisted queue). Same shape as transaction logs: mark done the moment the side effect lands.
+- **Beware silently-degrading fallbacks.** `hasChanges` caught ALL errors → null → "use cache": the probe operator was invalid (`>` isn't Redmine filter grammar) and change detection was dead for months with zero symptoms. A fallback that hides 100% failure needs a counter/log.
+- **Redmine relation records keep owner orientation in both issues' arrays.** Guards like `if (rel.issue_id !== issue.id) continue` drop every edge whose owner is filtered out of the fetched set. Process from either side; idempotent Set.adds dedupe for free.
+- **Non-atomic delete-then-recreate needs a rollback plan** (relation delay edit): on recreate failure, restore with old values; if that fails, sync local state to server reality — never leave the UI drawing ghosts.
+- **UTC-anchored axes need UTC-frame comparisons everywhere.** One `formatLocalDate(utcMidnight)` in the marker loop shifted "today" a gridline west of UTC while every other anchor was UTC-correct.
+
 ## v4.29.1 Windowing broke every init-time DOM assumption (2026-06-10)
 
 Deep multi-agent review of v4.29.0 found 14 confirmed bugs — all one root cause: code written when every row always had a DOM element. The audit checklist for any future "elements now churn" change:
