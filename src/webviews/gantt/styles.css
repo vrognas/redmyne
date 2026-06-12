@@ -1067,18 +1067,8 @@ svg {
   opacity: 0.6;
 }
 
-.issue-bar.selected .bar-outline {
-  stroke: var(--vscode-focusBorder) !important;
-  stroke-width: 2;
-}
-
-.issue-bar.selected .bar-main {
-  opacity: 1;
-}
-
-.multi-select-mode .issue-bar {
-  cursor: pointer;
-}
+/* Multi-selection is row-scoped (overlay rects in the task list);
+   bars carry no selected styling. */
 
 .selection-count {
   margin-left: 8px;

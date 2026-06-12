@@ -1026,10 +1026,30 @@ function initializeGantt(state, rowWindow) {
     let lastClickedIssueId = null;
     const selectionCountEl = document.getElementById('selectionCount');
 
-    function barsForIssueId(issueId) {
-      return lookupMaps.isReady()
-        ? lookupMaps.getIssueBars(issueId)
-        : document.querySelectorAll(`.issue-bar[data-issue-id="${issueId}"]`);
+    // Multi-selection is ROW-scoped: highlight rects in the task-list svg
+    // at each selected row's virtual Y (mount-independent), not a border
+    // on the bar. Bars stay drag/open targets only.
+    function rebuildMultiSelectOverlays() {
+      const labelsSvg = document.querySelector('.gantt-labels svg');
+      if (!labelsSvg) return;
+      let layer = labelsSvg.querySelector('.multi-select-layer');
+      if (!layer) {
+        layer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        layer.setAttribute('class', 'multi-select-layer');
+        layer.setAttribute('pointer-events', 'none');
+        const zebra = labelsSvg.querySelector('.zebra-layer');
+        if (zebra && zebra.nextSibling) labelsSvg.insertBefore(layer, zebra.nextSibling);
+        else labelsSvg.insertBefore(layer, labelsSvg.firstChild);
+      }
+      let rects = '';
+      selectedIssues.forEach(id => {
+        const meta = rowWindow?.getRowMetaByIssueId(id);
+        if (!meta) return;
+        const y = rowWindow.getVirtualY(meta.key);
+        if (y === null || y === undefined) return;
+        rects += '<rect x="0" y="' + y + '" width="100%" height="' + barHeight + '" fill="var(--vscode-list-activeSelectionBackground)" opacity="0.45"/>';
+      });
+      layer.innerHTML = rects;
     }
 
     function refreshSelectionChrome() {
@@ -1043,21 +1063,16 @@ function initializeGantt(state, rowWindow) {
       }
     }
 
-    // Update selection for specific changed IDs (O(changed) instead of O(all))
-    function updateSelectionForIds(changedIds) {
-      changedIds.forEach(issueId => {
-        barsForIssueId(issueId).forEach(bar =>
-          bar.classList.toggle('selected', selectedIssues.has(issueId)));
-      });
+    // Update selection (changed-id granularity no longer needed: the
+    // overlay layer rebuilds from the full set, O(selected))
+    function updateSelectionForIds(_changedIds) {
+      rebuildMultiSelectOverlays();
       refreshSelectionChrome();
     }
 
-    // Full UI sync over MOUNTED bars (bulk ops + window-refresh re-sync:
-    // recycled elements keep their classes across unmount/remount)
+    // Full UI re-sync (bulk ops + window-refresh: virtual Ys may change)
     function updateSelectionUI() {
-      document.querySelectorAll('.issue-bar').forEach(bar => {
-        bar.classList.toggle('selected', selectedIssues.has(bar.dataset.issueId));
-      });
+      rebuildMultiSelectOverlays();
       refreshSelectionChrome();
     }
 
@@ -1102,21 +1117,19 @@ function initializeGantt(state, rowWindow) {
       announce(`Selected all ${selectedIssues.size} issues`);
     }
 
-    // Handle Ctrl+click and Shift+click on bars for selection (delegated: 1
-    // listener on document instead of N per render).
+    // Handle Ctrl+click and Shift+click on task-list ROWS for selection
+    // (delegated). Bars are intentionally not selection targets — they're
+    // for dragging/opening; multi-select lives in the task list.
     addDocListener('mousedown', (e) => {
       // Only handle Ctrl or Shift clicks for selection
       if (!e.ctrlKey && !e.metaKey && !e.shiftKey) return;
-      // Don't interfere with drag handles or link handles (closest catches
-      // descendants like drag-grip circles, which classList wouldn't).
-      if (e.target.closest('.drag-handle') || e.target.closest('.link-handle')) return;
-      const bar = e.target.closest('.issue-bar');
-      if (!bar) return;
+      const label = e.target.closest('.issue-label');
+      if (!label) return;
 
       e.preventDefault();
       e.stopPropagation();
 
-      const issueId = bar.dataset.issueId;
+      const issueId = label.dataset.issueId;
       if (e.shiftKey && lastClickedIssueId) {
         // Shift+click: range selection
         selectRange(lastClickedIssueId, issueId);
