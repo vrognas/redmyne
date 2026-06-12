@@ -364,15 +364,33 @@ export function setupRowInteraction(ctx) {
     handleNavKeydown(e, activeKey);
   });
 
+  // ---------- ghost projections: inert except row-select ----------
+
+  // Ghosts are hover-info surfaces, nothing more. One capture-phase guard
+  // owns the whole contract: a plain press selects the row WITHOUT focus
+  // or scroll (preventDefault stops native focus of the tabindex'd bar
+  // group, whose bar+ghost bbox is wide; Chromium doesn't reliably honor
+  // preventScroll on SVG focus), and stopPropagation keeps every
+  // downstream mouse handler — bar pin-highlight on click, dependency
+  // focus on dblclick — from ever seeing a ghost event.
+  const onGhostPointer = (e) => {
+    if (!e.target.closest?.('.ghost-projection')) return;
+    e.stopPropagation();
+    e.preventDefault();
+    if (e.type !== 'mousedown') return;
+    // Modifier presses stay inert (bars don't multi-select either)
+    if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+    const key = e.target.closest('.gantt-row[data-collapse-key]')?.dataset.collapseKey
+      ?? e.target.closest('.issue-bar')?.dataset.collapseKey;
+    if (key) setActiveKey(key, { focus: false });
+  };
+  ['mousedown', 'click', 'dblclick'].forEach((type) =>
+    addDocListener(type, onGhostPointer, { capture: true })
+  );
+
   // ---------- click-to-select for non-label targets ----------
 
   addDocListener('mousedown', (e) => {
-    // Pressing a ghost must not scroll: preventDefault stops the native
-    // focus of the tabindex'd bar group (whose bar+ghost bbox is wide),
-    // and the selection below skips label.focus() too — Chromium does
-    // not reliably honor preventScroll when focusing SVG elements.
-    const fromGhost = !!e.target.closest('.ghost-projection');
-    if (fromGhost) e.preventDefault();
     // Leave modifier gestures to the multi-select handler
     if (e.ctrlKey || e.metaKey || e.shiftKey) return;
     if (!e.target.closest('#ganttScroll')) return;
@@ -397,10 +415,8 @@ export function setupRowInteraction(ctx) {
       key = rowWindow.keyAtIndex(Math.floor(contentY / barHeight));
       if (!key) return;
     }
-    // Focus the row's label (same as a label click) so arrow keys
-    // navigate. Ghost clicks skip the focus — the unfocused-keydown
-    // fallback keeps arrow keys working without any scroll risk.
-    setActiveKey(key, fromGhost ? { focus: false } : undefined);
+    // Focus the row's label (same as a label click) so arrow keys navigate
+    setActiveKey(key);
   });
 
   // Restore selection from the previous render. Collapse-hidden keys restore
