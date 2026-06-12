@@ -122,15 +122,29 @@ export function setupRowInteraction(ctx) {
     }
   }
 
+  // The body top is cached — getBoundingClientRect on every mousemove
+  // forces layout. All .gantt-body columns share the same top, so any
+  // one works; vertical scroll, resize and remounts invalidate it.
+  let hoverBodyTop = null;
+  const invalidateHoverTop = () => { hoverBodyTop = null; };
+
   addDocListener('mousemove', (e) => {
     const body = e.target.closest && e.target.closest('.gantt-body');
     if (!body) { setHoverRowY(null); return; }
-    const contentY = e.clientY - body.getBoundingClientRect().top;
-    const index = Math.floor(contentY / barHeight);
-    const key = rowWindow.keyAtIndex(index);
-    setHoverRowY(key ? index * barHeight : null);
+    if (hoverBodyTop === null) hoverBodyTop = body.getBoundingClientRect().top;
+    const index = Math.floor((e.clientY - hoverBodyTop) / barHeight);
+    const y = index * barHeight;
+    if (y === hoverRowY) return; // same row — skip the key lookup
+    setHoverRowY(rowWindow.keyAtIndex(index) ? y : null);
   });
+  addDocListener('mouseleave', () => setHoverRowY(null));
   addWinListener('blur', () => setHoverRowY(null));
+  addWinListener('resize', invalidateHoverTop);
+  // Rows shift under a stationary pointer on scroll/collapse/remount —
+  // the band would light the wrong row until the next mousemove. Hide it
+  // and re-measure on the next move.
+  addDocListener('scroll', () => { invalidateHoverTop(); setHoverRowY(null); }, { capture: true });
+  rowWindow.onRefresh(() => { invalidateHoverTop(); setHoverRowY(null); });
 
   function updateRowSelectionOverlays() {
     const y = activeKey ? rowWindow.getVirtualY(activeKey) : null;
