@@ -1079,6 +1079,22 @@ svg {
 /* Multi-selection is row-scoped (overlay rects in the task list);
    bars carry no selected styling. */
 
+/* Click-pinned highlight: bar + label + its arrows stay emphasized */
+.issue-bar.pinned-highlight .bar-outline {
+  stroke: var(--vscode-focusBorder);
+  stroke-width: 2;
+}
+
+.issue-label.pinned-highlight .issue-text {
+  font-weight: 600;
+}
+
+.dependency-arrow.pinned-highlight .arrow-line,
+.dependency-arrow.pinned-highlight .arrow-head {
+  opacity: 1;
+  stroke-width: 2.5;
+}
+
 .row-hover-overlay {
   fill: var(--vscode-list-hoverBackground);
   pointer-events: none;

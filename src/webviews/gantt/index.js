@@ -1145,6 +1145,9 @@ function initializeGantt(state, rowWindow) {
         e.preventDefault();
         selectAll();
       }
+      if (e.key === 'Escape' && pinnedIssueId) {
+        pinHighlight(pinnedIssueId); // toggle off
+      }
       if (e.key === 'Escape' && selectedIssues.size > 0) {
         e.stopImmediatePropagation();
         clearSelection();
@@ -1222,6 +1225,7 @@ function initializeGantt(state, rowWindow) {
       lookupMaps.rebuildIfReady();
       updateSelectionUI();
       applyFocusClasses();
+      applyPinnedHighlight();
       // A hovered element that unmounts never gets its mouseleave — drop the
       // hover state; the next pointer move re-applies it
       clearHoverHighlight();
@@ -1339,6 +1343,31 @@ function initializeGantt(state, rowWindow) {
         if (e.relatedTarget && container.contains(e.relatedTarget)) return;
         clearHoverHighlight();
       }, true);
+    }
+
+    // Click-pinned highlight: clicking a bar keeps it + its arrows
+    // emphasized until Escape, clicking it again, or pinning another bar.
+    // Re-applied from state on every window refresh (element churn).
+    let pinnedIssueId = null;
+    let pinnedEls = [];
+    function applyPinnedHighlight() {
+      pinnedEls.forEach(el => el.classList.remove('pinned-highlight'));
+      pinnedEls = [];
+      if (!pinnedIssueId) return;
+      const id = pinnedIssueId;
+      const bars = lookupMaps.isReady() ? lookupMaps.getIssueBars(id)
+        : document.querySelectorAll('.issue-bar[data-issue-id="' + id + '"]');
+      const labels = lookupMaps.isReady() ? lookupMaps.getIssueLabels(id)
+        : document.querySelectorAll('.issue-label[data-issue-id="' + id + '"]');
+      const arrows = lookupMaps.isReady() ? lookupMaps.getArrows(id)
+        : document.querySelectorAll('.dependency-arrow[data-from="' + id + '"], .dependency-arrow[data-to="' + id + '"]');
+      bars.forEach(el => { el.classList.add('pinned-highlight'); pinnedEls.push(el); });
+      labels.forEach(el => { el.classList.add('pinned-highlight'); pinnedEls.push(el); });
+      arrows.forEach(el => { el.classList.add('pinned-highlight'); pinnedEls.push(el); });
+    }
+    function pinHighlight(issueId) {
+      pinnedIssueId = pinnedIssueId === issueId ? null : issueId;
+      applyPinnedHighlight();
     }
 
     // Dependency arrow right-click delete (delegated)
@@ -1497,6 +1526,7 @@ function initializeGantt(state, rowWindow) {
       clearFocus,
       getFocusedIssueId,
       scrollToAndHighlight,
+      pinHighlight,
       isDraftModeEnabled: () => currentDraftMode,
       isPerfDebugEnabled: () => PERF_DEBUG,
       lookupMaps,

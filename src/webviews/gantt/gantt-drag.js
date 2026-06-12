@@ -27,6 +27,7 @@ export function setupDrag(ctx) {
       clearFocus,
       getFocusedIssueId,
       scrollToAndHighlight,
+      pinHighlight,
       isDraftModeEnabled,
       lookupMaps,
       rowWindow
@@ -865,7 +866,8 @@ export function setupDrag(ctx) {
       if (getFocusedIssueId()) {
         clearFocus();
       }
-      scrollToAndHighlight(bar.dataset.issueId);
+      // Pin the bar + its arrows highlighted (toggles off on second click)
+      pinHighlight(bar.dataset.issueId);
     });
     addDocListener('dblclick', (e) => {
       const bar = e.target.closest('.issue-bar');
