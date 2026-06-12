@@ -843,6 +843,7 @@ function initializeGantt(state, rowWindow) {
       vscode.postMessage({ command: 'setTaskTypeFilter', taskType: e.target.value });
     });
     document.getElementById('lateFilterBtn')?.addEventListener('click', () => {
+      saveState(); // persist scroll so the re-render restores the viewport
       vscode.postMessage({ command: 'toggleLateFilter' });
     });
 
