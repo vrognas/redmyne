@@ -177,6 +177,8 @@ const FILTER_ASSIGNEE_KEY = "redmyne.gantt.filterAssignee";
 const FILTER_STATUS_KEY = "redmyne.gantt.filterStatus";
 const FILTER_TASK_TYPE_KEY = "redmyne.gantt.filterTaskType";
 const FILTER_LATE_KEY = "redmyne.gantt.filterLateOnly";
+const SORT_BY_KEY = "redmyne.gantt.sortBy";
+const SORT_ORDER_KEY = "redmyne.gantt.sortOrder";
 const HIGHLIGHT_MINE_KEY = "redmyne.gantt.highlightMyIssues";
 const LOOKBACK_YEARS_KEY = "redmyne.gantt.lookbackYears";
 
@@ -256,7 +258,8 @@ export class GanttPanel {
   private _uniqueAssignees: string[] = []; // Extracted from issues
   private _showCapacityRibbon = true; // Capacity ribbon visible by default in My Work
   // Sort settings (null = no sorting, use natural/hierarchy order)
-  private _sortBy: "id" | "assignee" | "start" | "due" | "status" | null = null;
+  // Earliest due date on top by default — the fire column sorts itself
+  private _sortBy: "id" | "assignee" | "start" | "due" | "status" | null = "due";
   private _sortOrder: "asc" | "desc" = "asc";
   // Lookback period for filtering old data (in years)
   private _lookbackYears: 2 | 5 | 10 | null = 2; // null = no limit
@@ -308,6 +311,8 @@ export class GanttPanel {
       if (savedStatus) this._currentFilter.status = savedStatus;
       this._taskTypeFilter = GanttPanel._globalState.get<string | "any">(FILTER_TASK_TYPE_KEY, "any");
       this._lateOnly = GanttPanel._globalState.get<boolean>(FILTER_LATE_KEY, false);
+      this._sortBy = GanttPanel._globalState.get<"id" | "assignee" | "start" | "due" | "status" | null>(SORT_BY_KEY, "due");
+      this._sortOrder = GanttPanel._globalState.get<"asc" | "desc">(SORT_ORDER_KEY, "asc");
       this._highlightMyIssues = GanttPanel._globalState.get<boolean>(HIGHLIGHT_MINE_KEY, true);
       this._lookbackYears = GanttPanel._globalState.get<2 | 5 | 10 | null>(LOOKBACK_YEARS_KEY, 2);
     }
@@ -1620,6 +1625,8 @@ export class GanttPanel {
         if (message.sortOrder) {
           this._sortOrder = message.sortOrder;
         }
+        GanttPanel._globalState?.update(SORT_BY_KEY, this._sortBy);
+        GanttPanel._globalState?.update(SORT_ORDER_KEY, this._sortOrder);
         this._cachedHierarchy = undefined; // Clear cache to rebuild with new sort
         this._updateContent();
         break;
