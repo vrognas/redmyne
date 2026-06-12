@@ -808,14 +808,17 @@ function generateRegularBar(
     const midY = barY + ctx.barContentHeight / 2;
     const leader = ghostStartX > endX + 4
       ? `<line x1="${endX + 2}" y1="${midY}" x2="${ghostStartX}" y2="${midY}"
-            stroke="var(--vscode-charts-red)" stroke-width="1" stroke-dasharray="2,3" opacity="0.45"/>`
+            stroke="var(--vscode-charts-red)" stroke-width="1" stroke-dasharray="2,3" opacity="0.45" pointer-events="none"/>`
       : "";
-    return `<g class="ghost-projection" pointer-events="none">
+    // Hoverable: the ghost sits inside the issue-bar group, so pointer
+    // events on its fill surface the bar's full tooltip (incl. the
+    // overdue/projection line). Leader + outline stay inert.
+    return `<g class="ghost-projection">
       ${leader}
       <rect x="${ghostStartX}" y="${barY}" width="${ghostW}" height="${ctx.barContentHeight}" rx="6" ry="6"
-            fill="var(--vscode-charts-red)" opacity="0.14"/>
+            fill="var(--vscode-charts-red)" opacity="0.14" pointer-events="all"/>
       <rect x="${ghostStartX}" y="${barY}" width="${ghostW}" height="${ctx.barContentHeight}" rx="6" ry="6"
-            fill="none" stroke="var(--vscode-charts-red)" stroke-width="1" stroke-dasharray="4,3" opacity="0.6"/>
+            fill="none" stroke="var(--vscode-charts-red)" stroke-width="1" stroke-dasharray="4,3" opacity="0.6" pointer-events="none"/>
     </g>`;
   })();
 
