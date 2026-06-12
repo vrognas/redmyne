@@ -1079,6 +1079,11 @@ svg {
 /* Multi-selection is row-scoped (overlay rects in the task list);
    bars carry no selected styling. */
 
+.row-hover-overlay {
+  fill: var(--vscode-list-hoverBackground);
+  pointer-events: none;
+}
+
 .selection-count {
   margin-left: 8px;
   font-size: 11px;

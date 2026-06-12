@@ -92,6 +92,46 @@ export function setupRowInteraction(ctx) {
     selectionOverlays.push(rect);
   });
 
+  // Full-row HOVER band: same shape as the selection overlays, driven by
+  // pointer Y so any part of the row (labels, columns, empty timeline
+  // lane) lights the whole row up like a native list.
+  const hoverOverlays = [];
+  rowWindow.getBodySvgs().forEach(svg => {
+    const rect = document.createElementNS(SVG_NS, 'rect');
+    rect.setAttribute('class', 'row-hover-overlay');
+    rect.setAttribute('x', '0');
+    rect.setAttribute('width', '100%');
+    rect.setAttribute('height', String(barHeight + 2));
+    rect.setAttribute('visibility', 'hidden');
+    rect.setAttribute('pointer-events', 'none');
+    svg.insertBefore(rect, svg.firstChild);
+    hoverOverlays.push(rect);
+  });
+
+  let hoverRowY = null;
+  function setHoverRowY(y) {
+    if (y === hoverRowY) return;
+    hoverRowY = y;
+    if (y === null) {
+      hoverOverlays.forEach(r => r.setAttribute('visibility', 'hidden'));
+    } else {
+      hoverOverlays.forEach(r => {
+        r.setAttribute('y', String(y - 1)); // match row-hit-area band
+        r.setAttribute('visibility', 'visible');
+      });
+    }
+  }
+
+  addDocListener('mousemove', (e) => {
+    const body = e.target.closest && e.target.closest('.gantt-body');
+    if (!body) { setHoverRowY(null); return; }
+    const contentY = e.clientY - body.getBoundingClientRect().top;
+    const index = Math.floor(contentY / barHeight);
+    const key = rowWindow.keyAtIndex(index);
+    setHoverRowY(key ? index * barHeight : null);
+  });
+  addWinListener('blur', () => setHoverRowY(null));
+
   function updateRowSelectionOverlays() {
     const y = activeKey ? rowWindow.getVirtualY(activeKey) : null;
     if (y === null) {
