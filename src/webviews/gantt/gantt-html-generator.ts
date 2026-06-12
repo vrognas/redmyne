@@ -795,16 +795,13 @@ function generateRegularBar(
   // today for overdue bars, or at the bar's end for negative-flexibility
   // bars (the spillover past due). Dashed and non-interactive. No segment
   // when the projection fits inside the bar (positive flexibility).
+  const ghostStartX = ghostDays > 0 ? Math.max(0, Math.max(todayX, endX)) : 0;
+  const ghostEndX = ghostDays > 0
+    ? Math.min(ctx.timelineWidth, dateToX(projectedEndMs, ctx.minDate.getTime(), ctx.maxDate.getTime(), ctx.timelineWidth))
+    : 0;
+  const hasGhost = ghostDays > 0 && ghostEndX > ghostStartX + 1;
   const ghostSegment = (() => {
-    if (ghostDays <= 0) return "";
-    const minMs = ctx.minDate.getTime();
-    const maxMs = ctx.maxDate.getTime();
-    const ghostStartX = Math.max(0, Math.max(todayX, endX));
-    const ghostEndX = Math.min(
-      ctx.timelineWidth,
-      dateToX(projectedEndMs, minMs, maxMs, ctx.timelineWidth)
-    );
-    if (ghostEndX <= ghostStartX + 1) return "";
+    if (!hasGhost) return "";
     const ghostW = Math.max(6, ghostEndX - ghostStartX);
     // Overdue ghosts start at today, often far right of a small past bar —
     // a dotted leader ties the segment back to its owner.
@@ -838,8 +835,13 @@ function generateRegularBar(
     return `<text class="bar-subject" x="${startX - blockerOffset}" y="${barY + ctx.barContentHeight / 2 + 3}" text-anchor="end" fill="var(--vscode-foreground)" font-size="10" font-weight="500" opacity="0.9" pointer-events="none">${escapeHtml(displaySubject)}</text>`;
   })();
 
-  // Generate badges (daysLate > 0 swaps the flexibility pill for "Nd late")
-  const badges = generateBarBadges(issue, startX, endX, barY, flexPct, daysLate, visualDoneRatio, isFallbackProgress, isOverBudget, progressTooltip, blocksTooltip, blockerTooltip, ctx);
+  // Generate badges (daysLate > 0 swaps the flexibility pill for "Nd late").
+  // A spillover ghost is visually a bar extension — the right-side badges
+  // trail it instead of overlapping it (clamped so they stay on-screen).
+  const badgeAnchorX = hasGhost && ghostStartX <= endX + 2
+    ? Math.min(ghostEndX, ctx.timelineWidth - 40)
+    : endX;
+  const badges = generateBarBadges(issue, startX, badgeAnchorX, barY, flexPct, daysLate, visualDoneRatio, isFallbackProgress, isOverBudget, progressTooltip, blocksTooltip, blockerTooltip, ctx);
 
   return `
     <g class="issue-bar gantt-row${isPast ? " bar-past" : ""}${daysLate > 0 ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${issue.isAdHoc ? " bar-adhoc" : ""}${isCriticalPath ? " bar-critical" : ""}" data-issue-id="${issue.id}"
@@ -992,7 +994,8 @@ function generateBarBadges(
   const blockerEndX = startX - 16;
   const blockerColor = blockerCount >= 2 ? "var(--vscode-charts-red)" : "var(--vscode-charts-yellow)";
 
-  const labelX = endX + 16;
+  // Blocks badge hugs the arrow exit (stubs reach ~8px past the bar)
+  const labelX = endX + (showBlocks ? 10 : 16);
 
   // For closed issues, show checkmark
   if (issue.isClosed) {
