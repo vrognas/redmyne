@@ -277,10 +277,10 @@ describe("gantt-html-generator", () => {
 
       const svg = generateIssueBar(row, ctx as never);
 
-      expect(svg).toContain("5d late"); // badge replaces the constant -100%
-      expect(svg).not.toContain(">-100%<"); // no percent badge rendered
+      expect(svg).not.toContain("d late"); // lateness lives in the tooltip
+      expect(svg).not.toContain(">-100%<"); // no constant flex pill either
       expect(svg).toContain("ghost-projection"); // remaining work from today
-      expect(svg).toContain("Overdue 5d");
+      expect(svg).toContain("Overdue 5d"); // tooltip carries the day count
 
       // Negative flexibility (due in the future, work doesn't fit): ghost
       // shows the spillover past the due date, no late badge.

@@ -953,26 +953,21 @@ function generateBarBadges(
     : hasHealth ? healthColor : "var(--vscode-badge-background)";
   const progressBgOpacity = notStarted ? "0.3" : hasHealth ? "0.4" : "0.9";
 
-  // Flexibility badge — attention-worthy buffers only (<100%). Overdue
-  // tasks swap it for "Nd late": once the due date passes, the percentage
-  // is a constant -100% and says nothing.
+  // Flexibility badge — attention-worthy buffers only (<100%), and not
+  // for late tasks: late is late (red pill, red border, ghost), the day
+  // count lives in the hover tooltip.
   const showFlex = !isLate && flexPct !== null && flexPct < 100 && !issue.isClosed;
-  const flexLabel = isLate ? `${daysLate}d late`
-    : showFlex ? (flexPct > 0 ? `+${flexPct}%` : `${flexPct}%`)
-    : "";
-  const flexBadgeW = isLate ? (daysLate >= 100 ? 56 : daysLate >= 10 ? 50 : 44)
-    : showFlex ? (Math.abs(flexPct!) >= 100 ? 38 : Math.abs(flexPct!) >= 10 ? 32 : 26)
+  const flexLabel = showFlex ? (flexPct! > 0 ? `+${flexPct}%` : `${flexPct}%`) : "";
+  const flexBadgeW = showFlex
+    ? (Math.abs(flexPct!) >= 100 ? 38 : Math.abs(flexPct!) >= 10 ? 32 : 26)
     : 0;
-  const flexColor = isLate ? "var(--vscode-charts-red)"
-    : showFlex
-      ? (flexPct! >= 50 ? "var(--vscode-charts-green)"
-        : flexPct! > 0 ? "var(--vscode-charts-yellow)"
-        : "var(--vscode-charts-red)")
-      : "";
-  const showFlexSlot = isLate || showFlex;
-  const flexTooltip = isLate
-    ? `Overdue by ${daysLate} day${daysLate === 1 ? "" : "s"} (due ${issue.due_date ?? "?"})`
-    : showFlex ? flexibilityLine(flexPct) ?? "" : "";
+  const flexColor = showFlex
+    ? (flexPct! >= 50 ? "var(--vscode-charts-green)"
+      : flexPct! > 0 ? "var(--vscode-charts-yellow)"
+      : "var(--vscode-charts-red)")
+    : "";
+  const showFlexSlot = showFlex;
+  const flexTooltip = showFlex ? flexibilityLine(flexPct) ?? "" : "";
 
   // Blocks badge (downstream - at END of bar). Orange even at count 1 —
   // descriptionForeground over a 0.15 fill was nearly invisible.
@@ -1049,7 +1044,7 @@ function generateBarBadges(
             fill="${flexColor}" opacity="0.4"/>
       <rect x="${flexBadgeX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${flexBadgeW}" height="12" fill="transparent"/>
       <text class="flex-badge" x="${flexBadgeCenterX}" y="${ctx.barHeight / 2 + 4}"
-            text-anchor="middle" fill="var(--vscode-foreground)" font-size="10" font-weight="${isLate ? "600" : "500"}">${flexLabel}</text>
+            text-anchor="middle" fill="var(--vscode-foreground)" font-size="10" font-weight="500">${flexLabel}</text>
     </g>` : ""}
     ${showBlocks ? `<g class="blocks-badge-group" style="cursor: pointer;">
       <title>${escapeAttr(blocksTooltip)}</title>
