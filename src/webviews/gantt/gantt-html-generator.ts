@@ -864,8 +864,8 @@ function generateRegularBar(
         `}
         ${hasPastPortion ? `<rect class="past-overlay" x="${startX}" y="${barY}" width="${pastWidth}" height="${ctx.barContentHeight}" fill="url(#past-stripes)"/>` : ""}
         ${visualDoneRatio > 0 && visualDoneRatio < 100 ? `
-          <rect class="progress-unfilled" x="${startX + doneWidth}" y="${barY}" width="${width - doneWidth}" height="${ctx.barContentHeight}" fill="black" opacity="0.3"/>
-          <line class="progress-divider" x1="${startX + doneWidth}" y1="${barY + 1}" x2="${startX + doneWidth}" y2="${barY + ctx.barContentHeight - 1}" stroke="white" stroke-width="2" opacity="0.6"/>
+          <rect class="progress-unfilled" x="${startX + doneWidth}" y="${barY}" width="${width - doneWidth}" height="${ctx.barContentHeight}" fill="var(--vscode-editor-background)" opacity="0.35"/>
+          <line class="progress-divider" x1="${startX + doneWidth}" y1="${barY + 1}" x2="${startX + doneWidth}" y2="${barY + ctx.barContentHeight - 1}" stroke="var(--vscode-editor-background)" stroke-width="2" opacity="0.8"/>
         ` : ""}
       </g>
       <rect class="bar-outline cursor-move" x="${startX}" y="${barY}" width="${width}" height="${ctx.barContentHeight}" fill="none" stroke="var(--vscode-panel-border)" stroke-width="1" rx="6" ry="6" pointer-events="all"/>
