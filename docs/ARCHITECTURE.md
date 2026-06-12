@@ -72,9 +72,18 @@ src/
   - `gantt-render-types.ts`: shared interfaces
   - `row-window.js`: windowed mounting + data-computed layers (webview)
   - `row-window-utils.js`: pure visible-list/band/span/range functions
-  - `arrow-svg.js`: dependency-arrow path builder (webview)
+  - `arrow-svg.js`: dependency-arrow path builder (webview). `computeArrowGeometry`
+    is the ONLY arrow router — initial render and live drag updates both call it
+    (a drag-local copy of the routing diverged once; don't reintroduce one)
   - `lookup-maps.js`: mounted-element lookup maps, rebuilt per refresh (webview)
-  - `gantt-row-interaction.js`: collapse toggles, row selection, keyboard nav (webview)
+  - `gantt-row-interaction.js`: collapse toggles, row selection, keyboard nav,
+    hover band, and the capture-phase ghost guard — ghost projections are inert
+    hover surfaces; ONE document-capture listener stops all their mouse events
+    and row-selects on plain press (webview)
+- Lateness/remaining-work judgments (late chip/filter, ghost projections, bar
+  badges, arrow health, flexibility) all call `remainingHours()` in
+  `src/utilities/remaining-work.ts` — the single owner of the
+  internal-estimate-first / consumed-budget heuristic. Never inline a copy.
 
 ### Timer (`src/timer/`)
 - State machine: idle → working → paused → logging → break

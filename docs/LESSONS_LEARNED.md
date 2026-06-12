@@ -972,3 +972,26 @@ constructor(getServer?: () => RedmineServer | undefined) {
 1. **Getter functions for async-initialized resources**: Use `() => resource` not `resource` for late-binding
 2. **Webview serializers run early**: May execute before extension fully initializes
 3. **Consistent pattern across panels**: TimeSheetPanel and GanttPanel now both use getter pattern
+
+## Date Frame Mixing (v4.30.0)
+
+**Problem**: `projectDaysForHours` stepped a UTC-midnight-anchored date with
+`setUTCDate` but read the weekday with local `getDay()` — every schedule
+lookup shifted one weekday early for hosts west of UTC.
+
+**Lesson**: A `Date` has no frame; the CODE picks one per read/write. Pick
+the anchor frame once (here: ctx.today is UTC-midnight) and use only that
+frame's accessors in the same walk. Mixed `getDay()`/`setUTCDate` in one
+loop is always a bug waiting for a timezone.
+
+## One Owner for Scattered Event Contracts (v4.30.0)
+
+**Problem**: "Ghost bars must be inert" was enforced as exclusions inside
+three unrelated handlers (drag click, row-interaction mousedown, nothing
+for dblclick) — each new handler needed to remember the rule, and dblclick
+didn't.
+
+**Lesson**: An element-level interaction contract ("X never does Y") wants
+ONE capture-phase document listener that stops propagation, not N
+exclusions in bubble handlers. Capture runs first regardless of
+registration order, so downstream handlers need zero knowledge of the rule.

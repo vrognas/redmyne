@@ -7,15 +7,31 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-## [4.29.2]
+## [4.30.0]
+
+### Added
+
+- **Gantt ghost projections** — open tasks projected to run past today (overdue) or past their due date (negative flexibility) grow a translucent red ghost from the bar end to the projected finish, walked day-by-day through the weekly schedule. Internal estimates win over the budget heuristic; hovering a ghost shows the full bar tooltip; a leader line ties detached ghosts to their bar
+- **Late chip + late-only filter** — a toolbar chip counts late issues (past due, open, real work remaining — a task with its budget consumed and an unmaintained done ratio counts as done, not late); clicking it filters the board to just those
+- **My-issues highlight** — issues assigned to you get theme-blue labels; menu toggle, on by default
+- **Click-pinned bar highlight** — clicking a bar pins its highlight (bar and its dependency arrows stay lit); Escape or re-click clears
+- **Full-row hover band** — hovering anywhere on a row (labels, columns, empty timeline lane) lights the whole row like a native list
+- **Task names ride left of the bar** as plain text, clear of arrow anchors and the waiting badge
+- **Default sort: due date ascending** (persisted; earliest due on top)
 
 ### Changed
 
+- **One health color language end-to-end**: bar fill = schedule health (blue done, green on-track, yellow at-risk, red overbooked; >100% progress renders the real over-budget percent in red); borders = states (red overdue, orange pulse projected-late, purple dotted ad-hoc, faded dashed external); progress pills tint by the same health, grey 0% = not started; dependency arrows turn green when the source is on schedule, red when it's late or projected late. All theme-aware
+- **Badge layout**: waiting (⏳) hugs the bar's left edge, blocking (⛔) its right, adjacent to the arrow anchors; the "Nd late" pill is gone — late is late, hover for the day count
+- **Arrow routing**: long horizontals travel the gutter between rows (crossing no bars or labels); near-aligned bars get a vertical arrival onto the bar edge instead of a sub-radius curl
+- **Loading skeleton** mirrors the real chrome (header, gridlines, shimmer rows) instead of a bare message
 - **Gantt declutter**: the flexibility badge no longer trails every bar as a bare green/red percent pill — a self-explanatory line (`+N% schedule buffer` / `-N% — remaining work exceeds time left`) now rides the bar, progress-badge, and row-label hover tooltips. Dependency arrows recede to 35% opacity at rest and light up when their bar is hovered, when hovered directly, when selected, and in focus mode. The `?` help legend now describes the badges that actually render (it listed days-of-slack and milestone badges that don't exist)
 
 ### Fixed
 
 - **Gantt lookback now clamps the timeline axis** — the selector only limited data fetching, so one ancient still-open issue stretched the axis a decade into the past
+- **One lateness owner** — flexibility scores, the late chip/filter, ghost projections, bar badges, and arrow health each had a hand-mirrored copy of "how much work is left" and they disagreed (a finished-but-open task could show a green arrow, a red border, and a 50d-late ghost at once). All judgments now go through `remainingHours()`
+- Review of the UX pass fixed 13 further findings: drag-time arrows used a stale copy of the router and snapped to a different shape mid-drag (one shared router now; the dragged bar's ghost and name hide while dragging); ghost-bar inertness is one capture-phase guard (double-click could still enter dependency-focus mode through a ghost); two-row relates arrows kinked onto a bar border; ghost projections read the weekly schedule one weekday early west of UTC; the hover band stuck after pointer-leave/scroll/collapse and forced layout on every mousemove; the late-filter toggle jumped the viewport to the top
 
 Whole-codebase deep review (142 verified findings; report in `docs/reviews/2026-06-11-deep-review.md`). This release fixes the 2 critical and 29 high-severity bugs:
 
