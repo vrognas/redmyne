@@ -40,15 +40,17 @@ export const RELATION_STYLES = {
 const SCHEDULING_TYPES = ["blocks", "precedes", "finish_to_start", "start_to_start", "finish_to_finish", "start_to_finish"];
 
 /**
- * Build one dependency arrow.
+ * Pure geometry for one dependency arrow: routed path + arrowhead chevron.
+ * Shared by the initial render (buildArrowSvg) and the live drag updater
+ * in gantt-drag.js — one router, so dragged arrows can't diverge from
+ * rendered ones.
  * @param {{startX: number, endX: number, y: number}} source - bar x-range + row-center y
  * @param {{startX: number, endX: number, y: number}} target
- * @param {{relationId: number, fromId: number, toId: number, type: string}} rel
+ * @param {string} relType
  * @param {number} barHeight
- * @returns {{svg: string, hasDash: boolean}}
+ * @returns {{path: string, arrowHead: string, isScheduling: boolean}}
  */
-export function buildArrowSvg(source, target, rel, barHeight) {
-  const style = RELATION_STYLES[rel.type] || RELATION_STYLES.relates;
+export function computeArrowGeometry(source, target, relType, barHeight) {
   const arrowSize = 4;
   const sameRow = Math.abs(source.y - target.y) < 5;
   // Long horizontal runs travel in the GUTTER between rows (row boundaries
@@ -58,12 +60,12 @@ export function buildArrowSvg(source, target, rel, barHeight) {
 
   // Temporal relations: end → start (or based on type for extended)
   // Non-temporal relations (relates, duplicates, copied_to): center → center
-  const isScheduling = SCHEDULING_TYPES.includes(rel.type);
+  const isScheduling = SCHEDULING_TYPES.includes(relType);
 
   // Arrow anchor points: fromStart/toEnd determine which side of bars to connect
   // SS = start→start, SF = start→finish, FS = finish→start, FF = finish→finish
-  const fromStart = rel.type === "start_to_start" || rel.type === "start_to_finish";
-  const toEnd = rel.type === "finish_to_finish" || rel.type === "start_to_finish";
+  const fromStart = relType === "start_to_start" || relType === "start_to_finish";
+  const toEnd = relType === "finish_to_finish" || relType === "start_to_finish";
 
   let x1, y1, x2, y2;
   let path = "";
@@ -126,7 +128,7 @@ export function buildArrowSvg(source, target, rel, barHeight) {
   // the arrowhead must point the way the path actually arrives. A
   // vertical arrival (near-aligned anchors land on the bar's top/bottom
   // edge) sets verticalArrivalY instead.
-  let arrivalX = -approachDir;
+  const arrivalX = -approachDir;
   let verticalArrival = false;
   let verticalArrivalY = 0;
 
@@ -212,6 +214,20 @@ export function buildArrowSvg(source, target, rel, barHeight) {
     }
   }
 
+  return { path, arrowHead, isScheduling };
+}
+
+/**
+ * Build one dependency arrow.
+ * @param {{startX: number, endX: number, y: number}} source - bar x-range + row-center y
+ * @param {{startX: number, endX: number, y: number}} target
+ * @param {{relationId: number, fromId: number, toId: number, type: string}} rel
+ * @param {number} barHeight
+ * @returns {{svg: string, hasDash: boolean}}
+ */
+export function buildArrowSvg(source, target, rel, barHeight) {
+  const style = RELATION_STYLES[rel.type] || RELATION_STYLES.relates;
+  const { path, arrowHead, isScheduling } = computeArrowGeometry(source, target, rel.type, barHeight);
   const dashAttr = style.dash ? `stroke-dasharray="${style.dash}"` : "";
 
   const arrowTooltip = `#${rel.fromId} ${style.label} #${rel.toId}\n${style.tip}\n(right-click to delete)`;

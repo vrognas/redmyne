@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildArrowSvg, buildArrowsMarkup } from "../../../src/webviews/gantt/arrow-svg.js";
+import { buildArrowSvg, buildArrowsMarkup, computeArrowGeometry } from "../../../src/webviews/gantt/arrow-svg.js";
 
 const BAR = 22;
 const pos = (startX: number, endX: number, y: number) => ({ startX, endX, y });
@@ -61,6 +61,28 @@ describe("arrow-svg", () => {
     );
     expect(svg).toContain("V 46");
     expect(svg).toContain("L 110 46"); // downward head at the anchor x
+  });
+
+  it("computeArrowGeometry returns the exact path buildArrowSvg embeds", () => {
+    // The drag updater calls computeArrowGeometry directly — parity with
+    // the rendered markup is the whole point of the shared extraction.
+    const source = pos(0, 100, 11);
+    const target = pos(300, 400, 99);
+    const { path, arrowHead, isScheduling } = computeArrowGeometry(source, target, "blocks", BAR);
+    const { svg } = buildArrowSvg(
+      source, target, { relationId: 1, fromId: 1, toId: 2, type: "blocks" }, BAR
+    );
+    expect(isScheduling).toBe(true);
+    expect(svg).toContain(`d="${path}"`);
+    expect(svg).toContain(`d="${arrowHead}"`);
+  });
+
+  it("computeArrowGeometry snaps relates midpoints to the gutter", () => {
+    // Old drag-time router used the raw row midpoint (V 51 here); the
+    // shared router snaps the long horizontal to a row boundary.
+    const { path } = computeArrowGeometry(pos(0, 100, 11), pos(300, 400, 99), "relates", BAR);
+    expect(path).toContain("V 62"); // gutter 66 (3 × 22) minus corner radius
+    expect(path).not.toContain("V 51");
   });
 
   it("buildArrowsMarkup skips null endpoints and sorts solid before dashed", () => {

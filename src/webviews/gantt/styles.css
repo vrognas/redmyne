@@ -1216,6 +1216,14 @@ svg {
   opacity: 0.5;
 }
 
+/* The drag movers update bar visuals live but not the ghost projection
+   or the subject text — hide both rather than show stale geometry
+   detached from the moving bar. */
+.issue-bar.dragging .ghost-projection,
+.issue-bar.dragging .bar-subject {
+  display: none;
+}
+
 .issue-bar.linking-source .bar-outline {
   stroke-width: 3;
   stroke: var(--vscode-focusBorder);
