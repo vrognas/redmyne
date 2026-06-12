@@ -254,7 +254,7 @@ export function generateToolbar(ctx: GanttToolbarContext): string {
             <div class="help-section">
               <div class="help-title">Bar borders — special states</div>
               <span class="help-item"><span style="color:var(--vscode-charts-red)">▢</span> overdue</span>
-              <span class="help-item"><span style="color:var(--vscode-charts-orange)">▢</span> pulsing = critical path</span>
+              <span class="help-item"><span style="color:var(--vscode-charts-orange)">▢</span> pulsing = projected late</span>
               <span class="help-item"><span style="color:var(--vscode-charts-purple)">⬚</span> dotted = ad-hoc pool</span>
               <span class="help-item">faded dashed = external dependency</span>
               <span class="help-item">fading right edge = no due date</span>

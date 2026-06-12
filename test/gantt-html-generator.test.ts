@@ -281,6 +281,23 @@ describe("gantt-html-generator", () => {
       expect(svg).not.toContain(">-100%<"); // no constant flex pill either
       expect(svg).toContain("ghost-projection"); // remaining work from today
       expect(svg).toContain("Overdue 5d"); // tooltip carries the day count
+      expect(svg).not.toContain("bar-critical"); // overdue owns the signal
+
+      // No-estimate overdue: unknowable remaining work is still LATE
+      // (red border + tooltip) — it must agree with the late chip.
+      const noEstimate: GanttRow = {
+        ...row,
+        issue: {
+          ...(row.issue as object),
+          estimated_hours: null,
+          spent_hours: 0,
+          flexibilityPercent: null,
+        } as never,
+      };
+      const noEstSvg = generateIssueBar(noEstimate, ctx as never);
+      expect(noEstSvg).toContain("bar-overdue");
+      expect(noEstSvg).toContain("Overdue 5d");
+      expect(noEstSvg).not.toContain("ghost-projection"); // nothing to project
 
       // Negative flexibility (due in the future, work doesn't fit): ghost
       // shows the spillover past the due date, no late badge.
@@ -670,6 +687,10 @@ describe("gantt-html-generator", () => {
     it("buildArrowsPayload filters by visible relation types", () => {
       const arrows = buildArrowsPayload([projectRow, issueRow], new Set(["blocks"]));
       expect(arrows).toEqual([{ relationId: 9, fromId: 456, toId: 99, type: "blocks", risk: false }]);
+
+      // risk rides the panel's unified lateness set
+      const risky = buildArrowsPayload([projectRow, issueRow], new Set(["blocks"]), new Set([456]));
+      expect(risky[0]!.risk).toBe(true);
     });
   });
 

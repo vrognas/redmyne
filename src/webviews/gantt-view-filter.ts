@@ -2,6 +2,7 @@ import { Issue } from "../redmine/models/issue";
 import { IssueFilter } from "../redmine/models/common";
 import { RedmineProject } from "../redmine/redmine-project";
 import { isIssueClosed } from "../utilities/issue-status";
+import { remainingHours } from "../utilities/remaining-work";
 import type { InternalEstimates } from "../utilities/internal-estimates";
 
 /**
@@ -14,23 +15,20 @@ import type { InternalEstimates } from "../utilities/internal-estimates";
 export function isLateIssue(
   issue: Issue,
   internalEstimates: InternalEstimates,
-  todayStr: string
+  todayStr: string,
+  contributedHours = 0
 ): boolean {
   if (!issue.due_date || issue.due_date >= todayStr) return false;
   if (isIssueClosed(issue)) return false;
-  const doneRatio = issue.done_ratio ?? 0;
-  if (doneRatio >= 100) return false;
+  if ((issue.done_ratio ?? 0) >= 100) return false;
 
-  const internal = internalEstimates.get(issue.id);
-  const est = issue.estimated_hours ?? 0;
-  if (internal === undefined && est <= 0) return true;
-
-  const spent = issue.spent_hours ?? 0;
-  const remaining = internal !== undefined
-    ? internal.hoursRemaining
-    : spent >= est
-      ? (doneRatio > 0 ? est * (1 - doneRatio / 100) : 0)
-      : est - spent;
+  const remaining = remainingHours({
+    estimatedHours: issue.estimated_hours,
+    spentHours: (issue.spent_hours ?? 0) + contributedHours,
+    doneRatio: issue.done_ratio,
+    internalHoursRemaining: internalEstimates.get(issue.id)?.hoursRemaining,
+  });
+  if (remaining === null) return true; // past due and open is all we know
   return remaining > 0;
 }
 

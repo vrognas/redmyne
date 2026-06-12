@@ -9,6 +9,7 @@ import { escapeAttr, escapeHtml } from "../gantt-html-escape";
 import { parseLocalDate, formatLocalDate } from "../../utilities/date-utils";
 import type { WeeklySchedule } from "../../utilities/flexibility-calculator";
 import { dateToX, endExclusiveX } from "./gantt-coords";
+import { remainingHours } from "../../utilities/remaining-work";
 
 // ============================================================================
 // Helper Functions (exported for testing)
@@ -653,7 +654,11 @@ function generateRegularBar(
     isFallbackProgress = true;
   }
 
-  const doneWidth = (visualDoneRatio / 100) * width;
+  // Bar fill uses the maintained done_ratio when present (an over-budget
+  // 40%-done task must not render fully filled just because its time
+  // ratio is 113%); the time-derived fallback clamps at 100.
+  const fillRatio = doneRatio > 0 ? doneRatio : Math.min(100, visualDoneRatio);
+  const doneWidth = (fillRatio / 100) * width;
   const handleWidth = 14;
 
   // Past portion
@@ -667,7 +672,10 @@ function generateRegularBar(
   const effectiveStatus = issue.isClosed ? "completed" : (issue.status ?? "unknown");
   const statusDesc = ctx.getStatusDescription(effectiveStatus);
   const flexPct = issue.flexibilityPercent;
-  const isCriticalPath = flexPct !== null && flexPct <= 0 && !issue.isClosed;
+  // "Projected late": no remaining buffer but not yet past due — once
+  // overdue, the red border/ghost own the signal (every overdue task has
+  // remaining flex -100, so without the gate the whole board pulses).
+  const isCriticalPath = flexPct !== null && flexPct <= 0 && !issue.isClosed && !isOverdue;
 
   // Context-sensitive info from callbacks
   const issueInternalEstimate = ctx.getInternalEstimate(issue.id);
@@ -685,16 +693,20 @@ function generateRegularBar(
   let ghostHours = 0;
   let effectivelyDone = false;
   if (!issue.isClosed && doneRatio < 100) {
-    const estHours = issue.estimated_hours ?? 0;
-    const spentH = issue.spent_hours ?? 0;
-    const budgetRemaining = estHours > 0
-      ? (spentH >= estHours
-          ? (doneRatio > 0 ? estHours * (1 - doneRatio / 100) : 0)
-          : estHours - spentH)
-      : 0;
-    ghostHours = issueInternalEstimate?.hoursRemaining ?? budgetRemaining;
-    effectivelyDone =
-      (issueInternalEstimate !== null || estHours > 0) && ghostHours <= 0;
+    // Shared owner of the heuristic; effective spent includes ad-hoc
+    // contributions (the over-budget badge above uses the same figure).
+    // null = unknowable (no estimate): NOT effectively done — the task is
+    // still late, there's just nothing to project a ghost from. (The old
+    // `!== null` check met getInternalEstimate's `undefined` and silently
+    // marked every unestimated overdue task done.)
+    const remaining = remainingHours({
+      estimatedHours: issue.estimated_hours,
+      spentHours: effectiveSpentHours,
+      doneRatio,
+      internalHoursRemaining: issueInternalEstimate?.hoursRemaining,
+    });
+    ghostHours = remaining ?? 0;
+    effectivelyDone = remaining !== null && remaining <= 0;
   }
   const daysLate = isOverdue && !effectivelyDone
     ? Math.max(1, Math.round((ctx.today.getTime() - dueMs) / 86400000))
@@ -713,7 +725,7 @@ function generateRegularBar(
     issuePrecedence ? "⏫ PRECEDENCE PRIORITY" : null,
     issue.isAdHoc ? "🎲 AD-HOC BUDGET POOL" : null,
     issue.isExternal ? "⚡ EXTERNAL DEPENDENCY" : null,
-    isCriticalPath ? "🔶 CRITICAL PATH - no schedule flexibility" : null,
+    isCriticalPath ? "🔶 PROJECTED LATE — no schedule buffer left" : null,
     statusDesc,
     `#${issue.id} ${escapedSubject}`,
     `Project: ${escapedProject}`,
@@ -870,7 +882,7 @@ function generateRegularBar(
           <rect class="bar-main" x="${startX}" y="${barY}" width="${width}" height="${ctx.barContentHeight}" fill="${color}" opacity="${(0.85 * fillOpacity).toFixed(2)}" filter="url(#barShadow)"/>
         `}
         ${hasPastPortion ? `<rect class="past-overlay" x="${startX}" y="${barY}" width="${pastWidth}" height="${ctx.barContentHeight}" fill="url(#past-stripes)"/>` : ""}
-        ${visualDoneRatio > 0 && visualDoneRatio < 100 ? `
+        ${fillRatio > 0 && fillRatio < 100 ? `
           <rect class="progress-unfilled" x="${startX + doneWidth}" y="${barY}" width="${width - doneWidth}" height="${ctx.barContentHeight}" fill="var(--vscode-editor-background)" opacity="0.35"/>
           <line class="progress-divider" x1="${startX + doneWidth}" y1="${barY + 1}" x2="${startX + doneWidth}" y2="${barY + ctx.barContentHeight - 1}" stroke="var(--vscode-editor-background)" stroke-width="2" opacity="0.8"/>
         ` : ""}
@@ -949,7 +961,7 @@ function generateBarBadges(
     : flexPct !== null && flexPct > 100
       ? "var(--vscode-charts-green)"
       : "var(--vscode-charts-orange)";
-  const notStarted = visualDoneRatio === 0 && !isOverBudget;
+  const notStarted = visualDoneRatio === 0 && !isOverBudget && !isLate;
   const progressColor = notStarted || hasHealth ? "var(--vscode-foreground)" : "var(--vscode-badge-foreground)";
   const progressBg = notStarted
     ? "var(--vscode-descriptionForeground)"
@@ -1139,18 +1151,17 @@ export function buildRowsPayload(
  */
 export function buildArrowsPayload(
   rows: GanttRow[],
-  visibleRelTypes: ReadonlySet<string>
+  visibleRelTypes: ReadonlySet<string>,
+  riskIssueIds: ReadonlySet<number> = new Set()
 ): GanttArrowPayload[] {
   return rows
     .filter((row): row is GanttRow & { issue: GanttIssue } => row.type === "issue" && !!row.issue)
     .flatMap((row) => {
       // A late / projected-late source endangers its dependents: its
-      // outgoing arrows render red. Remaining flexibility < 0 covers both
-      // (overdue forces -100; essentially-done stays positive).
-      const risk =
-        !row.issue.isClosed &&
-        row.issue.flexibilityPercent !== null &&
-        row.issue.flexibilityPercent < 0;
+      // outgoing arrows render red. The panel computes the risk set with
+      // the SAME lateness rule as the chip/badges (internal estimates and
+      // unestimated-overdue included) so arrows can't contradict the bars.
+      const risk = riskIssueIds.has(row.issue.id);
       return row.issue.relations
         .filter((rel) => visibleRelTypes.has(rel.type))
         .map((rel) => ({ relationId: rel.id, fromId: row.issue.id, toId: rel.targetId, type: rel.type, risk }));

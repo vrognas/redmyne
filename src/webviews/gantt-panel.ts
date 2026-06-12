@@ -37,6 +37,7 @@ import { buildRowsPayload, buildArrowsPayload } from "./gantt/gantt-html-generat
 import type { GanttRenderContext, GanttRowPayload, GanttArrowPayload } from "./gantt/gantt-render-types";
 import { generateHeader, type GanttToolbarContext } from "./gantt/gantt-toolbar-generator";
 import { deriveAssigneeState, filterIssuesForView, isLateIssue } from "./gantt-view-filter";
+import { remainingHours } from "../utilities/remaining-work";
 import { deriveTaskTypes, filterIssuesByTaskType } from "../utilities/issue-task-type-filter";
 import { dateToX, endExclusiveX, clampMinDateToLookback } from "./gantt/gantt-coords";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
@@ -2080,13 +2081,37 @@ export class GanttPanel {
     const lateEstimates: InternalEstimates = GanttPanel._globalState
       ? getInternalEstimates(GanttPanel._globalState)
       : new Map();
-    const lateCount = taskTypeFiltered.reduce(
-      (n, i) => n + (isLateIssue(i, lateEstimates, lateTodayStr) ? 1 : 0),
-      0
+    // Spent includes ad-hoc contributions — same figure the bar badges use
+    const contributedFor = (id: number) =>
+      this._contributionSources?.get(id)?.reduce((sum, c) => sum + c.hours, 0) ?? 0;
+    // Parent rollup rows never render late chrome (generateParentBar) —
+    // counting them made the chip disagree with the visible board.
+    const lateParentIds = new Set(
+      taskTypeFiltered.map((i) => i.parent?.id).filter((v): v is number => v !== undefined)
     );
+    const isLateForView = (i: Issue) =>
+      !lateParentIds.has(i.id) && isLateIssue(i, lateEstimates, lateTodayStr, contributedFor(i.id));
+    const lateCount = taskTypeFiltered.reduce((n, i) => n + (isLateForView(i) ? 1 : 0), 0);
     const filteredIssues = this._lateOnly
-      ? taskTypeFiltered.filter((i) => isLateIssue(i, lateEstimates, lateTodayStr))
+      ? taskTypeFiltered.filter(isLateForView)
       : taskTypeFiltered;
+
+    // Arrow health uses the SAME lateness rule plus projected-late from
+    // flexibility — except when remaining work is known to be 0 (internal
+    // estimate), which overrides a stale negative flexibility score.
+    const arrowRiskIds = new Set<number>();
+    for (const i of taskTypeFiltered) {
+      const rem = remainingHours({
+        estimatedHours: i.estimated_hours,
+        spentHours: (i.spent_hours ?? 0) + contributedFor(i.id),
+        doneRatio: i.done_ratio,
+        internalHoursRemaining: lateEstimates.get(i.id)?.hoursRemaining,
+      });
+      const projectedLate = rem !== 0 && (this._flexibilityCache.get(i.id)?.remaining ?? 0) < 0;
+      if (isLateIssue(i, lateEstimates, lateTodayStr, contributedFor(i.id)) || projectedLate) {
+        arrowRiskIds.add(i.id);
+      }
+    }
 
     // Sort issues before building hierarchy (null = no sorting, keep natural order)
     const sortedIssues = this._sortBy === null ? [...filteredIssues] : [...filteredIssues].sort((a, b) => {
@@ -2440,7 +2465,7 @@ export class GanttPanel {
     // Row fragments + relation data for the webview row-window (assembled
     // beside the fragment generators — see gantt-html-generator.ts).
     const rowsPayload = buildRowsPayload(filteredRows, renderContext);
-    const arrowsPayload = buildArrowsPayload(rows, this._visibleRelationTypes);
+    const arrowsPayload = buildArrowsPayload(rows, this._visibleRelationTypes, arrowRiskIds);
 
     // Generate milestone markers (diamond shapes with vertical dashed lines)
     const milestoneMarkers = this._versions
