@@ -327,10 +327,12 @@ export function setupRowInteraction(ctx) {
   // ---------- click-to-select for non-label targets ----------
 
   addDocListener('mousedown', (e) => {
-    // Pressing a ghost must not natively focus the tabindex'd bar group:
-    // the browser scrolls the group's bbox (bar + ghost, often far apart)
-    // into view, yanking the viewport. Selection still happens on click.
-    if (e.target.closest('.ghost-projection')) e.preventDefault();
+    // Pressing a ghost must not scroll: preventDefault stops the native
+    // focus of the tabindex'd bar group (whose bar+ghost bbox is wide),
+    // and the selection below skips label.focus() too — Chromium does
+    // not reliably honor preventScroll when focusing SVG elements.
+    const fromGhost = !!e.target.closest('.ghost-projection');
+    if (fromGhost) e.preventDefault();
     // Leave modifier gestures to the multi-select handler
     if (e.ctrlKey || e.metaKey || e.shiftKey) return;
     if (!e.target.closest('#ganttScroll')) return;
@@ -355,8 +357,10 @@ export function setupRowInteraction(ctx) {
       key = rowWindow.keyAtIndex(Math.floor(contentY / barHeight));
       if (!key) return;
     }
-    // Focus the row's label (same as a label click) so arrow keys navigate
-    setActiveKey(key);
+    // Focus the row's label (same as a label click) so arrow keys
+    // navigate. Ghost clicks skip the focus — the unfocused-keydown
+    // fallback keeps arrow keys working without any scroll risk.
+    setActiveKey(key, fromGhost ? { focus: false } : undefined);
   });
 
   // Restore selection from the previous render. Collapse-hidden keys restore
