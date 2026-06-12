@@ -2012,7 +2012,7 @@ button:focus {
 }
 
 .rel-line-scheduling {
-  background: var(--vscode-charts-blue);
+  background: var(--vscode-foreground);
 }
 
 .rel-line-informational {
@@ -2031,13 +2031,14 @@ button:focus {
   stroke-width: 2;
 }
 
-/* Scheduling - all scheduling relation types use blue */
+/* Scheduling - neutral foreground (blue now belongs to done bars; the
+   0.35 rest opacity keeps these quiet until hover/selection) */
 .rel-precedes .arrow-line,
 .rel-finish_to_start .arrow-line,
 .rel-start_to_start .arrow-line,
 .rel-finish_to_finish .arrow-line,
 .rel-start_to_finish .arrow-line {
-  stroke: var(--vscode-charts-blue);
+  stroke: var(--vscode-foreground);
 }
 
 .rel-precedes .arrow-head,
@@ -2045,7 +2046,7 @@ button:focus {
 .rel-start_to_start .arrow-head,
 .rel-finish_to_finish .arrow-head,
 .rel-start_to_finish .arrow-head {
-  stroke: var(--vscode-charts-blue);
+  stroke: var(--vscode-foreground);
   stroke-width: 2;
 }
 
