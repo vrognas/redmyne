@@ -85,6 +85,15 @@ describe("arrow-svg", () => {
     expect(path).not.toContain("V 51");
   });
 
+  it("relates arrows two rows apart keep the raw midline off the borders", () => {
+    // source row 0 (center 11) → target row 2 (center 55): borders are
+    // y1=22, y2=44 and the gutter snap of the midpoint (33 → 44) lands
+    // exactly on the target's top border, degenerating the approach.
+    const { path } = computeArrowGeometry(pos(0, 100, 11), pos(150, 250, 55), "relates", BAR);
+    expect(path).toContain("V 29"); // raw midline 33 minus corner radius
+    expect(path).not.toContain("V 40"); // snapped 44 minus corner radius
+  });
+
   it("buildArrowsMarkup skips null endpoints and sorts solid before dashed", () => {
     const positions = new Map([
       [1, pos(0, 100, 11)],

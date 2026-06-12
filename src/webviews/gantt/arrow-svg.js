@@ -105,7 +105,14 @@ export function computeArrowGeometry(source, target, relType, barHeight) {
       y1 = goingDown ? source.y + barHeight / 2 : source.y - barHeight / 2; // bottom or top border
       x2 = centerX2;
       y2 = goingDown ? target.y - barHeight / 2 : target.y + barHeight / 2; // top or bottom border
-      const midY = snapGutter((source.y + target.y) / 2);
+      // A snapped midline that lands on (or hugs) either border degenerates
+      // the path — backwards verticals, sub-radius stubs. Two rows apart
+      // the snap hits the target's border exactly; keep the raw midpoint.
+      const rawMidY = (source.y + target.y) / 2;
+      const snappedMidY = snapGutter(rawMidY);
+      const midY = Math.abs(snappedMidY - y1) < 2 * r || Math.abs(snappedMidY - y2) < 2 * r
+        ? rawMidY
+        : snappedMidY;
       path = `M ${x1} ${y1} V ${midY + (goingDown ? -r : r)}` +
         ` q 0 ${goingDown ? r : -r} ${x2 > x1 ? r : -r} ${goingDown ? r : -r}` +
         ` H ${x2 + (x2 > x1 ? -r : r)}` +
