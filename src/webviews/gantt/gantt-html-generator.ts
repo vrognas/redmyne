@@ -831,7 +831,10 @@ function generateRegularBar(
     const displaySubject = issue.subject.length > maxChars
       ? issue.subject.substring(0, maxChars - 1) + "…"
       : issue.subject;
-    const blockerOffset = issue.blockedBy.length > 0 && !issue.isClosed ? 50 : 8;
+    // Clear the approach zone: arrows land at startX-2 with ~12px of
+    // stub/corner, and the link anchor sits on the bar edge — same 16px+
+    // clearance the waiting badge keeps.
+    const blockerOffset = issue.blockedBy.length > 0 && !issue.isClosed ? 52 : 18;
     return `<text class="bar-subject" x="${startX - blockerOffset}" y="${barY + ctx.barContentHeight / 2 + 3}" text-anchor="end" fill="var(--vscode-foreground)" font-size="10" font-weight="500" opacity="0.9" pointer-events="none">${escapeHtml(displaySubject)}</text>`;
   })();
 
