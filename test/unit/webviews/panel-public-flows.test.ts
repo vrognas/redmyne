@@ -109,7 +109,7 @@ describe("webview panel public flows", () => {
       expect.objectContaining({
         command: "render",
         payload: expect.objectContaining({
-          html: expect.stringContaining("Loading issues"),
+          html: expect.stringContaining("skeleton-label"),
         }),
       })
     );
