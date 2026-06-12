@@ -669,7 +669,7 @@ describe("gantt-html-generator", () => {
 
     it("buildArrowsPayload filters by visible relation types", () => {
       const arrows = buildArrowsPayload([projectRow, issueRow], new Set(["blocks"]));
-      expect(arrows).toEqual([{ relationId: 9, fromId: 456, toId: 99, type: "blocks" }]);
+      expect(arrows).toEqual([{ relationId: 9, fromId: 456, toId: 99, type: "blocks", risk: false }]);
     });
   });
 

@@ -327,6 +327,10 @@ export function setupRowInteraction(ctx) {
   // ---------- click-to-select for non-label targets ----------
 
   addDocListener('mousedown', (e) => {
+    // Pressing a ghost must not natively focus the tabindex'd bar group:
+    // the browser scrolls the group's bbox (bar + ghost, often far apart)
+    // into view, yanking the viewport. Selection still happens on click.
+    if (e.target.closest('.ghost-projection')) e.preventDefault();
     // Leave modifier gestures to the multi-select handler
     if (e.ctrlKey || e.metaKey || e.shiftKey) return;
     if (!e.target.closest('#ganttScroll')) return;

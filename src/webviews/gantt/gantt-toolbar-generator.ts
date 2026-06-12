@@ -270,8 +270,8 @@ export function generateToolbar(ctx: GanttToolbarContext): string {
             </div>
             <div class="help-section">
               <div class="help-title">Relations</div>
-              <span class="help-item"><span class="relation-legend-line rel-line-blocks"></span>blocking</span>
-              <span class="help-item"><span class="relation-legend-line rel-line-scheduling"></span>scheduling</span>
+              <span class="help-item"><span class="relation-legend-line rel-line-blocks"></span>source on schedule</span>
+              <span class="help-item"><span class="relation-legend-line rel-line-scheduling"></span>source late / projected late</span>
               <span class="help-item"><span class="relation-legend-line rel-line-informational"></span>informational</span>
             </div>
             <div class="help-section">

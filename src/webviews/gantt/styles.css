@@ -2006,11 +2006,11 @@ button:focus {
 
 /* Relation legend line colors - 3 semantic categories */
 .rel-line-blocks {
-  background: var(--vscode-charts-red);
+  background: var(--vscode-charts-green);
 }
 
 .rel-line-scheduling {
-  background: var(--vscode-foreground);
+  background: var(--vscode-charts-red);
 }
 
 .rel-line-informational {
@@ -2060,6 +2060,19 @@ button:focus {
 .rel-copied_to .arrow-head {
   stroke: var(--vscode-charts-lines);
   stroke-width: 2;
+}
+
+/* Arrow health: green = source on schedule, red = source late or
+   projected late (remaining flexibility < 0). Two-class specificity
+   beats the per-type colors above. */
+.dependency-arrow.arrow-ok .arrow-line,
+.dependency-arrow.arrow-ok .arrow-head {
+  stroke: var(--vscode-charts-green);
+}
+
+.dependency-arrow.arrow-risk .arrow-line,
+.dependency-arrow.arrow-risk .arrow-head {
+  stroke: var(--vscode-charts-red);
 }
 
 .color-swatch {

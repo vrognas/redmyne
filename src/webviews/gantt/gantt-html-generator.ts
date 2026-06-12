@@ -1143,9 +1143,16 @@ export function buildArrowsPayload(
 ): GanttArrowPayload[] {
   return rows
     .filter((row): row is GanttRow & { issue: GanttIssue } => row.type === "issue" && !!row.issue)
-    .flatMap((row) =>
-      row.issue.relations
+    .flatMap((row) => {
+      // A late / projected-late source endangers its dependents: its
+      // outgoing arrows render red. Remaining flexibility < 0 covers both
+      // (overdue forces -100; essentially-done stays positive).
+      const risk =
+        !row.issue.isClosed &&
+        row.issue.flexibilityPercent !== null &&
+        row.issue.flexibilityPercent < 0;
+      return row.issue.relations
         .filter((rel) => visibleRelTypes.has(rel.type))
-        .map((rel) => ({ relationId: rel.id, fromId: row.issue.id, toId: rel.targetId, type: rel.type }))
-    );
+        .map((rel) => ({ relationId: rel.id, fromId: row.issue.id, toId: rel.targetId, type: rel.type, risk }));
+    });
 }

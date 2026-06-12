@@ -100,6 +100,9 @@ export interface GanttArrowPayload {
   fromId: number;
   toId: number;
   type: string;
+  /** Source task late or projected late (remaining flexibility < 0) —
+   *  the arrow renders red instead of green. */
+  risk: boolean;
 }
 
 /** Position data for dependency arrows */

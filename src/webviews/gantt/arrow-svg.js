@@ -215,9 +215,13 @@ export function buildArrowSvg(source, target, rel, barHeight) {
   const dashAttr = style.dash ? `stroke-dasharray="${style.dash}"` : "";
 
   const arrowTooltip = `#${rel.fromId} ${style.label} #${rel.toId}\n${style.tip}\n(right-click to delete)`;
+  // Health coloring applies to temporal arrows only (informational links
+  // stay neutral): green = source on schedule, red = source late or
+  // projected late.
+  const healthClass = isScheduling ? (rel.risk ? " arrow-risk" : " arrow-ok") : "";
   return {
     svg: `
-            <g class="dependency-arrow rel-${rel.type} cursor-pointer" data-relation-id="${rel.relationId}" data-from="${rel.fromId}" data-to="${rel.toId}">
+            <g class="dependency-arrow rel-${rel.type}${healthClass} cursor-pointer" data-relation-id="${rel.relationId}" data-from="${rel.fromId}" data-to="${rel.toId}">
               <title>${escapeAttr(arrowTooltip)}</title>
               <!-- Wide invisible hit area for easier clicking -->
               <path class="arrow-hit-area" d="${path}" stroke="transparent" stroke-width="24" fill="none"/>
