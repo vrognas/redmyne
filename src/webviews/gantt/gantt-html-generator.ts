@@ -926,6 +926,7 @@ function generateBarBadges(
   // Progress badge: 0% renders as a neutral grey "not started" chip;
   // over budget renders red — more time spent than estimated means the
   // estimate (and possibly the timeline) needs attention.
+  const isLate = daysLate > 0;
   const showProgress = true;
   const progressBadgeW = visualDoneRatio >= 100 ? 36 : visualDoneRatio >= 10 ? 28 : 22;
   // Badge health lives in the FILL color (red over budget, green above
@@ -934,8 +935,11 @@ function generateBarBadges(
   // contrast against the theme background and went invisible on warm
   // themes — foreground text is contrast-guaranteed (same recipe as the
   // blocks/waiting badges).
-  const hasHealth = isOverBudget || flexPct !== null;
-  const healthColor = isOverBudget
+  // One severity ladder everywhere: late or over budget = red (a late
+  // task's flex is always "thin" — orange next to its red late pill read
+  // as inconsistent, and charts-orange fades on warm themes anyway).
+  const hasHealth = isOverBudget || isLate || flexPct !== null;
+  const healthColor = isOverBudget || isLate
     ? "var(--vscode-charts-red)"
     : flexPct !== null && flexPct > 100
       ? "var(--vscode-charts-green)"
@@ -950,7 +954,6 @@ function generateBarBadges(
   // Flexibility badge — attention-worthy buffers only (<100%). Overdue
   // tasks swap it for "Nd late": once the due date passes, the percentage
   // is a constant -100% and says nothing.
-  const isLate = daysLate > 0;
   const showFlex = !isLate && flexPct !== null && flexPct < 100 && !issue.isClosed;
   const flexLabel = isLate ? `${daysLate}d late`
     : showFlex ? (flexPct > 0 ? `+${flexPct}%` : `${flexPct}%`)
