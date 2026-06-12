@@ -245,6 +245,22 @@ export function generateToolbar(ctx: GanttToolbarContext): string {
         <button class="toggle-btn text-btn">?</button>
         <div class="help-tooltip">
             <div class="help-section">
+              <div class="help-title">Bars — fill = schedule health</div>
+              <span class="help-item"><span style="color:var(--vscode-charts-green)">█</span> done</span>
+              <span class="help-item"><span style="color:var(--vscode-charts-blue)">█</span> on track</span>
+              <span class="help-item"><span style="color:var(--vscode-charts-yellow)">█</span> at risk (&lt;20% buffer)</span>
+              <span class="help-item"><span style="color:var(--vscode-charts-red)">█</span> overbooked</span>
+            </div>
+            <div class="help-section">
+              <div class="help-title">Bar borders — special states</div>
+              <span class="help-item"><span style="color:var(--vscode-charts-red)">▢</span> overdue</span>
+              <span class="help-item"><span style="color:var(--vscode-charts-orange)">▢</span> pulsing = critical path</span>
+              <span class="help-item"><span style="color:var(--vscode-charts-purple)">⬚</span> dotted = ad-hoc pool</span>
+              <span class="help-item">faded dashed = external dependency</span>
+              <span class="help-item">fading right edge = no due date</span>
+              <span class="help-item"><span style="color:var(--vscode-charts-red)">⬚</span> dashed red box = projected remaining work</span>
+            </div>
+            <div class="help-section">
               <div class="help-title">Bar Badges</div>
               <span class="help-item">N% progress</span>
               <span class="help-item"><span style="color:var(--vscode-charts-orange)">⛔N</span> blocks N issues</span>
