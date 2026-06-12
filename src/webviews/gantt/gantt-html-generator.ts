@@ -483,7 +483,6 @@ export function generateIssueBar(
 
   const effectiveStatus = issue.isClosed ? "completed" : (issue.status ?? "unknown");
   const color = isParent ? "var(--vscode-descriptionForeground)" : ctx.getStatusColor(effectiveStatus);
-  const textColor = isParent ? "var(--vscode-editor-foreground)" : ctx.getStatusTextColor(effectiveStatus);
   const fillOpacity = isParent ? 0.5 : ctx.getStatusOpacity(effectiveStatus);
 
   const isPast = end < ctx.today;
@@ -497,7 +496,7 @@ export function generateIssueBar(
   }
 
   // Regular issue bar
-  return generateRegularBar(row, issue, startX, endX, width, barY, color, textColor, fillOpacity, isPast, isOverdue, hasOnlyStart, ctx);
+  return generateRegularBar(row, issue, startX, endX, width, barY, color, fillOpacity, isPast, isOverdue, hasOnlyStart, ctx);
 }
 
 /** Generate project aggregate bar */
@@ -628,7 +627,6 @@ function generateRegularBar(
   width: number,
   barY: number,
   color: string,
-  textColor: string,
   fillOpacity: number,
   isPast: boolean,
   isOverdue: boolean,
@@ -824,16 +822,17 @@ function generateRegularBar(
     </g>`;
   })();
 
+  // Task name LEFT of the bar (badge-style: bare text, no fill) — inside
+  // the bar it only fit on long bars and fought the progress divider.
+  // Right-aligned ending before the bar (and before the ⏳ blocker badge
+  // when one renders there).
   const subjectOnBar = (() => {
-    const padding = 12;
-    const availableWidth = width - padding * 2;
-    if (availableWidth < 30) return "";
-    const maxChars = Math.floor(availableWidth / 6);
-    if (maxChars < 3) return "";
+    const maxChars = 32;
     const displaySubject = issue.subject.length > maxChars
       ? issue.subject.substring(0, maxChars - 1) + "…"
       : issue.subject;
-    return `<text class="bar-subject" x="${startX + padding}" y="${barY + ctx.barContentHeight / 2 + 3}" fill="${textColor}" font-size="9" font-weight="500" pointer-events="none">${escapeHtml(displaySubject)}</text>`;
+    const blockerOffset = issue.blockedBy.length > 0 && !issue.isClosed ? 50 : 8;
+    return `<text class="bar-subject" x="${startX - blockerOffset}" y="${barY + ctx.barContentHeight / 2 + 3}" text-anchor="end" fill="var(--vscode-foreground)" font-size="10" font-weight="500" opacity="0.9" pointer-events="none">${escapeHtml(displaySubject)}</text>`;
   })();
 
   // Generate badges (daysLate > 0 swaps the flexibility pill for "Nd late")
