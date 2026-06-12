@@ -996,7 +996,6 @@ svg {
 .issue-bar.bar-past .bar-main,
 .issue-bar.bar-past .bar-outline,
 .issue-bar.bar-past .bar-intensity,
-.issue-bar.bar-past .past-overlay,
 .issue-bar.bar-past .bar-subject {
   filter: saturate(0.5) opacity(0.75);
 }
@@ -1004,7 +1003,6 @@ svg {
 .issue-bar.bar-past:hover .bar-main,
 .issue-bar.bar-past:hover .bar-outline,
 .issue-bar.bar-past:hover .bar-intensity,
-.issue-bar.bar-past:hover .past-overlay,
 .issue-bar.bar-past:hover .bar-subject {
   filter: saturate(0.65) opacity(0.9);
 }

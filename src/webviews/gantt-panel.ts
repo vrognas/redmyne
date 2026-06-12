@@ -2759,8 +2759,8 @@ export class GanttPanel {
         <div class="gantt-timeline" id="ganttTimeline">
           <svg width="${timelineWidth + TIMELINE_RIGHT_PADDING}" height="${bodyHeight}" data-render-key="${this._renderKey}">
             <defs>
-              <pattern id="past-stripes" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
-                <line x1="0" y1="0" x2="0" y2="6" stroke="var(--vscode-charts-red)" stroke-width="2" stroke-opacity="0.4"/>
+              <pattern id="past-stripes" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(45)">
+                <line x1="0" y1="0" x2="0" y2="7" stroke="var(--vscode-charts-red)" stroke-width="2.5" stroke-opacity="0.6"/>
               </pattern>
               <filter id="barShadow" x="-10%" y="-10%" width="120%" height="120%">
                 <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.3"/>
