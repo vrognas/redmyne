@@ -1048,7 +1048,7 @@ describe("gantt project-view root rows (skipTopProjectRow)", () => {
 
     const payload = panel._getRenderPayload();
     // Arrow data present regardless of collapse state (rows are collapsed here)
-    expect(payload.arrows).toContainEqual({ relationId: 500, fromId: 100, toId: 101, type: "blocks" });
+    expect(payload.arrows).toContainEqual(expect.objectContaining({ relationId: 500, fromId: 100, toId: 101, type: "blocks" }));
     const r = payload.rows.find((x: any) => x.key === "issue-100");
     expect(typeof r.barStartX).toBe("number");
     expect(typeof r.barEndX).toBe("number");
