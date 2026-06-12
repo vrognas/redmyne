@@ -854,6 +854,10 @@ export function setupDrag(ctx) {
     addDocListener('click', (e) => {
       // Ignore clicks on interactive elements (handles, badges, outline)
       if (e.target.closest(interactiveSelector)) return;
+      // Ghost clicks select the row (row-interaction) but must NOT invoke
+      // the scroll-into-view a real bar click performs — the ghost is
+      // often far from its bar and the viewport would jump to the bar.
+      if (e.target.closest('.ghost-projection')) return;
       const bar = e.target.closest('.issue-bar');
       if (!bar) return;
       if (dragState || linkingState || justEndedDrag) return;
