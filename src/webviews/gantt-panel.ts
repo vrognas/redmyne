@@ -415,8 +415,10 @@ export class GanttPanel {
     const barHeight = 22; // VS Code native tree row height
     const barGap = 0;
     const indentSize = INDENT_SIZE;
-    const rowCount = 10;
-    const timelineWidth = 600;
+    // Fill the viewport: real boards always do, and a short skeleton makes
+    // the load feel like a slam instead of a reveal (40 rows ≈ 880px).
+    const rowCount = 40;
+    const timelineWidth = 1400;
     const idColumnWidth = 50;
     const startDateColumnWidth = 58;
     const statusColumnWidth = 50; // Colored dot + header text
@@ -431,9 +433,10 @@ export class GanttPanel {
       const y = i * (barHeight + barGap);
       const isProject = i % 3 === 0;
       const indent = isProject ? 0 : indentSize;
-      // Vary bar positions and widths for visual interest
-      const barStart = 50 + (i * 37) % 200;
-      const barWidth = 80 + (i * 53) % 150;
+      // Vary bar positions and widths for visual interest, drifting
+      // rightward down the board like a real schedule
+      const barStart = 40 + ((i * 233) % 600) + Math.floor((i / rowCount) * 500);
+      const barWidth = 80 + (i * 53) % 180;
       return { y, isProject, indent, barStart, barWidth };
     });
 
@@ -493,9 +496,23 @@ export class GanttPanel {
 
     const bodyHeight = Math.max(rowCount * barHeight + barGap, MIN_BODY_HEIGHT);
 
+    // Timeline header placeholder (month-ish labels + tick row) and faint
+    // body grid columns — holds the chrome's space until the real header
+    // pops in.
+    const headerSegment = 175;
+    const headerSvg = Array.from({ length: Math.ceil(timelineWidth / headerSegment) }, (_, k) => `
+      <g class="skeleton-label delay-${Math.min(k, 7)}">
+        <rect x="${k * headerSegment + 4}" y="8" width="48" height="10" rx="2" fill="var(--vscode-panel-border)"/>
+        <rect x="${k * headerSegment + 4}" y="26" width="20" height="8" rx="2" fill="var(--vscode-panel-border)" opacity="0.6"/>
+      </g>
+    `).join("");
+    const gridLines = Array.from({ length: Math.ceil(timelineWidth / headerSegment) }, (_, k) =>
+      `<line x1="${k * headerSegment}" y1="0" x2="${k * headerSegment}" y2="${bodyHeight}" stroke="var(--vscode-panel-border)" stroke-width="1" opacity="0.25"/>`
+    ).join("");
+
     const html = `
   <div class="gantt-header">
-    <div class="gantt-title"><span class="loading-text">Loading issues...</span></div>
+    <div class="gantt-title"></div>
     <div class="gantt-actions" role="toolbar" aria-label="Gantt chart controls">
       <!-- Draft mode toggle -->
       <button class="draft-mode-toggle" disabled data-toolbar-tooltip="Queue changes for review before saving">Enable Draft Mode</button>
@@ -533,7 +550,7 @@ export class GanttPanel {
             <div class="gantt-col-assignee"><div class="gantt-col-header">Who</div></div>
           </div>
           <div class="gantt-timeline-header">
-            <svg width="${timelineWidth}" height="${headerHeight}"></svg>
+            <svg width="${timelineWidth}" height="${headerHeight}">${headerSvg}</svg>
           </div>
         </div>
         <div class="gantt-body">
@@ -579,6 +596,7 @@ export class GanttPanel {
           <div class="gantt-timeline" id="ganttTimeline">
             <svg width="${timelineWidth + TIMELINE_RIGHT_PADDING}" height="${bodyHeight}">
               <g class="zebra-layer">${zebraStripes}</g>
+              ${gridLines}
               ${barsSvg}
             </svg>
           </div>
