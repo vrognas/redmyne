@@ -840,7 +840,7 @@ function generateRegularBar(
   const badges = generateBarBadges(issue, startX, endX, barY, flexPct, daysLate, visualDoneRatio, isFallbackProgress, isOverBudget, progressTooltip, blocksTooltip, blockerTooltip, ctx);
 
   return `
-    <g class="issue-bar gantt-row${isPast ? " bar-past" : ""}${isOverdue ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${issue.isAdHoc ? " bar-adhoc" : ""}${isCriticalPath ? " bar-critical" : ""}" data-issue-id="${issue.id}"
+    <g class="issue-bar gantt-row${isPast ? " bar-past" : ""}${daysLate > 0 ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${issue.isAdHoc ? " bar-adhoc" : ""}${isCriticalPath ? " bar-critical" : ""}" data-issue-id="${issue.id}"
        data-project-id="${issue.projectId}"
        data-subject="${escapedSubject}"
        data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
@@ -848,7 +848,7 @@ function generateRegularBar(
        data-due-date="${issue.due_date || ""}"
        data-start-x="${startX}" data-end-x="${endX}" data-center-y="${ctx.barHeight / 2}"
        data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}'
-       tabindex="0" role="button" aria-label="#${issue.id} ${escapedSubject}${isOverdue ? " (overdue)" : ""}">
+       tabindex="0" role="button" aria-label="#${issue.id} ${escapedSubject}${daysLate > 0 ? " (overdue)" : ""}">
       <title>${escapeAttr(barTooltip)}</title>
       <defs>
         <clipPath id="bar-clip-${issue.id}">
