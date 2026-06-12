@@ -15,6 +15,7 @@ import {
   generateIssueBar,
   buildRowsPayload,
   buildArrowsPayload,
+  projectDaysForHours,
 } from "../src/webviews/gantt/gantt-html-generator";
 import type { GanttRow } from "../src/webviews/gantt-model";
 
@@ -562,6 +563,24 @@ describe("gantt-html-generator", () => {
       expect(generateDueDateCell(noDates, { ...baseCtx, today: new Date("2025-01-01") })).toContain("—");
       expect(generateStatusCell(noDates, baseCtx)).toContain("var(--vscode-charts-green)");
       expect(generateAssigneeCell(noDates, baseCtx)).toContain("—");
+    });
+  });
+
+  describe("ghost projection day walk", () => {
+    // ctx.today is UTC-midnight anchored and stepped in UTC days — the
+    // weekday lookup must read the SAME frame. Local getDay() shifted
+    // every weekday back one day for hosts west of UTC.
+    const wedOnly = { Sun: 0, Mon: 0, Tue: 0, Wed: 8, Thu: 0, Fri: 0, Sat: 0 };
+
+    it("counts schedule days in the UTC frame", () => {
+      const wednesday = new Date("2026-06-10"); // UTC Wednesday
+      expect(projectDaysForHours(wednesday, 8, wedOnly)).toBe(1);
+      expect(projectDaysForHours(wednesday, 16, wedOnly)).toBe(8); // next Wed
+    });
+
+    it("caps an unschedulable walk at maxDays", () => {
+      const empty = { Sun: 0, Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0 };
+      expect(projectDaysForHours(new Date("2026-06-10"), 8, empty, 30)).toBe(30);
     });
   });
 

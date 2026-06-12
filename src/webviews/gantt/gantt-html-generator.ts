@@ -77,18 +77,23 @@ function flexibilityLine(flexPct: number | null): string | null {
   return `Flexibility: ${flexPct}% — remaining work exceeds time left`;
 }
 
-/** Get day name key for WeeklySchedule lookup */
+const DAY_KEYS: (keyof WeeklySchedule)[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** Get day name key for WeeklySchedule lookup (local calendar frame) */
 function getDayKey(date: Date): keyof WeeklySchedule {
-  const keys: (keyof WeeklySchedule)[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  return keys[date.getDay()]!;
+  return DAY_KEYS[date.getDay()]!;
 }
 
 /**
  * Calendar days needed from `from` (inclusive) to fit `hours` of work
  * under the weekly schedule. Drives the overdue ghost projection. Capped
  * so an all-zero schedule cannot loop forever.
+ *
+ * `from` is UTC-midnight anchored (ctx.today) and stepped in UTC days,
+ * so the weekday is read in the SAME frame — local getDay() shifted
+ * every weekday back one for hosts west of UTC. Exported for tests.
  */
-function projectDaysForHours(
+export function projectDaysForHours(
   from: Date,
   hours: number,
   schedule: WeeklySchedule,
@@ -97,7 +102,7 @@ function projectDaysForHours(
   const d = new Date(from);
   let acc = 0;
   for (let i = 1; i <= maxDays; i++) {
-    acc += schedule[getDayKey(d)];
+    acc += schedule[DAY_KEYS[d.getUTCDay()]!];
     if (acc >= hours) return i;
     d.setUTCDate(d.getUTCDate() + 1);
   }
