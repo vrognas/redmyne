@@ -246,8 +246,8 @@ export function generateToolbar(ctx: GanttToolbarContext): string {
         <div class="help-tooltip">
             <div class="help-section">
               <div class="help-title">Bars — fill = schedule health</div>
-              <span class="help-item"><span style="color:var(--vscode-charts-green)">█</span> done</span>
-              <span class="help-item"><span style="color:var(--vscode-charts-blue)">█</span> on track</span>
+              <span class="help-item"><span style="color:var(--vscode-charts-blue)">█</span> done</span>
+              <span class="help-item"><span style="color:var(--vscode-charts-green)">█</span> on track</span>
               <span class="help-item"><span style="color:var(--vscode-charts-yellow)">█</span> at risk (&lt;20% buffer)</span>
               <span class="help-item"><span style="color:var(--vscode-charts-red)">█</span> overbooked</span>
             </div>
@@ -265,7 +265,7 @@ export function generateToolbar(ctx: GanttToolbarContext): string {
               <span class="help-item">N% progress</span>
               <span class="help-item"><span style="color:var(--vscode-charts-orange)">⛔N</span> blocks N issues</span>
               <span class="help-item"><span style="color:var(--vscode-charts-yellow)">⏳N</span> waiting on N issues</span>
-              <span class="help-item"><span style="color:var(--vscode-charts-green)">✓</span> closed</span>
+              <span class="help-item"><span style="color:var(--vscode-charts-blue)">✓</span> closed</span>
               <span class="help-item"><span style="color:var(--vscode-charts-red)">Nd late</span> overdue; dashed ghost = remaining work from today</span>
               <span class="help-item">hover a bar for flexibility &amp; hours</span>
             </div>

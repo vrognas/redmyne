@@ -921,13 +921,11 @@ function generateBarBadges(
   blockerTooltip: string,
   ctx: GanttRenderContext
 ): string {
-  // Progress badge — hidden at 0% (it was pure noise on untouched boards).
-  // Over budget renders red: more time spent than estimated means the
+  // Progress badge: 0% renders as a neutral grey "not started" chip;
+  // over budget renders red — more time spent than estimated means the
   // estimate (and possibly the timeline) needs attention.
-  const showProgress = visualDoneRatio > 0;
-  const progressBadgeW = showProgress
-    ? (visualDoneRatio >= 100 ? 36 : visualDoneRatio >= 10 ? 28 : 22)
-    : 0;
+  const showProgress = true;
+  const progressBadgeW = visualDoneRatio >= 100 ? 36 : visualDoneRatio >= 10 ? 28 : 22;
   // Badge health lives in the FILL color (red over budget, green above
   // 100% flexibility, orange below); the text is always the theme
   // foreground. Same-color text-on-tint depended on each chart color's
@@ -940,9 +938,12 @@ function generateBarBadges(
     : flexPct !== null && flexPct > 100
       ? "var(--vscode-charts-green)"
       : "var(--vscode-charts-orange)";
-  const progressColor = hasHealth ? "var(--vscode-foreground)" : "var(--vscode-badge-foreground)";
-  const progressBg = hasHealth ? healthColor : "var(--vscode-badge-background)";
-  const progressBgOpacity = hasHealth ? "0.4" : "0.9";
+  const notStarted = visualDoneRatio === 0 && !isOverBudget;
+  const progressColor = notStarted || hasHealth ? "var(--vscode-foreground)" : "var(--vscode-badge-foreground)";
+  const progressBg = notStarted
+    ? "var(--vscode-descriptionForeground)"
+    : hasHealth ? healthColor : "var(--vscode-badge-background)";
+  const progressBgOpacity = notStarted ? "0.3" : hasHealth ? "0.4" : "0.9";
 
   // Flexibility badge — attention-worthy buffers only (<100%). Overdue
   // tasks swap it for "Nd late": once the due date passes, the percentage
@@ -998,10 +999,10 @@ function generateBarBadges(
       <g class="progress-badge-group">
         <title>Closed</title>
         <rect class="status-badge-bg" x="${labelX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${checkBadgeW}" height="12" rx="2"
-              fill="var(--vscode-charts-green)" opacity="0.15"/>
+              fill="var(--vscode-charts-blue)" opacity="0.25"/>
         <rect x="${labelX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${checkBadgeW}" height="12" fill="transparent"/>
         <text class="status-badge" x="${checkCenterX}" y="${ctx.barHeight / 2 + 4}"
-              text-anchor="middle" fill="var(--vscode-charts-green)" font-size="12">✓</text>
+              text-anchor="middle" fill="var(--vscode-foreground)" font-size="12">✓</text>
       </g>
       ${issue.assignee ? `<g class="bar-assignee-group">
         <title>${escapeAttr(issue.assignee)}</title>

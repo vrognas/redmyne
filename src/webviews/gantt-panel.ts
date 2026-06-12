@@ -2854,8 +2854,8 @@ export class GanttPanel {
   private static readonly STATUS_COLORS: Record<string, { cssVar: string; darkText: boolean; opacity: number }> = {
     overbooked: { cssVar: "var(--vscode-charts-red)", darkText: false, opacity: 1 },      // Critical (accent)
     "at-risk": { cssVar: "var(--vscode-charts-yellow)", darkText: true, opacity: 1 },     // Warning (accent)
-    "on-track": { cssVar: "var(--vscode-charts-blue)", darkText: false, opacity: 0.6 },   // Normal (secondary, muted)
-    completed: { cssVar: "var(--vscode-charts-green)", darkText: false, opacity: 1 },     // Done (accent)
+    "on-track": { cssVar: "var(--vscode-charts-green)", darkText: false, opacity: 0.6 },  // Normal (secondary, muted)
+    completed: { cssVar: "var(--vscode-charts-blue)", darkText: false, opacity: 1 },      // Done (accent)
     default: { cssVar: "var(--vscode-descriptionForeground)", darkText: false, opacity: 0.5 },
   };
 
