@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as vscode from "vscode";
 import { GanttPanel } from "../../../src/webviews/gantt-panel";
 import { TimeSheetPanel } from "../../../src/webviews/timesheet-panel";
-import { adHocTracker } from "../../../src/utilities/adhoc-tracker";
 import * as precedenceTracker from "../../../src/utilities/precedence-tracker";
 import * as statusBar from "../../../src/utilities/status-bar";
 
@@ -208,9 +207,6 @@ describe("webview panel public flows", () => {
     const statusSpy = vi
       .spyOn(statusBar, "showStatusBarMessage")
       .mockImplementation(() => undefined);
-    const toggleAdHocSpy = vi
-      .spyOn(adHocTracker, "toggle")
-      .mockResolvedValue(true);
     const togglePrecedenceSpy = vi
       .spyOn(precedenceTracker, "togglePrecedence")
       .mockResolvedValue(true);
@@ -278,7 +274,6 @@ describe("webview panel public flows", () => {
     handler?.({ command: "todayOutOfRange" });
     handler?.({ command: "setInternalEstimate", issueId: 7 });
     handler?.({ command: "toggleAutoUpdate", issueId: 7 });
-    handler?.({ command: "toggleAdHoc", issueId: 7 });
     handler?.({ command: "togglePrecedence", issueId: 7 });
     handler?.({ command: "setFilter", filter: { assignee: "me", status: "open" } });
     handler?.({ command: "setSelectedKey", collapseKey: "issue-1" });
@@ -293,7 +288,6 @@ describe("webview panel public flows", () => {
     expect((panel._handleUndoRelation as ReturnType<typeof vi.fn>)).toHaveBeenCalled();
     expect((panel._handleRedoRelation as ReturnType<typeof vi.fn>)).toHaveBeenCalled();
     expect((panel._updateContent as ReturnType<typeof vi.fn>)).toHaveBeenCalled();
-    expect(toggleAdHocSpy).toHaveBeenCalledWith(7);
     expect(togglePrecedenceSpy).toHaveBeenCalled();
     expect(infoSpy).toHaveBeenCalledWith(
       "Today is outside the current timeline range"

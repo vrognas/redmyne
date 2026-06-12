@@ -290,6 +290,14 @@
         "title": "Custom..."
       },
       {
+        "command": "redmyne.clearDoneRatio",
+        "title": "Clear (track logged time)"
+      },
+      {
+        "command": "redmyne.toggleAdHoc",
+        "title": "Toggle Ad-Hoc Budget"
+      },
+      {
         "command": "redmyne.setIssuePriority",
         "title": "Set Priority",
         "icon": "$(arrow-both)"
@@ -596,6 +604,14 @@
       {
         "command": "redmyne.gantt.setDoneRatioCustom",
         "title": "Custom..."
+      },
+      {
+        "command": "redmyne.gantt.clearDoneRatio",
+        "title": "Clear (track logged time)"
+      },
+      {
+        "command": "redmyne.gantt.toggleAdHoc",
+        "title": "Toggle Ad-Hoc Budget"
       },
       {
         "command": "redmyne.gantt.setStatus",
@@ -1215,6 +1231,22 @@
           "when": "false"
         },
         {
+          "command": "redmyne.toggleAdHoc",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.gantt.toggleAdHoc",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.clearDoneRatio",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.gantt.clearDoneRatio",
+          "when": "false"
+        },
+        {
           "command": "redmyne.gantt.createSubIssue",
           "when": "false"
         },
@@ -1524,6 +1556,11 @@
           "group": "5_settings@1"
         },
         {
+          "command": "redmyne.toggleAdHoc",
+          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
+          "group": "5_settings@2"
+        },
+        {
           "command": "redmyne.addIssueToKanban",
           "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
           "group": "6_integrations@1"
@@ -1742,6 +1779,10 @@
         {
           "command": "redmyne.gantt.setDoneRatioCustom",
           "group": "2_custom@1"
+        },
+        {
+          "command": "redmyne.gantt.clearDoneRatio",
+          "group": "2_custom@2"
         }
       ],
       "redmyne.gantt.internalEstimateMenu": [
@@ -1802,6 +1843,10 @@
         {
           "command": "redmyne.setDoneRatioCustom",
           "group": "2_custom@1"
+        },
+        {
+          "command": "redmyne.clearDoneRatio",
+          "group": "2_custom@2"
         }
       ],
       "redmyne.internalEstimateMenu": [
@@ -1859,6 +1904,11 @@
           "submenu": "redmyne.gantt.internalEstimateMenu",
           "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar'",
           "group": "5_settings@1"
+        },
+        {
+          "command": "redmyne.gantt.toggleAdHoc",
+          "when": "webviewId == 'redmyneGantt' && webviewSection == 'issueBar'",
+          "group": "5_settings@2"
         },
         {
           "command": "redmyne.gantt.addToKanban",

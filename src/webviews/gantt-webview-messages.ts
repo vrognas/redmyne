@@ -39,7 +39,6 @@ export type GanttWebviewMessage =
   | { command: "todayOutOfRange" }
   | { command: "setInternalEstimate"; issueId: number }
   | { command: "toggleAutoUpdate"; issueId: number }
-  | { command: "toggleAdHoc"; issueId: number }
   | { command: "togglePrecedence"; issueId: number }
   | { command: "setFilter"; filter?: { assignee?: string; status?: string } }
   | { command: "setSelectedKey"; collapseKey?: string | null }

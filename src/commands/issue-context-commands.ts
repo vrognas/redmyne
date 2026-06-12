@@ -2,9 +2,9 @@ import * as vscode from "vscode";
 import { Issue } from "../redmine/models/issue";
 import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { autoUpdateTracker } from "../utilities/auto-update-tracker";
-import { contributeToIssue, removeContribution } from "./adhoc-commands";
+import { contributeToIssue, removeContribution, toggleAdHoc } from "./adhoc-commands";
 import { showStatusBarMessage } from "../utilities/status-bar";
-import { setInternalEstimate } from "../utilities/internal-estimates";
+import { setInternalEstimate, clearInternalEstimate } from "../utilities/internal-estimates";
 import { parseTimeInput } from "../utilities/time-input";
 import { GanttPanel } from "../webviews/gantt-panel";
 import { buildProjectUrl } from "./command-urls";
@@ -72,6 +72,18 @@ export function registerIssueContextCommands(
         try {
           await server.updateDoneRatio(issueId, selectedValue);
           await autoUpdateTracker.disable(issueId);
+
+          // 100% = nothing remains by definition: don't ask, and clear any
+          // stale internal estimate — it outranks done_ratio in
+          // remainingHours(), so a leftover "5h remaining" would keep the
+          // ghost projection and red arrows alive on a finished task.
+          if (selectedValue === 100) {
+            await clearInternalEstimate(deps.globalState, issueId);
+            showStatusBarMessage(`$(check) #${issueId} set to 100%`, 2000);
+            GanttPanel.currentPanel?.updateIssueDoneRatio(issueId, selectedValue);
+            refreshGanttData();
+            return;
+          }
 
           const hoursInput = await vscode.window.showInputBox({
             title: `Internal Estimate: #${issueId}`,
@@ -143,6 +155,41 @@ export function registerIssueContextCommands(
     ),
 
     // Bulk set done ratio for multiple issues
+    // Clear manual % done: back to time-based progress. done_ratio 0 makes
+    // the gantt fill fall back to spent/estimated, the internal estimate
+    // stops overriding remaining-work, and the issue rejoins per-issue
+    // auto-update (a no-op unless redmyne.autoUpdateDonePercent is on).
+    vscode.commands.registerCommand(
+      "redmyne.clearDoneRatio",
+      async (issue: { id: number } | undefined) => {
+        if (!ensureIssueId(issue)) return;
+        const issueId = issue.id;
+
+        const server = getServerOrShowError(deps.getProjectsServer);
+        if (!server) return;
+
+        try {
+          await server.updateDoneRatio(issueId, 0);
+          await clearInternalEstimate(deps.globalState, issueId);
+          await autoUpdateTracker.enable(issueId);
+
+          showStatusBarMessage(`$(check) #${issueId} % done cleared — tracking logged time`, 2000);
+          GanttPanel.currentPanel?.updateIssueDoneRatio(issueId, 0);
+          refreshGanttData();
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to update: ${error}`);
+        }
+      }
+    ),
+
+    // Toggle the ad-hoc budget tag (purple dotted border in the Gantt;
+    // time on the issue can contribute hours to other issues)
+    vscode.commands.registerCommand("redmyne.toggleAdHoc", async (item: { id: number } | undefined) => {
+      await toggleAdHoc(item as Parameters<typeof toggleAdHoc>[0]);
+      deps.refreshProjectsTree();
+      refreshGanttData();
+    }),
+
     vscode.commands.registerCommand("redmyne.bulkSetDoneRatio", async (issueIds: number[]) => {
       if (!issueIds || issueIds.length === 0) {
         vscode.window.showErrorMessage("No issues selected");
@@ -165,6 +212,18 @@ export function registerIssueContextCommands(
       try {
         await Promise.all(issueIds.map((id) => server.updateDoneRatio(id, selected.value)));
         await Promise.all(issueIds.map((id) => autoUpdateTracker.disable(id)));
+
+        // Same 100% rule as the single-issue path: nothing remains, so no
+        // prompt, and stale internal estimates must not outlive done.
+        if (selected.value === 100) {
+          for (const id of issueIds) {
+            await clearInternalEstimate(deps.globalState, id);
+          }
+          showStatusBarMessage(`$(check) ${issueIds.length} ${issueIds.length === 1 ? "issue" : "issues"} set to 100%`, 2000);
+          issueIds.forEach((id) => GanttPanel.currentPanel?.updateIssueDoneRatio(id, 100));
+          refreshGanttData();
+          return;
+        }
 
         const hoursInput = await vscode.window.showInputBox({
           title: `Internal Estimate for ${issueIds.length} ${issueIds.length === 1 ? "issue" : "issues"}`,

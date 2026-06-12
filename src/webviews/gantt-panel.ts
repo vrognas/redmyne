@@ -1548,18 +1548,6 @@ export class GanttPanel {
           }).catch(() => {});
         }
         break;
-      case "toggleAdHoc":
-        if (message.issueId) {
-          adHocTracker.toggle(message.issueId).then((isNowAdHoc) => {
-            showStatusBarMessage(
-              isNowAdHoc ? `$(check) #${message.issueId} tagged as ad-hoc` : `$(check) #${message.issueId} ad-hoc tag removed`,
-              2000
-            );
-            this._isRefreshing = true;
-            vscode.commands.executeCommand("redmyne.refreshIssues");
-          }).catch(() => {});
-        }
-        break;
       case "togglePrecedence":
         if (message.issueId) {
           togglePrecedence(message.issueId).then((isNowPrecedence) => {

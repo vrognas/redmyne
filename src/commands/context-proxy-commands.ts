@@ -132,6 +132,14 @@ export function registerContextProxyCommands(): vscode.Disposable[] {
       forwardIssueIdPayload("redmyne.setDoneRatio")
     ),
     vscode.commands.registerCommand(
+      "redmyne.gantt.clearDoneRatio",
+      forwardIssueIdPayload("redmyne.clearDoneRatio")
+    ),
+    vscode.commands.registerCommand(
+      "redmyne.gantt.toggleAdHoc",
+      forwardIssueIdPayload("redmyne.toggleAdHoc")
+    ),
+    vscode.commands.registerCommand(
       "redmyne.gantt.setStatusNew",
       forwardIssueIdPayload("redmyne.setIssueStatus", { statusPattern: "new" })
     ),

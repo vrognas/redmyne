@@ -52,10 +52,11 @@ describe("registerIssueContextCommands", () => {
   it("registers issue context command surface", () => {
     const disposables = registerCommands();
 
-    expect(disposables).toHaveLength(11);
+    expect(disposables).toHaveLength(13);
     expect(Array.from(handlers.keys())).toEqual(
       expect.arrayContaining([
         "redmyne.setDoneRatio",
+        "redmyne.clearDoneRatio",
         "redmyne.setStatus",
         "redmyne.bulkSetDoneRatio",
         "redmyne.setIssueStatus",
@@ -65,9 +66,47 @@ describe("registerIssueContextCommands", () => {
         "redmyne.revealProjectInTree",
         "redmyne.contributeToIssue",
         "redmyne.removeContribution",
+        "redmyne.toggleAdHoc",
         "redmyne.setIssuePriority",
       ])
     );
+  });
+
+  it("setting 100% skips the remaining-hours prompt and clears the estimate", async () => {
+    const mockServer = { updateDoneRatio: vi.fn().mockResolvedValue(undefined) };
+    vi.spyOn(autoUpdateTracker, "disable").mockResolvedValue(undefined);
+    const clearSpy = vi.spyOn(internalEstimates, "clearInternalEstimate").mockResolvedValue(undefined);
+    registerCommands({ getProjectsServer: () => mockServer });
+
+    await handlers.get("redmyne.setDoneRatio")?.({ id: 42, percentage: 100 });
+
+    expect(mockServer.updateDoneRatio).toHaveBeenCalledWith(42, 100);
+    expect(vscode.window.showInputBox).not.toHaveBeenCalled();
+    expect(clearSpy).toHaveBeenCalledWith(expect.anything(), 42);
+  });
+
+  it("clearDoneRatio resets to time-based progress", async () => {
+    const mockServer = { updateDoneRatio: vi.fn().mockResolvedValue(undefined) };
+    const enableSpy = vi.spyOn(autoUpdateTracker, "enable").mockResolvedValue(undefined);
+    const clearSpy = vi.spyOn(internalEstimates, "clearInternalEstimate").mockResolvedValue(undefined);
+    registerCommands({ getProjectsServer: () => mockServer });
+
+    await handlers.get("redmyne.clearDoneRatio")?.({ id: 42 });
+
+    expect(mockServer.updateDoneRatio).toHaveBeenCalledWith(42, 0);
+    expect(clearSpy).toHaveBeenCalledWith(expect.anything(), 42);
+    expect(enableSpy).toHaveBeenCalledWith(42);
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.refreshGanttData");
+  });
+
+  it("toggleAdHoc routes to the tracker and refreshes the gantt", async () => {
+    const toggleSpy = vi.spyOn(adhocCommands, "toggleAdHoc").mockResolvedValue(undefined);
+    registerCommands();
+
+    await handlers.get("redmyne.toggleAdHoc")?.({ id: 42 });
+
+    expect(toggleSpy).toHaveBeenCalledWith({ id: 42 });
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.refreshGanttData");
   });
 
   it("opens project in browser when project identifier and URL exist", async () => {
