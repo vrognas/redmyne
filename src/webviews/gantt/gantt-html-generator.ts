@@ -980,14 +980,13 @@ function generateBarBadges(
       : "var(--vscode-charts-orange)")
     : "";
 
-  // Blocker badge (upstream - at START of bar)
+  // Blocker badge (upstream - at START of bar): bare text, no fill,
+  // sitting right where incoming arrows land
   const blockerCount = issue.blockedBy.length;
   const showBlocker = blockerCount > 0 && !issue.isClosed;
-  const blockerBadgeW = showBlocker ? 28 : 0;
   const blockerLabel = showBlocker ? `⏳${blockerCount}` : "";
   const firstBlockerId = showBlocker ? issue.blockedBy[0]!.id : null;
-  const blockerBadgeStartX = startX - blockerBadgeW - 16;
-  const blockerBadgeCenterX = blockerBadgeStartX + blockerBadgeW / 2;
+  const blockerEndX = startX - 16;
   const blockerColor = blockerCount >= 2 ? "var(--vscode-charts-red)" : "var(--vscode-charts-yellow)";
 
   const labelX = endX + 16;
@@ -1014,14 +1013,15 @@ function generateBarBadges(
     </g>`;
   }
 
-  // Lay visible badges out left-to-right: [progress][flex][blocks][assignee]
+  // Lay visible badges out left-to-right: [blocks][progress][flex][assignee]
+  // — the blocks badge hugs the bar end, adjacent to its outgoing arrows.
   let cursorX = labelX;
+  const impactBadgeX = cursorX;
+  if (showBlocks) cursorX += impactBadgeW + 4;
   const progressX = cursorX;
   if (showProgress) cursorX += progressBadgeW + 4;
   const flexBadgeX = cursorX;
   if (showFlexSlot) cursorX += flexBadgeW + 4;
-  const impactBadgeX = cursorX;
-  if (showBlocks) cursorX += impactBadgeW + 4;
   const assigneeX = cursorX;
 
   const progressCenterX = progressX + progressBadgeW / 2;
@@ -1061,11 +1061,9 @@ function generateBarBadges(
   </g>
   ${showBlocker ? `<g class="blocker-badge" data-blocker-id="${firstBlockerId}" style="cursor: pointer;">
     <title>${escapeAttr(blockerTooltip)}</title>
-    <rect x="${blockerBadgeStartX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${blockerBadgeW}" height="12" rx="2"
-          fill="${blockerColor}" opacity="0.4"/>
-    <rect x="${blockerBadgeStartX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${blockerBadgeW}" height="12" fill="transparent"/>
-    <text x="${blockerBadgeCenterX}" y="${ctx.barHeight / 2 + 4}"
-          text-anchor="middle" fill="var(--vscode-foreground)" font-size="10" font-weight="600">${blockerLabel}</text>
+    <rect x="${blockerEndX - 26}" y="${barY + ctx.barContentHeight / 2 - 6}" width="26" height="12" fill="transparent"/>
+    <text x="${blockerEndX}" y="${ctx.barHeight / 2 + 4}"
+          text-anchor="end" fill="${blockerColor}" font-size="10" font-weight="600">${blockerLabel}</text>
   </g>` : ""}`;
 }
 
