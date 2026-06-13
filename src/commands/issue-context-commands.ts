@@ -183,10 +183,13 @@ export function registerIssueContextCommands(
     ),
 
     // Toggle the ad-hoc budget tag (purple dotted border in the Gantt;
-    // time on the issue can contribute hours to other issues)
+    // time on the issue can contribute hours to other issues). Ad-hoc state
+    // is read only by the Gantt — the projects tree never renders it — so a
+    // single Gantt refresh suffices, matching the done-ratio/estimate
+    // siblings. (refreshProjectsTree would double-render: refresh() fires
+    // onDidChangeTreeData, which already triggers refreshGanttData.)
     vscode.commands.registerCommand("redmyne.toggleAdHoc", async (item: { id: number } | undefined) => {
       await toggleAdHoc(item as Parameters<typeof toggleAdHoc>[0]);
-      deps.refreshProjectsTree();
       refreshGanttData();
     }),
 
