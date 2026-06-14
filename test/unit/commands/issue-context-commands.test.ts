@@ -183,6 +183,52 @@ describe("registerIssueContextCommands", () => {
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.refreshGanttData");
   });
 
+  it("setDoneRatio syncs the tree cache so refreshGanttData can't revert it", async () => {
+    const mockServer = { updateDoneRatio: vi.fn().mockResolvedValue(undefined) };
+    vi.spyOn(autoUpdateTracker, "disable").mockResolvedValue(undefined);
+    vi.mocked(vscode.window.showInputBox).mockResolvedValue("");
+    const cached = { id: 42, done_ratio: 30 } as never;
+    registerCommands({ getProjectsServer: () => mockServer, getAssignedIssues: () => [cached] });
+
+    await handlers.get("redmyne.setDoneRatio")?.({ id: 42, percentage: 60 });
+
+    // The gantt re-reads this object on refresh; stale 30 would revert the bar.
+    expect((cached as { done_ratio: number }).done_ratio).toBe(60);
+  });
+
+  it("clearDoneRatio resets the cached object (assigned and dependency) to 0", async () => {
+    const mockServer = { updateDoneRatio: vi.fn().mockResolvedValue(undefined) };
+    vi.spyOn(autoUpdateTracker, "enable").mockResolvedValue(undefined);
+    vi.spyOn(internalEstimates, "clearInternalEstimate").mockResolvedValue(undefined);
+    const assigned = { id: 7, done_ratio: 80 } as never;
+    const dep = { id: 9, done_ratio: 50 } as never;
+    registerCommands({
+      getProjectsServer: () => mockServer,
+      getAssignedIssues: () => [assigned],
+      getDependencyIssues: () => [dep],
+    });
+
+    await handlers.get("redmyne.clearDoneRatio")?.({ id: 9 }); // a dependency issue
+
+    expect((dep as { done_ratio: number }).done_ratio).toBe(0);
+    expect((assigned as { done_ratio: number }).done_ratio).toBe(80); // untouched
+  });
+
+  it("bulkSetDoneRatio syncs every selected issue in the tree cache", async () => {
+    const mockServer = { updateDoneRatio: vi.fn().mockResolvedValue(undefined) };
+    vi.spyOn(autoUpdateTracker, "disable").mockResolvedValue(undefined);
+    vi.mocked(vscode.window.showQuickPick).mockResolvedValue({ label: "40%", value: 40 } as never);
+    vi.mocked(vscode.window.showInputBox).mockResolvedValue("");
+    const c1 = { id: 1, done_ratio: 0 } as never;
+    const c2 = { id: 2, done_ratio: 90 } as never;
+    registerCommands({ getProjectsServer: () => mockServer, getAssignedIssues: () => [c1, c2] });
+
+    await handlers.get("redmyne.bulkSetDoneRatio")?.([1, 2]);
+
+    expect((c1 as { done_ratio: number }).done_ratio).toBe(40);
+    expect((c2 as { done_ratio: number }).done_ratio).toBe(40);
+  });
+
   it("updates status from picker and refreshes tree and gantt", async () => {
     const mockServer = {
       getIssueStatusesTyped: vi.fn().mockResolvedValue([

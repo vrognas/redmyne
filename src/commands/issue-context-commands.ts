@@ -39,6 +39,18 @@ export function registerIssueContextCommands(
 ): vscode.Disposable[] {
   const disposables: vscode.Disposable[] = [];
 
+  // Keep the tree's cached issue in sync with a done-ratio write. refreshGanttData
+  // re-reads these objects via fetchIssuesIfNeeded — the server write only
+  // invalidates the per-issue getIssueById cache, not this list — so without
+  // this the optimistic updateIssueDoneRatio is overwritten by the stale value
+  // and the bar snaps back. (Same objects feed the gantt on its next open.)
+  function syncCachedDoneRatio(issueId: number, doneRatio: number): void {
+    for (const list of [deps.getAssignedIssues(), deps.getDependencyIssues()]) {
+      const cached = list.find((i) => i.id === issueId);
+      if (cached) cached.done_ratio = doneRatio;
+    }
+  }
+
   disposables.push(
     // Set done ratio (% Done) for issue
     vscode.commands.registerCommand(
@@ -80,6 +92,7 @@ export function registerIssueContextCommands(
           if (selectedValue === 100) {
             await clearInternalEstimate(deps.globalState, issueId);
             showStatusBarMessage(`$(check) #${issueId} set to 100%`, 2000);
+            syncCachedDoneRatio(issueId, 100);
             GanttPanel.currentPanel?.updateIssueDoneRatio(issueId, selectedValue);
             refreshGanttData();
             return;
@@ -111,6 +124,7 @@ export function registerIssueContextCommands(
             showStatusBarMessage(`$(check) #${issueId} set to ${selectedValue}%`, 2000);
           }
 
+          syncCachedDoneRatio(issueId, selectedValue);
           GanttPanel.currentPanel?.updateIssueDoneRatio(issueId, selectedValue);
           refreshGanttData();
         } catch (error) {
@@ -154,7 +168,6 @@ export function registerIssueContextCommands(
       }
     ),
 
-    // Bulk set done ratio for multiple issues
     // Clear manual % done: back to time-based progress. done_ratio 0 makes
     // the gantt fill fall back to spent/estimated, the internal estimate
     // stops overriding remaining-work, and the issue rejoins per-issue
@@ -174,6 +187,7 @@ export function registerIssueContextCommands(
           await autoUpdateTracker.enable(issueId);
 
           showStatusBarMessage(`$(check) #${issueId} % done cleared — tracking logged time`, 2000);
+          syncCachedDoneRatio(issueId, 0);
           GanttPanel.currentPanel?.updateIssueDoneRatio(issueId, 0);
           refreshGanttData();
         } catch (error) {
@@ -223,6 +237,7 @@ export function registerIssueContextCommands(
             await clearInternalEstimate(deps.globalState, id);
           }
           showStatusBarMessage(`$(check) ${issueIds.length} ${issueIds.length === 1 ? "issue" : "issues"} set to 100%`, 2000);
+          issueIds.forEach((id) => syncCachedDoneRatio(id, 100));
           issueIds.forEach((id) => GanttPanel.currentPanel?.updateIssueDoneRatio(id, 100));
           refreshGanttData();
           return;
@@ -258,6 +273,7 @@ export function registerIssueContextCommands(
           showStatusBarMessage(`$(check) ${issueIds.length} ${issueIds.length === 1 ? "issue" : "issues"} set to ${selected.value}%`, 2000);
         }
 
+        issueIds.forEach((id) => syncCachedDoneRatio(id, selected.value));
         issueIds.forEach((id) => GanttPanel.currentPanel?.updateIssueDoneRatio(id, selected.value));
         refreshGanttData();
       } catch (error) {
