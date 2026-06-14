@@ -995,3 +995,18 @@ didn't.
 ONE capture-phase document listener that stops propagation, not N
 exclusions in bubble handlers. Capture runs first regardless of
 registration order, so downstream handlers need zero knowledge of the rule.
+
+## Optimistic UI Update vs Stale Cache (v4.30.0)
+
+**Problem**: Done-ratio commands optimistically updated the Gantt
+(`updateIssueDoneRatio`), then called `refreshGanttData`, which re-read the
+projects tree's `assignedIssues` cache and reverted the bar — the server
+write (`updateDoneRatio`) only invalidated the per-issue `getIssueById`
+cache, not the list the Gantt re-renders from.
+
+**Lesson**: An optimistic UI mutation and a follow-up "refresh" must read the
+SAME source of truth, or the refresh clobbers the mutation. When a write has
+a server side-effect but the UI renders from a separate in-memory cache,
+update that cache too (here: mutate the live `assignedIssues`/`dependencyIssues`
+objects). Tree getters that return live array refs (not copies) make this a
+one-liner; verify they're live before relying on it.

@@ -51,7 +51,9 @@ Browse your assigned issues grouped by project.
 **Actions (right-click):**
 - Quick Update (status + assignee + comment in one step)
 - Log Time
-- Set % Done
+- Set % Done (or Clear → track logged time)
+- Set Internal Estimate (hours remaining, overrides the budget heuristic)
+- Toggle Ad-Hoc Budget (time on it can contribute hours to other issues)
 - Create Sub-Issue
 - Show in Gantt
 - Open in Browser
@@ -90,11 +92,9 @@ Interactive timeline for workload visualization.
 - Drag bar body → move both dates together
 - Right-click bar → Update issue dialog
 
-**Selection:**
-- Click → select single issue
-- Ctrl+click → toggle selection
-- Shift+click → select range
-- Ctrl+A → select all
+**Selection:** (row-based — bars aren't selectable)
+- Click row → select; Ctrl+click → toggle; Shift+click → range; Ctrl+A → all
+- Click a bar → pin its highlight (bar + dependency arrows stay lit); Escape clears
 - Drag selected → bulk move
 
 **Navigation:**
@@ -103,19 +103,27 @@ Interactive timeline for workload visualization.
 - Enter → open issue actions
 - Minimap (bottom) → click/drag to navigate
 
+**Color language** (all theme-aware):
+- **Bar fill = schedule health:** blue = done, green = on track, yellow = at risk, red = overbooked (>100% shows the real over-budget percent)
+- **Bar border = state:** red = overdue, orange pulse = projected late, purple dotted = ad-hoc, dashed = external
+- **Ghost bar** → translucent red extension to the projected finish when a task runs past today or past its due date (hover for details)
+- **Dependency arrows:** green = source on schedule, red = late or projected late
+
 **Visualization:**
 - Zoom: Day / Week / Month / Quarter / Year
-- Intensity toggle → daily work distribution on bars
-- Critical path toggle → highlight blocking chains
-- Capacity ribbon → daily utilization overview
-- % Done shown on bars
-- Overdue issues → red outline
+- Late chip → count of late issues; click to filter to just those
+- Highlight my issues → theme-blue labels (on by default, toggle in menu)
+- Intensity / critical path / capacity ribbon toggles
+- Progress and flexibility shown on hover
+- Sort by due date (earliest first) by default; lookback selector clamps the axis
 - Project filter → checkboxes to show/hide
 
 **Dependencies:**
 - Drag from circle → create relation
 - Right-click arrow → remove relation
 - Relation types: blocks, precedes, follows, relates, duplicates, copied
+
+**Actions (right-click bar):** Update issue, Set Status / Priority, Set % Done (or Clear), Set Internal Estimate, Toggle Ad-Hoc Budget, Log Time, Add to Kanban
 
 **Other:**
 - Undo/redo for all edits
