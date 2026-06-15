@@ -187,14 +187,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   myTimeEntriesTree.setMonthlySchedules(cleanupResources.monthlySchedules ?? {});
   myTimeEntriesTree.setDraftQueue(draftQueue);
 
+  // Shared fan-out after a time-entry data change: refresh the time-entries
+  // tree and the Gantt (time entries affect contribution data).
+  const refreshTimeAndGantt = () => {
+    myTimeEntriesTree.refresh();
+    void vscode.commands.executeCommand("redmyne.refreshGanttData");
+  };
+
   const { controller: kanbanController, statusBar: kanbanStatusBar, treeProvider: kanbanTreeProvider, treeView: kanbanTreeView } =
     setupKanban({
       context,
       getServer: () => projectsTree.server,
-      refreshAfterTimeLog: () => {
-        myTimeEntriesTree.refresh();
-        vscode.commands.executeCommand("redmyne.refreshGanttData");
-      },
+      refreshAfterTimeLog: refreshTimeAndGantt,
     });
   cleanupResources.kanbanController = kanbanController;
   cleanupResources.kanbanStatusBar = kanbanStatusBar;
@@ -204,11 +208,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Register time entry commands
   registerTimeEntryCommands(context, {
     getServer: () => projectsTree.server,
-    refreshTree: () => {
-      myTimeEntriesTree.refresh();
-      // Also refresh Gantt if open (time entries affect contribution data)
-      vscode.commands.executeCommand("redmyne.refreshGanttData");
-    },
+    refreshTree: refreshTimeAndGantt,
     getMonthlySchedules: () => cleanupResources.monthlySchedules ?? {},
     getSelectedNode: () => myTimeEntriesTree.getSelectedNode() as SelectableNode | undefined,
     isDraftMode: () => draftModeManager.isEnabled,

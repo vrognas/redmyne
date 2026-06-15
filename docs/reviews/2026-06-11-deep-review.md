@@ -818,7 +818,7 @@ Status legend: [ ] open, [x] fixed, [-] wontfix.
 - **detail:** The command has exactly two invocation sources: the tooltip markdown command URI at src/trees/my-time-entries-tree.ts:830/846 which encodes `[issueId]` (first arg is a number, handled by lines 410-412), and package.json context menus (lines 174, 1022, 1417) which pass the tree node with `_entry` (handled by lines 414-417). The `{issue_id: number}` branch (419-423) and the string-parsing branch (424-429) have no callers anywhere in src/ or package.json.
 - **fix:** Delete the issue_id-object and string branches; keep the number and _entry-node cases. The getIssueIdOrShowError guard at line 431 already covers any unexpected shape.
 
-### 135. [ ] src/extension.ts:194 — Tree+Gantt refresh fan-out repeated at four sites in activate()
+### 135. [x] src/extension.ts:194 — Tree+Gantt refresh fan-out repeated at four sites in activate()
 
 - **dimension:** duplication | **verdict:** CONFIRMED
 - **detail:** The same 'refresh dependents after data change' fan-out is hand-rolled four times: (1) src/extension.ts:194-197 kanban refreshAfterTimeLog — myTimeEntriesTree.refresh() + executeCommand("redmyne.refreshGanttData"); (2) src/extension.ts:207-211 time-entry-commands refreshTree — identical pair; (3) src/extension.ts:289-293 projectsTree.onDidChangeTreeData — workloadStatusBar.update() + refreshGanttData; (4) src/extension.ts:441-446 draft-mode refreshTrees — projectsTree.refresh() + myTimeEntriesTree.refresh() + refreshGanttData + refreshTimesheet. Each new consumer re-derives which views must be poked, and sites already drift (some refresh the workload bar, some the timesheet).
