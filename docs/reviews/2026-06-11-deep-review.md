@@ -704,13 +704,13 @@ Status legend: [ ] open, [x] fixed, [-] wontfix.
 - **detail:** selectedArrowElements (index.js:1348) only ever mirrors the single selectedArrow (pushed at 1367/1412, read only inside clearArrowSelection at 1388) — it is redundant state. The inline clear in the click handler (1353-1359) duplicates clearArrowSelection but resets neither array, so selectedArrowElements and arrowConnectedElements grow by one arrow + all connected bars/labels on every successive arrow click until the next rowWindow refresh happens to flush arrowConnectedElements (1414-1415). The accumulation also retains refs to unmounted recycled SVG elements that still carry .arrow-connected.
 - **fix:** Delete selectedArrowElements (selectedArrow alone suffices for clearing) and replace the inline clear block at 1353-1359 with a call to clearArrowSelection(), which already resets arrowConnectedElements correctly.
 
-### 116. [ ] src/webviews/gantt/index.js:614 — sticky-left width / visible-timeline-width computed inline at 4 sites
+### 116. [x] src/webviews/gantt/index.js:614 — sticky-left width / visible-timeline-width computed inline at 4 sites
 
 - **dimension:** duplication | **verdict:** CONFIRMED
 - **detail:** The 'subtract sticky-left column width from clientWidth' geometry is re-derived at: index.js:614-617 (getCenterDateMs), index.js:627-629 (scrollToCenterDate), index.js:1509-1511 (scrollToToday), and index.js:778-779 (scrollToIssue handler, using a different measurement — getBoundingClientRect().width and the bare '.gantt-sticky-left' selector instead of '.gantt-body .gantt-sticky-left' + offsetWidth). The fourth copy has already drifted in both selector and measurement API.
 - **fix:** One helper next to getCenterDateMs, e.g. `function getVisibleTimelineWidth() { const w = document.querySelector('.gantt-body .gantt-sticky-left')?.offsetWidth ?? 0; return ganttScroll.clientWidth - w; }`, used by all four sites.
 
-### 117. [ ] src/webviews/gantt/index.js:752 — scrollToIssue message handler re-implements scrollToAndHighlight; highlight+setTimeout pattern at 4 sites
+### 117. [x] src/webviews/gantt/index.js:752 — scrollToIssue message handler re-implements scrollToAndHighlight; highlight+setTimeout pattern at 4 sites
 
 - **dimension:** duplication | **verdict:** CONFIRMED
 - **detail:** The scrollToIssue handler (index.js:752-795) and scrollToAndHighlight (index.js:1519-1537) both: resolve meta via getRowMetaByIssueId → rowWindow.scrollToKey, query label/bar by data-issue-id, horizontally scroll, and apply the add-'highlighted'-then-setTimeout-remove pattern. That pattern appears 4 times: index.js:768-769, 790-791 (2000ms) and 1525-1527, 1534-1535 (1500ms) — the durations have already diverged. Only the horizontal centering math differs (center-bar vs fixed 100px offset).

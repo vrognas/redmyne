@@ -607,13 +607,24 @@ function initializeGantt(state, rowWindow) {
     let savedScrollTop = previousState.scrollTop ?? null;
     let savedCenterDateMs = previousState.centerDateMs;
 
+    // Visible timeline width = scroll viewport minus the sticky-left column.
+    // (One source of truth — the inline copies had drifted in selector +
+    // measurement API.)
+    function getVisibleTimelineWidth() {
+      const stickyWidth = document.querySelector('.gantt-body .gantt-sticky-left')?.offsetWidth ?? 0;
+      return ganttScroll ? ganttScroll.clientWidth - stickyWidth : 0;
+    }
+
+    // Add the transient highlight class and clear it after `ms`.
+    function flashHighlight(el, ms) {
+      el.classList.add('highlighted');
+      setTimeout(() => el.classList.remove('highlighted'), ms);
+    }
+
     // Convert scroll position to center date (milliseconds)
     function getCenterDateMs() {
       if (!ganttScroll) return null;
-      // Account for sticky left column (same as scrollToCenterDate)
-      const stickyLeft = document.querySelector('.gantt-body .gantt-sticky-left');
-      const stickyWidth = stickyLeft?.offsetWidth ?? 0;
-      const visibleTimelineWidth = ganttScroll.clientWidth - stickyWidth;
+      const visibleTimelineWidth = getVisibleTimelineWidth();
       const centerX = ganttScroll.scrollLeft + visibleTimelineWidth / 2;
       const ratio = centerX / timelineWidth;
       return minDateMs + ratio * (maxDateMs - minDateMs);
@@ -624,10 +635,7 @@ function initializeGantt(state, rowWindow) {
       if (!ganttScroll) return;
       const ratio = (dateMs - minDateMs) / (maxDateMs - minDateMs);
       const centerX = ratio * timelineWidth;
-      const stickyLeft = document.querySelector('.gantt-body .gantt-sticky-left');
-      const stickyWidth = stickyLeft?.offsetWidth ?? 0;
-      const visibleTimelineWidth = ganttScroll.clientWidth - stickyWidth;
-      ganttScroll.scrollLeft = Math.max(0, centerX - visibleTimelineWidth / 2);
+      ganttScroll.scrollLeft = Math.max(0, centerX - getVisibleTimelineWidth() / 2);
     }
 
     function saveState() {
@@ -751,48 +759,9 @@ function initializeGantt(state, rowWindow) {
           }
         }
       } else if (message.command === 'scrollToIssue') {
-        // Scroll to, focus, and highlight a specific issue. The target row is
-        // usually outside the mounted window (that's why the user asked to
-        // reveal it) — scrollToKey scrolls vertically and mounts it first.
-        const issueId = message.issueId;
-        const scrollContainer = document.getElementById('ganttScroll');
-        if (!scrollContainer) return;
-        const meta = rowWindow?.getRowMetaByIssueId(issueId);
-        if (meta) rowWindow.scrollToKey(meta.key);
-
-        const label = document.querySelector('.issue-label[data-issue-id="' + issueId + '"]');
-        const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
-        let targetScrollLeft = scrollContainer.scrollLeft;
-
-        if (label) {
-          label.focus({ preventScroll: true });
-          label.classList.add('highlighted');
-          setTimeout(() => label.classList.remove('highlighted'), 2000);
-        }
-
-        if (bar) {
-          // Calculate horizontal scroll to show the bar
-          const startX = parseFloat(bar.getAttribute('data-start-x') || '0');
-          const endX = parseFloat(bar.getAttribute('data-end-x') || '0');
-          const barWidth = endX - startX;
-          const viewportWidth = scrollContainer.clientWidth;
-          const stickyLeftWidth = document.querySelector('.gantt-sticky-left')?.getBoundingClientRect().width || 0;
-          const availableWidth = viewportWidth - stickyLeftWidth;
-
-          if (barWidth <= availableWidth - 100) {
-            // Bar fits: center it in the available viewport
-            targetScrollLeft = startX - (availableWidth - barWidth) / 2;
-          } else {
-            // Bar too wide: show start with some padding
-            targetScrollLeft = startX - 50;
-          }
-          targetScrollLeft = Math.max(0, targetScrollLeft);
-
-          bar.classList.add('highlighted');
-          setTimeout(() => bar.classList.remove('highlighted'), 2000);
-        }
-
-        scrollContainer.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
+        // Reveal + focus + highlight an issue. centerBar centers the bar in
+        // the visible timeline; scrollToKey mounts the (likely-unmounted) row.
+        scrollToAndHighlight(message.issueId, { centerBar: true, focusLabel: true, duration: 2000 });
       }
     };
 
@@ -1560,33 +1529,44 @@ function initializeGantt(state, rowWindow) {
         return;
       }
       if (ganttScroll) {
-        const stickyLeft = document.querySelector('.gantt-body .gantt-sticky-left');
-        const stickyWidth = stickyLeft?.offsetWidth ?? 0;
-        const visibleTimelineWidth = ganttScroll.clientWidth - stickyWidth;
-        ganttScroll.scrollLeft = Math.max(0, todayX - visibleTimelineWidth / 2);
+        ganttScroll.scrollLeft = Math.max(0, todayX - getVisibleTimelineWidth() / 2);
       }
     }
 
     // Scroll to and highlight an issue (for click/keyboard navigation).
     // The row may be unmounted — scrollToKey scrolls vertically AND mounts
     // it, so the element queries below can succeed.
-    function scrollToAndHighlight(issueId) {
+    // opts.centerBar: center the bar in the visible timeline (scrollToIssue
+    // reveal) instead of the default left-offset nudge. opts.focusLabel
+    // moves keyboard focus to the row label. opts.duration: highlight ms.
+    function scrollToAndHighlight(issueId, opts = {}) {
       if (!issueId) return;
+      const ms = opts.duration ?? 1500;
       const meta = rowWindow?.getRowMetaByIssueId(issueId);
       if (meta) rowWindow.scrollToKey(meta.key);
       const label = document.querySelector('.issue-label[data-issue-id="' + issueId + '"]');
       const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
       if (label) {
-        label.classList.add('highlighted');
-        setTimeout(() => label.classList.remove('highlighted'), 1500);
+        if (opts.focusLabel) label.focus({ preventScroll: true });
+        flashHighlight(label, ms);
       }
       if (bar && ganttScroll) {
-        const barRect = bar.getBoundingClientRect();
-        const scrollRect = ganttScroll.getBoundingClientRect();
-        const scrollLeft = ganttScroll.scrollLeft + barRect.left - scrollRect.left - 100;
+        let scrollLeft;
+        if (opts.centerBar) {
+          const startX = parseFloat(bar.getAttribute('data-start-x') || '0');
+          const endX = parseFloat(bar.getAttribute('data-end-x') || '0');
+          const barWidth = endX - startX;
+          const availableWidth = getVisibleTimelineWidth();
+          scrollLeft = barWidth <= availableWidth - 100
+            ? startX - (availableWidth - barWidth) / 2
+            : startX - 50;
+        } else {
+          const barRect = bar.getBoundingClientRect();
+          const scrollRect = ganttScroll.getBoundingClientRect();
+          scrollLeft = ganttScroll.scrollLeft + barRect.left - scrollRect.left - 100;
+        }
         ganttScroll.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' });
-        bar.classList.add('highlighted');
-        setTimeout(() => bar.classList.remove('highlighted'), 1500);
+        flashHighlight(bar, ms);
       }
     }
 
