@@ -1547,7 +1547,7 @@ import { escapeHtml } from '../gantt-html-escape';
     // Get row structure
     const rowInputs = Array.from(currentRow.querySelectorAll(".day-input:not(:disabled)"));
     const colIndex = rowInputs.indexOf(currentInput);
-    const allRows = Array.from(document.querySelectorAll("#gridBody tr:not(.group-header-row)"));
+    const allRows = Array.from(document.querySelectorAll("#gridBody tr:not(.group-header)"));
     const rowIndex = allRows.indexOf(currentRow);
 
     let targetInput = null;
