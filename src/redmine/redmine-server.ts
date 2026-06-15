@@ -501,6 +501,51 @@ export class RedmineServer implements IRedmineServer {
   }
 
   /**
+   * Shared change-aware cache ritual: serve a still-fresh cached value, probe
+   * the server for changes when the cooldown allows, and refetch only when the
+   * probe reports a change (or the cooldown/TTL forces it). Factored out of
+   * getProjects/getTimeEntries/getFilteredIssues so the probe semantics — incl.
+   * the `changed === null || !changed` "use cache on no-change-or-probe-failure"
+   * rule and the `>=` probe operator — live in exactly one place.
+   *
+   * @param readCached serve-value for a non-expired entry, or null to force refetch
+   *                   (lets getProjects gate on its separate cachedProjects mirror)
+   * @param refetch    fetches fresh data, returning the serve-value, the cache
+   *                   payload to store, and the probe baseline (max updated_on)
+   * @param onStale    optional hook run when a change IS detected, before refetch
+   *                   (e.g. clearing an external mirror)
+   */
+  private async getChangeAwareCached<TServe, TStore>(opts: {
+    key: string;
+    probeEndpoint: string;
+    readCached: (entry: { data: TStore; lastCheckedAt: string }) => TServe | null;
+    refetch: () => Promise<{ serve: TServe; store: TStore; maxUpdatedOn: string }>;
+    onStale?: () => void;
+  }): Promise<TServe> {
+    const { key, probeEndpoint, readCached, refetch, onStale } = opts;
+    const cached = this.changeCache.get<TStore>(key);
+    if (cached && !this.changeCache.isExpired(key, CHANGE_CACHE_TTL_MS)) {
+      const servable = readCached(cached);
+      if (servable !== null) {
+        if (!this.changeCache.shouldProbe(key, MIN_PROBE_INTERVAL_MS)) {
+          return servable;
+        }
+        const changed = await this.hasChanges(probeEndpoint, cached.lastCheckedAt);
+        if (changed === null || !changed) {
+          // null = probe failed (use cache, apply backoff); false = no changes
+          this.changeCache.touch(key);
+          return servable;
+        }
+        onStale?.();
+      }
+    }
+
+    const { serve, store, maxUpdatedOn } = await refetch();
+    this.changeCache.set(key, store, maxUpdatedOn);
+    return serve;
+  }
+
+  /**
    * Encode data as JSON buffer for POST/PUT requests
    */
   private encodeJson<T>(data: T): Buffer {
@@ -520,43 +565,42 @@ export class RedmineServer implements IRedmineServer {
   }
 
   async getProjects(): Promise<RedmineProject[]> {
-    const cached = this.changeCache.get<true>("projects");
-    if (
-      this.cachedProjects &&
-      cached &&
-      !this.changeCache.isExpired("projects", CHANGE_CACHE_TTL_MS)
-    ) {
-      if (!this.changeCache.shouldProbe("projects", MIN_PROBE_INTERVAL_MS)) {
-        return this.cachedProjects;
-      }
+    // Stores a `true` sentinel in the change cache; the actual list lives in the
+    // cachedProjects mirror, so readCached gates on it (null => force refetch)
+    // and onStale clears it when a change is detected.
+    return this.getChangeAwareCached<RedmineProject[], true>({
+      key: "projects",
+      probeEndpoint: "/projects.json",
       // Probe via updated_on so renames/parent/identifier changes are caught
       // (count-only probes missed in-place edits).
-      const changed = await this.hasChanges("/projects.json", cached.lastCheckedAt);
-      if (changed === null || !changed) {
-        this.changeCache.touch("projects");
-        return this.cachedProjects;
-      }
-      this.cachedProjects = null;
-    }
-
-    // Baseline the change probe on the SERVER's max updated_on (consistent
-    // with getTimeEntries/getFilteredIssues) — client wall-clock skew vs the
-    // server makes `updated_on=>{baseline}` probes miss or over-report changes.
-    let maxUpdatedOn = "";
-    this.cachedProjects = await this.paginate<Project, RedmineProject>(
-      "/projects.json",
-      "projects",
-      (projects) => {
-        for (const p of projects as Array<Project & { updated_on?: string }>) {
-          if (p.updated_on && p.updated_on > maxUpdatedOn) {
-            maxUpdatedOn = p.updated_on;
+      readCached: () => this.cachedProjects,
+      onStale: () => {
+        this.cachedProjects = null;
+      },
+      refetch: async () => {
+        // Baseline the change probe on the SERVER's max updated_on (consistent
+        // with getTimeEntries/getFilteredIssues) — client wall-clock skew vs the
+        // server makes `updated_on=>{baseline}` probes miss or over-report changes.
+        let maxUpdatedOn = "";
+        this.cachedProjects = await this.paginate<Project, RedmineProject>(
+          "/projects.json",
+          "projects",
+          (projects) => {
+            for (const p of projects as Array<Project & { updated_on?: string }>) {
+              if (p.updated_on && p.updated_on > maxUpdatedOn) {
+                maxUpdatedOn = p.updated_on;
+              }
+            }
+            return projects.map((proj) => new RedmineProject({ ...proj }));
           }
-        }
-        return projects.map((proj) => new RedmineProject({ ...proj }));
-      }
-    );
-    this.changeCache.set("projects", true, maxUpdatedOn || new Date().toISOString());
-    return this.cachedProjects;
+        );
+        return {
+          serve: this.cachedProjects,
+          store: true,
+          maxUpdatedOn: maxUpdatedOn || new Date().toISOString(),
+        };
+      },
+    });
   }
 
   /**
@@ -871,22 +915,15 @@ export class RedmineServer implements IRedmineServer {
     const user = params?.allUsers ? "all" : "me";
     const cacheKey = `time_entries:${user}:${params?.from ?? ""}:${params?.to ?? ""}`;
 
-    // Check change-aware cache
-    const cached = this.changeCache.get<TimeEntry[]>(cacheKey);
-    if (cached && !this.changeCache.isExpired(cacheKey, CHANGE_CACHE_TTL_MS)) {
-      if (!this.changeCache.shouldProbe(cacheKey, MIN_PROBE_INTERVAL_MS)) {
-        return { time_entries: cached.data };
-      }
-      const changed = await this.hasChanges(endpoint, cached.lastCheckedAt);
-      if (changed === null || !changed) {
-        // null = probe failed (use cache, apply backoff); false = no changes
-        this.changeCache.touch(cacheKey);
-        return { time_entries: cached.data };
-      }
-    }
-
-    const time_entries = await this.paginate<TimeEntry>(endpoint, "time_entries");
-    this.changeCache.set(cacheKey, time_entries, extractMaxUpdatedOn(time_entries));
+    const time_entries = await this.getChangeAwareCached<TimeEntry[], TimeEntry[]>({
+      key: cacheKey,
+      probeEndpoint: endpoint,
+      readCached: (entry) => entry.data,
+      refetch: async () => {
+        const data = await this.paginate<TimeEntry>(endpoint, "time_entries");
+        return { serve: data, store: data, maxUpdatedOn: extractMaxUpdatedOn(data) };
+      },
+    });
     return { time_entries };
   }
 
@@ -1560,32 +1597,27 @@ export class RedmineServer implements IRedmineServer {
     const endpoint = `/issues.json?${params.toString()}`;
     const cacheKey = `issues:${filter.assignee}:${filter.status}:${filter.priority ?? "any"}`;
 
-    // Check change-aware cache
-    const cached = this.changeCache.get<Issue[]>(cacheKey);
-    if (cached && !this.changeCache.isExpired(cacheKey, CHANGE_CACHE_TTL_MS)) {
-      if (!this.changeCache.shouldProbe(cacheKey, MIN_PROBE_INTERVAL_MS)) {
-        return { issues: cached.data };
-      }
-      const changed = await this.hasChanges(endpoint, cached.lastCheckedAt);
-      if (changed === null || !changed) {
-        this.changeCache.touch(cacheKey);
-        return { issues: cached.data };
-      }
-    }
-
-    // Stream pages into onProgress as they arrive. Only accumulate when the
-    // caller cares (avoids ~1500-ref array work on every plain fetch); pass a
-    // snapshot so callers can't observe later mutations through the reference.
-    let onPage: ((page: Issue[]) => void) | undefined;
-    if (onProgress) {
-      const accumulated: Issue[] = [];
-      onPage = (page) => {
-        accumulated.push(...page);
-        onProgress([...accumulated]);
-      };
-    }
-    const issues = await this.paginate<Issue>(endpoint, "issues", undefined, onPage);
-    this.changeCache.set(cacheKey, issues, extractMaxUpdatedOn(issues));
+    const issues = await this.getChangeAwareCached<Issue[], Issue[]>({
+      key: cacheKey,
+      probeEndpoint: endpoint,
+      readCached: (entry) => entry.data,
+      refetch: async () => {
+        // Stream pages into onProgress as they arrive (only on refetch, never on
+        // a cache hit). Only accumulate when the caller cares (avoids ~1500-ref
+        // array work on every plain fetch); pass a snapshot so callers can't
+        // observe later mutations through the reference.
+        let onPage: ((page: Issue[]) => void) | undefined;
+        if (onProgress) {
+          const accumulated: Issue[] = [];
+          onPage = (page) => {
+            accumulated.push(...page);
+            onProgress([...accumulated]);
+          };
+        }
+        const data = await this.paginate<Issue>(endpoint, "issues", undefined, onPage);
+        return { serve: data, store: data, maxUpdatedOn: extractMaxUpdatedOn(data) };
+      },
+    });
     return { issues };
   }
 

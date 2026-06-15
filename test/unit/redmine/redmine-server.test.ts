@@ -3,6 +3,7 @@ import {
   RedmineServer,
   RedmineOptionsError,
 } from "../../../src/redmine/redmine-server";
+import { MIN_PROBE_INTERVAL_MS } from "../../../src/redmine/change-aware-cache";
 import {
   QuickUpdate,
   Membership,
@@ -1127,6 +1128,64 @@ describe("RedmineServer", () => {
       await expect(server.doRequest("/test.json", "GET")).rejects.toThrow(
         'redmyne.caFile: cannot read "/nonexistent/path/ca.pem"'
       );
+    });
+  });
+
+  describe("getChangeAwareCached (consolidated change-aware cache ritual)", () => {
+    // One end-to-end proof of the helper now shared by getProjects/
+    // getTimeEntries/getFilteredIssues: a cache hit avoids refetch, and a
+    // probe-detected change forces a refetch. Exercised via getTimeEntries.
+    it("serves cache on hit and refetches when a change is probed", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] }); // advance Date.now only; keep microtasks real
+      vi.setSystemTime(new Date("2026-06-01T00:00:00Z"));
+      try {
+        let fullFetches = 0; // limit=100 list pulls
+        let probes = 0; // limit=1 updated_on probes
+        const requestFn = createRouteMockRequest((options) => {
+          const path = options.path || "/";
+          if (options.method === "GET" && path.includes("/time_entries.json")) {
+            if (path.includes("limit=1&") || path.endsWith("limit=1")) {
+              probes++;
+              return { body: { total_count: 1 } }; // a change exists since baseline
+            }
+            fullFetches++;
+            return {
+              body: {
+                time_entries: [
+                  { id: 1, hours: 2, comments: "x", updated_on: "2026-06-01T00:00:00Z" },
+                ],
+                total_count: 1,
+              },
+            };
+          }
+          return { body: { ok: true } };
+        });
+
+        const server = new RedmineServer({
+          address: "https://redmine.example.com",
+          key: "test-key",
+          requestFn,
+        });
+
+        // 1) cold -> one full fetch
+        const first = await server.getTimeEntries();
+        expect(first.time_entries).toHaveLength(1);
+        expect(fullFetches).toBe(1);
+
+        // 2) immediate repeat is within the probe cooldown -> served from cache,
+        //    no probe, no refetch
+        await server.getTimeEntries();
+        expect(fullFetches).toBe(1);
+        expect(probes).toBe(0);
+
+        // 3) advance past the probe cooldown; probe reports a change -> refetch
+        vi.setSystemTime(new Date(Date.now() + MIN_PROBE_INTERVAL_MS + 1000));
+        await server.getTimeEntries();
+        expect(probes).toBe(1);
+        expect(fullFetches).toBe(2);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
