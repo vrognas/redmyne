@@ -746,7 +746,7 @@ Status legend: [ ] open, [x] fixed, [-] wontfix.
 - **detail:** The legend (lines 237-241) claims: "+Nd days of slack / -Nd days late" — but the flexibility badge renders PERCENTAGES (`+${flexPct}%`, gantt-html-generator.ts:815); "🚧N blocked by this" — the blocks badge actually renders `⛔N` (gantt-html-generator.ts:827); "⛔N blockers" — the blocker badge actually renders `⏳N` (gantt-html-generator.ts:838); "◆ milestone" — no milestone glyph is rendered anywhere in the generator. Net effect: the one UI element meant to explain badge semantics teaches users the inverse meaning of ⛔ (legend says "blockers", bar means "blocks N others").
 - **fix:** Rewrite the legend to match generateBarBadges: `+N%/-N%` flexibility, `⛔N` blocks N tasks, `⏳N` waiting on N blockers; delete the milestone row (or implement it).
 
-### 123. [ ] src/webviews/gantt/gantt-html-generator.ts:210 — The data-collapse-key/data-parent-key attribute pair (with the `|| ""` fallback) is hand-interpolated 18 times
+### 123. [x] src/webviews/gantt/gantt-html-generator.ts:210 — The data-collapse-key/data-parent-key attribute pair (with the `|| ""` fallback) is hand-interpolated 18 times
 
 - **dimension:** duplication | **verdict:** CONFIRMED
 - **detail:** `data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"` appears at src/webviews/gantt/gantt-html-generator.ts lines 210, 235, 260, 283, 294, 308, 314, 340, 355, 378, 393, 403, 476, 499, 508, 534, 558, and 737. These attributes are the row-window's identity contract (mount/recycle keying), so a single typo or a future third attribute (e.g., depth) means 18 coordinated edits; emptyCellRow (line 282) already exists as a partial helper but only covers the empty-cell case.

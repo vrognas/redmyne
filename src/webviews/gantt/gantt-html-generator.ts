@@ -257,7 +257,7 @@ export function generateIssueLabel(
   const isMine = ctx.currentUserId !== null && issue.assigneeId === ctx.currentUserId;
 
   return `
-    <g class="issue-label gantt-row cursor-pointer${isMine ? " my-issue" : ""}" data-issue-id="${issue.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-has-children="${row.hasChildren}" data-tooltip="${escapeAttr(tooltip)}" data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}' tabindex="0" role="button" aria-label="Open issue #${issue.id}">
+    <g class="issue-label gantt-row cursor-pointer${isMine ? " my-issue" : ""}" data-issue-id="${issue.id}" ${collapseKeyAttrs(row.collapseKey, row.parentKey)} data-has-children="${row.hasChildren}" data-tooltip="${escapeAttr(tooltip)}" data-vscode-context='{"webviewSection":"issueBar","issueId":${issue.id},"projectId":${issue.projectId},"hasParent":${issue.parentId !== null},"preventDefaultContextMenuItems":true}' tabindex="0" role="button" aria-label="Open issue #${issue.id}">
       <rect class="row-hit-area" x="0" y="-1" width="100%" height="${ctx.barHeight + 2}" fill="transparent" pointer-events="all"/>
       ${chevron}
       <text class="issue-text" x="${10 + indent + textOffset}" y="${ctx.barHeight / 2 + 5}" fill="${issue.isExternal ? "var(--vscode-descriptionForeground)" : "var(--vscode-foreground)"}" font-size="13" opacity="${taskOpacity}">
@@ -282,7 +282,7 @@ export function generateProjectLabel(
   const tooltip = ctx.buildProjectTooltip(row);
 
   return `
-    <g class="project-label gantt-row cursor-pointer" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-project-id="${row.id}" data-has-children="${row.hasChildren}" data-tooltip="${escapeAttr(tooltip)}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}' tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
+    <g class="project-label gantt-row cursor-pointer" ${collapseKeyAttrs(row.collapseKey, row.parentKey)} data-project-id="${row.id}" data-has-children="${row.hasChildren}" data-tooltip="${escapeAttr(tooltip)}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}' tabindex="0" role="button" aria-label="Toggle project ${escapeHtml(row.label)}">
       <rect class="row-hit-area" x="0" y="-1" width="100%" height="${ctx.barHeight + 2}" fill="transparent" pointer-events="all"/>
       ${chevron}
       <text x="${labelX}" y="${ctx.barHeight / 2 + 5}" fill="var(--vscode-descriptionForeground)" font-size="13" font-weight="bold" pointer-events="none">
@@ -307,7 +307,7 @@ export function generateTimeGroupLabel(
   const countBadge = row.childCount ? ` (${row.childCount})` : "";
 
   return `
-    <g class="time-group-label gantt-row ${timeGroupClass}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-time-group="${row.timeGroup}" data-has-children="${row.hasChildren}" data-tooltip="${escapeAttr(row.label)}" tabindex="0" role="button" aria-label="Toggle ${escapeHtml(row.label)}">
+    <g class="time-group-label gantt-row ${timeGroupClass}" ${collapseKeyAttrs(row.collapseKey, row.parentKey)} data-time-group="${row.timeGroup}" data-has-children="${row.hasChildren}" data-tooltip="${escapeAttr(row.label)}" tabindex="0" role="button" aria-label="Toggle ${escapeHtml(row.label)}">
       <rect class="row-hit-area" x="0" y="-1" width="100%" height="${ctx.barHeight + 2}" fill="transparent" pointer-events="all"/>
       ${chevron}
       <text x="${10 + indent + ctx.chevronWidth}" y="${ctx.barHeight / 2 + 5}" fill="var(--vscode-foreground)" font-size="13" font-weight="bold" pointer-events="none">
@@ -329,8 +329,19 @@ function generateChevron(indent: number, barHeight: number): string {
 // Column Cell Generation
 // ============================================================================
 
+/**
+ * The row-window identity contract: the `data-collapse-key`/`data-parent-key`
+ * pair keys every mounted/recycled row. Hand-interpolated at 18 sites — one
+ * helper so a typo (or a future third key) is a single edit. parentKey keeps
+ * the `|| ""` fallback (collapseKey is always set); byte-identical to the
+ * inline form it replaced. Exported for testing.
+ */
+export function collapseKeyAttrs(collapseKey: string, parentKey: string | null): string {
+  return `data-collapse-key="${collapseKey}" data-parent-key="${parentKey || ""}"`;
+}
+
 function emptyCellRow(row: GanttRow): string {
-  return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"></g>`;
+  return `<g class="gantt-row" ${collapseKeyAttrs(row.collapseKey, row.parentKey)}></g>`;
 }
 
 /** Generate ID column cell */
@@ -341,7 +352,7 @@ export function generateIdCell(
   if (row.type !== "issue") return emptyCellRow(row);
 
   const issue = row.issue!;
-  return `<g class="gantt-row cursor-pointer" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-vscode-context='{"webviewSection":"issueIdColumn","issueId":${issue.id},"preventDefaultContextMenuItems":true}'>
+  return `<g class="gantt-row cursor-pointer" ${collapseKeyAttrs(row.collapseKey, row.parentKey)} data-vscode-context='{"webviewSection":"issueIdColumn","issueId":${issue.id},"preventDefaultContextMenuItems":true}'>
     <text class="gantt-col-cell" x="${ctx.idColumnWidth / 2}" y="${ctx.barHeight / 2 + 4}" text-anchor="middle">#${issue.id}</text>
   </g>`;
 }
@@ -355,13 +366,13 @@ export function generateStartDateCell(
 
   const issue = row.issue!;
   if (!issue.start_date) {
-    return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"><text class="gantt-col-cell" x="4" y="${ctx.barHeight / 2 + 4}" text-anchor="start">—</text></g>`;
+    return `<g class="gantt-row" ${collapseKeyAttrs(row.collapseKey, row.parentKey)}><text class="gantt-col-cell" x="4" y="${ctx.barHeight / 2 + 4}" text-anchor="start">—</text></g>`;
   }
 
   const startDate = parseLocalDate(issue.start_date);
   const displayDate = startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
-  return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}">
+  return `<g class="gantt-row" ${collapseKeyAttrs(row.collapseKey, row.parentKey)}>
     <title>${escapeAttr(issue.start_date)}</title>
     <text class="gantt-col-cell" x="4" y="${ctx.barHeight / 2 + 4}" text-anchor="start">${displayDate}</text>
   </g>`;
@@ -387,7 +398,7 @@ export function generateStatusCell(
   const cx = ctx.statusColumnWidth / 2;
   const cy = ctx.barHeight / 2;
 
-  return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}">
+  return `<g class="gantt-row" ${collapseKeyAttrs(row.collapseKey, row.parentKey)}>
     <title>${escapeAttr(statusName)}</title>
     <circle cx="${cx}" cy="${cy}" r="5" fill="${dotColor}"/>
   </g>`;
@@ -402,7 +413,7 @@ export function generateDueDateCell(
 
   const issue = row.issue!;
   if (!issue.due_date) {
-    return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"><text class="gantt-col-cell" x="4" y="${ctx.barHeight / 2 + 4}" text-anchor="start">—</text></g>`;
+    return `<g class="gantt-row" ${collapseKeyAttrs(row.collapseKey, row.parentKey)}><text class="gantt-col-cell" x="4" y="${ctx.barHeight / 2 + 4}" text-anchor="start">—</text></g>`;
   }
 
   const dueDate = parseLocalDate(issue.due_date);
@@ -425,7 +436,7 @@ export function generateDueDateCell(
     dueTooltip = daysUntilDue === 0 ? `${issue.due_date} (Due today)` : `${issue.due_date} (Due in ${daysUntilDue} day${daysUntilDue === 1 ? "" : "s"})`;
   }
 
-  return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}">
+  return `<g class="gantt-row" ${collapseKeyAttrs(row.collapseKey, row.parentKey)}>
     <title>${escapeAttr(dueTooltip)}</title>
     <text class="gantt-col-cell ${dueClass}" x="4" y="${ctx.barHeight / 2 + 4}" text-anchor="start">${displayDate}</text>
   </g>`;
@@ -440,7 +451,7 @@ export function generateAssigneeCell(
 
   const issue = row.issue!;
   if (!issue.assignee) {
-    return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"><text class="gantt-col-cell" x="${ctx.assigneeColumnWidth / 2}" y="${ctx.barHeight / 2 + 4}" text-anchor="middle">—</text></g>`;
+    return `<g class="gantt-row" ${collapseKeyAttrs(row.collapseKey, row.parentKey)}><text class="gantt-col-cell" x="${ctx.assigneeColumnWidth / 2}" y="${ctx.barHeight / 2 + 4}" text-anchor="middle">—</text></g>`;
   }
 
   const initials = getInitials(issue.assignee);
@@ -450,7 +461,7 @@ export function generateAssigneeCell(
   const cx = ctx.assigneeColumnWidth / 2;
   const cy = ctx.barHeight / 2;
 
-  return `<g class="gantt-row assignee-badge${isCurrentUser ? " current-user" : ""}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}">
+  return `<g class="gantt-row assignee-badge${isCurrentUser ? " current-user" : ""}" ${collapseKeyAttrs(row.collapseKey, row.parentKey)}>
     <title>${escapeAttr(issue.assignee)}</title>
     <circle class="avatar-fill-${colors.fill} avatar-stroke-${colors.stroke}" cx="${cx}" cy="${cy}" r="${radius}"/>
     <text x="${cx}" y="${cy + 3}" text-anchor="middle" fill="var(--vscode-editor-background)" font-size="9" font-weight="600">${escapeHtml(initials)}</text>
@@ -524,7 +535,7 @@ function generateProjectAggregateBar(
   ctx: GanttRenderContext
 ): string {
   if (!row.childDateRanges || row.childDateRanges.length === 0) {
-    return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"></g>`;
+    return `<g class="gantt-row" ${collapseKeyAttrs(row.collapseKey, row.parentKey)}></g>`;
   }
 
   const tooltip = ctx.buildProjectTooltip(row);
@@ -549,7 +560,7 @@ function generateProjectAggregateBar(
     })
     .join("");
 
-  return `<g class="aggregate-bars gantt-row" data-project-id="${row.id}" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-tooltip="${escapeAttr(tooltip)}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}'><title>${escapeAttr(tooltip)}</title>${aggregateBars}</g>`;
+  return `<g class="aggregate-bars gantt-row" data-project-id="${row.id}" ${collapseKeyAttrs(row.collapseKey, row.parentKey)} data-tooltip="${escapeAttr(tooltip)}" data-vscode-context='${escapeAttr(JSON.stringify({ webviewSection: "projectLabel", projectId: row.id, projectIdentifier: row.identifier || "", preventDefaultContextMenuItems: true }))}'><title>${escapeAttr(tooltip)}</title>${aggregateBars}</g>`;
 }
 
 /** Generate time-group aggregate bar */
@@ -558,7 +569,7 @@ function generateTimeGroupAggregateBar(
   ctx: GanttRenderContext
 ): string {
   if (!row.childDateRanges || row.childDateRanges.length === 0) {
-    return `<g class="gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"></g>`;
+    return `<g class="gantt-row" ${collapseKeyAttrs(row.collapseKey, row.parentKey)}></g>`;
   }
 
   const stripH = Math.max(4, Math.round(ctx.barContentHeight * 0.4));
@@ -583,7 +594,7 @@ function generateTimeGroupAggregateBar(
     })
     .join("");
 
-  return `<g class="aggregate-bars time-group-bars gantt-row" data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}" data-time-group="${row.timeGroup}">${aggregateBars}</g>`;
+  return `<g class="aggregate-bars time-group-bars gantt-row" ${collapseKeyAttrs(row.collapseKey, row.parentKey)} data-time-group="${row.timeGroup}">${aggregateBars}</g>`;
 }
 
 /** Generate parent (summary) bar */
@@ -607,7 +618,7 @@ function generateParentBar(
     <g class="issue-bar parent-bar gantt-row" data-issue-id="${issue.id}"
        data-project-id="${issue.projectId}"
        data-subject="${escapedSubject}"
-       data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
+       ${collapseKeyAttrs(row.collapseKey, row.parentKey)}
        data-start-date="${issue.start_date || ""}"
        data-due-date="${issue.due_date || ""}"
        data-start-x="${startX}" data-end-x="${endX}" data-center-y="${ctx.barHeight / 2}"
@@ -876,7 +887,7 @@ function generateRegularBar(
     <g class="issue-bar gantt-row${isPast ? " bar-past" : ""}${daysLate > 0 ? " bar-overdue" : ""}${hasOnlyStart ? " bar-open-ended" : ""}${issue.isExternal ? " bar-external" : ""}${issue.isAdHoc ? " bar-adhoc" : ""}${isCriticalPath ? " bar-critical" : ""}" data-issue-id="${issue.id}"
        data-project-id="${issue.projectId}"
        data-subject="${escapedSubject}"
-       data-collapse-key="${row.collapseKey}" data-parent-key="${row.parentKey || ""}"
+       ${collapseKeyAttrs(row.collapseKey, row.parentKey)}
        data-start-date="${issue.start_date || ""}"
        data-due-date="${issue.due_date || ""}"
        data-start-x="${startX}" data-end-x="${endX}" data-center-y="${ctx.barHeight / 2}"

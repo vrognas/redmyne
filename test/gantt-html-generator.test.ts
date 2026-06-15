@@ -17,6 +17,7 @@ import {
   buildArrowsPayload,
   projectDaysForHours,
   calculateDailyIntensity,
+  collapseKeyAttrs,
 } from "../src/webviews/gantt/gantt-html-generator";
 import type { GanttRow } from "../src/webviews/gantt-model";
 import type { GanttIssue } from "../src/webviews/gantt-model";
@@ -56,6 +57,20 @@ describe("gantt-html-generator", () => {
       expect(formatShortName("Viktor Rognås")).toBe("Viktor R.");
       expect(formatShortName("John")).toBe("John");
       expect(formatShortName("Mary Jane Watson")).toBe("Mary W.");
+    });
+
+    it("collapseKeyAttrs builds the row-window identity attribute pair", () => {
+      // Normal keys: both attributes rendered verbatim, no fallback applied.
+      expect(collapseKeyAttrs("issue-123", "project-1")).toBe(
+        'data-collapse-key="issue-123" data-parent-key="project-1"'
+      );
+      // Root rows: null/empty parentKey falls back to "" (collapseKey stays).
+      expect(collapseKeyAttrs("project-1", null)).toBe(
+        'data-collapse-key="project-1" data-parent-key=""'
+      );
+      expect(collapseKeyAttrs("project-1", "")).toBe(
+        'data-collapse-key="project-1" data-parent-key=""'
+      );
     });
   });
 
