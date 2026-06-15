@@ -71,6 +71,53 @@ function collectChildDateRanges(node: HierarchyNode): ChildDateRange[] {
   return ranges;
 }
 
+/** Subtree aggregates accumulated bottom-up (own contribution + children's). */
+interface SubtreeAggregate {
+  issues: Issue[];
+  dateRanges: ChildDateRange[];
+}
+
+/**
+ * Single post-order pass over an already-built tree: each node's subtree
+ * aggregate = its own issue contribution prepended to the concatenation of its
+ * children's already-computed aggregates (children are visited first), so every
+ * node is walked exactly once (O(n)) instead of re-collecting the full subtree
+ * at each level. Project nodes are decorated in place with childDateRanges and
+ * health, matching the previous collect-after-build output byte-for-byte (same
+ * DFS pre-order list fed to calculateProjectHealth).
+ */
+function decorateProjectMetrics(
+  node: HierarchyNode,
+  blockedIds: Set<number>
+): SubtreeAggregate {
+  const issues: Issue[] = [];
+  const dateRanges: ChildDateRange[] = [];
+
+  if (node.issue) {
+    issues.push(node.issue);
+    if (node.issue.start_date || node.issue.due_date) {
+      dateRanges.push({
+        startDate: node.issue.start_date ?? null,
+        dueDate: node.issue.due_date ?? null,
+        issueId: node.issue.id,
+      });
+    }
+  }
+
+  for (const child of node.children) {
+    const childAgg = decorateProjectMetrics(child, blockedIds);
+    for (const i of childAgg.issues) issues.push(i);
+    for (const r of childAgg.dateRanges) dateRanges.push(r);
+  }
+
+  if (node.type === "project") {
+    node.childDateRanges = dateRanges;
+    node.health = calculateProjectHealth(issues, blockedIds);
+  }
+
+  return { issues, dateRanges };
+}
+
 /**
  * Build an issue HierarchyNode with shared defaults.
  * Callers pass only what varies (depth, children, parentKey); `extras`
@@ -159,18 +206,6 @@ export function buildProjectHierarchy(
     }
   }
 
-  // Collect all issues from node and descendants (for health calculation)
-  const collectAllIssues = (node: HierarchyNode): Issue[] => {
-    const result: Issue[] = [];
-    if (node.issue) {
-      result.push(node.issue);
-    }
-    for (const child of node.children) {
-      result.push(...collectAllIssues(child));
-    }
-    return result;
-  };
-
   // Build project node recursively (with cycle protection)
   const visitedProjects = new Set<number>();
   const buildProjectNode = (
@@ -200,7 +235,8 @@ export function buildProjectHierarchy(
     // Combine: subprojects first, then issues
     const children = [...subprojectNodes, ...issueNodes];
 
-    // Build node first, then calculate aggregate dates
+    // Structure only; childDateRanges + health are filled by the single
+    // bottom-up decorateProjectMetrics pass below (avoids O(n*depth) re-walks).
     const node: HierarchyNode = {
       type: "project",
       id: projectId,
@@ -213,13 +249,6 @@ export function buildProjectHierarchy(
       identifier: project.identifier,
       customFields: project.customFields,
     };
-
-    // Collect child date ranges for aggregate bar rendering
-    node.childDateRanges = collectChildDateRanges(node);
-
-    // Calculate project health from all descendant issues
-    const allIssues = collectAllIssues(node);
-    node.health = calculateProjectHealth(allIssues, blockedIds);
 
     return node;
   };
@@ -234,9 +263,12 @@ export function buildProjectHierarchy(
       .filter((p) => !p.parent || !projectIdSet.has(p.parent.id))
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    return rootProjects
+    const roots = rootProjects
       .map((p) => buildProjectNode(p, null, 0))
       .filter((n): n is HierarchyNode => n !== null);
+    // Single bottom-up pass decorates every project node's childDateRanges + health.
+    for (const root of roots) decorateProjectMetrics(root, blockedIds);
+    return roots;
   }
 
   // Fallback: no project hierarchy, group by issue.project (old behavior)
@@ -266,12 +298,8 @@ export function buildProjectHierarchy(
       parentKey: null,
     };
 
-    // Collect child date ranges for aggregate bar rendering
-    node.childDateRanges = collectChildDateRanges(node);
-
-    // Calculate project health
-    const allIssues = collectAllIssues(node);
-    node.health = calculateProjectHealth(allIssues, blockedIds);
+    // Single bottom-up pass fills childDateRanges + health (was two subtree re-walks).
+    decorateProjectMetrics(node, blockedIds);
 
     return node;
   });

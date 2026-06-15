@@ -131,6 +131,39 @@ describe("hierarchy-builder extra coverage", () => {
     expect(tree[0].children.some((c) => c.type === "project" && c.id === 2)).toBe(true);
   });
 
+  it("aggregates metrics bottom-up across nested project levels (parent = sum of descendants)", () => {
+    // Grandparent > Parent > Child, each with one dated issue.
+    const grandparent = project(1, "Alpha");
+    const parent = project(2, "Beta", { id: 1, name: "Alpha" });
+    const child = project(3, "Gamma", { id: 2, name: "Beta" });
+    const issues = [
+      issue({ id: 11, project: { id: 1, name: "Alpha" }, start_date: "2025-01-01", due_date: "2025-01-05", estimated_hours: 4, spent_hours: 1 }),
+      issue({ id: 22, project: { id: 2, name: "Beta" }, start_date: "2025-01-02", due_date: "2025-01-06", estimated_hours: 8, spent_hours: 2 }),
+      issue({ id: 33, project: { id: 3, name: "Gamma" }, start_date: "2025-01-03", due_date: "2025-01-07", estimated_hours: 2, spent_hours: 3 }),
+    ];
+
+    const tree = buildProjectHierarchy(issues, emptyCache, [grandparent, parent, child], false, new Set());
+    expect(tree).toHaveLength(1);
+    const root = tree[0]; // Alpha
+
+    // Root health/date ranges cover ALL three descendant issues (own + nested).
+    expect(root.health?.counts.total).toBe(3);
+    expect(root.health?.hours).toEqual({ estimated: 14, spent: 6 });
+    expect(root.childDateRanges?.map((r) => r.issueId).sort((a, b) => a - b)).toEqual([11, 22, 33]);
+
+    // Mid-level Beta aggregates only itself + Gamma (issues 22, 33).
+    const beta = root.children.find((c) => c.type === "project" && c.id === 2)!;
+    expect(beta.health?.counts.total).toBe(2);
+    expect(beta.health?.hours).toEqual({ estimated: 10, spent: 5 });
+    expect(beta.childDateRanges?.map((r) => r.issueId).sort((a, b) => a - b)).toEqual([22, 33]);
+
+    // Leaf-level Gamma aggregates only its own issue (33).
+    const gamma = beta.children.find((c) => c.type === "project" && c.id === 3)!;
+    expect(gamma.health?.counts.total).toBe(1);
+    expect(gamma.health?.hours).toEqual({ estimated: 2, spent: 3 });
+    expect(gamma.childDateRanges?.map((r) => r.issueId)).toEqual([33]);
+  });
+
   it("uses fallback project grouping and preserves incoming order when requested", () => {
     const issues = [
       issue({ id: 50, project: { id: 12, name: "Zulu" } }),

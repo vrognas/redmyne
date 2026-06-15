@@ -438,7 +438,7 @@ Status legend: [ ] open, [x] fixed, [-] wontfix.
 - **detail:** `remaining = Math.max(totalEstimated - totalSpent, 0)` nets across issues before clamping. Example: issue A est 10h/spent 0h, issue B est 5h/spent 20h → totals 15/20 → remaining 0, though A genuinely has 10h left. buffer = availableThisWeek - remaining then overstates free capacity in the status bar, telling the user they have slack when they are overbooked. capacity-calculator's calculateRemainingWork already does this correctly per-issue.
 - **fix:** Sum per-issue clamped remainders: `issues.reduce((s, i) => s + Math.max((i.estimated_hours ?? 0) - (i.spent_hours ?? 0), 0), 0)` (or reuse calculateRemainingWork's done_ratio-aware logic).
 
-### 72. [ ] src/utilities/hierarchy-builder.ts:196 — buildProjectNode mixes tree construction with metric aggregation via full-subtree recollection at every nesting level
+### 72. [x] src/utilities/hierarchy-builder.ts:196 — buildProjectNode mixes tree construction with metric aggregation via full-subtree recollection at every nesting level
 
 - **dimension:** soc | **verdict:** CONFIRMED
 - **detail:** Inside the recursive builder, each project node re-walks its entire subtree twice — collectChildDateRanges (line 193) and collectAllIssues (line 196) — to compute childDateRanges and health. Every ancestor repeats the walk over the same descendants, giving O(n × depth) work, and the identical decorate-after-build block is repeated in the fallback path (lines 245-249). Structure building, date-range aggregation, and health scoring are three concerns interleaved in one closure, so changes to health rules force edits inside the tree builder.
