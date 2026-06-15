@@ -66,18 +66,22 @@ export function generateProjectOptions(
   projects: ToolbarProject[],
   selectedId: number | null
 ): string {
-  // Build parent-children map
+  // Set of known project ids, so we can detect orphans (parent fetched/filtered out)
+  const idSet = new Set(projects.map((p) => p.id));
+
+  // Build parent-children map (only for parents present in the projects array)
   const childrenMap = new Map<number, ToolbarProject[]>();
   for (const p of projects) {
-    if (p.parent?.id) {
+    if (p.parent?.id && idSet.has(p.parent.id)) {
       if (!childrenMap.has(p.parent.id)) childrenMap.set(p.parent.id, []);
       childrenMap.get(p.parent.id)!.push(p);
     }
   }
 
-  // Get root projects (no parent)
+  // Root projects: no parent, OR a parent that isn't in the loaded set (orphans
+  // render at depth 0 rather than vanishing from the selector)
   const rootProjects = projects
-    .filter((p) => !p.parent)
+    .filter((p) => !p.parent?.id || !idSet.has(p.parent.id))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   // Recursive renderer

@@ -137,6 +137,17 @@ describe("gantt-toolbar-generator", () => {
       const html = generateProjectOptions(projects, 1);
       expect(html).toContain('value="1" selected');
     });
+
+    it("renders orphaned project whose parent is absent at top level", () => {
+      // Parent id 99 is not in the projects array (filtered/paginated out)
+      const projects = [
+        { id: 2, name: "Orphan", parent: { id: 99, name: "Missing" } },
+      ];
+      const html = generateProjectOptions(projects, 2);
+      // Must still render, marked selected, at depth 0 (no indentation)
+      expect(html).toContain('value="2" selected');
+      expect(html).toContain(">Orphan</option>");
+    });
   });
 
   describe("generateAssigneeOptions", () => {
