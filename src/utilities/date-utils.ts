@@ -37,13 +37,6 @@ export function formatLocalDate(date: Date): string {
 }
 
 /**
- * Format date as ISO string (YYYY-MM-DD) - uses local timezone
- */
-export function formatDateISO(date: Date): string {
-  return formatLocalDate(date);
-}
-
-/**
  * Get Monday of current week as YYYY-MM-DD (uses date-fns for reliability)
  */
 export function getWeekStart(): string {

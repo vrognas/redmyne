@@ -782,7 +782,7 @@ Status legend: [ ] open, [x] fixed, [-] wontfix.
 - **detail:** Line 163 hardcodes a second sensitive-field array inside redactQueryParams while SENSITIVE_FIELDS already exists at lines 3-12 and feeds redactPlainText/redactObject. The two lists have already drifted textually ('apiKey' vs 'apikey'; only coincidentally equivalent because both paths lowercase before comparing). Any future addition (e.g. 'session', 'bearer') to one list silently misses the other, leaving query-string credentials unredacted in the output channel.
 - **fix:** Delete the inline array; iterate SENSITIVE_FIELDS (pre-lowercased once at module scope) in redactQueryParams, sharing the same matching helper as isSensitiveField.
 
-### 129. [ ] src/utilities/date-utils.ts:42 — formatDateISO is a pure alias of formatLocalDate; callers split between the two names
+### 129. [x] src/utilities/date-utils.ts:42 — formatDateISO is a pure alias of formatLocalDate; callers split between the two names
 
 - **dimension:** complexity | **verdict:** CONFIRMED
 - **detail:** formatDateISO (lines 42-44) just calls formatLocalDate, yet both are exported and the codebase is split between them (formatDateISO in src/utilities/date-picker.ts and src/commands/create-test-issues.ts; formatLocalDate everywhere else, e.g. time-entry-clipboard.ts, capacity-calculator.ts). Two names for one behavior forces readers to check whether they differ. Similarly getISOWeekNumber (lines 95-97) is a one-line wrapper over date-fns getISOWeek while getISOWeekYear on line 103 is re-exported directly — inconsistent indirection in the same file.

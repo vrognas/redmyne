@@ -5,7 +5,7 @@
 
 import * as vscode from "vscode";
 import type { IRedmineServer } from "../redmine/redmine-server-interface";
-import { formatDateISO, parseLocalDate } from "../utilities/date-utils";
+import { formatLocalDate, parseLocalDate } from "../utilities/date-utils";
 import { getServerOrShowError } from "./command-guards";
 
 export interface CreateTestIssuesDeps {
@@ -73,20 +73,20 @@ export function registerCreateTestIssuesCommand(
           }
 
           const addDays = (date: string, days: number) => {
-            const d = parseLocalDate(date); // local frame, consistent with formatDateISO
+            const d = parseLocalDate(date); // local frame, consistent with formatLocalDate
             d.setDate(d.getDate() + days);
-            return formatDateISO(d);
+            return formatLocalDate(d);
           };
           const nextFriday = () => {
             const d = new Date();
             const day = d.getDay();
             const daysUntilFriday = (5 - day + 7) % 7 || 7;
             d.setDate(d.getDate() + daysUntilFriday);
-            return formatDateISO(d);
+            return formatLocalDate(d);
           };
 
           const TEST_PREFIX = "[TEST]";
-          const todayStr = formatDateISO(new Date());
+          const todayStr = formatLocalDate(new Date());
 
           const testIssues = [
             {

@@ -3,7 +3,7 @@
  */
 
 import * as vscode from "vscode";
-import { formatDateISO } from "./date-utils";
+import { formatLocalDate } from "./date-utils";
 
 const formatDisplay = (d: Date) =>
   d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -27,14 +27,14 @@ export async function pickDate(
   options?: DatePickerOptions
 ): Promise<string | undefined> {
   const today = new Date();
-  const todayStr = formatDateISO(today);
+  const todayStr = formatLocalDate(today);
   const allowFuture = options?.allowFuture ?? false;
   const showYesterday = options?.showYesterday ?? true;
   const showFutureDates = options?.showFutureDates ?? false;
 
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = formatDateISO(yesterday);
+  const yesterdayStr = formatLocalDate(yesterday);
 
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -57,8 +57,8 @@ export async function pickDate(
 
   if (showFutureDates) {
     items.push(
-      { label: `$(arrow-right) Tomorrow (${formatDisplay(tomorrow)})`, value: formatDateISO(tomorrow), action: "preset" },
-      { label: `$(arrow-right) Next week (${formatDisplay(nextWeek)})`, value: formatDateISO(nextWeek), action: "preset" }
+      { label: `$(arrow-right) Tomorrow (${formatDisplay(tomorrow)})`, value: formatLocalDate(tomorrow), action: "preset" },
+      { label: `$(arrow-right) Next week (${formatDisplay(nextWeek)})`, value: formatLocalDate(nextWeek), action: "preset" }
     );
   }
 
@@ -72,7 +72,7 @@ export async function pickDate(
       if (dow === 0 || dow === 6) continue; // Skip weekends
       recentDays.push({
         label: `$(history) ${formatDisplay(d)}`,
-        value: formatDateISO(d),
+        value: formatLocalDate(d),
         action: "preset",
       });
       if (recentDays.length >= 3) break; // Max 3 extra days
@@ -134,9 +134,9 @@ export async function pickOptionalDate(
   }
 
   options.push(
-    { label: `$(calendar) Today (${formatDisplay(today)})`, value: formatDateISO(today), action: "set" },
-    { label: `$(arrow-right) Tomorrow (${formatDisplay(tomorrow)})`, value: formatDateISO(tomorrow), action: "set" },
-    { label: `$(arrow-right) Next week (${formatDisplay(nextWeek)})`, value: formatDateISO(nextWeek), action: "set" },
+    { label: `$(calendar) Today (${formatDisplay(today)})`, value: formatLocalDate(today), action: "set" },
+    { label: `$(arrow-right) Tomorrow (${formatDisplay(tomorrow)})`, value: formatLocalDate(tomorrow), action: "set" },
+    { label: `$(arrow-right) Next week (${formatDisplay(nextWeek)})`, value: formatLocalDate(nextWeek), action: "set" },
     { label: "$(edit) Pick date...", value: "", action: "pick" }
   );
 
@@ -159,7 +159,7 @@ export async function pickOptionalDate(
     const customDate = await vscode.window.showInputBox({
       title,
       prompt: `Enter ${label.toLowerCase()} (YYYY-MM-DD)`,
-      placeHolder: currentValue || formatDateISO(today),
+      placeHolder: currentValue || formatLocalDate(today),
       validateInput: (value) => {
         if (!value) return `${label} required`;
         return validateDateInput(value, true);

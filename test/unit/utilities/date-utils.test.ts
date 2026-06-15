@@ -3,7 +3,6 @@ import {
   parseLocalDate,
   getLocalToday,
   formatLocalDate,
-  formatDateISO,
   getWeekStart,
   getMonthStart,
   getLastMonthRange,
@@ -93,7 +92,7 @@ describe("other date utility branches", () => {
     vi.setSystemTime(new Date("2026-02-18T10:00:00Z"));
 
     const date = new Date(2026, 1, 18);
-    expect(formatDateISO(date)).toBe("2026-02-18");
+    expect(formatLocalDate(date)).toBe("2026-02-18");
     expect(getWeekStart()).toBe("2026-02-16");
     expect(getMonthStart()).toBe("2026-02-01");
 
