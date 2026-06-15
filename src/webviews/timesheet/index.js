@@ -69,6 +69,15 @@ import { escapeHtml } from '../gantt-html-escape';
       updateUndoRedoButtons();
       return;
     }
+    if (action.type === "duplicateRow") {
+      // Re-duplicating creates a NEW row id and registers its own fresh undo
+      // entry via the duplicateRow message round-trip (pushUndo). Pushing the
+      // original here too double-pushed the undo stack and left a stale entry
+      // whose newRowId no longer exists.
+      vscode.postMessage({ type: "duplicateRow", rowId: action.sourceRowId });
+      updateUndoRedoButtons();
+      return;
+    }
     undoStack.push(action);
     applyAction(action, false);
     updateUndoRedoButtons();
