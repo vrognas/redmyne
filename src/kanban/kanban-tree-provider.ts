@@ -368,7 +368,7 @@ export class KanbanTreeProvider
     }
 
     // Children of a project folder
-    if (element?.type === "project-folder" && element.status && element.projectId) {
+    if (element?.type === "project-folder" && element.status && element.projectId !== undefined) {
       const tasks = this.getTasksForStatusAndProject(element.status, element.projectId, element.clientId);
       return this.sortTasks(tasks).map((task) => ({
         type: "task" as const,

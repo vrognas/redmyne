@@ -199,6 +199,29 @@ describe("kanban-tree-provider", () => {
     expect(noChildren).toEqual([]);
   });
 
+  it("expands a project folder for a task with linkedProjectId 0 (no phantom folder)", () => {
+    const tasks: KanbanTask[] = [
+      createTask({
+        id: "todo-zero-project",
+        title: "Unresolved project",
+        linkedProjectId: 0,
+        linkedProjectName: "",
+      }),
+    ];
+
+    const controller = createController(tasks);
+    const provider = new KanbanTreeProvider(controller as unknown as KanbanController);
+
+    const todoHeader: TaskTreeItem = { type: "status-header", status: "todo" };
+    const todoChildren = provider.getChildren(todoHeader);
+    expect(todoChildren).toHaveLength(1);
+    expect(todoChildren[0]).toMatchObject({ type: "project-folder", projectId: 0 });
+
+    // The folder must expand to reveal the task, not return [] (phantom folder bug)
+    const folderChildren = provider.getChildren(todoChildren[0]);
+    expect(folderChildren.map((item) => item.task?.id)).toEqual(["todo-zero-project"]);
+  });
+
   it("creates tree items for timers/status and moves tasks on drop", async () => {
     const workingTask = createTask({
       id: "working-task",

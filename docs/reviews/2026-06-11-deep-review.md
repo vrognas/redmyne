@@ -800,7 +800,7 @@ Status legend: [ ] open, [x] fixed, [-] wontfix.
 - **detail:** Line 187 emits `data-path="${op.http?.path || ""}"` without escapeHtml, while the same path is escaped for the visible span on line 188 and the client-side re-render escapes the attribute at line 808. Paths can contain arbitrary strings: createVersion builds `/projects/${projectId}/versions.json` where projectId is `number | string` (project identifier). A `"` in such a value breaks out of the attribute and injects markup into the webview on first render only.
 - **fix:** Wrap with the existing helper: `data-path="${escapeHtml(op.http?.path || "")}"` (and same for data-method for consistency with the JS render path).
 
-### 132. [ ] src/kanban/kanban-tree-provider.ts:371 — Falsy-zero projectId: tasks stored with linkedProjectId 0 render a project folder that can never expand
+### 132. [x] src/kanban/kanban-tree-provider.ts:371 — Falsy-zero projectId: tasks stored with linkedProjectId 0 render a project folder that can never expand
 
 - **dimension:** bug | **verdict:** CONFIRMED
 - **detail:** redmyne.addIssueToKanban stores projectId ?? 0 and projectName ?? '' when the project can't be resolved (kanban-commands.ts:332-333), and validateAndFilter accepts them. getClientFolders happily creates a project folder keyed 0 with empty name (kanban-tree-provider.ts:444-458), but getChildren's guard `element.status && element.projectId` (line 371) treats projectId 0 as falsy and returns [], so the folder shows '(N)' yet expands to nothing — the task becomes unreachable in To Do/Done columns. The cleanup command (kanban-commands.ts:698) then classifies these same tasks as 'corrupted' via !t.linkedProjectName, confirming the 0/'' sentinel leaks broken state.
