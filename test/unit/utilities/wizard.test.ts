@@ -114,7 +114,7 @@ describe("wizard utilities", () => {
         title: "",
         placeholder: "",
         items: [] as vscode.QuickPickItem[],
-        selectedItems: [{ label: "$(arrow-left) Back" }] as vscode.QuickPickItem[],
+        selectedItems: [{ label: "$(arrow-left) Back", data: WIZARD_BACK }] as WizardPickItem[],
         canSelectMany: false,
         value: "",
         onDidChangeValue: vi.fn(() => ({ dispose: vi.fn() })),
@@ -196,6 +196,47 @@ describe("wizard utilities", () => {
         true
       );
       expect(goodResult).toBe("good");
+    });
+
+    it("returns typed value containing 'Back' as input, not navigation", async () => {
+      let onAccept: (() => void) | undefined;
+      let onHide: (() => void) | undefined;
+      let onChange: ((value: string) => void) | undefined;
+      const quickPick = {
+        title: "",
+        placeholder: "",
+        items: [] as vscode.QuickPickItem[],
+        selectedItems: [] as vscode.QuickPickItem[],
+        canSelectMany: false,
+        value: "",
+        onDidChangeValue: vi.fn((handler: (value: string) => void) => {
+          onChange = handler;
+          return { dispose: vi.fn() };
+        }),
+        onDidAccept: vi.fn((handler: () => void) => {
+          onAccept = handler;
+          return { dispose: vi.fn() };
+        }),
+        onDidHide: vi.fn((handler: () => void) => {
+          onHide = handler;
+          return { dispose: vi.fn() };
+        }),
+        show: vi.fn(() => {
+          quickPick.value = "Backend work";
+          onChange?.("Backend work");
+          // Active item is the generated Accept item (first item)
+          quickPick.selectedItems = [quickPick.items[0]];
+          onAccept?.();
+        }),
+        hide: vi.fn(() => onHide?.()),
+        dispose: vi.fn(),
+      } as unknown as vscode.QuickPick<vscode.QuickPickItem>;
+      vi.spyOn(vscode.window, "createQuickPick").mockReturnValue(quickPick);
+
+      const result = await wizardInput({ title: "Input step", prompt: "Value" }, true);
+
+      expect(result).toBe("Backend work");
+      expect(isBack(result)).toBe(false);
     });
 
     it("handles empty value required validation branch", async () => {

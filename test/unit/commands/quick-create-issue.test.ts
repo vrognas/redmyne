@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as vscode from "vscode";
 import { window } from "../../mocks/vscode";
+import { WIZARD_BACK } from "../../../src/utilities/wizard";
 import {
   quickCreateIssue,
   quickCreateSubIssue,
@@ -68,7 +69,7 @@ describe("quickCreateIssue", () => {
         title: "",
         placeholder: "",
         items: [] as vscode.QuickPickItem[],
-        selectedItems: [] as { label: string }[],
+        selectedItems: [] as Array<{ label: string; data?: unknown }>,
         canSelectMany: false,
         value: "",
         onDidChangeValue: () => ({ dispose: vi.fn() }),
@@ -87,7 +88,9 @@ describe("quickCreateIssue", () => {
             return;
           }
           if (action.type === "back") {
-            qp.selectedItems = [{ label: "$(arrow-left) Back" }];
+            // Real wizardInput marks the back item with data === WIZARD_BACK
+            // (identity, not label text); mirror that so the mock is faithful.
+            qp.selectedItems = [{ label: "$(arrow-left) Back", data: WIZARD_BACK }];
           } else {
             qp.value = action.value ?? "";
             qp.selectedItems = [{ label: `$(check) Accept: "${qp.value}"` }];
@@ -127,7 +130,7 @@ describe("quickCreateIssue", () => {
         title: "",
         placeholder: "",
         items: [],
-        selectedItems: [] as { label: string }[],
+        selectedItems: [] as Array<{ label: string; data?: unknown }>,
         canSelectMany: false,
         value: "",
         onDidChangeValue: () => ({ dispose: vi.fn() }),
@@ -177,7 +180,7 @@ describe("quickCreateIssue", () => {
         title: "",
         placeholder: "",
         items: [],
-        selectedItems: [] as { label: string }[],
+        selectedItems: [] as Array<{ label: string; data?: unknown }>,
         canSelectMany: false,
         value: "",
         onDidChangeValue: () => ({ dispose: vi.fn() }),
@@ -295,7 +298,7 @@ describe("quickCreateIssue", () => {
         title: "",
         placeholder: "",
         items: [],
-        selectedItems: [] as { label: string }[],
+        selectedItems: [] as Array<{ label: string; data?: unknown }>,
         canSelectMany: false,
         value: "",
         onDidChangeValue: () => ({ dispose: vi.fn() }),
@@ -586,7 +589,7 @@ describe("quickCreateSubIssue", () => {
         title: "",
         placeholder: "",
         items: [] as vscode.QuickPickItem[],
-        selectedItems: [] as { label: string }[],
+        selectedItems: [] as Array<{ label: string; data?: unknown }>,
         canSelectMany: false,
         value: "",
         onDidChangeValue: () => ({ dispose: vi.fn() }),
@@ -605,7 +608,9 @@ describe("quickCreateSubIssue", () => {
             return;
           }
           if (action.type === "back") {
-            qp.selectedItems = [{ label: "$(arrow-left) Back" }];
+            // Real wizardInput marks the back item with data === WIZARD_BACK
+            // (identity, not label text); mirror that so the mock is faithful.
+            qp.selectedItems = [{ label: "$(arrow-left) Back", data: WIZARD_BACK }];
           } else {
             qp.value = action.value ?? "";
             qp.selectedItems = [{ label: `$(check) Accept: "${qp.value}"` }];
@@ -634,7 +639,7 @@ describe("quickCreateSubIssue", () => {
         title: "",
         placeholder: "",
         items: [],
-        selectedItems: [] as { label: string }[],
+        selectedItems: [] as Array<{ label: string; data?: unknown }>,
         canSelectMany: false,
         value: "",
         onDidChangeValue: () => ({ dispose: vi.fn() }),
@@ -702,7 +707,7 @@ describe("quickCreateSubIssue", () => {
         title: "",
         placeholder: "",
         items: [],
-        selectedItems: [] as { label: string }[],
+        selectedItems: [] as Array<{ label: string; data?: unknown }>,
         canSelectMany: false,
         value: "",
         onDidChangeValue: () => ({ dispose: vi.fn() }),
@@ -862,7 +867,7 @@ describe("quickCreateSubIssue", () => {
         title: "",
         placeholder: "",
         items: [] as vscode.QuickPickItem[],
-        selectedItems: [] as { label: string }[],
+        selectedItems: [] as Array<{ label: string; data?: unknown }>,
         canSelectMany: false,
         value: "",
         onDidChangeValue: () => ({ dispose: vi.fn() }),
@@ -874,7 +879,9 @@ describe("quickCreateSubIssue", () => {
             return;
           }
           if (action.type === "back") {
-            qp.selectedItems = [{ label: "$(arrow-left) Back" }];
+            // Real wizardInput marks the back item with data === WIZARD_BACK
+            // (identity, not label text); mirror that so the mock is faithful.
+            qp.selectedItems = [{ label: "$(arrow-left) Back", data: WIZARD_BACK }];
           } else {
             qp.value = action.value;
             qp.selectedItems = [{ label: `$(check) Accept: "${action.value}"` }];

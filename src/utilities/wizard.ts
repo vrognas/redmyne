@@ -88,12 +88,15 @@ export async function wizardInput(
   }
 
   // For back support, we need a workaround since InputBox doesn't support items
-  // Use a two-stage approach: first show option to go back, then input
-  const quickPick = vscode.window.createQuickPick();
+  // Use a two-stage approach: first show option to go back, then input.
+  // Items carry a `data` discriminant (WIZARD_BACK vs "accept") so control flow
+  // branches on identity, never on user-visible label text (which the typed
+  // value is interpolated into and could contain "Back" e.g. "Backend work").
+  const quickPick = vscode.window.createQuickPick<WizardPickItem<typeof WIZARD_BACK | "accept">>();
   quickPick.title = options.title;
   quickPick.placeholder = options.placeHolder || "Type to enter value, or select Back";
   quickPick.items = [
-    { label: "$(arrow-left) Back", description: "Return to previous step" },
+    { label: "$(arrow-left) Back", description: "Return to previous step", data: WIZARD_BACK },
   ];
   quickPick.canSelectMany = false;
 
@@ -104,12 +107,12 @@ export async function wizardInput(
       // User is typing - show hint that Enter will submit
       if (value) {
         quickPick.items = [
-          { label: `$(check) Accept: "${value}"`, description: "Press Enter to continue" },
-          { label: "$(arrow-left) Back", description: "Return to previous step" },
+          { label: `$(check) Accept: "${value}"`, description: "Press Enter to continue", data: "accept" },
+          { label: "$(arrow-left) Back", description: "Return to previous step", data: WIZARD_BACK },
         ];
       } else {
         quickPick.items = [
-          { label: "$(arrow-left) Back", description: "Return to previous step" },
+          { label: "$(arrow-left) Back", description: "Return to previous step", data: WIZARD_BACK },
         ];
       }
     });
@@ -118,7 +121,7 @@ export async function wizardInput(
       if (resolved) return;
       const selected = quickPick.selectedItems[0];
 
-      if (selected?.label.includes("Back")) {
+      if (selected?.data === WIZARD_BACK) {
         resolved = true;
         quickPick.hide();
         resolve(WIZARD_BACK);
@@ -133,8 +136,8 @@ export async function wizardInput(
         if (error) {
           // Show validation error - don't accept
           quickPick.items = [
-            { label: `$(error) ${error}`, description: "Fix the error and try again" },
-            { label: "$(arrow-left) Back", description: "Return to previous step" },
+            { label: `$(error) ${error}`, description: "Fix the error and try again", data: "accept" },
+            { label: "$(arrow-left) Back", description: "Return to previous step", data: WIZARD_BACK },
           ];
           return;
         }
@@ -145,8 +148,8 @@ export async function wizardInput(
         const error = options.validateInput("");
         if (error) {
           quickPick.items = [
-            { label: `$(error) ${error}`, description: "Value is required" },
-            { label: "$(arrow-left) Back", description: "Return to previous step" },
+            { label: `$(error) ${error}`, description: "Value is required", data: "accept" },
+            { label: "$(arrow-left) Back", description: "Return to previous step", data: WIZARD_BACK },
           ];
           return;
         }
