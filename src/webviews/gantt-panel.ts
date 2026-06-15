@@ -40,6 +40,7 @@ import { deriveAssigneeState, filterIssuesForView, isLateIssue } from "./gantt-v
 import { remainingHours } from "../utilities/remaining-work";
 import { deriveTaskTypes, filterIssuesByTaskType } from "../utilities/issue-task-type-filter";
 import { dateToX, endExclusiveX, clampMinDateToLookback } from "./gantt/gantt-coords";
+import { GANTT_LAYOUT, computeStickyLeftWidth } from "./gantt/gantt-layout-constants";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
 import { DRAFT_COMMAND_SOURCE } from "../draft-mode/draft-change-sources";
 
@@ -416,23 +417,14 @@ export class GanttPanel {
   }
 
   private _showLoadingSkeleton(): void {
-    const labelWidth = 250;
-    const headerHeight = 40;
-    const barHeight = 22; // VS Code native tree row height
+    const { labelWidth, headerHeight, barHeight, idColumnWidth, startDateColumnWidth, statusColumnWidth, dueDateColumnWidth, assigneeColumnWidth, resizeHandleWidth } = GANTT_LAYOUT;
     const barGap = 0;
     const indentSize = INDENT_SIZE;
     // Fill the viewport: real boards always do, and a short skeleton makes
     // the load feel like a slam instead of a reveal (40 rows ≈ 880px).
     const rowCount = 40;
     const timelineWidth = 1400;
-    const idColumnWidth = 50;
-    const startDateColumnWidth = 58;
-    const statusColumnWidth = 50; // Colored dot + header text
-    const dueDateColumnWidth = 58;
-    const assigneeColumnWidth = 40;
-    const resizeHandleWidth = 10;
-    const extraColumnsWidth = idColumnWidth + startDateColumnWidth + statusColumnWidth + dueDateColumnWidth + assigneeColumnWidth;
-    const stickyLeftWidth = labelWidth + resizeHandleWidth + extraColumnsWidth;
+    const { extraColumnsWidth, stickyLeftWidth } = computeStickyLeftWidth(idColumnWidth);
 
     // Generate skeleton rows
     const skeletonRows = Array.from({ length: rowCount }, (_, i) => {
@@ -683,17 +675,8 @@ export class GanttPanel {
 
   private _getFallbackState(overrides: Partial<GanttRenderState> = {}): GanttRenderState {
     const now = Date.now();
-    const labelWidth = 250;
-    const headerHeight = 40;
-    const barHeight = 22;
-    const idColumnWidth = 50;
-    const startDateColumnWidth = 58;
-    const statusColumnWidth = 50;
-    const dueDateColumnWidth = 58;
-    const assigneeColumnWidth = 40;
-    const resizeHandleWidth = 10;
-    const extraColumnsWidth = idColumnWidth + startDateColumnWidth + statusColumnWidth + dueDateColumnWidth + assigneeColumnWidth;
-    const stickyLeftWidth = labelWidth + resizeHandleWidth + extraColumnsWidth;
+    const { labelWidth, headerHeight, barHeight, idColumnWidth, startDateColumnWidth, statusColumnWidth, dueDateColumnWidth, assigneeColumnWidth, resizeHandleWidth } = GANTT_LAYOUT;
+    const { extraColumnsWidth, stickyLeftWidth } = computeStickyLeftWidth(idColumnWidth);
     const ganttConfig = vscode.workspace.getConfiguration("redmyne.gantt");
     const perfDebug = ganttConfig.get<boolean>("perfDebug", false);
     const redmineBaseUrl = vscode.workspace.getConfiguration("redmyne").get<string>("serverUrl") || "";
@@ -2344,7 +2327,7 @@ export class GanttPanel {
 
     const pixelsPerDay = ZOOM_PIXELS_PER_DAY[this._zoomLevel];
     const timelineWidth = Math.max(600, totalDays * pixelsPerDay);
-    const labelWidth = 250;
+    const { labelWidth, startDateColumnWidth, statusColumnWidth, dueDateColumnWidth, assigneeColumnWidth, resizeHandleWidth, barHeight, headerHeight } = GANTT_LAYOUT;
 
     // Auto-fit column widths based on content
     const charWidth = 7; // ~7px per char at 11px font
@@ -2356,18 +2339,10 @@ export class GanttPanel {
       }
     }
     const idColumnWidth = Math.max(40, Math.ceil(maxIdLen * charWidth + colPadding));
-    const startDateColumnWidth = 58; // Fixed: "MMM DD" format
-    const statusColumnWidth = 50; // Colored dot + header text
-    const dueDateColumnWidth = 58; // Fixed: "MMM DD" format
-    const assigneeColumnWidth = 40; // Fixed for avatar circles
-    const extraColumnsWidth = idColumnWidth + startDateColumnWidth + statusColumnWidth + dueDateColumnWidth + assigneeColumnWidth;
-    const resizeHandleWidth = 10;
-    const stickyLeftWidth = labelWidth + resizeHandleWidth + extraColumnsWidth;
-    const barHeight = 22; // VS Code native tree row height
+    const { extraColumnsWidth, stickyLeftWidth } = computeStickyLeftWidth(idColumnWidth);
     const barPadding = 3; // Vertical padding for bar content
     const barContentHeight = barHeight - barPadding * 2; // 16px
     const barGap = 10;
-    const headerHeight = 40;
     const indentSize = INDENT_SIZE;
 
     // All projects are visible - no hidden project filtering
