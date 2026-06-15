@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { wizardPick, wizardInput, WIZARD_BACK, isBack, WizardPickItem } from "../../../src/utilities/wizard";
+import { wizardPick, wizardInput, WIZARD_BACK, isBack, WizardPickItem, wizardStep, runWizard } from "../../../src/utilities/wizard";
 import * as vscode from "vscode";
 
 describe("wizard utilities", () => {
@@ -82,6 +82,57 @@ describe("wizard utilities", () => {
 
       const calledItems = mockShowQuickPick.mock.calls[0][0] as WizardPickItem[];
       expect(calledItems.some((i) => i.label?.includes("Back"))).toBe(false);
+    });
+  });
+
+  describe("runWizard", () => {
+    it("advances through steps, navigates back, and treats cancel as abort", async () => {
+      const state: Record<string, string> = {};
+      // Queue of raw results per visit, in order, across all steps.
+      // s1 value, s2 value, s3 BACK (-> s2), s2 value again, s3 value: completes.
+      const stepFn = (key: string, results: unknown[]) =>
+        wizardStep<string>(
+          () => Promise.resolve(results.shift() as string | typeof WIZARD_BACK | undefined),
+          (v) => { state[key] = v; }
+        );
+
+      const completed = await runWizard([
+        stepFn("a", ["A"]),
+        stepFn("b", ["B1", "B2"]),
+        stepFn("c", [WIZARD_BACK, "C"]),
+      ]);
+
+      expect(completed).toBe(true);
+      expect(state).toEqual({ a: "A", b: "B2", c: "C" });
+
+      // Back on first executed step aborts (returns false).
+      const backAtStart = await runWizard([
+        wizardStep<string>(() => Promise.resolve(WIZARD_BACK), () => {}),
+      ]);
+      expect(backAtStart).toBe(false);
+
+      // Cancel (undefined) aborts.
+      const cancelled = await runWizard([
+        wizardStep<string>(() => Promise.resolve("A"), () => {}),
+        wizardStep<string>(() => Promise.resolve(undefined), () => {}),
+      ]);
+      expect(cancelled).toBe(false);
+
+      // startIndex skips earlier steps but they remain reachable via back.
+      // Step 1 goes BACK once (revisiting step 0), then accepts on re-show.
+      let firstShowBack: boolean | undefined;
+      const step1Results: unknown[] = [WIZARD_BACK, "B"];
+      const skipped = await runWizard(
+        [
+          wizardStep<string>((showBack) => { firstShowBack = showBack; return Promise.resolve("re-A"); }, (v) => { state.a = v; }),
+          wizardStep<string>(() => Promise.resolve(step1Results.shift() as string | typeof WIZARD_BACK), () => {}),
+        ],
+        1
+      );
+      expect(skipped).toBe(true);
+      // Back from index 1 revisited index 0; index 0 ran with showBack=false.
+      expect(firstShowBack).toBe(false);
+      expect(state.a).toBe("re-A");
     });
   });
 

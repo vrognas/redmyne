@@ -177,3 +177,74 @@ export async function wizardInput(
 export function isBack(result: unknown): result is typeof WIZARD_BACK {
   return result === WIZARD_BACK;
 }
+
+/**
+ * Outcome of a single wizard step, as seen by the runner.
+ * - "next": value accepted, advance to the next step
+ * - "back": user chose to go back
+ * - "cancel": user dismissed (advance/back not requested)
+ */
+export type WizardStepOutcome = "next" | "back" | "cancel";
+
+/**
+ * A wizard step. Receives whether the back affordance should be shown
+ * (true for every step except the first), performs its prompt, and on a
+ * real value assigns it into the caller's state before returning "next".
+ */
+export type WizardStep = (showBack: boolean) => Promise<WizardStepOutcome>;
+
+/**
+ * Adapt a raw wizardPick/wizardInput call into a {@link WizardStep}.
+ *
+ * Collapses the per-step `if (result === undefined) cancel / if (isBack) back /
+ * else assign+advance` triage that was previously hand-written at every step.
+ *
+ * @param run Prompt to run; returns a value, WIZARD_BACK, or undefined (cancel)
+ * @param assign Stores the accepted value into wizard state (only on a real value)
+ */
+export function wizardStep<T>(
+  run: (showBack: boolean) => Promise<T | typeof WIZARD_BACK | undefined>,
+  assign: (value: T) => void
+): WizardStep {
+  return async (showBack) => {
+    const result = await run(showBack);
+    if (result === undefined) return "cancel";
+    if (isBack(result)) return "back";
+    assign(result);
+    return "next";
+  };
+}
+
+/**
+ * Run a back-navigable wizard from a list of steps.
+ *
+ * Owns the index/back/cancel/advance loop that was duplicated across the
+ * quick-create wizards. `showBack` is passed to each step as `index > 0`, so
+ * pressing back on the first executed step (index 0) aborts the wizard
+ * (returns false) — mirroring the legacy `if (isBack(result)) return undefined`
+ * at step 1 — while back on any later step returns to the previous step.
+ *
+ * @param steps Ordered steps; each assigns into shared state on accept
+ * @param startIndex First step to run (lets callers pre-fill earlier steps);
+ *   back from a later step can still revisit steps before startIndex
+ * @returns true if every step completed, false if cancelled or aborted via back
+ */
+export async function runWizard(
+  steps: WizardStep[],
+  startIndex = 0
+): Promise<boolean> {
+  let index = startIndex;
+  while (index < steps.length) {
+    const step = steps[index];
+    if (!step) break;
+    const outcome = await step(index > 0);
+    if (outcome === "cancel") return false;
+    if (outcome === "back") {
+      if (index === 0) return false;
+      index--;
+      continue;
+    }
+    index++;
+  }
+  return true;
+}
