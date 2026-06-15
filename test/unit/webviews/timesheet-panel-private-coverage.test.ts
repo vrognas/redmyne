@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as vscode from "vscode";
-import { TimeSheetPanel } from "../../../src/webviews/timesheet-panel";
+import { TimeSheetPanel, rowHoursTotal } from "../../../src/webviews/timesheet-panel";
 import { buildWeekInfo } from "../../../src/webviews/timesheet-webview-messages";
 import * as clipboardUtil from "../../../src/utilities/time-entry-clipboard";
 import * as statusBarUtil from "../../../src/utilities/status-bar";
@@ -1307,5 +1307,19 @@ describe("timesheet panel private coverage", () => {
         message: expect.stringContaining("queue write failed"),
       })
     );
+  });
+});
+
+describe("rowHoursTotal", () => {
+  const cell = (hours: number) => ({ hours, originalHours: 0, entryId: null, isDirty: false });
+
+  it("sums all day-cell hours and returns 0 for an empty row", () => {
+    const row = {
+      days: { 0: cell(2), 2: cell(1.5), 5: cell(3) },
+    } as unknown as Parameters<typeof rowHoursTotal>[0];
+    expect(rowHoursTotal(row)).toBe(6.5);
+
+    const empty = { days: {} } as unknown as Parameters<typeof rowHoursTotal>[0];
+    expect(rowHoursTotal(empty)).toBe(0);
   });
 });

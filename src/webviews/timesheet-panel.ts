@@ -63,6 +63,17 @@ function extractHoursFromDraftOp(data: Record<string, unknown> | undefined): num
 }
 
 /**
+ * Sum a row's day-cell hours into its week total.
+ *
+ * weekTotal is fully derivable from row.days; this is the single source for the
+ * recalc that previously appeared inline at nine mutation sites (forgetting it
+ * at the next site would silently desync the displayed total).
+ */
+export function rowHoursTotal(row: TimeSheetRow): number {
+  return Object.values(row.days).reduce((sum, cell) => sum + cell.hours, 0);
+}
+
+/**
  * Build the canonical resourceKey for a not-yet-saved (new) time entry.
  *
  * Comments are folded into the key so that two entries differing only by
@@ -857,7 +868,7 @@ export class TimeSheetPanel {
             if (cell?.entryId === op.resourceId) {
               const hours = extractHoursFromDraftOp(op.http.data);
               row.days[dayIndex] = { ...cell, hours, isDirty: true };
-              row.weekTotal = Object.values(row.days).reduce((sum, c) => sum + c.hours, 0);
+              row.weekTotal = rowHoursTotal(row);
               found = true;
               break;
             }
@@ -871,7 +882,7 @@ export class TimeSheetPanel {
             const cell = row.days[dayIndex];
             if (cell?.entryId === op.resourceId) {
               row.days[dayIndex] = { ...cell, hours: 0, isDirty: true };
-              row.weekTotal = Object.values(row.days).reduce((sum, c) => sum + c.hours, 0);
+              row.weekTotal = rowHoursTotal(row);
               break;
             }
           }
@@ -893,7 +904,7 @@ export class TimeSheetPanel {
             const hours = extractHoursFromDraftOp(op.http.data);
             const cell = row.days[dayIndex] || { hours: 0, originalHours: 0, entryId: null, isDirty: false };
             row.days[dayIndex] = { ...cell, hours, isDirty: true };
-            row.weekTotal = Object.values(row.days).reduce((sum, c) => sum + c.hours, 0);
+            row.weekTotal = rowHoursTotal(row);
           }
         } else if (op.tempId.startsWith("draft-timeentry-")) {
           // Paste format: extract data from http body, find/create row
@@ -957,7 +968,7 @@ export class TimeSheetPanel {
           // Apply hours to this day
           const cell = row.days[dayIndex] || { hours: 0, originalHours: 0, entryId: null, isDirty: false };
           row.days[dayIndex] = { ...cell, hours: cell.hours + hours, isDirty: true };
-          row.weekTotal = Object.values(row.days).reduce((sum, c) => sum + c.hours, 0);
+          row.weekTotal = rowHoursTotal(row);
         } else {
           // Normal row format: "rowId:dayIndex"
           const parsedRowTempId = parseRowDayTempId(op.tempId);
@@ -968,7 +979,7 @@ export class TimeSheetPanel {
             const hours = extractHoursFromDraftOp(op.http.data);
             const cell = row.days[dayIndex] || { hours: 0, originalHours: 0, entryId: null, isDirty: false };
             row.days[dayIndex] = { ...cell, hours, isDirty: true };
-            row.weekTotal = Object.values(row.days).reduce((sum, c) => sum + c.hours, 0);
+            row.weekTotal = rowHoursTotal(row);
           }
         }
       }
@@ -1317,7 +1328,7 @@ export class TimeSheetPanel {
       entryId,
       isDirty,
     };
-    row.weekTotal = Object.values(row.days).reduce((sum, cell) => sum + cell.hours, 0);
+    row.weekTotal = rowHoursTotal(row);
 
     // Queue operation to draft queue if draft mode enabled
     await this._queueCellOperation(row, dayIndex, hours, entryId, isDirty);
@@ -2102,7 +2113,7 @@ export class TimeSheetPanel {
         if (row) {
           // Set hours to 0 for this day
           row.days[dayIndex] = { hours: 0, originalHours: 0, entryId: null, isDirty: false };
-          row.weekTotal = Object.values(row.days).reduce((sum, cell) => sum + cell.hours, 0);
+          row.weekTotal = rowHoursTotal(row);
           // Remove row if it has no hours at all
           if (row.weekTotal === 0) {
             this._rows.splice(newRowIndex, 1);
@@ -2138,7 +2149,7 @@ export class TimeSheetPanel {
           entryId: entry.entryId,
           isDirty: newHours !== (row.days[dayIndex]?.originalHours ?? entry.hours),
         };
-        row.weekTotal = Object.values(row.days).reduce((sum, cell) => sum + cell.hours, 0);
+        row.weekTotal = rowHoursTotal(row);
       }
     } else {
       // Multiple entries → mark all as deleted (hours=0), create new if needed
@@ -2151,7 +2162,7 @@ export class TimeSheetPanel {
             entryId: entry.entryId,
             isDirty: true,
           };
-          row.weekTotal = Object.values(row.days).reduce((sum, cell) => sum + cell.hours, 0);
+          row.weekTotal = rowHoursTotal(row);
         }
       }
       // Create new entry if hours > 0

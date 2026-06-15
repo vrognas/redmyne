@@ -668,7 +668,7 @@ Status legend: [ ] open, [x] fixed, [-] wontfix.
 - **detail:** (1) `bodyMarkers` is declared at line 2821 and joined into the output at line 3034 but nothing ever pushes to it — it is always "". (2) _generateDateMarkers takes `leftMargin` (line 2814) and a `zoomLevel = "day"` default (line 2816); the single caller (line 2537-2543) always passes 0 and an explicit zoom, so the `leftMargin +`/`svgWidth - leftMargin` arithmetic at lines 2870-2872 and 2883 is dead generality. (3) `const rows = allRows;` (line 2256) is a bare alias. (4) _loadContributions builds a projectIds Set over all issues (lines 869-878) solely for `if (projectIds.size === 0) return false` — it is never used afterward.
 - **fix:** Delete bodyMarkers and the leftMargin/zoomLevel-default parameters (inline 0), drop the rows alias by using allRows directly, and replace the projectIds block with nothing (the _issues.length check at line 863 already covers the realistic empty case).
 
-### 110. [ ] src/webviews/timesheet-panel.ts:852 — weekTotal recomputation `Object.values(row.days).reduce((sum,c)=>sum+c.hours,0)` repeated 9 times
+### 110. [x] src/webviews/timesheet-panel.ts:852 — weekTotal recomputation `Object.values(row.days).reduce((sum,c)=>sum+c.hours,0)` repeated 9 times
 
 - **dimension:** duplication | **verdict:** CONFIRMED
 - **detail:** Identical recalculation after mutating a day cell at: src/webviews/timesheet-panel.ts:852, :866, :888, :944, :955 (_applyPendingDraftChanges), :1285 (_updateCell), :2066, :2102, :2115 (_updateAggregatedCellLocal). weekTotal is fully derivable from row.days; storing it invites the recalc being forgotten at the next mutation site.
