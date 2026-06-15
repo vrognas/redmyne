@@ -38,6 +38,34 @@ const createNetworkErrorMockRequest = (errorCode: string, errorMessage: string) 
     return request;
   });
 
+// Mock request that reproduces real Node behavior: on timeout the request is
+// destroyed, and destroying an in-flight ClientRequest re-emits 'error'
+// (ECONNRESET 'socket hang up'). Used to verify the terminal path runs once.
+const createTimeoutThenDestroyMockRequest = () =>
+  vi.fn((_options, _callback) => {
+    let timeoutHandler: (() => void) | undefined;
+    const request = new EventEmitter() as EventEmitter & {
+      end: () => void;
+      setTimeout: (ms: number, cb: () => void) => void;
+      destroy: () => void;
+    };
+    request.setTimeout = (_ms: number, cb: () => void) => {
+      timeoutHandler = cb;
+    };
+    // Real Node ClientRequest.destroy() re-emits 'error' on the request.
+    request.destroy = () => {
+      const error = new Error("socket hang up") as Error & { code: string };
+      error.code = "ECONNRESET";
+      request.emit("error", error);
+    };
+    request.end = function () {
+      queueMicrotask(() => {
+        timeoutHandler?.();
+      });
+    };
+    return request;
+  });
+
 describe("RedmineServer Error Handling", () => {
   describe("5xx Server Errors", () => {
     it("should handle 500 Internal Server Error", async () => {
@@ -151,6 +179,27 @@ describe("RedmineServer Error Handling", () => {
       await expect(server.getProjects()).rejects.toThrow(
         "Connection reset by server"
       );
+    });
+  });
+
+  describe("Timeout", () => {
+    it("fires the error hook exactly once when timeout destroy re-emits 'error'", async () => {
+      const server = new RedmineServer({
+        address: "https://localhost:3000",
+        key: "test-key",
+        requestFn: createTimeoutThenDestroyMockRequest(),
+      });
+      // onResponseError is the protected terminal hook; spy to count invocations.
+      const errorHook = vi.spyOn(
+        server as unknown as { onResponseError: (...args: unknown[]) => void },
+        "onResponseError"
+      );
+
+      await expect(server.getProjects()).rejects.toThrow(
+        "Request timeout after 30 seconds"
+      );
+
+      expect(errorHook).toHaveBeenCalledTimes(1);
     });
   });
 });

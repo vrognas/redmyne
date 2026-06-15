@@ -280,6 +280,10 @@ export class RedmineServer implements IRedmineServer {
 
     return new Promise((resolve, reject) => {
       const incomingChunks: Buffer[] = [];
+      // Guard terminal callbacks: the timeout handler destroys the request,
+      // which re-emits 'error', so handleError would otherwise fire a second
+      // time with the same requestId and corrupt logging correlation.
+      let settled = false;
       const handleData = (_: http.IncomingMessage) => (incoming: Buffer) => {
         incomingChunks.push(incoming);
       };
@@ -372,6 +376,8 @@ export class RedmineServer implements IRedmineServer {
       });
 
       const handleError = (error: Error & { code?: string }) => {
+        if (settled) return; // Ignore destroy()-induced re-emission after timeout
+        settled = true;
         // Map common network error codes to user-friendly messages
         let message: string;
         switch (error.code) {
@@ -405,6 +411,9 @@ export class RedmineServer implements IRedmineServer {
       // Timeout to prevent indefinite hangs
       if (typeof clientRequest.setTimeout === "function") {
         clientRequest.setTimeout(REQUEST_TIMEOUT_MS, () => {
+          if (settled) return;
+          settled = true;
+          // destroy() re-emits 'error'; handleError is no-op now (settled).
           clientRequest.destroy();
           const error = new Error(`Request timeout after ${REQUEST_TIMEOUT_MS / 1000} seconds`);
           this.onResponseError(undefined, undefined, error, path, method, data, undefined, undefined, requestId);
