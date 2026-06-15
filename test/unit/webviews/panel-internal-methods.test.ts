@@ -97,7 +97,6 @@ interface GanttInternals {
     minDate: Date,
     maxDate: Date,
     svgWidth: number,
-    leftMargin: number,
     zoomLevel?: "day" | "week" | "month" | "quarter" | "year"
   ) => { header: string; body: string; todayMarker: string };
   _getStatusColor: (status: string | null) => string;
@@ -198,7 +197,6 @@ describe("webview panel internal methods", () => {
       new Date(Date.UTC(2026, 0, 1)),
       new Date(Date.UTC(2026, 0, 15)),
       700,
-      0,
       "day"
     );
     expect(dayMarkers.header).toMatch(/W\d+/);
@@ -209,7 +207,6 @@ describe("webview panel internal methods", () => {
       new Date(Date.UTC(2026, 0, 1)),
       new Date(Date.UTC(2026, 5, 30)),
       900,
-      0,
       "quarter"
     );
     expect(quarterMarkers.header).toContain("Q1 2026");
@@ -220,7 +217,7 @@ describe("webview panel internal methods", () => {
     rangeStart.setDate(rangeStart.getDate() - 1);
     const rangeEnd = new Date(today);
     rangeEnd.setDate(rangeEnd.getDate() + 1);
-    const todayMarkers = panel._generateDateMarkers(rangeStart, rangeEnd, 300, 0, "day");
+    const todayMarkers = panel._generateDateMarkers(rangeStart, rangeEnd, 300, "day");
     expect(todayMarkers.todayMarker).toContain("today-marker");
   });
 

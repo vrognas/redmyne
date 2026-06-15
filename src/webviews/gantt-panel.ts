@@ -899,15 +899,8 @@ export class GanttPanel {
     this._contributionsLoading = true;
 
     try {
-      // Get unique project IDs from displayed issues
-      const projectIds = new Set<number>();
-      for (const issue of this._issues) {
-        if (issue.project?.id) {
-          projectIds.add(issue.project.id);
-        }
-      }
-
-      if (projectIds.size === 0) {
+      // No displayed issue belongs to a project — nothing to load.
+      if (!this._issues.some(issue => issue.project?.id)) {
         return false;
       }
 
@@ -2378,10 +2371,9 @@ export class GanttPanel {
     const indentSize = INDENT_SIZE;
 
     // All projects are visible - no hidden project filtering
-    const rows = allRows;
 
     // Collect all expandable keys (rows with children) for "Expand All" functionality
-    const allExpandableKeys = rows.filter(r => r.hasChildren).map(r => r.collapseKey);
+    const allExpandableKeys = allRows.filter(r => r.hasChildren).map(r => r.collapseKey);
 
     // Filter visible rows ONCE upfront (avoid multiple .filter() calls)
     // Also apply health filter if set (issues only - projects/time-groups always pass)
@@ -2391,12 +2383,12 @@ export class GanttPanel {
     // children have no parent row to expand from.
     const skipTopProjectRow = this._viewFocus === "project" && this._selectedProjectId !== null;
     // Find the top-level project's collapseKey to clear parent references
-    const topProjectKey = skipTopProjectRow ? rows.find(r => r.type === "project" && r.depth === 0)?.collapseKey : null;
+    const topProjectKey = skipTopProjectRow ? allRows.find(r => r.type === "project" && r.depth === 0)?.collapseKey : null;
 
     // Ship ALL rows (including collapse-hidden) — the webview row-window
     // derives the visible list from collapse state and mounts only the
     // viewport; rows hidden under a collapsed parent simply have no DOM.
-    const filteredRows = rows.filter(r => {
+    const filteredRows = allRows.filter(r => {
       // Skip top-level project row in per-project view
       if (skipTopProjectRow && r.type === "project" && r.depth === 0) return false;
       return true;
@@ -2447,7 +2439,7 @@ export class GanttPanel {
       maxDate,
       today: todayUTC,
       todayStr: getTodayStr(),
-      rows,
+      rows: allRows,
       filteredRows,
       viewFocus: this._viewFocus,
       showIntensity: this._showIntensity,
@@ -2473,7 +2465,7 @@ export class GanttPanel {
     // Row fragments + relation data for the webview row-window (assembled
     // beside the fragment generators — see gantt-html-generator.ts).
     const rowsPayload = buildRowsPayload(filteredRows, renderContext);
-    const arrowsPayload = buildArrowsPayload(rows, this._visibleRelationTypes, arrowRiskIds);
+    const arrowsPayload = buildArrowsPayload(allRows, this._visibleRelationTypes, arrowRiskIds);
 
     // Generate milestone markers (diamond shapes with vertical dashed lines)
     const milestoneMarkers = this._versions
@@ -2511,7 +2503,7 @@ export class GanttPanel {
     // Generate minimap bars (simplified representation)
     const minimapBarHeight = 5;
     const minimapHeight = 30;
-    const minimapBars = rows
+    const minimapBars = allRows
       .filter(r => r.type === "issue" && r.issue && (r.issue.start_date || r.issue.due_date))
       .map((row) => {
         const issue = row.issue!;
@@ -2663,7 +2655,6 @@ export class GanttPanel {
       minDate,
       maxDate,
       timelineWidth,
-      0,
       this._zoomLevel
     );
     perfEnd("_generateDateMarkers");
@@ -2940,13 +2931,11 @@ export class GanttPanel {
     minDate: Date,
     maxDate: Date,
     svgWidth: number,
-    leftMargin: number,
     zoomLevel: ZoomLevel = "day"
   ): { header: string; body: string; todayMarker: string } {
     const headerContent: string[] = [];
     const weekendBackgrounds: string[] = [];
     const bodyGridLines: string[] = [];
-    const bodyMarkers: string[] = [];
     let todayMarkerSvg = "";
     let currentPeriodHighlight = "";
     const current = new Date(minDate);
@@ -2998,7 +2987,7 @@ export class GanttPanel {
     const periodStartStr = periodStart.toISOString().slice(0, 10);
 
     const dayWidth =
-      (svgWidth - leftMargin) /
+      svgWidth /
       ((maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24));
 
     // Track last shown markers to avoid duplicates
@@ -3010,7 +2999,7 @@ export class GanttPanel {
     const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
     while (current <= maxDate) {
-      const x = leftMargin + dateToX(current.getTime(), minDate.getTime(), maxDate.getTime(), svgWidth - leftMargin);
+      const x = dateToX(current.getTime(), minDate.getTime(), maxDate.getTime(), svgWidth);
 
       const dayOfWeek = current.getUTCDay();
       const dayOfMonth = current.getUTCDate();
@@ -3163,7 +3152,7 @@ export class GanttPanel {
 
     return {
       header: currentPeriodHighlight + headerContent.join(""),
-      body: weekendGroup + bodyGridLines.join("") + bodyMarkers.join(""),
+      body: weekendGroup + bodyGridLines.join(""),
       todayMarker: todayMarkerSvg,
     };
   }
