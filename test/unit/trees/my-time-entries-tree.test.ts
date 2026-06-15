@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { MyTimeEntriesTreeDataProvider, TimeEntryNode } from "../../../src/trees/my-time-entries-tree";
+import { MyTimeEntriesTreeDataProvider, TimeEntryNode, filterDraftOpsForRange } from "../../../src/trees/my-time-entries-tree";
 import { TimeEntry } from "../../../src/redmine/models/time-entry";
+import type { DraftOperation } from "../../../src/draft-mode/draft-operation";
 import * as vscode from "vscode";
 
 // Helper to format date as YYYY-MM-DD in local timezone (avoids UTC issues)
@@ -1162,5 +1163,34 @@ describe("MyTimeEntriesTreeDataProvider", () => {
       type: "load-earlier",
     });
     expect(item.command?.command).toBe("redmyne.loadEarlierTimeEntries");
+  });
+
+  it("filterDraftOpsForRange keeps in-range / boundary / resourceId ops, drops out-of-range", () => {
+    const op = (id: string, spentOn?: string, resourceId?: number) => ({
+      id,
+      type: "createTimeEntry",
+      resourceId,
+      http: { data: { time_entry: { spent_on: spentOn } } },
+    });
+    const ops = [
+      op("in", "2026-03-10"), // inside [from,to]
+      op("from", "2026-03-08"), // == from (inclusive)
+      op("to", "2026-03-14"), // == to (inclusive)
+      op("before", "2026-03-07"), // < from
+      op("after", "2026-03-15"), // > to
+      op("res", "2026-01-01", 42), // out of range but targets existing entry id 42
+    ];
+    const entries = [{ id: 42, hours: "1", spent_on: "2026-01-01" }] as TimeEntry[];
+
+    const filtered = (
+      filterDraftOpsForRange as (
+        ops: DraftOperation[],
+        entries: TimeEntry[],
+        from: string,
+        to: string
+      ) => DraftOperation[]
+    )(ops as unknown as DraftOperation[], entries, "2026-03-08", "2026-03-14");
+
+    expect(filtered.map((o) => o.id).sort()).toEqual(["from", "in", "res", "to"]);
   });
 });

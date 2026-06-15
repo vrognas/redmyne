@@ -468,7 +468,7 @@ Status legend: [ ] open, [x] fixed, [-] wontfix.
 - **detail:** update() awaits deps.fetchIssuesIfNeeded() (line 57) without try/catch. The wired implementation (extension.ts:281 → projectsTree.fetchIssuesIfNeeded → getChildren → loadRoot) has no catch around server.getProjects/getFilteredIssues (projects-tree.ts:324-327), so any network/auth error rejects the chain. Every call site is `void ...update()` (extension.ts:286, 290, 344, 348; quick-issue-commands.ts:105), so the rejection is unhandled and the status bar silently keeps stale text or never appears.
 - **fix:** Wrap the fetch in try/catch inside update(); on error hide the bar or keep last-known text, optionally log via output channel.
 
-### 77. [ ] src/trees/my-time-entries-tree.ts:460 — Draft-operation date-range filter predicate repeated 3 times
+### 77. [x] src/trees/my-time-entries-tree.ts:460 — Draft-operation date-range filter predicate repeated 3 times
 
 - **dimension:** duplication | **verdict:** CONFIRMED
 - **detail:** The same predicate — keep op if its time_entry.spent_on falls in [start,end] OR op.resourceId matches an entry in the server set — is inlined three times: src/trees/my-time-entries-tree.ts:460-464 (today, range [today,today]), src/trees/my-time-entries-tree.ts:467-474 (week, [weekStart,weekEnd]), src/trees/my-time-entries-tree.ts:575-581 (month, [start,end]). Each re-implements the `op.http.data?.time_entry` cast and the `.some(e => e.id === op.resourceId)` scan; the three copies have already drifted once (the week version needed the weekEnd fix noted in its comment).

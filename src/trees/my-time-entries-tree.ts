@@ -126,6 +126,25 @@ function applyDraftsToEntries(
   return [...creates, ...result];
 }
 
+/**
+ * Select draft ops relevant to a date range [from, to] (both inclusive):
+ * keep an op if its time_entry.spent_on falls within the range, OR it
+ * targets an existing entry (resourceId matches an entry in `entries`).
+ */
+export function filterDraftOpsForRange(
+  ops: DraftOperation[],
+  entries: TimeEntry[],
+  from: string,
+  to: string
+): DraftOperation[] {
+  return ops.filter((op) => {
+    const data = op.http.data?.time_entry as Record<string, unknown> | undefined;
+    const spentOn = data?.spent_on as string | undefined;
+    if (spentOn && spentOn >= from && spentOn <= to) return true;
+    return Boolean(op.resourceId && entries.some((e) => e.id === op.resourceId));
+  });
+}
+
 export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNode> {
   private static readonly INITIAL_MONTHS = 3;
   private static readonly LOAD_BATCH_SIZE = 3;
@@ -480,21 +499,13 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const draftOps = this.draftQueue?.getAll() || [];
       const todayWithDrafts = applyDraftsToEntries(
         (this.todayEntries || []).filter(e => e.spent_on === today),
-        draftOps.filter(op => {
-          const data = op.http.data?.time_entry as Record<string, unknown> | undefined;
-          return data?.spent_on === today || (op.resourceId && (this.todayEntries || []).some(e => e.id === op.resourceId));
-        })
+        // Today is a single day: range [today, today]
+        filterDraftOpsForRange(draftOps, this.todayEntries || [], today, today)
       );
       const weekWithDrafts = applyDraftsToEntries(
         this.weekEntries || [],
-        draftOps.filter(op => {
-          const data = op.http.data?.time_entry as Record<string, unknown> | undefined;
-          const spentOn = data?.spent_on as string | undefined;
-          // Include drafts for any day in the week (Mon-Sun), not just up to today
-          if (spentOn && spentOn >= weekStart && spentOn <= weekEnd) return true;
-          // Include ops targeting existing week entries
-          return op.resourceId && (this.weekEntries || []).some(e => e.id === op.resourceId);
-        })
+        // Any day in the week (Mon-Sun), not just up to today
+        filterDraftOpsForRange(draftOps, this.weekEntries || [], weekStart, weekEnd)
       );
 
       const todayTotal = calculateTotal(todayWithDrafts);
@@ -585,13 +596,12 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
 
       // Apply all draft operations (create/update/delete) for this month
       const { start, end } = this.getMonthDateRange(element._monthYear);
-      const draftOps = (this.draftQueue?.getAll() || []).filter(op => {
-        const data = op.http.data?.time_entry as Record<string, unknown> | undefined;
-        const spentOn = data?.spent_on as string | undefined;
-        if (spentOn && spentOn >= start && spentOn <= end) return true;
-        // Include ops targeting existing month entries
-        return op.resourceId && serverEntries.some(e => e.id === op.resourceId);
-      });
+      const draftOps = filterDraftOpsForRange(
+        this.draftQueue?.getAll() || [],
+        serverEntries,
+        start,
+        end
+      );
       const entries = applyDraftsToEntries(serverEntries, draftOps);
 
       const weekGroups = this.groupEntriesByWeek(entries, element.id || "month", { start, end });
