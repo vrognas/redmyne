@@ -386,6 +386,42 @@ describe("RedmineServer", () => {
     });
   });
 
+  describe("getIssuesByIds", () => {
+    it("batches large ID sets across multiple requests and merges results", async () => {
+      const issuePaths: string[] = [];
+      const baseMock = createMockRequest();
+      const mockRequest = vi.fn((options: { path?: string }, callback: unknown) => {
+        const path = options.path || "";
+        if (path.includes("/issues.json") && path.includes("issue_id=")) {
+          issuePaths.push(path);
+        }
+        return baseMock(options, callback as Parameters<typeof baseMock>[1]);
+      }) as unknown as typeof http.request;
+
+      const serverWithCapture = new RedmineServer({
+        address: "https://localhost:3000",
+        key: "test-api-key",
+        requestFn: mockRequest,
+      });
+
+      // 300 six-digit IDs => joined issue_id far exceeds the URL-length cap,
+      // so a correct implementation must split into >1 request.
+      const ids = Array.from({ length: 300 }, (_, i) => 100000 + i);
+      const issues = await serverWithCapture.getIssuesByIds(ids, false);
+
+      // Distinct issue_id batch values (one request per batch; ignore pagination dups).
+      const batchValues = new Set(
+        issuePaths.map((p) => decodeURIComponent(p).match(/issue_id=([0-9,]+)/)?.[1])
+      );
+      expect(batchValues.size).toBeGreaterThan(1);
+
+      // Merged result covers every requested ID (de-dup guards against the
+      // offset-agnostic mock replaying a >100-ID batch across paginate pages).
+      const returnedIds = [...new Set(issues.map((i) => i.id))].sort((a, b) => a - b);
+      expect(returnedIds).toEqual(ids);
+    });
+  });
+
   it("should compare servers correctly", () => {
     const server2 = new RedmineServer({
       address: "https://localhost:3000",

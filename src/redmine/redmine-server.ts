@@ -1485,16 +1485,33 @@ export class RedmineServer implements IRedmineServer {
   async getIssuesByIds(ids: number[], skipClosed = true): Promise<Issue[]> {
     if (ids.length === 0) return [];
 
-    const params = new URLSearchParams();
-    params.set("issue_id", ids.join(","));
-    params.set("include", "relations");
-    params.set("status_id", skipClosed ? "open" : "*");
+    // Redmine supports a comma-separated issue_id filter, but a large ID set
+    // joined into one query param blows past server/proxy URL length limits
+    // (~414). Batch by URL length, mirroring getTimeEntriesForIssues, and
+    // concat the per-batch paginate results (batches are disjoint ID slices,
+    // so no de-dup is needed).
+    const MAX_URL_LEN = 1800;
+    const suffix = `&include=relations&status_id=${skipClosed ? "open" : "*"}`;
+    const baseUrl = `/issues.json?issue_id=`;
 
-    const issues = await this.paginate<Issue>(
-      `/issues.json?${params.toString()}`,
-      "issues"
-    );
-    return issues;
+    const fetchBatch = (batch: number[]) =>
+      this.paginate<Issue>(`${baseUrl}${batch.join(",")}${suffix}`, "issues");
+
+    const allIssues: Issue[] = [];
+    let currentBatch: number[] = [];
+    for (const id of ids) {
+      currentBatch.push(id);
+      const testUrl = `${baseUrl}${currentBatch.join(",")}${suffix}`;
+      if (testUrl.length > MAX_URL_LEN && currentBatch.length > 1) {
+        currentBatch.pop();
+        allIssues.push(...(await fetchBatch(currentBatch)));
+        currentBatch = [id];
+      }
+    }
+    if (currentBatch.length > 0) {
+      allIssues.push(...(await fetchBatch(currentBatch)));
+    }
+    return allIssues;
   }
 
   /**
