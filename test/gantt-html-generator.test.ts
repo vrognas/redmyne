@@ -47,6 +47,9 @@ describe("gantt-html-generator", () => {
       expect(formatHoursAsTime(1.5)).toBe("1:30");
       expect(formatHoursAsTime(8)).toBe("8:00");
       expect(formatHoursAsTime(0.25)).toBe("0:15");
+      // Rounds to the nearest minute via canonical formatHoursAsHHMM (was a
+      // local Math.ceil copy: 0.341h * 60 = 20.46min → ceil "0:21", now "0:20").
+      expect(formatHoursAsTime(0.341)).toBe("0:20");
     });
 
     it("formatShortName formats as Firstname L.", () => {

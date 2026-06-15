@@ -182,15 +182,25 @@ export class KanbanController {
     return task;
   }
 
-  async updateTask(
+  /**
+   * Locate a task by id, merge a patch (auto-stamping updatedAt), persist, and
+   * fire the change event. Returns whether a task was found and patched.
+   *
+   * `patch` may be a partial object or a function that derives the partial from
+   * the current task (for read-modify-write fields like loggedHours). Methods
+   * with extra side effects (interval start/stop, auto-pause of other tasks)
+   * keep those at the call site, around this call.
+   */
+  private async patchTask(
     id: string,
-    updates: Partial<Pick<KanbanTask, "title" | "description" | "priority" | "estimatedHours">>
-  ): Promise<void> {
+    patch: Partial<KanbanTask> | ((task: KanbanTask) => Partial<KanbanTask>)
+  ): Promise<boolean> {
     const index = this.tasks.findIndex((t) => t.id === id);
-    if (index === -1) return;
+    if (index === -1) return false;
     const task = this.tasks[index];
-    if (!task) return;
+    if (!task) return false;
 
+    const updates = typeof patch === "function" ? patch(task) : patch;
     this.tasks[index] = {
       ...task,
       ...updates,
@@ -198,6 +208,14 @@ export class KanbanController {
     };
     await this.persist();
     this._onTasksChange.fire();
+    return true;
+  }
+
+  async updateTask(
+    id: string,
+    updates: Partial<Pick<KanbanTask, "title" | "description" | "priority" | "estimatedHours">>
+  ): Promise<void> {
+    await this.patchTask(id, updates);
   }
 
   /**
@@ -208,19 +226,7 @@ export class KanbanController {
     linkedParentProjectId: number | undefined,
     linkedParentProjectName: string | undefined
   ): Promise<void> {
-    const index = this.tasks.findIndex((t) => t.id === id);
-    if (index === -1) return;
-    const task = this.tasks[index];
-    if (!task) return;
-
-    this.tasks[index] = {
-      ...task,
-      linkedParentProjectId,
-      linkedParentProjectName,
-      updatedAt: new Date().toISOString(),
-    };
-    await this.persist();
-    this._onTasksChange.fire();
+    await this.patchTask(id, { linkedParentProjectId, linkedParentProjectName });
   }
 
   async deleteTask(id: string): Promise<void> {
@@ -235,58 +241,27 @@ export class KanbanController {
   // --- Status Transitions ---
 
   async markDone(id: string): Promise<void> {
-    const index = this.tasks.findIndex((t) => t.id === id);
-    if (index === -1) return;
-    const task = this.tasks[index];
-    if (!task) return;
-
     // A done task must not keep ticking: it would stay getActiveTask()
     // and eventually fire a completion prompt to log time again.
-    if (task.timerPhase === "working") {
+    if (this.getTaskById(id)?.timerPhase === "working") {
       this.stopInterval();
     }
 
-    this.tasks[index] = {
-      ...task,
+    await this.patchTask(id, {
       timerPhase: undefined,
       timerSecondsLeft: undefined,
       lastActiveAt: undefined,
       completedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    await this.persist();
-    this._onTasksChange.fire();
+    });
   }
 
   async reopen(id: string): Promise<void> {
-    const index = this.tasks.findIndex((t) => t.id === id);
-    if (index === -1) return;
-    const task = this.tasks[index];
-    if (!task) return;
-
-    this.tasks[index] = {
-      ...task,
-      completedAt: undefined,
-      updatedAt: new Date().toISOString(),
-    };
-    await this.persist();
-    this._onTasksChange.fire();
+    await this.patchTask(id, { completedAt: undefined });
   }
 
   async addLoggedHours(id: string, hours: number): Promise<void> {
     if (hours <= 0) return; // Reject non-positive hours
-    const index = this.tasks.findIndex((t) => t.id === id);
-    if (index === -1) return;
-    const task = this.tasks[index];
-    if (!task) return;
-
-    this.tasks[index] = {
-      ...task,
-      loggedHours: task.loggedHours + hours,
-      updatedAt: new Date().toISOString(),
-    };
-    await this.persist();
-    this._onTasksChange.fire();
+    await this.patchTask(id, (task) => ({ loggedHours: task.loggedHours + hours }));
   }
 
   // --- Bulk Operations ---
@@ -397,8 +372,8 @@ export class KanbanController {
     }
 
     // Start timer on this task
-    this.tasks[index] = {
-      ...task,
+    this.startInterval();
+    await this.patchTask(id, {
       timerPhase: "working",
       timerSecondsLeft: reset
         ? this.workDurationSeconds
@@ -406,44 +381,24 @@ export class KanbanController {
       activityId,
       activityName,
       lastActiveAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    this.startInterval();
-    await this.persist();
-    this._onTasksChange.fire();
+    });
   }
 
   /**
    * Pause timer for a task
    */
   async pauseTimer(id: string): Promise<void> {
-    const index = this.tasks.findIndex((t) => t.id === id);
-    if (index === -1) return;
-    const task = this.tasks[index];
-    if (!task) return;
-    if (task.timerPhase !== "working") return;
+    if (this.getTaskById(id)?.timerPhase !== "working") return;
 
     this.stopInterval();
-    this.tasks[index] = {
-      ...task,
-      timerPhase: "paused",
-      updatedAt: new Date().toISOString(),
-    };
-
-    await this.persist();
-    this._onTasksChange.fire();
+    await this.patchTask(id, { timerPhase: "paused" });
   }
 
   /**
    * Resume timer for a paused task
    */
   async resumeTimer(id: string): Promise<void> {
-    const index = this.tasks.findIndex((t) => t.id === id);
-    if (index === -1) return;
-    const task = this.tasks[index];
-    if (!task) return;
-    if (task.timerPhase !== "paused") return;
+    if (this.getTaskById(id)?.timerPhase !== "paused") return;
 
     // Auto-pause any currently working task
     const activeIndex = this.tasks.findIndex((t) => t.timerPhase === "working");
@@ -458,58 +413,37 @@ export class KanbanController {
       }
     }
 
-    this.tasks[index] = {
-      ...task,
+    this.startInterval();
+    await this.patchTask(id, {
       timerPhase: "working",
       lastActiveAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    this.startInterval();
-    await this.persist();
-    this._onTasksChange.fire();
+    });
   }
 
   /**
    * Stop timer for a task (clears timer state, keeps logged hours)
    */
   async stopTimer(id: string): Promise<void> {
-    const index = this.tasks.findIndex((t) => t.id === id);
-    if (index === -1) return;
-    const task = this.tasks[index];
-    if (!task) return;
-
-    if (task.timerPhase === "working") {
+    if (this.getTaskById(id)?.timerPhase === "working") {
       this.stopInterval();
     }
 
-    this.tasks[index] = {
-      ...task,
+    await this.patchTask(id, {
       timerPhase: undefined,
       timerSecondsLeft: undefined,
       lastActiveAt: undefined,
-      updatedAt: new Date().toISOString(),
-    };
-
-    await this.persist();
-    this._onTasksChange.fire();
+    });
   }
 
   /**
    * Move task back to todo (clears timer state AND logged hours)
    */
   async moveToTodo(id: string): Promise<void> {
-    const index = this.tasks.findIndex((t) => t.id === id);
-    if (index === -1) return;
-    const task = this.tasks[index];
-    if (!task) return;
-
-    if (task.timerPhase === "working") {
+    if (this.getTaskById(id)?.timerPhase === "working") {
       this.stopInterval();
     }
 
-    this.tasks[index] = {
-      ...task,
+    await this.patchTask(id, {
       timerPhase: undefined,
       timerSecondsLeft: undefined,
       activityId: undefined,
@@ -518,52 +452,28 @@ export class KanbanController {
       doingAt: undefined,
       completedAt: undefined, // Clear if moving from Done
       loggedHours: 0,
-      updatedAt: new Date().toISOString(),
-    };
-
-    await this.persist();
-    this._onTasksChange.fire();
+    });
   }
 
   /**
    * Move task to Doing (initializes timer but doesn't start countdown)
    */
   async moveToDoing(id: string): Promise<void> {
-    const index = this.tasks.findIndex((t) => t.id === id);
-    if (index === -1) return;
-    const task = this.tasks[index];
-    if (!task) return;
-
-    this.tasks[index] = {
-      ...task,
+    await this.patchTask(id, {
       doingAt: new Date().toISOString(),
       timerSecondsLeft: this.workDurationSeconds,
       completedAt: undefined, // Clear if reopening from Done
-      updatedAt: new Date().toISOString(),
-    };
-
-    await this.persist();
-    this._onTasksChange.fire();
+    });
   }
 
   /**
    * Reset timer to full duration (for continuing same task)
    */
   async resetTimer(id: string): Promise<void> {
-    const index = this.tasks.findIndex((t) => t.id === id);
-    if (index === -1) return;
-    const task = this.tasks[index];
-    if (!task) return;
-
-    this.tasks[index] = {
-      ...task,
+    await this.patchTask(id, {
       timerSecondsLeft: this.workDurationSeconds,
       timerPhase: "pending",
-      updatedAt: new Date().toISOString(),
-    };
-
-    await this.persist();
-    this._onTasksChange.fire();
+    });
   }
 
   // --- Timer Internals ---

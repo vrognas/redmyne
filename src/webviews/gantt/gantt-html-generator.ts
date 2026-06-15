@@ -10,6 +10,7 @@ import { parseLocalDate, formatLocalDate } from "../../utilities/date-utils";
 import type { WeeklySchedule } from "../../utilities/flexibility-calculator";
 import { dateToX, barXRange } from "./gantt-coords";
 import { remainingHours } from "../../utilities/remaining-work";
+import { formatHoursAsHHMM } from "../../utilities/time-input";
 
 // ============================================================================
 // Helper Functions (exported for testing)
@@ -40,13 +41,15 @@ export function getAvatarColorIndices(name: string): AvatarColors {
   return { fill, stroke };
 }
 
-/** Format decimal hours as HH:MM (rounded up to nearest minute) */
+/**
+ * Format decimal hours as H:MM for gantt tooltips, or "—" for no value.
+ * Delegates the H:MM math to the canonical formatHoursAsHHMM (time-input.ts)
+ * so the gantt rounds to the nearest minute exactly like the trees/timesheet
+ * (was a local Math.ceil copy that drifted ~1min high vs the rest of the UI).
+ */
 export function formatHoursAsTime(hours: number | null): string {
   if (hours === null) return "—";
-  const totalMinutes = Math.ceil(hours * 60);
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return `${h}:${m.toString().padStart(2, "0")}`;
+  return formatHoursAsHHMM(hours);
 }
 
 /** Format name as "Firstname L." for compact display */

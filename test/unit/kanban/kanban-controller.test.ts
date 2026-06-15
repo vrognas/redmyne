@@ -24,6 +24,47 @@ describe("KanbanController", () => {
     controller = new KanbanController(mockState);
   });
 
+  describe("patchTask helper", () => {
+    it("applies a patch, bumps updatedAt, persists, and fires change", async () => {
+      const task = await controller.addTask("Task", 1, "Issue", 1, "P");
+      const before = controller.getTaskById(task.id)!.updatedAt;
+      const listener = vi.fn();
+      controller.onTasksChange(listener);
+      (mockState.update as ReturnType<typeof vi.fn>).mockClear();
+
+      // Drive the shared path through a public mutator that uses it.
+      await controller.updateTask(task.id, { title: "Patched" });
+
+      const updated = controller.getTaskById(task.id)!;
+      expect(updated.title).toBe("Patched");
+      expect(updated.updatedAt >= before).toBe(true);
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(mockState.update).toHaveBeenCalledWith(
+        "redmyne.kanban",
+        expect.any(Array)
+      );
+    });
+
+    it("is a no-op for a missing id (no patch, no persist, no fire)", async () => {
+      await controller.addTask("Task", 1, "Issue", 1, "P");
+      const listener = vi.fn();
+      controller.onTasksChange(listener);
+      (mockState.update as ReturnType<typeof vi.fn>).mockClear();
+
+      await controller.updateTask("does-not-exist", { title: "Nope" });
+
+      expect(listener).not.toHaveBeenCalled();
+      expect(mockState.update).not.toHaveBeenCalled();
+    });
+
+    it("supports a functional patch that reads the current task", async () => {
+      const task = await controller.addTask("Task", 1, "Issue", 1, "P");
+      await controller.addLoggedHours(task.id, 0.5);
+      await controller.addLoggedHours(task.id, 0.25);
+      expect(controller.getTaskById(task.id)?.loggedHours).toBe(0.75);
+    });
+  });
+
   describe("deep-review fixes", () => {
     it("markDone stops a running timer and clears timer state", async () => {
       vi.useFakeTimers();
