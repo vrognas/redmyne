@@ -72,8 +72,12 @@ type PassthroughMethod = (typeof PASSTHROUGH_METHODS)[number];
  * is preserved without 31 hand-written `name!: ...` declarations. The mapped type
  * picks each member straight from IRedmineServer, so signatures stay in lockstep.
  */
+// The merge is safe: the constructor loop binds every PASSTHROUGH_METHODS
+// entry, so each declared member exists at runtime. eslint can't see that.
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
 export interface DraftModeServer extends Pick<IRedmineServer, PassthroughMethod> {}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DraftModeServer implements IRedmineServer {
   private inner: RedmineServer;
   private queue: DraftQueue;
