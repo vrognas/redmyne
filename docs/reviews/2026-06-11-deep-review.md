@@ -674,7 +674,7 @@ Status legend: [ ] open, [x] fixed, [-] wontfix.
 - **detail:** Identical recalculation after mutating a day cell at: src/webviews/timesheet-panel.ts:852, :866, :888, :944, :955 (_applyPendingDraftChanges), :1285 (_updateCell), :2066, :2102, :2115 (_updateAggregatedCellLocal). weekTotal is fully derivable from row.days; storing it invites the recalc being forgotten at the next mutation site.
 - **fix:** Add a module-level recalcWeekTotal(row: TimeSheetRow): void (or setDayCell(row, dayIndex, cell) that updates both) in src/webviews/timesheet-panel.ts and use it at all 9 sites.
 
-### 111. [ ] src/webviews/timesheet/index.js:760 — Dead dataset writes: sourceEntries JSON-serialized per cell and dropdown entryId/rowId datasets are never read
+### 111. [x] src/webviews/timesheet/index.js:760 — Dead dataset writes: sourceEntries JSON-serialized per cell and dropdown entryId/rowId datasets are never read
 
 - **dimension:** complexity | **verdict:** CONFIRMED
 - **detail:** `input.dataset.sourceEntries = JSON.stringify(cell.sourceEntries)` (src/webviews/timesheet/index.js:760) is written for every aggregated day cell on every render but never read anywhere in the codebase (grep confirms the single occurrence); the blur handler uses the `cell` closure (line 782) and only checks dataset.isAggregated. Likewise `hoursInput.dataset.entryId` and `hoursInput.dataset.rowId` (lines 2054-2055) are never read — the blur/delete handlers use the `entry` closure (2074-2089, 2115-2121). This is leftover from a pre-closure design and adds per-render JSON serialization for nothing.

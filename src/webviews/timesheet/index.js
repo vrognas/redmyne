@@ -760,9 +760,8 @@ import { escapeHtml } from '../gantt-html-escape';
       }
       input.disabled = !isRowComplete;
       input.dataset.oldValue = cell.hours; // Store for undo
-      // Store source entries for aggregated row handling
+      // Mark aggregated cells (the blur handler reads dataset.isAggregated).
       if (isAggregated && cell.sourceEntries) {
-        input.dataset.sourceEntries = JSON.stringify(cell.sourceEntries);
         input.dataset.isAggregated = "true";
       }
       // Aggregated rows are now editable
@@ -2056,8 +2055,6 @@ import { escapeHtml } from '../gantt-html-escape';
       hoursInput.type = "text";
       hoursInput.className = "dropdown-entry-hours";
       hoursInput.value = formatHours(entry.hours);
-      hoursInput.dataset.entryId = entry.entryId;
-      hoursInput.dataset.rowId = entry.rowId;
       hoursInput.dataset.oldValue = entry.hours;
       hoursInput.addEventListener("focus", (e) => {
         e.target.dataset.oldValue = parseHours(e.target.value);
