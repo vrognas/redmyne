@@ -41,6 +41,17 @@ describe("ApiLogger", () => {
     );
   });
 
+  it("redacts sensitive query params via shared SENSITIVE_FIELDS", () => {
+    logger.logRequest(1, "GET", "/issues.json?token=abc123&apikey=xyz&project_id=5");
+
+    const logged = mockChannel.appendLine.mock.calls[0][0] as string;
+    expect(logged).toContain("token=***");
+    expect(logged).toContain("apikey=***");
+    expect(logged).not.toContain("abc123");
+    expect(logged).not.toContain("xyz");
+    expect(logged).toContain("project_id=5");
+  });
+
   it("increments counter sequentially", () => {
     logger.logRequest(1, "GET", "/projects.json");
     logger.logResponse(1, 200, 50);

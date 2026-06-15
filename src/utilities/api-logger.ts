@@ -160,11 +160,9 @@ export class ApiLogger {
 
   private redactQueryParams(query: string): string {
     const params = new URLSearchParams(query);
-    const sensitiveFields = ["password", "api_key", "apikey", "token", "secret", "auth", "authorization", "key"];
 
     for (const key of params.keys()) {
-      const lowerKey = key.toLowerCase();
-      if (sensitiveFields.some(field => lowerKey.includes(field))) {
+      if (isSensitiveField(key)) {
         params.set(key, "***");
       }
     }

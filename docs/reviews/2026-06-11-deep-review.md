@@ -776,7 +776,7 @@ Status legend: [ ] open, [x] fixed, [-] wontfix.
 - **detail:** clear() (lines 88-91) has zero callers across src/ (verified: only expand/collapse/expandAll/collapseAll/getExpandedKeys/version are used from extension.ts:175-179 and gantt-panel.ts:1207-2096). It duplicates collapseAll() except it skips `_onDidChange.fire`, so any future caller would silently desync every listener-synced view — the exact failure mode this 'shared collapse state manager for syncing views' exists to prevent. isExpanded() (line 33) is likewise uncalled and trivially `!isCollapsed`.
 - **fix:** Delete clear() (and isExpanded()); callers needing a reset use collapseAll(), which already clears the set and notifies listeners.
 
-### 128. [ ] src/utilities/api-logger.ts:163 — redactQueryParams re-declares the sensitive-field list inline instead of reusing module SENSITIVE_FIELDS
+### 128. [x] src/utilities/api-logger.ts:163 — redactQueryParams re-declares the sensitive-field list inline instead of reusing module SENSITIVE_FIELDS
 
 - **dimension:** complexity | **verdict:** CONFIRMED
 - **detail:** Line 163 hardcodes a second sensitive-field array inside redactQueryParams while SENSITIVE_FIELDS already exists at lines 3-12 and feeds redactPlainText/redactObject. The two lists have already drifted textually ('apiKey' vs 'apikey'; only coincidentally equivalent because both paths lowercase before comparing). Any future addition (e.g. 'session', 'bearer') to one list silently misses the other, leaving query-string credentials unredacted in the output channel.
