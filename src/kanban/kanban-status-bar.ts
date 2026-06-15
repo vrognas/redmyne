@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { KanbanController } from "./kanban-controller";
 import { getTaskStatus } from "./kanban-state";
-import { formatHoursAsHHMM } from "../utilities/time-input";
+import { formatHoursAsHHMM, formatSecondsAsMMSS } from "../utilities/time-input";
 
 /**
  * Status bar display for Kanban progress and timer
@@ -62,7 +62,7 @@ export class KanbanStatusBar {
 
     if (isOnBreak) {
       // Show break countdown
-      const timeStr = this.formatSecondsAsMmSs(breakSecondsLeft);
+      const timeStr = formatSecondsAsMMSS(breakSecondsLeft);
       this.statusBarItem.text = `$(coffee) ${timeStr} break`;
       this.statusBarItem.tooltip = this.buildBreakTooltip(doneCount, tasks.length, totalLoggedHours);
       this.statusBarItem.command = "redmyne.kanban.skipBreak";
@@ -70,7 +70,7 @@ export class KanbanStatusBar {
       // Show active timer with progress bar
       const secondsLeft = activeTask.timerSecondsLeft ?? 0;
       const totalSeconds = this.controller.getWorkDurationSeconds();
-      const timeStr = this.formatSecondsAsMmSs(secondsLeft);
+      const timeStr = formatSecondsAsMMSS(secondsLeft);
       const progressBar = this.buildProgressBar(secondsLeft, totalSeconds);
       const deferredStr = deferredMinutes > 0 ? ` +${deferredMinutes}m` : "";
       this.statusBarItem.text = `$(pulse) ${timeStr} ${progressBar} ${this.truncate(activeTask.title, 100)}${deferredStr}`;
@@ -80,7 +80,7 @@ export class KanbanStatusBar {
       // Show paused timer with progress bar
       const secondsLeft = pausedTask.timerSecondsLeft ?? 0;
       const totalSeconds = this.controller.getWorkDurationSeconds();
-      const timeStr = this.formatSecondsAsMmSs(secondsLeft);
+      const timeStr = formatSecondsAsMMSS(secondsLeft);
       const progressBar = this.buildProgressBar(secondsLeft, totalSeconds);
       this.statusBarItem.text = `$(debug-pause) ${timeStr} ${progressBar} ${this.truncate(pausedTask.title, 100)}`;
       this.statusBarItem.tooltip = this.buildPausedTooltip(pausedTask, doneCount, tasks.length, totalLoggedHours);
@@ -89,7 +89,7 @@ export class KanbanStatusBar {
       // Show "ready to start" with first doing task
       const doingTask = tasks.find((t) => getTaskStatus(t) === "doing");
       const totalSeconds = this.controller.getWorkDurationSeconds();
-      const timeStr = this.formatSecondsAsMmSs(totalSeconds);
+      const timeStr = formatSecondsAsMMSS(totalSeconds);
       const progressBar = this.buildProgressBar(totalSeconds, totalSeconds); // Full time left = empty bar
       this.statusBarItem.text = doingTask
         ? `$(play) ${timeStr} ${progressBar} ${this.truncate(doingTask.title, 100)}`
@@ -111,12 +111,6 @@ export class KanbanStatusBar {
       this.statusBarItem.tooltip = "Click to add a Kanban task";
       this.statusBarItem.command = "redmyne.kanban.add";
     }
-  }
-
-  private formatSecondsAsMmSs(seconds: number): string {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
   }
 
   private truncate(text: string, maxLen: number): string {
@@ -177,7 +171,7 @@ export class KanbanStatusBar {
     md.supportThemeIcons = true;
     md.appendMarkdown("**Paused** $(debug-pause)\n\n");
     md.appendMarkdown(`#${task.linkedIssueId} - ${task.linkedIssueSubject}\n\n`);
-    md.appendMarkdown(`Remaining: ${this.formatSecondsAsMmSs(task.timerSecondsLeft ?? 0)}\n\n`);
+    md.appendMarkdown(`Remaining: ${formatSecondsAsMMSS(task.timerSecondsLeft ?? 0)}\n\n`);
     md.appendMarkdown("---\n\n");
     md.appendMarkdown(`Progress: ${done}/${total} tasks\n\n`);
     md.appendMarkdown(`Logged: ${formatHoursAsHHMM(hours)}\n\n`);

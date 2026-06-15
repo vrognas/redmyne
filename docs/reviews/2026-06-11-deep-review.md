@@ -860,7 +860,7 @@ Status legend: [ ] open, [x] fixed, [-] wontfix.
 - **detail:** buildWeekInfo returns weekNumber: getISOWeekNumber(monday) (ISO-8601 week) but year: monday.getFullYear() (calendar year of the Monday). For ISO week 1 whose Monday falls in late December (e.g. Monday 2025-12-29 is W01 of ISO year 2026), the timesheet header (src/webviews/timesheet/index.js:313 renders `W${week.weekNumber} (… ${week.year})`) shows 'W01 … 2025' instead of 2026. date-utils.ts even re-exports date-fns getISOWeekYear (line 103) with a comment noting exactly this boundary case, but buildWeekInfo doesn't use it.
 - **fix:** Use getISOWeekYear(monday) for the year field in buildWeekInfo instead of monday.getFullYear().
 
-### 142. [ ] src/kanban/kanban-status-bar.ts:116 — MM:SS timer formatter implemented three times; the two kanban copies lack the canonical version's negative clamp
+### 142. [x] src/kanban/kanban-status-bar.ts:116 — MM:SS timer formatter implemented three times; the two kanban copies lack the canonical version's negative clamp
 
 - **dimension:** duplication | **verdict:** CONFIRMED
 - **detail:** The same seconds→'M:SS' formatter exists at: (1) src/utilities/time-input.ts:84 formatSecondsAsMMSS — the canonical exported one, which clamps with Math.max(0, seconds); (2) src/kanban/kanban-status-bar.ts:116 private formatSecondsAsMmSs; (3) src/kanban/kanban-tree-provider.ts:341 private formatSecondsAsMmSs. Both kanban copies omit the negative clamp, so a negative secondsLeft renders as e.g. '-1:-5'-style garbage. Both kanban files already import formatHoursAsHHMM from utilities/time-input, so the import path exists.

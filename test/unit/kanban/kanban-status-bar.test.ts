@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import type * as vscode from "vscode";
+import * as vscode from "vscode";
 import type { KanbanTask } from "../../../src/kanban/kanban-state";
 
 // Mock controller factory
@@ -75,10 +75,14 @@ describe("KanbanStatusBar", () => {
     controller: ReturnType<typeof createMockController>,
     globalState: vscode.Memento
   ) => { dispose: () => void };
+  // Same vscode instance the freshly-imported source uses (resetModules clears
+  // the registry, so the top-level import would be a different copy).
+  let vscodeMock: typeof import("vscode");
 
   beforeEach(async () => {
     vi.clearAllMocks();
     vi.resetModules();
+    vscodeMock = await import("vscode");
     const module = await import("../../../src/kanban/kanban-status-bar");
     KanbanStatusBar = module.KanbanStatusBar as unknown as typeof KanbanStatusBar;
   });
@@ -252,6 +256,44 @@ describe("KanbanStatusBar", () => {
       new KanbanStatusBar(controller, globalState);
 
       expect(controller.getDeferredMinutes).toHaveBeenCalled();
+    });
+  });
+
+  describe("MM:SS formatting", () => {
+    function lastStatusBarText(): string {
+      const create = vscodeMock.window.createStatusBarItem as unknown as {
+        mock: { results: Array<{ value: { text: string } }> };
+      };
+      const results = create.mock.results;
+      return results[results.length - 1].value.text;
+    }
+
+    it("formats a normal break countdown as M:SS", () => {
+      const controller = createMockController({
+        tasks: [createTask()],
+        isOnBreak: true,
+        breakSecondsLeft: 125,
+      });
+      const globalState = createMockGlobalState();
+
+      new KanbanStatusBar(controller, globalState);
+
+      expect(lastStatusBarText()).toContain("2:05");
+    });
+
+    it("clamps a negative countdown to 0:00 (canonical clamp)", () => {
+      const controller = createMockController({
+        tasks: [createTask()],
+        isOnBreak: true,
+        breakSecondsLeft: -5,
+      });
+      const globalState = createMockGlobalState();
+
+      new KanbanStatusBar(controller, globalState);
+
+      const text = lastStatusBarText();
+      expect(text).toContain("0:00");
+      expect(text).not.toContain("-");
     });
   });
 });

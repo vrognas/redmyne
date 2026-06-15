@@ -7,7 +7,7 @@ import {
   getTaskStatus,
   sortTasksByPriority,
 } from "./kanban-state";
-import { formatHoursAsHHMM } from "../utilities/time-input";
+import { formatHoursAsHHMM, formatSecondsAsMMSS } from "../utilities/time-input";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
 
 // Filter/sort persistence keys
@@ -162,7 +162,7 @@ export class KanbanTreeProvider
 
   getTreeItem(element: TaskTreeItem): vscode.TreeItem {
     if (element.type === "break-status") {
-      const timeStr = this.formatSecondsAsMmSs(element.breakSecondsLeft ?? 0);
+      const timeStr = formatSecondsAsMMSS(element.breakSecondsLeft ?? 0);
       const item = new vscode.TreeItem(`☕ Break: ${timeStr}`, vscode.TreeItemCollapsibleState.None);
       item.id = "kanban-break";
       item.iconPath = new vscode.ThemeIcon("coffee", new vscode.ThemeColor("charts.blue"));
@@ -266,7 +266,7 @@ export class KanbanTreeProvider
 
     // Description: timer info if active/initialized, else project/hours
     if (task.timerSecondsLeft !== undefined && task.timerSecondsLeft > 0) {
-      const timeStr = this.formatSecondsAsMmSs(task.timerSecondsLeft);
+      const timeStr = formatSecondsAsMMSS(task.timerSecondsLeft);
       const activityStr = task.activityName ? ` [${task.activityName}]` : "";
       const stateStr = task.timerPhase ? "" : " (ready)";
       item.description = `${timeStr}${activityStr}${stateStr} #${task.linkedIssueId}`;
@@ -297,7 +297,7 @@ export class KanbanTreeProvider
     md.appendMarkdown(`Project: ${task.linkedProjectName}\n\n`);
     md.appendMarkdown(`Priority: ${task.priority}\n\n`);
     if (task.timerPhase && task.timerSecondsLeft !== undefined) {
-      const timeStr = this.formatSecondsAsMmSs(task.timerSecondsLeft);
+      const timeStr = formatSecondsAsMMSS(task.timerSecondsLeft);
       md.appendMarkdown(`Timer: ${timeStr} (${task.timerPhase})\n\n`);
     }
     if (task.activityName) {
@@ -336,12 +336,6 @@ export class KanbanTreeProvider
     }
 
     return item;
-  }
-
-  private formatSecondsAsMmSs(seconds: number): string {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
   }
 
   getChildren(element?: TaskTreeItem): TaskTreeItem[] {
