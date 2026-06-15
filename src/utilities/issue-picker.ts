@@ -90,15 +90,17 @@ async function getMyIssues(server: IRedmineServer): Promise<{ openIssues: Issue[
     myIssuesCache.serverAddress === serverAddress &&
     Date.now() - myIssuesCache.timestamp < PROJECT_CACHE_TTL_MS;
 
+  // Return shallow copies so callers (e.g. recent-issue hydration) can mutate
+  // their lists without polluting the shared module cache.
   if (isCacheValid) {
-    return { openIssues: myIssuesCache!.openIssues, closedIssues: myIssuesCache!.closedIssues };
+    return { openIssues: [...myIssuesCache!.openIssues], closedIssues: [...myIssuesCache!.closedIssues] };
   }
 
   // If a fetch is in flight, wait for it
   if (myIssuesFetchPromise) {
     await myIssuesFetchPromise;
     if (myIssuesCache && myIssuesCache.serverAddress === serverAddress) {
-      return { openIssues: myIssuesCache.openIssues, closedIssues: myIssuesCache.closedIssues };
+      return { openIssues: [...myIssuesCache.openIssues], closedIssues: [...myIssuesCache.closedIssues] };
     }
   }
 
@@ -110,7 +112,7 @@ async function getMyIssues(server: IRedmineServer): Promise<{ openIssues: Issue[
     timestamp: Date.now(),
     serverAddress,
   };
-  return { openIssues: myIssuesCache.openIssues, closedIssues: myIssuesCache.closedIssues };
+  return { openIssues: [...myIssuesCache.openIssues], closedIssues: [...myIssuesCache.closedIssues] };
 }
 
 /**

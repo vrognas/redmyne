@@ -1508,4 +1508,67 @@ describe("issue-picker", () => {
     const selected = await __testIssuePicker.showActivityPicker([activityA], "Title", "Holder");
     expect(selected).toEqual(activityA);
   });
+
+  it("pickIssueWithSearch recent hydration does not pollute the shared my-issues cache", async () => {
+    const vscodeApi = await import("vscode");
+    const recentIssues = await import("../../../src/utilities/recent-issues");
+    vi.spyOn(recentIssues, "recordRecentIssue").mockImplementation(() => {});
+    // First open: #5005 is a recent issue not in "my issues" (triggers hydration).
+    // Second open: recent list is empty.
+    vi.spyOn(recentIssues, "getRecentIssueIds")
+      .mockReturnValueOnce([5005]) // hydration probe (first open)
+      .mockReturnValueOnce([5005]) // buildIssuePickerItems (first open)
+      .mockReturnValue([]); // all later reads (second open)
+
+    const myOpen = createIssue({
+      id: 1,
+      subject: "Genuine my-open",
+      project: { id: 201, name: "Core" },
+      status: { id: 1, name: "Open", is_closed: false },
+    });
+    // Unassigned recent issue fetched via getIssueById during hydration.
+    const hydratedRecent = createIssue({
+      id: 5005,
+      subject: "Unassigned recent",
+      project: { id: 201, name: "Core" },
+      status: { id: 1, name: "Open", is_closed: false },
+      assigned_to: { id: 0, name: "Unassigned" },
+    });
+
+    const { pickIssueWithSearch } = await import("../../../src/utilities/issue-picker");
+    const server = createMockServer({
+      getFilteredIssues: vi.fn(async (filter: { status: "open" | "closed" }) => ({
+        issues: filter.status === "open" ? [myOpen] : [],
+      })),
+      getProjects: vi.fn().mockResolvedValue([createProject(201, "Core")]),
+      isTimeTrackingEnabled: vi.fn().mockResolvedValue(true),
+      getIssueById: vi.fn().mockResolvedValue({ issue: hydratedRecent }),
+    });
+
+    // First open — hydrates #5005 into the (returned) my-open list.
+    const firstQp = createControlledQuickPick();
+    vi.spyOn(vscodeApi.window, "createQuickPick").mockReturnValueOnce(
+      firstQp as unknown as vscode.QuickPick<vscode.QuickPickItem>
+    );
+    const firstPending = pickIssueWithSearch(server as unknown as IRedmineServer, "Pick");
+    await flushMicrotasks();
+    expect(firstQp.items.some((i) => i.label.includes("#5005"))).toBe(true);
+    firstQp.triggerHide();
+    await expect(firstPending).resolves.toBeUndefined();
+
+    // Second open — recent list empty, cache still warm. #5005 must be gone.
+    const secondQp = createControlledQuickPick();
+    vi.spyOn(vscodeApi.window, "createQuickPick").mockReturnValueOnce(
+      secondQp as unknown as vscode.QuickPick<vscode.QuickPickItem>
+    );
+    const secondPending = pickIssueWithSearch(server as unknown as IRedmineServer, "Pick");
+    await flushMicrotasks();
+
+    const secondLabels = secondQp.items.map((i) => i.label);
+    expect(secondLabels.some((l) => l.includes("#5005"))).toBe(false);
+    expect(secondLabels.some((l) => l.includes("#1 Genuine my-open"))).toBe(true);
+
+    secondQp.triggerHide();
+    await expect(secondPending).resolves.toBeUndefined();
+  });
 });
