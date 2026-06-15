@@ -54,6 +54,18 @@ describe("workload-calculator", () => {
       expect(result.remaining).toBe(17); // 5 + 12 + 0
     });
 
+    it("does not let an overspent issue cancel another issue's remaining", () => {
+      const issues = [
+        createIssue({ id: 1, estimated_hours: 10, spent_hours: 0 }), // 10h left
+        createIssue({ id: 2, estimated_hours: 5, spent_hours: 20 }), // overspent → 0h, not -15h
+      ];
+
+      const result = calculateWorkload(issues, DEFAULT_SCHEDULE);
+
+      // Overspent issue contributes 0, so total == issue 1's genuine remaining
+      expect(result.remaining).toBe(10);
+    });
+
     it("calculates buffer correctly", () => {
       // 3 days left in week (Wed, Thu, Fri), 8h/day = 24h available
       // 10h remaining work = +14h buffer

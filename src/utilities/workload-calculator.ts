@@ -58,7 +58,13 @@ export function calculateWorkload(
     (sum, i) => sum + (i.spent_hours ?? 0),
     0
   );
-  const remaining = Math.max(totalEstimated - totalSpent, 0);
+  // Clamp each issue's remaining at >= 0 BEFORE summing: an overspent issue
+  // (spent > estimate) must contribute 0, not a negative that cancels other
+  // issues' genuine remaining hours and understates total workload.
+  const remaining = withEstimates.reduce(
+    (sum, i) => sum + Math.max((i.estimated_hours ?? 0) - (i.spent_hours ?? 0), 0),
+    0
+  );
 
   // Available capacity this week
   const weekEnd = getWeekEnd(today);

@@ -432,7 +432,7 @@ Status legend: [ ] open, [x] fixed, [-] wontfix.
 - **detail:** Custom-fields rendering loop appears at tree-item-factory.ts:136-145 (createFlexibilityTooltip), 203-212 (createBasicTooltip), 287-297 (createProjectTooltip, appendText variant). The browser-link block (strip trailing slashes from server.options.address, append link) appears at 148-151, 215-218, 314-317. Beyond those 3x snippets, createBasicTooltip (160-221) duplicates createFlexibilityTooltip (89-154) wholesale — title, tracker/priority/due metadata, description section, relations section — differing only in the Status line and the Progress/Remaining lines.
 - **fix:** Extract appendCustomFields(md, fields) and appendBrowserLink(md, server, path) helpers in tree-item-factory.ts, then collapse the two issue tooltips into one createIssueTooltip(issue, server, flexibility?: FlexibilityScore) that branches only on the status/progress lines.
 
-### 71. [ ] src/utilities/workload-calculator.ts:61 — Remaining work clamps at the aggregate level, letting overspent issues cancel other issues' remaining hours
+### 71. [x] src/utilities/workload-calculator.ts:61 — Remaining work clamps at the aggregate level, letting overspent issues cancel other issues' remaining hours
 
 - **dimension:** bug | **verdict:** CONFIRMED
 - **detail:** `remaining = Math.max(totalEstimated - totalSpent, 0)` nets across issues before clamping. Example: issue A est 10h/spent 0h, issue B est 5h/spent 20h → totals 15/20 → remaining 0, though A genuinely has 10h left. buffer = availableThisWeek - remaining then overstates free capacity in the status bar, telling the user they have slack when they are overbooked. capacity-calculator's calculateRemainingWork already does this correctly per-issue.
