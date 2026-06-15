@@ -1054,6 +1054,9 @@ function initializeGantt(state, rowWindow) {
     }
 
     function refreshSelectionChrome() {
+      // The selection count chrome isn't mounted during the loading skeleton;
+      // Ctrl+A then would deref a null element. No chrome to update — bail.
+      if (!selectionCountEl) return;
       if (selectedIssues.size > 0) {
         selectionCountEl.textContent = `${selectedIssues.size} selected`;
         selectionCountEl.classList.remove('hidden');

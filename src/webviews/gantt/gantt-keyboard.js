@@ -103,6 +103,10 @@ export function setupKeyboard(ctx) {
 
   // Quick search overlay
   let quickSearchEl = null;
+  // Hoisted so closeQuickSearch can cancel a pending highlight-apply timer —
+  // otherwise a debounced match scheduled just before close re-applies
+  // stale .search-match classes after the overlay is gone.
+  let searchTimeout = null;
   function showQuickSearch() {
     if (quickSearchEl) { quickSearchEl.remove(); }
     quickSearchEl = document.createElement('div');
@@ -121,7 +125,7 @@ export function setupKeyboard(ctx) {
       .filter(r => r.issueId !== null && r.issueId !== undefined)
       .map(r => ({ key: r.key, issueId: String(r.issueId), text: 'open issue #' + r.issueId }));
     let matchedRows = [];
-    let searchTimeout = null;
+    searchTimeout = null;
     input.addEventListener('input', () => {
       // Debounce search to avoid CPU spikes on rapid typing
       if (searchTimeout) clearTimeout(searchTimeout);
@@ -154,6 +158,10 @@ export function setupKeyboard(ctx) {
   }
 
   function closeQuickSearch() {
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+      searchTimeout = null;
+    }
     if (quickSearchEl) {
       quickSearchEl.remove();
       quickSearchEl = null;
