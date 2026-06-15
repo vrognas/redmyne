@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as vscode from "vscode";
-import { TimeSheetPanel, rowHoursTotal } from "../../../src/webviews/timesheet-panel";
+import {
+  TimeSheetPanel,
+  rowHoursTotal,
+  buildDeleteEntryOp,
+  buildUpdateEntryOp,
+} from "../../../src/webviews/timesheet-panel";
 import { buildWeekInfo } from "../../../src/webviews/timesheet-webview-messages";
 import * as clipboardUtil from "../../../src/utilities/time-entry-clipboard";
 import * as statusBarUtil from "../../../src/utilities/status-bar";
@@ -463,6 +468,46 @@ describe("timesheet panel private coverage", () => {
     const op = queue.add.mock.calls.at(-1)[0];
     expect(op.type).toBe("updateTimeEntry");
     expect(op.http.data.time_entry.issue_id).toBe(42);
+  });
+
+  it("buildDeleteEntryOp / buildUpdateEntryOp produce the canonical draft-op envelope", () => {
+    const del = buildDeleteEntryOp({ entryId: 101 });
+    expect(del).toMatchObject({
+      type: "deleteTimeEntry",
+      resourceId: 101,
+      resourceKey: "ts:timeentry:101",
+      http: { method: "DELETE", path: "/time_entries/101.json" },
+    });
+    expect(del.http.data).toBeUndefined(); // DELETE carries no body
+    expect(typeof del.id).toBe("string");
+    expect(buildDeleteEntryOp({ entryId: 7, description: "custom" }).description).toBe("custom");
+
+    // Field edit: issue_id rides along so a re-target reaches the server.
+    const upd = buildUpdateEntryOp({
+      entryId: 202,
+      issueId: 42,
+      hours: 3,
+      activityId: 9,
+      comments: "note",
+      date: "2026-02-02",
+    });
+    expect(upd).toMatchObject({
+      type: "updateTimeEntry",
+      resourceId: 202,
+      issueId: 42,
+      resourceKey: "ts:timeentry:202",
+      http: {
+        method: "PUT",
+        path: "/time_entries/202.json",
+        data: { time_entry: { issue_id: 42, hours: 3, activity_id: 9, comments: "note" } },
+      },
+    });
+
+    // Hours-only update (merge path): omitted fields are absent from the body.
+    const merge = buildUpdateEntryOp({ entryId: 5, hours: 8, description: "Merge" });
+    expect(merge.http.data.time_entry).toEqual({ hours: 8 });
+    expect(merge.issueId).toBeUndefined();
+    expect(merge.description).toBe("Merge");
   });
 
   it("covers saveAll copy/paste undo and draft-mode requirements", async () => {

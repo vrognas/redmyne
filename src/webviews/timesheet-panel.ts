@@ -138,6 +138,82 @@ function buildCreateEntryOp(args: {
   };
 }
 
+/** Canonical resourceKey for a saved (server-backed) time entry. */
+function savedEntryResourceKey(entryId: number): string {
+  return `ts:timeentry:${entryId}`;
+}
+
+/**
+ * Build a deleteTimeEntry draft op. Single source for the DELETE envelope —
+ * previously hand-built at eight call sites whose human-readable descriptions
+ * had already drifted ("#N" vs "N" vs "on <date>" vs "merged entry N"). The
+ * replayed shape (resourceId / DELETE path / resourceKey, no body) was always
+ * identical, so descriptions are converged on one canonical default unless a
+ * caller passes a meaningful override.
+ */
+export function buildDeleteEntryOp(args: {
+  entryId: number;
+  description?: string;
+}): DraftOperation {
+  return {
+    id: generateDraftId(),
+    type: "deleteTimeEntry",
+    timestamp: Date.now(),
+    resourceId: args.entryId,
+    description: args.description ?? `Delete time entry #${args.entryId}`,
+    http: {
+      method: "DELETE",
+      path: `/time_entries/${args.entryId}.json`,
+    },
+    resourceKey: savedEntryResourceKey(args.entryId),
+  };
+}
+
+/**
+ * Build an updateTimeEntry (PUT) draft op. Single source for the envelope —
+ * previously hand-built at four call sites that had drifted on body coverage:
+ * two sent { hours, activity_id, comments } and two sent only { hours },
+ * silently dropping issue reassignment + comment/activity edits (see finding
+ * #1: a PUT without issue_id leaves hours logged to the old issue).
+ *
+ * Only fields explicitly supplied are sent — a Redmine PUT leaves omitted
+ * fields untouched. Field-editing callers should pass issueId/activityId/
+ * comments so a re-target reaches the server; the merge path deliberately
+ * passes hours alone (issue/activity/comments are unchanged by a sum).
+ */
+export function buildUpdateEntryOp(args: {
+  entryId: number;
+  hours: number;
+  issueId?: number;
+  activityId?: number | null;
+  comments?: string | null;
+  date?: string | undefined;
+  description?: string;
+}): DraftOperation {
+  const timeEntry: Record<string, unknown> = { hours: args.hours };
+  // issue_id must ride along when supplied: the user may have re-targeted a
+  // saved entry via the Task dropdown, and Redmine only reassigns (and
+  // re-derives project) when the PUT body names the new issue.
+  if (args.issueId !== undefined) timeEntry.issue_id = args.issueId;
+  if (args.activityId !== undefined) timeEntry.activity_id = args.activityId;
+  if (args.comments !== undefined) timeEntry.comments = args.comments ?? "";
+
+  return {
+    id: generateDraftId(),
+    type: "updateTimeEntry",
+    timestamp: Date.now(),
+    resourceId: args.entryId,
+    ...(args.issueId !== undefined ? { issueId: args.issueId } : {}),
+    description: args.description ?? `Update #${args.issueId ?? args.entryId} on ${args.date}: ${args.hours}h`,
+    http: {
+      method: "PUT",
+      path: `/time_entries/${args.entryId}.json`,
+      data: { time_entry: timeEntry },
+    },
+    resourceKey: savedEntryResourceKey(args.entryId),
+  };
+}
+
 export class TimeSheetPanel {
   public static currentPanel: TimeSheetPanel | undefined;
 
@@ -1088,18 +1164,10 @@ export class TimeSheetPanel {
     if (!row.isNew && this._draftQueue && this._draftModeManager?.isEnabled) {
       for (const cell of Object.values(row.days)) {
         if (cell.entryId) {
-          await this._draftQueue.add({
-            id: generateDraftId(),
-            type: "deleteTimeEntry",
-            timestamp: Date.now(),
-            resourceId: cell.entryId,
-            description: `Delete time entry #${cell.entryId}`,
-            http: {
-              method: "DELETE",
-              path: `/time_entries/${cell.entryId}.json`,
-            },
-            resourceKey: `ts:timeentry:${cell.entryId}`,
-          }, TIMESHEET_SOURCE);
+          await this._draftQueue.add(
+            buildDeleteEntryOp({ entryId: cell.entryId }),
+            TIMESHEET_SOURCE
+          );
         }
       }
     }
@@ -1191,18 +1259,10 @@ export class TimeSheetPanel {
     for (const row of sourceRows) {
       for (const cell of Object.values(row.days)) {
         if (cell.entryId) {
-          await this._draftQueue.add({
-            id: generateDraftId(),
-            type: "deleteTimeEntry",
-            timestamp: Date.now(),
-            resourceId: cell.entryId,
-            description: `Delete time entry #${cell.entryId}`,
-            http: {
-              method: "DELETE",
-              path: `/time_entries/${cell.entryId}.json`,
-            },
-            resourceKey: `ts:timeentry:${cell.entryId}`,
-          }, TIMESHEET_SOURCE);
+          await this._draftQueue.add(
+            buildDeleteEntryOp({ entryId: cell.entryId }),
+            TIMESHEET_SOURCE
+          );
         }
       }
     }
@@ -1377,47 +1437,28 @@ export class TimeSheetPanel {
     }
 
     if (entryId) {
-      // Existing entry
+      // Existing entry. resourceKey resolves to ts:timeentry:<entryId> here,
+      // matching the envelope helpers' own resourceKey.
       if (hours > 0) {
-        // Update
-        await this._draftQueue.add({
-          id: generateDraftId(),
-          type: "updateTimeEntry",
-          timestamp: Date.now(),
-          resourceId: entryId,
-          issueId: row.issueId,
-          description: `Update #${row.issueId} on ${date}: ${hours}h`,
-          http: {
-            method: "PUT",
-            path: `/time_entries/${entryId}.json`,
-            data: {
-              time_entry: {
-                // issue_id must ride along: the user may have re-targeted a
-                // saved entry via the Task dropdown, and Redmine only
-                // reassigns when the PUT body names the new issue.
-                issue_id: row.issueId,
-                hours,
-                activity_id: row.activityId,
-                comments: row.comments ?? "",
-              },
-            },
-          },
-          resourceKey,
-        }, TIMESHEET_SOURCE);
+        // Update — carry issue_id/activity_id/comments so a re-target reaches
+        // the server (Redmine only reassigns when the PUT names the new issue).
+        await this._draftQueue.add(
+          buildUpdateEntryOp({
+            entryId,
+            issueId: row.issueId ?? undefined,
+            hours,
+            activityId: row.activityId,
+            comments: row.comments,
+            date,
+          }),
+          TIMESHEET_SOURCE
+        );
       } else {
         // Delete (hours = 0)
-        await this._draftQueue.add({
-          id: generateDraftId(),
-          type: "deleteTimeEntry",
-          timestamp: Date.now(),
-          resourceId: entryId,
-          description: `Delete time entry on ${date}`,
-          http: {
-            method: "DELETE",
-            path: `/time_entries/${entryId}.json`,
-          },
-          resourceKey,
-        }, TIMESHEET_SOURCE);
+        await this._draftQueue.add(
+          buildDeleteEntryOp({ entryId, description: `Delete time entry on ${date}` }),
+          TIMESHEET_SOURCE
+        );
       }
     } else if (hours > 0) {
       // New entry (no entryId, hours > 0)
@@ -2005,41 +2046,26 @@ export class TimeSheetPanel {
         // Single saved entry + same as original → remove any pending operation (reverted to original)
         await this._draftQueue.removeByKey(`ts:timeentry:${entry.entryId}`, TIMESHEET_SOURCE);
       } else if (newHours > 0) {
-        // Single saved entry → update
-        await this._draftQueue.add({
-          id: generateDraftId(),
-          type: "updateTimeEntry",
-          timestamp: Date.now(),
-          resourceId: entry.entryId!,
-          issueId: entry.issueId,
-          description: `Update #${entry.issueId} on ${date}: ${newHours}h`,
-          http: {
-            method: "PUT",
-            path: `/time_entries/${entry.entryId}.json`,
-            data: {
-              time_entry: {
-                hours: newHours,
-                activity_id: entry.activityId,
-                comments: entry.comments ?? "",
-              },
-            },
-          },
-          resourceKey: `ts:timeentry:${entry.entryId}`,
-        }, TIMESHEET_SOURCE);
+        // Single saved entry → update. issue_id rides along (was previously
+        // omitted here, unlike _queueCellOperation) so a re-target reaches the
+        // server.
+        await this._draftQueue.add(
+          buildUpdateEntryOp({
+            entryId: entry.entryId!,
+            issueId: entry.issueId,
+            hours: newHours,
+            activityId: entry.activityId,
+            comments: entry.comments,
+            date,
+          }),
+          TIMESHEET_SOURCE
+        );
       } else {
         // Single saved entry + 0h → delete
-        await this._draftQueue.add({
-          id: generateDraftId(),
-          type: "deleteTimeEntry",
-          timestamp: Date.now(),
-          resourceId: entry.entryId!,
-          description: `Delete time entry on ${date}`,
-          http: {
-            method: "DELETE",
-            path: `/time_entries/${entry.entryId}.json`,
-          },
-          resourceKey: `ts:timeentry:${entry.entryId}`,
-        }, TIMESHEET_SOURCE);
+        await this._draftQueue.add(
+          buildDeleteEntryOp({ entryId: entry.entryId!, description: `Delete time entry on ${date}` }),
+          TIMESHEET_SOURCE
+        );
       }
     } else {
       // Multiple entries → delete/remove all, create one (if hours > 0)
@@ -2050,18 +2076,10 @@ export class TimeSheetPanel {
           await this._draftQueue.removeByKey(resourceKey, TIMESHEET_SOURCE);
         } else {
           // Saved entry → queue DELETE
-          await this._draftQueue.add({
-            id: generateDraftId(),
-            type: "deleteTimeEntry",
-            timestamp: Date.now(),
-            resourceId: entry.entryId,
-            description: `Delete time entry #${entry.entryId}`,
-            http: {
-              method: "DELETE",
-              path: `/time_entries/${entry.entryId}.json`,
-            },
-            resourceKey: `ts:timeentry:${entry.entryId}`,
-          }, TIMESHEET_SOURCE);
+          await this._draftQueue.add(
+            buildDeleteEntryOp({ entryId: entry.entryId }),
+            TIMESHEET_SOURCE
+          );
         }
       }
 
@@ -2333,34 +2351,27 @@ export class TimeSheetPanel {
     }
 
     if (newHours > 0) {
-      // Update entry
-      await this._draftQueue.add({
-        id: generateDraftId(),
-        type: "updateTimeEntry",
-        timestamp: Date.now(),
-        resourceId: entryId,
-        description: `Update time entry ${entryId} to ${newHours}h`,
-        resourceKey: `ts:timeentry:${entryId}`,
-        http: {
-          method: "PUT",
-          path: `/time_entries/${entryId}.json`,
-          data: { time_entry: { hours: newHours } },
-        },
-      }, TIMESHEET_SOURCE);
+      // Update entry. Carry issue_id/activity_id/comments from the row (was
+      // previously hours-only, silently dropping a prior comments/activity edit
+      // and any re-target — see finding #47).
+      const date = this._currentWeek.dayDates[dayIndex];
+      await this._draftQueue.add(
+        buildUpdateEntryOp({
+          entryId,
+          issueId: row.issueId ?? undefined,
+          hours: newHours,
+          activityId: row.activityId,
+          comments: row.comments,
+          date,
+        }),
+        TIMESHEET_SOURCE
+      );
     } else {
       // Delete entry (hours = 0)
-      await this._draftQueue.add({
-        id: generateDraftId(),
-        type: "deleteTimeEntry",
-        timestamp: Date.now(),
-        resourceId: entryId,
-        description: `Delete time entry ${entryId}`,
-        resourceKey: `ts:timeentry:${entryId}`,
-        http: {
-          method: "DELETE",
-          path: `/time_entries/${entryId}.json`,
-        },
-      }, TIMESHEET_SOURCE);
+      await this._draftQueue.add(
+        buildDeleteEntryOp({ entryId }),
+        TIMESHEET_SOURCE
+      );
     }
 
     // Reload to reflect changes
@@ -2390,18 +2401,10 @@ export class TimeSheetPanel {
     }
 
     // Queue delete operation
-    await this._draftQueue.add({
-      id: generateDraftId(),
-      type: "deleteTimeEntry",
-      timestamp: Date.now(),
-      resourceId: entryId,
-      description: `Delete time entry ${entryId}`,
-      resourceKey: `ts:timeentry:${entryId}`,
-      http: {
-        method: "DELETE",
-        path: `/time_entries/${entryId}.json`,
-      },
-    }, TIMESHEET_SOURCE);
+    await this._draftQueue.add(
+      buildDeleteEntryOp({ entryId }),
+      TIMESHEET_SOURCE
+    );
 
     // Reload to reflect changes
     await this._loadWeek(this._currentWeek);
@@ -2439,35 +2442,27 @@ export class TimeSheetPanel {
     // Sum all hours
     const totalHours = sourceEntries.reduce((sum, e) => sum + e.hours, 0);
 
-    // Queue update for target entry with total hours
-    await this._draftQueue.add({
-      id: generateDraftId(),
-      type: "updateTimeEntry",
-      timestamp: Date.now(),
-      resourceId: targetEntry.entryId,
-      description: `Merge ${sourceEntries.length} entries → ${totalHours}h`,
-      resourceKey: `ts:timeentry:${targetEntry.entryId}`,
-      http: {
-        method: "PUT",
-        path: `/time_entries/${targetEntry.entryId}.json`,
-        data: { time_entry: { hours: totalHours } },
-      },
-    }, TIMESHEET_SOURCE);
+    // Queue update for target entry with total hours. Hours-only by design:
+    // a merge sums duplicates that already share issue/activity/comments, so
+    // those fields are left untouched (omitted fields stay as-is on PUT).
+    await this._draftQueue.add(
+      buildUpdateEntryOp({
+        entryId: targetEntry.entryId,
+        hours: totalHours,
+        description: `Merge ${sourceEntries.length} entries → ${totalHours}h`,
+      }),
+      TIMESHEET_SOURCE
+    );
 
     // Queue delete for all other entries
     for (const entry of entriesToDelete) {
-      await this._draftQueue.add({
-        id: generateDraftId(),
-        type: "deleteTimeEntry",
-        timestamp: Date.now(),
-        resourceId: entry.entryId,
-        description: `Delete merged entry ${entry.entryId}`,
-        resourceKey: `ts:timeentry:${entry.entryId}`,
-        http: {
-          method: "DELETE",
-          path: `/time_entries/${entry.entryId}.json`,
-        },
-      }, TIMESHEET_SOURCE);
+      await this._draftQueue.add(
+        buildDeleteEntryOp({
+          entryId: entry.entryId,
+          description: `Delete merged entry ${entry.entryId}`,
+        }),
+        TIMESHEET_SOURCE
+      );
     }
 
     // Show toast
