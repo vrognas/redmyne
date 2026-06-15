@@ -7,6 +7,40 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.31.0]
+
+Continuation of the whole-codebase deep review (report: `docs/reviews/2026-06-11-deep-review.md`): **73 further findings fixed — 105 of 142 resolved** — on top of v4.30.0. Fixes are unit-tested where the surface allows; webview-interaction fixes (no DOM in the test env) were verified by review + production-bundle checks. No user-facing feature changes — this is a correctness, security, and maintainability release.
+
+### Fixed
+
+- **Timesheet wrote some edits to the wrong issue** — the delete/update draft-op envelopes were hand-built at 12 sites and had drifted; some update ops omitted `issue_id`, re-targeting hours onto the old issue. All now go through shared builders
+- **Large issue/dependency sets silently failed to load** — `getIssuesByIds` now batches by URL length instead of overflowing server/proxy URL limits
+- **API key stranded after upgrade** — a transient locked-keychain on first post-upgrade launch marked the namespace migration "done" without copying the secret; it now retries until the copy succeeds
+- **% Done changes snapped back in the Gantt** — every done-ratio write (set/bulk/clear) optimistically updated the bar, then a refresh re-read the untouched tree cache and reverted it; the cache is synced on write now
+- **Workload buffer overstated** — remaining work clamps per-issue before summing, so an over-spent issue no longer cancels others' remaining hours
+- **Restored Gantt stuck on the loading skeleton** when a panel was deserialized with zero issues (filter callback also went unwired)
+- **Gantt timeouts/edge cases**: request timeout double-fired the error path (corrupted log correlation); the flexibility cache was mutated in place, leaking gantt-view scores into the sidebar; a superseded contribution load could overwrite newer state; `removeDraft` had no error path
+- **Pickers & wizards**: issue-picker cleared-query searches no longer let a slow result overwrite the restored list; recent-issue hydration no longer mutates the shared My-Open/Closed cache; the wizard no longer treats a typed value containing "Back" as navigation; list-format custom fields pre-select the current value
+- **Commands**: changing the Redmine URL now re-prompts for the new server's API key (was silently keeping the wrong key); internal-estimate input parses `1:30`/`2h 30min` (was truncating); a reconfigure disposes the previous server (was leaking its 30s timer); timesheet command/serializer disposables now reach `context.subscriptions`
+- **Kanban / dates / misc**: a `linkedProjectId` of 0 no longer renders an unexpandable project folder; the draft-queue badge refreshes when the queue is cleared on a server switch; the ISO-week header pairs the right year at year boundaries; ghost/intensity day-walks read the weekday in a consistent date frame (DST drift)
+- **Webview UX**: Ctrl+A on the loading skeleton no longer throws; cancelling the drag-confirm modal with Escape no longer also clears focus/row-selection; timesheet grid arrow-nav no longer dead-stops on group headers; the quick-search highlight timer is cancelled on close; redo of a duplicated row no longer double-pushes the undo stack with a dead row id; an arrow-deselect no longer leaks its tracker arrays
+
+### Security
+
+- **One canonical `escapeHtml`** (8-entity, null-safe) replaces the divergent 4–5-entity copies across the draft-review TS and the timesheet webview, ending an XSS-sensitive drift
+- The draft-review panel uses the shared **CSPRNG nonce** instead of a forked `Math.random()` one
+- `data-path`/`data-method` attributes in the draft-review render are escaped (attribute breakout); query-param redaction reuses the shared sensitive-field list
+
+### Changed (internal)
+
+- Eliminated duplication across ~30 findings: shared helpers for the arrow router, bar geometry, collapse-key attributes, config-backed id-set trackers, draft-op envelopes, the change-aware cache ritual, kanban time-logging + controller patches, the `withProgress` scaffold, issue→QuickPick mapping, tooltip builders, date/duration formatters, and the gantt scroll/highlight helpers; the `formatDateISO` alias was dropped; draft-mode-server's 31 passthroughs reduced to a typed list + bind loop
+- Removed dead code: the 277-line unused `MyIssuesTree` module, redundant capacity/collapse paths, dead render-path variables, write-only dataset writes, and dead command-arg branches
+- `buildProjectNode` aggregates project metrics bottom-up in one pass (was re-collecting the full subtree at every level)
+
+### Notes
+
+37 findings remain open (tracked in the review doc): ~9 god-file structural rewrites, a handful of untestable webview-JS dedups, and a few wide type-renames — all better suited to dedicated focused work than a sweep.
+
 ## [4.30.0]
 
 ### Added
