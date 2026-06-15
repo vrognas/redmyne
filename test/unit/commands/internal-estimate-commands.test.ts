@@ -74,6 +74,19 @@ describe("registerInternalEstimateCommands", () => {
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.refreshGanttData");
   });
 
+  it("parses H:MM input without truncating to whole hours", async () => {
+    registerInternalEstimateCommands(context);
+    vi.mocked(vscode.window.showInputBox).mockResolvedValue("1:30");
+
+    await handlers.get("redmyne.setInternalEstimate")?.({
+      id: 456,
+      subject: "Colon input",
+    });
+
+    const stored = globalState._store.get(STORAGE_KEY) as Record<string, unknown>;
+    expect((stored["456"] as { hoursRemaining: number }).hoursRemaining).toBe(1.5);
+  });
+
   it("returns when set command input is cancelled", async () => {
     registerInternalEstimateCommands(context);
     vi.mocked(vscode.window.showInputBox).mockResolvedValue(undefined);

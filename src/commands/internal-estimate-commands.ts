@@ -10,6 +10,7 @@ import {
   clearInternalEstimate,
   getInternalEstimate,
 } from "../utilities/internal-estimates";
+import { parseTimeInput } from "../utilities/time-input";
 import { ensureIssueId } from "./command-guards";
 
 export function registerInternalEstimateCommands(
@@ -33,16 +34,16 @@ export function registerInternalEstimateCommands(
           value: placeholder,
           validateInput: (value) => {
             if (!value.trim()) return "Please enter a number";
-            const num = parseFloat(value);
-            if (isNaN(num)) return "Please enter a valid number";
-            if (num < 0) return "Hours cannot be negative";
+            if (value.trim().startsWith("-")) return "Hours cannot be negative";
+            const num = parseTimeInput(value);
+            if (num === null) return "Please enter a valid number";
             return null;
           },
         });
 
         if (input === undefined) return; // Cancelled
 
-        const hours = parseFloat(input);
+        const hours = parseTimeInput(input) ?? 0;
         await setInternalEstimate(context.globalState, issue.id, hours);
 
         vscode.window.showInformationMessage(
