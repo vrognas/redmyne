@@ -54,7 +54,11 @@ export function registerConfigureCommand(
           await config.update("serverUrl", url, vscode.ConfigurationTarget.Global);
         }
 
-        shouldUpdateApiKey = choice.value === "apiKey" || choice.value === "both";
+        // API keys are server-scoped: a changed URL invalidates the old key,
+        // so a URL-only change must also re-prompt for the new server's key.
+        const urlChanged = choice.value === "url" && url !== existingUrl;
+        shouldUpdateApiKey =
+          choice.value === "apiKey" || choice.value === "both" || urlChanged;
       } else if (existingUrl && !existingApiKey) {
         const choice = await vscode.window.showQuickPick(
           [

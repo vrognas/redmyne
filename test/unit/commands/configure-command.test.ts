@@ -84,11 +84,32 @@ describe("registerConfigureCommand", () => {
     expect(updateConfiguredContext).not.toHaveBeenCalled();
   });
 
-  it("updates only url when existing url+key and user picks url", async () => {
+  it("keeps existing key when url choice resubmits unchanged url", async () => {
     configGet.mockReturnValue("https://redmine.example.test");
     secretManager.getApiKey.mockResolvedValue("old-key");
     vi.mocked(vscode.window.showQuickPick).mockResolvedValue({ value: "url" } as never);
-    vi.mocked(vscode.window.showInputBox).mockResolvedValue("https://new-redmine.example.test");
+    vi.mocked(vscode.window.showInputBox).mockResolvedValue("https://redmine.example.test");
+
+    const handler = registerAndGetHandler();
+    await handler();
+
+    expect(configUpdate).toHaveBeenCalledWith(
+      "serverUrl",
+      "https://redmine.example.test",
+      vscode.ConfigurationTarget.Global
+    );
+    expect(secretManager.setApiKey).not.toHaveBeenCalled();
+    expect(updateConfiguredContext).toHaveBeenCalledTimes(1);
+  });
+
+  it("prompts for new key when url choice actually changes the url", async () => {
+    configGet.mockReturnValue("https://redmine.example.test");
+    secretManager.getApiKey.mockResolvedValue("old-key");
+    vi.mocked(vscode.window.showQuickPick).mockResolvedValue({ value: "url" } as never);
+    vi.mocked(vscode.window.showInformationMessage).mockResolvedValue("I Have My Key" as never);
+    vi.mocked(vscode.window.showInputBox)
+      .mockResolvedValueOnce("https://new-redmine.example.test")
+      .mockResolvedValueOnce("new-server-key-1234567890");
 
     const handler = registerAndGetHandler();
     await handler();
@@ -98,7 +119,8 @@ describe("registerConfigureCommand", () => {
       "https://new-redmine.example.test",
       vscode.ConfigurationTarget.Global
     );
-    expect(secretManager.setApiKey).not.toHaveBeenCalled();
+    // old server's key must not silently remain active for the new server
+    expect(secretManager.setApiKey).toHaveBeenCalledWith("new-server-key-1234567890");
     expect(updateConfiguredContext).toHaveBeenCalledTimes(1);
   });
 
