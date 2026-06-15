@@ -10,6 +10,7 @@ import type { DraftModeServer } from "../draft-mode/draft-mode-server";
 import type { DraftOperation } from "../draft-mode/draft-operation";
 import { DRAFT_COMMAND_SOURCE } from "../draft-mode/draft-change-sources";
 import { getServerOrShowError } from "./command-guards";
+import { errorToString } from "../utilities/error-feedback";
 
 export interface DraftModeCommandDeps {
   queue: DraftQueue;
@@ -58,7 +59,7 @@ export async function applyDraftsWithTracking(
       realId = await executeOperation(server, remapStubIds(op, stubIdMap));
       applied = true;
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
+      const msg = errorToString(error);
       result.failed.push({ operation: op, error: msg });
 
       const shouldContinue = await onError(op, msg);
@@ -321,7 +322,7 @@ Skipped (not attempted): ${skippedNames}`;
         refreshTrees();
         vscode.window.showInformationMessage(`Applied: ${op.description}`);
       } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
+        const msg = errorToString(error);
         vscode.window.showErrorMessage(`Failed to apply: ${op.description}\n${msg}`);
       } finally {
         applyInFlight = false;

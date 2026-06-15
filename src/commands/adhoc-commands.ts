@@ -4,6 +4,7 @@ import { parseTargetIssueId } from "../utilities/contribution-calculator";
 import { TimeEntryNode } from "../trees/my-time-entries-tree";
 import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { pickIssue } from "../utilities/issue-picker";
+import { errorToString } from "../utilities/error-feedback";
 
 /** Issue tree item passed from context menu */
 interface IssueItem {
@@ -41,7 +42,7 @@ function getEntryAndServerOrShowError(
 
 function showUpdateTimeEntryError(error: unknown): void {
   vscode.window.showErrorMessage(
-    `Failed to update time entry: ${error instanceof Error ? error.message : String(error)}`
+    `Failed to update time entry: ${errorToString(error)}`
   );
 }
 

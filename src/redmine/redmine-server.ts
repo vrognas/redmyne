@@ -18,6 +18,7 @@ import { Membership as RedmineMembership } from "./models/membership";
 import { CustomFieldDefinition, TimeEntryCustomFieldValue } from "./models/custom-field-definition";
 import type { IRedmineServer } from "./redmine-server-interface";
 import { ChangeAwareCache, CHANGE_CACHE_TTL_MS, MIN_PROBE_INTERVAL_MS, extractMaxUpdatedOn } from "./change-aware-cache";
+import { errorToString } from "../utilities/error-feedback";
 
 type HttpMethods = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
@@ -154,7 +155,7 @@ export class RedmineServer implements IRedmineServer {
       this.cachedCaBuffer = fs.readFileSync(caFile);
       return this.cachedCaBuffer;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = errorToString(err);
       throw new Error(`redmyne.caFile: cannot read "${caFile}" — ${msg}`);
     }
   }

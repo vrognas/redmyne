@@ -3,6 +3,7 @@ import type { ActionProperties } from "./action-properties";
 import type { RedmineServerConnectionOptions } from "../redmine/redmine-server";
 import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { getConfiguredServerUrlOrShowError } from "./command-guards";
+import { errorToString } from "../utilities/error-feedback";
 
 export interface RegisterConfiguredCommandDeps {
   context: vscode.ExtensionContext;
@@ -134,7 +135,7 @@ export function createConfiguredCommandRegistrar(
               await action(parsedProps, ...parsedArgs);
             }
           } catch (error) {
-            const msg = error instanceof Error ? error.message : String(error);
+            const msg = errorToString(error);
             vscode.window.showErrorMessage(`Command failed: ${msg}`);
           }
         }

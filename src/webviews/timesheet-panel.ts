@@ -47,6 +47,7 @@ import {
   SourceEntry,
 } from "./timesheet-webview-messages";
 import { startOfISOWeek } from "date-fns";
+import { errorToString } from "../utilities/error-feedback";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -1756,7 +1757,7 @@ export class TimeSheetPanel {
           successCount++;
         } catch (error) {
           errorCount++;
-          const msg = error instanceof Error ? error.message : String(error);
+          const msg = errorToString(error);
           vscode.window.showErrorMessage(`Failed: ${op.description} - ${msg}`);
         }
       }
