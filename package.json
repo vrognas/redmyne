@@ -1512,67 +1512,67 @@
         },
         {
           "command": "redmyne.openIssueInBrowser",
-          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue/",
           "group": "1_navigation@1"
         },
         {
           "command": "redmyne.openIssueInGantt",
-          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue/",
           "group": "1_navigation@2"
         },
         {
           "command": "redmyne.updateIssue",
-          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue/",
           "group": "2_actions@1"
         },
         {
           "command": "redmyne.quickCreateSubIssue",
-          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/ && viewItem =~ /-root$/ && view != 'redmyne-explorer-kanban' && view != 'redmyne-explorer-my-time-entries'",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue/ && viewItem =~ /-root$/ && view != 'redmyne-explorer-kanban' && view != 'redmyne-explorer-my-time-entries'",
           "group": "2_actions@2"
         },
         {
           "submenu": "redmyne.doneRatioMenu",
-          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue/",
           "group": "3_properties@1"
         },
         {
           "command": "redmyne.setStatus",
-          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue/",
           "group": "3_properties@2"
         },
         {
           "command": "redmyne.setIssuePriority",
-          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue/",
           "group": "3_properties@3"
         },
         {
           "command": "redmyne.quickLogTime",
-          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue-active/",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue-active/",
           "group": "4_time@1"
         },
         {
           "submenu": "redmyne.internalEstimateMenu",
-          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue/",
           "group": "5_settings@1"
         },
         {
           "command": "redmyne.toggleAdHoc",
-          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue/",
           "group": "5_settings@2"
         },
         {
           "command": "redmyne.addIssueToKanban",
-          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue/",
           "group": "6_integrations@1"
         },
         {
           "command": "redmyne.copyIssueUrl",
-          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue/",
           "group": "9_clipboard@1"
         },
         {
           "command": "redmyne.copyIssueId",
-          "when": "(view == 'redmyne-explorer-projects' || view == 'redmyne-explorer-my-issues') && viewItem =~ /^issue/",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue/",
           "group": "9_clipboard@2"
         },
         {

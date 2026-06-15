@@ -1,5 +1,1788 @@
-"use strict";(()=>{(()=>{let c=acquireVsCodeApi(),Y=-1,A=[],W=[],Be=50,T={expandedCells:new Set,issueDetails:new Map},l=null,J=null;function N(e){A.push(e),A.length>Be&&A.shift(),W.length=0,U()}function ve(){if(A.length===0)return;let e=A.pop();if(e.type==="barrier"){k(e.message||"Cannot undo this action"),U();return}W.push(e),we(e,!0),U()}function oe(){if(W.length===0)return;let e=W.pop();if(e.type==="paste"){k("Redo paste not supported - use Paste again"),U();return}A.push(e),we(e,!1),U()}function U(){ie&&(ie.disabled=A.length===0),le&&(le.disabled=W.length===0)}function we(e,t){let s=t?e.oldValue:e.newValue;switch(e.type){case"cell":c.postMessage({type:"updateCell",rowId:e.rowId,dayIndex:e.dayIndex,hours:s,skipUndo:!0});let n=document.querySelector(`tr[data-row-id="${e.rowId}"] .day-cell[data-day="${e.dayIndex}"] .day-input`);n&&(n.value=C(s),n.classList.toggle("zero",s===0));break;case"field":c.postMessage({type:"updateRowField",rowId:e.rowId,field:e.field,value:s,skipUndo:!0});break;case"duplicateRow":t?c.postMessage({type:"deleteRow",rowId:e.newRowId,skipUndo:!0}):c.postMessage({type:"duplicateRow",rowId:e.sourceRowId});break;case"deleteRow":t?c.postMessage({type:"restoreRow",row:e.deletedRow}):c.postMessage({type:"deleteRow",rowId:e.deletedRow.id,skipUndo:!0});break;case"aggregatedCell":if(t&&(e.sourceEntries?.length||0)>1){c.postMessage({type:"restoreAggregatedEntries",entries:e.sourceEntries,aggRowId:e.aggRowId,dayIndex:e.dayIndex});break}c.postMessage({type:"updateAggregatedCell",aggRowId:e.aggRowId,dayIndex:e.dayIndex,newHours:s,sourceEntries:e.sourceEntries,confirmed:!0,skipUndo:!0});let a=document.querySelector(`tr[data-row-id="${e.aggRowId}"] .day-cell[data-day="${e.dayIndex}"] .day-input`);a&&(a.value=C(s),a.classList.toggle("zero",s===0));break;case"aggregatedField":c.postMessage({type:"updateAggregatedField",aggRowId:e.aggRowId,field:e.field,value:s,sourceRowIds:e.sourceRowIds,confirmed:!0,skipUndo:!0});let o=document.querySelector(`tr[data-row-id="${e.aggRowId}"] .comments-input`);o&&(o.value=s||"");break;case"expandedEntry":c.postMessage({type:"updateExpandedEntry",rowId:e.rowId,entryId:e.entryId,dayIndex:e.dayIndex,newHours:s,oldHours:t?e.newValue:e.oldValue,skipUndo:!0});break;case"paste":c.postMessage({type:"undoPaste",draftIds:e.draftIds}),k(`Undid paste of ${e.count} entries`);break}}let B=document.getElementById("gridBody"),$e=document.getElementById("totalsRow"),de=document.getElementById("weekLabel"),Pe=document.getElementById("loadingOverlay"),xe=document.getElementById("weekTotal"),re=document.getElementById("groupBySelect"),Ee=document.getElementById("draftModeWarning"),Ae=document.getElementById("enableDraftModeBtn"),He=document.getElementById("addEntryBtn"),ie=document.getElementById("undoBtn"),le=document.getElementById("redoBtn"),Ce=document.getElementById("weekPickerInput"),Q=null;typeof flatpickr<"u"&&Ce&&(Q=flatpickr(Ce,{weekNumbers:!0,locale:{firstDayOfWeek:1},positionElement:de,plugins:typeof weekSelectPlugin<"u"?[new weekSelectPlugin({})]:[],onChange:function(e){if(e.length>0){let t=e[0],s=t.getFullYear(),n=String(t.getMonth()+1).padStart(2,"0"),a=String(t.getDate()).padStart(2,"0"),o=`${s}-${n}-${a}`;c.postMessage({type:"navigateWeek",direction:"date",targetDate:o})}},onReady:function(e,t,s){let n=document.createElement("button");n.className="flatpickr-this-week-btn",n.textContent="This week",n.type="button",n.addEventListener("click",a=>{a.preventDefault(),a.stopPropagation(),s.jumpToDate(new Date)}),s.calendarContainer.appendChild(n)},onOpen:function(e,t,s){s._escHandler=function(n){n.key==="Escape"&&s.close()},document.addEventListener("keydown",s._escHandler)},onClose:function(e,t,s){s._escHandler&&(document.removeEventListener("keydown",s._escHandler),s._escHandler=null)}}),de?.addEventListener("click",()=>{Q&&(l?.week?.startDate&&Q.setDate(l.week.startDate,!1),Q.open())}));function ke(e){e.isDraftMode?(Ee.classList.add("hidden"),document.body.classList.remove("draft-mode-disabled")):(Ee.classList.remove("hidden"),document.body.classList.add("draft-mode-disabled"))}function Fe(e){if(!e)return"Loading...";let t=new Date(e.startDate+"T12:00:00"),s=new Date(e.endDate+"T12:00:00"),n={day:"numeric",month:"short"},a=t.toLocaleDateString("en-US",n),o=s.toLocaleDateString("en-US",n);return`W${String(e.weekNumber).padStart(2,"0")} (${a} - ${o} ${e.year})`}function C(e){return e===0?"":e===Math.floor(e)?e.toString():String(Number(e.toFixed(2)))}function be(e){let t=Math.round(e*60),s=Math.floor(t/60),n=t%60;return`${s}:${n.toString().padStart(2,"0")}`}function Z(e){let t=e.trim();if(!t)return 0;if(t.includes(":")){let[a,o]=t.split(":").map(Number);return Number.isFinite(a)?Math.max(0,a+(Number.isFinite(o)?o:0)/60):0}let s=t.match(/^(\d+(?:\.\d+)?)\s*h?\s*(\d+)?\s*m?$/i);if(s){let a=parseFloat(s[1])||0,o=parseInt(s[2]||"0",10);return a+o/60}let n=parseFloat(t);return isNaN(n)?0:Math.max(0,n)}function Re(e,t,s){return l?.totals?.days?(l.totals.days[e]||0)-t+s>24:!1}function qe(e){return e?e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"):""}function ce(e){if(!e)return-1;let t=new Date;t.setHours(0,0,0,0);let s=t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0");return e.dayDates.indexOf(s)}function ue(e,t){let s=document.createElement("tr");s.dataset.rowId=e.id;let n=e.isAggregated===!0;n&&s.classList.add("aggregated-row"),e.isNew&&(!e.issueId||!e.activityId)&&e.weekTotal>0&&s.classList.add("incomplete-row");let o=document.createElement("td");o.className="col-parent";let d=document.createElement("select");d.className="parent-select",d.innerHTML='<option value="">Client...</option>';for(let i of t.parentProjects){let u=document.createElement("option");u.value=i.id,u.textContent=i.id===Y?i.name:`#${i.id} ${i.name}`,i.id===e.parentProjectId&&(u.selected=!0),d.appendChild(u)}if(e.parentProjectId!==null){let i=e.parentProjectId===Y?"Others":`#${e.parentProjectId} ${e.parentProjectName||""}`;if(d.dataset.tooltip=i,e.parentProjectId!==Y){let u=t.parentProjects.find(h=>h.id===e.parentProjectId);d.dataset.vscodeContext=JSON.stringify({webviewSection:"tsClient",projectId:e.parentProjectId,projectIdentifier:u?.identifier||"",preventDefaultContextMenuItems:!0})}}d.addEventListener("change",()=>{let i=d.value?parseInt(d.value,10):null;n&&e.sourceRowIds?.length>0?c.postMessage({type:"updateAggregatedField",aggRowId:e.id,field:"parentProject",value:i,sourceRowIds:e.sourceRowIds,confirmed:!1}):c.postMessage({type:"updateRowField",rowId:e.id,field:"parentProject",value:i}),i!==null&&c.postMessage({type:"requestChildProjects",parentId:i})}),o.appendChild(d),s.appendChild(o);let g=document.createElement("td");g.className="col-project";let p=document.createElement("select");p.className="project-select",p.innerHTML='<option value="">Project...</option>';let m=e.parentProjectId!==null;if(p.disabled=!m,m){let i=t.childProjectsByParent.get(String(e.parentProjectId))||[];for(let u of i){let h=document.createElement("option");h.value=u.id,h.textContent=`#${u.id} ${u.name}`,u.id===e.projectId&&(h.selected=!0),p.appendChild(h)}}if(e.projectId!==null){p.dataset.tooltip=`#${e.projectId} ${e.projectName||""}`;let i=t.projects.find(u=>u.id===e.projectId);p.dataset.vscodeContext=JSON.stringify({webviewSection:"tsProject",projectId:e.projectId,projectIdentifier:i?.identifier||"",preventDefaultContextMenuItems:!0})}p.addEventListener("change",()=>{let i=p.value?parseInt(p.value,10):null;n&&e.sourceRowIds?.length>0?c.postMessage({type:"updateAggregatedField",aggRowId:e.id,field:"project",value:i,sourceRowIds:e.sourceRowIds,confirmed:!1}):c.postMessage({type:"updateRowField",rowId:e.id,field:"project",value:i}),i!==null&&c.postMessage({type:"requestIssues",projectId:i})}),g.appendChild(p),s.appendChild(g);let r=document.createElement("td");r.className="col-task";let f=document.createElement("div");f.className="task-cell-content";let y=document.createElement("select");y.className="task-select",y.innerHTML='<option value="">Task...</option>';let D=e.projectId!==null;if(y.disabled=!D,D){let i=t.issuesByProject.get(String(e.projectId))||[];for(let u of i){let h=document.createElement("option");h.value=u.id,h.textContent=`#${u.id} ${u.subject}`,u.id===e.issueId&&(h.selected=!0),y.appendChild(h)}}e.issueId!==null&&(r.dataset.issueId=e.issueId,y.dataset.vscodeContext=JSON.stringify({webviewSection:"tsTask",issueId:e.issueId,preventDefaultContextMenuItems:!0})),y.addEventListener("change",()=>{let i=y.value?parseInt(y.value,10):null;n&&e.sourceRowIds?.length>0?c.postMessage({type:"updateAggregatedField",aggRowId:e.id,field:"issue",value:i,sourceRowIds:e.sourceRowIds,confirmed:!1}):c.postMessage({type:"updateRowField",rowId:e.id,field:"issue",value:i})}),f.appendChild(y);let w=document.createElement("button");w.className="search-btn",w.textContent="\u{1F50D}",w.dataset.tooltip="Search all issues",w.addEventListener("click",()=>{c.postMessage({type:"pickIssue",rowId:e.id})}),f.appendChild(w),r.appendChild(f),s.appendChild(r);let P=document.createElement("td");P.className="col-activity";let I=document.createElement("select");I.className="activity-select",I.innerHTML='<option value="">Activity...</option>',I.disabled=!D;let M=t.activitiesByProject.get(String(e.projectId))||[];for(let i of M){let u=document.createElement("option");u.value=i.id,u.textContent=i.name,i.id===e.activityId&&(u.selected=!0),I.appendChild(u)}e.activityId!==null&&e.activityName&&(I.dataset.tooltip=e.activityName),I.addEventListener("change",()=>{let i=I.value?parseInt(I.value,10):null;n&&e.sourceRowIds?.length>0?c.postMessage({type:"updateAggregatedField",aggRowId:e.id,field:"activity",value:i,sourceRowIds:e.sourceRowIds,confirmed:!1}):c.postMessage({type:"updateRowField",rowId:e.id,field:"activity",value:i})}),P.appendChild(I),s.appendChild(P);let S=e.parentProjectId!==null&&e.projectId!==null&&e.issueId!==null&&e.activityId!==null,fe=document.createElement("td");fe.className="col-comments";let x=document.createElement("input");x.type="text",x.className="comments-input",x.value=e.comments||"",x.placeholder=S?"":"Select client/project/task/activity first",x.disabled=!S;let ne=e.comments||null;x.addEventListener("focus",i=>{ne=i.target.value.trim()||null}),x.addEventListener("blur",i=>{let u=i.target.value.trim()||null;u!==ne&&(n&&e.sourceRowIds?.length>0?(N({type:"aggregatedField",aggRowId:e.id,field:"comments",oldValue:ne,newValue:u,sourceRowIds:e.sourceRowIds}),c.postMessage({type:"updateAggregatedField",aggRowId:e.id,field:"comments",value:u,sourceRowIds:e.sourceRowIds,confirmed:!1})):(N({type:"field",rowId:e.id,field:"comments",oldValue:ne,newValue:u}),c.postMessage({type:"updateRowField",rowId:e.id,field:"comments",value:u})))}),x.addEventListener("keydown",i=>{i.key==="Enter"&&i.target.blur()}),fe.appendChild(x),s.appendChild(fe);let rt=ce(t.week);for(let i=0;i<7;i++){let u=document.createElement("td");u.className="col-day day-cell",u.dataset.day=i,i===rt&&u.classList.add("today");let h=e.days[i]||{hours:0,isDirty:!1,sourceEntries:[]},X=h.sourceEntries?.length||0;h.hours>0&&u.classList.add("has-value");let it=`${e.id}:${i}`,he=T.expandedCells.has(it);n&&X>1&&(u.classList.add("multi-entry"),u.dataset.entryCount=X,he&&u.classList.add("expanded"));let E=document.createElement("input");if(E.type="text",E.className="day-input"+(h.isDirty?" dirty":"")+(h.hours===0?" zero":""),n&&E.classList.add("aggregated-cell-input"),E.value=C(h.hours),n&&h.sourceEntries?.length>1?E.dataset.tooltip=`${h.sourceEntries.length} entries`:h.entryId?E.dataset.tooltip=`#${h.entryId}`:h.hours>0?E.dataset.tooltip="Draft":E.dataset.tooltip="",E.disabled=!S,E.dataset.oldValue=h.hours,n&&h.sourceEntries&&(E.dataset.sourceEntries=JSON.stringify(h.sourceEntries),E.dataset.isAggregated="true"),E.addEventListener("focus",v=>{v.target.dataset.oldValue=Z(v.target.value),v.target.select()}),E.addEventListener("blur",v=>{let L=parseFloat(v.target.dataset.oldValue)||0,O=Z(v.target.value);if(O>L&&Re(i,L,O)){v.target.value=C(L),k("Cannot exceed 24h per day");return}v.target.value=C(O),L!==O&&(v.target.dataset.isAggregated==="true"?at(e,i,O,L,h):(N({type:"cell",rowId:e.id,dayIndex:i,oldValue:L,newValue:O}),c.postMessage({type:"updateCell",rowId:e.id,dayIndex:i,hours:O})))}),E.addEventListener("keydown",v=>{v.key==="Enter"&&v.target.blur(),v.key==="Escape"&&(v.target.value=C(parseFloat(v.target.dataset.oldValue)||0),v.target.blur())}),u.appendChild(E),n&&X>1){let v=document.createElement("span");if(v.className="multi-entry-badge",v.dataset.tooltip=he?"Click to collapse":`${X} entries - click to expand`,v.textContent=X,v.addEventListener("click",L=>{L.stopPropagation(),tt(e.id,i)}),u.appendChild(v),he&&h.sourceEntries){let L=nt(e,i,h.sourceEntries);u.appendChild(L)}}s.appendChild(u)}let ye=document.createElement("td");ye.className="col-total row-total",ye.textContent=C(e.weekTotal),s.appendChild(ye);let ae=document.createElement("td");ae.className="col-actions";let Ie=n&&e.sourceRowIds?.length||1,_=document.createElement("button");_.className="action-btn delete-btn",_.textContent="\u{1F5D1}\uFE0F",_.dataset.tooltip=n?`Delete ${Ie} entries`:"Delete",_.addEventListener("click",()=>{n&&Ie>1&&k(`Deleted ${Ie} entries`),c.postMessage({type:"deleteRow",rowId:e.id})}),ae.appendChild(_);let z=document.createElement("button");return z.className="action-btn copy-btn",z.textContent="\u{1F4CB}",z.dataset.tooltip=n?"Duplicate as single row":"Duplicate",z.addEventListener("click",()=>{n&&k("Duplicated as single row"),c.postMessage({type:"duplicateRow",rowId:e.id})}),ae.appendChild(z),s.appendChild(ae),s}function Oe(e,t){switch(t.groupBy){case"client":return e.parentProjectId!==null?`client:${e.parentProjectId}`:"client:none";case"project":return e.projectId!==null?`project:${e.projectId}`:"project:none";case"issue":return e.issueId!==null?`issue:${e.issueId}`:"issue:none";case"activity":return e.activityId!==null?`activity:${e.activityId}`:"activity:none";default:return null}}function Ve(e,t){switch(t.groupBy){case"client":return e.parentProjectId===Y?e.parentProjectName||"Others":e.parentProjectId?`#${e.parentProjectId} ${e.parentProjectName||""}`:"(No client)";case"project":return e.projectId?`#${e.projectId} ${e.projectName||""}`:"(No project)";case"issue":return e.issueId?`#${e.issueId} ${e.issueSubject||""}`:"(No task)";case"activity":return e.activityName||"(No activity)";default:return""}}function We(e){return e.reduce((t,s)=>t+s.weekTotal,0)}function Ue(e,t,s,n,a){let o=document.createElement("tr");o.className="group-header"+(n?" collapsed":""),o.dataset.groupKey=e;let d=document.createElement("td");d.colSpan=12,d.className="group-header-cell";let g=document.createElement("span");g.className="group-chevron",g.textContent=n?"\u25B6":"\u25BC";let p=document.createElement("span");p.className="group-label",p.textContent=t,d.appendChild(g),d.appendChild(p),d.addEventListener("click",()=>{l&&(l.collapsedGroups.has(e)?l.collapsedGroups.delete(e):l.collapsedGroups.add(e),c.postMessage({type:"toggleGroup",groupKey:e}),b(l))}),o.appendChild(d);let m=document.createElement("td");m.className="col-total group-total",m.textContent=C(s),o.appendChild(m);let r=document.createElement("td");return r.className="col-actions",o.appendChild(r),o}function Ge(e,t){if(!e||e.length===0)return e;let s=new Map;for(let n of e){let a=`${n.issueId??"null"}::${n.activityId??"null"}::${n.comments??""}`;if(s.has(a)){let o=s.get(a);o.sourceRowIds.push(n.id);for(let d=0;d<7;d++)n.days[d]&&(o.days[d]||(o.days[d]={hours:0,originalHours:0,entryId:null,isDirty:!1,sourceEntries:[]}),o.days[d].hours+=n.days[d].hours||0,o.days[d].originalHours+=n.days[d].originalHours||0,o.weekTotal+=n.days[d].hours||0,n.days[d].isDirty&&(o.days[d].isDirty=!0),n.days[d].hours>0&&o.days[d].sourceEntries.push({rowId:n.id,entryId:n.days[d].entryId,hours:n.days[d].hours,originalHours:n.days[d].originalHours||0,issueId:n.issueId,activityId:n.activityId,comments:n.comments,spentOn:t.week?.dayDates[d]||"",isDraft:!n.days[d].entryId}))}else{let o={...n,id:`agg-${a}`,isAggregated:!0,sourceRowIds:[n.id],days:{},weekTotal:0};for(let d=0;d<7;d++)if(n.days[d]){let g=[];n.days[d].hours>0&&g.push({rowId:n.id,entryId:n.days[d].entryId,hours:n.days[d].hours,originalHours:n.days[d].originalHours||0,issueId:n.issueId,activityId:n.activityId,comments:n.comments,spentOn:t.week?.dayDates[d]||"",isDraft:!n.days[d].entryId}),o.days[d]={hours:n.days[d].hours,originalHours:n.days[d].originalHours,entryId:null,isDirty:n.days[d].isDirty||!1,sourceEntries:g},o.weekTotal+=n.days[d].hours||0}s.set(a,o)}}return[...s.values()]}function b(e){for(;B.firstChild;)B.removeChild(B.firstChild);let t=e.aggregateRows?Ge(e.rows,e):e.rows;if(t.length===0){let s=document.createElement("tr");s.className="empty-row";let n=document.createElement("td");n.colSpan=14,n.textContent="No time entries yet.",s.appendChild(n),B.appendChild(s)}else if(e.groupBy==="none"){let s=De(t,e);for(let n of s)B.appendChild(ue(n,e))}else{let s=new Map;for(let a of t){let o=Oe(a,e);s.has(o)||s.set(o,{label:Ve(a,e),rows:[]}),s.get(o).rows.push(a)}let n=[...s.entries()].sort((a,o)=>a[1].label.localeCompare(o[1].label));for(let[a,o]of n){let d=e.collapsedGroups.has(a),g=We(o.rows);if(B.appendChild(Ue(a,o.label,g,d,e)),!d){let p=De(o.rows,e);for(let m of p)B.appendChild(ue(m,e))}}}Te(e),ze(e),Qe()}function De(e,t){return t.sortColumn?[...e].sort((s,n)=>{let a,o;switch(t.sortColumn){case"client":a=s.parentProjectName||"",o=n.parentProjectName||"";break;case"project":a=s.projectName||"",o=n.projectName||"";break;case"task":a=s.issueId||0,o=n.issueId||0;break;case"activity":a=s.activityName||"",o=n.activityName||"";break;case"comments":a=s.comments||"",o=n.comments||"";break;case"total":a=s.weekTotal,o=n.weekTotal;break;default:return 0}let d=typeof a=="string"?a.localeCompare(o):a-o;return t.sortDirection==="asc"?d:-d}):e}function Te(e){if(!e.totals)return;let t=ce(e.week);$e.querySelectorAll(".col-day.total-cell").forEach((d,g)=>{let p=e.totals.days[g],m=e.totals.targetHours[g],r=d.querySelector(".total-value");if(r){let y=p===0?"0":C(p);r.textContent=`${y} / ${m}`}let f=d.querySelector(".progress-fill");if(f&&m>0){let y=Math.min(p/m*100,100);f.style.width=`${y}%`,f.classList.remove("met","over"),p>m?f.classList.add("over"):p>=m&&f.classList.add("met")}else f&&(f.style.width="0%");d.classList.toggle("today",g===t)});let n=e.totals.weekTargetTotal,a=e.totals.weekTotal,o=a===0?"0":C(a);xe.textContent=`${o} / ${n}`}function Ke(e,t,s){if(s.aggregateRows){t&&(s.totals=t),b(s);return}let n=B.querySelector(`tr[data-row-id="${e.id}"]`);if(n){let a=ue(e,s);n.replaceWith(a)}t&&(s.totals=t,Te(s))}window.addEventListener("message",e=>{let t=e.data;switch(t.type){case"render":{let s={rows:t.rows,week:t.week,totals:t.totals,projects:t.projects||[],parentProjects:t.parentProjects||[],childProjectsByParent:new Map(Object.entries(t.childProjectsByParent||{})),issuesByProject:new Map(Object.entries(t.issuesByProject||{})),activitiesByProject:new Map(Object.entries(t.activitiesByProject||{})),isDraftMode:t.isDraftMode,sortColumn:t.sortColumn??null,sortDirection:t.sortDirection??"asc",groupBy:t.groupBy??"none",collapsedGroups:new Set(t.collapsedGroups||[]),aggregateRows:t.aggregateRows??!1};l=s,re&&(re.value=s.groupBy);let n=document.getElementById("aggregateToggle");n&&(n.checked=s.aggregateRows),de.textContent=Fe(s.week),_e(s),ke(s),b(s);break}case"updateRow":{if(!l)break;if(t.rowCascadeData){let{childProjects:n,issues:a,activities:o}=t.rowCascadeData;n&&t.row.parentProjectId!==null&&l.childProjectsByParent.set(String(t.row.parentProjectId),n),a&&t.row.projectId!==null&&l.issuesByProject.set(String(t.row.projectId),a),o&&t.row.projectId!==null&&l.activitiesByProject.set(String(t.row.projectId),o)}let s=l.rows.findIndex(n=>n.id===t.row.id);s!==-1&&(l.rows[s]=t.row),l.totals=t.totals,Ke(t.row,t.totals,l);break}case"updateChildProjects":l&&(l.childProjectsByParent.set(String(t.forParentId),t.projects),b(l));break;case"updateIssues":l&&(l.issuesByProject.set(String(t.forProjectId),t.issues),b(l));break;case"updateActivities":l&&(l.activitiesByProject.set(String(t.forProjectId),t.activities),b(l));break;case"setLoading":Pe.classList.toggle("hidden",!t.loading);break;case"showError":console.error(t.message),k(t.message,null,8e3);break;case"draftModeChanged":l&&(l.isDraftMode=t.isDraftMode,ke(l));break;case"updateIssueDetails":T.issueDetails.set(t.issueId,t.details),ee===t.issueId&&F&&(Se(F,je,Me),ee=null);break;case"rowDuplicated":N({type:"duplicateRow",sourceRowId:t.sourceRowId,newRowId:t.newRowId});break;case"rowDeleted":N({type:"deleteRow",deletedRow:t.deletedRow});break;case"showToast":k(t.message,t.undoAction,t.duration);break;case"requestAggregatedCellConfirm":ot(t);break;case"requestAggregatedFieldConfirm":dt(t);break;case"pasteComplete":N({type:"paste",draftIds:t.draftIds,count:t.count});break}});function _e(e){if(!e.week)return;let t=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],s=document.querySelectorAll("thead .col-day"),n=ce(e.week);s.forEach((a,o)=>{let g=new Date(e.week.dayDates[o]+"T12:00:00").getDate();a.textContent=`${t[o]} ${g}`,a.classList.toggle("today",o===n)})}function ze(e){document.querySelectorAll("thead .sortable").forEach(s=>{let n=s.dataset.sort,a=s.querySelector(".sort-indicator");if(a&&a.remove(),n===e.sortColumn){let o=document.createElement("span");o.className="sort-indicator",o.textContent=e.sortDirection==="asc"?"\u25B2":"\u25BC",s.appendChild(o)}})}function Xe(e){l&&(l.sortColumn===e?l.sortDirection==="asc"?l.sortDirection="desc":(l.sortColumn=null,l.sortDirection="asc"):(l.sortColumn=e,l.sortDirection="asc"),c.postMessage({type:"sortChanged",sortColumn:l.sortColumn,sortDirection:l.sortDirection}),b(l))}function Ye(){document.querySelectorAll("thead .sortable").forEach(t=>{let s=t.dataset.sort;s&&t.addEventListener("click",()=>Xe(s))})}document.getElementById("prevWeek")?.addEventListener("click",()=>{c.postMessage({type:"navigateWeek",direction:"prev"})}),document.getElementById("nextWeek")?.addEventListener("click",()=>{c.postMessage({type:"navigateWeek",direction:"next"})}),document.getElementById("todayBtn")?.addEventListener("click",()=>{c.postMessage({type:"navigateWeek",direction:"today"})}),document.getElementById("saveBtn")?.addEventListener("click",()=>{c.postMessage({type:"saveAll"})}),re?.addEventListener("change",e=>{l&&(l.groupBy=e.target.value,c.postMessage({type:"setGroupBy",groupBy:l.groupBy}),b(l))}),document.getElementById("aggregateToggle")?.addEventListener("change",e=>{l&&(l.aggregateRows=e.target.checked,c.postMessage({type:"setAggregateRows",aggregateRows:l.aggregateRows}),b(l))}),document.getElementById("copyWeekBtn")?.addEventListener("click",()=>{c.postMessage({type:"copyWeek"})}),document.getElementById("pasteWeekBtn")?.addEventListener("click",()=>{c.postMessage({type:"pasteWeek"})}),Ae?.addEventListener("click",()=>{c.postMessage({type:"enableDraftMode"})}),He?.addEventListener("click",()=>{c.postMessage({type:"addRow"})}),ie?.addEventListener("click",()=>{ve()}),le?.addEventListener("click",()=>{oe()}),Ye(),document.addEventListener("keydown",e=>{let t=navigator.platform.toUpperCase().indexOf("MAC")>=0,s=t?e.metaKey:e.ctrlKey,n=e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA"||e.target.tagName==="SELECT",a=e.target.classList?.contains("day-input");s&&e.key==="z"&&!e.shiftKey?(e.preventDefault(),ve()):s&&e.key==="z"&&e.shiftKey||s&&e.key==="y"&&!t?(e.preventDefault(),oe()):e.key.toLowerCase()==="t"&&!s&&!e.altKey&&!n?(e.preventDefault(),c.postMessage({type:"navigateWeek",direction:"today"})):a&&["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Enter","Tab"].includes(e.key)&&Je(e)});function Je(e){let t=e.target,s=t.closest("td"),n=s?.closest("tr");if(!s||!n||Array.from(document.querySelectorAll(".day-input:not(:disabled)")).indexOf(t)===-1)return;let d=Array.from(n.querySelectorAll(".day-input:not(:disabled)")),g=d.indexOf(t),p=Array.from(document.querySelectorAll("#gridBody tr:not(.group-header-row)")),m=p.indexOf(n),r=null;switch(e.key){case"ArrowRight":g<d.length-1&&(r=d[g+1]);break;case"ArrowLeft":g>0&&(r=d[g-1]);break;case"ArrowDown":case"Enter":if(m<p.length-1){let f=p[m+1],y=Array.from(f.querySelectorAll(".day-input:not(:disabled)"));y[g]&&(r=y[g])}break;case"ArrowUp":if(m>0){let f=p[m-1],y=Array.from(f.querySelectorAll(".day-input:not(:disabled)"));y[g]&&(r=y[g])}break;case"Tab":return}if(r){e.preventDefault();let f=r.closest("td"),y=f?.closest("tr");y&&f&&(J={rowId:y.dataset.rowId,dayIndex:Number(f.dataset.day)}),t.blur(),r.focus(),r.select()}}function Qe(){if(!J)return;let{rowId:e,dayIndex:t}=J;J=null;let s=document.querySelector(`tr[data-row-id="${e}"] .day-cell[data-day="${t}"] .day-input`);s&&!s.disabled&&(s.focus(),s.select())}let R=document.getElementById("issueTooltip"),H=R?.querySelector(".issue-tooltip-content"),F=null,j=null,q=null,ee=null,je=0,Me=0,pe=0,ge=0;document.addEventListener("pointermove",e=>{pe=e.clientX,ge=e.clientY},{passive:!0});function Se(e,t,s){if(!R||!H)return;let n=parseInt(e.dataset.issueId,10);if(!n)return;let a=T.issueDetails.get(n);if(!a){ee=n,je=t,Me=s,c.postMessage({type:"requestIssueDetails",issueId:n});return}H.innerHTML="";let o=document.createElement("div");o.className="issue-tooltip-line issue-tooltip-title",o.textContent=`#${a.id} ${a.subject}`,H.appendChild(o);let d=document.createElement("div");d.className="issue-tooltip-divider",H.appendChild(d);let g=[{key:"Status",value:a.status},{key:"Priority",value:a.priority},{key:"Tracker",value:a.tracker},{key:"Assignee",value:a.assignedTo||"Unassigned"},{key:"Done",value:`${a.doneRatio}%`}];a.estimatedHours!==null&&g.push({key:"Estimated",value:be(a.estimatedHours)}),a.spentHours!==null&&g.push({key:"Spent",value:be(a.spentHours)}),a.startDate&&g.push({key:"Start",value:a.startDate}),a.dueDate&&g.push({key:"Due",value:a.dueDate});for(let p of g){let m=document.createElement("div");m.className="issue-tooltip-line";let r=document.createElement("span");r.className="issue-tooltip-key",r.textContent=`${p.key}: `,m.appendChild(r),m.appendChild(document.createTextNode(p.value)),H.appendChild(m)}if(a.customFields&&a.customFields.length>0){let p=document.createElement("div");p.className="issue-tooltip-divider",H.appendChild(p);for(let m of a.customFields){let r=document.createElement("div");r.className="issue-tooltip-line";let f=document.createElement("span");f.className="issue-tooltip-key",f.textContent=`${m.name}: `,r.appendChild(f),r.appendChild(document.createTextNode(m.value)),H.appendChild(r)}}Ze(t,s),R.classList.add("visible"),R.setAttribute("aria-hidden","false")}function Le(e,t,s,n,a){let o=e+a,d=t+a;return o+s.width>window.innerWidth-n&&(o=e-s.width-a),d+s.height>window.innerHeight-n&&(d=t-s.height-a),o=Math.max(n,Math.min(o,window.innerWidth-s.width-n)),d=Math.max(n,Math.min(d,window.innerHeight-s.height-n)),{left:Math.round(o),top:Math.round(d)}}function Ze(e,t){R.style.left="0",R.style.top="0";let s=R.getBoundingClientRect(),{left:n,top:a}=Le(e,t,s,8,12);R.style.left=`${n}px`,R.style.top=`${a}px`}function Ne(){j&&(clearTimeout(j),j=null),q&&(clearTimeout(q),q=null),F=null,ee=null,R?.classList.remove("visible"),R?.setAttribute("aria-hidden","true")}document.addEventListener("pointerover",e=>{let t=e.target.closest("[data-issue-id]");!t||!B.contains(t)||F!==t&&(q&&(clearTimeout(q),q=null),F=t,j&&clearTimeout(j),j=setTimeout(()=>{j=null,F===t&&Se(t,pe,ge)},400))},!0),document.addEventListener("pointerout",e=>{let t=e.target.closest("[data-issue-id]");if(!t||t!==F)return;let s=e.relatedTarget;s&&t.contains(s)||(j&&(clearTimeout(j),j=null),q=setTimeout(()=>{Ne()},100))},!0),document.querySelector(".timesheet-grid-container")?.addEventListener("scroll",()=>{Ne()});let $=document.getElementById("genericTooltip"),G=null,K=null;function et(e,t,s){if(!$)return;let n=e.dataset.tooltip;if(!n)return;$.textContent=n,$.style.left="0",$.style.top="0",$.classList.add("visible");let a=$.getBoundingClientRect(),{left:o,top:d}=Le(t,s,a,8,10);$.style.left=`${o}px`,$.style.top=`${d}px`}function me(){K&&(clearTimeout(K),K=null),G=null,$?.classList.remove("visible")}document.addEventListener("pointerover",e=>{let t=e.target.closest("[data-tooltip]");!t||t.dataset.issueId||G!==t&&(me(),G=t,K=setTimeout(()=>{K=null,G===t&&et(t,pe,ge)},400))},!0),document.addEventListener("pointerout",e=>{let t=e.target.closest("[data-tooltip]");if(!t||t!==G)return;let s=e.relatedTarget;s&&t.contains(s)||me()},!0),document.querySelector(".timesheet-grid-container")?.addEventListener("scroll",()=>{me()});let V=null,te=null;function k(e,t=null,s=5e3){se();let n=document.createElement("div");n.className="toast-notification",n.innerHTML=`
-      <span class="toast-message">${qe(e)}</span>
-      ${t?'<button class="toast-undo-btn">Undo</button>':""}
+"use strict";
+(() => {
+  // src/webviews/timesheet/index.js
+  (() => {
+    const vscode = acquireVsCodeApi();
+    const OTHERS_PARENT_ID = -1;
+    const undoStack = [];
+    const redoStack = [];
+    const MAX_UNDO_STACK = 50;
+    let state = {
+      expandedCells: /* @__PURE__ */ new Set(),
+      // Set of "rowId:dayIndex" for expanded multi-entry cells
+      issueDetails: /* @__PURE__ */ new Map()
+      // issueId -> IssueDetails (cached for tooltips)
+    };
+    let lastRenderContext = null;
+    let pendingFocus = null;
+    function pushUndo(action) {
+      undoStack.push(action);
+      if (undoStack.length > MAX_UNDO_STACK) {
+        undoStack.shift();
+      }
+      redoStack.length = 0;
+      updateUndoRedoButtons();
+    }
+    function undo() {
+      if (undoStack.length === 0) {
+        return;
+      }
+      const action = undoStack.pop();
+      if (action.type === "barrier") {
+        showToast(action.message || "Cannot undo this action");
+        updateUndoRedoButtons();
+        return;
+      }
+      redoStack.push(action);
+      applyAction(action, true);
+      updateUndoRedoButtons();
+    }
+    function redo() {
+      if (redoStack.length === 0) {
+        return;
+      }
+      const action = redoStack.pop();
+      if (action.type === "paste") {
+        showToast("Redo paste not supported - use Paste again");
+        updateUndoRedoButtons();
+        return;
+      }
+      undoStack.push(action);
+      applyAction(action, false);
+      updateUndoRedoButtons();
+    }
+    function updateUndoRedoButtons() {
+      if (undoBtn) undoBtn.disabled = undoStack.length === 0;
+      if (redoBtn) redoBtn.disabled = redoStack.length === 0;
+    }
+    function applyAction(action, isUndo) {
+      const value = isUndo ? action.oldValue : action.newValue;
+      switch (action.type) {
+        case "cell":
+          vscode.postMessage({
+            type: "updateCell",
+            rowId: action.rowId,
+            dayIndex: action.dayIndex,
+            hours: value,
+            skipUndo: true
+          });
+          const input = document.querySelector(
+            `tr[data-row-id="${action.rowId}"] .day-cell[data-day="${action.dayIndex}"] .day-input`
+          );
+          if (input) {
+            input.value = formatHours(value);
+            input.classList.toggle("zero", value === 0);
+          }
+          break;
+        case "field":
+          vscode.postMessage({
+            type: "updateRowField",
+            rowId: action.rowId,
+            field: action.field,
+            value,
+            skipUndo: true
+          });
+          break;
+        case "duplicateRow":
+          if (isUndo) {
+            vscode.postMessage({
+              type: "deleteRow",
+              rowId: action.newRowId,
+              skipUndo: true
+            });
+          } else {
+            vscode.postMessage({
+              type: "duplicateRow",
+              rowId: action.sourceRowId
+            });
+          }
+          break;
+        case "deleteRow":
+          if (isUndo) {
+            vscode.postMessage({
+              type: "restoreRow",
+              row: action.deletedRow
+            });
+          } else {
+            vscode.postMessage({
+              type: "deleteRow",
+              rowId: action.deletedRow.id,
+              skipUndo: true
+            });
+          }
+          break;
+        case "aggregatedCell":
+          if (isUndo && (action.sourceEntries?.length || 0) > 1) {
+            vscode.postMessage({
+              type: "restoreAggregatedEntries",
+              entries: action.sourceEntries,
+              aggRowId: action.aggRowId,
+              dayIndex: action.dayIndex
+            });
+            break;
+          }
+          vscode.postMessage({
+            type: "updateAggregatedCell",
+            aggRowId: action.aggRowId,
+            dayIndex: action.dayIndex,
+            newHours: value,
+            sourceEntries: action.sourceEntries,
+            confirmed: true,
+            skipUndo: true
+          });
+          const aggInput = document.querySelector(
+            `tr[data-row-id="${action.aggRowId}"] .day-cell[data-day="${action.dayIndex}"] .day-input`
+          );
+          if (aggInput) {
+            aggInput.value = formatHours(value);
+            aggInput.classList.toggle("zero", value === 0);
+          }
+          break;
+        case "aggregatedField":
+          vscode.postMessage({
+            type: "updateAggregatedField",
+            aggRowId: action.aggRowId,
+            field: action.field,
+            value,
+            sourceRowIds: action.sourceRowIds,
+            confirmed: true,
+            skipUndo: true
+          });
+          const fieldInput = document.querySelector(
+            `tr[data-row-id="${action.aggRowId}"] .comments-input`
+          );
+          if (fieldInput) {
+            fieldInput.value = value || "";
+          }
+          break;
+        case "expandedEntry":
+          vscode.postMessage({
+            type: "updateExpandedEntry",
+            rowId: action.rowId,
+            entryId: action.entryId,
+            dayIndex: action.dayIndex,
+            newHours: value,
+            oldHours: isUndo ? action.newValue : action.oldValue,
+            skipUndo: true
+          });
+          break;
+        case "paste":
+          vscode.postMessage({
+            type: "undoPaste",
+            draftIds: action.draftIds
+          });
+          showToast(`Undid paste of ${action.count} entries`);
+          break;
+      }
+    }
+    const gridBody = document.getElementById("gridBody");
+    const totalsRow = document.getElementById("totalsRow");
+    const weekLabel = document.getElementById("weekLabel");
+    const loadingOverlay = document.getElementById("loadingOverlay");
+    const weekTotal = document.getElementById("weekTotal");
+    const groupBySelect = document.getElementById("groupBySelect");
+    const draftModeWarning = document.getElementById("draftModeWarning");
+    const enableDraftModeBtn = document.getElementById("enableDraftModeBtn");
+    const addEntryBtn = document.getElementById("addEntryBtn");
+    const undoBtn = document.getElementById("undoBtn");
+    const redoBtn = document.getElementById("redoBtn");
+    const weekPickerInput = document.getElementById("weekPickerInput");
+    let weekPicker = null;
+    if (typeof flatpickr !== "undefined" && weekPickerInput) {
+      weekPicker = flatpickr(weekPickerInput, {
+        weekNumbers: true,
+        locale: { firstDayOfWeek: 1 },
+        // Monday
+        positionElement: weekLabel,
+        // Position relative to week label
+        plugins: typeof weekSelectPlugin !== "undefined" ? [new weekSelectPlugin({})] : [],
+        onChange: function(selectedDates) {
+          if (selectedDates.length > 0) {
+            const selectedDate = selectedDates[0];
+            const year = selectedDate.getFullYear();
+            const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+            const day = String(selectedDate.getDate()).padStart(2, "0");
+            const dateStr = `${year}-${month}-${day}`;
+            vscode.postMessage({ type: "navigateWeek", direction: "date", targetDate: dateStr });
+          }
+        },
+        onReady: function(selectedDates, dateStr, instance) {
+          const thisWeekBtn = document.createElement("button");
+          thisWeekBtn.className = "flatpickr-this-week-btn";
+          thisWeekBtn.textContent = "This week";
+          thisWeekBtn.type = "button";
+          thisWeekBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            instance.jumpToDate(/* @__PURE__ */ new Date());
+          });
+          instance.calendarContainer.appendChild(thisWeekBtn);
+        },
+        onOpen: function(selectedDates, dateStr, instance) {
+          instance._escHandler = function(e) {
+            if (e.key === "Escape") {
+              instance.close();
+            }
+          };
+          document.addEventListener("keydown", instance._escHandler);
+        },
+        onClose: function(selectedDates, dateStr, instance) {
+          if (instance._escHandler) {
+            document.removeEventListener("keydown", instance._escHandler);
+            instance._escHandler = null;
+          }
+        }
+      });
+      weekLabel?.addEventListener("click", () => {
+        if (weekPicker) {
+          if (lastRenderContext?.week?.startDate) {
+            weekPicker.setDate(lastRenderContext.week.startDate, false);
+          }
+          weekPicker.open();
+        }
+      });
+    }
+    function updateDraftModeUI(ctx) {
+      if (ctx.isDraftMode) {
+        draftModeWarning.classList.add("hidden");
+        document.body.classList.remove("draft-mode-disabled");
+      } else {
+        draftModeWarning.classList.remove("hidden");
+        document.body.classList.add("draft-mode-disabled");
+      }
+    }
+    function formatWeekLabel(week) {
+      if (!week) return "Loading...";
+      const startDate = /* @__PURE__ */ new Date(week.startDate + "T12:00:00");
+      const endDate = /* @__PURE__ */ new Date(week.endDate + "T12:00:00");
+      const options = { day: "numeric", month: "short" };
+      const startStr = startDate.toLocaleDateString("en-US", options);
+      const endStr = endDate.toLocaleDateString("en-US", options);
+      return `W${String(week.weekNumber).padStart(2, "0")} (${startStr} - ${endStr} ${week.year})`;
+    }
+    function formatHours(hours) {
+      if (hours === 0) return "";
+      if (hours === Math.floor(hours)) return hours.toString();
+      return String(Number(hours.toFixed(2)));
+    }
+    function formatHoursAsHHMM(hours) {
+      const totalMinutes = Math.round(hours * 60);
+      const h = Math.floor(totalMinutes / 60);
+      const m = totalMinutes % 60;
+      return `${h}:${m.toString().padStart(2, "0")}`;
+    }
+    function parseHours(value) {
+      const str = value.trim();
+      if (!str) return 0;
+      if (str.includes(":")) {
+        const [h, m] = str.split(":").map(Number);
+        if (!Number.isFinite(h)) return 0;
+        return Math.max(0, h + (Number.isFinite(m) ? m : 0) / 60);
+      }
+      const match = str.match(/^(\d+(?:\.\d+)?)\s*h?\s*(\d+)?\s*m?$/i);
+      if (match) {
+        const hours = parseFloat(match[1]) || 0;
+        const minutes = parseInt(match[2] || "0", 10);
+        return hours + minutes / 60;
+      }
+      const parsed = parseFloat(str);
+      return isNaN(parsed) ? 0 : Math.max(0, parsed);
+    }
+    function wouldExceed24Hours(dayIndex, oldHours, newHours) {
+      if (!lastRenderContext?.totals?.days) return false;
+      const currentDayTotal = lastRenderContext.totals.days[dayIndex] || 0;
+      const newDayTotal = currentDayTotal - oldHours + newHours;
+      return newDayTotal > 24;
+    }
+    function escapeHtml(str) {
+      if (!str) return "";
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+    function getTodayDayIndex(week) {
+      if (!week) return -1;
+      const today = /* @__PURE__ */ new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStr = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
+      return week.dayDates.indexOf(todayStr);
+    }
+    function renderRow(row, ctx) {
+      const tr = document.createElement("tr");
+      tr.dataset.rowId = row.id;
+      const isAggregated = row.isAggregated === true;
+      if (isAggregated) {
+        tr.classList.add("aggregated-row");
+      }
+      const isIncomplete = row.isNew && (!row.issueId || !row.activityId) && row.weekTotal > 0;
+      if (isIncomplete) {
+        tr.classList.add("incomplete-row");
+      }
+      const parentTd = document.createElement("td");
+      parentTd.className = "col-parent";
+      const parentSelect = document.createElement("select");
+      parentSelect.className = "parent-select";
+      parentSelect.innerHTML = '<option value="">Client...</option>';
+      for (const parent of ctx.parentProjects) {
+        const option = document.createElement("option");
+        option.value = parent.id;
+        option.textContent = parent.id === OTHERS_PARENT_ID ? parent.name : `#${parent.id} ${parent.name}`;
+        if (parent.id === row.parentProjectId) option.selected = true;
+        parentSelect.appendChild(option);
+      }
+      if (row.parentProjectId !== null) {
+        const label = row.parentProjectId === OTHERS_PARENT_ID ? "Others" : `#${row.parentProjectId} ${row.parentProjectName || ""}`;
+        parentSelect.dataset.tooltip = label;
+        if (row.parentProjectId !== OTHERS_PARENT_ID) {
+          const parentProject = ctx.parentProjects.find((p) => p.id === row.parentProjectId);
+          parentSelect.dataset.vscodeContext = JSON.stringify({
+            webviewSection: "tsClient",
+            projectId: row.parentProjectId,
+            projectIdentifier: parentProject?.identifier || "",
+            preventDefaultContextMenuItems: true
+          });
+        }
+      }
+      parentSelect.addEventListener("change", () => {
+        const value = parentSelect.value ? parseInt(parentSelect.value, 10) : null;
+        if (isAggregated && row.sourceRowIds?.length > 0) {
+          vscode.postMessage({
+            type: "updateAggregatedField",
+            aggRowId: row.id,
+            field: "parentProject",
+            value,
+            sourceRowIds: row.sourceRowIds,
+            confirmed: false
+          });
+        } else {
+          vscode.postMessage({
+            type: "updateRowField",
+            rowId: row.id,
+            field: "parentProject",
+            value
+          });
+        }
+        if (value !== null) {
+          vscode.postMessage({
+            type: "requestChildProjects",
+            parentId: value
+          });
+        }
+      });
+      parentTd.appendChild(parentSelect);
+      tr.appendChild(parentTd);
+      const projectTd = document.createElement("td");
+      projectTd.className = "col-project";
+      const projectSelect = document.createElement("select");
+      projectSelect.className = "project-select";
+      projectSelect.innerHTML = '<option value="">Project...</option>';
+      const hasParent = row.parentProjectId !== null;
+      projectSelect.disabled = !hasParent;
+      if (hasParent) {
+        const children = ctx.childProjectsByParent.get(String(row.parentProjectId)) || [];
+        for (const child of children) {
+          const option = document.createElement("option");
+          option.value = child.id;
+          option.textContent = `#${child.id} ${child.name}`;
+          if (child.id === row.projectId) option.selected = true;
+          projectSelect.appendChild(option);
+        }
+      }
+      if (row.projectId !== null) {
+        projectSelect.dataset.tooltip = `#${row.projectId} ${row.projectName || ""}`;
+        const childProject = ctx.projects.find((p) => p.id === row.projectId);
+        projectSelect.dataset.vscodeContext = JSON.stringify({
+          webviewSection: "tsProject",
+          projectId: row.projectId,
+          projectIdentifier: childProject?.identifier || "",
+          preventDefaultContextMenuItems: true
+        });
+      }
+      projectSelect.addEventListener("change", () => {
+        const value = projectSelect.value ? parseInt(projectSelect.value, 10) : null;
+        if (isAggregated && row.sourceRowIds?.length > 0) {
+          vscode.postMessage({
+            type: "updateAggregatedField",
+            aggRowId: row.id,
+            field: "project",
+            value,
+            sourceRowIds: row.sourceRowIds,
+            confirmed: false
+          });
+        } else {
+          vscode.postMessage({
+            type: "updateRowField",
+            rowId: row.id,
+            field: "project",
+            value
+          });
+        }
+        if (value !== null) {
+          vscode.postMessage({
+            type: "requestIssues",
+            projectId: value
+          });
+        }
+      });
+      projectTd.appendChild(projectSelect);
+      tr.appendChild(projectTd);
+      const taskTd = document.createElement("td");
+      taskTd.className = "col-task";
+      const taskContent = document.createElement("div");
+      taskContent.className = "task-cell-content";
+      const taskSelect = document.createElement("select");
+      taskSelect.className = "task-select";
+      taskSelect.innerHTML = '<option value="">Task...</option>';
+      const hasProject = row.projectId !== null;
+      taskSelect.disabled = !hasProject;
+      if (hasProject) {
+        const issues = ctx.issuesByProject.get(String(row.projectId)) || [];
+        for (const issue of issues) {
+          const option = document.createElement("option");
+          option.value = issue.id;
+          option.textContent = `#${issue.id} ${issue.subject}`;
+          if (issue.id === row.issueId) option.selected = true;
+          taskSelect.appendChild(option);
+        }
+      }
+      if (row.issueId !== null) {
+        taskTd.dataset.issueId = row.issueId;
+        taskSelect.dataset.vscodeContext = JSON.stringify({
+          webviewSection: "tsTask",
+          issueId: row.issueId,
+          preventDefaultContextMenuItems: true
+        });
+      }
+      taskSelect.addEventListener("change", () => {
+        const value = taskSelect.value ? parseInt(taskSelect.value, 10) : null;
+        if (isAggregated && row.sourceRowIds?.length > 0) {
+          vscode.postMessage({
+            type: "updateAggregatedField",
+            aggRowId: row.id,
+            field: "issue",
+            value,
+            sourceRowIds: row.sourceRowIds,
+            confirmed: false
+          });
+        } else {
+          vscode.postMessage({
+            type: "updateRowField",
+            rowId: row.id,
+            field: "issue",
+            value
+          });
+        }
+      });
+      taskContent.appendChild(taskSelect);
+      const searchBtn = document.createElement("button");
+      searchBtn.className = "search-btn";
+      searchBtn.textContent = "\u{1F50D}";
+      searchBtn.dataset.tooltip = "Search all issues";
+      searchBtn.addEventListener("click", () => {
+        vscode.postMessage({ type: "pickIssue", rowId: row.id });
+      });
+      taskContent.appendChild(searchBtn);
+      taskTd.appendChild(taskContent);
+      tr.appendChild(taskTd);
+      const activityTd = document.createElement("td");
+      activityTd.className = "col-activity";
+      const activitySelect = document.createElement("select");
+      activitySelect.className = "activity-select";
+      activitySelect.innerHTML = '<option value="">Activity...</option>';
+      activitySelect.disabled = !hasProject;
+      const activities = ctx.activitiesByProject.get(String(row.projectId)) || [];
+      for (const activity of activities) {
+        const option = document.createElement("option");
+        option.value = activity.id;
+        option.textContent = activity.name;
+        if (activity.id === row.activityId) option.selected = true;
+        activitySelect.appendChild(option);
+      }
+      if (row.activityId !== null && row.activityName) {
+        activitySelect.dataset.tooltip = row.activityName;
+      }
+      activitySelect.addEventListener("change", () => {
+        const value = activitySelect.value ? parseInt(activitySelect.value, 10) : null;
+        if (isAggregated && row.sourceRowIds?.length > 0) {
+          vscode.postMessage({
+            type: "updateAggregatedField",
+            aggRowId: row.id,
+            field: "activity",
+            value,
+            sourceRowIds: row.sourceRowIds,
+            confirmed: false
+          });
+        } else {
+          vscode.postMessage({
+            type: "updateRowField",
+            rowId: row.id,
+            field: "activity",
+            value
+          });
+        }
+      });
+      activityTd.appendChild(activitySelect);
+      tr.appendChild(activityTd);
+      const isRowComplete = row.parentProjectId !== null && row.projectId !== null && row.issueId !== null && row.activityId !== null;
+      const commentsTd = document.createElement("td");
+      commentsTd.className = "col-comments";
+      const commentsInput = document.createElement("input");
+      commentsInput.type = "text";
+      commentsInput.className = "comments-input";
+      commentsInput.value = row.comments || "";
+      commentsInput.placeholder = isRowComplete ? "" : "Select client/project/task/activity first";
+      commentsInput.disabled = !isRowComplete;
+      let commentsOldValue = row.comments || null;
+      commentsInput.addEventListener("focus", (e) => {
+        commentsOldValue = e.target.value.trim() || null;
+      });
+      commentsInput.addEventListener("blur", (e) => {
+        const value = e.target.value.trim() || null;
+        if (value === commentsOldValue) {
+          return;
+        }
+        if (isAggregated && row.sourceRowIds?.length > 0) {
+          pushUndo({
+            type: "aggregatedField",
+            aggRowId: row.id,
+            field: "comments",
+            oldValue: commentsOldValue,
+            newValue: value,
+            sourceRowIds: row.sourceRowIds
+          });
+          vscode.postMessage({
+            type: "updateAggregatedField",
+            aggRowId: row.id,
+            field: "comments",
+            value,
+            sourceRowIds: row.sourceRowIds,
+            confirmed: false
+          });
+        } else {
+          pushUndo({
+            type: "field",
+            rowId: row.id,
+            field: "comments",
+            oldValue: commentsOldValue,
+            newValue: value
+          });
+          vscode.postMessage({
+            type: "updateRowField",
+            rowId: row.id,
+            field: "comments",
+            value
+          });
+        }
+      });
+      commentsInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") e.target.blur();
+      });
+      commentsTd.appendChild(commentsInput);
+      tr.appendChild(commentsTd);
+      const todayIndex = getTodayDayIndex(ctx.week);
+      for (let i = 0; i < 7; i++) {
+        const dayTd = document.createElement("td");
+        dayTd.className = "col-day day-cell";
+        dayTd.dataset.day = i;
+        if (i === todayIndex) dayTd.classList.add("today");
+        const cell = row.days[i] || { hours: 0, isDirty: false, sourceEntries: [] };
+        const sourceEntryCount = cell.sourceEntries?.length || 0;
+        if (cell.hours > 0) dayTd.classList.add("has-value");
+        const cellKey = `${row.id}:${i}`;
+        const isExpanded = state.expandedCells.has(cellKey);
+        if (isAggregated && sourceEntryCount > 1) {
+          dayTd.classList.add("multi-entry");
+          dayTd.dataset.entryCount = sourceEntryCount;
+          if (isExpanded) {
+            dayTd.classList.add("expanded");
+          }
+        }
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "day-input" + (cell.isDirty ? " dirty" : "") + (cell.hours === 0 ? " zero" : "");
+        if (isAggregated) {
+          input.classList.add("aggregated-cell-input");
+        }
+        input.value = formatHours(cell.hours);
+        if (isAggregated && cell.sourceEntries?.length > 1) {
+          input.dataset.tooltip = `${cell.sourceEntries.length} entries`;
+        } else if (cell.entryId) {
+          input.dataset.tooltip = `#${cell.entryId}`;
+        } else if (cell.hours > 0) {
+          input.dataset.tooltip = "Draft";
+        } else {
+          input.dataset.tooltip = "";
+        }
+        input.disabled = !isRowComplete;
+        input.dataset.oldValue = cell.hours;
+        if (isAggregated && cell.sourceEntries) {
+          input.dataset.sourceEntries = JSON.stringify(cell.sourceEntries);
+          input.dataset.isAggregated = "true";
+        }
+        input.addEventListener("focus", (e) => {
+          e.target.dataset.oldValue = parseHours(e.target.value);
+          e.target.select();
+        });
+        input.addEventListener("blur", (e) => {
+          const oldHours = parseFloat(e.target.dataset.oldValue) || 0;
+          const newHours = parseHours(e.target.value);
+          if (newHours > oldHours && wouldExceed24Hours(i, oldHours, newHours)) {
+            e.target.value = formatHours(oldHours);
+            showToast("Cannot exceed 24h per day");
+            return;
+          }
+          e.target.value = formatHours(newHours);
+          if (oldHours !== newHours) {
+            if (e.target.dataset.isAggregated === "true") {
+              handleAggregatedCellBlur(row, i, newHours, oldHours, cell);
+            } else {
+              pushUndo({
+                type: "cell",
+                rowId: row.id,
+                dayIndex: i,
+                oldValue: oldHours,
+                newValue: newHours
+              });
+              vscode.postMessage({
+                type: "updateCell",
+                rowId: row.id,
+                dayIndex: i,
+                hours: newHours
+              });
+            }
+          }
+        });
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") e.target.blur();
+          if (e.key === "Escape") {
+            e.target.value = formatHours(parseFloat(e.target.dataset.oldValue) || 0);
+            e.target.blur();
+          }
+        });
+        dayTd.appendChild(input);
+        if (isAggregated && sourceEntryCount > 1) {
+          const badge = document.createElement("span");
+          badge.className = "multi-entry-badge";
+          badge.dataset.tooltip = isExpanded ? "Click to collapse" : `${sourceEntryCount} entries - click to expand`;
+          badge.textContent = sourceEntryCount;
+          badge.addEventListener("click", (e) => {
+            e.stopPropagation();
+            toggleCellExpand(row.id, i);
+          });
+          dayTd.appendChild(badge);
+          if (isExpanded && cell.sourceEntries) {
+            const dropdown = renderExpandedCellDropdown(row, i, cell.sourceEntries);
+            dayTd.appendChild(dropdown);
+          }
+        }
+        tr.appendChild(dayTd);
+      }
+      const totalTd = document.createElement("td");
+      totalTd.className = "col-total row-total";
+      totalTd.textContent = formatHours(row.weekTotal);
+      tr.appendChild(totalTd);
+      const actionsTd = document.createElement("td");
+      actionsTd.className = "col-actions";
+      const sourceCount = isAggregated ? row.sourceRowIds?.length || 1 : 1;
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "action-btn delete-btn";
+      deleteBtn.textContent = "\u{1F5D1}\uFE0F";
+      deleteBtn.dataset.tooltip = isAggregated ? `Delete ${sourceCount} entries` : "Delete";
+      deleteBtn.addEventListener("click", () => {
+        if (isAggregated && sourceCount > 1) {
+          showToast(`Deleted ${sourceCount} entries`);
+        }
+        vscode.postMessage({ type: "deleteRow", rowId: row.id });
+      });
+      actionsTd.appendChild(deleteBtn);
+      const copyBtn = document.createElement("button");
+      copyBtn.className = "action-btn copy-btn";
+      copyBtn.textContent = "\u{1F4CB}";
+      copyBtn.dataset.tooltip = isAggregated ? "Duplicate as single row" : "Duplicate";
+      copyBtn.addEventListener("click", () => {
+        if (isAggregated) {
+          showToast("Duplicated as single row");
+        }
+        vscode.postMessage({ type: "duplicateRow", rowId: row.id });
+      });
+      actionsTd.appendChild(copyBtn);
+      tr.appendChild(actionsTd);
+      return tr;
+    }
+    function getGroupKey(row, ctx) {
+      switch (ctx.groupBy) {
+        case "client":
+          return row.parentProjectId !== null ? `client:${row.parentProjectId}` : "client:none";
+        case "project":
+          return row.projectId !== null ? `project:${row.projectId}` : "project:none";
+        case "issue":
+          return row.issueId !== null ? `issue:${row.issueId}` : "issue:none";
+        case "activity":
+          return row.activityId !== null ? `activity:${row.activityId}` : "activity:none";
+        default:
+          return null;
+      }
+    }
+    function getGroupLabel(row, ctx) {
+      switch (ctx.groupBy) {
+        case "client":
+          if (row.parentProjectId === OTHERS_PARENT_ID) return row.parentProjectName || "Others";
+          return row.parentProjectId ? `#${row.parentProjectId} ${row.parentProjectName || ""}` : "(No client)";
+        case "project":
+          return row.projectId ? `#${row.projectId} ${row.projectName || ""}` : "(No project)";
+        case "issue":
+          return row.issueId ? `#${row.issueId} ${row.issueSubject || ""}` : "(No task)";
+        case "activity":
+          return row.activityName || "(No activity)";
+        default:
+          return "";
+      }
+    }
+    function getGroupTotal(rows) {
+      return rows.reduce((sum, r) => sum + r.weekTotal, 0);
+    }
+    function renderGroupHeader(groupKey, label, total, isCollapsed, ctx) {
+      const tr = document.createElement("tr");
+      tr.className = "group-header" + (isCollapsed ? " collapsed" : "");
+      tr.dataset.groupKey = groupKey;
+      const td = document.createElement("td");
+      td.colSpan = 12;
+      td.className = "group-header-cell";
+      const chevron = document.createElement("span");
+      chevron.className = "group-chevron";
+      chevron.textContent = isCollapsed ? "\u25B6" : "\u25BC";
+      const labelSpan = document.createElement("span");
+      labelSpan.className = "group-label";
+      labelSpan.textContent = label;
+      td.appendChild(chevron);
+      td.appendChild(labelSpan);
+      td.addEventListener("click", () => {
+        if (!lastRenderContext) return;
+        if (lastRenderContext.collapsedGroups.has(groupKey)) {
+          lastRenderContext.collapsedGroups.delete(groupKey);
+        } else {
+          lastRenderContext.collapsedGroups.add(groupKey);
+        }
+        vscode.postMessage({ type: "toggleGroup", groupKey });
+        renderGrid(lastRenderContext);
+      });
+      tr.appendChild(td);
+      const totalTd = document.createElement("td");
+      totalTd.className = "col-total group-total";
+      totalTd.textContent = formatHours(total);
+      tr.appendChild(totalTd);
+      const actionsTd = document.createElement("td");
+      actionsTd.className = "col-actions";
+      tr.appendChild(actionsTd);
+      return tr;
+    }
+    function aggregateIdenticalRows(rows, ctx) {
+      if (!rows || rows.length === 0) return rows;
+      const groups = /* @__PURE__ */ new Map();
+      for (const row of rows) {
+        const key = `${row.issueId ?? "null"}::${row.activityId ?? "null"}::${row.comments ?? ""}`;
+        if (!groups.has(key)) {
+          const aggRow = {
+            ...row,
+            id: `agg-${key}`,
+            // Mark as aggregated
+            isAggregated: true,
+            // Flag for special handling
+            sourceRowIds: [row.id],
+            // Track original rows
+            days: {},
+            weekTotal: 0
+          };
+          for (let d = 0; d < 7; d++) {
+            if (row.days[d]) {
+              const sourceEntries = [];
+              if (row.days[d].hours > 0) {
+                sourceEntries.push({
+                  rowId: row.id,
+                  entryId: row.days[d].entryId,
+                  // null for drafts
+                  hours: row.days[d].hours,
+                  originalHours: row.days[d].originalHours || 0,
+                  issueId: row.issueId,
+                  activityId: row.activityId,
+                  comments: row.comments,
+                  spentOn: ctx.week?.dayDates[d] || "",
+                  isDraft: !row.days[d].entryId
+                  // Flag for drafts
+                });
+              }
+              aggRow.days[d] = {
+                hours: row.days[d].hours,
+                originalHours: row.days[d].originalHours,
+                entryId: null,
+                // Aggregated has no single entry
+                isDirty: row.days[d].isDirty || false,
+                sourceEntries
+              };
+              aggRow.weekTotal += row.days[d].hours || 0;
+            }
+          }
+          groups.set(key, aggRow);
+        } else {
+          const aggRow = groups.get(key);
+          aggRow.sourceRowIds.push(row.id);
+          for (let d = 0; d < 7; d++) {
+            if (row.days[d]) {
+              if (!aggRow.days[d]) {
+                aggRow.days[d] = {
+                  hours: 0,
+                  originalHours: 0,
+                  entryId: null,
+                  isDirty: false,
+                  sourceEntries: []
+                };
+              }
+              aggRow.days[d].hours += row.days[d].hours || 0;
+              aggRow.days[d].originalHours += row.days[d].originalHours || 0;
+              aggRow.weekTotal += row.days[d].hours || 0;
+              if (row.days[d].isDirty) aggRow.days[d].isDirty = true;
+              if (row.days[d].hours > 0) {
+                aggRow.days[d].sourceEntries.push({
+                  rowId: row.id,
+                  entryId: row.days[d].entryId,
+                  // null for drafts
+                  hours: row.days[d].hours,
+                  originalHours: row.days[d].originalHours || 0,
+                  issueId: row.issueId,
+                  activityId: row.activityId,
+                  comments: row.comments,
+                  spentOn: ctx.week?.dayDates[d] || "",
+                  isDraft: !row.days[d].entryId
+                  // Flag for drafts
+                });
+              }
+            }
+          }
+        }
+      }
+      return [...groups.values()];
+    }
+    function renderGrid(ctx) {
+      while (gridBody.firstChild) {
+        gridBody.removeChild(gridBody.firstChild);
+      }
+      const rowsToRender = ctx.aggregateRows ? aggregateIdenticalRows(ctx.rows, ctx) : ctx.rows;
+      if (rowsToRender.length === 0) {
+        const tr = document.createElement("tr");
+        tr.className = "empty-row";
+        const td = document.createElement("td");
+        td.colSpan = 14;
+        td.textContent = "No time entries yet.";
+        tr.appendChild(td);
+        gridBody.appendChild(tr);
+      } else if (ctx.groupBy === "none") {
+        const sortedRows = sortRows(rowsToRender, ctx);
+        for (const row of sortedRows) {
+          gridBody.appendChild(renderRow(row, ctx));
+        }
+      } else {
+        const groups = /* @__PURE__ */ new Map();
+        for (const row of rowsToRender) {
+          const groupKey = getGroupKey(row, ctx);
+          if (!groups.has(groupKey)) {
+            groups.set(groupKey, { label: getGroupLabel(row, ctx), rows: [] });
+          }
+          groups.get(groupKey).rows.push(row);
+        }
+        const sortedGroups = [...groups.entries()].sort(
+          (a, b) => a[1].label.localeCompare(b[1].label)
+        );
+        for (const [groupKey, group] of sortedGroups) {
+          const isCollapsed = ctx.collapsedGroups.has(groupKey);
+          const total = getGroupTotal(group.rows);
+          gridBody.appendChild(renderGroupHeader(groupKey, group.label, total, isCollapsed, ctx));
+          if (!isCollapsed) {
+            const sortedGroupRows = sortRows(group.rows, ctx);
+            for (const row of sortedGroupRows) {
+              gridBody.appendChild(renderRow(row, ctx));
+            }
+          }
+        }
+      }
+      renderTotals(ctx);
+      updateSortIndicators(ctx);
+      restorePendingFocus();
+    }
+    function sortRows(rows, ctx) {
+      if (!ctx.sortColumn) return rows;
+      return [...rows].sort((a, b) => {
+        let valA, valB;
+        switch (ctx.sortColumn) {
+          case "client":
+            valA = a.parentProjectName || "";
+            valB = b.parentProjectName || "";
+            break;
+          case "project":
+            valA = a.projectName || "";
+            valB = b.projectName || "";
+            break;
+          case "task":
+            valA = a.issueId || 0;
+            valB = b.issueId || 0;
+            break;
+          case "activity":
+            valA = a.activityName || "";
+            valB = b.activityName || "";
+            break;
+          case "comments":
+            valA = a.comments || "";
+            valB = b.comments || "";
+            break;
+          case "total":
+            valA = a.weekTotal;
+            valB = b.weekTotal;
+            break;
+          default:
+            return 0;
+        }
+        const cmp = typeof valA === "string" ? valA.localeCompare(valB) : valA - valB;
+        return ctx.sortDirection === "asc" ? cmp : -cmp;
+      });
+    }
+    function renderTotals(ctx) {
+      if (!ctx.totals) return;
+      const todayIndex = getTodayDayIndex(ctx.week);
+      const dayCells = totalsRow.querySelectorAll(".col-day.total-cell");
+      dayCells.forEach((cell, i) => {
+        const hours = ctx.totals.days[i];
+        const target = ctx.totals.targetHours[i];
+        const valueSpan = cell.querySelector(".total-value");
+        if (valueSpan) {
+          const hoursDisplay = hours === 0 ? "0" : formatHours(hours);
+          valueSpan.textContent = `${hoursDisplay} / ${target}`;
+        }
+        const progressFill = cell.querySelector(".progress-fill");
+        if (progressFill && target > 0) {
+          const percent = Math.min(hours / target * 100, 100);
+          progressFill.style.width = `${percent}%`;
+          progressFill.classList.remove("met", "over");
+          if (hours > target) {
+            progressFill.classList.add("over");
+          } else if (hours >= target) {
+            progressFill.classList.add("met");
+          }
+        } else if (progressFill) {
+          progressFill.style.width = "0%";
+        }
+        cell.classList.toggle("today", i === todayIndex);
+      });
+      const targetTotal = ctx.totals.weekTargetTotal;
+      const weekHours = ctx.totals.weekTotal;
+      const weekHoursDisplay = weekHours === 0 ? "0" : formatHours(weekHours);
+      weekTotal.textContent = `${weekHoursDisplay} / ${targetTotal}`;
+    }
+    function updateRow(row, totals, ctx) {
+      if (ctx.aggregateRows) {
+        if (totals) ctx.totals = totals;
+        renderGrid(ctx);
+        return;
+      }
+      const existingRow = gridBody.querySelector(`tr[data-row-id="${row.id}"]`);
+      if (existingRow) {
+        const newRow = renderRow(row, ctx);
+        existingRow.replaceWith(newRow);
+      }
+      if (totals) {
+        ctx.totals = totals;
+        renderTotals(ctx);
+      }
+    }
+    window.addEventListener("message", (event) => {
+      const message = event.data;
+      switch (message.type) {
+        case "render": {
+          const ctx = {
+            rows: message.rows,
+            week: message.week,
+            totals: message.totals,
+            projects: message.projects || [],
+            parentProjects: message.parentProjects || [],
+            childProjectsByParent: new Map(Object.entries(message.childProjectsByParent || {})),
+            issuesByProject: new Map(Object.entries(message.issuesByProject || {})),
+            activitiesByProject: new Map(Object.entries(message.activitiesByProject || {})),
+            isDraftMode: message.isDraftMode,
+            sortColumn: message.sortColumn ?? null,
+            sortDirection: message.sortDirection ?? "asc",
+            groupBy: message.groupBy ?? "none",
+            collapsedGroups: new Set(message.collapsedGroups || []),
+            aggregateRows: message.aggregateRows ?? false
+          };
+          lastRenderContext = ctx;
+          if (groupBySelect) groupBySelect.value = ctx.groupBy;
+          const aggregateToggle = document.getElementById("aggregateToggle");
+          if (aggregateToggle) aggregateToggle.checked = ctx.aggregateRows;
+          weekLabel.textContent = formatWeekLabel(ctx.week);
+          updateWeekHeaders(ctx);
+          updateDraftModeUI(ctx);
+          renderGrid(ctx);
+          break;
+        }
+        case "updateRow": {
+          if (!lastRenderContext) break;
+          if (message.rowCascadeData) {
+            const { childProjects, issues, activities } = message.rowCascadeData;
+            if (childProjects && message.row.parentProjectId !== null) {
+              lastRenderContext.childProjectsByParent.set(String(message.row.parentProjectId), childProjects);
+            }
+            if (issues && message.row.projectId !== null) {
+              lastRenderContext.issuesByProject.set(String(message.row.projectId), issues);
+            }
+            if (activities && message.row.projectId !== null) {
+              lastRenderContext.activitiesByProject.set(String(message.row.projectId), activities);
+            }
+          }
+          const rowIndex = lastRenderContext.rows.findIndex((r) => r.id === message.row.id);
+          if (rowIndex !== -1) {
+            lastRenderContext.rows[rowIndex] = message.row;
+          }
+          lastRenderContext.totals = message.totals;
+          updateRow(message.row, message.totals, lastRenderContext);
+          break;
+        }
+        case "updateChildProjects":
+          if (lastRenderContext) {
+            lastRenderContext.childProjectsByParent.set(String(message.forParentId), message.projects);
+            renderGrid(lastRenderContext);
+          }
+          break;
+        case "updateIssues":
+          if (lastRenderContext) {
+            lastRenderContext.issuesByProject.set(String(message.forProjectId), message.issues);
+            renderGrid(lastRenderContext);
+          }
+          break;
+        case "updateActivities":
+          if (lastRenderContext) {
+            lastRenderContext.activitiesByProject.set(String(message.forProjectId), message.activities);
+            renderGrid(lastRenderContext);
+          }
+          break;
+        case "setLoading":
+          loadingOverlay.classList.toggle("hidden", !message.loading);
+          break;
+        case "showError":
+          console.error(message.message);
+          showToast(message.message, null, 8e3);
+          break;
+        case "draftModeChanged":
+          if (lastRenderContext) {
+            lastRenderContext.isDraftMode = message.isDraftMode;
+            updateDraftModeUI(lastRenderContext);
+          }
+          break;
+        case "updateIssueDetails":
+          state.issueDetails.set(message.issueId, message.details);
+          if (pendingTooltipIssueId === message.issueId && tooltipTarget) {
+            showIssueTooltip(tooltipTarget, pendingTooltipX, pendingTooltipY);
+            pendingTooltipIssueId = null;
+          }
+          break;
+        case "rowDuplicated":
+          pushUndo({
+            type: "duplicateRow",
+            sourceRowId: message.sourceRowId,
+            newRowId: message.newRowId
+          });
+          break;
+        case "rowDeleted":
+          pushUndo({
+            type: "deleteRow",
+            deletedRow: message.deletedRow
+          });
+          break;
+        case "showToast":
+          showToast(message.message, message.undoAction, message.duration);
+          break;
+        case "requestAggregatedCellConfirm":
+          handleAggregatedCellConfirm(message);
+          break;
+        case "requestAggregatedFieldConfirm":
+          handleAggregatedFieldConfirm(message);
+          break;
+        case "pasteComplete":
+          pushUndo({
+            type: "paste",
+            draftIds: message.draftIds,
+            count: message.count
+          });
+          break;
+      }
+    });
+    function updateWeekHeaders(ctx) {
+      if (!ctx.week) return;
+      const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+      const headerCells = document.querySelectorAll("thead .col-day");
+      const todayIndex = getTodayDayIndex(ctx.week);
+      headerCells.forEach((cell, i) => {
+        const date = /* @__PURE__ */ new Date(ctx.week.dayDates[i] + "T12:00:00");
+        const day = date.getDate();
+        cell.textContent = `${dayNames[i]} ${day}`;
+        cell.classList.toggle("today", i === todayIndex);
+      });
+    }
+    function updateSortIndicators(ctx) {
+      const sortableHeaders = document.querySelectorAll("thead .sortable");
+      sortableHeaders.forEach((header) => {
+        const sortKey = header.dataset.sort;
+        const existingIndicator = header.querySelector(".sort-indicator");
+        if (existingIndicator) existingIndicator.remove();
+        if (sortKey === ctx.sortColumn) {
+          const indicator = document.createElement("span");
+          indicator.className = "sort-indicator";
+          indicator.textContent = ctx.sortDirection === "asc" ? "\u25B2" : "\u25BC";
+          header.appendChild(indicator);
+        }
+      });
+    }
+    function handleSortClick(sortKey) {
+      if (!lastRenderContext) return;
+      if (lastRenderContext.sortColumn === sortKey) {
+        if (lastRenderContext.sortDirection === "asc") {
+          lastRenderContext.sortDirection = "desc";
+        } else {
+          lastRenderContext.sortColumn = null;
+          lastRenderContext.sortDirection = "asc";
+        }
+      } else {
+        lastRenderContext.sortColumn = sortKey;
+        lastRenderContext.sortDirection = "asc";
+      }
+      vscode.postMessage({
+        type: "sortChanged",
+        sortColumn: lastRenderContext.sortColumn,
+        sortDirection: lastRenderContext.sortDirection
+      });
+      renderGrid(lastRenderContext);
+    }
+    function setupSortHandlers() {
+      const sortableHeaders = document.querySelectorAll("thead .sortable");
+      sortableHeaders.forEach((header) => {
+        const sortKey = header.dataset.sort;
+        if (sortKey) {
+          header.addEventListener("click", () => handleSortClick(sortKey));
+        }
+      });
+    }
+    document.getElementById("prevWeek")?.addEventListener("click", () => {
+      vscode.postMessage({ type: "navigateWeek", direction: "prev" });
+    });
+    document.getElementById("nextWeek")?.addEventListener("click", () => {
+      vscode.postMessage({ type: "navigateWeek", direction: "next" });
+    });
+    document.getElementById("todayBtn")?.addEventListener("click", () => {
+      vscode.postMessage({ type: "navigateWeek", direction: "today" });
+    });
+    document.getElementById("saveBtn")?.addEventListener("click", () => {
+      vscode.postMessage({ type: "saveAll" });
+    });
+    groupBySelect?.addEventListener("change", (e) => {
+      if (!lastRenderContext) return;
+      lastRenderContext.groupBy = e.target.value;
+      vscode.postMessage({ type: "setGroupBy", groupBy: lastRenderContext.groupBy });
+      renderGrid(lastRenderContext);
+    });
+    document.getElementById("aggregateToggle")?.addEventListener("change", (e) => {
+      if (!lastRenderContext) return;
+      lastRenderContext.aggregateRows = e.target.checked;
+      vscode.postMessage({ type: "setAggregateRows", aggregateRows: lastRenderContext.aggregateRows });
+      renderGrid(lastRenderContext);
+    });
+    document.getElementById("copyWeekBtn")?.addEventListener("click", () => {
+      vscode.postMessage({ type: "copyWeek" });
+    });
+    document.getElementById("pasteWeekBtn")?.addEventListener("click", () => {
+      vscode.postMessage({ type: "pasteWeek" });
+    });
+    enableDraftModeBtn?.addEventListener("click", () => {
+      vscode.postMessage({ type: "enableDraftMode" });
+    });
+    addEntryBtn?.addEventListener("click", () => {
+      vscode.postMessage({ type: "addRow" });
+    });
+    undoBtn?.addEventListener("click", () => {
+      undo();
+    });
+    redoBtn?.addEventListener("click", () => {
+      redo();
+    });
+    setupSortHandlers();
+    document.addEventListener("keydown", (e) => {
+      const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+      const ctrlOrCmd = isMac ? e.metaKey : e.ctrlKey;
+      const isInInput = e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT";
+      const isDayInput = e.target.classList?.contains("day-input");
+      if (ctrlOrCmd && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if (ctrlOrCmd && e.key === "z" && e.shiftKey) {
+        e.preventDefault();
+        redo();
+      } else if (ctrlOrCmd && e.key === "y" && !isMac) {
+        e.preventDefault();
+        redo();
+      } else if (e.key.toLowerCase() === "t" && !ctrlOrCmd && !e.altKey && !isInInput) {
+        e.preventDefault();
+        vscode.postMessage({ type: "navigateWeek", direction: "today" });
+      } else if (isDayInput && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", "Tab"].includes(e.key)) {
+        handleGridNavigation(e);
+      }
+    });
+    function handleGridNavigation(e) {
+      const currentInput = e.target;
+      const currentCell = currentInput.closest("td");
+      const currentRow = currentCell?.closest("tr");
+      if (!currentCell || !currentRow) return;
+      const allDayInputs = Array.from(document.querySelectorAll(".day-input:not(:disabled)"));
+      const currentIndex = allDayInputs.indexOf(currentInput);
+      if (currentIndex === -1) return;
+      const rowInputs = Array.from(currentRow.querySelectorAll(".day-input:not(:disabled)"));
+      const colIndex = rowInputs.indexOf(currentInput);
+      const allRows = Array.from(document.querySelectorAll("#gridBody tr:not(.group-header-row)"));
+      const rowIndex = allRows.indexOf(currentRow);
+      let targetInput = null;
+      switch (e.key) {
+        case "ArrowRight":
+          if (colIndex < rowInputs.length - 1) {
+            targetInput = rowInputs[colIndex + 1];
+          }
+          break;
+        case "ArrowLeft":
+          if (colIndex > 0) {
+            targetInput = rowInputs[colIndex - 1];
+          }
+          break;
+        case "ArrowDown":
+        case "Enter":
+          if (rowIndex < allRows.length - 1) {
+            const nextRow = allRows[rowIndex + 1];
+            const nextRowInputs = Array.from(nextRow.querySelectorAll(".day-input:not(:disabled)"));
+            if (nextRowInputs[colIndex]) {
+              targetInput = nextRowInputs[colIndex];
+            }
+          }
+          break;
+        case "ArrowUp":
+          if (rowIndex > 0) {
+            const prevRow = allRows[rowIndex - 1];
+            const prevRowInputs = Array.from(prevRow.querySelectorAll(".day-input:not(:disabled)"));
+            if (prevRowInputs[colIndex]) {
+              targetInput = prevRowInputs[colIndex];
+            }
+          }
+          break;
+        case "Tab":
+          return;
+      }
+      if (targetInput) {
+        e.preventDefault();
+        const targetCell = targetInput.closest("td");
+        const targetRow = targetCell?.closest("tr");
+        if (targetRow && targetCell) {
+          pendingFocus = {
+            rowId: targetRow.dataset.rowId,
+            dayIndex: Number(targetCell.dataset.day)
+          };
+        }
+        currentInput.blur();
+        targetInput.focus();
+        targetInput.select();
+      }
+    }
+    function restorePendingFocus() {
+      if (!pendingFocus) return;
+      const { rowId, dayIndex } = pendingFocus;
+      pendingFocus = null;
+      const input = document.querySelector(
+        `tr[data-row-id="${rowId}"] .day-cell[data-day="${dayIndex}"] .day-input`
+      );
+      if (input && !input.disabled) {
+        input.focus();
+        input.select();
+      }
+    }
+    const issueTooltip = document.getElementById("issueTooltip");
+    const tooltipContent = issueTooltip?.querySelector(".issue-tooltip-content");
+    let tooltipTarget = null;
+    let tooltipShowTimer = null;
+    let tooltipHideTimer = null;
+    let pendingTooltipIssueId = null;
+    let pendingTooltipX = 0;
+    let pendingTooltipY = 0;
+    let lastMouseX = 0;
+    let lastMouseY = 0;
+    document.addEventListener("pointermove", (e) => {
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+    }, { passive: true });
+    function showIssueTooltip(target, x, y) {
+      if (!issueTooltip || !tooltipContent) return;
+      const issueId = parseInt(target.dataset.issueId, 10);
+      if (!issueId) return;
+      const details = state.issueDetails.get(issueId);
+      if (!details) {
+        pendingTooltipIssueId = issueId;
+        pendingTooltipX = x;
+        pendingTooltipY = y;
+        vscode.postMessage({ type: "requestIssueDetails", issueId });
+        return;
+      }
+      tooltipContent.innerHTML = "";
+      const title = document.createElement("div");
+      title.className = "issue-tooltip-line issue-tooltip-title";
+      title.textContent = `#${details.id} ${details.subject}`;
+      tooltipContent.appendChild(title);
+      const divider = document.createElement("div");
+      divider.className = "issue-tooltip-divider";
+      tooltipContent.appendChild(divider);
+      const fields = [
+        { key: "Status", value: details.status },
+        { key: "Priority", value: details.priority },
+        { key: "Tracker", value: details.tracker },
+        { key: "Assignee", value: details.assignedTo || "Unassigned" },
+        { key: "Done", value: `${details.doneRatio}%` }
+      ];
+      if (details.estimatedHours !== null) {
+        fields.push({ key: "Estimated", value: formatHoursAsHHMM(details.estimatedHours) });
+      }
+      if (details.spentHours !== null) {
+        fields.push({ key: "Spent", value: formatHoursAsHHMM(details.spentHours) });
+      }
+      if (details.startDate) {
+        fields.push({ key: "Start", value: details.startDate });
+      }
+      if (details.dueDate) {
+        fields.push({ key: "Due", value: details.dueDate });
+      }
+      for (const field of fields) {
+        const line = document.createElement("div");
+        line.className = "issue-tooltip-line";
+        const keySpan = document.createElement("span");
+        keySpan.className = "issue-tooltip-key";
+        keySpan.textContent = `${field.key}: `;
+        line.appendChild(keySpan);
+        line.appendChild(document.createTextNode(field.value));
+        tooltipContent.appendChild(line);
+      }
+      if (details.customFields && details.customFields.length > 0) {
+        const cfDivider = document.createElement("div");
+        cfDivider.className = "issue-tooltip-divider";
+        tooltipContent.appendChild(cfDivider);
+        for (const cf of details.customFields) {
+          const line = document.createElement("div");
+          line.className = "issue-tooltip-line";
+          const keySpan = document.createElement("span");
+          keySpan.className = "issue-tooltip-key";
+          keySpan.textContent = `${cf.name}: `;
+          line.appendChild(keySpan);
+          line.appendChild(document.createTextNode(cf.value));
+          tooltipContent.appendChild(line);
+        }
+      }
+      positionTooltip(x, y);
+      issueTooltip.classList.add("visible");
+      issueTooltip.setAttribute("aria-hidden", "false");
+    }
+    function clampTooltipPosition(x, y, rect, padding, offset) {
+      let left = x + offset;
+      let top = y + offset;
+      if (left + rect.width > window.innerWidth - padding) {
+        left = x - rect.width - offset;
+      }
+      if (top + rect.height > window.innerHeight - padding) {
+        top = y - rect.height - offset;
+      }
+      left = Math.max(padding, Math.min(left, window.innerWidth - rect.width - padding));
+      top = Math.max(padding, Math.min(top, window.innerHeight - rect.height - padding));
+      return { left: Math.round(left), top: Math.round(top) };
+    }
+    function positionTooltip(x, y) {
+      issueTooltip.style.left = "0";
+      issueTooltip.style.top = "0";
+      const rect = issueTooltip.getBoundingClientRect();
+      const { left, top } = clampTooltipPosition(x, y, rect, 8, 12);
+      issueTooltip.style.left = `${left}px`;
+      issueTooltip.style.top = `${top}px`;
+    }
+    function hideIssueTooltip() {
+      if (tooltipShowTimer) {
+        clearTimeout(tooltipShowTimer);
+        tooltipShowTimer = null;
+      }
+      if (tooltipHideTimer) {
+        clearTimeout(tooltipHideTimer);
+        tooltipHideTimer = null;
+      }
+      tooltipTarget = null;
+      pendingTooltipIssueId = null;
+      issueTooltip?.classList.remove("visible");
+      issueTooltip?.setAttribute("aria-hidden", "true");
+    }
+    document.addEventListener("pointerover", (e) => {
+      const target = e.target.closest("[data-issue-id]");
+      if (!target || !gridBody.contains(target)) {
+        return;
+      }
+      if (tooltipTarget === target) return;
+      if (tooltipHideTimer) {
+        clearTimeout(tooltipHideTimer);
+        tooltipHideTimer = null;
+      }
+      tooltipTarget = target;
+      if (tooltipShowTimer) clearTimeout(tooltipShowTimer);
+      tooltipShowTimer = setTimeout(() => {
+        tooltipShowTimer = null;
+        if (tooltipTarget === target) {
+          showIssueTooltip(target, lastMouseX, lastMouseY);
+        }
+      }, 400);
+    }, true);
+    document.addEventListener("pointerout", (e) => {
+      const target = e.target.closest("[data-issue-id]");
+      if (!target || target !== tooltipTarget) return;
+      const relatedTarget = e.relatedTarget;
+      if (relatedTarget && target.contains(relatedTarget)) {
+        return;
+      }
+      if (tooltipShowTimer) {
+        clearTimeout(tooltipShowTimer);
+        tooltipShowTimer = null;
+      }
+      tooltipHideTimer = setTimeout(() => {
+        hideIssueTooltip();
+      }, 100);
+    }, true);
+    document.querySelector(".timesheet-grid-container")?.addEventListener("scroll", () => {
+      hideIssueTooltip();
+    });
+    const genericTooltip = document.getElementById("genericTooltip");
+    let genericTooltipTarget = null;
+    let genericTooltipTimer = null;
+    function showGenericTooltip(target, x, y) {
+      if (!genericTooltip) return;
+      const text = target.dataset.tooltip;
+      if (!text) return;
+      genericTooltip.textContent = text;
+      genericTooltip.style.left = "0";
+      genericTooltip.style.top = "0";
+      genericTooltip.classList.add("visible");
+      const rect = genericTooltip.getBoundingClientRect();
+      const { left, top } = clampTooltipPosition(x, y, rect, 8, 10);
+      genericTooltip.style.left = `${left}px`;
+      genericTooltip.style.top = `${top}px`;
+    }
+    function hideGenericTooltip() {
+      if (genericTooltipTimer) {
+        clearTimeout(genericTooltipTimer);
+        genericTooltipTimer = null;
+      }
+      genericTooltipTarget = null;
+      genericTooltip?.classList.remove("visible");
+    }
+    document.addEventListener("pointerover", (e) => {
+      const target = e.target.closest("[data-tooltip]");
+      if (!target || target.dataset.issueId) return;
+      if (genericTooltipTarget === target) return;
+      hideGenericTooltip();
+      genericTooltipTarget = target;
+      genericTooltipTimer = setTimeout(() => {
+        genericTooltipTimer = null;
+        if (genericTooltipTarget === target) {
+          showGenericTooltip(target, lastMouseX, lastMouseY);
+        }
+      }, 400);
+    }, true);
+    document.addEventListener("pointerout", (e) => {
+      const target = e.target.closest("[data-tooltip]");
+      if (!target || target !== genericTooltipTarget) return;
+      const relatedTarget = e.relatedTarget;
+      if (relatedTarget && target.contains(relatedTarget)) return;
+      hideGenericTooltip();
+    }, true);
+    document.querySelector(".timesheet-grid-container")?.addEventListener("scroll", () => {
+      hideGenericTooltip();
+    });
+    let activeToast = null;
+    let toastTimeout = null;
+    function showToast(message, undoAction = null, duration = 5e3) {
+      hideToast();
+      const toast = document.createElement("div");
+      toast.className = "toast-notification";
+      toast.innerHTML = `
+      <span class="toast-message">${escapeHtml(message)}</span>
+      ${undoAction ? '<button class="toast-undo-btn">Undo</button>' : ""}
       <button class="toast-dismiss-btn">\xD7</button>
-    `,t&&n.querySelector(".toast-undo-btn")?.addEventListener("click",()=>{c.postMessage(t),se()}),n.querySelector(".toast-dismiss-btn")?.addEventListener("click",()=>se()),(document.querySelector(".timesheet-container")||document.body).appendChild(n),V=n,requestAnimationFrame(()=>{n.classList.add("visible")}),s>0&&(te=setTimeout(()=>se(),s))}function se(){te&&(clearTimeout(te),te=null),V&&(V.classList.remove("visible"),V.classList.add("hiding"),setTimeout(()=>{V?.remove(),V=null},200))}function tt(e,t){let s=`${e}:${t}`;T.expandedCells.has(s)?T.expandedCells.delete(s):(T.expandedCells.clear(),T.expandedCells.add(s)),l&&b(l)}function st(){T.expandedCells.size>0&&(T.expandedCells.clear(),l&&b(l))}function nt(e,t,s){let n=document.createElement("div");n.className="expanded-cell-dropdown",n.addEventListener("click",r=>r.stopPropagation());let a=document.createElement("div");a.className="dropdown-header";let o=document.createElement("span");o.textContent=`${s.length} time entries`,a.appendChild(o);let d=s.filter(r=>r.entryId);if(d.length>=2){let r=document.createElement("button");r.className="dropdown-merge-btn",r.textContent="Merge",r.dataset.tooltip="Combine all entries into one",r.addEventListener("click",f=>{f.stopPropagation(),c.postMessage({type:"mergeEntries",aggRowId:e.id,dayIndex:t,sourceEntries:d})}),a.appendChild(r)}let g=s.reduce((r,f)=>r+f.hours,0),p=document.createElement("span");p.className="dropdown-header-total",p.textContent=`${C(g)}h total`,a.appendChild(p),n.appendChild(a);let m=document.createElement("div");return m.className="dropdown-entry-list",s.forEach((r,f)=>{let y=document.createElement("div");y.className="dropdown-entry";let D=document.createElement("span");if(D.className="dropdown-entry-context",!r.entryId)D.textContent="Draft",D.classList.add("draft"),D.dataset.tooltip=`Draft entry on ${r.spentOn}`;else{D.textContent=`#${r.entryId}`;let M=new Date(r.spentOn+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"});D.dataset.tooltip=`Created on ${M}`}y.appendChild(D);let w=document.createElement("input");w.type="text",w.className="dropdown-entry-hours",w.value=C(r.hours),w.dataset.entryId=r.entryId,w.dataset.rowId=r.rowId,w.dataset.oldValue=r.hours,w.addEventListener("focus",I=>{I.target.dataset.oldValue=Z(I.target.value),I.target.select()}),w.addEventListener("blur",I=>{let M=parseFloat(I.target.dataset.oldValue)||0,S=Z(I.target.value);if(S>M&&Re(t,M,S)){I.target.value=C(M),k("Cannot exceed 24h per day");return}I.target.value=C(S),M!==S&&(N({type:"expandedEntry",rowId:r.rowId,entryId:r.entryId,dayIndex:t,oldValue:M,newValue:S}),c.postMessage({type:"updateExpandedEntry",rowId:r.rowId,entryId:r.entryId,dayIndex:t,newHours:S,oldHours:M}))}),w.addEventListener("keydown",I=>{I.key==="Enter"&&I.target.blur(),I.key==="Escape"&&(I.target.value=C(parseFloat(I.target.dataset.oldValue)||0),I.target.blur())}),y.appendChild(w);let P=document.createElement("button");P.className="dropdown-entry-delete",P.textContent="\xD7",P.dataset.tooltip="Delete this entry",P.addEventListener("click",I=>{I.stopPropagation(),N({type:"barrier",message:"Cannot undo entry delete"}),c.postMessage({type:"deleteExpandedEntry",rowId:r.rowId,entryId:r.entryId,aggRowId:e.id,dayIndex:t}),k("Deleted 1 entry")}),y.appendChild(P),m.appendChild(y)}),n.appendChild(m),n}function at(e,t,s,n,a){let o=a.sourceEntries||[],d=o.length;N({type:"aggregatedCell",aggRowId:e.id,dayIndex:t,oldValue:n,newValue:s,sourceEntries:o}),d===0?(c.postMessage({type:"updateAggregatedCell",aggRowId:e.id,dayIndex:t,newHours:s,sourceEntries:[],confirmed:!0}),k("Created entry")):d===1?(c.postMessage({type:"updateAggregatedCell",aggRowId:e.id,dayIndex:t,newHours:s,sourceEntries:o,confirmed:!0}),k("Updated 1 entry")):c.postMessage({type:"updateAggregatedCell",aggRowId:e.id,dayIndex:t,newHours:s,sourceEntries:o,confirmed:!1})}function ot(e){let{aggRowId:t,dayIndex:s,newHours:n,oldHours:a,sourceEntryCount:o,sourceEntries:d}=e;k(`${n===0?"Deleted":"Replaced"} ${o} entries`,{type:"restoreAggregatedEntries",entries:d,aggRowId:t,dayIndex:s},5e3),c.postMessage({type:"updateAggregatedCell",aggRowId:t,dayIndex:s,newHours:n,sourceEntries:d,confirmed:!0})}function dt(e){let{aggRowId:t,field:s,value:n,oldValue:a,sourceRowIds:o,sourceEntryCount:d}=e;k(`Updated ${d} entries`,{type:"updateAggregatedField",aggRowId:t,field:s,value:a,sourceRowIds:o,confirmed:!0},5e3),c.postMessage({type:"updateAggregatedField",aggRowId:t,field:s,value:n,sourceRowIds:o,confirmed:!0})}document.addEventListener("click",e=>{if(T.expandedCells.size===0)return;let t=e.target.closest(".expanded-cell-dropdown"),s=e.target.closest(".multi-entry-badge");!t&&!s&&st()}),c.postMessage({type:"webviewReady"})})();})();
+    `;
+      if (undoAction) {
+        const undoBtn2 = toast.querySelector(".toast-undo-btn");
+        undoBtn2?.addEventListener("click", () => {
+          vscode.postMessage(undoAction);
+          hideToast();
+        });
+      }
+      const dismissBtn = toast.querySelector(".toast-dismiss-btn");
+      dismissBtn?.addEventListener("click", () => hideToast());
+      const container = document.querySelector(".timesheet-container") || document.body;
+      container.appendChild(toast);
+      activeToast = toast;
+      requestAnimationFrame(() => {
+        toast.classList.add("visible");
+      });
+      if (duration > 0) {
+        toastTimeout = setTimeout(() => hideToast(), duration);
+      }
+    }
+    function hideToast() {
+      if (toastTimeout) {
+        clearTimeout(toastTimeout);
+        toastTimeout = null;
+      }
+      if (activeToast) {
+        activeToast.classList.remove("visible");
+        activeToast.classList.add("hiding");
+        setTimeout(() => {
+          activeToast?.remove();
+          activeToast = null;
+        }, 200);
+      }
+    }
+    function toggleCellExpand(rowId, dayIndex) {
+      const cellKey = `${rowId}:${dayIndex}`;
+      if (state.expandedCells.has(cellKey)) {
+        state.expandedCells.delete(cellKey);
+      } else {
+        state.expandedCells.clear();
+        state.expandedCells.add(cellKey);
+      }
+      if (lastRenderContext) renderGrid(lastRenderContext);
+    }
+    function collapseAllCells() {
+      if (state.expandedCells.size > 0) {
+        state.expandedCells.clear();
+        if (lastRenderContext) renderGrid(lastRenderContext);
+      }
+    }
+    function renderExpandedCellDropdown(row, dayIndex, sourceEntries) {
+      const dropdown = document.createElement("div");
+      dropdown.className = "expanded-cell-dropdown";
+      dropdown.addEventListener("click", (e) => e.stopPropagation());
+      const header = document.createElement("div");
+      header.className = "dropdown-header";
+      const headerLabel = document.createElement("span");
+      headerLabel.textContent = `${sourceEntries.length} time entries`;
+      header.appendChild(headerLabel);
+      const savedEntries = sourceEntries.filter((e) => e.entryId);
+      if (savedEntries.length >= 2) {
+        const mergeBtn = document.createElement("button");
+        mergeBtn.className = "dropdown-merge-btn";
+        mergeBtn.textContent = "Merge";
+        mergeBtn.dataset.tooltip = "Combine all entries into one";
+        mergeBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          vscode.postMessage({
+            type: "mergeEntries",
+            aggRowId: row.id,
+            dayIndex,
+            sourceEntries: savedEntries
+          });
+        });
+        header.appendChild(mergeBtn);
+      }
+      const totalHours = sourceEntries.reduce((sum, e) => sum + e.hours, 0);
+      const headerTotal = document.createElement("span");
+      headerTotal.className = "dropdown-header-total";
+      headerTotal.textContent = `${formatHours(totalHours)}h total`;
+      header.appendChild(headerTotal);
+      dropdown.appendChild(header);
+      const list = document.createElement("div");
+      list.className = "dropdown-entry-list";
+      sourceEntries.forEach((entry, index) => {
+        const entryRow = document.createElement("div");
+        entryRow.className = "dropdown-entry";
+        const contextLabel = document.createElement("span");
+        contextLabel.className = "dropdown-entry-context";
+        if (!entry.entryId) {
+          contextLabel.textContent = "Draft";
+          contextLabel.classList.add("draft");
+          contextLabel.dataset.tooltip = `Draft entry on ${entry.spentOn}`;
+        } else {
+          contextLabel.textContent = `#${entry.entryId}`;
+          const date = /* @__PURE__ */ new Date(entry.spentOn + "T12:00:00");
+          const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          contextLabel.dataset.tooltip = `Created on ${dateStr}`;
+        }
+        entryRow.appendChild(contextLabel);
+        const hoursInput = document.createElement("input");
+        hoursInput.type = "text";
+        hoursInput.className = "dropdown-entry-hours";
+        hoursInput.value = formatHours(entry.hours);
+        hoursInput.dataset.entryId = entry.entryId;
+        hoursInput.dataset.rowId = entry.rowId;
+        hoursInput.dataset.oldValue = entry.hours;
+        hoursInput.addEventListener("focus", (e) => {
+          e.target.dataset.oldValue = parseHours(e.target.value);
+          e.target.select();
+        });
+        hoursInput.addEventListener("blur", (e) => {
+          const oldHours = parseFloat(e.target.dataset.oldValue) || 0;
+          const newHours = parseHours(e.target.value);
+          if (newHours > oldHours && wouldExceed24Hours(dayIndex, oldHours, newHours)) {
+            e.target.value = formatHours(oldHours);
+            showToast("Cannot exceed 24h per day");
+            return;
+          }
+          e.target.value = formatHours(newHours);
+          if (oldHours !== newHours) {
+            pushUndo({
+              type: "expandedEntry",
+              rowId: entry.rowId,
+              entryId: entry.entryId,
+              dayIndex,
+              oldValue: oldHours,
+              newValue: newHours
+            });
+            vscode.postMessage({
+              type: "updateExpandedEntry",
+              rowId: entry.rowId,
+              entryId: entry.entryId,
+              dayIndex,
+              newHours,
+              oldHours
+            });
+          }
+        });
+        hoursInput.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") e.target.blur();
+          if (e.key === "Escape") {
+            e.target.value = formatHours(parseFloat(e.target.dataset.oldValue) || 0);
+            e.target.blur();
+          }
+        });
+        entryRow.appendChild(hoursInput);
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "dropdown-entry-delete";
+        deleteBtn.textContent = "\xD7";
+        deleteBtn.dataset.tooltip = "Delete this entry";
+        deleteBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          pushUndo({
+            type: "barrier",
+            message: "Cannot undo entry delete"
+          });
+          vscode.postMessage({
+            type: "deleteExpandedEntry",
+            rowId: entry.rowId,
+            entryId: entry.entryId,
+            aggRowId: row.id,
+            dayIndex
+          });
+          showToast("Deleted 1 entry");
+        });
+        entryRow.appendChild(deleteBtn);
+        list.appendChild(entryRow);
+      });
+      dropdown.appendChild(list);
+      return dropdown;
+    }
+    function handleAggregatedCellBlur(row, dayIndex, newHours, oldHours, cell) {
+      const sourceEntries = cell.sourceEntries || [];
+      const sourceCount = sourceEntries.length;
+      pushUndo({
+        type: "aggregatedCell",
+        aggRowId: row.id,
+        dayIndex,
+        oldValue: oldHours,
+        newValue: newHours,
+        sourceEntries
+      });
+      if (sourceCount === 0) {
+        vscode.postMessage({
+          type: "updateAggregatedCell",
+          aggRowId: row.id,
+          dayIndex,
+          newHours,
+          sourceEntries: [],
+          confirmed: true
+        });
+        showToast("Created entry");
+      } else if (sourceCount === 1) {
+        vscode.postMessage({
+          type: "updateAggregatedCell",
+          aggRowId: row.id,
+          dayIndex,
+          newHours,
+          sourceEntries,
+          confirmed: true
+        });
+        showToast("Updated 1 entry");
+      } else {
+        vscode.postMessage({
+          type: "updateAggregatedCell",
+          aggRowId: row.id,
+          dayIndex,
+          newHours,
+          sourceEntries,
+          confirmed: false
+          // Extension will request confirm via toast
+        });
+      }
+    }
+    function handleAggregatedCellConfirm(message) {
+      const { aggRowId, dayIndex, newHours, oldHours, sourceEntryCount, sourceEntries } = message;
+      const action = newHours === 0 ? "Deleted" : "Replaced";
+      showToast(
+        `${action} ${sourceEntryCount} entries`,
+        {
+          type: "restoreAggregatedEntries",
+          entries: sourceEntries,
+          aggRowId,
+          dayIndex
+        },
+        5e3
+      );
+      vscode.postMessage({
+        type: "updateAggregatedCell",
+        aggRowId,
+        dayIndex,
+        newHours,
+        sourceEntries,
+        confirmed: true
+      });
+    }
+    function handleAggregatedFieldConfirm(message) {
+      const { aggRowId, field, value, oldValue, sourceRowIds, sourceEntryCount } = message;
+      showToast(
+        `Updated ${sourceEntryCount} entries`,
+        {
+          type: "updateAggregatedField",
+          aggRowId,
+          field,
+          value: oldValue,
+          // Undo restores old value
+          sourceRowIds,
+          confirmed: true
+        },
+        5e3
+      );
+      vscode.postMessage({
+        type: "updateAggregatedField",
+        aggRowId,
+        field,
+        value,
+        sourceRowIds,
+        confirmed: true
+      });
+    }
+    document.addEventListener("click", (e) => {
+      if (state.expandedCells.size === 0) return;
+      const dropdown = e.target.closest(".expanded-cell-dropdown");
+      const badge = e.target.closest(".multi-entry-badge");
+      if (!dropdown && !badge) {
+        collapseAllCells();
+      }
+    });
+    vscode.postMessage({ type: "webviewReady" });
+  })();
+})();
