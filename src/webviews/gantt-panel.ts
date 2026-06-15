@@ -1342,6 +1342,15 @@ export class GanttPanel {
               count: this._draftModeManager?.queue?.count ?? 0,
             });
             showStatusBarMessage(`$(discard) #${message.issueId} draft removed`, 2000);
+          }).catch((e) => {
+            // Without this, a rejected removal is an unhandled rejection and
+            // the webview believes the draft was undone while the queue still
+            // holds it. Surface the error and re-sync the badge count.
+            vscode.window.showErrorMessage(`Failed to remove draft: ${errorToString(e)}`);
+            this._panel.webview.postMessage({
+              command: "setDraftQueueCount",
+              count: this._draftModeManager?.queue?.count ?? 0,
+            });
           });
         }
         break;

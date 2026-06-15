@@ -656,7 +656,7 @@ Status legend: [ ] open, [x] fixed, [-] wontfix.
 
 ## LOW (35)
 
-### 108. [ ] src/webviews/gantt-panel.ts:1294 — removeDraft promise chain has no .catch — failed removal yields an unhandled rejection and a silently desynced UI
+### 108. [x] src/webviews/gantt-panel.ts:1294 — removeDraft promise chain has no .catch — failed removal yields an unhandled rejection and a silently desynced UI
 
 - **dimension:** bug | **verdict:** CONFIRMED
 - **detail:** The removeDraft handler runs `void this._draftModeManager.queue.removeByKey(resourceKey).then(() => {...})` (lines 1294-1312). If removeByKey rejects, the rejection is unhandled (void only discards the promise), the success-only .then never restores the issue's dates or re-renders, and the user gets no feedback — the webview believes the draft was undone while the queue still holds it and the badge count is never refreshed.

@@ -295,6 +295,42 @@ describe("webview panel public flows", () => {
     expect(statusSpy).toHaveBeenCalled();
   });
 
+  it("surfaces an error when removeDraft rejects (no unhandled rejection)", async () => {
+    const mock = createMockPanel();
+    const extensionUri = vscode.Uri.parse("file:///ext");
+    const queue = {
+      count: 1,
+      removeByKey: vi.fn().mockRejectedValue(new Error("queue write failed")),
+      onDidChange: vi.fn(() => ({ dispose: vi.fn() })),
+    };
+    const draftModeManager = {
+      isEnabled: true,
+      queue,
+      onDidChangeEnabled: vi.fn(() => ({ dispose: vi.fn() })),
+      onDidQueueChange: vi.fn(() => ({ dispose: vi.fn() })),
+    } as unknown as import("../../../src/draft-mode/draft-mode-manager").DraftModeManager;
+    const server = {
+      options: { address: "https://redmine.example" },
+    } as unknown as import("../../../src/redmine/redmine-server").RedmineServer;
+    const errorSpy = vi.spyOn(vscode.window, "showErrorMessage").mockResolvedValue(undefined as never);
+
+    GanttPanel.initialize({
+      get: vi.fn((_: string, fallback?: unknown) => fallback),
+      update: vi.fn().mockResolvedValue(undefined),
+    } as unknown as vscode.Memento);
+    GanttPanel.restore(mock.panel, extensionUri, () => server, () => draftModeManager);
+    const panel = GanttPanel.currentPanel as unknown as Record<string, unknown>;
+    panel._issueById = new Map([[101, { id: 101 }]]);
+
+    const handler = mock.getMessageHandler();
+    handler?.({ command: "removeDraft", issueId: 101, startDate: "2026-01-01", dueDate: "2026-01-05" });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(queue.removeByKey).toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("Failed to remove draft"));
+  });
+
   it("routes timesheet webview commands through handlers", async () => {
     const mock = createMockPanel();
     const extensionUri = vscode.Uri.parse("file:///ext");
