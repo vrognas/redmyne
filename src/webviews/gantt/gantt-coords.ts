@@ -48,6 +48,45 @@ export function endExclusiveX(
 }
 
 /**
+ * Resolve a bar's (startX, endX) pixel range from a start/due date pair,
+ * capturing the shared null-fallback + parse + dateToX + endExclusiveX logic
+ * that every bar generator re-derived. Returns null when BOTH dates are
+ * absent (caller emits an empty group); width clamps stay at the call site.
+ *
+ * Fallbacks:
+ *  - start absent → use the due date (single-day bar anchored on due).
+ *  - due absent, start present → use `openEndedMax` when supplied (bars that
+ *    render to the timeline's right edge, e.g. ctx.maxDate), else fall back
+ *    to the start date (single-day bar). This keeps the start-without-due
+ *    open-ended behaviour intact for the issue/payload sites while child
+ *    aggregate ranges (no openEndedMax) collapse to a one-day strip.
+ *
+ * Dates are parsed with `new Date(str)` (UTC) to match the UTC-anchored axis.
+ *
+ * @param startDate     ISO date string or null
+ * @param dueDate       ISO date string or null
+ * @param minDateMs     Timeline start timestamp (ms)
+ * @param maxDateMs     Timeline end timestamp (ms)
+ * @param timelineWidth Total SVG width in pixels
+ * @param openEndedMax  ISO date for the due fallback when only a start exists
+ */
+export function barXRange(
+  startDate: string | null,
+  dueDate: string | null,
+  minDateMs: number,
+  maxDateMs: number,
+  timelineWidth: number,
+  openEndedMax?: string
+): { startX: number; endX: number } | null {
+  if (!startDate && !dueDate) return null;
+  const effStart = startDate ?? dueDate!;
+  const effDue = dueDate ?? (startDate && openEndedMax ? openEndedMax : effStart);
+  const startX = dateToX(new Date(effStart).getTime(), minDateMs, maxDateMs, timelineWidth);
+  const endX = endExclusiveX(new Date(effDue), minDateMs, maxDateMs, timelineWidth);
+  return { startX, endX };
+}
+
+/**
  * Clamp the timeline's left edge to the lookback horizon (today minus
  * lookbackYears). One ancient still-open issue must not stretch the axis
  * years into the past — bars starting before the horizon simply render

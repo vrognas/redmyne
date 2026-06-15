@@ -8,7 +8,7 @@ import type { GanttRow, GanttIssue } from "../gantt-model";
 import { escapeAttr, escapeHtml } from "../gantt-html-escape";
 import { parseLocalDate, formatLocalDate } from "../../utilities/date-utils";
 import type { WeeklySchedule } from "../../utilities/flexibility-calculator";
-import { dateToX, endExclusiveX } from "./gantt-coords";
+import { dateToX, barXRange } from "./gantt-coords";
 import { remainingHours } from "../../utilities/remaining-work";
 
 // ============================================================================
@@ -483,16 +483,18 @@ export function generateIssueBar(
   const isParent = row.isParent ?? false;
   const hasOnlyStart = Boolean(issue.start_date && !issue.due_date);
   const maxDateStr = ctx.maxDate.toISOString().slice(0, 10);
-  const startDate = issue.start_date ?? issue.due_date!;
+  // Open-ended bars (start, no due) render to the timeline's right edge.
   const dueDate = issue.due_date ?? (hasOnlyStart ? maxDateStr : issue.start_date!);
 
-  const start = new Date(startDate);
+  // `end` is also the inclusive due date for the isPast/isOverdue checks below.
   const end = new Date(dueDate);
 
   const minMs = ctx.minDate.getTime();
   const maxMs = ctx.maxDate.getTime();
-  const startX = dateToX(start.getTime(), minMs, maxMs, ctx.timelineWidth);
-  const endX = endExclusiveX(end, minMs, maxMs, ctx.timelineWidth);
+  const { startX, endX } = barXRange(
+    issue.start_date ?? null, issue.due_date ?? null,
+    minMs, maxMs, ctx.timelineWidth, maxDateStr
+  )!;
   const width = Math.max(10, endX - startX);
 
   const effectiveStatus = issue.isClosed ? "completed" : (issue.status ?? "unknown");
@@ -529,17 +531,15 @@ function generateProjectAggregateBar(
   const stripH = Math.max(4, Math.round(ctx.barContentHeight * 0.4));
   const stripY = ctx.barPadding + (ctx.barContentHeight - stripH) / 2;
 
+  const minMs = ctx.minDate.getTime();
+  const maxMs = ctx.maxDate.getTime();
   const aggregateBars = row.childDateRanges
     .filter(range => range.startDate || range.dueDate)
     .map(range => {
-      const startDate = range.startDate ?? range.dueDate!;
-      const dueDate = range.dueDate ?? range.startDate!;
-      const start = new Date(startDate);
-      const end = new Date(dueDate);
-      const minMs = ctx.minDate.getTime();
-      const maxMs = ctx.maxDate.getTime();
-      const startX = dateToX(start.getTime(), minMs, maxMs, ctx.timelineWidth);
-      const endX = endExclusiveX(end, minMs, maxMs, ctx.timelineWidth);
+      const { startX, endX } = barXRange(
+        range.startDate ?? null, range.dueDate ?? null,
+        minMs, maxMs, ctx.timelineWidth
+      )!;
       const width = Math.max(4, endX - startX);
 
       return `<rect class="aggregate-bar" x="${startX}" y="${stripY}" width="${width}" height="${stripH}" fill="var(--vscode-descriptionForeground)" opacity="0.15" rx="2" ry="2"><title>${escapeAttr(tooltip)}</title></rect>`;
@@ -565,17 +565,15 @@ function generateTimeGroupAggregateBar(
     : row.timeGroup === "later" ? "var(--vscode-charts-green)"
     : "var(--vscode-descriptionForeground)";
 
+  const minMs = ctx.minDate.getTime();
+  const maxMs = ctx.maxDate.getTime();
   const aggregateBars = row.childDateRanges
     .filter(range => range.startDate || range.dueDate)
     .map(range => {
-      const startDate = range.startDate ?? range.dueDate!;
-      const dueDate = range.dueDate ?? range.startDate!;
-      const start = new Date(startDate);
-      const end = new Date(dueDate);
-      const minMs = ctx.minDate.getTime();
-      const maxMs = ctx.maxDate.getTime();
-      const startX = dateToX(start.getTime(), minMs, maxMs, ctx.timelineWidth);
-      const endX = endExclusiveX(end, minMs, maxMs, ctx.timelineWidth);
+      const { startX, endX } = barXRange(
+        range.startDate ?? null, range.dueDate ?? null,
+        minMs, maxMs, ctx.timelineWidth
+      )!;
       const width = Math.max(4, endX - startX);
 
       return `<rect class="aggregate-bar" x="${startX}" y="${stripY}" width="${width}" height="${stripH}" fill="${timeGroupColor}" opacity="0.15" rx="2" ry="2"/>`;
@@ -1125,12 +1123,16 @@ export function buildRowsPayload(
     let barEndX: number | null = null;
     if (row.type === "issue" && row.issue && (row.issue.start_date || row.issue.due_date)) {
       const issue = row.issue;
-      const hasOnlyStart = Boolean(issue.start_date && !issue.due_date);
-      const startDate = issue.start_date ?? issue.due_date!;
-      // Open-ended bars render to the timeline's right edge (maxDate).
-      const dueDate = issue.due_date ?? (hasOnlyStart ? ctx.maxDate.toISOString().slice(0, 10) : issue.start_date!);
-      barStartX = dateToX(new Date(startDate).getTime(), ctx.minDate.getTime(), ctx.maxDate.getTime(), ctx.timelineWidth);
-      barEndX = endExclusiveX(new Date(dueDate), ctx.minDate.getTime(), ctx.maxDate.getTime(), ctx.timelineWidth);
+      // Open-ended bars render to the timeline's right edge (maxDate). Shares
+      // the exact fallback logic with generateIssueBar via barXRange so the
+      // unmounted-row geometry can't drift from the mounted bar.
+      const range = barXRange(
+        issue.start_date ?? null, issue.due_date ?? null,
+        ctx.minDate.getTime(), ctx.maxDate.getTime(), ctx.timelineWidth,
+        ctx.maxDate.toISOString().slice(0, 10)
+      )!;
+      barStartX = range.startX;
+      barEndX = range.endX;
     }
     return {
       key: row.collapseKey,

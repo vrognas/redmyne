@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   dateToX,
   endExclusiveX,
+  barXRange,
   clampMinDateToLookback,
 } from "../../../src/webviews/gantt/gantt-coords";
 
@@ -44,6 +45,31 @@ describe("endExclusiveX", () => {
     const original = end.getTime();
     endExclusiveX(end, minMs, maxMs, width);
     expect(end.getTime()).toBe(original);
+  });
+});
+
+describe("barXRange", () => {
+  const minMs = new Date("2026-01-01T00:00:00Z").getTime();
+  const maxMs = new Date("2026-01-11T00:00:00Z").getTime(); // 10-day range
+  const width = 1000;
+
+  it("resolves a normal start/due pair to dateToX + endExclusiveX", () => {
+    const r = barXRange("2026-01-03", "2026-01-06", minMs, maxMs, width)!;
+    expect(r.startX).toBe(dateToX(new Date("2026-01-03").getTime(), minMs, maxMs, width));
+    expect(r.endX).toBe(endExclusiveX(new Date("2026-01-06"), minMs, maxMs, width));
+    expect(r.endX).toBeGreaterThan(r.startX);
+  });
+
+  it("extends an open-ended bar (start, no due) to openEndedMax, else 1 day", () => {
+    const maxStr = "2026-01-11";
+    const open = barXRange("2026-01-03", null, minMs, maxMs, width, maxStr)!;
+    // Matches a bar that closes exactly at maxDate.
+    expect(open.endX).toBe(barXRange("2026-01-03", maxStr, minMs, maxMs, width)!.endX);
+    // Without openEndedMax the due falls back to the start (single-day strip).
+    const oneDay = barXRange("2026-01-03", null, minMs, maxMs, width)!;
+    expect(oneDay.endX).toBe(endExclusiveX(new Date("2026-01-03"), minMs, maxMs, width));
+    // both dates absent → null (caller emits an empty group)
+    expect(barXRange(null, null, minMs, maxMs, width)).toBeNull();
   });
 });
 
