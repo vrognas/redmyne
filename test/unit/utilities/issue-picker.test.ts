@@ -324,6 +324,43 @@ describe("issue-picker", () => {
     expect(fresh.size).toBe(0);
   });
 
+  it("issueToQuickPickItem builds common shape and honors opts variations", async () => {
+    const { __testIssuePicker } = await import("../../../src/utilities/issue-picker");
+    const issue = createIssue({
+      id: 42,
+      subject: "Fix login",
+      project: { id: 10, name: "Project A" },
+      assigned_to: { id: 2, name: "Alice" },
+    });
+    const projectPathMap = new Map<number, string>([[10, "ClientA: Project A"]]);
+
+    // Common shape: no icon/tag → bare "#id subject" label, plain assignee, path detail.
+    const base = __testIssuePicker.issueToQuickPickItem(issue, projectPathMap);
+    expect(base.label).toBe("#42 Fix login");
+    expect(base.description).toBe("Alice");
+    expect(base.detail).toBe("ClientA: Project A");
+    expect(base.issue).toBe(issue);
+
+    // Variations: icon prefix, description tag, disabled flag.
+    const closed = __testIssuePicker.issueToQuickPickItem(issue, projectPathMap, {
+      icon: "$(archive)",
+      tag: " · Closed",
+      disabled: true,
+    });
+    expect(closed.label).toBe("$(archive) #42 Fix login");
+    expect(closed.description).toBe("Alice · Closed");
+    expect(closed.disabled).toBe(true);
+
+    // Detail fallback + Unassigned: no assignee, no project name → opts.fallback.
+    const orphan = { id: 7, subject: "Orphan", assigned_to: undefined, project: undefined } as unknown as Issue;
+    const fellBack = __testIssuePicker.issueToQuickPickItem(orphan, new Map(), {
+      fallback: "Unknown",
+    });
+    expect(fellBack.label).toBe("#7 Orphan");
+    expect(fellBack.description).toBe("Unassigned");
+    expect(fellBack.detail).toBe("Unknown");
+  });
+
   it("pickIssue returns selected issue and records recents", async () => {
     const vscodeApi = await import("vscode");
     const recentIssues = await import("../../../src/utilities/recent-issues");

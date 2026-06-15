@@ -165,6 +165,47 @@ async function getTimeTrackingStatusCached(
 }
 
 /**
+ * Build a single QuickPick item for an issue. Centralizes the shared shape
+ * (label `[icon ]#id subject`, description `assignee[tag]`, project-path detail)
+ * so the ~dozen call sites stay consistent.
+ *
+ * @param opts.icon      Codicon prefix (e.g. "$(history)"); omitted → no prefix
+ * @param opts.tag       Trailing description tag (e.g. " · closed"); appended raw
+ * @param opts.detail    Pre-resolved detail string; overrides projectPathMap lookup
+ * @param opts.fallback  Detail fallback when project path + name are unavailable
+ * @param opts.disabled  Mark item as non-selectable
+ * @param opts.alwaysShow Bypass VSCode's built-in filtering
+ */
+function issueToQuickPickItem(
+  issue: Issue,
+  projectPathMap: Map<number, string>,
+  opts: {
+    icon?: string;
+    tag?: string;
+    detail?: string;
+    fallback?: string;
+    disabled?: boolean;
+    alwaysShow?: boolean;
+  } = {}
+): IssueQuickPickItem {
+  const prefix = opts.icon ? `${opts.icon} ` : "";
+  const detail =
+    opts.detail ??
+    projectPathMap.get(issue.project?.id ?? 0) ??
+    issue.project?.name ??
+    opts.fallback;
+  const item: IssueQuickPickItem = {
+    label: `${prefix}#${issue.id} ${issue.subject}`,
+    description: `${issue.assigned_to?.name ?? "Unassigned"}${opts.tag ?? ""}`,
+    detail,
+    issue,
+  };
+  if (opts.disabled !== undefined) item.disabled = opts.disabled;
+  if (opts.alwaysShow !== undefined) item.alwaysShow = opts.alwaysShow;
+  return item;
+}
+
+/**
  * Build QuickPick items from categorized issue lists
  */
 function buildIssuePickerItems(
@@ -193,52 +234,46 @@ function buildIssuePickerItems(
       const isClosed = issue.status?.is_closed ?? false;
       const icon = isClosed ? "$(archive)" : "$(history)";
       const statusTag = isClosed ? ` · ${issue.status?.name ?? "closed"}` : "";
-      items.push({
-        label: `${icon} #${issue.id} ${issue.subject}`,
-        description: `${issue.assigned_to?.name ?? "Unassigned"}${statusTag}`,
-        detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
-        issue,
-        disabled: false,
-      });
+      items.push(
+        issueToQuickPickItem(issue, projectPathMap, {
+          icon,
+          tag: statusTag,
+          disabled: false,
+        })
+      );
     }
   }
 
   if (otherOpen.length > 0) {
     items.push({ label: "My Open", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
     for (const issue of otherOpen) {
-      items.push({
-        label: `#${issue.id} ${issue.subject}`,
-        description: issue.assigned_to?.name ?? "Unassigned",
-        detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
-        issue,
-        disabled: false,
-      });
+      items.push(issueToQuickPickItem(issue, projectPathMap, { disabled: false }));
     }
   }
 
   if (otherClosed.length > 0) {
     items.push({ label: "My Closed", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
     for (const issue of otherClosed.slice(0, 20)) {
-      items.push({
-        label: `$(archive) #${issue.id} ${issue.subject}`,
-        description: `${issue.assigned_to?.name ?? "Unassigned"} · ${issue.status?.name ?? "closed"}`,
-        detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
-        issue,
-        disabled: false,
-      });
+      items.push(
+        issueToQuickPickItem(issue, projectPathMap, {
+          icon: "$(archive)",
+          tag: ` · ${issue.status?.name ?? "closed"}`,
+          disabled: false,
+        })
+      );
     }
   }
 
   if (nonTrackable.length > 0) {
     items.push({ label: "No Time Tracking", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
     for (const issue of nonTrackable) {
-      items.push({
-        label: `$(circle-slash) #${issue.id} ${issue.subject}`,
-        description: issue.assigned_to?.name ?? "Unassigned",
-        detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name ?? "Unknown",
-        issue,
-        disabled: true,
-      });
+      items.push(
+        issueToQuickPickItem(issue, projectPathMap, {
+          icon: "$(circle-slash)",
+          fallback: "Unknown",
+          disabled: true,
+        })
+      );
     }
   }
 
@@ -828,13 +863,14 @@ export async function pickIssueWithSearch(
           const isClosed = issue.status?.is_closed ?? false;
           const icon = isClosed ? "$(archive)" : isMine ? "$(account)" : "$(search)";
           const tagStr = isClosed ? " (closed)" : "";
-          resultItems.push({
-            label: `${icon} #${issue.id} ${issue.subject}`,
-            description: `${issue.assigned_to?.name ?? "Unassigned"}${tagStr}`,
-            detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name ?? "",
-            issue,
-            alwaysShow: true,
-          });
+          resultItems.push(
+            issueToQuickPickItem(issue, projectPathMap, {
+              icon,
+              tag: tagStr,
+              fallback: "",
+              alwaysShow: true,
+            })
+          );
         }
 
         const resultIds = new Set(limitedResults.map(i => i.id));
@@ -1094,25 +1130,15 @@ export async function pickIssue(
     if (recentIssues.length > 0) {
       baseItems.push({ label: "Recent", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
       for (const issue of recentIssues) {
-        baseItems.push({
-          label: `$(history) #${issue.id} ${issue.subject}`,
-          description: issue.assigned_to?.name ?? "Unassigned",
-          detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
-          issue,
-          disabled: false,
-        });
+        baseItems.push(
+          issueToQuickPickItem(issue, projectPathMap, { icon: "$(history)", disabled: false })
+        );
       }
     }
     if (otherIssues.length > 0) {
       baseItems.push({ label: "All Issues", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
       for (const issue of otherIssues) {
-        baseItems.push({
-          label: `#${issue.id} ${issue.subject}`,
-          description: issue.assigned_to?.name ?? "Unassigned",
-          detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
-          issue,
-          disabled: false,
-        });
+        baseItems.push(issueToQuickPickItem(issue, projectPathMap, { disabled: false }));
       }
     }
   } else {
@@ -1132,37 +1158,27 @@ export async function pickIssue(
     if (recentTrackable.length > 0) {
       baseItems.push({ label: "Recent", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
       for (const issue of recentTrackable) {
-        baseItems.push({
-          label: `$(history) #${issue.id} ${issue.subject}`,
-          description: issue.assigned_to?.name ?? "Unassigned",
-          detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
-          issue,
-          disabled: false,
-        });
+        baseItems.push(
+          issueToQuickPickItem(issue, projectPathMap, { icon: "$(history)", disabled: false })
+        );
       }
     }
     if (otherTrackable.length > 0) {
       baseItems.push({ label: "Assigned", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
       for (const issue of otherTrackable) {
-        baseItems.push({
-          label: `#${issue.id} ${issue.subject}`,
-          description: issue.assigned_to?.name ?? "Unassigned",
-          detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
-          issue,
-          disabled: false,
-        });
+        baseItems.push(issueToQuickPickItem(issue, projectPathMap, { disabled: false }));
       }
     }
     if (nonTrackableIssues.length > 0) {
       baseItems.push({ label: "No Time Tracking", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
       for (const issue of nonTrackableIssues) {
-        baseItems.push({
-          label: `$(circle-slash) #${issue.id} ${issue.subject}`,
-          description: issue.assigned_to?.name ?? "Unassigned",
-          detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name ?? "Unknown",
-          issue,
-          disabled: true,
-        });
+        baseItems.push(
+          issueToQuickPickItem(issue, projectPathMap, {
+            icon: "$(circle-slash)",
+            fallback: "Unknown",
+            disabled: true,
+          })
+        );
       }
     }
   }
@@ -1248,23 +1264,20 @@ export async function pickIssue(
               const hasTimeTracking = skipTimeTrackingCheck || (projectId ? timeTrackingByProject.get(projectId) : false);
               const projectPath = projectPathMap.get(projectId ?? 0) ?? issue.project?.name ?? "";
               if (!hasTimeTracking) {
-                return {
-                  label: `$(circle-slash) #${issue.id} ${issue.subject}`,
-                  description: `${issue.assigned_to?.name ?? "Unassigned"} (no time tracking)`,
+                return issueToQuickPickItem(issue, projectPathMap, {
+                  icon: "$(circle-slash)",
+                  tag: " (no time tracking)",
                   detail: projectPath,
-                  issue,
                   disabled: true,
                   alwaysShow: true,
-                };
+                });
               }
-              const icon = isAssigned ? "$(account)" : "$(search)";
-              return {
-                label: `${icon} #${issue.id} ${issue.subject}`,
-                description: `${issue.assigned_to?.name ?? "Unassigned"}${isAssigned ? " (assigned)" : ""}`,
+              return issueToQuickPickItem(issue, projectPathMap, {
+                icon: isAssigned ? "$(account)" : "$(search)",
+                tag: isAssigned ? " (assigned)" : "",
                 detail: projectPath,
-                issue,
                 alwaysShow: true,  // Bypass VSCode's built-in filter
-              };
+              });
             });
 
         // Filter baseItems to exclude issues already in search results
@@ -1378,4 +1391,5 @@ export const __testIssuePicker = {
   showActivityPicker,
   getTimeTrackingStatusCached,
   buildIssuePickerItems,
+  issueToQuickPickItem,
 };

@@ -982,6 +982,66 @@ describe("gantt panel private coverage", () => {
     expect(callerCache.get(1)).toBe(sentinel);
     expect([...callerCache.entries()]).toEqual([...callerSnapshot.entries()]);
   });
+
+  it("discards a superseded _loadContributions instead of writing stale data", async () => {
+    const mock = createMockPanel();
+    const extensionUri = vscode.Uri.parse("file:///ext");
+
+    // Deferred FTE fetch: the slow load blocks here until we resolve it, giving
+    // a newer load (setLookback-style _supplementalLoadId bump) time to win.
+    let resolveFte!: (m: Map<number, number>) => void;
+    const ftePromise = new Promise<Map<number, number>>((res) => {
+      resolveFte = res;
+    });
+    const server = {
+      options: { address: "https://redmine.example" },
+      getTimeEntriesForIssues: vi.fn().mockResolvedValue([
+        { issue_id: 2, issue: { id: 2 }, activity_id: 1, hours: "2", comments: "#1 help", spent_on: "2026-02-02" },
+      ]),
+      getUserFteBatch: vi.fn().mockReturnValue(ftePromise),
+    };
+
+    GanttPanel.restore(
+      mock.panel,
+      extensionUri,
+      () => server as unknown as import("../../../src/redmine/redmine-server").RedmineServer
+    );
+    const panel = GanttPanel.currentPanel as any;
+    panel._viewFocus = "project";
+    panel._lookbackYears = null;
+    panel._currentUserId = 999;
+    panel._issues = [
+      createIssue({ id: 1, assigneeId: 7, assigneeName: "Alice", start_date: "2025-12-01", spent_hours: 3 }),
+      createIssue({ id: 2, assigneeId: 8, assigneeName: "Bob", start_date: "2025-11-01", spent_hours: 4 }),
+    ];
+
+    vi.spyOn(adHocTracker, "getAll").mockReturnValue([2]);
+    vi.spyOn(adHocTracker, "isAdHoc").mockImplementation((issueId: number) => issueId === 2);
+
+    // Start the slow (earlier) load; it parks on the deferred getUserFteBatch.
+    panel._supplementalLoadId = 11;
+    const slowLoad = panel._loadContributions(11);
+    await Promise.resolve(); // let it pass the time-entries await and reach the FTE await
+    expect(server.getUserFteBatch).toHaveBeenCalled();
+
+    // A newer load supersedes it (what setLookback -> _refreshSupplementalData does:
+    // bump _supplementalLoadId) and writes the authoritative newer caches.
+    panel._supplementalLoadId = 12;
+    const newerFlex = { remaining: 7 } as unknown as import("../../../src/utilities/flexibility").FlexibilityScore;
+    panel._flexibilityCache = new Map<number, any>([[1, newerFlex]]);
+    panel._userFteCache = new Map<number, number>([[7, 0.99]]);
+    panel._cachedHierarchy = ["newer-hierarchy"];
+
+    // Now let the stale load resolve its FTE fetch and finish.
+    resolveFte(new Map([[7, 0.5]]));
+    const staleResult = await slowLoad;
+
+    // The superseded load must bail and leave the newer caches untouched.
+    expect(staleResult).toBe(false);
+    expect(panel._flexibilityCache.get(1)).toBe(newerFlex);
+    expect(panel._userFteCache.get(7)).toBe(0.99);
+    expect(panel._cachedHierarchy).toEqual(["newer-hierarchy"]);
+  });
 });
 
 describe("gantt project-view root rows (skipTopProjectRow)", () => {

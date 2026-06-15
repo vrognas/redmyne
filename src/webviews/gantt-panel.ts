@@ -983,6 +983,10 @@ export class GanttPanel {
       )];
       if (uniqueAssigneeIds.length > 0 && this._server) {
         const fteMap = await this._server.getUserFteBatch(uniqueAssigneeIds);
+        // Re-validate after the second await: a load superseded mid-flight
+        // (e.g. setLookback bumping _supplementalLoadId) must NOT clobber the
+        // _userFteCache / _flexibilityCache / _cachedHierarchy the newer load wrote.
+        if (loadId !== this._supplementalLoadId) return false;
         for (const [id, fte] of fteMap) {
           this._userFteCache.set(id, fte);
         }
@@ -1364,9 +1368,12 @@ export class GanttPanel {
       case "setLookback":
         this._lookbackYears = parseLookbackYears(message.years, this._lookbackYears);
         GanttPanel._globalState?.update(LOOKBACK_YEARS_KEY, this._lookbackYears);
-        // Clear contribution cache and re-fetch with new lookback
+        // Clear contribution display cache and re-fetch with new lookback.
+        // Do NOT force-clear _contributionsLoading here: _refreshSupplementalData
+        // bumps _supplementalLoadId, which invalidates any in-flight load at its
+        // post-await re-checks. Resetting the duplicate-fetch guard instead let a
+        // slow earlier load interleave and overwrite the newer load's caches.
         this._contributionData = undefined;
-        this._contributionsLoading = false;
         this._updateContent();
         void this._refreshSupplementalData();
         break;
