@@ -415,18 +415,6 @@ export function registerTimeEntryCommands(
         const node = args[0] as TimeEntryNode;
         issueId = node._entry?.issue_id ?? node._entry?.issue?.id;
       }
-      // Handle object with issue_id
-      else if (args[0] && typeof args[0] === "object" && "issue_id" in args[0]) {
-        const params = args[0] as { issue_id: number };
-        issueId = params.issue_id;
-      }
-      // Handle string
-      else if (typeof args[0] === "string") {
-        const parsed = parseInt(args[0], 10);
-        if (!isNaN(parsed)) {
-          issueId = parsed;
-        }
-      }
 
       const resolvedIssueId = getIssueIdOrShowError({ id: issueId });
       if (!resolvedIssueId) return;
