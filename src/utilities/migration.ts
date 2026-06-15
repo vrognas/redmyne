@@ -71,19 +71,20 @@ async function migrateSecretKey(
   oldKey: string,
   newKey: string
 ): Promise<boolean> {
-  try {
-    const oldValue = await secrets.get(oldKey);
-    if (!oldValue) return false;
+  // No try/catch: a SecretStorage failure must propagate so the caller can
+  // skip the version bump and retry next activation. Swallowing it here
+  // (returning false) was indistinguishable from "nothing to migrate" and
+  // permanently stranded the old API key when the OS keychain was briefly
+  // locked/unavailable at first post-upgrade launch.
+  const oldValue = await secrets.get(oldKey);
+  if (!oldValue) return false;
 
-    const newValue = await secrets.get(newKey);
-    if (newValue) return false; // Don't overwrite
+  const newValue = await secrets.get(newKey);
+  if (newValue) return false; // Don't overwrite
 
-    await secrets.store(newKey, oldValue);
-    await secrets.delete(oldKey);
-    return true;
-  } catch {
-    return false;
-  }
+  await secrets.store(newKey, oldValue);
+  await secrets.delete(oldKey);
+  return true;
 }
 
 /**
@@ -108,10 +109,18 @@ export async function runMigration(
     }
   }
 
-  // Migrate secrets
+  // Migrate secrets. A transient SecretStorage failure (e.g. locked keychain
+  // on first post-upgrade launch) must NOT mark the migration complete — else
+  // the old API key never gets copied and the user appears unconfigured
+  // forever. Track success and gate the version bump below so it retries.
+  let secretsMigrated = true;
   for (const [oldKey, newKey] of SECRET_MIGRATIONS) {
-    if (await migrateSecretKey(context.secrets, oldKey, newKey)) {
-      migratedCount++;
+    try {
+      if (await migrateSecretKey(context.secrets, oldKey, newKey)) {
+        migratedCount++;
+      }
+    } catch {
+      secretsMigrated = false;
     }
   }
 
@@ -133,11 +142,15 @@ export async function runMigration(
     }
   }
 
-  // Mark migration complete
-  await context.globalState.update(
-    MIGRATION_VERSION_KEY,
-    CURRENT_MIGRATION_VERSION
-  );
+  // Mark migration complete only if no secret migration failed; the
+  // globalState/config steps are idempotent (they clear the old key once
+  // moved), so a retry next activation re-attempts only the stranded secret.
+  if (secretsMigrated) {
+    await context.globalState.update(
+      MIGRATION_VERSION_KEY,
+      CURRENT_MIGRATION_VERSION
+    );
+  }
 
   if (migratedCount > 0) {
     vscode.window.showInformationMessage(

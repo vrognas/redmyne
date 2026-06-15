@@ -78,6 +78,24 @@ describe("WorkloadStatusBar", () => {
     bar.dispose();
   });
 
+  it("hides the status bar and does not throw when the fetch fails", async () => {
+    const deps = {
+      fetchIssuesIfNeeded: vi.fn().mockRejectedValue(new Error("network down")),
+      getMonthlySchedules: vi.fn().mockReturnValue(undefined),
+      getUserFte: vi.fn().mockReturnValue(undefined),
+    };
+
+    const bar = new WorkloadStatusBar(deps as never);
+    await expect(bar.update()).resolves.toBeUndefined();
+
+    const item = vi.mocked(vscode.window.createStatusBarItem).mock
+      .results[0].value as StatusBarItemMock;
+    expect(item.hide).toHaveBeenCalledTimes(1);
+    expect(item.show).not.toHaveBeenCalled();
+
+    bar.dispose();
+  });
+
   it("renders workload text and tooltip details with schedule/FTE info", async () => {
     const currentMonthKey = getMonthKey(new Date());
     const deps = {

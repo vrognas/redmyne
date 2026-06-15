@@ -54,7 +54,15 @@ export class WorkloadStatusBar implements vscode.Disposable {
   async update(): Promise<void> {
     if (this.disposed || !this.statusBar) return;
 
-    const issues = await this.deps.fetchIssuesIfNeeded();
+    let issues: Issue[];
+    try {
+      issues = await this.deps.fetchIssuesIfNeeded();
+    } catch {
+      // Transient network/auth failure: degrade gracefully by hiding the bar
+      // rather than rejecting (every caller invokes this as `void update()`).
+      if (!this.disposed) this.statusBar?.hide();
+      return;
+    }
 
     if (this.disposed || !this.statusBar) return;
 

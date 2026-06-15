@@ -126,6 +126,20 @@ describe("migration", () => {
       expect(context._stateStore["redmyne.migrationVersion"]).toBe(2);
     });
 
+    it("does not bump version when secret migration throws (so it retries)", async () => {
+      const context = createMockContext();
+      context._secretStore["redmine:global:apiKey:v2"] = "stranded_key";
+      // First post-upgrade launch with a locked/unavailable OS keychain
+      vi.mocked(context.secrets.get).mockRejectedValueOnce(new Error("keychain locked"));
+
+      await runMigration(context);
+
+      // Version must stay unbumped so next activation retries the secret copy
+      expect(context._stateStore["redmyne.migrationVersion"]).toBeUndefined();
+      // The stranded key must NOT be deleted (it was never copied across)
+      expect(context.secrets.delete).not.toHaveBeenCalled();
+    });
+
     it("handles empty migration gracefully", async () => {
       const context = createMockContext();
 
