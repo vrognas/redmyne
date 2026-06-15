@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   buildMyWorkHierarchy,
   flattenHierarchy,
+  makeIssueNode,
   HierarchyNode,
 } from "../../../src/utilities/hierarchy-builder";
 import type { Issue } from "../../../src/redmine/models/issue";
@@ -35,6 +36,33 @@ function createMockIssue(overrides: Partial<Issue> & { id: number }): Issue {
 function getIssueNodes(result: HierarchyNode[]): HierarchyNode[] {
   return result.flatMap(group => group.children);
 }
+
+describe("makeIssueNode", () => {
+  it("builds an issue node with shared defaults and merges extras", () => {
+    const issue = createMockIssue({ id: 7, subject: "Build factory" });
+
+    // Without extras
+    expect(makeIssueNode(issue, 2, [], "parent-1")).toEqual({
+      type: "issue",
+      id: 7,
+      label: "Build factory",
+      depth: 2,
+      issue,
+      children: [],
+      collapseKey: "issue-7",
+      parentKey: "parent-1",
+    });
+
+    // With extras (My Work fields)
+    const withExtras = makeIssueNode(issue, 1, [], "time-group-later", {
+      projectName: "Alpha",
+      isExternal: true,
+    });
+    expect(withExtras.projectName).toBe("Alpha");
+    expect(withExtras.isExternal).toBe(true);
+    expect(withExtras.collapseKey).toBe("issue-7");
+  });
+});
 
 describe("buildMyWorkHierarchy", () => {
   const emptyCache = new Map<number, FlexibilityScore | null>();

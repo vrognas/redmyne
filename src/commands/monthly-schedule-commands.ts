@@ -31,6 +31,20 @@ export function registerMonthlyScheduleCommands(
   context: vscode.ExtensionContext,
   deps: MonthlyScheduleCommandDeps
 ): void {
+  // Shared 5-step persist sequence used by every mutation path.
+  // Caller mutates `overrides` first (assign or delete), then calls this.
+  const persistSchedules = async (
+    overrides: MonthlyScheduleOverrides,
+    message: string,
+    durationMs: number
+  ): Promise<void> => {
+    deps.setOverrides(overrides);
+    await saveMonthlySchedules(context.globalState, overrides);
+    deps.setTreeSchedules(overrides);
+    showStatusBarMessage(message, durationMs);
+    deps.refreshTree();
+  };
+
   context.subscriptions.push(
     vscode.commands.registerCommand("redmyne.workingHours.editMonth", async () => {
       // Get default schedule from config
@@ -94,27 +108,21 @@ export function registerMonthlyScheduleCommands(
 
       if (selectedAction.action === "clear") {
         delete overrides[selectedMonth.key];
-        deps.setOverrides(overrides);
-        await saveMonthlySchedules(context.globalState, overrides);
-        deps.setTreeSchedules(overrides);
-        showStatusBarMessage(
+        await persistSchedules(
+          overrides,
           `$(check) ${formatMonthKeyDisplay(selectedMonth.key)} reset to default`,
           2000
         );
-        deps.refreshTree();
         return;
       }
 
       if (selectedAction.action === "copy") {
         overrides[selectedMonth.key] = { ...defaultSchedule };
-        deps.setOverrides(overrides);
-        await saveMonthlySchedules(context.globalState, overrides);
-        deps.setTreeSchedules(overrides);
-        showStatusBarMessage(
+        await persistSchedules(
+          overrides,
           `$(check) ${formatMonthKeyDisplay(selectedMonth.key)} set to default`,
           2000
         );
-        deps.refreshTree();
         return;
       }
 
@@ -146,11 +154,7 @@ export function registerMonthlyScheduleCommands(
           );
           if (save === "Save") {
             overrides[selectedMonth.key] = newSchedule;
-            deps.setOverrides(overrides);
-            await saveMonthlySchedules(context.globalState, overrides);
-            deps.setTreeSchedules(overrides);
-            showStatusBarMessage("$(check) Partial changes saved", 2000);
-            deps.refreshTree();
+            await persistSchedules(overrides, "$(check) Partial changes saved", 2000);
           }
           return;
         }
@@ -160,17 +164,14 @@ export function registerMonthlyScheduleCommands(
 
       // Save complete schedule
       overrides[selectedMonth.key] = newSchedule;
-      deps.setOverrides(overrides);
-      await saveMonthlySchedules(context.globalState, overrides);
-      deps.setTreeSchedules(overrides);
 
       const weeklyTotal = calculateWeeklyTotal(newSchedule);
       const monthlyTotal = calculateMonthlyTotal(selectedMonth.key, newSchedule);
-      showStatusBarMessage(
+      await persistSchedules(
+        overrides,
         `$(check) ${formatMonthKeyDisplay(selectedMonth.key)}: ${weeklyTotal}h/week, ${monthlyTotal}h total`,
         3000
       );
-      deps.refreshTree();
     })
   );
 }

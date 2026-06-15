@@ -71,6 +71,31 @@ function collectChildDateRanges(node: HierarchyNode): ChildDateRange[] {
   return ranges;
 }
 
+/**
+ * Build an issue HierarchyNode with shared defaults.
+ * Callers pass only what varies (depth, children, parentKey); `extras`
+ * carries view-specific fields (e.g. My Work's projectName/isExternal).
+ */
+export function makeIssueNode(
+  issue: Issue,
+  depth: number,
+  children: HierarchyNode[],
+  parentKey: string | null,
+  extras?: Partial<HierarchyNode>
+): HierarchyNode {
+  return {
+    type: "issue",
+    id: issue.id,
+    label: issue.subject,
+    depth,
+    issue,
+    children,
+    collapseKey: `issue-${issue.id}`,
+    parentKey,
+    ...extras,
+  };
+}
+
 export interface HierarchyOptions {
   /** Group issues by project (adds project header nodes) */
   groupByProject?: boolean;
@@ -311,16 +336,7 @@ async function buildFlatHierarchy(
     if (!issue.parent?.id) {
       // Root issue
       const children = buildIssueTreeFromMap(issue.id, childrenByParent, issueMap, flexibilityCache, `issue-${issue.id}`, 1);
-      topLevel.push({
-        type: "issue",
-        id: issue.id,
-        label: issue.subject,
-        depth: 0,
-        issue,
-        children,
-        collapseKey: `issue-${issue.id}`,
-        parentKey: null,
-      });
+      topLevel.push(makeIssueNode(issue, 0, children, null));
     } else if (issueMap.has(issue.parent.id)) {
       // Parent in list - will be child, skip
       continue;
@@ -328,29 +344,11 @@ async function buildFlatHierarchy(
       // Has container - add to container's children
       const container = containers.get(issue.parent.id)!;
       const children = buildIssueTreeFromMap(issue.id, childrenByParent, issueMap, flexibilityCache, `issue-${issue.id}`, 1);
-      container.children.push({
-        type: "issue",
-        id: issue.id,
-        label: issue.subject,
-        depth: 1,
-        issue,
-        children,
-        collapseKey: `issue-${issue.id}`,
-        parentKey: container.collapseKey,
-      });
+      container.children.push(makeIssueNode(issue, 1, children, container.collapseKey));
     } else {
       // Orphan - show at root
       const children = buildIssueTreeFromMap(issue.id, childrenByParent, issueMap, flexibilityCache, `issue-${issue.id}`, 1);
-      topLevel.push({
-        type: "issue",
-        id: issue.id,
-        label: issue.subject,
-        depth: 0,
-        issue,
-        children,
-        collapseKey: `issue-${issue.id}`,
-        parentKey: null,
-      });
+      topLevel.push(makeIssueNode(issue, 0, children, null));
     }
   }
 
@@ -401,16 +399,7 @@ function buildIssueTree(
       const hasChildren = childrenByParent.has(issue.id) && childrenByParent.get(issue.id)!.length > 0;
       const children = hasChildren ? buildChildren(issue.id, issueKey, d + 1) : [];
 
-      return {
-        type: "issue" as const,
-        id: issue.id,
-        label: issue.subject,
-        depth: d,
-        issue,
-        children,
-        collapseKey: issueKey,
-        parentKey: pKey,
-      };
+      return makeIssueNode(issue, d, children, pKey);
     });
   }
 
@@ -432,16 +421,7 @@ function buildIssueTreeFromMap(
   return childIssues.map((issue) => {
     const issueKey = `issue-${issue.id}`;
     const children = buildIssueTreeFromMap(issue.id, childrenByParent, issueMap, flexibilityCache, issueKey, depth + 1);
-    return {
-      type: "issue" as const,
-      id: issue.id,
-      label: issue.subject,
-      depth,
-      issue,
-      children,
-      collapseKey: issueKey,
-      parentKey,
-    };
+    return makeIssueNode(issue, depth, children, parentKey);
   });
 }
 
@@ -564,18 +544,12 @@ export function buildMyWorkHierarchy(
     const groupKey = `time-group-${groupDef.key}`;
 
     // Create child nodes
-    const children: HierarchyNode[] = sortedIssues.map((issue): HierarchyNode => ({
-      type: "issue",
-      id: issue.id,
-      label: issue.subject,
-      depth: 1,
-      issue,
-      children: [],
-      collapseKey: `issue-${issue.id}`,
-      parentKey: groupKey,
-      projectName: issue.project?.name ?? "Unknown",
-      isExternal: externalIds.has(issue.id),
-    }));
+    const children: HierarchyNode[] = sortedIssues.map((issue) =>
+      makeIssueNode(issue, 1, [], groupKey, {
+        projectName: issue.project?.name ?? "Unknown",
+        isExternal: externalIds.has(issue.id),
+      })
+    );
 
     // Collect child date ranges for aggregate bar
     const childDateRanges = sortedIssues

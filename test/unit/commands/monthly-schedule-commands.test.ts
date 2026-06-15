@@ -24,10 +24,13 @@ describe("registerMonthlyScheduleCommands", () => {
   let setOverrides: ReturnType<typeof vi.fn>;
   let refreshTree: ReturnType<typeof vi.fn>;
   let setTreeSchedules: ReturnType<typeof vi.fn>;
+  let statusBarSpy: ReturnType<typeof vi.spyOn<typeof statusBarUtil, "showStatusBarMessage">>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(statusBarUtil, "showStatusBarMessage").mockImplementation(() => undefined);
+    statusBarSpy = vi
+      .spyOn(statusBarUtil, "showStatusBarMessage")
+      .mockImplementation(() => undefined);
 
     handlers = new Map<string, Handler>();
     globalStateUpdate = vi.fn().mockResolvedValue(undefined);
@@ -122,5 +125,47 @@ describe("registerMonthlyScheduleCommands", () => {
     expect(globalStateUpdate).toHaveBeenCalledWith(MONTHLY_SCHEDULES_KEY, overrides);
     expect(setTreeSchedules).toHaveBeenCalledWith(overrides);
     expect(refreshTree).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs the full persist sequence after a complete day-by-day edit", async () => {
+    const overrides: Record<string, WeeklySchedule> = {};
+    vi.mocked(vscode.window.showQuickPick)
+      .mockResolvedValueOnce({ key: "2026-05", hasOverride: false } as never)
+      .mockResolvedValueOnce({ action: "edit" } as never);
+    // 7 day prompts (Mon..Sun); change Mon to 6, keep defaults otherwise.
+    vi.mocked(vscode.window.showInputBox)
+      .mockResolvedValueOnce("6")
+      .mockResolvedValueOnce("8")
+      .mockResolvedValueOnce("8")
+      .mockResolvedValueOnce("8")
+      .mockResolvedValueOnce("8")
+      .mockResolvedValueOnce("0")
+      .mockResolvedValueOnce("0");
+
+    const handler = registerAndGetHandler(overrides);
+    await handler();
+
+    expect(overrides["2026-05"]).toEqual({
+      Mon: 6,
+      Tue: 8,
+      Wed: 8,
+      Thu: 8,
+      Fri: 8,
+      Sat: 0,
+      Sun: 0,
+    });
+    // All five persist steps ran via the shared helper.
+    expect(setOverrides).toHaveBeenCalledWith(overrides);
+    expect(globalStateUpdate).toHaveBeenCalledWith(MONTHLY_SCHEDULES_KEY, overrides);
+    expect(setTreeSchedules).toHaveBeenCalledWith(overrides);
+    expect(statusBarSpy).toHaveBeenCalledWith(
+      expect.stringContaining("38h/week"),
+      3000
+    );
+    expect(refreshTree).toHaveBeenCalledTimes(1);
+    // Status message fires before the tree refresh (shared-helper ordering).
+    expect(statusBarSpy.mock.invocationCallOrder[0]).toBeLessThan(
+      refreshTree.mock.invocationCallOrder[0]
+    );
   });
 });
