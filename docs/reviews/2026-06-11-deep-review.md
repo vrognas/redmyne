@@ -486,7 +486,7 @@ Status legend: [ ] open, [x] fixed, [-] wontfix.
 - **detail:** getHtmlForWebview (lines 165-884) embeds the full stylesheet (~310 lines) and a complete webview application (~300 lines of JS: tooltip logic, keyboard nav, rendering, message handling) as a template string inside the extension-host class. Every other webview in this repo (src/webviews/gantt/*.js, src/webviews/timesheet/index.js) keeps webview code in its own JS bundled by esbuild into media/. The inline approach gets no type-checking, no linting, no bundling, and is the direct cause of the duplication drift above.
 - **fix:** Incremental split: move the inline script to src/webviews/draft-review/index.js (bundled to media/ like the gantt/timesheet webviews) and the CSS to a media stylesheet; draft-review-panel.ts keeps only panel lifecycle + postMessage plumbing.
 
-### 80. [ ] src/draft-mode/draft-mode-server.ts:31 — 31 passthrough methods each hand-written twice (declaration + constructor bind), ~70 lines of boilerplate
+### 80. [x] src/draft-mode/draft-mode-server.ts:31 — 31 passthrough methods each hand-written twice (declaration + constructor bind), ~70 lines of boilerplate
 
 - **dimension:** complexity | **verdict:** CONFIRMED
 - **detail:** Lines 31-61 declare every read method with definite-assignment (`getIssueById!: ...`), then lines 73-103 repeat each name to bind it. Adding any read method to RedmineServer requires two synchronized edits here; forgetting the bind compiles fine (the `!` suppresses the check) but yields `undefined is not a function` at runtime. Nothing about these 31 methods is intercept-specific — they are pure delegation.

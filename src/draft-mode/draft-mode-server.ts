@@ -21,44 +21,63 @@ export interface DraftBypassOptions {
   _bypassDraft?: boolean;
 }
 
+/**
+ * Read/query methods that are pure passthroughs to the inner RedmineServer.
+ * These carry no draft-mode interception — they always delegate. Listing each
+ * name once here (instead of a declaration + a constructor bind per method)
+ * drives the constructor binding loop below.
+ *
+ * The `satisfies` clause keeps the list aligned with the public interface: if a
+ * name here is not a method of IRedmineServer, this fails to compile.
+ */
+const PASSTHROUGH_METHODS = [
+  "getIssueById",
+  "getIssueWithJournals",
+  "getIssuesByIds",
+  "getFilteredIssues",
+  "getIssuesAssignedToMe",
+  "getAllOpenIssues",
+  "getOpenIssuesForProject",
+  "searchIssues",
+  "getProjects",
+  "clearProjectsCache",
+  "getTimeEntries",
+  "getTimeEntriesForIssues",
+  "getTimeEntryActivities",
+  "getProjectTimeEntryActivities",
+  "getTimeEntryCustomFields",
+  "getTimeEntryById",
+  "getProjectVersions",
+  "getVersionsForProjects",
+  "getIssueStatuses",
+  "getIssueStatusesTyped",
+  "getIssuePriorities",
+  "getPriorities",
+  "getTrackers",
+  "getCurrentUser",
+  "getCustomFields",
+  "getMemberships",
+  "getCachedMemberships",
+  "isTimeTrackingEnabled",
+  "getUserFte",
+  "getUserFteBatch",
+  "compare",
+] as const satisfies readonly (keyof IRedmineServer)[];
+
+type PassthroughMethod = (typeof PASSTHROUGH_METHODS)[number];
+
+/**
+ * Declaration merging: declares the passthrough members on the class with their
+ * exact interface types (bound in the constructor loop), so the typed public API
+ * is preserved without 31 hand-written `name!: ...` declarations. The mapped type
+ * picks each member straight from IRedmineServer, so signatures stay in lockstep.
+ */
+export interface DraftModeServer extends Pick<IRedmineServer, PassthroughMethod> {}
 
 export class DraftModeServer implements IRedmineServer {
   private inner: RedmineServer;
   private queue: DraftQueue;
   private manager: DraftModeManager;
-
-  // Passthrough methods (assigned in constructor)
-  getIssueById!: RedmineServer["getIssueById"];
-  getIssueWithJournals!: RedmineServer["getIssueWithJournals"];
-  getIssuesByIds!: RedmineServer["getIssuesByIds"];
-  getFilteredIssues!: RedmineServer["getFilteredIssues"];
-  getIssuesAssignedToMe!: RedmineServer["getIssuesAssignedToMe"];
-  getAllOpenIssues!: RedmineServer["getAllOpenIssues"];
-  getOpenIssuesForProject!: RedmineServer["getOpenIssuesForProject"];
-  searchIssues!: RedmineServer["searchIssues"];
-  getProjects!: RedmineServer["getProjects"];
-  clearProjectsCache!: RedmineServer["clearProjectsCache"];
-  getTimeEntries!: RedmineServer["getTimeEntries"];
-  getTimeEntriesForIssues!: RedmineServer["getTimeEntriesForIssues"];
-  getTimeEntryActivities!: RedmineServer["getTimeEntryActivities"];
-  getProjectTimeEntryActivities!: RedmineServer["getProjectTimeEntryActivities"];
-  getTimeEntryCustomFields!: RedmineServer["getTimeEntryCustomFields"];
-  getTimeEntryById!: RedmineServer["getTimeEntryById"];
-  getProjectVersions!: RedmineServer["getProjectVersions"];
-  getVersionsForProjects!: RedmineServer["getVersionsForProjects"];
-  getIssueStatuses!: RedmineServer["getIssueStatuses"];
-  getIssueStatusesTyped!: RedmineServer["getIssueStatusesTyped"];
-  getIssuePriorities!: RedmineServer["getIssuePriorities"];
-  getPriorities!: RedmineServer["getPriorities"];
-  getTrackers!: RedmineServer["getTrackers"];
-  getCurrentUser!: RedmineServer["getCurrentUser"];
-  getCustomFields!: RedmineServer["getCustomFields"];
-  getMemberships!: RedmineServer["getMemberships"];
-  getCachedMemberships!: RedmineServer["getCachedMemberships"];
-  isTimeTrackingEnabled!: RedmineServer["isTimeTrackingEnabled"];
-  getUserFte!: RedmineServer["getUserFte"];
-  getUserFteBatch!: RedmineServer["getUserFteBatch"];
-  compare!: RedmineServer["compare"];
 
   constructor(
     inner: RedmineServer,
@@ -69,38 +88,10 @@ export class DraftModeServer implements IRedmineServer {
     this.queue = queue;
     this.manager = manager;
 
-    // Bind all passthrough methods
-    this.getIssueById = inner.getIssueById.bind(inner);
-    this.getIssueWithJournals = inner.getIssueWithJournals.bind(inner);
-    this.getIssuesByIds = inner.getIssuesByIds.bind(inner);
-    this.getFilteredIssues = inner.getFilteredIssues.bind(inner);
-    this.getIssuesAssignedToMe = inner.getIssuesAssignedToMe.bind(inner);
-    this.getAllOpenIssues = inner.getAllOpenIssues.bind(inner);
-    this.getOpenIssuesForProject = inner.getOpenIssuesForProject.bind(inner);
-    this.searchIssues = inner.searchIssues.bind(inner);
-    this.getProjects = inner.getProjects.bind(inner);
-    this.clearProjectsCache = inner.clearProjectsCache.bind(inner);
-    this.getTimeEntries = inner.getTimeEntries.bind(inner);
-    this.getTimeEntriesForIssues = inner.getTimeEntriesForIssues.bind(inner);
-    this.getTimeEntryActivities = inner.getTimeEntryActivities.bind(inner);
-    this.getProjectTimeEntryActivities = inner.getProjectTimeEntryActivities.bind(inner);
-    this.getTimeEntryCustomFields = inner.getTimeEntryCustomFields.bind(inner);
-    this.getTimeEntryById = inner.getTimeEntryById.bind(inner);
-    this.getProjectVersions = inner.getProjectVersions.bind(inner);
-    this.getVersionsForProjects = inner.getVersionsForProjects.bind(inner);
-    this.getIssueStatuses = inner.getIssueStatuses.bind(inner);
-    this.getIssueStatusesTyped = inner.getIssueStatusesTyped.bind(inner);
-    this.getIssuePriorities = inner.getIssuePriorities.bind(inner);
-    this.getPriorities = inner.getPriorities.bind(inner);
-    this.getTrackers = inner.getTrackers.bind(inner);
-    this.getCurrentUser = inner.getCurrentUser.bind(inner);
-    this.getCustomFields = inner.getCustomFields.bind(inner);
-    this.getMemberships = inner.getMemberships.bind(inner);
-    this.getCachedMemberships = inner.getCachedMemberships.bind(inner);
-    this.isTimeTrackingEnabled = inner.isTimeTrackingEnabled.bind(inner);
-    this.getUserFte = inner.getUserFte.bind(inner);
-    this.getUserFteBatch = inner.getUserFteBatch.bind(inner);
-    this.compare = inner.compare.bind(inner);
+    // Bind every passthrough method to the inner server in one loop.
+    for (const name of PASSTHROUGH_METHODS) {
+      (this[name] as unknown) = (inner[name] as (...args: unknown[]) => unknown).bind(inner);
+    }
   }
 
   private shouldIntercept(options?: DraftBypassOptions): boolean {

@@ -501,6 +501,26 @@ describe("DraftModeServer", () => {
     });
   });
 
+  describe("consolidated passthrough binding (finding #80)", () => {
+    it("binds passthroughs to delegate while intercepted writes still intercept", async () => {
+      const manager = createMockManager(true);
+      const server = new DraftModeServer(innerServer, queue, manager);
+
+      // Representative passthrough still delegates to the inner server,
+      // even with draft mode ON (read methods are never intercepted).
+      await server.getTimeEntries({ from: "2026-01-01" });
+      expect(innerServer.getTimeEntries).toHaveBeenCalledWith({ from: "2026-01-01" });
+      expect(queue.add).not.toHaveBeenCalled();
+
+      // Intercepted write still intercepts (queues, does not hit inner server).
+      await server.setIssueStatus({ id: 7 }, 3);
+      expect(innerServer.setIssueStatus).not.toHaveBeenCalled();
+      expect(queue.add).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "setIssueStatus", issueId: 7 })
+      );
+    });
+  });
+
   describe("generic HTTP passthroughs", () => {
     it("post passes through", async () => {
       const manager = createMockManager(true);
