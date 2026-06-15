@@ -90,8 +90,11 @@ export class DraftQueue {
           throw new ServerConflictError(state.operations.length);
         }
         // Clear persisted data from different server
+        const hadOperations = this.operations.length > 0;
         this.operations = [];
         await this.persist();
+        // Notify subscribers if the queue actually changed, so badge/contexts refresh
+        if (hadOperations) this.emitChange();
         return;
       }
 
@@ -103,7 +106,10 @@ export class DraftQueue {
         throw e;
       }
       // File doesn't exist or parse error - start fresh
+      const hadOperations = this.operations.length > 0;
       this.operations = [];
+      // Notify subscribers if the queue actually changed, so badge/contexts refresh
+      if (hadOperations) this.emitChange();
     }
   }
 

@@ -477,6 +477,23 @@ describe("DraftQueue", () => {
 
       expect(handler).toHaveBeenCalled();
     });
+
+    it("clears AND emits change when reload hits a parse failure", async () => {
+      // Seed an in-memory draft for the current server.
+      await queue.load(serverIdentity);
+      await queue.add(createOp());
+      expect(queue.count).toBe(1);
+
+      // Corrupt the file so the next load() falls into the catch branch.
+      mockFileData = new TextEncoder().encode("{ not valid json");
+
+      const handler = vi.fn();
+      queue.onDidChange(handler);
+      await queue.load(serverIdentity);
+
+      expect(queue.getAll()).toHaveLength(0);
+      expect(handler).toHaveBeenCalled();
+    });
   });
 
   describe("change handler error isolation", () => {
