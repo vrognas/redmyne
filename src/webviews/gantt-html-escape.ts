@@ -2,7 +2,8 @@
  * Escape HTML/SVG special characters to prevent XSS.
  * User data (issue subjects, project names) must be escaped before SVG insertion.
  */
-export function escapeHtml(value: string): string {
+export function escapeHtml(value: string | null | undefined): string {
+  if (value === null || value === undefined) return "";
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

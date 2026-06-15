@@ -15,6 +15,7 @@ import * as vscode from "vscode";
 import type { DraftQueue } from "./draft-queue";
 import type { DraftOperation } from "./draft-operation";
 import { getNonce } from "../utilities/webview-nonce";
+import { escapeHtml } from "../webviews/gantt-html-escape";
 
 export class DraftReviewPanel implements vscode.Disposable {
   public static currentPanel: DraftReviewPanel | undefined;
@@ -892,15 +893,6 @@ export class DraftReviewPanel implements vscode.Disposable {
       d.dispose();
     }
   }
-}
-
-export function escapeHtml(unsafe: string): string {
-  return unsafe
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
 }
 
 export function formatTime(timestamp: number): string {

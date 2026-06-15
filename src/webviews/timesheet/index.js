@@ -1,4 +1,4 @@
-"use strict";
+import { escapeHtml } from '../gantt-html-escape';
 
 (() => {
   // Get VS Code API
@@ -361,16 +361,6 @@
     return newDayTotal > 24;
   }
 
-  // Escape HTML
-  function escapeHtml(str) {
-    if (!str) return "";
-    return str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
 
   // Get today's day index in current week (0=Mon, 6=Sun)
   function getTodayDayIndex(week) {

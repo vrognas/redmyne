@@ -2,33 +2,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as vscode from "vscode";
 import {
   DraftReviewPanel,
-  escapeHtml,
   formatTime,
   getTypeVerb,
   getTypeClass,
   formatChangesPreview,
 } from "../../../src/draft-mode/draft-review-panel";
 import { getNonce } from "../../../src/utilities/webview-nonce";
-
-describe("escapeHtml", () => {
-  it("escapes HTML special characters", () => {
-    expect(escapeHtml("<script>alert('xss')</script>")).toBe(
-      "&lt;script&gt;alert(&#039;xss&#039;)&lt;/script&gt;"
-    );
-  });
-
-  it("escapes ampersands", () => {
-    expect(escapeHtml("a & b")).toBe("a &amp; b");
-  });
-
-  it("escapes quotes", () => {
-    expect(escapeHtml('"test"')).toBe("&quot;test&quot;");
-  });
-
-  it("returns empty string unchanged", () => {
-    expect(escapeHtml("")).toBe("");
-  });
-});
 
 describe("formatTime", () => {
   it("formats today's time as HH:MM", () => {
