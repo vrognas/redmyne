@@ -1406,13 +1406,10 @@ function initializeGantt(state, rowWindow) {
       timelineSvg.addEventListener('click', (e) => {
         const arrow = e.target.closest('.dependency-arrow');
 
-        // Clear previous selection
-        if (selectedArrow) {
-          selectedArrow.classList.remove('selected');
-          document.body.classList.remove('arrow-selection-mode');
-          document.querySelectorAll('.arrow-connected').forEach(el => el.classList.remove('arrow-connected'));
-          selectedArrow = null;
-        }
+        // Clear previous selection through the one canonical path so all
+        // three trackers reset — the old inline clear left the
+        // selectedArrowElements and arrowConnectedElements arrays growing.
+        if (selectedArrow) clearArrowSelection();
 
         if (!arrow) return;
 

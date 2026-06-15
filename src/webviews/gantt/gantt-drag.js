@@ -337,21 +337,27 @@ export function setupDrag(ctx) {
       }
     });
 
-    // Keyboard handling for modal
+    // Keyboard handling for modal. CAPTURE phase + stopImmediatePropagation:
+    // while the modal is open it owns Escape/Enter and must run BEFORE the
+    // bubble-phase document handlers registered earlier in initializeGantt
+    // (clear-pin, clear-row-selection, arrow-deselect) — otherwise cancelling
+    // the drag also wiped the dependency-chain focus and the row selection.
     addDocListener('keydown', (e) => {
       if (!pendingDragConfirm) return;
       if (e.key === 'Escape') {
         e.preventDefault();
+        e.stopImmediatePropagation();
         if (pendingDragConfirm.onCancel) pendingDragConfirm.onCancel();
         restoreScrollPosition();
         hideDragConfirmModal();
       } else if (e.key === 'Enter') {
         e.preventDefault();
+        e.stopImmediatePropagation();
         if (pendingDragConfirm.onConfirm) pendingDragConfirm.onConfirm();
         dragScrollSnapshot = null; // Clear snapshot on confirm (change accepted)
         hideDragConfirmModal();
       }
-    });
+    }, { capture: true });
 
 
     // Drag state
