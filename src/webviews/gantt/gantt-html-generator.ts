@@ -113,8 +113,16 @@ export function projectDaysForHours(
 // Intensity Calculation
 // ============================================================================
 
-/** Calculate daily intensity for an issue (uniform distribution) */
-function calculateDailyIntensity(
+/**
+ * Calculate daily intensity for an issue (uniform distribution).
+ *
+ * Dates are local-midnight (parseLocalDate) and the weekday is read with
+ * local getDay() (getDayKey), so the day walk steps in the SAME local frame
+ * (setDate, like the sibling getScheduledIntensity). UTC stepping here drifted
+ * the weekday/segment count by a day for bars spanning a DST transition.
+ * Exported for tests.
+ */
+export function calculateDailyIntensity(
   issue: GanttIssue,
   schedule: WeeklySchedule
 ): { dayOffset: number; intensity: number }[] {
@@ -130,7 +138,7 @@ function calculateDailyIntensity(
   const current = new Date(start);
   while (current <= end) {
     totalAvailable += schedule[getDayKey(current)];
-    current.setUTCDate(current.getUTCDate() + 1);
+    current.setDate(current.getDate() + 1);
   }
 
   if (totalAvailable === 0 || estimatedHours === 0) {
@@ -148,7 +156,7 @@ function calculateDailyIntensity(
     const dayHours = schedule[getDayKey(current)];
     const intensity = dayHours > 0 ? hoursPerAvailableHour : 0;
     result.push({ dayOffset, intensity: Math.min(intensity, 1.5) });
-    current.setUTCDate(current.getUTCDate() + 1);
+    current.setDate(current.getDate() + 1);
     dayOffset++;
   }
 

@@ -16,8 +16,11 @@ import {
   buildRowsPayload,
   buildArrowsPayload,
   projectDaysForHours,
+  calculateDailyIntensity,
 } from "../src/webviews/gantt/gantt-html-generator";
 import type { GanttRow } from "../src/webviews/gantt-model";
+import type { GanttIssue } from "../src/webviews/gantt-model";
+import type { WeeklySchedule } from "../src/utilities/flexibility-calculator";
 
 describe("gantt-html-generator", () => {
   describe("helper functions", () => {
@@ -581,6 +584,34 @@ describe("gantt-html-generator", () => {
     it("caps an unschedulable walk at maxDays", () => {
       const empty = { Sun: 0, Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0 };
       expect(projectDaysForHours(new Date("2026-06-10"), 8, empty, 30)).toBe(30);
+    });
+  });
+
+  describe("calculateDailyIntensity day walk", () => {
+    // Dates are parsed as local midnight and the weekday is read with local
+    // getDay(), so the day walk must step in the local frame too. UTC stepping
+    // dropped/shifted a day for bars spanning a DST transition: a Fri→Mon span
+    // crossing the EU spring-forward (2026-03-29) lost its final Monday.
+    const monFri8h: WeeklySchedule = { Sun: 0, Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0 };
+
+    const makeIssue = (start: string, due: string): GanttIssue => ({
+      id: 10, subject: "I", project: "P", projectId: 1, parentId: null,
+      start_date: start, due_date: due, done_ratio: 0, estimated_hours: 40,
+      spent_hours: 0, status: "new", statusName: "New", isClosed: false,
+      isExternal: false, isAdHoc: false, assignee: null, assigneeId: null,
+      flexibilityPercent: null, relations: [], blocks: [], blockedBy: [],
+    });
+
+    it("aligns each day to its local weekday across a DST-crossing span", () => {
+      // Fri 2026-03-27 .. Mon 2026-03-30 spans the EU spring-forward.
+      const result = calculateDailyIntensity(makeIssue("2026-03-27", "2026-03-30"), monFri8h);
+      // One segment per calendar day, inclusive — the final Monday must survive.
+      expect(result.map((d) => d.dayOffset)).toEqual([0, 1, 2, 3]);
+      // Sat/Sun (offsets 1,2) are off-schedule → 0; Fri/Mon are working days → > 0.
+      expect(result[0]!.intensity).toBeGreaterThan(0); // Fri
+      expect(result[1]!.intensity).toBe(0); // Sat
+      expect(result[2]!.intensity).toBe(0); // Sun
+      expect(result[3]!.intensity).toBeGreaterThan(0); // Mon
     });
   });
 
