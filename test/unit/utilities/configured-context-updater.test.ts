@@ -45,6 +45,7 @@ function createDeps() {
     () => ({
       getCurrentUser: vi.fn(),
       getFilteredIssues: vi.fn().mockResolvedValue({ issues: [] }),
+      dispose: vi.fn(),
     }) as unknown as RedmineServer
   );
   const projectsTree = {
@@ -171,5 +172,24 @@ describe("createConfiguredContextUpdater", () => {
 
     expect(vscode.window.showWarningMessage).toHaveBeenCalledTimes(1);
     expect(draftQueue.load).not.toHaveBeenCalled();
+  });
+
+  it("disposes the previous inner server before replacing it on reconfigure", async () => {
+    const { deps, createServer } = createDeps();
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(
+      makeConfig({ serverUrl: "https://redmine.example.com" })
+    );
+
+    const updateConfiguredContext = createConfiguredContextUpdater(deps);
+    await updateConfiguredContext();
+    await flushPromises();
+    await updateConfiguredContext();
+    await flushPromises();
+
+    expect(createServer).toHaveBeenCalledTimes(2);
+    const firstInner = createServer.mock.results[0].value as { dispose: ReturnType<typeof vi.fn> };
+    const secondInner = createServer.mock.results[1].value as { dispose: ReturnType<typeof vi.fn> };
+    expect(firstInner.dispose).toHaveBeenCalledTimes(1);
+    expect(secondInner.dispose).not.toHaveBeenCalled();
   });
 });

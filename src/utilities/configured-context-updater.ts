@@ -25,6 +25,16 @@ export interface ConfiguredContextUpdaterDeps {
   updateWorkloadStatusBar: () => void;
 }
 
+// Duck-typed: only LoggingRedmineServer exposes dispose() (clears its 30s
+// cleanup setInterval); the base RedmineServer has none, so this is a no-op
+// for plain servers.
+function disposeServer(server: RedmineServer | undefined): void {
+  const maybeDisposable = server as { dispose?: () => void } | undefined;
+  if (typeof maybeDisposable?.dispose === "function") {
+    maybeDisposable.dispose();
+  }
+}
+
 export function createConfiguredContextUpdater(
   deps: ConfiguredContextUpdaterDeps
 ): () => Promise<void> {
@@ -32,6 +42,11 @@ export function createConfiguredContextUpdater(
   // load; without sequencing, a stale identity's load can win and drafts
   // recorded against the old server would flush to the new one.
   let generation = 0;
+  // Track the previously created inner server so we can dispose it on the
+  // next run. LoggingRedmineServer holds a 30s setInterval; without disposal
+  // each reconfiguration (URL/key change, toggleApiLogging) leaks a timer and
+  // pins the server's caches in memory.
+  let previousInnerServer: RedmineServer | undefined;
   return async () => {
     const gen = ++generation;
     const config = vscode.workspace.getConfiguration("redmyne");
@@ -56,6 +71,11 @@ export function createConfiguredContextUpdater(
           additionalHeaders: config.get("additionalHeaders"),
           caFile: config.get<string>("caFile"),
         });
+
+        // Dispose the prior inner server (e.g. LoggingRedmineServer's cleanup
+        // timer) now that its replacement exists.
+        disposeServer(previousInnerServer);
+        previousInnerServer = innerServer;
 
         // Wrap with draft mode server.
         const draftModeServer = new DraftModeServer(
@@ -127,6 +147,8 @@ export function createConfiguredContextUpdater(
       }
     } else {
       // Clear servers when not configured (don't refresh - let welcome view show).
+      disposeServer(previousInnerServer);
+      previousInnerServer = undefined;
       deps.projectsTree.setServer(undefined);
       deps.timeEntriesTree.setServer(undefined);
     }
