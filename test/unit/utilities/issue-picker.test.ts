@@ -1035,6 +1035,72 @@ describe("issue-picker", () => {
     await expect(pending).resolves.toBeUndefined();
   });
 
+  it("pickIssue drops a slow in-flight search that resolves after the query is cleared", async () => {
+    vi.useFakeTimers();
+    const vscodeApi = await import("vscode");
+    const recentIssues = await import("../../../src/utilities/recent-issues");
+    vi.spyOn(recentIssues, "getRecentIssueIds").mockReturnValue([]);
+    vi.spyOn(recentIssues, "recordRecentIssue").mockImplementation(() => {});
+
+    const quickPick = createControlledQuickPick();
+    vi.spyOn(vscodeApi.window, "createQuickPick").mockImplementation(
+      () => quickPick as unknown as vscode.QuickPick<vscode.QuickPickItem>
+    );
+
+    const baseIssue = createIssue({
+      id: 921,
+      subject: "Baseline",
+      project: { id: 61, name: "Core" },
+    });
+    const staleResult = createIssue({
+      id: 999,
+      subject: "Stale remote hit",
+      project: { id: 61, name: "Core" },
+    });
+
+    // Search that we resolve manually, simulating a slow request.
+    let resolveSearch: ((value: Issue[]) => void) | undefined;
+    const searchPromise = new Promise<Issue[]>((res) => {
+      resolveSearch = res;
+    });
+
+    const { pickIssue } = await import("../../../src/utilities/issue-picker");
+    const server = createMockServer({
+      getIssuesAssignedToMe: vi.fn().mockResolvedValue({ issues: [baseIssue] }),
+      getProjects: vi.fn().mockResolvedValue([createProject(61, "Core")]),
+      isTimeTrackingEnabled: vi.fn().mockResolvedValue(true),
+      searchIssues: vi.fn(() => searchPromise),
+    });
+
+    const pending = pickIssue(server as unknown as IRedmineServer, "Pick issue");
+    await flushMicrotasks();
+
+    // Fire the search; it parks on the unresolved searchPromise.
+    quickPick.triggerValue("stale");
+    await vi.advanceTimersByTimeAsync(250);
+    expect(server.searchIssues).toHaveBeenCalled();
+
+    // Clear the query before the search resolves — base list is restored.
+    quickPick.triggerValue("");
+    expect(
+      quickPick.items.some((item) => item.label.includes("#921 Baseline"))
+    ).toBe(true);
+
+    // The slow search now resolves; its stale result must NOT overwrite the base list.
+    resolveSearch?.([staleResult]);
+    await flushMicrotasks();
+
+    expect(
+      quickPick.items.some((item) => item.label.includes("#999"))
+    ).toBe(false);
+    expect(
+      quickPick.items.some((item) => item.label.includes("#921 Baseline"))
+    ).toBe(true);
+
+    quickPick.triggerHide();
+    await expect(pending).resolves.toBeUndefined();
+  });
+
   it("pickIssueWithSearch shows error when refreshed issue has no project", async () => {
     const vscodeApi = await import("vscode");
     const recentIssues = await import("../../../src/utilities/recent-issues");

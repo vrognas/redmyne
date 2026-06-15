@@ -764,9 +764,10 @@ export async function pickIssueWithSearch(
     };
 
     const debouncedSearch = debounce(SEARCH_DEBOUNCE_MS, async (query: string) => {
+      // Bump version even on a too-short query so any in-flight search is superseded.
+      const thisSearchVersion = ++searchVersion;
       if (query.length < 2) return;
 
-      const thisSearchVersion = ++searchVersion;
       quickPick.busy = true;
 
       try {
@@ -862,8 +863,11 @@ export async function pickIssueWithSearch(
     quickPick.onDidChangeValue((value) => {
       const query = value.trim();
       if (!query) {
+        // Bump version so a slow in-flight search can't overwrite the restored base list.
+        ++searchVersion;
         debouncedSearch.cancel();
         quickPick.items = baseItems;
+        quickPick.busy = false;
         return;
       }
       void debouncedSearch(query);
@@ -1197,9 +1201,10 @@ export async function pickIssue(
     };
 
     const debouncedSearch = debounce(SEARCH_DEBOUNCE_MS, async (query: string) => {
+      // Bump version even on a too-short query so any in-flight search is superseded.
+      const thisSearchVersion = ++searchVersion;
       if (query.length < 2) return;
 
-      const thisSearchVersion = ++searchVersion;
       quickPick.busy = true;
 
       try {
@@ -1289,8 +1294,11 @@ export async function pickIssue(
     quickPick.onDidChangeValue((value) => {
       const query = value.trim();
       if (!query) {
+        // Bump version so a slow in-flight search can't overwrite the restored base list.
+        ++searchVersion;
         debouncedSearch.cancel();
         quickPick.items = baseItems;
+        quickPick.busy = false;
         return;
       }
       void debouncedSearch(query);
