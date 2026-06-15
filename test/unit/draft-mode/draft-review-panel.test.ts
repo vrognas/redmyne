@@ -285,6 +285,29 @@ describe("DraftReviewPanel", () => {
       expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
     });
 
+    it("escapes data-path attribute in initial render (no breakout)", () => {
+      const harness = setupPanelHarness([
+        {
+          id: "d1",
+          type: "createIssue",
+          description: "Create",
+          timestamp: Date.now(),
+          http: { method: "POST", path: '/p/"><img>/versions.json' },
+        },
+      ]);
+
+      DraftReviewPanel.createOrShow(harness.queue as unknown as never, harness.extensionUri);
+
+      // Isolate the rendered data row's api-call cell. Anchor on the literal path
+      // (data-path="/p/...) so we skip both the inline-script bootstrap
+      // (let operations = ...) and the client-side JS render template.
+      const cell = harness.webview.html.match(/<td class="api-call" data-method="[^"]*" data-path="\/p\/[\s\S]*?<\/td>/)?.[0] ?? "";
+      // Raw quote/angle-bracket from path must not break out of the attribute.
+      expect(cell).not.toContain('data-path="/p/"><img');
+      expect(cell).not.toContain('"><img>');
+      expect(cell).toContain('data-path="/p/&quot;&gt;&lt;img&gt;/versions.json"');
+    });
+
     it("handles webview commands and loading states", async () => {
       const harness = setupPanelHarness();
       DraftReviewPanel.createOrShow(harness.queue as unknown as never, harness.extensionUri);

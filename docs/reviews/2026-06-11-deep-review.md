@@ -794,7 +794,7 @@ Status legend: [ ] open, [x] fixed, [-] wontfix.
 - **detail:** createLoadingTreeItem (line 32) is exported, marked @deprecated, and has zero callers repo-wide. LoadingPlaceholder.skeletonIndex (line 10) is never set or read anywhere. createSkeletonPlaceholders(_count) (line 45) ignores its parameter yet callers pass meaningful counts expecting that many rows (projects-tree.ts:238 passes 5, projects-tree.ts:269 passes 3, my-issues-tree.ts:140 passes 5) — misleading API. Separately, my-time-entries-tree.ts ignores this shared module entirely and inlines its own identical spinner node literal at lines 435-440, 545-550, and 563-568.
 - **fix:** Delete createLoadingTreeItem and skeletonIndex; change createSkeletonPlaceholders() to take no arguments (or honor the count). Have my-time-entries-tree reuse one local loadingNode() helper for its three inlined literals.
 
-### 131. [ ] src/draft-mode/draft-review-panel.ts:187 — data-path attribute interpolated unescaped in initial HTML render
+### 131. [x] src/draft-mode/draft-review-panel.ts:187 — data-path attribute interpolated unescaped in initial HTML render
 
 - **dimension:** bug | **verdict:** PLAUSIBLE
 - **detail:** Line 187 emits `data-path="${op.http?.path || ""}"` without escapeHtml, while the same path is escaped for the visible span on line 188 and the client-side re-render escapes the attribute at line 808. Paths can contain arbitrary strings: createVersion builds `/projects/${projectId}/versions.json` where projectId is `number | string` (project identifier). A `"` in such a value breaks out of the attribute and injects markup into the webview on first render only.

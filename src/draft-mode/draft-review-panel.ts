@@ -184,7 +184,7 @@ export class DraftReviewPanel implements vscode.Disposable {
             <span class="meta-time">${formatTime(op.timestamp)}</span>
           </div>
         </td>
-        <td class="api-call" data-method="${op.http?.method || ""}" data-path="${op.http?.path || ""}" data-body="${escapeHtml(op.http?.data ? JSON.stringify(op.http.data) : "")}">
+        <td class="api-call" data-method="${escapeHtml(op.http?.method || "")}" data-path="${escapeHtml(op.http?.path || "")}" data-body="${escapeHtml(op.http?.data ? JSON.stringify(op.http.data) : "")}">
           ${op.http ? `<span class="api-method ${op.http.method}">${op.http.method}</span><span class="api-path">${escapeHtml(op.http.path)}</span>` : "-"}
         </td>
         <td class="actions">
