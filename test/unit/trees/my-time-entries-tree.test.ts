@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { MyTimeEntriesTreeDataProvider, TimeEntryNode, filterDraftOpsForRange } from "../../../src/trees/my-time-entries-tree";
+import { MyTimeEntriesTreeDataProvider, TimeEntryNode, filterDraftOpsForRange, buildEntryTooltip } from "../../../src/trees/my-time-entries-tree";
 import { TimeEntry } from "../../../src/redmine/models/time-entry";
 import type { DraftOperation } from "../../../src/draft-mode/draft-operation";
 import * as vscode from "vscode";
@@ -1192,5 +1192,53 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     )(ops as unknown as DraftOperation[], entries, "2026-03-08", "2026-03-14");
 
     expect(filtered.map((o) => o.id).sort()).toEqual(["from", "in", "res", "to"]);
+  });
+});
+
+describe("buildEntryTooltip", () => {
+  const baseEntry = {
+    id: 7,
+    issue_id: 123,
+    activity_id: 9,
+    activity: { id: 9, name: "Development" },
+    hours: "2.5",
+    comments: "[pwn](command:workbench.action.terminal.sendSequence)",
+    spent_on: "2026-06-10",
+  } as TimeEntry;
+
+  it("scopes trust, escapes server text, and branches on draft state", () => {
+    const saved = buildEntryTooltip({
+      entry: baseEntry,
+      issueId: 123,
+      issueSubject: "Fix login",
+      projectName: "Web",
+      clientName: "Acme",
+      isDraft: false,
+      isDraftModified: false,
+      showUser: false,
+    });
+
+    // Trust scoped to the extension's own command only.
+    expect(saved.isTrusted).toEqual({ enabledCommands: ["redmyne.openTimeEntryInBrowser"] });
+    // Injected command link in a comment is neutralized; our own link survives.
+    expect(saved.value).not.toContain("[pwn](command:");
+    expect(saved.value).toContain("command:redmyne.openTimeEntryInBrowser");
+    // Saved entries expose the Entry ID and the browser link.
+    expect(saved.value).toContain("**Entry ID:** 7");
+
+    // Draft entries omit Entry ID + browser link and show the DRAFT banner.
+    const draft = buildEntryTooltip({
+      entry: baseEntry,
+      issueId: 123,
+      issueSubject: "Fix login",
+      projectName: "Web",
+      clientName: "Acme",
+      isDraft: true,
+      isDraftModified: false,
+      showUser: false,
+    });
+    expect(draft.value).toContain("DRAFT");
+    expect(draft.value).not.toContain("**Entry ID:**");
+    expect(draft.value).not.toContain("redmyne.openTimeEntryInBrowser");
   });
 });

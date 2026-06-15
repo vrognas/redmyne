@@ -145,6 +145,53 @@ export function filterDraftOpsForRange(
   });
 }
 
+/** Inputs for {@link buildEntryTooltip} — pure presentation, no I/O. */
+export interface EntryTooltipInfo {
+  entry: TimeEntry;
+  issueId: number;
+  issueSubject: string;
+  projectName: string;
+  clientName: string;
+  isDraft: boolean;
+  isDraftModified: boolean;
+  showUser: boolean;
+}
+
+/**
+ * Build the markdown tooltip for a single time-entry node. Pure presentation:
+ * interpolates already-resolved issue/project/client info and escapes all
+ * server-supplied text. Trust is scoped to the extension's own browser-link
+ * command so a crafted comment cannot execute arbitrary commands on click.
+ */
+export function buildEntryTooltip(info: EntryTooltipInfo): vscode.MarkdownString {
+  const { entry, issueId, issueSubject, projectName, clientName, isDraft, isDraftModified, showUser } = info;
+  const commandArgs = encodeURIComponent(JSON.stringify([issueId]));
+  const userLine = showUser && entry.user?.name ? `**User:** ${escapeMarkdown(entry.user.name)}\n\n` : "";
+  const draftLine = isDraft ? `**⚠️ DRAFT** - Not yet saved to server\n\n` :
+    isDraftModified ? `**✏️ MODIFIED** - Changes pending save\n\n` : "";
+  const entryIdLine = isDraft ? "" : `**Entry ID:** ${entry.id}\n\n`;
+  const tooltip = new vscode.MarkdownString(
+    draftLine +
+    `**Issue:** #${issueId} ${escapeMarkdown(issueSubject)}\n\n` +
+      userLine +
+      (clientName ? `**Client:** ${escapeMarkdown(clientName)}\n\n` : "") +
+      (projectName ? `**Project:** ${escapeMarkdown(projectName)}\n\n` : "") +
+      `**Hours:** ${formatHoursAsHHMM(parseFloat(entry.hours))}\n\n` +
+      `**Activity:** ${escapeMarkdown(entry.activity?.name || "Unknown")}\n\n` +
+      `**Date:** ${entry.spent_on}\n\n` +
+      `**Comments:** ${escapeMarkdown(entry.comments || "(none)")}\n\n` +
+      entryIdLine +
+      (isDraft ? "" : `---\n\n[Open Issue in Browser](command:redmyne.openTimeEntryInBrowser?${commandArgs})`)
+  );
+  // Trust ONLY our own browser-link command: server text (comments,
+  // subjects) is interpolated above, and blanket trust would let a
+  // crafted comment execute arbitrary commands on click.
+  tooltip.isTrusted = { enabledCommands: ["redmyne.openTimeEntryInBrowser"] };
+  tooltip.supportHtml = false;
+  tooltip.supportThemeIcons = true;
+  return tooltip;
+}
+
 export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNode> {
   private static readonly INITIAL_MONTHS = 3;
   private static readonly LOAD_BATCH_SIZE = 3;
@@ -780,8 +827,12 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     }).filter((node): node is NonNullable<typeof node> => node !== null);
   }
 
-  private async mapEntriesToNodes(entries: TimeEntry[], idPrefix = "entry"): Promise<TimeEntryNode[]> {
-    // Build project→client lookup from server's cached projects
+  /**
+   * Build a project→client lookup from the server's cached projects. A child
+   * project's "client" is its parent project's name. Optional: returns an empty
+   * map if there is no server or the fetch fails.
+   */
+  private async buildProjectClientMap(): Promise<Map<number, string>> {
     const projectClientMap = new Map<number, string>();
     if (this.server) {
       try {
@@ -795,7 +846,16 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         // Ignore - client info is optional
       }
     }
+    return projectClientMap;
+  }
 
+  /**
+   * Ensure every issue referenced by `entries` is present in issueCache.
+   * Batch-fetches the missing ones in a single API call; issues the server
+   * cannot return are negatively cached as "Unknown Issue" so they are not
+   * retried on every render.
+   */
+  private async populateIssueCache(entries: TimeEntry[]): Promise<void> {
     // Collect unique issue IDs that need fetching
     const uniqueIssueIds = Array.from(
       new Set(entries.map((entry) => entry.issue?.id || entry.issue_id))
@@ -806,33 +866,39 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       (id) => !this.issueCache.has(id)
     );
 
+    if (missingIssueIds.length === 0 || !this.server) return;
+
     // Batch fetch missing issues in single API call
-    if (missingIssueIds.length > 0 && this.server) {
-      try {
-        const issues = await this.server.getIssuesByIds(missingIssueIds, false);
-        const foundIds = new Set<number>();
-        for (const issue of issues) {
-          foundIds.add(issue.id);
-          this.issueCache.set(issue.id, {
-            id: issue.id,
-            subject: issue.subject,
-            projectId: issue.project?.id,
-            project: issue.project?.name || "",
-          });
-        }
-        // Mark unfound issues as "Unknown" to avoid retry
-        for (const id of missingIssueIds) {
-          if (!foundIds.has(id)) {
-            this.issueCache.set(id, { id, subject: "Unknown Issue", project: "" });
-          }
-        }
-      } catch {
-        // On error, mark all as unknown
-        for (const id of missingIssueIds) {
+    try {
+      const issues = await this.server.getIssuesByIds(missingIssueIds, false);
+      const foundIds = new Set<number>();
+      for (const issue of issues) {
+        foundIds.add(issue.id);
+        this.issueCache.set(issue.id, {
+          id: issue.id,
+          subject: issue.subject,
+          projectId: issue.project?.id,
+          project: issue.project?.name || "",
+        });
+      }
+      // Mark unfound issues as "Unknown" to avoid retry
+      for (const id of missingIssueIds) {
+        if (!foundIds.has(id)) {
           this.issueCache.set(id, { id, subject: "Unknown Issue", project: "" });
         }
       }
+    } catch {
+      // On error, mark all as unknown
+      for (const id of missingIssueIds) {
+        this.issueCache.set(id, { id, subject: "Unknown Issue", project: "" });
+      }
     }
+  }
+
+  private async mapEntriesToNodes(entries: TimeEntry[], idPrefix = "entry"): Promise<TimeEntryNode[]> {
+    // Transport/cache: resolve client + issue info before presentation.
+    const projectClientMap = await this.buildProjectClientMap();
+    await this.populateIssueCache(entries);
 
     // Sort entries if sort config is set
     const sortedEntries = this.sortEntries(entries);
@@ -849,31 +915,16 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       const isDraft = isDraftEntry(entry);
       const isDraftModified = (entry as TimeEntry & { _isDraftModified?: boolean })._isDraftModified === true;
 
-      // Encode command arguments as JSON array for VS Code command URI
-      const commandArgs = encodeURIComponent(JSON.stringify([issueId]));
-      const userLine = this.showAllUsers && entry.user?.name ? `**User:** ${escapeMarkdown(entry.user.name)}\n\n` : "";
-      const draftLine = isDraft ? `**⚠️ DRAFT** - Not yet saved to server\n\n` :
-        isDraftModified ? `**✏️ MODIFIED** - Changes pending save\n\n` : "";
-      const entryIdLine = isDraft ? "" : `**Entry ID:** ${entry.id}\n\n`;
-      const tooltip = new vscode.MarkdownString(
-        draftLine +
-        `**Issue:** #${issueId} ${escapeMarkdown(issueSubject)}\n\n` +
-          userLine +
-          (clientName ? `**Client:** ${escapeMarkdown(clientName)}\n\n` : "") +
-          (projectName ? `**Project:** ${escapeMarkdown(projectName)}\n\n` : "") +
-          `**Hours:** ${formatHoursAsHHMM(parseFloat(entry.hours))}\n\n` +
-          `**Activity:** ${escapeMarkdown(entry.activity?.name || "Unknown")}\n\n` +
-          `**Date:** ${entry.spent_on}\n\n` +
-          `**Comments:** ${escapeMarkdown(entry.comments || "(none)")}\n\n` +
-          entryIdLine +
-          (isDraft ? "" : `---\n\n[Open Issue in Browser](command:redmyne.openTimeEntryInBrowser?${commandArgs})`)
-      );
-      // Trust ONLY our own browser-link command: server text (comments,
-      // subjects) is interpolated above, and blanket trust would let a
-      // crafted comment execute arbitrary commands on click.
-      tooltip.isTrusted = { enabledCommands: ["redmyne.openTimeEntryInBrowser"] };
-      tooltip.supportHtml = false;
-      tooltip.supportThemeIcons = true;
+      const tooltip = buildEntryTooltip({
+        entry,
+        issueId,
+        issueSubject,
+        projectName,
+        clientName,
+        isDraft,
+        isDraftModified,
+        showUser: this.showAllUsers,
+      });
 
       // Format: "#1234 comment" with "HH:MM [activity] issue_subject [user]" as description
       const hours = formatHoursAsHHMM(parseFloat(entry.hours));
