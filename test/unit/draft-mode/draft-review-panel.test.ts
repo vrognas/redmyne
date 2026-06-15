@@ -7,8 +7,8 @@ import {
   getTypeVerb,
   getTypeClass,
   formatChangesPreview,
-  getNonce,
 } from "../../../src/draft-mode/draft-review-panel";
+import { getNonce } from "../../../src/utilities/webview-nonce";
 
 describe("escapeHtml", () => {
   it("escapes HTML special characters", () => {
@@ -104,15 +104,13 @@ describe("getTypeClass", () => {
   });
 });
 
-describe("getNonce", () => {
-  it("returns 32 character string", () => {
+describe("getNonce (shared CSPRNG generator)", () => {
+  // Draft review now imports the shared crypto.randomBytes nonce (Finding #102),
+  // not a local Math.random() one. Base64 of 16 bytes -> 24 chars incl. padding.
+  it("returns a non-empty base64 nonce", () => {
     const nonce = getNonce();
-    expect(nonce.length).toBe(32);
-  });
-
-  it("returns only alphanumeric characters", () => {
-    const nonce = getNonce();
-    expect(nonce).toMatch(/^[A-Za-z0-9]+$/);
+    expect(nonce.length).toBeGreaterThanOrEqual(22);
+    expect(nonce).toMatch(/^[A-Za-z0-9+/=]+$/);
   });
 
   it("returns unique values", () => {
@@ -283,6 +281,24 @@ describe("DraftReviewPanel", () => {
       expect(harness.webview.html).toContain("Pending Drafts");
       expect(harness.webview.html).toContain("Update #1");
       expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
+    });
+
+    it("renders a CSPRNG nonce in CSP and script tag (not Math.random alphanumeric)", () => {
+      const harness = setupPanelHarness();
+      DraftReviewPanel.createOrShow(harness.queue as unknown as never, harness.extensionUri);
+      const html = harness.webview.html;
+
+      // Both the CSP script-src directive and the <script> tag must carry a nonce.
+      const cspNonce = html.match(/script-src 'nonce-([^']+)'/)?.[1];
+      const scriptNonce = html.match(/<script nonce="([^"]+)"/)?.[1];
+
+      expect(cspNonce).toBeTruthy();
+      expect(scriptNonce).toBeTruthy();
+      expect(cspNonce).toBe(scriptNonce);
+      // Shared generator emits base64 (16-byte randomBytes -> >=22 chars), so the
+      // nonce is longer/wider-charset than the old 32-char alphanumeric Math.random one.
+      expect(scriptNonce!.length).toBeGreaterThanOrEqual(22);
+      expect(scriptNonce!).toMatch(/^[A-Za-z0-9+/=]+$/);
     });
 
     it("escapes data-path attribute in initial render (no breakout)", () => {

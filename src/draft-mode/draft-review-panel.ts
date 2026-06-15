@@ -14,6 +14,7 @@
 import * as vscode from "vscode";
 import type { DraftQueue } from "./draft-queue";
 import type { DraftOperation } from "./draft-operation";
+import { getNonce } from "../utilities/webview-nonce";
 
 export class DraftReviewPanel implements vscode.Disposable {
   public static currentPanel: DraftReviewPanel | undefined;
@@ -891,15 +892,6 @@ export class DraftReviewPanel implements vscode.Disposable {
       d.dispose();
     }
   }
-}
-
-export function getNonce(): string {
-  let text = "";
-  const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  for (let i = 0; i < 32; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-  return text;
 }
 
 export function escapeHtml(unsafe: string): string {
