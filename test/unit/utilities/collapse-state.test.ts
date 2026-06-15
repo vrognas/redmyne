@@ -43,8 +43,6 @@ describe("CollapseStateManager", () => {
     manager.expandAll(); // branch without keys
     manager.collapseAll();
     expect(manager.getExpandedKeys().size).toBe(0);
-    manager.clear();
-    expect(manager.getExpandedKeys().size).toBe(0);
 
     expect(events).toContainEqual({ key: "*", collapsed: false });
     expect(events).toContainEqual({ key: "*", collapsed: true });

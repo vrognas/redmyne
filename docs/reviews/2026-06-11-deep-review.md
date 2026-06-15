@@ -758,7 +758,7 @@ Status legend: [ ] open, [x] fixed, [-] wontfix.
 - **detail:** The literal { type: 'issue', id: issue.id, label: issue.subject, depth, issue, children, collapseKey: `issue-${issue.id}`, parentKey } is constructed six times in this file: src/utilities/hierarchy-builder.ts:314-323 (root in buildFlatHierarchy), :331-340 (container child), :344-353 (orphan), :404-413 (buildIssueTree), :435-444 (buildIssueTreeFromMap), :567-578 (buildMyWorkHierarchy, plus projectName/isExternal extras). Any added HierarchyNode field for issues must be threaded through all six.
 - **fix:** Add a makeIssueNode(issue, depth, parentKey, children, extras?: Partial<HierarchyNode>) helper in hierarchy-builder.ts and use it at all six sites; the My Work site passes { projectName, isExternal } as extras.
 
-### 125. [ ] src/utilities/capacity-calculator.ts:176 — generateEmptyCapacity duplicates the main loop and is provably redundant
+### 125. [x] src/utilities/capacity-calculator.ts:176 — generateEmptyCapacity duplicates the main loop and is provably redundant
 
 - **dimension:** complexity | **verdict:** CONFIRMED
 - **detail:** With leafIssues empty, the main loop in calculateDailyCapacity already produces exactly what generateEmptyCapacity does: loadHours stays 0, percentage 0, status getCapacityStatus(0) === 'available', same working-day filtering. The early return at lines 123-126 and the entire 29-line helper (lines 176-204) — a copy of the same UTC date-walk — exist only to special-case a path the general code handles identically.
@@ -770,7 +770,7 @@ Status legend: [ ] open, [x] fixed, [-] wontfix.
 - **detail:** Lines 35-39 register vscode.workspace.onDidChangeConfiguration as an import-time side effect and drop the returned Disposable — it is never added to context.subscriptions, so it cannot be disposed on extension deactivation and leaks for the extension-host lifetime. It also fires (and dereferences cachedIds invalidation logic) for the whole host even after the extension's own state is torn down, and the import-time registration makes the module impossible to load in isolation without a live vscode workspace.
 - **fix:** Export an `initAdHocTracker(context)` (or a dispose() on adHocTracker) that registers the listener and pushes the Disposable to context.subscriptions; call it from activate().
 
-### 127. [ ] src/utilities/collapse-state.ts:88 — clear() is dead code and a desync trap (mutates state without firing onDidChange)
+### 127. [x] src/utilities/collapse-state.ts:88 — clear() is dead code and a desync trap (mutates state without firing onDidChange)
 
 - **dimension:** complexity | **verdict:** CONFIRMED
 - **detail:** clear() (lines 88-91) has zero callers across src/ (verified: only expand/collapse/expandAll/collapseAll/getExpandedKeys/version are used from extension.ts:175-179 and gantt-panel.ts:1207-2096). It duplicates collapseAll() except it skips `_onDidChange.fire`, so any future caller would silently desync every listener-synced view — the exact failure mode this 'shared collapse state manager for syncing views' exists to prevent. isExpanded() (line 33) is likewise uncalled and trivially `!isCollapsed`.

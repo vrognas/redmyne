@@ -84,12 +84,6 @@ export class CollapseStateManager {
     this._onDidChange.fire({ key: "*", collapsed: true });
   }
 
-  /** Clear all expand state (everything becomes collapsed) */
-  clear(): void {
-    this._expandedKeys.clear();
-    this._version++;
-  }
-
   dispose(): void {
     this._onDidChange.dispose();
   }

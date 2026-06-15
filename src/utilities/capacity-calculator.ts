@@ -121,10 +121,8 @@ export function calculateDailyCapacity(
   // Also exclude closed issues (status-based: reopened keep closed_on)
   const leafIssues = issues.filter(i => (!i.children || i.children.length === 0) && !isIssueClosed(i));
 
-  if (leafIssues.length === 0) {
-    // Still generate capacity entries for the range
-    return generateEmptyCapacity(schedule, startDate, endDate);
-  }
+  // No special-case for an empty leaf set: the loop below already emits a
+  // 0-load / "available" entry per working day when nothing spans it.
 
   // Pre-calculate hours/day for each issue
   const issueHoursPerDay = new Map<number, number>();
@@ -162,39 +160,6 @@ export function calculateDailyCapacity(
         capacityHours,
         percentage: Math.round(percentage),
         status: getCapacityStatus(percentage),
-      });
-    }
-
-    current.setUTCDate(current.getUTCDate() + 1);  // Use UTC increment
-  }
-
-  return result;
-}
-
-/**
- * Generate empty capacity entries for a date range (no issues)
- */
-function generateEmptyCapacity(
-  schedule: WeeklySchedule,
-  startDate: string,
-  endDate: string
-): DailyCapacity[] {
-  const result: DailyCapacity[] = [];
-  const current = new Date(startDate + "T00:00:00Z");  // Explicit UTC
-  const end = new Date(endDate + "T00:00:00Z");
-
-  while (current <= end) {
-    const dateStr = current.toISOString().slice(0, 10);
-    const dayOfWeek = current.getUTCDay();  // Use UTC day
-    const capacityHours = schedule[DAY_KEYS[dayOfWeek]!];
-
-    if (capacityHours > 0) {
-      result.push({
-        date: dateStr,
-        loadHours: 0,
-        capacityHours,
-        percentage: 0,
-        status: "available",
       });
     }
 
