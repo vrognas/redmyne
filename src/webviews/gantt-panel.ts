@@ -775,7 +775,11 @@ export class GanttPanel {
     const allIssues = [...this._issues, ...this._dependencyIssues];
     this._issueById = new Map(allIssues.map(i => [i.id, i]));
     this._projects = projects.filter(p => p !== null);
-    this._flexibilityCache = flexibilityCache;
+    // Copy, don't alias: _loadContributions writes contribution-adjusted,
+    // view-specific scores back into this Map. Callers pass ProjectsTree's
+    // shared cache (projectsTree.getFlexibilityCache()) by reference, so
+    // mutating it in place would corrupt the sidebar's flexibility scores.
+    this._flexibilityCache = new Map(flexibilityCache);
 
     // Memberships loaded lazily on hover (see requestProjectMembers handler)
 

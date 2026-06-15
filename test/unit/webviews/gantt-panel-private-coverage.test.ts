@@ -924,6 +924,64 @@ describe("gantt panel private coverage", () => {
     await panel.updateIssues(issues, new Map(), [{ id: 10, name: "Project 10", identifier: "project-10" }]);
     expect(panel._actualTimeEntries).toBeInstanceOf(Map);
   });
+
+  it("does not mutate the caller-owned flexibility cache when loading contributions", async () => {
+    const mock = createMockPanel();
+    const extensionUri = vscode.Uri.parse("file:///ext");
+    const server = {
+      options: { address: "https://redmine.example" },
+      getTimeEntriesForIssues: vi.fn().mockResolvedValue([
+        { issue_id: 2, issue: { id: 2 }, activity_id: 1, hours: "2", comments: "#1 help", spent_on: "2026-02-02" },
+      ]),
+      getUserFteBatch: vi.fn().mockResolvedValue(new Map([[7, 0.5]])),
+      getCachedMemberships: vi.fn(() => undefined),
+    };
+
+    GanttPanel.restore(
+      mock.panel,
+      extensionUri,
+      () => server as unknown as import("../../../src/redmine/redmine-server").RedmineServer
+    );
+    const panel = GanttPanel.currentPanel as any;
+    panel._viewFocus = "project";
+    panel._lookbackYears = null;
+    panel._currentUserId = 999;
+    // Pre-seed so updateIssues skips its status/current-user cold-start fetches
+    // (project focus also skips the person-view time-entry fetch).
+    panel._closedStatusIds = new Set<number>([99]);
+    // Don't auto-fire supplemental load; we drive _loadContributions explicitly.
+    panel._refreshSupplementalData = vi.fn().mockResolvedValue(undefined);
+
+    vi.spyOn(adHocTracker, "getAll").mockReturnValue([2]);
+    vi.spyOn(adHocTracker, "isAdHoc").mockImplementation((issueId: number) => issueId === 2);
+
+    const issues = [
+      createIssue({ id: 1, assigneeId: 7, assigneeName: "Alice", start_date: "2025-12-01", spent_hours: 3 }),
+      createIssue({ id: 2, assigneeId: 8, assigneeName: "Bob", start_date: "2025-11-01", spent_hours: 4 }),
+    ];
+
+    // Caller (ProjectsTree) owns this Map and shares it across views. Seed a
+    // sidebar score the panel must never touch.
+    const sentinel = { remaining: 42 } as unknown as import("../../../src/utilities/flexibility").FlexibilityScore;
+    const callerCache = new Map<number, any>([[1, sentinel]]);
+    const callerSnapshot = new Map(callerCache);
+
+    await panel.updateIssues(issues, callerCache, [{ id: 10, name: "Project 10", identifier: "project-10" }]);
+
+    // Intake must copy, not alias, the caller's Map.
+    expect(panel._flexibilityCache).not.toBe(callerCache);
+
+    // Trigger the contribution-adjusted .set(...) path.
+    const changed = await panel._loadContributions(panel._supplementalLoadId);
+    expect(changed).toBe(true);
+    // Panel computed a fresh, view-specific score for #1 in its own copy.
+    expect(panel._flexibilityCache.get(1)).not.toBe(sentinel);
+
+    // The caller-owned Map is byte-for-byte unchanged: same identity preserved,
+    // no new keys leaked in.
+    expect(callerCache.get(1)).toBe(sentinel);
+    expect([...callerCache.entries()]).toEqual([...callerSnapshot.entries()]);
+  });
 });
 
 describe("gantt project-view root rows (skipTopProjectRow)", () => {

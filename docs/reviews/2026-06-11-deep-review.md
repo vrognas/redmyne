@@ -258,7 +258,7 @@ Status legend: [ ] open, [x] fixed, [-] wontfix.
 
 ## MEDIUM (66)
 
-### 42. [ ] src/webviews/gantt-panel.ts:1002 — Panel mutates the caller-owned flexibility cache in place, leaking gantt-view-specific scores into ProjectsTree's shared cache
+### 42. [x] src/webviews/gantt-panel.ts:1002 — Panel mutates the caller-owned flexibility cache in place, leaking gantt-view-specific scores into ProjectsTree's shared cache
 
 - **dimension:** bug | **verdict:** CONFIRMED
 - **detail:** updateIssues deep-copies issues explicitly 'to avoid mutating source cache' (lines 730-737) but stores the flexibilityCache Map by reference (line 748: `this._flexibilityCache = flexibilityCache` — callers pass projectsTree.getFlexibilityCache(), see src/extension.ts:260 and src/commands/gantt-commands.ts:36). _loadContributions then overwrites entries via this._flexibilityCache.set(issue.id, newFlexibility) (line 1002) with contribution-adjusted values — including negative effectiveSpent for ad-hoc donors (line 966) and values computed from time entries filtered to the currently viewed person only (userId filter, lines 914-920). Those view-dependent scores silently replace the tree view's flexibility data and persist after the panel closes.
