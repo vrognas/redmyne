@@ -35,6 +35,85 @@ function getFreshTimerSecondsLeft(
   return current?.timerSecondsLeft ?? task.timerSecondsLeft ?? 0;
 }
 
+interface LogTimeFlowArgs {
+  server: IRedmineServer;
+  controller: KanbanController;
+  task: KanbanTask;
+  /** Pre-rounded hours to log (already includes any deferred minutes). */
+  roundedHours: number;
+  /**
+   * Optional confirmation prompt shown after custom-field/closed-issue checks
+   * but before writing the time entry. Return false to abort silently.
+   */
+  confirm?: () => Promise<boolean>;
+  /** Side effect run after a successful log (e.g. stop/restart timer). */
+  onLogged: () => Promise<void>;
+  /** Success message shown after onLogged. */
+  successMessage: string;
+}
+
+/**
+ * Shared time-logging flow for kanban timer commands.
+ *
+ * Owns the common sequence: required-custom-field prompt -> closed-issue
+ * confirmation -> optional confirm -> addTimeEntry -> addLoggedHours ->
+ * consumeDeferredMinutes -> caller side effect -> success message, plus the
+ * custom-field-aware error handling. Callers supply the per-site hours, confirm
+ * step, post-log side effect, and success message.
+ *
+ * Deferred-minute consumption ordering is preserved exactly: minutes are
+ * consumed only after a successful addTimeEntry + addLoggedHours.
+ *
+ * @returns true if the time entry was written, false if the flow was aborted
+ *          (cancelled prompt, declined confirmation) or failed.
+ */
+async function logTimeFlow({
+  server,
+  controller,
+  task,
+  roundedHours,
+  confirm,
+  onLogged,
+  successMessage,
+}: LogTimeFlowArgs): Promise<boolean> {
+  // Prompt for required custom fields first
+  const { values: customFieldValues, cancelled, prompted } =
+    await promptForRequiredCustomFields(() => server.getTimeEntryCustomFields());
+  if (cancelled) return false;
+
+  // Confirm if issue is closed
+  const closedConfirmed = await confirmLogTimeOnClosedIssue(server, task.linkedIssueId);
+  if (!closedConfirmed) return false;
+
+  if (confirm && !(await confirm())) return false;
+
+  try {
+    await server.addTimeEntry(
+      task.linkedIssueId,
+      task.activityId ?? 0,
+      roundedHours.toString(),
+      task.title,
+      undefined,
+      customFieldValues
+    );
+    await controller.addLoggedHours(task.id, roundedHours);
+    controller.consumeDeferredMinutes();
+    await onLogged();
+    vscode.window.showInformationMessage(successMessage);
+    return true;
+  } catch (error) {
+    const errorMsg = String(error);
+    if (/custom.?field/i.test(errorMsg) && !prompted) {
+      vscode.window.showErrorMessage(
+        `${errorMsg} - Custom fields API requires admin access.`
+      );
+    } else {
+      vscode.window.showErrorMessage(`Failed to log time: ${error}`);
+    }
+    return false;
+  }
+}
+
 function createIntegerRangeValidator({
   min,
   max,
@@ -497,47 +576,25 @@ export function registerKanbanCommands(
           return;
         }
 
-        // Prompt for required custom fields first
-        const { values: customFieldValues, cancelled, prompted } =
-          await promptForRequiredCustomFields(() => server.getTimeEntryCustomFields());
-        if (cancelled) return;
-
-        // Confirm if issue is closed
-        const closedConfirmed = await confirmLogTimeOnClosedIssue(server, task.linkedIssueId);
-        if (!closedConfirmed) return;
-
         const roundedHours = Math.round(hours * 100) / 100;
         const deferredNote = deferredMinutes > 0 ? ` (${deferredMinutes} min deferred included)` : "";
-        const confirm = await vscode.window.showWarningMessage(
-          `Log ${roundedHours}h for #${task.linkedIssueId}?${deferredNote}`,
-          { modal: true },
-          "Log"
-        );
-        if (confirm !== "Log") return;
 
-        try {
-          await server.addTimeEntry(
-            task.linkedIssueId,
-            task.activityId ?? 0,
-            roundedHours.toString(),
-            task.title,
-            undefined,
-            customFieldValues
-          );
-          await controller.addLoggedHours(task.id, roundedHours);
-          controller.consumeDeferredMinutes();
-          await controller.stopTimer(task.id);
-          vscode.window.showInformationMessage(`Logged ${roundedHours}h`);
-        } catch (error) {
-          const errorMsg = String(error);
-          if (/custom.?field/i.test(errorMsg) && !prompted) {
-            vscode.window.showErrorMessage(
-              `${errorMsg} - Custom fields API requires admin access.`
+        await logTimeFlow({
+          server,
+          controller,
+          task,
+          roundedHours,
+          confirm: async () => {
+            const choice = await vscode.window.showWarningMessage(
+              `Log ${roundedHours}h for #${task.linkedIssueId}?${deferredNote}`,
+              { modal: true },
+              "Log"
             );
-          } else {
-            vscode.window.showErrorMessage(`Failed to log time: ${error}`);
-          }
-        }
+            return choice === "Log";
+          },
+          onLogged: () => controller.stopTimer(task.id),
+          successMessage: `Logged ${roundedHours}h`,
+        });
       }
     )
   );
@@ -606,46 +663,23 @@ export function registerKanbanCommands(
           return;
         }
 
-        // Prompt for required custom fields first
-        const { values: customFieldValues, cancelled, prompted } =
-          await promptForRequiredCustomFields(() => server.getTimeEntryCustomFields());
-        if (cancelled) return;
-
-        // Confirm if issue is closed
-        const closedConfirmed = await confirmLogTimeOnClosedIssue(server, task.linkedIssueId);
-        if (!closedConfirmed) return;
-
         // Log full work duration plus any deferred minutes from prior tasks
         const deferredMinutes = controller.getDeferredMinutes();
         const workDuration = controller.getWorkDurationSeconds();
         const hours = workDuration / 3600 + deferredMinutes / 60;
         const roundedHours = Math.round(hours * 100) / 100;
+        const deferredNote = deferredMinutes > 0 ? ` (${deferredMinutes} min deferred included)` : "";
 
-        try {
-          await server.addTimeEntry(
-            task.linkedIssueId,
-            task.activityId ?? 0,
-            roundedHours.toString(),
-            task.title,
-            undefined,
-            customFieldValues
-          );
-          await controller.addLoggedHours(task.id, roundedHours);
-          controller.consumeDeferredMinutes();
+        await logTimeFlow({
+          server,
+          controller,
+          task,
+          roundedHours,
           // Reset timer to full duration and keep running
-          await controller.startTimer(task.id, task.activityId ?? 0, task.activityName ?? "", true);
-          const deferredNote = deferredMinutes > 0 ? ` (${deferredMinutes} min deferred included)` : "";
-          vscode.window.showInformationMessage(`Logged ${roundedHours}h, timer restarted${deferredNote}`);
-        } catch (error) {
-          const errorMsg = String(error);
-          if (/custom.?field/i.test(errorMsg) && !prompted) {
-            vscode.window.showErrorMessage(
-              `${errorMsg} - Custom fields API requires admin access.`
-            );
-          } else {
-            vscode.window.showErrorMessage(`Failed to log time: ${error}`);
-          }
-        }
+          onLogged: () =>
+            controller.startTimer(task.id, task.activityId ?? 0, task.activityName ?? "", true),
+          successMessage: `Logged ${roundedHours}h, timer restarted${deferredNote}`,
+        });
       }
     )
   );

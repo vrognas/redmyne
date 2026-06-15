@@ -544,6 +544,76 @@ describe("registerKanbanCommands", () => {
     );
   });
 
+  it("shared log-time flow calls addTimeEntry -> addLoggedHours -> consumeDeferredMinutes in order and surfaces errors", async () => {
+    const order: string[] = [];
+    const task = createTask({
+      id: "task-flow",
+      title: "Flow task",
+      linkedIssueId: 99,
+      timerPhase: "working",
+      timerSecondsLeft: 1800, // 30 min elapsed of 1h
+      activityId: 8,
+      activityName: "Development",
+    });
+    const server = createServer({
+      addTimeEntry: vi.fn().mockImplementation(() => {
+        order.push("addTimeEntry");
+        return Promise.resolve(undefined);
+      }),
+      getTimeEntryCustomFields: vi.fn().mockResolvedValue([]),
+    });
+    const { controller } = registerCommands({ server, tasks: [task] });
+    controller.getWorkDurationSeconds.mockReturnValue(3600);
+    controller.addLoggedHours.mockImplementation(() => {
+      order.push("addLoggedHours");
+      return Promise.resolve(undefined);
+    });
+    controller.consumeDeferredMinutes.mockImplementation(() => {
+      order.push("consumeDeferredMinutes");
+      return 0;
+    });
+    vi.mocked(vscode.window.showWarningMessage).mockResolvedValue("Log" as never);
+
+    // Success path: ordering preserved across the shared helper.
+    await handlers.get("redmyne.kanban.logEarly")?.({ task });
+
+    expect(server.addTimeEntry).toHaveBeenCalledWith(
+      99,
+      8,
+      "0.5",
+      "Flow task",
+      undefined,
+      undefined
+    );
+    expect(order).toEqual([
+      "addTimeEntry",
+      "addLoggedHours",
+      "consumeDeferredMinutes",
+    ]);
+    expect(controller.stopTimer).toHaveBeenCalledWith("task-flow");
+
+    // Error path: failure from addTimeEntry is surfaced, no logging side effects.
+    vi.clearAllMocks();
+    controller.getActiveTask.mockReturnValue(task);
+    controller.getWorkDurationSeconds.mockReturnValue(3600);
+    promptForRequiredCustomFieldsSpy.mockResolvedValue({
+      values: undefined,
+      cancelled: false,
+      prompted: true,
+    });
+    confirmLogTimeOnClosedIssueSpy.mockResolvedValue(true);
+    server.addTimeEntry = vi.fn().mockRejectedValue(new Error("boom"));
+    vi.mocked(vscode.window.showWarningMessage).mockResolvedValue("Log" as never);
+
+    await handlers.get("redmyne.kanban.logAndContinue")?.({ task });
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to log time")
+    );
+    expect(controller.addLoggedHours).not.toHaveBeenCalled();
+    expect(controller.consumeDeferredMinutes).not.toHaveBeenCalled();
+  });
+
   it("logAndContinue no-ops when target is not the active task", async () => {
     const task = createTask({
       id: "not-active",

@@ -76,50 +76,39 @@ export function registerKanbanTimerHandlers(
       "Log & continue"
     );
 
+    // Both timer-completion choices log identically, differing only in the
+    // post-log controller action (complete vs reset) and the status message.
+    const logAndFinalize = async (finalize: () => Promise<void>, doneMsg: string) => {
+      try {
+        await server.addTimeEntry(
+          task.linkedIssueId,
+          task.activityId ?? 0,
+          totalHours.toString(),
+          task.title,
+          undefined,
+          customFieldResult.values
+        );
+        await deps.controller.addLoggedHours(task.id, totalHours);
+        deps.controller.consumeDeferredMinutes();
+        await finalize();
+        showStatusBarMessage(doneMsg, 2000);
+        deps.refreshAfterTimeLog();
+        deps.controller.startBreak();
+      } catch (error) {
+        vscode.window.showErrorMessage(`Failed to log time: ${error}`);
+      }
+    };
+
     if (action === "Log & complete") {
-      try {
-        await server.addTimeEntry(
-          task.linkedIssueId,
-          task.activityId ?? 0,
-          totalHours.toString(),
-          task.title,
-          undefined,
-          customFieldResult.values
-        );
-        await deps.controller.addLoggedHours(task.id, totalHours);
-        deps.controller.consumeDeferredMinutes();
-        await deps.controller.markDone(task.id);
-        showStatusBarMessage(
-          `$(check) Logged ${formattedTime} to #${task.linkedIssueId}${deferredNote}`,
-          2000
-        );
-        deps.refreshAfterTimeLog();
-        deps.controller.startBreak();
-      } catch (error) {
-        vscode.window.showErrorMessage(`Failed to log time: ${error}`);
-      }
+      await logAndFinalize(
+        () => deps.controller.markDone(task.id),
+        `$(check) Logged ${formattedTime} to #${task.linkedIssueId}${deferredNote}`
+      );
     } else if (action === "Log & continue") {
-      try {
-        await server.addTimeEntry(
-          task.linkedIssueId,
-          task.activityId ?? 0,
-          totalHours.toString(),
-          task.title,
-          undefined,
-          customFieldResult.values
-        );
-        await deps.controller.addLoggedHours(task.id, totalHours);
-        deps.controller.consumeDeferredMinutes();
-        await deps.controller.resetTimer(task.id);
-        showStatusBarMessage(
-          `$(check) Logged ${formattedTime}, timer reset${deferredNote}`,
-          2000
-        );
-        deps.refreshAfterTimeLog();
-        deps.controller.startBreak();
-      } catch (error) {
-        vscode.window.showErrorMessage(`Failed to log time: ${error}`);
-      }
+      await logAndFinalize(
+        () => deps.controller.resetTimer(task.id),
+        `$(check) Logged ${formattedTime}, timer reset${deferredNote}`
+      );
     }
     // Cancel/close: do nothing, timer stays completed.
   });
