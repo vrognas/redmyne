@@ -676,7 +676,7 @@ describe("extension lifecycle", () => {
     expect(updateConfiguredContext.mock.calls.length).toBeGreaterThan(baseline);
   });
 
-  it("skips gantt serializer update when no issues", async () => {
+  it("renders empty gantt and wires filter callback when no issues on restore", async () => {
     const context = createContext();
     const updateIssues = vi.fn().mockResolvedValue(undefined);
     const setFilterChangeCallback = vi.fn();
@@ -692,8 +692,17 @@ describe("extension lifecycle", () => {
       webview: {},
     } as unknown as vscode.WebviewPanel);
 
-    expect(updateIssues).not.toHaveBeenCalled();
-    expect(setFilterChangeCallback).not.toHaveBeenCalled();
+    // Panel must leave the skeleton: updateIssues called with the empty array
+    // so it renders its empty state.
+    expect(updateIssues).toHaveBeenCalledTimes(1);
+    expect(updateIssues.mock.calls[0]?.[0]).toEqual([]);
+    // Filter callback must be wired even with zero issues, and forward to the tree.
+    expect(setFilterChangeCallback).toHaveBeenCalledTimes(1);
+    const filterCb = setFilterChangeCallback.mock.calls[0]?.[0] as
+      | ((filter: unknown) => void)
+      | undefined;
+    filterCb?.({ assignee: "me" });
+    expect(hoisted.projectsTree.setFilter).toHaveBeenCalledWith({ assignee: "me" });
   });
 
   it("executes callback dependencies passed to command registrars", async () => {

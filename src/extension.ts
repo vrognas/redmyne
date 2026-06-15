@@ -17,6 +17,7 @@ import { RedmineSecretManager } from "./utilities/secret-manager";
 import { setApiKey } from "./commands/set-api-key";
 import { MonthlyScheduleOverrides, loadMonthlySchedules } from "./utilities/monthly-schedule";
 import { disposeStatusBar } from "./utilities/status-bar";
+import { errorToString } from "./utilities/error-feedback";
 import type { KanbanController } from "./kanban/kanban-controller";
 import type { KanbanStatusBar } from "./kanban/kanban-status-bar";
 import type { KanbanTreeProvider } from "./kanban/kanban-tree-provider";
@@ -251,9 +252,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     async deserializeWebviewPanel(panel: vscode.WebviewPanel) {
       // Restore panel with loading skeleton (use getter function for late binding)
       const ganttPanel = GanttPanel.restore(panel, context.extensionUri, () => projectsTree.server, () => draftModeManager);
-      // Fetch and populate data
-      const issues = await projectsTree.fetchIssuesIfNeeded();
-      if (issues.length > 0) {
+      // Always wire the filter callback so webview filter changes reach the tree,
+      // even when the fetch yields zero issues.
+      ganttPanel.setFilterChangeCallback((filter) => projectsTree.setFilter(filter));
+      try {
+        // Fetch and populate data. Pass the (possibly empty) array so the panel
+        // renders its empty state instead of being stuck on the loading skeleton.
+        const issues = await projectsTree.fetchIssuesIfNeeded();
         const schedule = getWeeklySchedule();
         await ganttPanel.updateIssues(
           issues,
@@ -264,7 +269,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           projectsTree.getDependencyIssues(),
           () => projectsTree.server
         );
-        ganttPanel.setFilterChangeCallback((filter) => projectsTree.setFilter(filter));
+      } catch (error) {
+        // Don't let a fetch/render rejection escape deserializeWebviewPanel and
+        // leave the panel silently stuck on the skeleton.
+        void vscode.window.showErrorMessage(errorToString(error));
       }
     },
   });
