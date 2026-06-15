@@ -237,12 +237,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
 
   // Register timesheet commands
-  registerTimeSheetCommands(context, {
-    getServer: () => projectsTree.server,
-    getDraftQueue: () => draftQueue,
-    getDraftModeManager: () => draftModeManager,
-    getCachedIssues: () => projectsTree.getAssignedIssues(),
-  });
+  context.subscriptions.push(
+    ...registerTimeSheetCommands(context, {
+      getServer: () => projectsTree.server,
+      getDraftQueue: () => draftQueue,
+      getDraftModeManager: () => draftModeManager,
+      getCachedIssues: () => projectsTree.getAssignedIssues(),
+    })
+  );
 
   // Register internal estimate commands
   registerInternalEstimateCommands(context);

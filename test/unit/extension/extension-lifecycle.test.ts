@@ -121,7 +121,7 @@ const hoisted = vi.hoisted(() => {
     setApiKey: vi.fn().mockResolvedValue(undefined),
     registerTimeEntryCommands: vi.fn(),
     registerMonthlyScheduleCommands: vi.fn(),
-    registerTimeSheetCommands: vi.fn(),
+    registerTimeSheetCommands: vi.fn().mockReturnValue([]),
     registerInternalEstimateCommands: vi.fn(),
     registerIssueContextCommands: vi.fn().mockReturnValue([]),
     registerNavigationClipboardCommands: vi.fn().mockReturnValue([]),

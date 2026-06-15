@@ -330,7 +330,8 @@ describe("open-actions + timesheet commands", () => {
           return disposable as never;
         }
       );
-      const serializerMock = vi.fn();
+      const serializerDisposable = { dispose: vi.fn() };
+      const serializerMock = vi.fn().mockReturnValue(serializerDisposable);
       (
         vscode.window as unknown as {
           registerWebviewPanelSerializer: ReturnType<typeof vi.fn>;
@@ -348,7 +349,9 @@ describe("open-actions + timesheet commands", () => {
 
       const disposables = registerTimeSheetCommands(context, deps);
 
-      expect(disposables).toHaveLength(2);
+      // Two commands + serializer registration must all be returned for cleanup.
+      expect(disposables).toHaveLength(3);
+      expect(disposables).toContain(serializerDisposable);
       expect(Object.keys(registered).sort()).toEqual([
         "redmyne.refreshTimesheet",
         "redmyne.showTimeSheet",

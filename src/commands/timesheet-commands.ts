@@ -44,19 +44,21 @@ export function registerTimeSheetCommands(
   );
 
   // Register webview panel serializer for restore on reload
-  vscode.window.registerWebviewPanelSerializer("redmyneTimeSheet", {
-    async deserializeWebviewPanel(panel: vscode.WebviewPanel) {
-      TimeSheetPanel.restore(
-        panel,
-        context.extensionUri,
-        context,
-        deps.getServer,
-        deps.getDraftQueue,
-        deps.getDraftModeManager,
-        deps.getCachedIssues
-      );
-    },
-  });
+  disposables.push(
+    vscode.window.registerWebviewPanelSerializer("redmyneTimeSheet", {
+      async deserializeWebviewPanel(panel: vscode.WebviewPanel) {
+        TimeSheetPanel.restore(
+          panel,
+          context.extensionUri,
+          context,
+          deps.getServer,
+          deps.getDraftQueue,
+          deps.getDraftModeManager,
+          deps.getCachedIssues
+        );
+      },
+    })
+  );
 
   return disposables;
 }
