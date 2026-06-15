@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   isLoadingPlaceholder,
-  createLoadingTreeItem,
   createSkeletonPlaceholders,
   createSkeletonTreeItem,
   LoadingPlaceholder,
@@ -36,29 +35,13 @@ describe("loading-placeholder", () => {
     });
   });
 
-  describe("createLoadingTreeItem", () => {
-    it("creates TreeItem with default message", () => {
-      const item = createLoadingTreeItem();
-      expect(item.label).toBe("Loading...");
-      expect(item.collapsibleState).toBe(vscode.TreeItemCollapsibleState.None);
-    });
-
-    it("creates TreeItem with custom message", () => {
-      const item = createLoadingTreeItem("Fetching data...");
-      expect(item.label).toBe("Fetching data...");
-    });
-
-    it("sets loading spinner icon", () => {
-      const item = createLoadingTreeItem();
-      expect(item.iconPath).toBeInstanceOf(vscode.ThemeIcon);
-      expect((item.iconPath as vscode.ThemeIcon).id).toBe("loading~spin");
-    });
-  });
-
   describe("skeleton helpers", () => {
-    it("createSkeletonPlaceholders returns single loading placeholder", () => {
-      const placeholders = createSkeletonPlaceholders(5);
-      expect(placeholders).toEqual([{ isLoadingPlaceholder: true, message: "Loading..." }]);
+    it("createSkeletonPlaceholders returns the requested number of rows", () => {
+      expect(createSkeletonPlaceholders(5)).toHaveLength(5);
+      expect(createSkeletonPlaceholders(5).every(isLoadingPlaceholder)).toBe(true);
+      expect(createSkeletonPlaceholders()).toEqual([
+        { isLoadingPlaceholder: true, message: "Loading..." },
+      ]);
     });
 
     it("createSkeletonTreeItem uses placeholder message fallback", () => {

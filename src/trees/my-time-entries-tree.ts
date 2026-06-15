@@ -434,6 +434,16 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     this._onDidChangeTreeData.fire(undefined);
   }
 
+  /** A single "Loading..." spinner row for tree loading states. */
+  private loadingNode(): TimeEntryNode {
+    return {
+      label: "Loading...",
+      iconPath: new vscode.ThemeIcon("loading~spin"),
+      collapsibleState: vscode.TreeItemCollapsibleState.None,
+      type: "loading",
+    };
+  }
+
   async getChildren(element?: TimeEntryNode): Promise<TimeEntryNode[]> {
     // No server configured - return empty
     if (!this.server) {
@@ -450,12 +460,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
 
       // Show spinner only when no data at all (first load)
       if (this.todayEntries === undefined) {
-        return [{
-          label: "Loading...",
-          iconPath: new vscode.ThemeIcon("loading~spin"),
-          collapsibleState: vscode.TreeItemCollapsibleState.None,
-          type: "loading",
-        }];
+        return [this.loadingNode()];
       }
 
       const today = formatLocalDate(new Date());
@@ -560,12 +565,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
 
       // Check if currently loading
       if (this.loadingMonths.has(monthKey)) {
-        return [{
-          label: "Loading...",
-          iconPath: new vscode.ThemeIcon("loading~spin"),
-          collapsibleState: vscode.TreeItemCollapsibleState.None,
-          type: "loading",
-        }];
+        return [this.loadingNode()];
       }
 
       // Load entries if not cached
@@ -578,12 +578,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
           // Ensure tree refreshes even on error so loading state clears
           this._onDidChangeTreeData.fire(undefined);
         });
-        return [{
-          label: "Loading...",
-          iconPath: new vscode.ThemeIcon("loading~spin"),
-          collapsibleState: vscode.TreeItemCollapsibleState.None,
-          type: "loading",
-        }];
+        return [this.loadingNode()];
       }
 
       const serverEntries = this.loadedMonthEntries.get(monthKey) || [];

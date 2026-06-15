@@ -788,7 +788,7 @@ Status legend: [ ] open, [x] fixed, [-] wontfix.
 - **detail:** formatDateISO (lines 42-44) just calls formatLocalDate, yet both are exported and the codebase is split between them (formatDateISO in src/utilities/date-picker.ts and src/commands/create-test-issues.ts; formatLocalDate everywhere else, e.g. time-entry-clipboard.ts, capacity-calculator.ts). Two names for one behavior forces readers to check whether they differ. Similarly getISOWeekNumber (lines 95-97) is a one-line wrapper over date-fns getISOWeek while getISOWeekYear on line 103 is re-exported directly — inconsistent indirection in the same file.
 - **fix:** Delete formatDateISO and update its ~12 call sites to formatLocalDate; either re-export getISOWeek directly (matching getISOWeekYear) or drop the wrapper.
 
-### 130. [ ] src/shared/loading-placeholder.ts:32 — Dead export, dead field, and a count parameter that is silently ignored
+### 130. [x] src/shared/loading-placeholder.ts:32 — Dead export, dead field, and a count parameter that is silently ignored
 
 - **dimension:** complexity | **verdict:** CONFIRMED
 - **detail:** createLoadingTreeItem (line 32) is exported, marked @deprecated, and has zero callers repo-wide. LoadingPlaceholder.skeletonIndex (line 10) is never set or read anywhere. createSkeletonPlaceholders(_count) (line 45) ignores its parameter yet callers pass meaningful counts expecting that many rows (projects-tree.ts:238 passes 5, projects-tree.ts:269 passes 3, my-issues-tree.ts:140 passes 5) — misleading API. Separately, my-time-entries-tree.ts ignores this shared module entirely and inlines its own identical spinner node literal at lines 435-440, 545-550, and 563-568.
