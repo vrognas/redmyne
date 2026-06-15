@@ -1162,13 +1162,12 @@ export class RedmineServer implements IRedmineServer {
   }
 
   /**
-   * Get available issue priorities
+   * Get available issue priorities.
+   * Delegates to getIssuePriorities so results are cached per server instance
+   * (static enumeration data) instead of re-fetched on every call.
    */
   async getPriorities(): Promise<{ id: number; name: string }[]> {
-    const response = await this.doRequest<{
-      issue_priorities: { id: number; name: string }[];
-    }>("/enumerations/issue_priorities.json", "GET");
-    return response?.issue_priorities || [];
+    return (await this.getIssuePriorities()).issue_priorities;
   }
 
   /**

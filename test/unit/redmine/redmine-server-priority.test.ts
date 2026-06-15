@@ -105,6 +105,27 @@ describe("RedmineServer Priority", () => {
     });
   });
 
+  describe("getPriorities", () => {
+    it("should cache across calls (single underlying request)", async () => {
+      const mockRequest = createMockRequest();
+      const serverWithMock = new RedmineServer({
+        address: "https://localhost:3000",
+        key: "test-api-key",
+        requestFn: mockRequest,
+      });
+
+      const first = await serverWithMock.getPriorities();
+      expect(mockRequest).toHaveBeenCalledTimes(1);
+      expect(first).toHaveLength(4);
+      expect(first[0].name).toBe("Low");
+
+      // Second call must hit the shared cache, not re-fetch
+      const second = await serverWithMock.getPriorities();
+      expect(mockRequest).toHaveBeenCalledTimes(1);
+      expect(second).toHaveLength(4);
+    });
+  });
+
   describe("setIssuePriority", () => {
     it("should update issue priority", async () => {
       await expect(server.setIssuePriority(123, 3)).resolves.not.toThrow();
