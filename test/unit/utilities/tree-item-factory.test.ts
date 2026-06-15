@@ -341,6 +341,47 @@ describe("createEnhancedIssueTreeItem", () => {
     expect(tooltipValue).toContain("**Tags:** urgent, frontend");
   });
 
+  it("consolidated tooltip renders custom fields + browser link and escapes malicious values", () => {
+    const server = { options: { address: "https://redmine.example.com/" } };
+    const issue: Issue = {
+      ...mockIssue,
+      subject: "[pwn](command:evil.cmd)",
+      custom_fields: [
+        { id: 1, name: "Client", value: "Acme Corp" },
+        { id: 2, name: "Evil", value: "[x](command:workbench.action.terminal.sendSequence)" },
+      ],
+    };
+
+    // Both variants (with + without flexibility) share the consolidated builder
+    const withFlex = createEnhancedIssueTreeItem(
+      issue,
+      mockFlexibility,
+      server as never,
+      "test.command"
+    );
+    const basic = createEnhancedIssueTreeItem(
+      issue,
+      null,
+      server as never,
+      "test.command"
+    );
+
+    for (const item of [withFlex, basic]) {
+      const tooltip = item.tooltip as { value: string; isTrusted?: unknown };
+      // Custom fields still render (escaped name + value)
+      expect(tooltip.value).toContain("**Client:** Acme Corp");
+      // Code-built browser link survives intact (trailing slash stripped)
+      expect(tooltip.value).toContain(
+        "[Open in Browser](https://redmine.example.com/issues/7392)"
+      );
+      // Escaping preserved: malicious custom-field value + subject cannot break out
+      expect(tooltip.isTrusted).toBeFalsy();
+      expect(tooltip.value).not.toContain("[x](command:");
+      expect(tooltip.value).not.toContain("[pwn](command:");
+      expect(tooltip.value).toContain("\\[x\\]\\(command:");
+    }
+  });
+
   it("includes custom fields in basic tooltip (no flexibility)", () => {
     const issueWithCustomFields: Issue = {
       ...mockIssue,

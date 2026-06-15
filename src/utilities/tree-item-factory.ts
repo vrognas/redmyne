@@ -70,9 +70,7 @@ export function createEnhancedIssueTreeItem(
   treeItem.description = assignee ? `${baseDesc} • ${assignee}${descIndicator}` : `${baseDesc}${descIndicator}`;
 
   // Tooltip: rich if flexibility data available, basic otherwise
-  treeItem.tooltip = flexibility
-    ? createFlexibilityTooltip(issue, flexibility, server)
-    : createBasicTooltip(issue, server);
+  treeItem.tooltip = createIssueTooltip(issue, server, flexibility);
 
   treeItem.command = {
     command: commandName,
@@ -84,18 +82,57 @@ export function createEnhancedIssueTreeItem(
 }
 
 /**
- * Creates rich tooltip with flexibility details
- * Uses tight line breaks within sections, separators between groups
+ * Appends the non-empty custom-fields section to an issue tooltip.
+ * Untrusted: field names and values are server-controlled and escaped.
  */
-function createFlexibilityTooltip(
+function appendCustomFields(
+  md: vscode.MarkdownString,
+  customFields: Issue["custom_fields"]
+): void {
+  if (!customFields || customFields.length === 0) {
+    return;
+  }
+  md.appendMarkdown("---\n\n");
+  for (const cf of customFields) {
+    const val = formatCustomFieldValue(cf.value);
+    if (val !== "") {
+      md.appendMarkdown(`**${escapeMarkdown(cf.name)}:** ${escapeMarkdown(val)}  \n`);
+    }
+  }
+  md.appendMarkdown("\n");
+}
+
+/**
+ * Appends an "Open in Browser" link to a tooltip.
+ * `path` is the trusted, code-built resource path (e.g. `/issues/123`);
+ * server address has trailing slashes stripped.
+ */
+function appendBrowserLink(
+  md: vscode.MarkdownString,
+  server: IRedmineServer | undefined,
+  path: string
+): void {
+  if (!server) {
+    return;
+  }
+  const base = server.options.address.replace(/\/+$/, "");
+  md.appendMarkdown(`[Open in Browser](${base}${path})`);
+}
+
+/**
+ * Creates an issue tooltip. With flexibility data it renders the rich
+ * Status/Progress/Remaining lines; without it, the basic Status/Hours lines.
+ * All other sections (title, metadata, description, relations, custom fields,
+ * browser link) are identical between the two variants.
+ * Uses tight line breaks within sections, separators between groups.
+ */
+function createIssueTooltip(
   issue: Issue,
-  flexibility: FlexibilityScore,
-  server: IRedmineServer | undefined
+  server: IRedmineServer | undefined,
+  flexibility: FlexibilityScore | null
 ): vscode.MarkdownString {
-  const statusText = STATUS_TEXT[flexibility.status];
   const spentHours = issue.spent_hours ?? 0;
   const estHours = issue.estimated_hours ?? 0;
-  const progress = estHours > 0 ? Math.round((spentHours / estHours) * 100) : 0;
 
   // Untrusted + no HTML: subject/description/custom fields are
   // server-controlled; with trust, an embedded [x](command:...) link
@@ -111,78 +148,21 @@ function createFlexibilityTooltip(
   // Core metadata (tight spacing with soft breaks)
   md.appendMarkdown(`**Tracker:** ${escapeMarkdown(issue.tracker?.name?.trim() ?? "Unknown")}  \n`);
   md.appendMarkdown(`**Priority:** ${escapeMarkdown(issue.priority?.name?.trim() ?? "Unknown")}  \n`);
-  md.appendMarkdown(`**Status:** ${statusText}  \n`);
+  if (flexibility) {
+    md.appendMarkdown(`**Status:** ${STATUS_TEXT[flexibility.status]}  \n`);
+  } else {
+    md.appendMarkdown(`**Status:** ${escapeMarkdown(issue.status?.name?.trim() ?? "Unknown")}  \n`);
+  }
   if (issue.due_date) {
     md.appendMarkdown(`**Due:** ${issue.due_date}  \n`);
   }
-  md.appendMarkdown(`**Progress:** ${formatHoursAsHHMM(spentHours)} / ${formatHoursAsHHMM(estHours)} (${progress}%)`);
-  if (flexibility.status !== "completed") {
-    md.appendMarkdown(`  \n**Remaining:** ${flexibility.daysRemaining}d · ${formatHoursAsHHMM(flexibility.hoursRemaining)}h`);
-  }
-  md.appendMarkdown("\n\n");
-
-  // Description section
-  if (issue.description?.trim()) {
-    md.appendMarkdown(`---\n\n${escapeMarkdown(issue.description.trim())}\n\n`);
-  }
-
-  // Relations section
-  if (issue.relations && issue.relations.length > 0) {
-    const relationsText = formatRelationsCompact(issue.relations);
-    if (relationsText) {
-      md.appendMarkdown(`---\n\n${relationsText}\n\n`);
+  if (flexibility) {
+    const progress = estHours > 0 ? Math.round((spentHours / estHours) * 100) : 0;
+    md.appendMarkdown(`**Progress:** ${formatHoursAsHHMM(spentHours)} / ${formatHoursAsHHMM(estHours)} (${progress}%)`);
+    if (flexibility.status !== "completed") {
+      md.appendMarkdown(`  \n**Remaining:** ${flexibility.daysRemaining}d · ${formatHoursAsHHMM(flexibility.hoursRemaining)}h`);
     }
-  }
-
-  // Custom fields section
-  if (issue.custom_fields && issue.custom_fields.length > 0) {
-    md.appendMarkdown("---\n\n");
-    for (const cf of issue.custom_fields) {
-      const val = formatCustomFieldValue(cf.value);
-      if (val !== "") {
-        md.appendMarkdown(`**${escapeMarkdown(cf.name)}:** ${escapeMarkdown(val)}  \n`);
-      }
-    }
-    md.appendMarkdown("\n");
-  }
-
-  // Browser link
-  if (server) {
-    const base = server.options.address.replace(/\/+$/, "");
-    md.appendMarkdown(`[Open in Browser](${base}/issues/${issue.id})`);
-  }
-
-  return md;
-}
-
-/**
- * Creates basic tooltip for issues without flexibility data
- * Uses tight line breaks within sections, separators between groups
- */
-function createBasicTooltip(
-  issue: Issue,
-  server: IRedmineServer | undefined
-): vscode.MarkdownString {
-  const spentHours = issue.spent_hours ?? 0;
-  const estHours = issue.estimated_hours ?? 0;
-
-  // Untrusted + no HTML — see createFlexibilityTooltip.
-  const md = new vscode.MarkdownString();
-  md.supportThemeIcons = true;
-
-  const subject = escapeMarkdown(issue.subject?.trim() || "Unknown");
-
-  // Title
-  md.appendMarkdown(`**#${issue.id}: ${subject}**\n\n`);
-
-  // Core metadata (tight spacing with soft breaks)
-  md.appendMarkdown(`**Tracker:** ${escapeMarkdown(issue.tracker?.name?.trim() ?? "Unknown")}  \n`);
-  md.appendMarkdown(`**Priority:** ${escapeMarkdown(issue.priority?.name?.trim() ?? "Unknown")}  \n`);
-  md.appendMarkdown(`**Status:** ${escapeMarkdown(issue.status?.name?.trim() ?? "Unknown")}  \n`);
-  if (issue.due_date) {
-    md.appendMarkdown(`**Due:** ${issue.due_date}  \n`);
-  }
-  if (estHours > 0 || spentHours > 0) {
+  } else if (estHours > 0 || spentHours > 0) {
     md.appendMarkdown(`**Hours:** ${formatHoursAsHHMM(spentHours)} / ${formatHoursAsHHMM(estHours)}`);
   }
   md.appendMarkdown("\n\n");
@@ -201,22 +181,10 @@ function createBasicTooltip(
   }
 
   // Custom fields section
-  if (issue.custom_fields && issue.custom_fields.length > 0) {
-    md.appendMarkdown("---\n\n");
-    for (const cf of issue.custom_fields) {
-      const val = formatCustomFieldValue(cf.value);
-      if (val !== "") {
-        md.appendMarkdown(`**${escapeMarkdown(cf.name)}:** ${escapeMarkdown(val)}  \n`);
-      }
-    }
-    md.appendMarkdown("\n");
-  }
+  appendCustomFields(md, issue.custom_fields);
 
   // Browser link
-  if (server) {
-    const base = server.options.address.replace(/\/+$/, "");
-    md.appendMarkdown(`[Open in Browser](${base}/issues/${issue.id})`);
-  }
+  appendBrowserLink(md, server, `/issues/${issue.id}`);
 
   return md;
 }
@@ -312,9 +280,6 @@ export function createProjectTooltip(
     }
   }
 
-  if (server) {
-    const base = server.options.address.replace(/\/+$/, "");
-    md.appendMarkdown(`[Open in Browser](${base}/projects/${project.identifier})`);
-  }
+  appendBrowserLink(md, server, `/projects/${project.identifier}`);
   return md;
 }
