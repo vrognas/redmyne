@@ -319,6 +319,47 @@ describe("custom-field-picker", () => {
       expect(noOptions[1].picked).toBe(true);
     });
 
+    it("pre-selects existing list value and preserves it when unchanged", async () => {
+      const vscode = await import("vscode");
+      const { pickCustomFields } = await import("../../../src/utilities/custom-field-picker");
+
+      const field: CustomFieldDefinition = {
+        id: 8,
+        name: "Billing Code",
+        field_format: "list",
+        is_required: true,
+        customized_type: "time_entry",
+        possible_values: [
+          { value: "internal", label: "Internal" },
+          { value: "client", label: "Client" },
+        ],
+      };
+      const existing: TimeEntryCustomFieldValue[] = [{ id: 8, value: "client" }];
+
+      // Simulate the user accepting the highlighted (first/active) item unchanged.
+      vi.mocked(vscode.window.showQuickPick).mockImplementation(
+        async (items) => {
+          const arr = (await items) as Array<{
+            label: string;
+            value: string;
+            picked?: boolean;
+          }>;
+          // The matching existing value must be flagged as picked...
+          const match = arr.find((o) => o.value === "client");
+          expect(match?.picked).toBe(true);
+          // ...and surfaced first so the single-select QuickPick highlights it.
+          expect(arr[0]?.value).toBe("client");
+          return arr[0] as never;
+        }
+      );
+
+      const result = await pickCustomFields([field], existing);
+
+      // Accepting the pre-selected option must keep the stored value, not the
+      // first declared possible_value ("internal").
+      expect(result.values).toEqual([{ id: 8, value: "client" }]);
+    });
+
     it("validates numeric, date and string constraints", async () => {
       const vscode = await import("vscode");
       const { pickCustomFields } = await import("../../../src/utilities/custom-field-picker");

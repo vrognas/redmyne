@@ -76,7 +76,7 @@ async function pickFieldValue(
 
   switch (field.field_format) {
     case "list":
-      return pickListField(field, requiredLabel);
+      return pickListField(field, requiredLabel, defaultValue);
 
     case "bool":
       return pickBoolField(field, requiredLabel, defaultValue);
@@ -100,14 +100,25 @@ async function pickFieldValue(
 
 async function pickListField(
   field: CustomFieldDefinition,
-  requiredLabel: string
+  requiredLabel: string,
+  defaultValue?: string
 ): Promise<string | string[] | undefined> {
+  // Existing values arrive as the comma-joined string built by the caller.
+  const defaults = new Set(
+    (defaultValue ?? "")
+      .split(",")
+      .map((v) => v.trim())
+      .filter((v) => v.length > 0)
+  );
+
   const options = (field.possible_values || []).map((pv) => ({
     label: pv.label || pv.value,
     value: pv.value,
+    picked: defaults.has(pv.value),
   }));
 
   if (field.multiple) {
+    // canPickMany honors `picked`, so pre-checking the stored values is enough.
     const selected = await vscode.window.showQuickPick(options, {
       title: `${field.name}${requiredLabel}`,
       placeHolder: `Select one or more values for ${field.name}`,
@@ -116,7 +127,12 @@ async function pickListField(
     if (!selected) return undefined;
     return (selected as Array<{ value: string }>).map((s) => s.value);
   } else {
-    const selected = await vscode.window.showQuickPick(options, {
+    // Single-select ignores `picked`; surface the current value first so it is
+    // the highlighted/active item and an unchanged confirm preserves it.
+    const ordered = options
+      .slice()
+      .sort((a, b) => Number(b.picked) - Number(a.picked));
+    const selected = await vscode.window.showQuickPick(ordered, {
       title: `${field.name}${requiredLabel}`,
       placeHolder: `Select value for ${field.name}`,
     });

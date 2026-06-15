@@ -3,7 +3,7 @@
  * Defines communication protocol between extension and webview
  */
 
-import { formatLocalDate, getISOWeekNumber } from "../utilities/date-utils";
+import { formatLocalDate, getISOWeekNumber, getISOWeekYear } from "../utilities/date-utils";
 
 // Sentinel value for orphan projects (no parent)
 export const OTHERS_PARENT_ID = -1;
@@ -459,7 +459,7 @@ export function buildWeekInfo(monday: Date): WeekInfo {
   }
   return {
     weekNumber: getISOWeekNumber(monday),
-    year: monday.getFullYear(),
+    year: getISOWeekYear(monday),
     startDate: dayDates[0] ?? "",
     endDate: dayDates[6] ?? "",
     dayDates,

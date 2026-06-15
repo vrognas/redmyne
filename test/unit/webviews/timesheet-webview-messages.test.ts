@@ -20,4 +20,13 @@ describe("timesheet webview message date helpers", () => {
       "2026-02-08",
     ]);
   });
+
+  it("pairs ISO week 1 with the ISO-week-year across a year boundary", () => {
+    // Monday 2025-12-29 is ISO week 1 of ISO-year 2026 (not calendar year 2025)
+    const monday = new Date(2025, 11, 29);
+    const week = buildWeekInfo(monday);
+
+    expect(week.weekNumber).toBe(1);
+    expect(week.year).toBe(2026);
+  });
 });
