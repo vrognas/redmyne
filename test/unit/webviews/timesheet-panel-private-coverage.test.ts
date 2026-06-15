@@ -1255,4 +1255,57 @@ describe("timesheet panel private coverage", () => {
     await panel._navigateWeek("date");
     expect(panel._loadWeek).toHaveBeenCalledTimes(5);
   });
+
+  it("a rejecting message handler surfaces an error instead of an unhandled rejection", async () => {
+    // Capture the handler the panel registers with onDidReceiveMessage so we
+    // exercise the real dispatch wiring (not the private method directly).
+    let registeredHandler: MessageHandler | undefined;
+    const mock = createMockPanel();
+    mock.webview.onDidReceiveMessage.mockImplementation(
+      (handler: MessageHandler, _thisArg?: unknown, disposables?: Array<{ dispose: () => void }>) => {
+        registeredHandler = handler;
+        const disposable = { dispose: vi.fn() };
+        if (Array.isArray(disposables)) disposables.push(disposable);
+        return disposable;
+      }
+    );
+
+    const queue = createQueue();
+    const server = createServer();
+    const draftModeManager = createDraftModeManager(true, queue);
+    TimeSheetPanel.restore(
+      mock.panel,
+      vscode.Uri.parse("file:///ext"),
+      createContext(),
+      () => server as unknown as import("../../../src/redmine/redmine-server").RedmineServer,
+      () => queue as unknown as import("../../../src/draft-mode/draft-queue").DraftQueue,
+      () =>
+        draftModeManager as unknown as import("../../../src/draft-mode/draft-mode-manager").DraftModeManager
+    );
+    const panel = TimeSheetPanel.currentPanel as unknown as Record<string, any>;
+
+    // Make a handler reject mid-flight (mirrors a DraftQueue/server failure).
+    panel._deleteRow = vi.fn().mockRejectedValue(new Error("queue write failed"));
+
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on("unhandledRejection", onUnhandled);
+    try {
+      registeredHandler?.({ type: "deleteRow", rowId: "row-x" });
+      // Flush microtasks so the dispatch promise + its .catch settle.
+      await Promise.resolve();
+      await Promise.resolve();
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+
+    expect(panel._deleteRow).toHaveBeenCalledWith("row-x");
+    expect(unhandled).toHaveLength(0);
+    expect(mock.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "showError",
+        message: expect.stringContaining("queue write failed"),
+      })
+    );
+  });
 });

@@ -286,9 +286,16 @@ export class TimeSheetPanel {
     // Set HTML content
     this._panel.webview.html = this._getHtml();
 
-    // Handle messages from webview
+    // Handle messages from webview. _handleMessage is async and several
+    // handlers (delete/update/merge/undo) await DraftQueue + server calls with
+    // no internal try/catch, so a dropped promise here would surface a rejected
+    // edit as a silent unhandled rejection. Catch it and tell the user.
     this._panel.webview.onDidReceiveMessage(
-      (message: WebviewToExtensionMessage) => this._handleMessage(message),
+      (message: WebviewToExtensionMessage) => {
+        void this._handleMessage(message).catch((err) => {
+          this._postMessage({ type: "showError", message: `Action failed: ${err}` });
+        });
+      },
       null,
       this._disposables
     );
@@ -508,6 +515,7 @@ export class TimeSheetPanel {
   }
 
   private _postMessage(message: ExtensionToWebviewMessage): void {
+    if (this._disposed) return; // late async completion after panel close
     this._panel.webview.postMessage(message);
   }
 
