@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { errorToString } from "../utilities/error-feedback";
 import { ActionProperties } from "./action-properties";
+import { runWithServerProgress } from "./commons/open-actions-for-issue-id";
 
 export default async ({ server, config }: ActionProperties) => {
   const open = (projectName: string) => {
@@ -20,23 +21,12 @@ export default async ({ server, config }: ActionProperties) => {
     return open(config.defaultProject);
   }
 
-  const promise = server.getProjects();
-
-  vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-    },
-    (progress) => {
-      progress.report({
-        message: `Waiting for response from ${server.options.url.hostname}...`,
-      });
-      return promise;
-    }
+  const projects = await runWithServerProgress(server, () =>
+    server.getProjects()
   );
+  if (!projects) return;
 
   try {
-    const projects = await promise;
-
     const project = await vscode.window.showQuickPick(
       projects.map((project) => project.toQuickPickItem()),
       {

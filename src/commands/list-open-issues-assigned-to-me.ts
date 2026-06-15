@@ -3,6 +3,7 @@ import { IssueController } from "../controllers/issue-controller";
 import { ActionProperties } from "./action-properties";
 import { Issue } from "../redmine/models/issue";
 import { errorToString } from "../utilities/error-feedback";
+import { runWithServerProgress } from "./commons/open-actions-for-issue-id";
 
 export interface PickItem extends vscode.QuickPickItem {
   label: string;
@@ -25,23 +26,12 @@ const mapIssueToPickItem = (issue: Issue): PickItem => ({
 });
 
 export default async ({ server }: ActionProperties) => {
-  const promise = server.getIssuesAssignedToMe();
-
-  vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-    },
-    (progress) => {
-      progress.report({
-        message: `Waiting for response from ${server.options.url.hostname}...`,
-      });
-      return promise;
-    }
+  const issues = await runWithServerProgress(server, () =>
+    server.getIssuesAssignedToMe()
   );
+  if (!issues) return;
 
   try {
-    const issues = await promise;
-
     const issue = await vscode.window.showQuickPick(
       issues.issues.map(mapIssueToPickItem),
       {

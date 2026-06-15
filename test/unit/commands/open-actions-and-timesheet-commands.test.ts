@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as vscode from "vscode";
 import openActionsForIssue from "../../../src/commands/open-actions-for-issue";
 import openActionsForIssueUnderCursor from "../../../src/commands/open-actions-for-issue-under-cursor";
-import openActionsForIssueId from "../../../src/commands/commons/open-actions-for-issue-id";
+import openActionsForIssueId, {
+  runWithServerProgress,
+} from "../../../src/commands/commons/open-actions-for-issue-id";
 import newIssue from "../../../src/commands/new-issue";
 import { registerTimeSheetCommands } from "../../../src/commands/timesheet-commands";
 import { TimeSheetPanel } from "../../../src/webviews/timesheet-panel";
@@ -178,6 +180,35 @@ describe("open-actions + timesheet commands", () => {
       await openActionsForIssueId(failingServer, "42");
 
       expect(listSpy).not.toHaveBeenCalled();
+      expect(errSpy).toHaveBeenCalledWith("boom");
+    });
+  });
+
+  describe("runWithServerProgress", () => {
+    it("runs the operation under progress and surfaces errors via showErrorMessage", async () => {
+      const server = {
+        options: { url: { hostname: "example.test" } },
+      } as never;
+      const progressSpy = vi.spyOn(vscode.window, "withProgress");
+      const errSpy = vi.spyOn(vscode.window, "showErrorMessage");
+
+      // success: returns the resolved value, runs under withProgress
+      const ok = await runWithServerProgress(server, () =>
+        Promise.resolve("payload")
+      );
+      expect(ok).toBe("payload");
+      expect(progressSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          location: vscode.ProgressLocation.Notification,
+        }),
+        expect.any(Function)
+      );
+
+      // failure: swallows rejection, returns undefined, reports errorToString
+      const failed = await runWithServerProgress(server, () =>
+        Promise.reject(new Error("boom"))
+      );
+      expect(failed).toBeUndefined();
       expect(errSpy).toHaveBeenCalledWith("boom");
     });
   });
