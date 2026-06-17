@@ -156,7 +156,6 @@ describe("gantt-html-generator", () => {
 
       const mockContext = {
         ...baseContext,
-        getHealthDot: () => '<tspan fill="green">●</tspan>',
         buildProjectTooltip: () => "Project tooltip",
       };
 
@@ -217,7 +216,6 @@ describe("gantt-html-generator", () => {
         maxDate: new Date("2025-01-31"),
         today: new Date("2025-01-15"),
         viewFocus: "project" as const,
-        showIntensity: false,
         currentUserId: null,
         schedule: { Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0, Sun: 0 },
         issueScheduleMap: new Map(),
@@ -411,7 +409,6 @@ describe("gantt-html-generator", () => {
         maxDate: new Date("2025-01-31"),
         today: new Date("2025-01-15"),
         viewFocus: "project" as const,
-        showIntensity: false,
         currentUserId: null,
         schedule: { Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0, Sun: 0 },
         issueScheduleMap: new Map(),
@@ -423,7 +420,6 @@ describe("gantt-html-generator", () => {
         hasPrecedence: () => false,
         isAutoUpdateEnabled: () => true,
         contributionSources: new Map(),
-        donationTargets: new Map(),
       };
 
       const noDateRow: GanttRow = {

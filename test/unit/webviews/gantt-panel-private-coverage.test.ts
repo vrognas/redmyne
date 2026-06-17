@@ -194,9 +194,7 @@ describe("gantt panel private coverage", () => {
       })
     );
     expect(server.getUserFteBatch).toHaveBeenCalled();
-    expect(panel._contributionData).toBeDefined();
     expect(panel._contributionSources).toBeDefined();
-    expect(panel._donationTargets).toBeDefined();
     expect(panel._flexibilityCache.has(1)).toBe(true);
     expect(panel._flexibilityCache.has(2)).toBe(true);
     expect(panel._cachedHierarchy).toBeUndefined();
@@ -712,8 +710,6 @@ describe("gantt panel private coverage", () => {
       expect(payload.state.totalDays).toBeGreaterThan(0);
     }
 
-    expect(panel.getHealthDot("red")).toBe("🔴 ");
-    expect(panel.getHealthDot("grey")).toBe("⚪ ");
     expect(panel.getProjectCustomFieldLines()).toEqual([]);
     expect(panel.formatProjectTooltip(undefined, undefined)).toBe("");
 

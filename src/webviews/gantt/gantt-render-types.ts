@@ -15,30 +15,19 @@ export interface GanttRenderContext {
   indentSize: number;
   chevronWidth: number;
   timelineWidth: number;
-  labelWidth: number;
 
   // Column widths
   idColumnWidth: number;
-  startDateColumnWidth: number;
   statusColumnWidth: number;
-  dueDateColumnWidth: number;
   assigneeColumnWidth: number;
 
   // Date range
   minDate: Date;
   maxDate: Date;
   today: Date;
-  todayStr: string;
-
-  // Data
-  rows: GanttRow[];
-  filteredRows: GanttRow[];
 
   // View settings
   viewFocus: "project" | "person";
-  showIntensity: boolean;
-  showDependencies: boolean;
-  showBadges: boolean;
   currentUserId: number | null;
 
   // Schedule
@@ -47,8 +36,6 @@ export interface GanttRenderContext {
 
   // Contribution tracking
   contributionSources?: Map<number, { fromIssueId: number; hours: number }[]>;
-  donationTargets?: Map<number, { toIssueId: number; hours: number }[]>;
-  adHocIssues?: Set<number>;
 
   // Callbacks for tooltips/status (injected from panel)
   getStatusColor: (status: string) => string;
@@ -56,7 +43,6 @@ export interface GanttRenderContext {
   getStatusOpacity: (status: string) => number;
   getStatusDescription: (status: string) => string;
   buildProjectTooltip: (row: GanttRow) => string;
-  getHealthDot: (status: string) => string;
 
   // Internal estimates and precedence
   getInternalEstimate: (issueId: number) => { hoursRemaining: number } | null;
@@ -103,27 +89,6 @@ export interface GanttArrowPayload {
   /** Source task late or projected late (remaining flexibility < 0) —
    *  the arrow renders red instead of green. */
   risk: boolean;
-}
-
-/** Position data for dependency arrows */
-export interface IssuePosition {
-  startX: number;
-  endX: number;
-  y: number;
-}
-
-/** Group range for zebra stripes */
-export interface GroupRange {
-  startIdx: number;
-  endIdx: number;
-  groupIdx: number;
-}
-
-/** Relation style definition */
-export interface RelationStyle {
-  dash: string;
-  label: string;
-  tip: string;
 }
 
 /** Avatar color indices */

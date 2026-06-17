@@ -4,7 +4,7 @@ import { Version } from "../redmine/models/version";
 import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { RedmineProject } from "../redmine/redmine-project";
 import { groupMembersByRole } from "../controllers/domain";
-import { FlexibilityScore, WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE, calculateFlexibility, scaleScheduleByFte, ContributionData } from "../utilities/flexibility-calculator";
+import { FlexibilityScore, WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE, calculateFlexibility, scaleScheduleByFte } from "../utilities/flexibility-calculator";
 import { calculateContributions, parseTargetIssueId } from "../utilities/contribution-calculator";
 import { adHocTracker } from "../utilities/adhoc-tracker";
 import { showStatusBarMessage } from "../utilities/status-bar";
@@ -278,10 +278,8 @@ export class GanttPanel {
   // Scoped to the focus that set it so a flag surviving an empty render
   // can't fire on the other focus's next render.
   private _expandAllOnNextRender: "project" | "person" | "any" | false = "any";
-  // Ad-hoc budget contribution tracking
-  private _contributionData?: ContributionData;
+  // Ad-hoc budget contribution tracking (per-issue sources for tooltips + effective-spent calc)
   private _contributionSources?: Map<number, { fromIssueId: number; hours: number }[]>;
-  private _donationTargets?: Map<number, { toIssueId: number; hours: number }[]>;
 
   private constructor(
     panel: vscode.WebviewPanel,
@@ -939,17 +937,8 @@ export class GanttPanel {
       const contributions = calculateContributions(allTimeEntries);
       if (loadId !== this._supplementalLoadId) return false;
 
-      // Build contribution data for flexibility calculation
-      const contributionData: ContributionData = {
-        contributedTo: contributions.contributedTo,
-        donatedFrom: contributions.donatedFrom,
-        adHocIssues: adHocIssueIds,
-      };
-
-      // Store contribution data for tooltip display
-      this._contributionData = contributionData;
+      // Cache per-issue contribution sources for tooltip + effective-spent calc.
       this._contributionSources = contributions.contributionSources;
-      this._donationTargets = contributions.donationTargets;
 
       // Fetch FTE values for unique assignees (for flexibility calculation)
       const uniqueAssigneeIds = [...new Set(
@@ -1344,12 +1333,11 @@ export class GanttPanel {
       case "setLookback":
         this._lookbackYears = parseLookbackYears(message.years, this._lookbackYears);
         GanttPanel._globalState?.update(LOOKBACK_YEARS_KEY, this._lookbackYears);
-        // Clear contribution display cache and re-fetch with new lookback.
+        // Re-fetch contributions with the new lookback window.
         // Do NOT force-clear _contributionsLoading here: _refreshSupplementalData
         // bumps _supplementalLoadId, which invalidates any in-flight load at its
         // post-await re-checks. Resetting the duplicate-fetch guard instead let a
         // slow earlier load interleave and overwrite the newer load's caches.
-        this._contributionData = undefined;
         this._updateContent();
         void this._refreshSupplementalData();
         break;
@@ -2404,34 +2392,22 @@ export class GanttPanel {
       indentSize,
       chevronWidth,
       timelineWidth,
-      labelWidth,
       idColumnWidth,
-      startDateColumnWidth,
       statusColumnWidth,
-      dueDateColumnWidth,
       assigneeColumnWidth,
       minDate,
       maxDate,
       today: todayUTC,
-      todayStr: getTodayStr(),
-      rows: allRows,
-      filteredRows,
       viewFocus: this._viewFocus,
-      showIntensity: this._showIntensity,
-      showDependencies: this._showDependencies,
-      showBadges: this._showBadges,
       currentUserId: this._currentUserId,
       schedule: this._schedule,
       issueScheduleMap,
       contributionSources: this._contributionSources,
-      donationTargets: this._donationTargets,
-      adHocIssues: this._contributionData?.adHocIssues,
       getStatusColor: (status: string) => this._getStatusColor(status as FlexibilityScore["status"] | null),
       getStatusTextColor: (status: string) => this._getStatusTextColor(status as FlexibilityScore["status"] | null),
       getStatusOpacity: (status: string) => this._getStatusOpacity(status as FlexibilityScore["status"] | null),
       getStatusDescription: (status: string) => this._getStatusDescription(status as FlexibilityScore["status"] | null),
       buildProjectTooltip: (row: GanttRow) => this.buildProjectTooltip(row),
-      getHealthDot: (status: string) => this.getHealthDot(status as "green" | "yellow" | "red" | "grey"),
       getInternalEstimate: (issueId: number) => GanttPanel._globalState ? getInternalEstimate(GanttPanel._globalState, issueId) : null,
       hasPrecedence: (issueId: number) => hasPrecedence(issueId),
       isAutoUpdateEnabled: (issueId: number) => autoUpdateTracker.isEnabled(issueId),
@@ -3130,18 +3106,6 @@ export class GanttPanel {
       body: weekendGroup + bodyGridLines.join(""),
       todayMarker: todayMarkerSvg,
     };
-  }
-
-  /**
-   * Get health status dot/emoji for display
-   */
-  private getHealthDot(status: "green" | "yellow" | "red" | "grey"): string {
-    switch (status) {
-      case "green": return "🟢 ";
-      case "yellow": return "🟡 ";
-      case "red": return "🔴 ";
-      case "grey": return "⚪ ";
-    }
   }
 
   private normalizeTooltipText(value: string): string {
