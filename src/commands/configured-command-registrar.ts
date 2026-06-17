@@ -28,6 +28,55 @@ export type RegisterConfiguredCommand = (
   action: ConfiguredCommandAction
 ) => void;
 
+/**
+ * Decodes the 3-way overloaded first-argument convention used by configured commands.
+ *
+ * Shapes:
+ *   withPick === false  → pre-configured path: return props + remaining args unchanged
+ *   withPick is object  → context-menu path: reassemble all args as forwardedArgs
+ *   anything else       → pick/config path: no preconfigured props, no forwarded args
+ *                         (primitive non-boolean first args are silently dropped — by design)
+ */
+export function decodeInvocation(
+  withPick: unknown,
+  props: ActionProperties | undefined,
+  args: unknown[]
+): { preconfigured?: ActionProperties; forwardedArgs: unknown[] } {
+  if (withPick === false) {
+    return { preconfigured: props, forwardedArgs: args };
+  }
+  if (typeof withPick === "object" && withPick !== null) {
+    return {
+      forwardedArgs: [withPick, ...(props === undefined ? [] : [props]), ...args],
+    };
+  }
+  // withPick === true | undefined | any primitive: pick/config path, drop withPick
+  return { forwardedArgs: [] };
+}
+
+/**
+ * Produces the command arguments array for a configured command invocation,
+ * for use in `vscode.TreeItem.command.arguments` (deferred execution).
+ */
+export function configuredCommandArgs(
+  props: ActionProperties,
+  ...args: unknown[]
+): [false, ActionProperties, ...unknown[]] {
+  return [false, props, ...args];
+}
+
+/**
+ * Directly execute a configured command, bypassing the pick flow.
+ * Equivalent to `vscode.commands.executeCommand(name, false, props, ...args)`.
+ */
+export function invokeConfigured(
+  name: string,
+  props: ActionProperties,
+  ...args: unknown[]
+): Thenable<unknown> {
+  return vscode.commands.executeCommand(name, false, props, ...args);
+}
+
 export function createConfiguredCommandRegistrar(
   deps: RegisterConfiguredCommandDeps
 ): RegisterConfiguredCommand {
@@ -41,19 +90,17 @@ export function createConfiguredCommandRegistrar(
     props?: ActionProperties;
     args: unknown[];
   }> => {
-    // When invoked from context menu, tree element is passed as first arg.
-    // Preserve it in args if it's an object (not a boolean).
-    let contextArgs: unknown[] = [];
-    if (typeof withPick === "object" && withPick !== null) {
-      contextArgs = [withPick, ...(props === undefined ? [] : [props]), ...args];
-    }
+    const { preconfigured, forwardedArgs } = decodeInvocation(withPick, props, args);
 
     if (withPick === false) {
       return {
-        props,
-        args,
+        props: preconfigured,
+        args: forwardedArgs,
       };
     }
+
+    // Context-menu or config/pick path
+    const contextArgs = forwardedArgs;
 
     const config = vscode.workspace.getConfiguration("redmyne");
     const url = getConfiguredServerUrlOrShowError(

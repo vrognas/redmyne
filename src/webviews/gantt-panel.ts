@@ -43,6 +43,8 @@ import { dateToX, endExclusiveX, clampMinDateToLookback } from "./gantt/gantt-co
 import { GANTT_LAYOUT, computeStickyLeftWidth } from "./gantt/gantt-layout-constants";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
 import { DRAFT_COMMAND_SOURCE } from "../draft-mode/draft-change-sources";
+import { invokeConfigured } from "../commands/configured-command-registrar";
+import type { ActionProperties } from "../commands/action-properties";
 
 // Performance instrumentation (gated behind redmyne.gantt.perfDebug config).
 // The flag is read once at render entry and pinned for the duration of the
@@ -1273,10 +1275,9 @@ export class GanttPanel {
       case "openIssue":
         if (message.issueId && this._server) {
           // Open issue actions (refresh is handled by individual actions if needed)
-          vscode.commands.executeCommand(
+          void invokeConfigured(
             "redmyne.openActionsForIssue",
-            false,
-            { server: this._server },
+            { server: this._server } as ActionProperties,
             String(message.issueId)
           );
         }

@@ -8,6 +8,8 @@ import { formatCustomFieldValue } from "./custom-field-formatter";
 import { Membership, groupMembersByRole } from "../controllers/domain";
 import { escapeMarkdown } from "./markdown-escape";
 import { formatIssueLabel } from "./issue-label";
+import { configuredCommandArgs } from "../commands/configured-command-registrar";
+import type { ActionProperties } from "../commands/action-properties";
 
 /**
  * Status display text for flexibility scores (used in tooltips)
@@ -75,7 +77,7 @@ export function createEnhancedIssueTreeItem(
 
   treeItem.command = {
     command: commandName,
-    arguments: [false, { server }, `${issue.id}`],
+    arguments: configuredCommandArgs({ server } as ActionProperties, `${issue.id}`),
     title: `Open actions for issue #${issue.id}`,
   };
 

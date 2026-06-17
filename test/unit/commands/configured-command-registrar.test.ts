@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as vscode from "vscode";
 import type { ActionProperties } from "../../../src/commands/action-properties";
-import { createConfiguredCommandRegistrar } from "../../../src/commands/configured-command-registrar";
+import { createConfiguredCommandRegistrar, decodeInvocation } from "../../../src/commands/configured-command-registrar";
 import type { IRedmineServer } from "../../../src/redmine/redmine-server-interface";
 
 function makeConfig(values: Record<string, unknown>): vscode.WorkspaceConfiguration {
@@ -20,6 +20,48 @@ async function flushAsyncWork(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
 }
+
+describe("decodeInvocation", () => {
+  const fakeProps = { server: {}, config: {} } as unknown as ActionProperties;
+
+  it("withPick=true: config path — no preconfigured, no forwardedArgs", () => {
+    const result = decodeInvocation(true, fakeProps, ["extra"]);
+    expect(result.preconfigured).toBeUndefined();
+    expect(result.forwardedArgs).toEqual([]);
+  });
+
+  it("withPick=false: pre-configured path — preserves props and all remaining args", () => {
+    const result = decodeInvocation(false, fakeProps, ["arg1", 2]);
+    expect(result.preconfigured).toBe(fakeProps);
+    expect(result.forwardedArgs).toEqual(["arg1", 2]);
+  });
+
+  it("withPick=object: context-menu path — reassembles all three params as forwardedArgs", () => {
+    const node = { id: 42 };
+    const result = decodeInvocation(node, fakeProps, ["extra"]);
+    expect(result.preconfigured).toBeUndefined();
+    expect(result.forwardedArgs).toEqual([node, fakeProps, "extra"]);
+  });
+
+  it("withPick=object with no props: context-menu path — omits props slot", () => {
+    const node = { id: 99 };
+    const result = decodeInvocation(node, undefined, ["x"]);
+    expect(result.forwardedArgs).toEqual([node, "x"]);
+  });
+
+  it("withPick=undefined: treated as config path — drops undefined, no forwardedArgs", () => {
+    const result = decodeInvocation(undefined, fakeProps, ["arg"]);
+    expect(result.preconfigured).toBeUndefined();
+    expect(result.forwardedArgs).toEqual([]);
+  });
+
+  it("primitive withPick (number): silently dropped — config path, no forwardedArgs", () => {
+    // Characterization: primitive non-boolean first args are dropped today. Do not change.
+    const result = decodeInvocation(42, fakeProps, ["arg"]);
+    expect(result.preconfigured).toBeUndefined();
+    expect(result.forwardedArgs).toEqual([]);
+  });
+});
 
 describe("createConfiguredCommandRegistrar", () => {
   let registeredHandler: ((...args: unknown[]) => void) | undefined;
