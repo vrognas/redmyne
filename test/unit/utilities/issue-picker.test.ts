@@ -343,7 +343,7 @@ describe("issue-picker", () => {
 
     // Variations: icon prefix, description tag, disabled flag.
     const closed = __testIssuePicker.issueToQuickPickItem(issue, projectPathMap, {
-      icon: "$(archive)",
+      icon: "archive",
       tag: " · Closed",
       disabled: true,
     });

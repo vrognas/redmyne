@@ -33,6 +33,7 @@ import {
   getServerOrShowError,
 } from "./command-guards";
 import { buildIssueUrl } from "./command-urls";
+import { formatIssueLabel } from "../utilities/issue-label";
 
 /** Time entry node from tree view */
 interface TimeEntryNode {
@@ -437,7 +438,7 @@ export function registerTimeEntryCommands(
 
       // Show what to edit
       const hoursDisplay = formatHoursAsHHMM(parseFloat(entry.hours));
-      const issueDisplay = entry.issue ? `#${entry.issue.id} ${entry.issue.subject || ""}`.trim() : `#${entry.issue_id || "?"}`;
+      const issueDisplay = entry.issue ? formatIssueLabel({ id: entry.issue.id, subject: entry.issue.subject || "" }).trim() : `#${entry.issue_id || "?"}`;
 
       // Fetch custom fields to determine if option should be shown
       const customFieldDefs = await server.getTimeEntryCustomFields();
@@ -553,7 +554,7 @@ export function registerTimeEntryCommands(
       if (!server) return;
 
       const hoursDisplay = formatHoursAsHHMM(parseFloat(entry.hours));
-      const issueInfo = entry.issue ? `#${entry.issue.id} ${entry.issue.subject || ""}`.trim() : "Unknown issue";
+      const issueInfo = entry.issue ? formatIssueLabel({ id: entry.issue.id, subject: entry.issue.subject || "" }).trim() : "Unknown issue";
       const activityInfo = entry.activity?.name ? `[${entry.activity.name}]` : "";
       const confirm = await vscode.window.showWarningMessage(
         "Delete time entry?",

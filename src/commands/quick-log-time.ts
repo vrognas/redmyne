@@ -9,6 +9,7 @@ import { errorToString } from "../utilities/error-feedback";
 import { pickRequiredCustomFields, TimeEntryCustomFieldValue } from "../utilities/custom-field-picker";
 import { confirmLogTimeOnClosedIssue } from "../utilities/closed-issue-guard";
 import { formatLocalDate, getLocalToday } from "../utilities/date-utils";
+import { formatIssueLabel } from "../utilities/issue-label";
 
 function truncateSubject(subject: string, max = 30): string {
   return subject.length > max ? subject.slice(0, max - 1) + "…" : subject;
@@ -42,7 +43,7 @@ export async function quickLogTime(
       const activity = await pickActivityForProject(
         props.server,
         issue.project.id,
-        `Log Time · #${issue.id} ${truncateSubject(issue.subject)}`,
+        `Log Time · ${formatIssueLabel({ id: issue.id, subject: truncateSubject(issue.subject) })}`,
         "What type of work?"
       );
       if (!activity) return;

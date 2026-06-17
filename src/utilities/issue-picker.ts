@@ -7,6 +7,7 @@ import { RedmineProject } from "../redmine/redmine-project";
 import { debounce } from "./debounce";
 import { recordRecentIssue, getRecentIssueIds } from "./recent-issues";
 import { fetchMyOpenAndClosedIssues } from "./get-my-issues";
+import { formatIssueLabel } from "./issue-label";
 
 const SEARCH_DEBOUNCE_MS = 250;
 const PROJECT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -188,14 +189,13 @@ function issueToQuickPickItem(
     alwaysShow?: boolean;
   } = {}
 ): IssueQuickPickItem {
-  const prefix = opts.icon ? `${opts.icon} ` : "";
   const detail =
     opts.detail ??
     projectPathMap.get(issue.project?.id ?? 0) ??
     issue.project?.name ??
     opts.fallback;
   const item: IssueQuickPickItem = {
-    label: `${prefix}#${issue.id} ${issue.subject}`,
+    label: formatIssueLabel({ id: issue.id, subject: issue.subject }, { icon: opts.icon }),
     description: `${issue.assigned_to?.name ?? "Unassigned"}${opts.tag ?? ""}`,
     detail,
     issue,
@@ -232,7 +232,7 @@ function buildIssuePickerItems(
     items.push({ label: "Recent", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
     for (const issue of recentIssues) {
       const isClosed = issue.status?.is_closed ?? false;
-      const icon = isClosed ? "$(archive)" : "$(history)";
+      const icon = isClosed ? "archive" : "history";
       const statusTag = isClosed ? ` · ${issue.status?.name ?? "closed"}` : "";
       items.push(
         issueToQuickPickItem(issue, projectPathMap, {
@@ -256,7 +256,7 @@ function buildIssuePickerItems(
     for (const issue of otherClosed.slice(0, 20)) {
       items.push(
         issueToQuickPickItem(issue, projectPathMap, {
-          icon: "$(archive)",
+          icon: "archive",
           tag: ` · ${issue.status?.name ?? "closed"}`,
           disabled: false,
         })
@@ -269,7 +269,7 @@ function buildIssuePickerItems(
     for (const issue of nonTrackable) {
       items.push(
         issueToQuickPickItem(issue, projectPathMap, {
-          icon: "$(circle-slash)",
+          icon: "circle-slash",
           fallback: "Unknown",
           disabled: true,
         })
@@ -861,7 +861,7 @@ export async function pickIssueWithSearch(
         for (const issue of limitedResults) {
           const isMine = myIssueIds.has(issue.id);
           const isClosed = issue.status?.is_closed ?? false;
-          const icon = isClosed ? "$(archive)" : isMine ? "$(account)" : "$(search)";
+          const icon = isClosed ? "archive" : isMine ? "account" : "search";
           const tagStr = isClosed ? " (closed)" : "";
           resultItems.push(
             issueToQuickPickItem(issue, projectPathMap, {
@@ -1131,7 +1131,7 @@ export async function pickIssue(
       baseItems.push({ label: "Recent", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
       for (const issue of recentIssues) {
         baseItems.push(
-          issueToQuickPickItem(issue, projectPathMap, { icon: "$(history)", disabled: false })
+          issueToQuickPickItem(issue, projectPathMap, { icon: "history", disabled: false })
         );
       }
     }
@@ -1159,7 +1159,7 @@ export async function pickIssue(
       baseItems.push({ label: "Recent", kind: vscode.QuickPickItemKind.Separator } as IssueQuickPickItem);
       for (const issue of recentTrackable) {
         baseItems.push(
-          issueToQuickPickItem(issue, projectPathMap, { icon: "$(history)", disabled: false })
+          issueToQuickPickItem(issue, projectPathMap, { icon: "history", disabled: false })
         );
       }
     }
@@ -1174,7 +1174,7 @@ export async function pickIssue(
       for (const issue of nonTrackableIssues) {
         baseItems.push(
           issueToQuickPickItem(issue, projectPathMap, {
-            icon: "$(circle-slash)",
+            icon: "circle-slash",
             fallback: "Unknown",
             disabled: true,
           })
@@ -1265,7 +1265,7 @@ export async function pickIssue(
               const projectPath = projectPathMap.get(projectId ?? 0) ?? issue.project?.name ?? "";
               if (!hasTimeTracking) {
                 return issueToQuickPickItem(issue, projectPathMap, {
-                  icon: "$(circle-slash)",
+                  icon: "circle-slash",
                   tag: " (no time tracking)",
                   detail: projectPath,
                   disabled: true,
@@ -1273,7 +1273,7 @@ export async function pickIssue(
                 });
               }
               return issueToQuickPickItem(issue, projectPathMap, {
-                icon: isAssigned ? "$(account)" : "$(search)",
+                icon: isAssigned ? "account" : "search",
                 tag: isAssigned ? " (assigned)" : "",
                 detail: projectPath,
                 alwaysShow: true,  // Bypass VSCode's built-in filter

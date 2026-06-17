@@ -9,6 +9,7 @@ import { showStatusBarMessage } from "../utilities/status-bar";
 import { pickOptionalDate } from "../utilities/date-picker";
 import { promptForRequiredCustomFields } from "../utilities/custom-field-picker";
 import { confirmLogTimeOnClosedIssue } from "../utilities/closed-issue-guard";
+import { formatIssueLabel } from "../utilities/issue-label";
 
 interface TimeEntryActivityItem extends vscode.QuickPickItem {
   activity: TimeEntryActivity;
@@ -357,7 +358,7 @@ export class IssueController {
           },
         ],
         {
-          title: `#${this.issue.id}: ${this.issue.subject}`,
+          title: formatIssueLabel({ id: this.issue.id, subject: this.issue.subject }, { separator: ": " }),
           placeHolder: "Select an action",
         }
       );

@@ -5,6 +5,7 @@ import { Issue } from "../redmine/models/issue";
 import { debounce } from "../utilities/debounce";
 import { getProjectPathMap } from "../utilities/issue-picker";
 import { fetchMyOpenAndClosedIssues } from "../utilities/get-my-issues";
+import { formatIssueLabel } from "../utilities/issue-label";
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -191,13 +192,13 @@ async function pickIssueForTask(server: IRedmineServer): Promise<Issue | undefin
   // Build items: label=#id subject, description=assignee, detail=project path
   const items: IssueQuickPickItem[] = [
     ...myOpenIssues.map((issue) => ({
-      label: `#${issue.id} ${issue.subject}`,
+      label: formatIssueLabel({ id: issue.id, subject: issue.subject }),
       description: issue.assigned_to?.name ?? "Unassigned",
       detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
       issue,
     })),
     ...displayedClosedIssues.map((issue) => ({
-      label: `$(archive) #${issue.id} ${issue.subject}`,
+      label: formatIssueLabel({ id: issue.id, subject: issue.subject }, { icon: "archive" }),
       description: `${issue.assigned_to?.name ?? "Unassigned"} (closed)`,
       detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
       issue,
@@ -313,10 +314,10 @@ async function pickIssueForTask(server: IRedmineServer): Promise<Issue | undefin
         if (exactIssue && !seenIds.has(exactIssue.id)) {
           const isClosed = exactIssue.status?.is_closed ?? false;
           const isMine = myIssueIds.has(exactIssue.id);
-          const icon = isClosed ? "$(archive)" : isMine ? "$(account)" : "$(search)";
+          const icon = isClosed ? "archive" : isMine ? "account" : "search";
           const tagStr = isClosed ? " (closed)" : "";
           resultItems.push({
-            label: `${icon} #${exactIssue.id} ${exactIssue.subject}`,
+            label: formatIssueLabel({ id: exactIssue.id, subject: exactIssue.subject }, { icon }),
             description: `${exactIssue.assigned_to?.name ?? "Unassigned"}${tagStr}`,
             detail: projectPathMap.get(exactIssue.project?.id ?? 0) ?? exactIssue.project?.name,
             issue: exactIssue,
@@ -338,10 +339,10 @@ async function pickIssueForTask(server: IRedmineServer): Promise<Issue | undefin
           if (!seenIds.has(issue.id)) {
             const isClosed = issue.status?.is_closed ?? false;
             const isMine = myIssueIds.has(issue.id);
-            const icon = isClosed ? "$(archive)" : isMine ? "$(account)" : "$(search)";
+            const icon = isClosed ? "archive" : isMine ? "account" : "search";
             const tagStr = isClosed ? " (closed)" : "";
             resultItems.push({
-              label: `${icon} #${issue.id} ${issue.subject}`,
+              label: formatIssueLabel({ id: issue.id, subject: issue.subject }, { icon }),
               description: `${issue.assigned_to?.name ?? "Unassigned"}${tagStr}`,
               detail: projectPathMap.get(issue.project?.id ?? 0) ?? issue.project?.name,
               issue,

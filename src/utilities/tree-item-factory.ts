@@ -7,6 +7,7 @@ import { formatHoursAsHHMM } from "./time-input";
 import { formatCustomFieldValue } from "./custom-field-formatter";
 import { Membership, groupMembersByRole } from "../controllers/domain";
 import { escapeMarkdown } from "./markdown-escape";
+import { formatIssueLabel } from "./issue-label";
 
 /**
  * Status display text for flexibility scores (used in tooltips)
@@ -40,7 +41,7 @@ export function createEnhancedIssueTreeItem(
 ): vscode.TreeItem {
   // Label always includes issue ID for scannability
   const treeItem = new vscode.TreeItem(
-    `#${issue.id} ${issue.subject}`,
+    formatIssueLabel(issue),
     vscode.TreeItemCollapsibleState.None
   );
 
