@@ -11,6 +11,12 @@ Quick reference of key patterns. Details in sections below.
 
 ---
 
+## v4.33.0 god-file split: issue-search extraction (2026-06-18)
+
+- **A clean seam takes its data as parameters.** The fuzzy-search engine was trivial to extract because `searchIssuesWithFuzzy`/`fuzzyFilterIssues` already received `localIssues`/`projectPathMap`/`recentIds` as args and touched only the server interface + their own search caches — zero vscode, zero hidden UI coupling. Where a god-file function reaches back into module UI state, the cut is expensive; where it takes data in and returns data out, the cut is nearly free. Extract those first.
+- **A test-only export names the seam.** `__testIssuePicker` existed only because the search logic couldn't be reached without dragging in the UI module. After extraction those functions are first-class exports of `issue-search.ts`, tested directly, and the hack shrank to the genuinely UI-coupled helpers. Treat such exports as a map of what to pull out.
+- **Delete large contiguous blocks with an encoding-preserving line-range rewrite, not Edit.** Removing the 384-line search block (and 183 lines of migrated tests) via `[System.IO.File]::WriteAllText` with a matched newline + `UTF8Encoding($false)` kept LF/no-BOM, so `git diff --stat` showed pure deletions and no whole-file churn. A 380-line Edit `old_string` is too fragile to match; re-read the file afterward (the Edit tool's cached state is now stale).
+
 ## v4.29.2 Whole-codebase deep review themes (2026-06-11)
 
 142 verified findings (report: `docs/reviews/2026-06-11-deep-review.md`); 31 critical/high bugs fixed. Transferable patterns:
