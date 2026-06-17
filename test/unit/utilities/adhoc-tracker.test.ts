@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 let stored: number[] = [];
+const onDidChangeConfigurationMock = vi.fn(() => ({ dispose: vi.fn() }));
 
 vi.mock("vscode", () => ({
   workspace: {
@@ -8,13 +9,14 @@ vi.mock("vscode", () => ({
       get: vi.fn((_key: string, def?: unknown) => stored.length > 0 ? [...stored] : def),
       update: vi.fn(async (_key: string, value: number[]) => { stored = value; }),
     })),
-    onDidChangeConfiguration: vi.fn(() => ({ dispose: vi.fn() })),
+    onDidChangeConfiguration: onDidChangeConfigurationMock,
   },
   ConfigurationTarget: { Global: 1 },
 }));
 
 describe("AdHocTracker", () => {
   let tracker: typeof import("../../../src/utilities/adhoc-tracker").adHocTracker;
+  let initAdHocTracker: typeof import("../../../src/utilities/adhoc-tracker").initAdHocTracker;
 
   beforeEach(async () => {
     stored = [];
@@ -22,6 +24,7 @@ describe("AdHocTracker", () => {
     vi.resetModules();
     const module = await import("../../../src/utilities/adhoc-tracker");
     tracker = module.adHocTracker;
+    initAdHocTracker = module.initAdHocTracker;
   });
 
   it("returns false for untagged issues", () => {
@@ -46,5 +49,19 @@ describe("AdHocTracker", () => {
 
   it("getAll returns empty when none tagged", () => {
     expect(tracker.getAll()).toEqual([]);
+  });
+
+  it("importing the module does NOT register onDidChangeConfiguration listener", async () => {
+    // The mock is already fresh after vi.resetModules() + re-import in beforeEach.
+    // onDidChangeConfigurationMock should not have been called at import time.
+    expect(onDidChangeConfigurationMock).not.toHaveBeenCalled();
+  });
+
+  it("initAdHocTracker pushes exactly one Disposable into context.subscriptions", () => {
+    const fakeContext = { subscriptions: [] as { dispose(): void }[] };
+    initAdHocTracker(fakeContext as never);
+    expect(fakeContext.subscriptions).toHaveLength(1);
+    expect(typeof fakeContext.subscriptions[0].dispose).toBe("function");
+    expect(onDidChangeConfigurationMock).toHaveBeenCalledTimes(1);
   });
 });

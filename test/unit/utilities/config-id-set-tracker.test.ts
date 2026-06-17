@@ -49,9 +49,10 @@ describe("createConfigIdSetTracker", () => {
     expect(t.has(7)).toBe(false);
   });
 
-  it("cache option re-reads after onDidChangeConfiguration invalidation", async () => {
-    const t = create("someKey", { cache: true });
+  it("lazyCache re-reads after onDidChangeConfiguration invalidation", async () => {
+    const t = create("someKey", { lazyCache: true });
     expect(t.has(9)).toBe(false); // primes cache
+    t.registerCacheListener!(); // register invalidation listener
 
     const onChange = vi.mocked(
       (await import("vscode")).workspace.onDidChangeConfiguration,

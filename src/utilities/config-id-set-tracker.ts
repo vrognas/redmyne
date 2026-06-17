@@ -21,6 +21,12 @@ export interface ConfigIdSetTracker {
   remove(issueId: number): Promise<void>;
   /** Toggle `issueId`; resolves to its new membership state. Serialized. */
   toggle(issueId: number): Promise<boolean>;
+  /**
+   * Only present when created with `lazyCache: true`.
+   * Registers the `onDidChangeConfiguration` cache-invalidation listener
+   * and returns its Disposable. Push to `context.subscriptions`.
+   */
+  registerCacheListener?(): vscode.Disposable;
 }
 
 export interface ConfigIdSetTrackerOptions {
@@ -28,8 +34,12 @@ export interface ConfigIdSetTrackerOptions {
    * When true, the read set is cached and only invalidated on
    * `onDidChangeConfiguration` for this key. Use for keys read inside hot
    * loops (per-row Gantt render, per-time-entry contribution calc).
+   *
+   * Caching does NOT auto-register the config-change listener: the caller
+   * must call `registerCacheListener()` on the returned tracker and push the
+   * Disposable to `context.subscriptions` so it is disposed on deactivation.
    */
-  cache?: boolean;
+  lazyCache?: boolean;
 }
 
 export function createConfigIdSetTracker(
@@ -47,10 +57,11 @@ export function createConfigIdSetTracker(
 
   // Optional read cache. Reading vscode config is non-trivial and `has()` may
   // be called from inside hot loops; cache and invalidate on config change.
+  const useCache = options.lazyCache === true;
   let cachedSet: Set<number> | undefined;
 
   function getSet(): Set<number> {
-    if (!options.cache) return loadSet();
+    if (!useCache) return loadSet();
     if (!cachedSet) cachedSet = loadSet();
     return cachedSet;
   }
@@ -63,12 +74,11 @@ export function createConfigIdSetTracker(
     await vscode.workspace
       .getConfiguration("redmyne")
       .update(settingKey, ids, vscode.ConfigurationTarget.Global);
-    if (options.cache) cachedSet = new Set(ids);
+    if (useCache) cachedSet = new Set(ids);
   }
 
-  if (options.cache) {
-    // Listen for external config changes (Settings UI, sync, draft mode).
-    vscode.workspace.onDidChangeConfiguration((e) => {
+  function makeCacheListener(): vscode.Disposable {
+    return vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration(fullSettingKey)) {
         cachedSet = undefined;
       }
@@ -93,6 +103,7 @@ export function createConfigIdSetTracker(
     has,
     getAllArray: getArray,
     getAllSet: getSet,
+    ...(options.lazyCache ? { registerCacheListener: makeCacheListener } : {}),
     add(issueId: number): Promise<void> {
       return enqueue(async () => {
         const ids = getArray();

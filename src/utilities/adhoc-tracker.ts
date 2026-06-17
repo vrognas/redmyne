@@ -1,9 +1,11 @@
+import * as vscode from "vscode";
 import { createConfigIdSetTracker } from "./config-id-set-tracker";
 
 // Cached: isAdHoc() is called from inside hot loops (per-row Gantt render,
 // per-time-entry contribution calc). The factory caches the read set and
 // invalidates on config change (Settings UI, sync, draft mode).
-const tracker = createConfigIdSetTracker("adHocBudgetIssues", { cache: true });
+// Use lazyCache so the listener is registered (and disposed) via initAdHocTracker.
+const tracker = createConfigIdSetTracker("adHocBudgetIssues", { lazyCache: true });
 
 class AdHocTracker {
   isAdHoc(issueId: number): boolean {
@@ -28,3 +30,11 @@ class AdHocTracker {
 }
 
 export const adHocTracker = new AdHocTracker();
+
+/**
+ * Register the cache-invalidation listener for adHocTracker and push its
+ * Disposable to context.subscriptions. Must be called once from activate().
+ */
+export function initAdHocTracker(context: vscode.ExtensionContext): void {
+  context.subscriptions.push(tracker.registerCacheListener!());
+}

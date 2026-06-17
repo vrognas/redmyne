@@ -42,6 +42,7 @@ import { WorkloadStatusBar } from "./status-bars/workload-status-bar";
 import { debounce, DebouncedFunction } from "./utilities/debounce";
 import { runMigration } from "./utilities/migration";
 import { initRecentIssues } from "./utilities/recent-issues";
+import { initAdHocTracker } from "./utilities/adhoc-tracker";
 import { createConfiguredContextUpdater } from "./utilities/configured-context-updater";
 import { DraftQueue } from "./draft-mode/draft-queue";
 import { DraftModeManager } from "./draft-mode/draft-mode-manager";
@@ -367,6 +368,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       cleanupResources.debouncedConfigChange?.(event);
     })
   );
+
+  initAdHocTracker(context);
 
   // Register configure command
   registerConfigureCommand(context, {

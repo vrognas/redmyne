@@ -764,7 +764,7 @@ Status legend: [ ] open, [x] fixed, [-] wontfix.
 - **detail:** With leafIssues empty, the main loop in calculateDailyCapacity already produces exactly what generateEmptyCapacity does: loadHours stays 0, percentage 0, status getCapacityStatus(0) === 'available', same working-day filtering. The early return at lines 123-126 and the entire 29-line helper (lines 176-204) — a copy of the same UTC date-walk — exist only to special-case a path the general code handles identically.
 - **fix:** Delete generateEmptyCapacity and the `if (leafIssues.length === 0)` early return; the main loop covers the empty case.
 
-### 126. [ ] src/utilities/adhoc-tracker.ts:35 — Module-scope onDidChangeConfiguration listener registered at import time; Disposable discarded
+### 126. [x] src/utilities/adhoc-tracker.ts:35 — Module-scope onDidChangeConfiguration listener registered at import time; Disposable discarded
 
 - **dimension:** bug | **verdict:** CONFIRMED
 - **detail:** Lines 35-39 register vscode.workspace.onDidChangeConfiguration as an import-time side effect and drop the returned Disposable — it is never added to context.subscriptions, so it cannot be disposed on extension deactivation and leaks for the extension-host lifetime. It also fires (and dereferences cachedIds invalidation logic) for the whole host even after the extension's own state is torn down, and the import-time registration makes the module impossible to load in isolation without a live vscode workspace.

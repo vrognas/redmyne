@@ -342,6 +342,7 @@ vi.mock("../../../src/utilities/auto-update-tracker", () => ({
 }));
 vi.mock("../../../src/utilities/adhoc-tracker", () => ({
   adHocTracker: {},
+  initAdHocTracker: vi.fn(),
 }));
 
 vi.mock("../../../src/utilities/debounce", () => ({
