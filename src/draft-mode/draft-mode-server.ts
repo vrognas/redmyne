@@ -50,7 +50,6 @@ const PASSTHROUGH_METHODS = [
   "getProjectVersions",
   "getVersionsForProjects",
   "getIssueStatuses",
-  "getIssueStatusesTyped",
   "getIssuePriorities",
   "getPriorities",
   "getTrackers",
@@ -294,7 +293,7 @@ export class DraftModeServer implements IRedmineServer {
         {
           method: "PUT",
           path: `/issues/${quickUpdate.issueId}.json`,
-          data: { issue: { status_id: quickUpdate.status.statusId } },
+          data: { issue: { status_id: quickUpdate.status.id } },
         },
         { issueId: quickUpdate.issueId }
       )

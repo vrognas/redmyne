@@ -231,9 +231,9 @@ describe("registerIssueContextCommands", () => {
 
   it("updates status from picker and refreshes tree and gantt", async () => {
     const mockServer = {
-      getIssueStatusesTyped: vi.fn().mockResolvedValue([
-        { statusId: 2, name: "In Progress" },
-      ]),
+      getIssueStatuses: vi.fn().mockResolvedValue({
+        issue_statuses: [{ id: 2, name: "In Progress", is_closed: false }],
+      }),
       setIssueStatus: vi.fn().mockResolvedValue(undefined),
     };
     const refreshProjectsTree = vi.fn();
@@ -249,7 +249,7 @@ describe("registerIssueContextCommands", () => {
 
     await handlers.get("redmyne.setStatus")?.({ id: 42 });
 
-    expect(mockServer.getIssueStatusesTyped).toHaveBeenCalled();
+    expect(mockServer.getIssueStatuses).toHaveBeenCalled();
     expect(mockServer.setIssueStatus).toHaveBeenCalledWith({ id: 42 }, 2);
     expect(refreshProjectsTree).toHaveBeenCalled();
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith("redmyne.refreshGanttData");
@@ -436,11 +436,10 @@ describe("registerIssueContextCommands", () => {
   it("covers guard and cancel paths across issue-context handlers", async () => {
     const mockServer = {
       updateDoneRatio: vi.fn().mockResolvedValue(undefined),
-      getIssueStatusesTyped: vi.fn().mockResolvedValue([{ statusId: 1, name: "Open" }]),
-      setIssueStatus: vi.fn().mockResolvedValue(undefined),
       getIssueStatuses: vi.fn().mockResolvedValue({
         issue_statuses: [{ id: 1, name: "Open", is_closed: false }],
       }),
+      setIssueStatus: vi.fn().mockResolvedValue(undefined),
       getIssuePriorities: vi.fn().mockResolvedValue({
         issue_priorities: [{ id: 1, name: "Normal" }],
       }),
@@ -475,9 +474,8 @@ describe("registerIssueContextCommands", () => {
   it("covers catch branches for done ratio, status, bulk, issue status, and priority", async () => {
     const mockServer = {
       updateDoneRatio: vi.fn().mockRejectedValue(new Error("done fail")),
-      getIssueStatusesTyped: vi.fn().mockRejectedValue(new Error("status fail")),
+      getIssueStatuses: vi.fn().mockRejectedValue(new Error("status fail")),
       setIssueStatus: vi.fn().mockResolvedValue(undefined),
-      getIssueStatuses: vi.fn().mockRejectedValue(new Error("issue status fail")),
       getIssuePriorities: vi.fn().mockRejectedValue(new Error("priority fail")),
       setIssuePriority: vi.fn().mockResolvedValue(undefined),
     };
@@ -497,8 +495,7 @@ describe("registerIssueContextCommands", () => {
 
     expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Failed to update: Error: done fail");
     expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Failed to update: Error: status fail");
-    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Failed to update: Error: done fail");
-    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Failed to update status: Error: issue status fail");
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Failed to update status: Error: status fail");
     expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Failed to update priority: Error: priority fail");
   });
 

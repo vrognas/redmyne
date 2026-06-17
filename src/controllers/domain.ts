@@ -28,19 +28,12 @@ export function groupMembersByRole(members: Membership[]): Map<string, string[]>
   return sorted;
 }
 
-export class IssueStatus {
-  constructor(
-    public readonly statusId: number,
-    public readonly name: string
-  ) {}
-}
-
 export class QuickUpdate {
   constructor(
     public readonly issueId: number,
     public readonly message: string,
     public readonly assignee: Membership,
-    public readonly status: IssueStatus,
+    public readonly status: { id: number; name: string },
     public readonly startDate?: string | null, // YYYY-MM-DD or null to clear
     public readonly dueDate?: string | null // YYYY-MM-DD or null to clear
   ) {}

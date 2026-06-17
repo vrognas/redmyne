@@ -3,7 +3,6 @@ import * as http from "http";
 import * as https from "https";
 import { RedmineProject } from "./redmine-project";
 import {
-  IssueStatus,
   Membership,
   QuickUpdate,
   QuickUpdateResult,
@@ -1408,11 +1407,6 @@ export class RedmineServer implements IRedmineServer {
     }
   }
 
-  async getIssueStatusesTyped(): Promise<IssueStatus[]> {
-    const statuses = await this.getIssueStatuses();
-    return (statuses?.issue_statuses || []).map((s) => new IssueStatus(s.id, s.name));
-  }
-
   /**
    * Returns issue priorities (cached per server instance)
    */
@@ -1480,7 +1474,7 @@ export class RedmineServer implements IRedmineServer {
   async applyQuickUpdate(quickUpdate: QuickUpdate): Promise<QuickUpdateResult> {
     // Build issue payload with optional date fields
     const issuePayload: Record<string, unknown> = {
-      status_id: quickUpdate.status.statusId,
+      status_id: quickUpdate.status.id,
       notes: quickUpdate.message,
     };
 
@@ -1517,7 +1511,7 @@ export class RedmineServer implements IRedmineServer {
     ) {
       updateResult.addDifference("Couldn't assign user");
     }
-    if (issue.status.id !== quickUpdate.status.statusId) {
+    if (issue.status.id !== quickUpdate.status.id) {
       updateResult.addDifference("Couldn't update status");
     }
     return updateResult;

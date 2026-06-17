@@ -144,11 +144,11 @@ export function registerIssueContextCommands(
         if (!server) return;
 
         try {
-          const statuses = await server.getIssueStatusesTyped();
+          const { issue_statuses: statuses } = await server.getIssueStatuses();
           const options = statuses.map((s) => ({
             label: s.name,
-            value: s.statusId,
-            picked: issue.status?.id === s.statusId,
+            value: s.id,
+            picked: issue.status?.id === s.id,
           }));
 
           const selected = await vscode.window.showQuickPick(options, {

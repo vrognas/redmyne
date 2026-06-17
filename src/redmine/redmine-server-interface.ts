@@ -7,7 +7,6 @@
 import type { RedmineProject } from "./redmine-project";
 import type { RedmineServerConnectionOptions } from "./redmine-server";
 import type {
-  IssueStatus,
   Membership,
   QuickUpdate,
   QuickUpdateResult,
@@ -151,7 +150,6 @@ export interface IRedmineServer {
   // ============ Statuses & priorities ============
 
   getIssueStatuses(): Promise<{ issue_statuses: RedmineIssueStatus[] }>;
-  getIssueStatusesTyped(): Promise<IssueStatus[]>;
   getIssuePriorities(): Promise<{ issue_priorities: IssuePriority[] }>;
   getPriorities(): Promise<{ id: number; name: string }[]>;
   getTrackers(): Promise<{ id: number; name: string }[]>;

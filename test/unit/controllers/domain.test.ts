@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   Membership,
-  IssueStatus,
   QuickUpdate,
   QuickUpdateResult,
 } from "../../../src/controllers/domain";
@@ -28,18 +27,10 @@ describe("Domain Models", () => {
     });
   });
 
-  describe("IssueStatus", () => {
-    it("should create issue status", () => {
-      const status = new IssueStatus(1, "New");
-      expect(status.statusId).toBe(1);
-      expect(status.name).toBe("New");
-    });
-  });
-
   describe("QuickUpdate", () => {
     it("should create quick update", () => {
       const assignee = new Membership(1, "John Doe");
-      const status = new IssueStatus(2, "In Progress");
+      const status = { id: 2, name: "In Progress", is_closed: false };
       const update = new QuickUpdate(123, "Test message", assignee, status);
 
       expect(update.issueId).toBe(123);

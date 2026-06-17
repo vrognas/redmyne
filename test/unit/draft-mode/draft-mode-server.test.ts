@@ -41,7 +41,6 @@ function createMockServer(): RedmineServer {
     getProjectVersions: vi.fn().mockResolvedValue([]),
     getVersionsForProjects: vi.fn().mockResolvedValue(new Map()),
     getIssueStatuses: vi.fn().mockResolvedValue({ issue_statuses: [] }),
-    getIssueStatusesTyped: vi.fn().mockResolvedValue([]),
     getIssuePriorities: vi.fn().mockResolvedValue({ issue_priorities: [] }),
     getPriorities: vi.fn().mockResolvedValue([]),
     getTrackers: vi.fn().mockResolvedValue([]),
@@ -431,7 +430,7 @@ describe("DraftModeServer", () => {
 
       await server.applyQuickUpdate({
         issueId: 123,
-        status: { statusId: 2, name: "In Progress" },
+        status: { id: 2, name: "In Progress", is_closed: false },
         assignee: { id: 5, name: "John" },
         message: "Note text",
         startDate: "2026-01-01",
@@ -453,7 +452,7 @@ describe("DraftModeServer", () => {
 
       await server.applyQuickUpdate({
         issueId: 123,
-        status: { statusId: 2, name: "In Progress" },
+        status: { id: 2, name: "In Progress", is_closed: false },
         assignee: { id: 5, name: "John" },
       });
 
@@ -467,7 +466,7 @@ describe("DraftModeServer", () => {
 
       await server.applyQuickUpdate({
         issueId: 123,
-        status: { statusId: 2, name: "In Progress" },
+        status: { id: 2, name: "In Progress", is_closed: false },
         assignee: { id: 5, name: "John" },
       });
 
@@ -481,7 +480,7 @@ describe("DraftModeServer", () => {
 
       const result = await server.applyQuickUpdate({
         issueId: 123,
-        status: { statusId: 2, name: "In Progress" },
+        status: { id: 2, name: "In Progress", is_closed: false },
         assignee: { id: 5, name: "John" },
       });
 

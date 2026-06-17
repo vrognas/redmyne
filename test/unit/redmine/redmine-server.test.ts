@@ -7,7 +7,6 @@ import { MIN_PROBE_INTERVAL_MS } from "../../../src/redmine/change-aware-cache";
 import {
   QuickUpdate,
   Membership,
-  IssueStatus as DomainIssueStatus,
 } from "../../../src/controllers/domain";
 import * as http from "http";
 import { EventEmitter } from "events";
@@ -339,8 +338,8 @@ describe("RedmineServer", () => {
     expect(memberships[0].roles).toEqual(["Analyst"]);
   });
 
-  it("should fetch typed issue statuses", async () => {
-    const statuses = await server.getIssueStatusesTyped();
+  it("should fetch issue statuses", async () => {
+    const { issue_statuses: statuses } = await server.getIssueStatuses();
     expect(statuses).toHaveLength(2);
     expect(statuses[0].name).toBe("New");
   });
@@ -1235,7 +1234,7 @@ describe("RedmineServer", () => {
           7,
           "",
           new Membership(0, "_unassigned_", true),
-          new DomainIssueStatus(2, "Open")
+          { id: 2, name: "Open", is_closed: false }
         )
       );
 

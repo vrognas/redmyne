@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { QuickUpdate, Membership, IssueStatus } from "./domain";
+import { QuickUpdate, Membership } from "./domain";
 import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { Issue } from "../redmine/models/issue";
 import { IssueStatus as RedmineIssueStatus, IssuePriority, TimeEntryActivity } from "../redmine/models/common";
@@ -201,12 +201,14 @@ export class IssueController {
 
   private async quickUpdate() {
     let memberships: Membership[];
-    let possibleStatuses: IssueStatus[];
+    let possibleStatuses: RedmineIssueStatus[];
     try {
-      [memberships, possibleStatuses] = await Promise.all([
+      const [membershipsResult, statusesResult] = await Promise.all([
         this.redmine.getMemberships(this.issue.project.id),
-        this.redmine.getIssueStatusesTyped(),
+        this.redmine.getIssueStatuses(),
       ]);
+      memberships = membershipsResult;
+      possibleStatuses = statusesResult.issue_statuses;
     } catch (_error) {
       vscode.window.showErrorMessage(
         "Could not fetch required data for quick update"
@@ -215,11 +217,11 @@ export class IssueController {
     }
 
     // Build status options: "No change" first, then other statuses (excluding current)
-    const currentStatus = new IssueStatus(this.issue.status.id, this.issue.status.name);
+    const currentStatus = this.issue.status;
     const statusOptions = [
       { label: "$(check) No change", status: currentStatus, isNoChange: true },
       ...possibleStatuses
-        .filter((s) => s.statusId !== this.issue.status.id)
+        .filter((s) => s.id !== this.issue.status.id)
         .map((status) => ({ label: status.name, status, isNoChange: false })),
     ];
 

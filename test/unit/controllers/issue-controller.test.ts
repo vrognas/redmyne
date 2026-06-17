@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as vscode from "vscode";
 import { IssueController } from "../../../src/controllers/issue-controller";
 import {
-  IssueStatus as TypedIssueStatus,
   Membership,
   QuickUpdateResult,
 } from "../../../src/controllers/domain";
@@ -27,7 +26,6 @@ type MockServer = {
   getIssuePriorities: ReturnType<typeof vi.fn>;
   getProjectTimeEntryActivities: ReturnType<typeof vi.fn>;
   getMemberships: ReturnType<typeof vi.fn>;
-  getIssueStatusesTyped: ReturnType<typeof vi.fn>;
   applyQuickUpdate: ReturnType<typeof vi.fn>;
   getIssueWithJournals: ReturnType<typeof vi.fn>;
 };
@@ -73,7 +71,10 @@ function createMockServer(overrides: Partial<MockServer> = {}): MockServer {
     setIssueStatus: vi.fn().mockResolvedValue(undefined),
     setIssuePriority: vi.fn().mockResolvedValue(undefined),
     getIssueStatuses: vi.fn().mockResolvedValue({
-      issue_statuses: [{ id: 2, name: "Closed", is_closed: true }],
+      issue_statuses: [
+        { id: 2, name: "Closed", is_closed: true },
+        { id: 3, name: "In Progress", is_closed: false },
+      ],
     }),
     getIssuePriorities: vi.fn().mockResolvedValue({
       issue_priorities: [
@@ -87,10 +88,6 @@ function createMockServer(overrides: Partial<MockServer> = {}): MockServer {
     getMemberships: vi.fn().mockResolvedValue([
       new Membership(11, "Alice", true),
       new Membership(42, "Team Ops", false),
-    ]),
-    getIssueStatusesTyped: vi.fn().mockResolvedValue([
-      new TypedIssueStatus(2, "Closed"),
-      new TypedIssueStatus(3, "In Progress"),
     ]),
     applyQuickUpdate: vi.fn().mockResolvedValue({
       isSuccessful: () => true,
@@ -348,7 +345,7 @@ describe("IssueController", () => {
     vi.mocked(vscode.window.showQuickPick)
       .mockResolvedValueOnce({
         label: "Closed",
-        status: new TypedIssueStatus(2, "Closed"),
+        status: { id: 2, name: "Closed", is_closed: true },
       } as never)
       .mockResolvedValueOnce({
         label: "Team Ops (group)",
@@ -365,14 +362,14 @@ describe("IssueController", () => {
       issueId: number;
       message: string;
       assignee: Membership;
-      status: TypedIssueStatus;
+      status: { id: number; name: string };
       startDate?: string | null;
       dueDate?: string | null;
     };
     expect(payload.issueId).toBe(123);
     expect(payload.message).toBe("done");
     expect(payload.assignee.id).toBe(42);
-    expect(payload.status.statusId).toBe(2);
+    expect(payload.status.id).toBe(2);
     expect(payload.startDate).toBe("2026-02-15");
     expect(payload.dueDate).toBeUndefined();
     expect(statusBar.showStatusBarMessage).toHaveBeenCalledWith(
@@ -399,7 +396,7 @@ describe("IssueController", () => {
     vi.mocked(vscode.window.showQuickPick)
       .mockResolvedValueOnce({
         label: "No change",
-        status: new TypedIssueStatus(1, "Open"),
+        status: { id: 1, name: "Open", is_closed: false },
       } as never)
       .mockResolvedValueOnce({
         label: "No change",
@@ -428,7 +425,7 @@ describe("IssueController", () => {
     const server = createMockServer();
     const controller = new IssueController(issue, server as never);
     const runQuickUpdate = controller as unknown as { quickUpdate: () => Promise<void> };
-    const pickStatus = { label: "Closed", status: new TypedIssueStatus(2, "Closed") };
+    const pickStatus = { label: "Closed", status: { id: 2, name: "Closed", is_closed: true } };
     const pickAssignee = {
       label: "Team Ops",
       assignee: new Membership(42, "Team Ops", false),
