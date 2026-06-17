@@ -579,7 +579,11 @@ export function registerKanbanCommands(
         const roundedHours = Math.round(hours * 100) / 100;
         const deferredNote = deferredMinutes > 0 ? ` (${deferredMinutes} min deferred included)` : "";
 
-        await logTimeFlow({
+        // Pause so the controller interval cannot complete the timer and fire
+        // onTimerComplete (a second, full-duration log flow) while these dialogs
+        // are open. Elapsed was already captured above, so the amount is fixed.
+        await controller.pauseTimer(task.id);
+        const logged = await logTimeFlow({
           server,
           controller,
           task,
@@ -595,6 +599,10 @@ export function registerKanbanCommands(
           onLogged: () => controller.stopTimer(task.id),
           successMessage: `Logged ${roundedHours}h`,
         });
+        // On success onLogged stopped the timer; on cancel/failure resume it.
+        if (!logged) {
+          await controller.resumeTimer(task.id);
+        }
       }
     )
   );
@@ -623,12 +631,18 @@ export function registerKanbanCommands(
           return;
         }
 
+        // Pause so the timer cannot complete (and log full duration) while the
+        // confirm dialog is open; resume if the user cancels.
+        await controller.pauseTimer(task.id);
         const confirm = await vscode.window.showWarningMessage(
           `Defer ${elapsedMinutes}min to next task?`,
           { modal: true },
           "Defer"
         );
-        if (confirm !== "Defer") return;
+        if (confirm !== "Defer") {
+          await controller.resumeTimer(task.id);
+          return;
+        }
 
         controller.addDeferredMinutes(elapsedMinutes);
         await controller.stopTimer(task.id);

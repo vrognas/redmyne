@@ -450,6 +450,56 @@ describe("registerKanbanCommands", () => {
     expect(controller.stopTimer).toHaveBeenCalledWith("task-log");
   });
 
+  // Regression #81: the controller interval must not complete the timer (and
+  // fire onTimerComplete -> a second "log full duration" flow) while logEarly's
+  // dialogs are open. logEarly pauses the timer first, resuming only on cancel.
+  it("logEarly pauses the timer during the dialog and resumes if cancelled", async () => {
+    const task = createTask({
+      id: "task-pause",
+      linkedIssueId: 70,
+      timerPhase: "working",
+      timerSecondsLeft: 900,
+      activityId: 12,
+    });
+    const server = createServer({
+      addTimeEntry: vi.fn().mockResolvedValue(undefined),
+      getTimeEntryCustomFields: vi.fn().mockResolvedValue([]),
+    });
+    const { controller } = registerCommands({ server, tasks: [task] });
+    controller.getWorkDurationSeconds.mockReturnValue(3600);
+    vi.mocked(vscode.window.showWarningMessage).mockResolvedValue(undefined as never);
+
+    await handlers.get("redmyne.kanban.logEarly")?.({ task });
+
+    expect(controller.pauseTimer).toHaveBeenCalledWith("task-pause");
+    expect(controller.resumeTimer).toHaveBeenCalledWith("task-pause");
+    expect(server.addTimeEntry).not.toHaveBeenCalled();
+    expect(controller.stopTimer).not.toHaveBeenCalled();
+  });
+
+  it("logEarly pauses then stops (not resumes) the timer on a successful log", async () => {
+    const task = createTask({
+      id: "task-pause-ok",
+      linkedIssueId: 71,
+      timerPhase: "working",
+      timerSecondsLeft: 900,
+      activityId: 12,
+    });
+    const server = createServer({
+      addTimeEntry: vi.fn().mockResolvedValue(undefined),
+      getTimeEntryCustomFields: vi.fn().mockResolvedValue([]),
+    });
+    const { controller } = registerCommands({ server, tasks: [task] });
+    controller.getWorkDurationSeconds.mockReturnValue(3600);
+    vi.mocked(vscode.window.showWarningMessage).mockResolvedValue("Log" as never);
+
+    await handlers.get("redmyne.kanban.logEarly")?.({ task });
+
+    expect(controller.pauseTimer).toHaveBeenCalledWith("task-pause-ok");
+    expect(controller.stopTimer).toHaveBeenCalledWith("task-pause-ok");
+    expect(controller.resumeTimer).not.toHaveBeenCalled();
+  });
+
   it("logEarly includes deferred minutes and consumes them", async () => {
     const task = createTask({
       id: "task-defer-log",
@@ -738,6 +788,26 @@ describe("registerKanbanCommands", () => {
     await handlers.get("redmyne.kanban.deferTime")?.({ task });
     expect(controller.addDeferredMinutes).toHaveBeenCalledWith(10);
     expect(controller.stopTimer).toHaveBeenCalledWith("defer-1");
+  });
+
+  // Regression #81: deferTime must also pause the timer so completion cannot
+  // fire (and log the full duration) while the confirm dialog is open.
+  it("deferTime pauses during the confirm dialog and resumes if cancelled", async () => {
+    const task = createTask({
+      id: "defer-pause",
+      timerPhase: "working",
+      timerSecondsLeft: 1800,
+    });
+    const { controller } = registerCommands({ tasks: [task] });
+    controller.getWorkDurationSeconds.mockReturnValue(3600);
+    vi.mocked(vscode.window.showWarningMessage).mockResolvedValue(undefined as never);
+
+    await handlers.get("redmyne.kanban.deferTime")?.({ task });
+
+    expect(controller.pauseTimer).toHaveBeenCalledWith("defer-pause");
+    expect(controller.resumeTimer).toHaveBeenCalledWith("defer-pause");
+    expect(controller.addDeferredMinutes).not.toHaveBeenCalled();
+    expect(controller.stopTimer).not.toHaveBeenCalled();
   });
 
   it("covers configure timer progress bar and unit duration branches", async () => {
