@@ -7,6 +7,35 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.33.0]
+
+Continued god-file decomposition from the deep review (report: `docs/reviews/2026-06-11-deep-review.md`): **`issue-picker.ts` split — 113 of 142 resolved**.
+
+### Fixed
+
+- **Issue search showed "Search failed" when one project's time-tracking check errored** — the picker's search-time probe called `isTimeTrackingEnabled` in a bare `Promise.all`, so a single flaky or forbidden project rejected the whole search. It now routes through the fail-open cached probe, matching the other pickers
+
+### Changed (internal)
+
+- Extracted the vscode-free fuzzy-search engine (`searchIssuesWithFuzzy`, `fuzzyFilterIssues`, `parseSearchOperators`, `getOrCreateFuse`, `buildProjectPathMap` + the search/Fuse caches) out of the 1371-line `issue-picker.ts` god-file into `src/utilities/issue-search.ts`, now unit-tested directly instead of through a UI-coupled test export. QuickPick orchestration and the data caches stay in `issue-picker.ts`; the public API is unchanged (7 consumers untouched)
+
+## [4.32.0]
+
+Deep-review sweep continued (report: `docs/reviews/2026-06-11-deep-review.md`): **7 further findings fixed — 112 of 142 resolved**. Two genuine bugs plus correctness/maintainability refactors. No user-facing feature changes.
+
+### Fixed
+
+- **Kanban timer could double-log time to Redmine** — logging early or deferring opened dialogs while the countdown kept running; a timer completion firing mid-dialog queued a second "log full duration" flow, writing the session twice. The timer now pauses for the duration of those dialogs and resumes on cancel
+- **Time entries risked string-concatenated totals** — `TimeEntry.hours` was typed `string` but Redmine returns a JSON number, forcing scattered `parseFloat` coercions and inviting silent `sum + hours` concatenation; the read model is now `number`, with a separate `TimeEntryWrite` payload type for writes
+- **Ad-hoc budget config listener leaked** — an import-time `onDidChangeConfiguration` listener discarded its Disposable; it is now owned by `context.subscriptions` via `initAdHocTracker`
+
+### Changed (internal)
+
+- One canonical `formatIssueLabel` helper replaces ~23 hand-written `#id subject` label sites
+- The configured-command registrar's `[withPick, props, args]` wire tuple is decoded in one place (`decodeInvocation`/`invokeConfigured`) instead of being hand-encoded at each call site
+- Removed the duplicate `domain.IssueStatus {statusId}` type and its parallel `getIssueStatusesTyped` API in favour of the canonical `getIssueStatuses {id}`
+- Removed dead Gantt render-context code: 12 unread `GanttRenderContext` fields, 3 zero-importer interfaces, and the now-orphaned `_contributionData`/`_donationTargets`/`getHealthDot` plumbing
+
 ## [4.31.0]
 
 Continuation of the whole-codebase deep review (report: `docs/reviews/2026-06-11-deep-review.md`): **73 further findings fixed — 105 of 142 resolved** — on top of v4.30.0. Fixes are unit-tested where the surface allows; webview-interaction fixes (no DOM in the test env) were verified by review + production-bundle checks. No user-facing feature changes — this is a correctness, security, and maintainability release.
