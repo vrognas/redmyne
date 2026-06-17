@@ -9,7 +9,7 @@ import {
 } from "../controllers/domain";
 import { TimeEntryActivity } from "./models/common";
 import { Project } from "./models/project";
-import { TimeEntry } from "./models/time-entry";
+import { TimeEntry, TimeEntryWrite } from "./models/time-entry";
 import { Issue } from "./models/issue";
 import { Version } from "./models/version";
 import { IssueStatus as RedmineIssueStatus, IssuePriority } from "./models/common";
@@ -810,7 +810,7 @@ export class RedmineServer implements IRedmineServer {
   async addTimeEntry(
     issueId: number,
     activityId: number,
-    hours: string,
+    hours: string | number,
     message: string,
     spentOn?: string, // YYYY-MM-DD format, defaults to today
     customFields?: TimeEntryCustomFieldValue[]
@@ -1002,14 +1002,7 @@ export class RedmineServer implements IRedmineServer {
    */
   async updateTimeEntry(
     id: number,
-    updates: {
-      hours?: string;
-      comments?: string;
-      activity_id?: number;
-      spent_on?: string;
-      issue_id?: number;
-      custom_fields?: TimeEntryCustomFieldValue[];
-    }
+    updates: TimeEntryWrite
   ): Promise<void> {
     await this.doRequest(
       `/time_entries/${id}.json`,

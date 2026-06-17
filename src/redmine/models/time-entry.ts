@@ -8,11 +8,25 @@ export interface TimeEntry {
   project?: NamedEntity; // Present in GET responses
   activity_id: TimeEntryActivity["id"];
   activity?: NamedEntity; // Present in GET responses
-  hours: string;
+  hours: number; // Redmine GET responses return hours as a JSON number
   comments: string;
   spent_on?: string; // Date in YYYY-MM-DD format, present in GET responses
   user?: NamedEntity; // Present in GET responses
   created_on?: string; // ISO date string, present in GET responses
   updated_on?: string; // ISO date string, present in GET responses
   custom_fields?: CustomField[] | TimeEntryCustomFieldValue[]; // Present in GET responses or POST/PUT body
+}
+
+/**
+ * Write payload for creating/updating a time entry (addTimeEntry / updateTimeEntry).
+ * Unlike the GET read-model, hours may be sent as a string ("1.5", "H:MM") OR a
+ * number — Redmine accepts both on POST/PUT. Keep callers' existing formatting.
+ */
+export interface TimeEntryWrite {
+  hours?: string | number;
+  comments?: string;
+  activity_id?: number;
+  spent_on?: string;
+  issue_id?: number;
+  custom_fields?: TimeEntryCustomFieldValue[];
 }

@@ -83,7 +83,7 @@ export async function quickLogTime(
 
     const dateEntries = await timeEntriesPromise;
     const dateTotal = dateEntries.time_entries.reduce(
-      (sum, entry) => sum + parseFloat(entry.hours),
+      (sum, entry) => sum + entry.hours,
       0
     );
 

@@ -59,7 +59,7 @@ describe("ContributionCalculator", () => {
     it("returns empty maps when no ad-hoc issues", async () => {
       const { calculateContributions } = await import("../../../src/utilities/contribution-calculator");
       const entries: TimeEntry[] = [
-        { issue_id: 100, hours: "2", comments: "work #200" },
+        { issue_id: 100, hours: 2, comments: "work #200" },
       ];
 
       const result = calculateContributions(entries);
@@ -73,8 +73,8 @@ describe("ContributionCalculator", () => {
 
       const { calculateContributions } = await import("../../../src/utilities/contribution-calculator");
       const entries: TimeEntry[] = [
-        { issue_id: 100, hours: "2", comments: "work for #200" },
-        { issue_id: 100, hours: "3", comments: "more work #200" },
+        { issue_id: 100, hours: 2, comments: "work for #200" },
+        { issue_id: 100, hours: 3, comments: "more work #200" },
       ];
 
       const result = calculateContributions(entries);
@@ -88,7 +88,7 @@ describe("ContributionCalculator", () => {
 
       const { calculateContributions } = await import("../../../src/utilities/contribution-calculator");
       const entries: TimeEntry[] = [
-        { issue_id: 100, hours: "2", comments: "admin work" },
+        { issue_id: 100, hours: 2, comments: "admin work" },
       ];
 
       const result = calculateContributions(entries);
@@ -102,7 +102,7 @@ describe("ContributionCalculator", () => {
 
       const { calculateContributions } = await import("../../../src/utilities/contribution-calculator");
       const entries: TimeEntry[] = [
-        { issue_id: 100, hours: "2", comments: "work #200" },
+        { issue_id: 100, hours: 2, comments: "work #200" },
       ];
 
       const result = calculateContributions(entries);
@@ -115,8 +115,8 @@ describe("ContributionCalculator", () => {
 
       const { calculateContributions } = await import("../../../src/utilities/contribution-calculator");
       const entries: TimeEntry[] = [
-        { issue_id: 100, hours: "2", comments: "work #200" },
-        { issue_id: 100, hours: "3", comments: "work #300" },
+        { issue_id: 100, hours: 2, comments: "work #200" },
+        { issue_id: 100, hours: 3, comments: "work #300" },
       ];
 
       const result = calculateContributions(entries);
@@ -131,8 +131,8 @@ describe("ContributionCalculator", () => {
 
       const { calculateContributions } = await import("../../../src/utilities/contribution-calculator");
       const entries: TimeEntry[] = [
-        { issue_id: 100, hours: "2", comments: "work #200" },
-        { issue_id: 101, hours: "3", comments: "work #200" },
+        { issue_id: 100, hours: 2, comments: "work #200" },
+        { issue_id: 101, hours: 3, comments: "work #200" },
       ];
 
       const result = calculateContributions(entries);
@@ -147,8 +147,8 @@ describe("ContributionCalculator", () => {
 
       const { calculateContributions } = await import("../../../src/utilities/contribution-calculator");
       const entries: TimeEntry[] = [
-        { issue_id: 100, hours: "2", comments: "work #200" },
-        { issue_id: 101, hours: "3", comments: "work #200" },
+        { issue_id: 100, hours: 2, comments: "work #200" },
+        { issue_id: 101, hours: 3, comments: "work #200" },
       ];
 
       const result = calculateContributions(entries);
@@ -164,8 +164,8 @@ describe("ContributionCalculator", () => {
 
       const { calculateContributions } = await import("../../../src/utilities/contribution-calculator");
       const entries: TimeEntry[] = [
-        { issue_id: 100, hours: "2", comments: "work #200" },
-        { issue_id: 100, hours: "3", comments: "work #300" },
+        { issue_id: 100, hours: 2, comments: "work #200" },
+        { issue_id: 100, hours: 3, comments: "work #300" },
       ];
 
       const result = calculateContributions(entries);
@@ -174,6 +174,26 @@ describe("ContributionCalculator", () => {
         { toIssueId: 200, hours: 2 },
         { toIssueId: 300, hours: 3 },
       ]);
+    });
+
+    // Regression guard: TimeEntry.hours is a number (Redmine GET returns a JSON
+    // number). Summing must be numeric addition — a string-typed field would
+    // make `sum + entry.hours` concatenate ("0" + "2" + "3" => "023").
+    it("sums hours numerically (guards against string-concat regression)", async () => {
+      mockIsAdHoc.mockImplementation((id) => id === 100);
+
+      const { calculateContributions } = await import("../../../src/utilities/contribution-calculator");
+      const entries: TimeEntry[] = [
+        { issue_id: 100, hours: 2, comments: "work #200" },
+        { issue_id: 100, hours: 3, comments: "more #200" },
+      ];
+
+      const total = entries.reduce((sum, e) => sum + e.hours, 0);
+      expect(typeof total).toBe("number");
+      expect(total).toBe(5);
+
+      // And through the real summation path:
+      expect(calculateContributions(entries).contributedTo.get(200)).toBe(5);
     });
   });
 

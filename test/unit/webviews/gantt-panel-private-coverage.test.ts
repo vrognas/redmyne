@@ -137,7 +137,7 @@ describe("gantt panel private coverage", () => {
           issue_id: 2,
           issue: { id: 2 },
           activity_id: 1,
-          hours: "2",
+          hours: 2,
           comments: "#1 help",
           spent_on: "2026-02-02",
         },
@@ -877,7 +877,7 @@ describe("gantt panel private coverage", () => {
           {
             issue: { id: 900 },
             spent_on: "2026-02-03",
-            hours: "1.5",
+            hours: 1.5,
             comments: "#100 supporting work",
           },
         ],
@@ -927,7 +927,7 @@ describe("gantt panel private coverage", () => {
     const server = {
       options: { address: "https://redmine.example" },
       getTimeEntriesForIssues: vi.fn().mockResolvedValue([
-        { issue_id: 2, issue: { id: 2 }, activity_id: 1, hours: "2", comments: "#1 help", spent_on: "2026-02-02" },
+        { issue_id: 2, issue: { id: 2 }, activity_id: 1, hours: 2, comments: "#1 help", spent_on: "2026-02-02" },
       ]),
       getUserFteBatch: vi.fn().mockResolvedValue(new Map([[7, 0.5]])),
       getCachedMemberships: vi.fn(() => undefined),
@@ -992,7 +992,7 @@ describe("gantt panel private coverage", () => {
     const server = {
       options: { address: "https://redmine.example" },
       getTimeEntriesForIssues: vi.fn().mockResolvedValue([
-        { issue_id: 2, issue: { id: 2 }, activity_id: 1, hours: "2", comments: "#1 help", spent_on: "2026-02-02" },
+        { issue_id: 2, issue: { id: 2 }, activity_id: 1, hours: 2, comments: "#1 help", spent_on: "2026-02-02" },
       ]),
       getUserFteBatch: vi.fn().mockReturnValue(ftePromise),
     };

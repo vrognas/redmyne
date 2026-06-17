@@ -35,7 +35,7 @@ export interface ClipboardEntrySource {
   project?: { id: number; name?: string };
   activity_id?: number;
   activity?: { id: number; name?: string };
-  hours: string;
+  hours: string | number; // TimeEntry/CachedEntry GET shape is number; flat rows pass strings
   comments: string;
   custom_fields?: Array<{ id: number; value: unknown }>;
 }
@@ -50,7 +50,7 @@ export function toClipboardEntry(e: ClipboardEntrySource): ClipboardEntry {
   return {
     issue_id: e.issue_id ?? e.issue?.id ?? 0,
     activity_id: e.activity_id ?? e.activity?.id ?? 0,
-    hours: e.hours,
+    hours: String(e.hours),
     comments: e.comments || "",
     issueSubject: e.issue?.subject,
     activityName: e.activity?.name,

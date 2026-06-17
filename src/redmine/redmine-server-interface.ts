@@ -13,7 +13,7 @@ import type {
 } from "../controllers/domain";
 import type { TimeEntryActivity } from "./models/common";
 import type { IssueStatus as RedmineIssueStatus, IssuePriority } from "./models/common";
-import type { TimeEntry } from "./models/time-entry";
+import type { TimeEntry, TimeEntryWrite } from "./models/time-entry";
 import type { Issue } from "./models/issue";
 import type { Version } from "./models/version";
 import type { CustomFieldDefinition, TimeEntryCustomFieldValue } from "./models/custom-field-definition";
@@ -99,22 +99,12 @@ export interface IRedmineServer {
   addTimeEntry(
     issueId: number,
     activityId: number,
-    hours: string,
+    hours: string | number,
     message: string,
     spentOn?: string,
     customFields?: TimeEntryCustomFieldValue[]
   ): Promise<{ time_entry: TimeEntry }>;
-  updateTimeEntry(
-    id: number,
-    updates: {
-      hours?: string;
-      comments?: string;
-      activity_id?: number;
-      spent_on?: string;
-      issue_id?: number;
-      custom_fields?: TimeEntryCustomFieldValue[];
-    }
-  ): Promise<void>;
+  updateTimeEntry(id: number, updates: TimeEntryWrite): Promise<void>;
   deleteTimeEntry(id: number): Promise<void>;
 
   // ============ Versions ============

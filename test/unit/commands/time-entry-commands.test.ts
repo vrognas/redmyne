@@ -499,7 +499,7 @@ describe("registerTimeEntryCommands", () => {
           id: 10,
           issue_id: 1,
           activity_id: 2,
-          hours: "2.0",
+          hours: 2.0,
           comments: "ok",
           spent_on: "2026-02-03",
         },
@@ -507,7 +507,7 @@ describe("registerTimeEntryCommands", () => {
           id: -1,
           issue_id: 9,
           activity_id: 2,
-          hours: "1.0",
+          hours: 1.0,
           comments: "draft",
           spent_on: "2026-02-04",
         },
@@ -554,7 +554,7 @@ describe("registerTimeEntryCommands", () => {
     const selectedDay = {
       _date: "2026-02-04",
       _cachedEntries: [
-        { id: 11, issue_id: 4, activity_id: 2, hours: "1.0", comments: "x", spent_on: "2026-02-04" },
+        { id: 11, issue_id: 4, activity_id: 2, hours: 1.0, comments: "x", spent_on: "2026-02-04" },
       ],
     };
     registerCommands({ getSelectedNode: () => selectedDay });
@@ -575,7 +575,7 @@ describe("registerTimeEntryCommands", () => {
     const selectedWeek = {
       _weekStart: "2026-02-02",
       _cachedEntries: [
-        { id: 20, issue_id: 7, activity_id: 1, hours: "3.0", comments: "wk", spent_on: "2026-02-03" },
+        { id: 20, issue_id: 7, activity_id: 1, hours: 3.0, comments: "wk", spent_on: "2026-02-03" },
       ],
     };
     registerCommands({ getSelectedNode: () => selectedWeek });
@@ -664,7 +664,7 @@ describe("registerTimeEntryCommands", () => {
       getServer: () => ({ getTimeEntries }),
       getSelectedNode: () => ({
         _weekStart: cur,
-        _cachedEntries: [{ id: 1, issue_id: 4, activity_id: 2, hours: "1", comments: "", spent_on: cur }],
+        _cachedEntries: [{ id: 1, issue_id: 4, activity_id: 2, hours: 1, comments: "", spent_on: cur }],
       }),
     });
 
@@ -896,7 +896,7 @@ describe("buildPasteConfirmLines", () => {
       isWeekToWeekPaste: false,
       targetWeekStartForPaste: "",
       existingEntries: [
-        { id: 50, issue_id: 9, issue: { id: 9, subject: "Old" }, hours: "3", comments: "", spent_on: "2026-03-16" },
+        { id: 50, issue_id: 9, issue: { id: 9, subject: "Old" }, hours: 3, comments: "", spent_on: "2026-03-16" },
       ],
     });
     const text = lines.join("\n");
@@ -951,9 +951,9 @@ describe("buildPasteConfirmLines", () => {
       isWeekToWeekPaste: false,
       targetWeekStartForPaste: "",
       existingEntries: [
-        { id: 60, issue_id: 9, hours: "2", comments: "", spent_on: "2026-03-16" },
-        { id: 61, issue_id: 9, hours: "1.5", comments: "", spent_on: "2026-03-16" },
-        { id: 62, issue_id: 8, hours: "4", comments: "", spent_on: "2026-03-18" },
+        { id: 60, issue_id: 9, hours: 2, comments: "", spent_on: "2026-03-16" },
+        { id: 61, issue_id: 9, hours: 1.5, comments: "", spent_on: "2026-03-16" },
+        { id: 62, issue_id: 8, hours: 4, comments: "", spent_on: "2026-03-18" },
       ],
     });
     const text = lines.join("\n");
@@ -971,7 +971,7 @@ describe("buildPasteConfirmLines", () => {
       isWeekToWeekPaste: false,
       targetWeekStartForPaste: "",
       existingEntries: [
-        { id: -5, issue_id: 9, hours: "3", comments: "", spent_on: "2026-03-16" },
+        { id: -5, issue_id: 9, hours: 3, comments: "", spent_on: "2026-03-16" },
       ],
     });
     expect(lines.join("\n")).not.toContain("Already on this day");

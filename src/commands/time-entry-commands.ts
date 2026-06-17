@@ -39,7 +39,7 @@ import { formatIssueLabel } from "../utilities/issue-label";
 interface TimeEntryNode {
   _entry?: {
     id?: number;
-    hours: string;
+    hours: number;
     comments: string;
     activity?: { id: number; name: string };
     spent_on?: string;
@@ -57,7 +57,7 @@ interface CachedEntry {
   project?: { id: number; name?: string };
   activity_id?: number;
   activity?: { id: number; name?: string };
-  hours: string;
+  hours: number; // Mirrors TimeEntry GET shape (sourced from getTimeEntries + draft stubs)
   comments: string;
   spent_on?: string;
   custom_fields?: Array<{ id: number; name?: string; value: unknown }>;
@@ -187,13 +187,13 @@ export function buildPasteConfirmLines(ctx: PasteConfirmContext): string[] {
   if (existing.length === 0) return lines;
 
   if (targetKind === "day") {
-    const total = existing.reduce((sum, e) => sum + parseFloat(e.hours), 0);
+    const total = existing.reduce((sum, e) => sum + e.hours, 0);
     lines.push("");
     lines.push(`Already on this day (${formatHoursAsHHMM(total)}):`);
     for (const e of existing.slice(0, PASTE_CONFIRM_ENTRY_CAP)) {
       const id = e.issue_id ?? e.issue?.id ?? 0;
       const label = e.issue?.subject ? `#${id} ${e.issue.subject}` : `#${id}`;
-      lines.push(`  ${label} — ${formatHoursAsHHMM(parseFloat(e.hours))}`);
+      lines.push(`  ${label} — ${formatHoursAsHHMM(e.hours)}`);
     }
     if (existing.length > PASTE_CONFIRM_ENTRY_CAP) {
       lines.push(`  ... and ${existing.length - PASTE_CONFIRM_ENTRY_CAP} more`);
@@ -211,7 +211,7 @@ export function buildPasteConfirmLines(ctx: PasteConfirmContext): string[] {
     lines.push("Already in target week:");
     for (const date of [...byDate.keys()].sort()) {
       const dayEntries = byDate.get(date)!;
-      const total = dayEntries.reduce((sum, e) => sum + parseFloat(e.hours), 0);
+      const total = dayEntries.reduce((sum, e) => sum + e.hours, 0);
       const label = date === "unknown" ? "(no date)" : formatDayLabel(date);
       lines.push(`  ${label} — ${dayEntries.length} ${dayEntries.length === 1 ? "entry" : "entries"}, ${formatHoursAsHHMM(total)}`);
     }
@@ -437,7 +437,7 @@ export function registerTimeEntryCommands(
       if (!server) return;
 
       // Show what to edit
-      const hoursDisplay = formatHoursAsHHMM(parseFloat(entry.hours));
+      const hoursDisplay = formatHoursAsHHMM(entry.hours);
       const issueDisplay = entry.issue ? formatIssueLabel({ id: entry.issue.id, subject: entry.issue.subject || "" }).trim() : `#${entry.issue_id || "?"}`;
 
       // Fetch custom fields to determine if option should be shown
@@ -478,7 +478,7 @@ export function registerTimeEntryCommands(
         } else if (choice.field === "hours") {
           const input = await vscode.window.showInputBox({
             title: "Edit Hours",
-            value: formatHoursAsHHMM(parseFloat(entry.hours)),
+            value: formatHoursAsHHMM(entry.hours),
             placeHolder: "e.g., 1:30, 1.5, 1h 30min",
             validateInput: (v) => {
               const parsed = parseTimeInput(v);
@@ -553,7 +553,7 @@ export function registerTimeEntryCommands(
       const server = getServerOrShowError(deps.getServer);
       if (!server) return;
 
-      const hoursDisplay = formatHoursAsHHMM(parseFloat(entry.hours));
+      const hoursDisplay = formatHoursAsHHMM(entry.hours);
       const issueInfo = entry.issue ? formatIssueLabel({ id: entry.issue.id, subject: entry.issue.subject || "" }).trim() : "Unknown issue";
       const activityInfo = entry.activity?.name ? `[${entry.activity.name}]` : "";
       const confirm = await vscode.window.showWarningMessage(

@@ -63,7 +63,7 @@ function draftOperationToTimeEntry(op: DraftOperation): TimeEntry | null {
     issue: { id: data.issue_id as number },
     activity_id: data.activity_id as number,
     activity: { id: data.activity_id as number, name: "" },
-    hours: String(data.hours),
+    hours: Number(data.hours), // stored write payload may be string or number; read-model is numeric
     comments: (data.comments as string) ?? "",
     spent_on: (data.spent_on as string) ?? formatLocalDate(new Date()),
   };
@@ -108,7 +108,7 @@ function applyDraftsToEntries(
       if (data) {
         result.push({
           ...entry,
-          hours: data.hours !== undefined ? String(data.hours) : entry.hours,
+          hours: data.hours !== undefined ? Number(data.hours) : entry.hours,
           comments: data.comments !== undefined ? (data.comments as string) : entry.comments,
           activity_id: data.activity_id !== undefined ? (data.activity_id as number) : entry.activity_id,
           // Mark as modified (use negative ID offset for visual indicator)
@@ -176,7 +176,7 @@ export function buildEntryTooltip(info: EntryTooltipInfo): vscode.MarkdownString
       userLine +
       (clientName ? `**Client:** ${escapeMarkdown(clientName)}\n\n` : "") +
       (projectName ? `**Project:** ${escapeMarkdown(projectName)}\n\n` : "") +
-      `**Hours:** ${formatHoursAsHHMM(parseFloat(entry.hours))}\n\n` +
+      `**Hours:** ${formatHoursAsHHMM(entry.hours)}\n\n` +
       `**Activity:** ${escapeMarkdown(entry.activity?.name || "Unknown")}\n\n` +
       `**Date:** ${entry.spent_on}\n\n` +
       `**Comments:** ${escapeMarkdown(entry.comments || "(none)")}\n\n` +
@@ -927,7 +927,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
       });
 
       // Format: "#1234 comment" with "HH:MM [activity] issue_subject [user]" as description
-      const hours = formatHoursAsHHMM(parseFloat(entry.hours));
+      const hours = formatHoursAsHHMM(entry.hours);
       const activity = entry.activity?.name ? `[${entry.activity.name}]` : "";
       const comment = entry.comments ? ` ${entry.comments}` : "";
       const userName = this.showAllUsers && entry.user?.name ? `• ${entry.user.name}` : "";
@@ -1057,7 +1057,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
 // Helper functions
 
 function calculateTotal(entries: TimeEntry[]): number {
-  return entries.reduce((sum, entry) => sum + parseFloat(entry.hours), 0);
+  return entries.reduce((sum, entry) => sum + entry.hours, 0);
 }
 
 

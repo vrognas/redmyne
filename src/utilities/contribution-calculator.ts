@@ -58,7 +58,7 @@ export function calculateContributions(entries: TimeEntry[]): ContributionResult
     const targetIssueId = parseTargetIssueId(entry.comments);
     if (!targetIssueId) continue;
 
-    const hours = parseFloat(entry.hours);
+    const hours = entry.hours;
 
     // Update total contributed to target
     contributedTo.set(

@@ -363,7 +363,7 @@ export class DraftModeServer implements IRedmineServer {
   async addTimeEntry(
     issueId: number,
     activityId: number,
-    hours: string,
+    hours: string | number,
     message: string,
     spentOn?: string,
     customFields?: TimeEntryCustomFieldValue[],
@@ -404,13 +404,14 @@ export class DraftModeServer implements IRedmineServer {
       )
     );
 
-    // Return stub with temp ID
+    // Return stub with temp ID. The write payload (entryData.hours) keeps the
+    // caller's raw string/number; the read-model stub is normalized to number.
     return {
       time_entry: {
         id: tempId,
         issue_id: issueId,
         activity_id: activityId,
-        hours,
+        hours: Number(hours),
         comments: message,
         spent_on: effectiveSpentOn,
         activity: { id: activityId, name: "" },

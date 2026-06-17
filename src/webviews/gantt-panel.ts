@@ -835,7 +835,7 @@ export class GanttPanel {
         if (!entry.issue?.id || !entry.spent_on) continue;
         const sourceIssueId = entry.issue.id;
         const date = entry.spent_on;
-        const hours = parseFloat(entry.hours as unknown as string) || 0;
+        const hours = entry.hours || 0;
 
         let targetIssueId = sourceIssueId;
         if (adHocTracker.isAdHoc(sourceIssueId)) {

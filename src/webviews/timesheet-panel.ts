@@ -827,7 +827,7 @@ export class TimeSheetPanel {
       row.isNew = false;
 
       // Set hours for this entry's day
-      const entryHours = typeof entry.hours === "string" ? parseFloat(entry.hours) : entry.hours;
+      const entryHours = entry.hours;
       row.days[dayIndex] = {
         hours: entryHours,
         originalHours: entryHours,
