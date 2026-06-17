@@ -1235,19 +1235,22 @@ export async function pickIssue(
 
         if (thisSearchVersion !== searchVersion || resolved) return;
 
-        // Check time tracking for any new projects in search results (unless skipped)
+        // Check time tracking for any new projects in search results (unless skipped).
+        // Route through getTimeTrackingStatusCached so a single flaky project fails
+        // open (its own per-project catch) instead of rejecting the whole search —
+        // matching pickIssueWithSearch and the base-section build.
         if (!skipTimeTrackingCheck) {
           const newProjectIds = [...new Set(
             allResults
               .map(i => i.project?.id)
               .filter((id): id is number => id !== undefined && !timeTrackingByProject.has(id))
           )];
-          await Promise.all(
-            newProjectIds.map(async (projectId) => {
-              const enabled = await server.isTimeTrackingEnabled(projectId);
-              timeTrackingByProject.set(projectId, enabled);
-            })
-          );
+          if (newProjectIds.length > 0) {
+            const statuses = await getTimeTrackingStatusCached(server, newProjectIds);
+            for (const projectId of newProjectIds) {
+              timeTrackingByProject.set(projectId, statuses.get(projectId) ?? true);
+            }
+          }
         }
 
         if (thisSearchVersion !== searchVersion || resolved) return;

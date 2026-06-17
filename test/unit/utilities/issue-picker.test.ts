@@ -979,6 +979,62 @@ describe("issue-picker", () => {
     await expect(pending).resolves.toMatchObject({ id: 901 });
   });
 
+  it("pickIssue search stays open when a project's tracking check fails (regression #68)", async () => {
+    vi.useFakeTimers();
+    const vscodeApi = await import("vscode");
+    const recentIssues = await import("../../../src/utilities/recent-issues");
+    vi.spyOn(recentIssues, "getRecentIssueIds").mockReturnValue([]);
+    vi.spyOn(recentIssues, "recordRecentIssue").mockImplementation(() => {});
+
+    const quickPick = createControlledQuickPick();
+    vi.spyOn(vscodeApi.window, "createQuickPick").mockImplementation(
+      () => quickPick as unknown as vscode.QuickPick<vscode.QuickPickItem>
+    );
+
+    const assignedIssue = createIssue({
+      id: 901,
+      subject: "Auth assigned",
+      project: { id: 41, name: "Core" },
+      status: { id: 1, name: "Open", is_closed: false },
+    });
+    const searchResultIssue = createIssue({
+      id: 902,
+      subject: "Auth result",
+      project: { id: 42, name: "Ops" },
+      assigned_to: { id: 77, name: "Someone Else" },
+      status: { id: 1, name: "Open", is_closed: false },
+    });
+
+    const { pickIssue } = await import("../../../src/utilities/issue-picker");
+    const server = createMockServer({
+      getIssuesAssignedToMe: vi.fn().mockResolvedValue({ issues: [assignedIssue] }),
+      getProjects: vi.fn().mockResolvedValue([
+        createProject(41, "Core"),
+        createProject(42, "Ops"),
+      ]),
+      // Project 42 appears only in search results; its tracking check rejects.
+      // Pre-fix the inline Promise.all rejected -> the whole search showed
+      // "Search failed". The fail-open getTimeTrackingStatusCached must absorb it.
+      isTimeTrackingEnabled: vi.fn(async (projectId: number) => {
+        if (projectId === 42) throw new Error("403");
+        return true;
+      }),
+      searchIssues: vi.fn().mockResolvedValue([searchResultIssue]),
+    });
+
+    const pending = pickIssue(server as unknown as IRedmineServer, "Pick issue");
+    await flushMicrotasks();
+
+    quickPick.triggerValue("auth");
+    await vi.advanceTimersByTimeAsync(250);
+
+    expect(quickPick.items.some((item) => item.label.includes("#902"))).toBe(true);
+    expect(quickPick.items.some((item) => item.label === "$(error) Search failed")).toBe(false);
+
+    quickPick.triggerHide();
+    await expect(pending).resolves.toBeUndefined();
+  });
+
   it("pickIssue inline search with skipTimeTrackingCheck selects non-assigned result", async () => {
     vi.useFakeTimers();
     const vscodeApi = await import("vscode");
