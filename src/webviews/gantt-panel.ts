@@ -10,7 +10,7 @@ import { adHocTracker } from "../utilities/adhoc-tracker";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { normalizeServerUrl } from "../utilities/server-url";
 import { errorToString } from "../utilities/error-feedback";
-import { buildProjectHierarchy, buildResourceHierarchy, flattenHierarchyAll, HierarchyNode } from "../utilities/hierarchy-builder";
+import { buildProjectHierarchy, buildResourceHierarchy, flattenHierarchyAll, attachUnscheduledGroups, HierarchyNode } from "../utilities/hierarchy-builder";
 import { ProjectHealth } from "../utilities/project-health";
 import { buildDependencyGraph, resetDownstreamCountCache } from "../utilities/dependency-graph";
 import {
@@ -200,6 +200,7 @@ export class GanttPanel {
   private readonly _extensionUri: vscode.Uri;
   private _disposables: vscode.Disposable[] = [];
   private _issues: Issue[] = [];
+  private _unscheduledIssues: Issue[] = []; // Dateless issues → per-project "Unscheduled" group
   private _dependencyIssues: Issue[] = []; // External scheduling dependencies
   private _issueById: Map<number, Issue> = new Map(); // O(1) lookup cache
   private _projects: RedmineProject[] = [];
@@ -745,6 +746,11 @@ export class GanttPanel {
     // when applying draft date changes
     this._issues = issues
       .filter((i) => i.start_date || i.due_date)
+      .map(i => ({ ...i }));
+    // Dateless issues can't get a timeline bar; keep them for the per-project
+    // "Unscheduled" group instead of dropping them entirely.
+    this._unscheduledIssues = issues
+      .filter((i) => !i.start_date && !i.due_date)
       .map(i => ({ ...i }));
     this._dependencyIssues = (dependencyIssues ?? [])
       .filter((i) => i.start_date || i.due_date)
@@ -2156,6 +2162,34 @@ export class GanttPanel {
 
         this._cachedHierarchy = buildProjectHierarchy(sortedIssues, this._flexibilityCache, projectsForHierarchy, true, blockedIds);
       }
+
+      // Attach a per-project "Unscheduled" group of dateless issues, narrowed by
+      // the same view + task-type filters as the timeline (never under late-only
+      // — dateless issues can't be late). Cached with the hierarchy.
+      const unscheduledByProject = new Map<number, Issue[]>();
+      if (!this._lateOnly && this._unscheduledIssues.length > 0) {
+        const viewMatched = filterIssuesForView({
+          issues: this._unscheduledIssues,
+          projects: this._projects,
+          viewFocus: this._viewFocus,
+          selectedAssignee: this._selectedAssignee,
+          currentUserName: this._currentUserName,
+          uniqueAssignees: this._uniqueAssignees,
+          selectedProjectId: this._selectedProjectId,
+          currentFilter: this._currentFilter,
+          currentUserId: this._currentUserId,
+        }).filteredIssues;
+        const ttMatched = taskTypeField
+          ? filterIssuesByTaskType(viewMatched, taskTypeField, this._taskTypeFilter)
+          : viewMatched;
+        for (const issue of ttMatched) {
+          const pid = issue.project?.id ?? 0;
+          const list = unscheduledByProject.get(pid);
+          if (list) list.push(issue);
+          else unscheduledByProject.set(pid, [issue]);
+        }
+      }
+      attachUnscheduledGroups(this._cachedHierarchy, unscheduledByProject);
     }
     // Auto-expand all when switching project/person (before flattening).
     // Only consume the flag once keys actually exist — an early render before

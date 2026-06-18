@@ -762,5 +762,49 @@ export function flattenHierarchyAll(
   return result;
 }
 
+/**
+ * Append a per-project "Unscheduled" group (issues with no start/due date) as
+ * the last child of each matching project node. Modeled as a `time-group`
+ * node with `timeGroup: "no-date"` so it reuses the existing collapsible
+ * header + empty aggregate bar; its child issue rows render label-only because
+ * the bar generator already emits nothing for dateless issues. Collapsed by
+ * default (its collapseKey isn't pre-expanded). Mutates `roots` in place.
+ */
+export function attachUnscheduledGroups(
+  roots: HierarchyNode[],
+  unscheduledByProject: Map<number, Issue[]>,
+): void {
+  if (unscheduledByProject.size === 0) return;
 
+  const walk = (nodes: HierarchyNode[]): void => {
+    for (const node of nodes) {
+      // Recurse first so subprojects get their own groups; the group we append
+      // below holds only issue nodes, so it never needs walking.
+      walk(node.children);
+      if (node.type !== "project") continue;
+      const issues = unscheduledByProject.get(node.id);
+      if (!issues || issues.length === 0) continue;
+
+      const groupKey = `unscheduled-${node.id}`;
+      const children = issues.map((issue) =>
+        makeIssueNode(issue, node.depth + 2, [], groupKey),
+      );
+      node.children.push({
+        type: "time-group",
+        id: -node.id, // synthetic, distinct from any real project/issue id
+        label: "Unscheduled",
+        depth: node.depth + 1,
+        children,
+        collapseKey: groupKey,
+        parentKey: node.collapseKey,
+        timeGroup: "no-date",
+        icon: "📋",
+        childCount: children.length,
+        childDateRanges: [], // dateless ⇒ no aggregate bar
+      });
+    }
+  };
+
+  walk(roots);
+}
 

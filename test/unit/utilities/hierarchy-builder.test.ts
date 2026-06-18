@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   buildMyWorkHierarchy,
+  buildProjectHierarchy,
+  attachUnscheduledGroups,
   flattenHierarchy,
   makeIssueNode,
   HierarchyNode,
@@ -36,6 +38,42 @@ function createMockIssue(overrides: Partial<Issue> & { id: number }): Issue {
 function getIssueNodes(result: HierarchyNode[]): HierarchyNode[] {
   return result.flatMap(group => group.children);
 }
+
+describe("attachUnscheduledGroups", () => {
+  it("appends a per-project Unscheduled time-group of dateless issues", () => {
+    const dated = createMockIssue({
+      id: 1,
+      project: { id: 10, name: "P10" },
+      start_date: "2026-01-01",
+      due_date: "2026-01-05",
+    });
+    const roots = buildProjectHierarchy([dated], new Map(), [], true);
+    const undated = {
+      ...createMockIssue({ id: 2, project: { id: 10, name: "P10" }, due_date: null }),
+      start_date: null,
+    };
+
+    attachUnscheduledGroups(roots, new Map([[10, [undated]]]));
+
+    const project = roots.find((n) => n.id === 10)!;
+    const group = project.children.find((c) => c.collapseKey === "unscheduled-10");
+    expect(group).toBeDefined();
+    expect(group!.type).toBe("time-group");
+    expect(group!.label).toBe("Unscheduled");
+    expect(group!.timeGroup).toBe("no-date");
+    expect(group!.children.map((c) => c.id)).toEqual([2]);
+    // Appended last (after the project's dated issue rows).
+    expect(project.children[project.children.length - 1]).toBe(group);
+  });
+
+  it("does nothing when there are no unscheduled issues for a project", () => {
+    const dated = createMockIssue({ id: 1, project: { id: 10, name: "P10" } });
+    const roots = buildProjectHierarchy([dated], new Map(), [], true);
+    attachUnscheduledGroups(roots, new Map());
+    const project = roots.find((n) => n.id === 10)!;
+    expect(project.children.some((c) => c.type === "time-group")).toBe(false);
+  });
+});
 
 describe("makeIssueNode", () => {
   it("builds an issue node with shared defaults and merges extras", () => {
