@@ -8,6 +8,7 @@ import { FlexibilityScore, WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE, calculateFle
 import { calculateContributions, parseTargetIssueId } from "../utilities/contribution-calculator";
 import { adHocTracker } from "../utilities/adhoc-tracker";
 import { showStatusBarMessage } from "../utilities/status-bar";
+import { normalizeServerUrl } from "../utilities/server-url";
 import { errorToString } from "../utilities/error-feedback";
 import { buildProjectHierarchy, buildResourceHierarchy, flattenHierarchyAll, HierarchyNode } from "../utilities/hierarchy-builder";
 import { ProjectHealth } from "../utilities/project-health";
@@ -679,7 +680,7 @@ export class GanttPanel {
     const { extraColumnsWidth, stickyLeftWidth } = computeStickyLeftWidth(idColumnWidth);
     const ganttConfig = vscode.workspace.getConfiguration("redmyne.gantt");
     const perfDebug = ganttConfig.get<boolean>("perfDebug", false);
-    const redmineBaseUrl = vscode.workspace.getConfiguration("redmyne").get<string>("serverUrl") || "";
+    const redmineBaseUrl = normalizeServerUrl(vscode.workspace.getConfiguration("redmyne").get<string>("serverUrl") || "");
 
     const baseState: GanttRenderState = {
       timelineWidth: 600,
@@ -2776,7 +2777,7 @@ export class GanttPanel {
   </div>
 `;
 
-    const redmineBaseUrl = vscode.workspace.getConfiguration("redmyne").get<string>("serverUrl") || "";
+    const redmineBaseUrl = normalizeServerUrl(vscode.workspace.getConfiguration("redmyne").get<string>("serverUrl") || "");
     const renderState: GanttRenderState = {
       timelineWidth,
       minDateMs: minDate.getTime(),
@@ -3171,7 +3172,7 @@ export class GanttPanel {
     }
 
     if (this._server && row.identifier) {
-      const base = this._server.options.address.replace(/\/+$/, "");
+      const base = normalizeServerUrl(this._server.options.address);
       tooltip += `Open in Browser: ${base}/projects/${row.identifier}`;
     }
 

@@ -10,6 +10,7 @@ import {
 import { TimeEntryActivity } from "./models/common";
 import { Project } from "./models/project";
 import { TimeEntry, TimeEntryWrite } from "./models/time-entry";
+import { normalizeServerUrl } from "../utilities/server-url";
 import { Issue } from "./models/issue";
 import { Version } from "./models/version";
 import { IssueStatus as RedmineIssueStatus, IssuePriority } from "./models/common";
@@ -134,9 +135,14 @@ export class RedmineServer implements IRedmineServer {
   }
 
   private setOptions(options: RedmineServerConnectionOptions) {
+    // Normalize once at the source so every consumer of options.address (URL
+    // builders, the Gantt links, the HTTP transport) is free of trailing
+    // slashes — appending "/issues/123" can't then produce "//issues/123".
+    const address = normalizeServerUrl(options.address);
     this.options = {
       ...options,
-      url: new URL(options.address),
+      address,
+      url: new URL(address),
     };
     if (
       this.options.additionalHeaders === null ||

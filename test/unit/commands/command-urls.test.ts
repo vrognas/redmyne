@@ -13,4 +13,16 @@ describe("command-urls", () => {
       "https://redmine.example.test/projects/operations"
     );
   });
+
+  it("strips a trailing slash so the issue URL has no double slash", () => {
+    expect(buildIssueUrl("https://redmine.example.test/", 42)).toBe(
+      "https://redmine.example.test/issues/42"
+    );
+  });
+
+  it("strips a trailing slash from the project URL", () => {
+    expect(buildProjectUrl("https://redmine.example.test/", "operations")).toBe(
+      "https://redmine.example.test/projects/operations"
+    );
+  });
 });

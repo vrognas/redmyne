@@ -8,6 +8,7 @@ import { formatCustomFieldValue } from "./custom-field-formatter";
 import { Membership, groupMembersByRole } from "../controllers/domain";
 import { escapeMarkdown } from "./markdown-escape";
 import { formatIssueLabel } from "./issue-label";
+import { normalizeServerUrl } from "./server-url";
 import { configuredCommandArgs } from "../commands/configured-command-registrar";
 import type { ActionProperties } from "../commands/action-properties";
 
@@ -118,7 +119,7 @@ function appendBrowserLink(
   if (!server) {
     return;
   }
-  const base = server.options.address.replace(/\/+$/, "");
+  const base = normalizeServerUrl(server.options.address);
   md.appendMarkdown(`[Open in Browser](${base}${path})`);
 }
 
