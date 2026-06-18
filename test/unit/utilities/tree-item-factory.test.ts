@@ -173,6 +173,23 @@ describe("createEnhancedIssueTreeItem", () => {
     expect(tooltipValue).toContain("**Tracker:** Tasks");
   });
 
+  it("always shows start and due dates, marking missing ones", () => {
+    const dated = createEnhancedIssueTreeItem(mockIssue, null, undefined, "test.command");
+    const datedTip = (dated.tooltip as { value: string }).value;
+    expect(datedTip).toContain("**Start:** 2025-11-01");
+    expect(datedTip).toContain("**Due:** 2025-11-30");
+
+    const undated = createEnhancedIssueTreeItem(
+      { ...mockIssue, start_date: null, due_date: null },
+      null,
+      undefined,
+      "test.command"
+    );
+    const undatedTip = (undated.tooltip as { value: string }).value;
+    expect(undatedTip).toContain("**Start:** _not set_");
+    expect(undatedTip).toContain("**Due:** _not set_");
+  });
+
   it("does not show billable prefix in description (moved to tooltip)", () => {
     const nonBillableIssue: Issue = {
       ...mockIssue,

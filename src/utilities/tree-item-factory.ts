@@ -157,9 +157,12 @@ function createIssueTooltip(
   } else {
     md.appendMarkdown(`**Status:** ${escapeMarkdown(issue.status?.name?.trim() ?? "Unknown")}  \n`);
   }
-  if (issue.due_date) {
-    md.appendMarkdown(`**Due:** ${issue.due_date}  \n`);
-  }
+  // Always surface scheduling dates so it's obvious when an issue is
+  // unscheduled (no start/due = it won't appear on the Gantt timeline).
+  const dateOrMissing = (d: string | null | undefined): string =>
+    d && d.trim() ? d : "_not set_";
+  md.appendMarkdown(`**Start:** ${dateOrMissing(issue.start_date)}  \n`);
+  md.appendMarkdown(`**Due:** ${dateOrMissing(issue.due_date)}  \n`);
   if (flexibility) {
     const progress = estHours > 0 ? Math.round((spentHours / estHours) * 100) : 0;
     md.appendMarkdown(`**Progress:** ${formatHoursAsHHMM(spentHours)} / ${formatHoursAsHHMM(estHours)} (${progress}%)`);
