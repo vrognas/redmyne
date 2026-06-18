@@ -91,6 +91,13 @@ describe("registerViewCommands", () => {
     }
   });
 
+  it("filterNone also clears the sticky task-type filter", () => {
+    handlers.get("redmyne.filterNone")?.();
+    expect(projectsTree.setFilter).toHaveBeenCalledWith(
+      expect.objectContaining({ assignee: "any", status: "any", taskType: "any" })
+    );
+  });
+
   it("toggles API logging and updates configured context", async () => {
     const configUpdate = vi.fn().mockResolvedValue(undefined);
     vi.mocked(vscode.workspace.getConfiguration).mockImplementation((section) => {
@@ -171,6 +178,7 @@ describe("registerViewCommands", () => {
       assignee: "any",
       status: "any",
       showEmptyProjects: true,
+      taskType: "any",
     });
     expect(timeEntriesTree.setShowAllUsers).toHaveBeenCalledWith(true);
     expect(projectsTree.setSort).toHaveBeenCalledWith("subject");

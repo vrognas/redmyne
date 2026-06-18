@@ -62,6 +62,20 @@ describe("ProjectsTree", () => {
     });
   });
 
+  describe("view description reflects active filters", () => {
+    it("shows the active task-type filter and clears it on 'any'", () => {
+      const tree = new ProjectsTree();
+      const view: { description?: string } = {};
+      tree.setTreeView(view as never);
+
+      tree.setTaskTypeFilter("Data Management");
+      expect(view.description).toContain("Data Management");
+
+      tree.setTaskTypeFilter("any");
+      expect(view.description).toBeUndefined();
+    });
+  });
+
   describe("project formatting", () => {
     it("should format project with collapsible state", () => {
       const tree = new ProjectsTree();

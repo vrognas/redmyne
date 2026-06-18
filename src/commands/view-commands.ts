@@ -102,7 +102,9 @@ export function registerViewCommands(
     }),
 
     vscode.commands.registerCommand("redmyne.filterNone", () => {
-      deps.projectsTree.setFilter({ assignee: "any", status: "any", showEmptyProjects: true });
+      // "No Filter" clears everything — including the orthogonal, otherwise
+      // invisible task-type filter that setFilter would normally preserve.
+      deps.projectsTree.setFilter({ assignee: "any", status: "any", showEmptyProjects: true, taskType: "any" });
       showStatusBarMessage("$(eye-closed) No Filter", 2000);
     }),
 

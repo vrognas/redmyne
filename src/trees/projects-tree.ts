@@ -72,6 +72,8 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   private assignedIssues: Issue[] = [];
   private dependencyIssues: Issue[] = []; // External scheduling dependencies
   private issueFilter: IssueFilter = { ...DEFAULT_ISSUE_FILTER };
+  /** The tree view, used to surface the active filter in its description. */
+  private treeView?: vscode.TreeView<unknown>;
   private issueSort: SortConfig<IssueSortField> | null = null; // null = use risk sorting
   private issuesByProject = new Map<number, Issue[]>();
   private issuesByParent = new Map<number, Issue[]>(); // parent issue ID → child issues
@@ -601,6 +603,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
     // caller sets it explicitly (it's an orthogonal, client-side filter).
     this.issueFilter = { taskType: this.issueFilter.taskType, ...filter };
     this.globalState?.update(FILTER_KEY, this.issueFilter);
+    this.updateViewDescription();
     this.clearProjects();
     this.refresh();
   }
@@ -629,8 +632,32 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   setTaskTypeFilter(taskType: string | "any"): void {
     this.issueFilter = { ...this.issueFilter, taskType };
     this.globalState?.update(FILTER_KEY, this.issueFilter);
+    this.updateViewDescription();
     this.applyIssues(this.assignedIssues);
     this.refresh();
+  }
+
+  /**
+   * Wire the TreeView so active filters can be shown in its description.
+   * Without this the client-side task-type filter is invisible: issues
+   * silently vanish from the pane with no indication why (and the Gantt,
+   * which has its own task-type filter, then disagrees).
+   */
+  setTreeView(treeView: vscode.TreeView<unknown>): void {
+    this.treeView = treeView;
+    this.updateViewDescription();
+  }
+
+  private updateViewDescription(): void {
+    if (!this.treeView) return;
+    const parts: string[] = [];
+    if (this.issueFilter.assignee === "me") parts.push("Mine");
+    if (this.issueFilter.status && this.issueFilter.status !== "any") {
+      parts.push(this.issueFilter.status);
+    }
+    const taskType = this.issueFilter.taskType;
+    if (taskType && taskType !== "any") parts.push(taskType);
+    this.treeView.description = parts.length > 0 ? parts.join(" · ") : undefined;
   }
 
   /**
