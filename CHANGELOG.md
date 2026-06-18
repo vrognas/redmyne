@@ -7,6 +7,13 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.34.0]
+
+### Fixed
+
+- **"Copy URL" / "Open in Browser" produced double-slash links** (e.g. `…com//issues/123`) when the Redmine `serverUrl` was configured with a trailing slash. The base URL is now normalized once at the source, so every link (Copy URL, browser open, Gantt tooltips) — and the API transport — stays consistent
+- **The Issues pane could silently show only a subset of a project's issues.** Its task-type filter was invisible and sticky — "No Filter" didn't clear it — so the pane and the Gantt (which has its own task-type filter) could disagree about which issues exist. "No Filter" now also clears the task type, and the active task-type/assignee/status filter is shown in the Issues view description
+
 ## [4.33.0]
 
 Continued god-file decomposition from the deep review (report: `docs/reviews/2026-06-11-deep-review.md`): **`issue-picker.ts` split — 113 of 142 resolved**.
