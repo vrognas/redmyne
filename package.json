@@ -83,10 +83,6 @@
         "title": "My Issues"
       },
       {
-        "command": "redmyne.filterNone",
-        "title": "No Filter"
-      },
-      {
         "command": "redmyne.timeFilterMy",
         "title": "My Time Entries"
       },
@@ -854,10 +850,6 @@
         },
         {
           "command": "redmyne.filterAll",
-          "group": "1_filters@5"
-        },
-        {
-          "command": "redmyne.filterNone",
           "group": "2_special@1"
         },
         {
@@ -968,10 +960,6 @@
         },
         {
           "command": "redmyne.filterMyIssues",
-          "when": "false"
-        },
-        {
-          "command": "redmyne.filterNone",
           "when": "false"
         },
         {

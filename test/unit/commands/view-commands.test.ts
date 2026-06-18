@@ -91,8 +91,8 @@ describe("registerViewCommands", () => {
     }
   });
 
-  it("filterNone also clears the sticky task-type filter", () => {
-    handlers.get("redmyne.filterNone")?.();
+  it("filterAll resets every filter, including the sticky task-type", () => {
+    handlers.get("redmyne.filterAll")?.();
     expect(projectsTree.setFilter).toHaveBeenCalledWith(
       expect.objectContaining({ assignee: "any", status: "any", taskType: "any" })
     );
@@ -154,7 +154,7 @@ describe("registerViewCommands", () => {
   it("wires representative view/filter/sort/output commands", async () => {
     handlers.get("redmyne.toggleTreeView")?.();
     handlers.get("redmyne.toggleListView")?.();
-    handlers.get("redmyne.filterNone")?.();
+    handlers.get("redmyne.filterAll")?.();
     handlers.get("redmyne.timeFilterAll")?.();
     handlers.get("redmyne.issueSortSubject")?.();
     handlers.get("redmyne.timeSortUser")?.();
@@ -201,7 +201,12 @@ describe("registerViewCommands", () => {
     expect(projectsTree.setFilter).toHaveBeenCalledWith({ assignee: "me", status: "open" });
     expect(projectsTree.setFilter).toHaveBeenCalledWith({ assignee: "any", status: "open" });
     expect(projectsTree.setFilter).toHaveBeenCalledWith({ assignee: "me", status: "closed" });
-    expect(projectsTree.setFilter).toHaveBeenCalledWith({ assignee: "any", status: "any" });
+    expect(projectsTree.setFilter).toHaveBeenCalledWith({
+      assignee: "any",
+      status: "any",
+      showEmptyProjects: true,
+      taskType: "any",
+    });
     expect(projectsTree.setFilter).toHaveBeenCalledWith({ assignee: "me", status: "any" });
   });
 

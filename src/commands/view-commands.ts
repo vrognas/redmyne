@@ -92,20 +92,16 @@ export function registerViewCommands(
     }),
 
     vscode.commands.registerCommand("redmyne.filterAll", () => {
-      deps.projectsTree.setFilter({ assignee: "any", status: "any" });
+      // The single show-everything action: any assignee/status, and also clears
+      // the orthogonal, otherwise-invisible task-type filter (which setFilter
+      // would preserve) and reveals empty projects.
+      deps.projectsTree.setFilter({ assignee: "any", status: "any", showEmptyProjects: true, taskType: "any" });
       showStatusBarMessage("$(list-flat) All Issues", 2000);
     }),
 
     vscode.commands.registerCommand("redmyne.filterMyIssues", () => {
       deps.projectsTree.setFilter({ assignee: "me", status: "any" });
       showStatusBarMessage("$(account) My Issues", 2000);
-    }),
-
-    vscode.commands.registerCommand("redmyne.filterNone", () => {
-      // "No Filter" clears everything — including the orthogonal, otherwise
-      // invisible task-type filter that setFilter would normally preserve.
-      deps.projectsTree.setFilter({ assignee: "any", status: "any", showEmptyProjects: true, taskType: "any" });
-      showStatusBarMessage("$(eye-closed) No Filter", 2000);
     }),
 
     vscode.commands.registerCommand("redmyne.filterByTaskType", async () => {
