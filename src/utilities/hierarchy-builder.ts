@@ -798,7 +798,6 @@ export function attachUnscheduledGroups(
         collapseKey: groupKey,
         parentKey: node.collapseKey,
         timeGroup: "no-date",
-        icon: "📋",
         childCount: children.length,
         childDateRanges: [], // dateless ⇒ no aggregate bar
       });
