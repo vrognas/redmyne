@@ -576,8 +576,8 @@ describe("gantt-html-generator", () => {
         ...baseIssueRow,
         issue: { ...baseIssueRow.issue!, start_date: null, due_date: null, assignee: null, isClosed: true, done_ratio: 100 },
       };
-      expect(generateStartDateCell(noDates, baseCtx)).toContain("—");
-      expect(generateDueDateCell(noDates, { ...baseCtx, today: new Date("2025-01-01") })).toContain("—");
+      expect(generateStartDateCell(noDates, baseCtx)).toContain("Not set");
+      expect(generateDueDateCell(noDates, { ...baseCtx, today: new Date("2025-01-01") })).toContain("Not set");
       expect(generateStatusCell(noDates, baseCtx)).toContain("var(--vscode-charts-green)");
       expect(generateAssigneeCell(noDates, baseCtx)).toContain("—");
     });

@@ -366,7 +366,7 @@ export function generateStartDateCell(
 
   const issue = row.issue!;
   if (!issue.start_date) {
-    return `<g class="gantt-row" ${collapseKeyAttrs(row.collapseKey, row.parentKey)}><text class="gantt-col-cell" x="4" y="${ctx.barHeight / 2 + 4}" text-anchor="start">—</text></g>`;
+    return `<g class="gantt-row" ${collapseKeyAttrs(row.collapseKey, row.parentKey)}><text class="gantt-col-cell" x="4" y="${ctx.barHeight / 2 + 4}" text-anchor="start">Not set</text></g>`;
   }
 
   const startDate = parseLocalDate(issue.start_date);
@@ -413,7 +413,7 @@ export function generateDueDateCell(
 
   const issue = row.issue!;
   if (!issue.due_date) {
-    return `<g class="gantt-row" ${collapseKeyAttrs(row.collapseKey, row.parentKey)}><text class="gantt-col-cell" x="4" y="${ctx.barHeight / 2 + 4}" text-anchor="start">—</text></g>`;
+    return `<g class="gantt-row" ${collapseKeyAttrs(row.collapseKey, row.parentKey)}><text class="gantt-col-cell" x="4" y="${ctx.barHeight / 2 + 4}" text-anchor="start">Not set</text></g>`;
   }
 
   const dueDate = parseLocalDate(issue.due_date);

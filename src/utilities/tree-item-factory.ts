@@ -160,7 +160,7 @@ function createIssueTooltip(
   // Always surface scheduling dates so it's obvious when an issue is
   // unscheduled (no start/due = it won't appear on the Gantt timeline).
   const dateOrMissing = (d: string | null | undefined): string =>
-    d && d.trim() ? d : "_not set_";
+    d && d.trim() ? d : "_Not set_";
   md.appendMarkdown(`**Start:** ${dateOrMissing(issue.start_date)}  \n`);
   md.appendMarkdown(`**Due:** ${dateOrMissing(issue.due_date)}  \n`);
   if (flexibility) {

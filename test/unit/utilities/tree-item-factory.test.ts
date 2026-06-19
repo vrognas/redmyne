@@ -186,8 +186,8 @@ describe("createEnhancedIssueTreeItem", () => {
       "test.command"
     );
     const undatedTip = (undated.tooltip as { value: string }).value;
-    expect(undatedTip).toContain("**Start:** _not set_");
-    expect(undatedTip).toContain("**Due:** _not set_");
+    expect(undatedTip).toContain("**Start:** _Not set_");
+    expect(undatedTip).toContain("**Due:** _Not set_");
   });
 
   it("does not show billable prefix in description (moved to tooltip)", () => {
