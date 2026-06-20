@@ -43,6 +43,7 @@ import { debounce, DebouncedFunction } from "./utilities/debounce";
 import { runMigration } from "./utilities/migration";
 import { initRecentIssues } from "./utilities/recent-issues";
 import { initAdHocTracker } from "./utilities/adhoc-tracker";
+import { isClientStateOnlyConfigChange } from "./utilities/config-change";
 import { createConfiguredContextUpdater } from "./utilities/configured-context-updater";
 import { DraftQueue } from "./draft-mode/draft-queue";
 import { DraftModeManager } from "./draft-mode/draft-mode-manager";
@@ -342,9 +343,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         if (event.affectsConfiguration("redmyne.serverUrl")) {
           clearClipboard();
         }
-        // Only update server context for server-related config changes
-        // Skip for UI-only configs (statusBar, workingHours)
+        // Rebuild the server context for server-related config changes only.
+        // Skip UI-only configs (statusBar, workingHours) and the client-side
+        // id-set toggles (ad-hoc/auto-update/precedence) — the latter write
+        // state only and self-refresh, so rebuilding the server (wiping every
+        // cache + reloading all issues) on each toggle is pure waste.
         if (
+          !isClientStateOnlyConfigChange(event) &&
           !event.affectsConfiguration("redmyne.statusBar") &&
           !event.affectsConfiguration("redmyne.workingHours")
         ) {
