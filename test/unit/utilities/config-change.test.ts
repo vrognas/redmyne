@@ -25,5 +25,8 @@ describe("isClientStateOnlyConfigChange", () => {
     expect(
       isClientStateOnlyConfigChange(event("redmyne.serverUrl", "redmyne.adHocBudgetIssues")),
     ).toBe(false);
+    expect(
+      isClientStateOnlyConfigChange(event("redmyne.maxConcurrentRequests", "redmyne.adHocBudgetIssues")),
+    ).toBe(false);
   });
 });

@@ -1530,9 +1530,12 @@ export class GanttPanel {
       case "toggleAutoUpdate":
         if (message.issueId) {
           autoUpdateTracker.toggle(message.issueId).then((nowEnabled) => {
-            // The auto-update marker is baked into row HTML — invalidate
-            // render caches so the next render/memo serve shows the new tag
+            // The auto-update marker is baked into row HTML — invalidate the
+            // render caches and repaint immediately. (The config listener no
+            // longer rebuilds the server for this client-side toggle, so this
+            // is now the only thing that refreshes the marker.)
             this._bumpRevision();
+            this._updateContent();
             showStatusBarMessage(
               nowEnabled ? `$(check) Auto-update %done enabled for #${message.issueId}` : `$(x) Auto-update %done disabled for #${message.issueId}`,
               2000

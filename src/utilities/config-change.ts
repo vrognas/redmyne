@@ -11,8 +11,8 @@ import type * as vscode from "vscode";
  * the very caches the toggle's self-refresh would otherwise reuse.
  *
  * Returns false the moment a server-affecting key (`serverUrl`,
- * `additionalHeaders`, `caFile`, `logging`) is also part of the change, so a
- * combined change still rebuilds the server.
+ * `additionalHeaders`, `caFile`, `maxConcurrentRequests`, `logging`) is also
+ * part of the change, so a combined change still rebuilds the server.
  */
 export function isClientStateOnlyConfigChange(
   event: vscode.ConfigurationChangeEvent,
@@ -21,6 +21,7 @@ export function isClientStateOnlyConfigChange(
     event.affectsConfiguration("redmyne.serverUrl") ||
     event.affectsConfiguration("redmyne.additionalHeaders") ||
     event.affectsConfiguration("redmyne.caFile") ||
+    event.affectsConfiguration("redmyne.maxConcurrentRequests") ||
     event.affectsConfiguration("redmyne.logging");
   if (serverAffecting) return false;
 
