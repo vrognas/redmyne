@@ -7,6 +7,16 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.36.0]
+
+### Changed
+
+- **The Gantt now shows the full project tree, matching the Issues pane.** In the all-projects view it builds its hierarchy from the complete project list — every project nested under its parent, including issue-less ones as collapsible headers — instead of only the projects reachable from dated issues. The two views no longer disagree about which projects and subprojects exist.
+
+### Fixed
+
+- **Projects whose issues were all dateless vanished entirely from the Gantt.** Because the chart derived its tree from dated issues, a project (or subproject) with only unscheduled issues had no node — and so its Unscheduled group was never attached, dropping those issues even though the Issues pane showed them. Every project now gets a node, so its dateless issues are reachable via its Unscheduled group.
+
 ## [4.35.0]
 
 ### Added
