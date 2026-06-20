@@ -1016,3 +1016,22 @@ a server side-effect but the UI renders from a separate in-memory cache,
 update that cache too (here: mutate the live `assignedIssues`/`dependencyIssues`
 objects). Tree getters that return live array refs (not copies) make this a
 one-liner; verify they're live before relying on it.
+
+## Derive structure from the canonical list, not a filtered projection (v4.36.0)
+
+**Problem**: The Gantt and Issues pane disagreed about which projects/subprojects
+exist. The pane built its tree from the full `getProjects()` list; the Gantt
+derived its tree from the *issues* (ancestry-walking each dated issue's project),
+so projects with only dateless issues — or none — had no node. Worse, the
+Unscheduled group only attaches to project nodes that already exist, so those
+projects' dateless issues were dropped entirely (present in the pane, gone in
+the Gantt).
+
+**Lesson**: When two views render the same hierarchy, derive the *structure*
+from the same canonical entity list (projects), and let filters affect only the
+*content* (which bars/issues show). Building structure from a filtered
+projection (dated issues) silently loses entities outside the projection — and
+any "catch-all" pass keyed on the resulting nodes (Unscheduled groups) inherits
+the same blind spot. Fix: `selectProjectsForHierarchy(projects, selectedId)` —
+pure, structural, independent of dates. Keep selection logic out of the god-file
+and unit-test it (3 tests) rather than reaching into the webview panel.
