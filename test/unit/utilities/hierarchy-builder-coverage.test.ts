@@ -208,6 +208,45 @@ describe("hierarchy-builder extra coverage", () => {
     expect(buildResourceHierarchy(issues, emptyCache, "Me", projects)).toEqual([]);
   });
 
+  it("nests a person's subproject under its parent company (By Person view)", () => {
+    const company = project(1, "Blueprint Medicines");
+    const sub = project(2, "BLU-808", { id: 1, name: "Blueprint Medicines" });
+    const issues = [
+      issue({
+        id: 100,
+        project: { id: 2, name: "BLU-808" },
+        assigned_to: { id: 99, name: "Me" },
+        start_date: "2026-01-01",
+        due_date: "2026-01-05",
+      }),
+    ];
+
+    const tree = buildResourceHierarchy(issues, emptyCache, "Me", [company, sub], true);
+
+    // Parent company is the root header; subproject nested under it; issue under the sub.
+    expect(tree).toHaveLength(1);
+    expect(tree[0].id).toBe(1); // Blueprint Medicines
+    expect(tree[0].type).toBe("project");
+    expect(tree[0].children.map((c) => c.id)).toEqual([2]); // BLU-808 nested
+    expect(tree[0].children[0].children.map((c) => c.id)).toEqual([100]); // issue under sub
+  });
+
+  it("includes only the person's projects plus their ancestors (By Person view)", () => {
+    const company = project(1, "Blueprint Medicines");
+    const sub = project(2, "BLU-808", { id: 1, name: "Blueprint Medicines" });
+    const other = project(3, "Unrelated Co");
+    const issues = [
+      issue({ id: 100, project: { id: 2, name: "BLU-808" }, assigned_to: { id: 99, name: "Me" } }),
+      issue({ id: 200, project: { id: 3, name: "Unrelated Co" }, assigned_to: { id: 2, name: "Other" } }),
+    ];
+
+    const tree = buildResourceHierarchy(issues, emptyCache, "Me", [company, sub, other], true);
+
+    // Only Blueprint Medicines (ancestor of the person's project) appears; the
+    // unrelated company with only another person's issue is absent.
+    expect(tree.map((n) => n.id)).toEqual([1]);
+  });
+
   it("returns flattenHierarchyAll visibility and expansion flags", () => {
     const nodes: HierarchyNode[] = [
       {

@@ -55,22 +55,6 @@ export interface HierarchyNode {
   customFields?: CustomField[];
 }
 
-/** Collect date ranges from a node's issue and all descendants (recursive) */
-function collectChildDateRanges(node: HierarchyNode): ChildDateRange[] {
-  const ranges: ChildDateRange[] = [];
-  if (node.issue && (node.issue.start_date || node.issue.due_date)) {
-    ranges.push({
-      startDate: node.issue.start_date ?? null,
-      dueDate: node.issue.due_date ?? null,
-      issueId: node.issue.id,
-    });
-  }
-  for (const child of node.children) {
-    ranges.push(...collectChildDateRanges(child));
-  }
-  return ranges;
-}
-
 /** Subtree aggregates accumulated bottom-up (own contribution + children's). */
 interface SubtreeAggregate {
   issues: Issue[];
@@ -644,82 +628,68 @@ export function buildMyWorkHierarchy(
 }
 
 /**
- * Build hierarchy for "Resource" view - single assignee grouped by project
- * Filters issues by assignee, groups by project, preserves parent/child hierarchy
+ * Projects relevant to a set of issues: each issue's own project plus every
+ * ancestor (so parent-company headers appear), resolved from `allProjects`.
+ * Returned in `allProjects` order; empty when `allProjects` is empty.
+ */
+function projectsForIssueAncestry(
+  issues: Issue[],
+  allProjects: RedmineProject[]
+): RedmineProject[] {
+  if (allProjects.length === 0) return [];
+  const byId = new Map(allProjects.map((p) => [p.id, p]));
+  const relevant = new Set<number>();
+  for (const issue of issues) {
+    let currentId: number | undefined = issue.project?.id;
+    while (currentId !== undefined && !relevant.has(currentId)) {
+      relevant.add(currentId);
+      currentId = byId.get(currentId)?.parent?.id;
+    }
+  }
+  return allProjects.filter((p) => relevant.has(p.id));
+}
+
+/**
+ * Build hierarchy for "Resource" (By Person) view: one assignee's issues nested
+ * under the full project tree, exactly like the Issues pane and the By Project
+ * Gantt view — parent companies become headers, subprojects nest under them.
+ * Only projects the person has issues in (plus their ancestors) are included;
+ * empty companies are not. Reuses buildProjectHierarchy so issue parent/child
+ * nesting, project health, and aggregate date ranges all match the other views.
  */
 export function buildResourceHierarchy(
   issues: Issue[],
   flexibilityCache: Map<number, FlexibilityScore | null>,
   assigneeName: string,
   projects: RedmineProject[] = [],
-  preserveOrder = false
+  preserveOrder = false,
+  blockedIds: Set<number> = new Set()
 ): HierarchyNode[] {
-  // Filter by assignee
   const assigneeIssues = issues.filter(
     (i) => i.assigned_to?.name === assigneeName
   );
   if (assigneeIssues.length === 0) return [];
 
-  const projectMap = new Map<number, RedmineProject>(
-    projects.map((project) => [project.id, project])
-  );
-
-  // Drop issues from projects that are not in the current project list.
-  const visibleIssues = projectMap.size > 0
-    ? assigneeIssues.filter((issue) => {
-        const projectId = issue.project?.id;
-        return projectId !== undefined && projectMap.has(projectId);
-      })
+  // Drop issues whose project isn't in the current list (preserves prior
+  // behavior). With no project list, keep them and let buildProjectHierarchy
+  // fall back to flat issue.project grouping.
+  const projectIds = new Set(projects.map((p) => p.id));
+  const visibleIssues = projectIds.size > 0
+    ? assigneeIssues.filter(
+        (issue) =>
+          issue.project?.id !== undefined && projectIds.has(issue.project.id)
+      )
     : assigneeIssues;
-
   if (visibleIssues.length === 0) return [];
 
-  // Group by project
-  const byProject = new Map<number, { name: string; issues: Issue[] }>();
-  for (const issue of visibleIssues) {
-    const projectId = issue.project?.id ?? 0;
-    const projectName = issue.project?.name ?? "Unknown";
-    if (!byProject.has(projectId)) {
-      const resolvedName = projectMap.get(projectId)?.name ?? projectName;
-      byProject.set(projectId, { name: resolvedName, issues: [] });
-    }
-    byProject.get(projectId)!.issues.push(issue);
-  }
-
-  // Sort projects alphabetically
-  const sortedProjects = [...byProject.entries()].sort((a, b) =>
-    a[1].name.localeCompare(b[1].name)
+  const relevantProjects = projectsForIssueAncestry(visibleIssues, projects);
+  return buildProjectHierarchy(
+    visibleIssues,
+    flexibilityCache,
+    relevantProjects,
+    preserveOrder,
+    blockedIds
   );
-
-  // Build project nodes with hierarchical issue tree
-  return sortedProjects.map(([projectId, { name, issues: projectIssues }]) => {
-    const projectKey = `project-${projectId}`;
-
-    // Use buildIssueTree to preserve parent/child relationships
-    const children = buildIssueTree(projectIssues, flexibilityCache, projectKey, 1, preserveOrder);
-
-    // Collect date ranges for aggregate bar
-    const childDateRanges: ChildDateRange[] = [];
-    for (const child of children) {
-      childDateRanges.push(...collectChildDateRanges(child));
-    }
-
-    const project = projectMap.get(projectId);
-
-    return {
-      type: "project" as const,
-      id: projectId,
-      label: project?.name ?? name,
-      depth: 0,
-      children,
-      collapseKey: projectKey,
-      parentKey: null,
-      childDateRanges,
-      description: project?.description,
-      identifier: project?.identifier,
-      customFields: project?.customFields,
-    };
-  });
 }
 
 /**

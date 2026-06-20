@@ -2132,7 +2132,8 @@ export class GanttPanel {
           this._flexibilityCache,
           this._selectedAssignee ?? "",
           this._projects,
-          this._sortBy !== null // preserve order when user has applied a sort
+          this._sortBy !== null, // preserve order when user has applied a sort
+          blockedIds
         );
       } else {
         // Project view: full project tree (every project nested under its
