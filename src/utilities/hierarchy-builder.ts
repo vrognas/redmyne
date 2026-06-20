@@ -306,6 +306,35 @@ export function buildProjectHierarchy(
 }
 
 /**
+ * Choose which projects feed the Gantt project hierarchy.
+ *
+ * - No selection (`null`) → the FULL project list, so the Gantt mirrors the
+ *   Issues pane's complete project tree: every project nested under its parent,
+ *   including issue-less ones. Without this the Gantt derived its tree only
+ *   from projects reachable from dated issues, silently dropping all-dateless /
+ *   empty projects (and, via attachUnscheduledGroups, their dateless issues).
+ * - A selected id → that project plus all its descendants (sub-tree scope).
+ *
+ * Pure and purely structural: depends only on the project list and selection,
+ * never on which issues happen to have dates.
+ */
+export function selectProjectsForHierarchy(
+  allProjects: RedmineProject[],
+  selectedProjectId: number | null
+): RedmineProject[] {
+  if (selectedProjectId === null) return allProjects;
+  const byId = new Map(allProjects.map((p) => [p.id, p]));
+  return allProjects.filter((project) => {
+    let current: RedmineProject | undefined = project;
+    while (current) {
+      if (current.id === selectedProjectId) return true;
+      current = current.parent?.id ? byId.get(current.parent.id) : undefined;
+    }
+    return false;
+  });
+}
+
+/**
  * Build flat hierarchy without project grouping (for Issues pane)
  */
 async function buildFlatHierarchy(

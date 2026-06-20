@@ -10,7 +10,7 @@ import { adHocTracker } from "../utilities/adhoc-tracker";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { normalizeServerUrl } from "../utilities/server-url";
 import { errorToString } from "../utilities/error-feedback";
-import { buildProjectHierarchy, buildResourceHierarchy, flattenHierarchyAll, attachUnscheduledGroups, HierarchyNode } from "../utilities/hierarchy-builder";
+import { buildProjectHierarchy, buildResourceHierarchy, flattenHierarchyAll, attachUnscheduledGroups, selectProjectsForHierarchy, HierarchyNode } from "../utilities/hierarchy-builder";
 import { ProjectHealth } from "../utilities/project-health";
 import { buildDependencyGraph, resetDownstreamCountCache } from "../utilities/dependency-graph";
 import {
@@ -2135,34 +2135,12 @@ export class GanttPanel {
           this._sortBy !== null // preserve order when user has applied a sort
         );
       } else {
-        // Project view: selected project and all subprojects
-        // _selectedProjectId was already updated to effective value in filtering logic above
-        const projectMap = new Map(this._projects.map((project) => [project.id, project]));
-        let projectsForHierarchy: RedmineProject[] = [];
-
-        if (this._selectedProjectId === null) {
-          const relevantProjectIds = new Set<number>();
-          for (const issue of sortedIssues) {
-            let currentId: number | undefined = issue.project?.id;
-            while (currentId !== undefined) {
-              if (relevantProjectIds.has(currentId)) break;
-              relevantProjectIds.add(currentId);
-              currentId = projectMap.get(currentId)?.parent?.id;
-            }
-          }
-          projectsForHierarchy = this._projects.filter((project) => relevantProjectIds.has(project.id));
-        } else {
-          projectsForHierarchy = this._projects.filter((project) => {
-            // Include selected project and all its descendants
-            let current: RedmineProject | undefined = project;
-            while (current) {
-              if (current.id === this._selectedProjectId) return true;
-              current = current.parent?.id ? projectMap.get(current.parent.id) : undefined;
-            }
-            return false;
-          });
-        }
-
+        // Project view: full project tree (every project nested under its
+        // parent — mirrors the Issues pane) when nothing is selected, else the
+        // selected project + its descendants. _selectedProjectId was already
+        // resolved to its effective value in the filtering logic above. Dated
+        // issues fill in bars; dateless ones attach below via Unscheduled groups.
+        const projectsForHierarchy = selectProjectsForHierarchy(this._projects, this._selectedProjectId);
         this._cachedHierarchy = buildProjectHierarchy(sortedIssues, this._flexibilityCache, projectsForHierarchy, true, blockedIds);
       }
 

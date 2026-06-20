@@ -3,12 +3,18 @@ import {
   buildMyWorkHierarchy,
   buildProjectHierarchy,
   attachUnscheduledGroups,
+  selectProjectsForHierarchy,
   flattenHierarchy,
   makeIssueNode,
   HierarchyNode,
 } from "../../../src/utilities/hierarchy-builder";
+import { RedmineProject } from "../../../src/redmine/redmine-project";
 import type { Issue } from "../../../src/redmine/models/issue";
 import type { FlexibilityScore } from "../../../src/utilities/flexibility-calculator";
+
+function proj(id: number, name: string, parent?: { id: number; name: string }): RedmineProject {
+  return new RedmineProject({ id, name, description: "", identifier: `${name}-${id}`, parent });
+}
 
 function createMockIssue(overrides: Partial<Issue> & { id: number }): Issue {
   return {
@@ -313,5 +319,54 @@ describe("flattenHierarchy with My Work nodes", () => {
     const expanded = flattenHierarchy(nodes, new Set(["time-group-overdue"]));
     expect(expanded.length).toBe(2);
     expect(expanded.map(n => n.type)).toEqual(["time-group", "issue"]);
+  });
+});
+
+describe("selectProjectsForHierarchy", () => {
+  const top = proj(1, "Top");
+  const sub = proj(2, "Sub", { id: 1, name: "Top" });
+  const subEmpty = proj(3, "SubEmpty", { id: 1, name: "Top" });
+  const other = proj(4, "Other");
+  const all = [top, sub, subEmpty, other];
+
+  it("returns ALL projects (incl. issue-less) when no project is selected", () => {
+    const result = selectProjectsForHierarchy(all, null);
+    expect(result.map((p) => p.id).sort()).toEqual([1, 2, 3, 4]);
+  });
+
+  it("returns the selected project plus its descendants only", () => {
+    const result = selectProjectsForHierarchy(all, 1);
+    expect(result.map((p) => p.id).sort()).toEqual([1, 2, 3]); // excludes Other(4)
+  });
+
+  it("returns empty for an empty project list", () => {
+    expect(selectProjectsForHierarchy([], null)).toEqual([]);
+    expect(selectProjectsForHierarchy([], 1)).toEqual([]);
+  });
+});
+
+describe("buildProjectHierarchy full-tree parity", () => {
+  it("emits a node for an issue-less project nested under its parent", () => {
+    const top = proj(1, "Top");
+    const subWithIssue = proj(2, "SubWithIssue", { id: 1, name: "Top" });
+    const subEmpty = proj(3, "SubEmpty", { id: 1, name: "Top" });
+    const dated = createMockIssue({
+      id: 100,
+      project: { id: 2, name: "SubWithIssue" },
+      start_date: "2026-01-01",
+      due_date: "2026-01-05",
+    });
+
+    // Only ONE dated issue (in SubWithIssue); SubEmpty has none.
+    const roots = buildProjectHierarchy([dated], new Map(), [top, subWithIssue, subEmpty], true);
+
+    const topNode = roots.find((n) => n.id === 1)!;
+    expect(topNode).toBeDefined();
+    const childIds = topNode.children.map((c) => c.id);
+    expect(childIds).toContain(2); // sub with a dated issue
+    expect(childIds).toContain(3); // EMPTY sub still rendered as a header
+    const emptyNode = topNode.children.find((c) => c.id === 3)!;
+    expect(emptyNode.type).toBe("project");
+    expect(emptyNode.children).toEqual([]); // no issues, node exists anyway
   });
 });
