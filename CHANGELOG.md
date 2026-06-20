@@ -7,6 +7,21 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.35.0]
+
+### Added
+
+- **"Unscheduled" group in the Gantt.** Issues with no start *and* no due date were silently dropped from the timeline (it can't draw a bar without a date). They now appear in a collapsible, per-project **Unscheduled** group at the bottom of each project — clickable, honoring the same view/task-type filters — so every issue is reachable from the chart.
+- **Scheduling dates are always visible.** The Issues-pane hover tooltip now always shows **Start** and **Due** (marking missing ones *Not set*), and the Gantt's Start/Due columns read **"Not set"** instead of a dash — making unscheduled issues obvious at a glance in both views.
+
+### Performance
+
+- **Toggling ad-hoc budget (and auto-update / precedence) is no longer a full reload.** These client-side toggles were triggering a complete RedmineServer rebuild — wiping every cache and reloading all issues, time entries, and the issue picker — on each toggle. They now do only the lightweight refresh they actually need (still rebuilding when a server-config key changes).
+
+### Fixed
+
+- The standalone Gantt **"toggle auto-update %done"** action now repaints immediately (previously it relied on the full reload, removed above, to show the change).
+
 ## [4.34.0]
 
 ### Fixed
