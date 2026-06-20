@@ -11,7 +11,8 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 
-- **The Gantt now shows the full project tree, matching the Issues pane.** In the all-projects view it builds its hierarchy from the complete project list — every project nested under its parent, including issue-less ones as collapsible headers — instead of only the projects reachable from dated issues. The two views no longer disagree about which projects and subprojects exist.
+- **The Gantt now shows the full project tree, matching the Issues pane.** In the all-projects (By Project) view it builds its hierarchy from the complete project list — every project nested under its parent, including issue-less ones as collapsible headers — instead of only the projects reachable from dated issues. The two views no longer disagree about which projects and subprojects exist.
+- **"By Person" view now nests projects under their parent companies too.** It previously listed a person's projects flat (e.g. a subproject `BLU-808` at the top level instead of under `Blueprint Medicines`). It now nests them exactly like the Issues pane and the By Project view — showing only the person's projects plus their ancestor companies as headers (empty companies stay out). Project health dots show here now as well.
 
 ### Fixed
 
