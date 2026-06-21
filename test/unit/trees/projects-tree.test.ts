@@ -134,7 +134,7 @@ describe("ProjectsTree", () => {
   });
 
   describe("sortProjectNodes filtering", () => {
-    it("should hide empty projects when showEmptyProjects is false (default)", () => {
+    it("shows empty projects by default, hides them only when showEmptyProjects is explicitly false", () => {
       const tree = new ProjectsTree();
       tree.viewStyle = ProjectsViewStyle.LIST;
 
@@ -154,15 +154,18 @@ describe("ProjectsTree", () => {
         { project: emptyProject, assignedIssues: [], hasAssignedIssues: false, totalIssuesWithSubprojects: 0 },
         { project: projectWithIssues, assignedIssues: [{} as Issue], hasAssignedIssues: true, totalIssuesWithSubprojects: 1 },
       ];
+      const sortNodes = () =>
+        (tree as unknown as { sortProjectNodes: (n: typeof nodes) => typeof nodes }).sortProjectNodes(nodes);
 
-      // Set filter without showEmptyProjects (default: false)
+      // Default (assignee/status filter, flag not set): empty project still shown.
       tree.setFilter({ assignee: "me", status: "open" });
+      expect(sortNodes()).toHaveLength(2);
 
-      // Use the internal method via type casting
-      const sorted = (tree as unknown as { sortProjectNodes: (nodes: typeof nodes) => typeof nodes }).sortProjectNodes(nodes);
-
-      expect(sorted).toHaveLength(1);
-      expect(sorted[0].project.name).toBe("Active Project");
+      // Explicit false: empty project hidden.
+      tree.setFilter({ assignee: "me", status: "open", showEmptyProjects: false });
+      const hidden = sortNodes();
+      expect(hidden).toHaveLength(1);
+      expect(hidden[0].project.name).toBe("Active Project");
     });
 
     it("should show all projects when showEmptyProjects is true", () => {
@@ -193,7 +196,7 @@ describe("ProjectsTree", () => {
       expect(sorted).toHaveLength(2);
     });
 
-    it("should show parent project with issues only in subprojects when showEmptyProjects is false", () => {
+    it("shows a parent with issues only in subprojects even when showEmptyProjects is false", () => {
       const tree = new ProjectsTree();
       tree.viewStyle = ProjectsViewStyle.LIST;
 
@@ -208,7 +211,7 @@ describe("ProjectsTree", () => {
         { project: parentProject, assignedIssues: [], hasAssignedIssues: false, totalIssuesWithSubprojects: 3 },
       ];
 
-      tree.setFilter({ assignee: "me", status: "open" });
+      tree.setFilter({ assignee: "me", status: "open", showEmptyProjects: false });
 
       const sorted = (tree as unknown as { sortProjectNodes: (nodes: typeof nodes) => typeof nodes }).sortProjectNodes(nodes);
 
@@ -225,7 +228,8 @@ describe("ProjectsTree", () => {
       const filter = tree.getFilter();
       expect(filter.assignee).toBe("me");
       expect(filter.status).toBe("any");
-      expect(filter.showEmptyProjects).toBeUndefined();
+      // Preserved from DEFAULT_ISSUE_FILTER (show by default), not dropped.
+      expect(filter.showEmptyProjects).toBe(true);
     });
 
     it("should set No Filter (assignee: any, status: any, showEmptyProjects: true)", () => {
@@ -236,6 +240,16 @@ describe("ProjectsTree", () => {
       expect(filter.assignee).toBe("any");
       expect(filter.status).toBe("any");
       expect(filter.showEmptyProjects).toBe(true);
+    });
+
+    it("preserves showEmptyProjects across later filter changes (explicit false stays false)", () => {
+      const tree = new ProjectsTree();
+      tree.setFilter({ assignee: "any", status: "any", showEmptyProjects: false });
+      expect(tree.getFilter().showEmptyProjects).toBe(false);
+
+      // Changing assignee/status without the flag must not silently reset it.
+      tree.setFilter({ assignee: "me", status: "open" });
+      expect(tree.getFilter().showEmptyProjects).toBe(false);
     });
   });
 

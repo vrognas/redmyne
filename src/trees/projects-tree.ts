@@ -505,8 +505,10 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
       );
     }
 
-    // Hide empty projects unless showEmptyProjects is true
-    if (!this.issueFilter.showEmptyProjects) {
+    // Hide empty projects only when explicitly disabled. Defaults to showing
+    // them (matching DEFAULT_ISSUE_FILTER + the Gantt); an undefined flag must
+    // mean "show", so a filter change that omits it never silently hides them.
+    if (this.issueFilter.showEmptyProjects === false) {
       filtered = filtered.filter((n) => n.totalIssuesWithSubprojects > 0);
     }
 
@@ -599,9 +601,14 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
    * Set issue filter and refresh
    */
   setFilter(filter: IssueFilter): void {
-    // Preserve the task-type dimension across assignee/status changes unless the
-    // caller sets it explicitly (it's an orthogonal, client-side filter).
-    this.issueFilter = { taskType: this.issueFilter.taskType, ...filter };
+    // Preserve orthogonal dimensions (task-type and show-empty-projects) across
+    // assignee/status changes unless the caller sets them explicitly — otherwise
+    // a preset would silently drop them (and empty projects would vanish).
+    this.issueFilter = {
+      taskType: this.issueFilter.taskType,
+      showEmptyProjects: this.issueFilter.showEmptyProjects,
+      ...filter,
+    };
     this.globalState?.update(FILTER_KEY, this.issueFilter);
     this.updateViewDescription();
     this.clearProjects();
