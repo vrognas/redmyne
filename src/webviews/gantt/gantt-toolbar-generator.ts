@@ -190,6 +190,10 @@ export function generateToolbar(ctx: GanttToolbarContext): string {
         ${ctx.taskTypeValues.map((t) => `<option value="${escapeAttr(t)}"${ctx.selectedTaskType === t ? " selected" : ""}>${escapeHtml(t)}</option>`).join("")}
       </select>` : ""}
       ${ctx.lateCount > 0 || ctx.lateFilterActive ? `<button id="lateFilterBtn" class="toggle-btn text-btn late-filter-btn${ctx.lateFilterActive ? " active" : ""}" data-toolbar-tooltip="${ctx.lateFilterActive ? "Showing late tasks only — click to show all" : "Show only late tasks"}">⏰ ${ctx.lateCount} late</button>` : ""}
+      <!-- Empty-project visibility (gantt-local toggle) -->
+      <label class="toolbar-checkbox" data-toolbar-tooltip="Show projects with no issues">
+        <input type="checkbox" id="emptyProjectsToggle"${ctx.showEmptyProjects ? " checked" : ""}> Empty projects
+      </label>
       <!-- Primary actions -->
       <button id="refreshBtn" class="toggle-btn text-btn" data-toolbar-tooltip="Refresh (R)">↻</button>
       <button id="todayBtn" class="toggle-btn text-btn" data-toolbar-tooltip="${ctx.todayInRange ? "Today (T)" : "Today is outside timeline range"}"${ctx.todayInRange ? "" : " disabled"}>T</button>
@@ -211,10 +215,6 @@ export function generateToolbar(ctx: GanttToolbarContext): string {
             <div class="toolbar-dropdown-item${ctx.highlightMyIssues ? " active" : ""}" id="menuMyIssues">
               <span class="icon">●</span>
               <span>My issues in blue</span>
-            </div>
-            <div class="toolbar-dropdown-item${ctx.showEmptyProjects ? " active" : ""}" id="menuEmptyProjects">
-              <span class="icon">▢</span>
-              <span>Empty projects</span>
             </div>
             <div class="toolbar-dropdown-item${ctx.showCapacityRibbon && ctx.viewFocus === "person" ? " active" : ""}" id="menuCapacity"${ctx.viewFocus !== "person" ? " disabled" : ""}>
               <span class="icon">▤</span>

@@ -891,8 +891,8 @@ function initializeGantt(state, rowWindow) {
       vscode.postMessage({ command: 'toggleMyIssuesHighlight' });
     });
 
-    // Empty-projects toggle (menu item) — gantt-local, re-renders the tree
-    document.getElementById('menuEmptyProjects')?.addEventListener('click', () => {
+    // Empty-projects toolbar checkbox — gantt-local, re-renders the tree
+    document.getElementById('emptyProjectsToggle')?.addEventListener('change', () => {
       saveState();
       vscode.postMessage({ command: 'toggleEmptyProjects' });
     });

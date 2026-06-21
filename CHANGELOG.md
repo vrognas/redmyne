@@ -11,7 +11,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
-- **Show/hide empty projects — independently in each view.** The Issues pane gained a **Show/Hide Empty Projects** entry in its filter dropdown; the Gantt gained an **Empty projects** toggle in its overflow (`⋮`) menu. Each view remembers its own setting (the Gantt's is separate from the pane's), and both default to showing empty projects.
+- **Show/hide empty projects — independently in each view.** The Issues pane gained a **Show/Hide Empty Projects** entry in its filter dropdown; the Gantt gained an **Empty projects** checkbox in its toolbar. Each view remembers its own setting (the Gantt's is separate from the pane's), and both default to showing empty projects.
 
 ### Changed
 
