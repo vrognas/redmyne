@@ -9,6 +9,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [4.36.0]
 
+### Added
+
+- **Show/hide empty projects — independently in each view.** The Issues pane gained a **Show/Hide Empty Projects** entry in its filter dropdown; the Gantt gained an **Empty projects** toggle in its overflow (`⋮`) menu. Each view remembers its own setting (the Gantt's is separate from the pane's), and both default to showing empty projects.
+
 ### Changed
 
 - **The Gantt now shows the full project tree, matching the Issues pane.** In the all-projects (By Project) view it builds its hierarchy from the complete project list — every project nested under its parent, including issue-less ones as collapsible headers — instead of only the projects reachable from dated issues. The two views no longer disagree about which projects and subprojects exist.
