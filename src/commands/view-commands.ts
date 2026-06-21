@@ -97,6 +97,8 @@ export function registerViewCommands(
       // the orthogonal, otherwise-invisible task-type filter (which setFilter
       // would preserve) and reveals empty projects.
       deps.projectsTree.setFilter({ assignee: "any", status: "any", showEmptyProjects: true, taskType: "any" });
+      // Keep the menu's Show/Hide toggle in sync — filterAll forces empties on.
+      vscode.commands.executeCommand("setContext", "redmyne:showEmptyProjects", true);
       showStatusBarMessage("$(list-flat) All Issues", 2000);
     }),
 

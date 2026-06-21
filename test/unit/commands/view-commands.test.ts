@@ -100,6 +100,12 @@ describe("registerViewCommands", () => {
     expect(projectsTree.setFilter).toHaveBeenCalledWith(
       expect.objectContaining({ assignee: "any", status: "any", taskType: "any" })
     );
+    // Must also re-sync the menu toggle context key (filterAll forces empties on).
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      "setContext",
+      "redmyne:showEmptyProjects",
+      true
+    );
   });
 
   it("show/hide empty projects commands flip only the pane flag", () => {
