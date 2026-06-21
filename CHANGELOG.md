@@ -17,6 +17,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Fixed
 
 - **Projects whose issues were all dateless vanished entirely from the Gantt.** Because the chart derived its tree from dated issues, a project (or subproject) with only unscheduled issues had no node — and so its Unscheduled group was never attached, dropping those issues even though the Issues pane showed them. Every project now gets a node, so its dateless issues are reachable via its Unscheduled group.
+- **Empty projects silently disappeared from the Issues pane after filtering.** `showEmptyProjects` defaults to on, but applying an assignee/status filter dropped the flag, so empty top-level projects (companies with no current issues) vanished from the pane — diverging from the Gantt, which shows them. The pane now shows empty projects by default and preserves the flag across filter changes; only an explicit "off" hides them.
 
 ## [4.35.0]
 
