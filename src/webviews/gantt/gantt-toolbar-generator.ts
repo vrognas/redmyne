@@ -191,8 +191,8 @@ export function generateToolbar(ctx: GanttToolbarContext): string {
       </select>` : ""}
       ${ctx.lateCount > 0 || ctx.lateFilterActive ? `<button id="lateFilterBtn" class="toggle-btn text-btn late-filter-btn${ctx.lateFilterActive ? " active" : ""}" data-toolbar-tooltip="${ctx.lateFilterActive ? "Showing late tasks only — click to show all" : "Show only late tasks"}">⏰ ${ctx.lateCount} late</button>` : ""}
       <!-- Empty-project visibility (gantt-local toggle) -->
-      <label class="toolbar-checkbox" data-toolbar-tooltip="Show projects with no issues">
-        <input type="checkbox" id="emptyProjectsToggle"${ctx.showEmptyProjects ? " checked" : ""}> Empty projects
+      <label class="toolbar-checkbox${ctx.viewFocus === "person" ? " disabled" : ""}" data-toolbar-tooltip="${ctx.viewFocus === "person" ? "Empty projects apply to the By Project view" : "Show projects with no issues"}">
+        <input type="checkbox" id="emptyProjectsToggle"${ctx.showEmptyProjects ? " checked" : ""}${ctx.viewFocus === "person" ? " disabled" : ""}> Empty projects
       </label>
       <!-- Primary actions -->
       <button id="refreshBtn" class="toggle-btn text-btn" data-toolbar-tooltip="Refresh (R)">↻</button>

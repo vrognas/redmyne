@@ -27,6 +27,7 @@ const baseContext: GanttToolbarContext = {
   todayInRange: true,
   draftModeEnabled: false,
   draftQueueCount: 0,
+  showEmptyProjects: true,
 };
 
 describe("gantt-toolbar-generator", () => {
@@ -106,6 +107,16 @@ describe("gantt-toolbar-generator", () => {
       expect(html).toContain('id="menuBadges"');
       expect(html).toContain('id="menuCapacity"');
       expect(html).toContain('id="menuIntensity"');
+    });
+
+    it("renders the empty-projects checkbox, disabled in person view", () => {
+      const projectHtml = generateToolbar(baseContext); // project view
+      expect(projectHtml).toContain('id="emptyProjectsToggle"');
+      expect(projectHtml).not.toMatch(/id="emptyProjectsToggle"[^>]*disabled/);
+
+      // No empty projects exist in By-Person view, so the toggle is disabled.
+      const personHtml = generateToolbar({ ...baseContext, viewFocus: "person" });
+      expect(personHtml).toMatch(/id="emptyProjectsToggle"[^>]*disabled/);
     });
   });
 

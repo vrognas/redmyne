@@ -242,6 +242,15 @@ body {
   margin: 0;
 }
 
+.toolbar-checkbox.disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.toolbar-checkbox.disabled input {
+  cursor: default;
+}
+
 /* ========== Toolbar Tooltips (CSS-only) ========== */
 [data-toolbar-tooltip] {
   position: relative;
