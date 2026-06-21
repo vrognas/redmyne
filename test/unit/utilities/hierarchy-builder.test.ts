@@ -4,6 +4,7 @@ import {
   buildProjectHierarchy,
   attachUnscheduledGroups,
   selectProjectsForHierarchy,
+  pruneEmptyProjectRoots,
   flattenHierarchy,
   makeIssueNode,
   HierarchyNode,
@@ -368,5 +369,37 @@ describe("buildProjectHierarchy full-tree parity", () => {
     const emptyNode = topNode.children.find((c) => c.id === 3)!;
     expect(emptyNode.type).toBe("project");
     expect(emptyNode.children).toEqual([]); // no issues, node exists anyway
+  });
+});
+
+describe("pruneEmptyProjectRoots", () => {
+  it("drops empty top-level projects but keeps ones with issues in a subproject", () => {
+    const company = proj(1, "Company");
+    const sub = proj(2, "Sub", { id: 1, name: "Company" });
+    const empty = proj(3, "EmptyCo");
+    const dated = createMockIssue({
+      id: 100,
+      project: { id: 2, name: "Sub" },
+      start_date: "2026-01-01",
+      due_date: "2026-01-05",
+    });
+    const roots = buildProjectHierarchy([dated], new Map(), [company, sub, empty], true);
+    expect(roots.map((r) => r.id).sort((a, b) => a - b)).toEqual([1, 3]); // both before prune
+
+    const pruned = pruneEmptyProjectRoots(roots);
+    expect(pruned.map((r) => r.id)).toEqual([1]); // EmptyCo dropped; Company kept (sub has an issue)
+  });
+
+  it("keeps a project whose only issues are in its Unscheduled group", () => {
+    const company = proj(10, "DatelessCo");
+    const roots = buildProjectHierarchy([], new Map(), [company], true);
+    const undated = {
+      ...createMockIssue({ id: 200, project: { id: 10, name: "DatelessCo" }, due_date: null }),
+      start_date: null,
+    };
+    attachUnscheduledGroups(roots, new Map([[10, [undated]]]));
+
+    const pruned = pruneEmptyProjectRoots(roots);
+    expect(pruned.map((r) => r.id)).toEqual([10]); // kept — dateless issue under Unscheduled
   });
 });

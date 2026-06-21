@@ -891,6 +891,12 @@ function initializeGantt(state, rowWindow) {
       vscode.postMessage({ command: 'toggleMyIssuesHighlight' });
     });
 
+    // Empty-projects toggle (menu item) — gantt-local, re-renders the tree
+    document.getElementById('menuEmptyProjects')?.addEventListener('click', () => {
+      saveState();
+      vscode.postMessage({ command: 'toggleEmptyProjects' });
+    });
+
     const ganttContainer = document.querySelector('.gantt-container');
 
     // Build blocking graph from relation DATA (used by focus mode). Arrow

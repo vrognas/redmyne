@@ -57,6 +57,9 @@ export interface GanttToolbarContext {
 
   // Color my issues blue in the task list
   highlightMyIssues: boolean;
+
+  // Show empty (issue-less) projects in the project tree
+  showEmptyProjects: boolean;
 }
 
 /**
@@ -208,6 +211,10 @@ export function generateToolbar(ctx: GanttToolbarContext): string {
             <div class="toolbar-dropdown-item${ctx.highlightMyIssues ? " active" : ""}" id="menuMyIssues">
               <span class="icon">●</span>
               <span>My issues in blue</span>
+            </div>
+            <div class="toolbar-dropdown-item${ctx.showEmptyProjects ? " active" : ""}" id="menuEmptyProjects">
+              <span class="icon">▢</span>
+              <span>Empty projects</span>
             </div>
             <div class="toolbar-dropdown-item${ctx.showCapacityRibbon && ctx.viewFocus === "person" ? " active" : ""}" id="menuCapacity"${ctx.viewFocus !== "person" ? " disabled" : ""}>
               <span class="icon">▤</span>

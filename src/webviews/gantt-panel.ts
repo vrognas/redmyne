@@ -10,7 +10,7 @@ import { adHocTracker } from "../utilities/adhoc-tracker";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { normalizeServerUrl } from "../utilities/server-url";
 import { errorToString } from "../utilities/error-feedback";
-import { buildProjectHierarchy, buildResourceHierarchy, flattenHierarchyAll, attachUnscheduledGroups, selectProjectsForHierarchy, HierarchyNode } from "../utilities/hierarchy-builder";
+import { buildProjectHierarchy, buildResourceHierarchy, flattenHierarchyAll, attachUnscheduledGroups, selectProjectsForHierarchy, pruneEmptyProjectRoots, HierarchyNode } from "../utilities/hierarchy-builder";
 import { ProjectHealth } from "../utilities/project-health";
 import { buildDependencyGraph, resetDownstreamCountCache } from "../utilities/dependency-graph";
 import {
@@ -182,6 +182,7 @@ const FILTER_ASSIGNEE_KEY = "redmyne.gantt.filterAssignee";
 const FILTER_STATUS_KEY = "redmyne.gantt.filterStatus";
 const FILTER_TASK_TYPE_KEY = "redmyne.gantt.filterTaskType";
 const FILTER_LATE_KEY = "redmyne.gantt.filterLateOnly";
+const SHOW_EMPTY_PROJECTS_KEY = "redmyne.gantt.showEmptyProjects";
 const SORT_BY_KEY = "redmyne.gantt.sortBy";
 const SORT_ORDER_KEY = "redmyne.gantt.sortOrder";
 const HIGHLIGHT_MINE_KEY = "redmyne.gantt.highlightMyIssues";
@@ -255,6 +256,7 @@ export class GanttPanel {
   private _currentFilter: IssueFilter = { ...DEFAULT_ISSUE_FILTER };
   private _taskTypeFilter: string | "any" = "any"; // task-type custom-field value (gantt-local)
   private _lateOnly = false; // show only late tasks (gantt-local)
+  private _showEmptyProjects = true; // show empty projects in the tree (gantt-local, own toggle)
   private _highlightMyIssues = true; // color my issues blue in the task list
   private _filterChangeCallback?: (filter: IssueFilter) => void;
   private _viewMode: GanttViewMode = "projects";
@@ -315,6 +317,7 @@ export class GanttPanel {
       if (savedStatus) this._currentFilter.status = savedStatus;
       this._taskTypeFilter = GanttPanel._globalState.get<string | "any">(FILTER_TASK_TYPE_KEY, "any");
       this._lateOnly = GanttPanel._globalState.get<boolean>(FILTER_LATE_KEY, false);
+      this._showEmptyProjects = GanttPanel._globalState.get<boolean>(SHOW_EMPTY_PROJECTS_KEY, true);
       this._sortBy = GanttPanel._globalState.get<"id" | "assignee" | "start" | "due" | "status" | null>(SORT_BY_KEY, "due");
       this._sortOrder = GanttPanel._globalState.get<"asc" | "desc">(SORT_ORDER_KEY, "asc");
       this._highlightMyIssues = GanttPanel._globalState.get<boolean>(HIGHLIGHT_MINE_KEY, true);
@@ -1598,6 +1601,12 @@ export class GanttPanel {
         this._bumpRevision(); // invalidate hierarchy/capacity caches
         this._updateContent();
         break;
+      case "toggleEmptyProjects":
+        this._showEmptyProjects = !this._showEmptyProjects;
+        GanttPanel._globalState?.update(SHOW_EMPTY_PROJECTS_KEY, this._showEmptyProjects);
+        this._bumpRevision(); // invalidate hierarchy cache (prune changes rows)
+        this._updateContent();
+        break;
       case "setSelectedKey":
         // Preserve keyboard selection across re-renders
         this._selectedCollapseKey = message.collapseKey ?? null;
@@ -2172,6 +2181,13 @@ export class GanttPanel {
         }
       }
       attachUnscheduledGroups(this._cachedHierarchy, unscheduledByProject);
+
+      // Hide empty top-level projects when the gantt's own toggle is off
+      // (all-projects view only — a deliberately selected project always shows).
+      // After attachUnscheduledGroups so a dateless-only project still counts.
+      if (this._selectedProjectId === null && !this._showEmptyProjects) {
+        this._cachedHierarchy = pruneEmptyProjectRoots(this._cachedHierarchy);
+      }
     }
     // Auto-expand all when switching project/person (before flattening).
     // Only consume the flag once keys actually exist — an early render before
@@ -2660,6 +2676,7 @@ export class GanttPanel {
       lateCount,
       lateFilterActive: this._lateOnly,
       highlightMyIssues: this._highlightMyIssues,
+      showEmptyProjects: this._showEmptyProjects,
     };
 
     const html = `

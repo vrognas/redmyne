@@ -806,3 +806,20 @@ export function attachUnscheduledGroups(
   walk(roots);
 }
 
+/** True if a node or any descendant is an issue (dated bar or Unscheduled). */
+function subtreeHasIssue(node: HierarchyNode): boolean {
+  if (node.type === "issue") return true;
+  return node.children.some(subtreeHasIssue);
+}
+
+/**
+ * Drop top-level *project* nodes whose subtree holds no issues — mirrors the
+ * Issues pane hiding empty top-level projects (`totalIssuesWithSubprojects > 0`)
+ * when the gantt's "show empty projects" toggle is off. Non-project roots are
+ * left untouched. Run AFTER attachUnscheduledGroups so a project whose only
+ * issues are dateless (now under its Unscheduled group) still counts.
+ */
+export function pruneEmptyProjectRoots(roots: HierarchyNode[]): HierarchyNode[] {
+  return roots.filter((root) => root.type !== "project" || subtreeHasIssue(root));
+}
+
