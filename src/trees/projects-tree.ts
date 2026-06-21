@@ -644,6 +644,22 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
     this.refresh();
   }
 
+  /** Whether empty projects are shown (default true; only explicit false hides). */
+  getShowEmptyProjects(): boolean {
+    return this.issueFilter.showEmptyProjects !== false;
+  }
+
+  /**
+   * Toggle empty-project visibility (side pane only — the Gantt has its own).
+   * Flips just this flag and persists it; the filter applies at render in
+   * sortProjectNodes, so no refetch or re-group is needed.
+   */
+  setShowEmptyProjects(show: boolean): void {
+    this.issueFilter = { ...this.issueFilter, showEmptyProjects: show };
+    this.globalState?.update(FILTER_KEY, this.issueFilter);
+    this.refresh();
+  }
+
   /**
    * Wire the TreeView so active filters can be shown in its description.
    * Without this the client-side task-type filter is invisible: issues

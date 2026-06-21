@@ -251,6 +251,30 @@ describe("ProjectsTree", () => {
       tree.setFilter({ assignee: "me", status: "open" });
       expect(tree.getFilter().showEmptyProjects).toBe(false);
     });
+
+    it("setShowEmptyProjects flips only the flag, preserving assignee/status/taskType", () => {
+      const tree = new ProjectsTree();
+      tree.setFilter({ assignee: "me", status: "open" });
+      tree.setTaskTypeFilter("Data Management");
+
+      tree.setShowEmptyProjects(false);
+      const hidden = tree.getFilter();
+      expect(hidden.showEmptyProjects).toBe(false);
+      expect(hidden.assignee).toBe("me");
+      expect(hidden.status).toBe("open");
+      expect(hidden.taskType).toBe("Data Management");
+      expect(tree.getShowEmptyProjects()).toBe(false);
+
+      tree.setShowEmptyProjects(true);
+      expect(tree.getFilter().showEmptyProjects).toBe(true);
+      expect(tree.getShowEmptyProjects()).toBe(true);
+    });
+
+    it("getShowEmptyProjects treats an unset flag as showing (default)", () => {
+      const tree = new ProjectsTree();
+      tree.setFilter({ assignee: "me", status: "open" }); // flag preserved from default
+      expect(tree.getShowEmptyProjects()).toBe(true);
+    });
   });
 
   describe("async data flows", () => {

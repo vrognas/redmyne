@@ -83,6 +83,14 @@
         "title": "My Issues"
       },
       {
+        "command": "redmyne.showEmptyProjects",
+        "title": "Show Empty Projects"
+      },
+      {
+        "command": "redmyne.hideEmptyProjects",
+        "title": "Hide Empty Projects"
+      },
+      {
         "command": "redmyne.timeFilterMy",
         "title": "My Time Entries"
       },
@@ -855,6 +863,16 @@
         {
           "command": "redmyne.filterByTaskType",
           "group": "3_tasktype@1"
+        },
+        {
+          "command": "redmyne.hideEmptyProjects",
+          "group": "4_display@1",
+          "when": "redmyne:showEmptyProjects"
+        },
+        {
+          "command": "redmyne.showEmptyProjects",
+          "group": "4_display@1",
+          "when": "!redmyne:showEmptyProjects"
         }
       ],
       "redmyne.timeFilterMenu": [
@@ -960,6 +978,14 @@
         },
         {
           "command": "redmyne.filterMyIssues",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.showEmptyProjects",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.hideEmptyProjects",
           "when": "false"
         },
         {

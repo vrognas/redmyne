@@ -15,6 +15,8 @@ describe("registerViewCommands", () => {
     setViewStyle: ReturnType<typeof vi.fn>;
     setFilter: ReturnType<typeof vi.fn>;
     setSort: ReturnType<typeof vi.fn>;
+    setShowEmptyProjects: ReturnType<typeof vi.fn>;
+    getShowEmptyProjects: ReturnType<typeof vi.fn>;
   };
   let timeEntriesTree: {
     setShowAllUsers: ReturnType<typeof vi.fn>;
@@ -38,6 +40,8 @@ describe("registerViewCommands", () => {
       setViewStyle: vi.fn(),
       setFilter: vi.fn(),
       setSort: vi.fn(),
+      setShowEmptyProjects: vi.fn(),
+      getShowEmptyProjects: vi.fn().mockReturnValue(true),
     };
     timeEntriesTree = {
       setShowAllUsers: vi.fn(),
@@ -96,6 +100,17 @@ describe("registerViewCommands", () => {
     expect(projectsTree.setFilter).toHaveBeenCalledWith(
       expect.objectContaining({ assignee: "any", status: "any", taskType: "any" })
     );
+  });
+
+  it("show/hide empty projects commands flip only the pane flag", () => {
+    handlers.get("redmyne.hideEmptyProjects")?.();
+    expect(projectsTree.setShowEmptyProjects).toHaveBeenCalledWith(false);
+
+    handlers.get("redmyne.showEmptyProjects")?.();
+    expect(projectsTree.setShowEmptyProjects).toHaveBeenCalledWith(true);
+
+    // These toggles must not touch assignee/status/task-type.
+    expect(projectsTree.setFilter).not.toHaveBeenCalled();
   });
 
   it("toggles API logging and updates configured context", async () => {

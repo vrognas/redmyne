@@ -29,6 +29,7 @@ export function registerViewCommands(
 
   // Initialize toggle state from persisted value
   vscode.commands.executeCommand("setContext", "redmyne:showZeroDays", !deps.timeEntriesTree.getHideZeroDays());
+  vscode.commands.executeCommand("setContext", "redmyne:showEmptyProjects", deps.projectsTree.getShowEmptyProjects());
 
   context.subscriptions.push(
     vscode.commands.registerCommand("redmyne.refreshIssues", debouncedRefresh),
@@ -102,6 +103,19 @@ export function registerViewCommands(
     vscode.commands.registerCommand("redmyne.filterMyIssues", () => {
       deps.projectsTree.setFilter({ assignee: "me", status: "any" });
       showStatusBarMessage("$(account) My Issues", 2000);
+    }),
+
+    // Empty-project visibility toggle (side pane only; the Gantt has its own).
+    vscode.commands.registerCommand("redmyne.showEmptyProjects", () => {
+      deps.projectsTree.setShowEmptyProjects(true);
+      vscode.commands.executeCommand("setContext", "redmyne:showEmptyProjects", true);
+      showStatusBarMessage("$(eye) Showing Empty Projects", 2000);
+    }),
+
+    vscode.commands.registerCommand("redmyne.hideEmptyProjects", () => {
+      deps.projectsTree.setShowEmptyProjects(false);
+      vscode.commands.executeCommand("setContext", "redmyne:showEmptyProjects", false);
+      showStatusBarMessage("$(eye-closed) Hiding Empty Projects", 2000);
     }),
 
     vscode.commands.registerCommand("redmyne.filterByTaskType", async () => {
