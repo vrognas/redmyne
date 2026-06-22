@@ -61,21 +61,24 @@ Note: maintainers are working on `vrognas-redmyne` as a spare-time project, we w
 
 ## Commit messages
 
-Commit messages are validated in CI (PRs only). Follow these rules:
+Commit messages are validated locally by a `commit-msg` hook and in CI
+(on PRs). The enforced rules:
 
-- **Subject line**: Max 50 characters
-- **Body lines**: Max 72 characters per line
-- **Format**: `Type: description`
+- **Subject line**: max 50 characters
+- **Blank line** between subject and body
+- **Body lines**: max 72 characters each
 
-Supported types: `Add`, `Fix`, `Feat`, `Chore`, `Docs`, `Test`, `Refactor`, `Revert`
+Use lowercase [Conventional Commits](https://www.conventionalcommits.org)
+`type: description` format. Types: `feat`, `fix`, `refactor`, `docs`,
+`test`, `chore`, `perf`, `ci`, `revert`.
 
 **Examples:**
 ```
-Fix: resolve authentication timeout issue
+fix: resolve authentication timeout issue
 
-Add: GitHub templates for bug reports and PRs
+feat: add GitHub templates for bug reports and PRs
 
-Chore: update dependencies to latest versions
+chore: update dependencies to latest versions
 ```
 
 **If validation fails:**

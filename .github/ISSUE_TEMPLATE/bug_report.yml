@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        **Security Issues**: Do NOT report security bugs here. Email github@rozpuszczalny.com instead.
+        **Security Issues**: Do NOT report security bugs here. See the [Security Policy](https://github.com/vrognas/vrognas-redmyne/security/policy) instead.
 
         **Feature Requests**: Use [Discussions](https://github.com/vrognas/vrognas-redmyne/discussions) instead.
 
