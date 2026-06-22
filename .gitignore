@@ -7,3 +7,15 @@ node_modules
 coverage
 .claude/settings.local.json
 docs/superpowers/
+
+# Generated webview bundles — esbuild rebuilds these from src/webviews/** on
+# every build; vscode:prepublish + the CI release job run `npm run compile`
+# before packaging, so the committed copy never ships. Tracking them only
+# invited dev-watch clobber + huge diffs. Vendored assets stay tracked
+# (flatpickr*, webview-common.css).
+media/gantt.js
+media/gantt.js.map
+media/gantt.css
+media/timesheet.js
+media/timesheet.js.map
+media/timesheet.css
