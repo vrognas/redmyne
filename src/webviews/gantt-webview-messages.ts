@@ -60,3 +60,19 @@ export function parseLookbackDays(
   if (value === "") return null;
   return parseInt(value, 10);
 }
+
+/**
+ * Resolve the lookback in days, migrating the pre-4.37 years-based setting.
+ * Uses the stored days value when set; otherwise converts the old years
+ * value (x365) so an existing non-default lookback survives the units switch,
+ * or falls back to defaultDays when neither is stored.
+ */
+export function resolveLookbackDays(
+  storedDays: number | null | undefined,
+  storedYears: number | null | undefined,
+  defaultDays: number
+): number | null {
+  if (storedDays !== undefined) return storedDays;
+  if (storedYears === undefined) return defaultDays;
+  return storedYears === null ? null : Math.round(storedYears * 365);
+}

@@ -240,7 +240,7 @@ describe("webview panel public flows", () => {
     handler?.({ command: "updateDates", issueId: 7, startDate: "2026-02-01", dueDate: "2026-02-02" });
     handler?.({ command: "removeDraft", issueId: 101, startDate: "2026-01-01", dueDate: "2026-01-05" });
     handler?.({ command: "setZoom", zoomLevel: "week" });
-    handler?.({ command: "setLookback", years: "5" });
+    handler?.({ command: "setLookback", days: "730" });
     handler?.({ command: "setViewMode", viewMode: "mywork" });
     handler?.({ command: "setViewFocus", focus: "person" });
     handler?.({ command: "setSelectedProject", projectId: 9 });

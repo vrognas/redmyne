@@ -31,7 +31,7 @@ import { IssueFilter, DEFAULT_ISSUE_FILTER, GanttViewMode, CustomField } from ".
 import { formatCustomFieldValue } from "../utilities/custom-field-formatter";
 import { parseLocalDate, getLocalToday, formatLocalDate } from "../utilities/date-utils";
 import { getNonce } from "../utilities/webview-nonce";
-import { GanttWebviewMessage, parseLookbackDays } from "./gantt-webview-messages";
+import { GanttWebviewMessage, parseLookbackDays, resolveLookbackDays } from "./gantt-webview-messages";
 import { escapeAttr, escapeHtml } from "./gantt-html-escape";
 import { CreatableRelationType, GanttRow, nodeToGanttRow } from "./gantt-model";
 import { buildRowsPayload, buildArrowsPayload } from "./gantt/gantt-html-generator";
@@ -41,7 +41,7 @@ import { deriveAssigneeState, filterIssuesForView, isLateIssue } from "./gantt-v
 import { remainingHours } from "../utilities/remaining-work";
 import { deriveTaskTypes, filterIssuesByTaskType } from "../utilities/issue-task-type-filter";
 import { dateToX, endExclusiveX, clampMinDateToLookback } from "./gantt/gantt-coords";
-import { computeHeaderDimRects } from "./gantt/header-dim";
+import { computeHeaderDimRects, computeFutureDimStartMs } from "./gantt/header-dim";
 import { GANTT_LAYOUT, computeStickyLeftWidth } from "./gantt/gantt-layout-constants";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
 import { DRAFT_COMMAND_SOURCE } from "../draft-mode/draft-change-sources";
@@ -188,6 +188,8 @@ const SORT_BY_KEY = "redmyne.gantt.sortBy";
 const SORT_ORDER_KEY = "redmyne.gantt.sortOrder";
 const HIGHLIGHT_MINE_KEY = "redmyne.gantt.highlightMyIssues";
 const LOOKBACK_DAYS_KEY = "redmyne.gantt.lookbackDays";
+const LOOKBACK_YEARS_KEY = "redmyne.gantt.lookbackYears"; // legacy (pre-4.37), migrated to days
+const DEFAULT_LOOKBACK_DAYS = 730; // 2 years
 
 export class GanttPanel {
   public static currentPanel: GanttPanel | undefined;
@@ -270,8 +272,8 @@ export class GanttPanel {
   // Earliest due date on top by default — the fire column sorts itself
   private _sortBy: "id" | "assignee" | "start" | "due" | "status" | null = "due";
   private _sortOrder: "asc" | "desc" = "asc";
-  // Lookback period for filtering old data (in years)
-  private _lookbackDays: number | null = 730; // days (730 = 2 years); null = no limit
+  // Lookback period for filtering old data (in days)
+  private _lookbackDays: number | null = DEFAULT_LOOKBACK_DAYS; // 2 years; null = no limit
   // Actual time entries for past-day intensity (issueId -> date -> hours)
   private _actualTimeEntries: ActualTimeEntries = new Map();
   // Current user for special highlighting
@@ -322,7 +324,13 @@ export class GanttPanel {
       this._sortBy = GanttPanel._globalState.get<"id" | "assignee" | "start" | "due" | "status" | null>(SORT_BY_KEY, "due");
       this._sortOrder = GanttPanel._globalState.get<"asc" | "desc">(SORT_ORDER_KEY, "asc");
       this._highlightMyIssues = GanttPanel._globalState.get<boolean>(HIGHLIGHT_MINE_KEY, true);
-      this._lookbackDays = GanttPanel._globalState.get<number | null>(LOOKBACK_DAYS_KEY, 730);
+      // Migrate the pre-4.37 years-based setting (x365) so an existing
+      // non-default lookback survives the years->days switch.
+      this._lookbackDays = resolveLookbackDays(
+        GanttPanel._globalState.get<number | null>(LOOKBACK_DAYS_KEY),
+        GanttPanel._globalState.get<number | null>(LOOKBACK_YEARS_KEY),
+        DEFAULT_LOOKBACK_DAYS
+      );
     }
 
     // Subscribe to draft mode and queue changes
@@ -913,7 +921,7 @@ export class GanttPanel {
       const today = getLocalToday();
       const todayStr = formatLocalDate(today);
 
-      // Apply lookback limit (default 2 years, can be 5, 10, or null for unlimited)
+      // Apply lookback limit (days back from today; null = unlimited)
       let fromDate: string;
       if (this._lookbackDays === null) {
         // Unlimited: use earliest non-ad-hoc issue start date
@@ -2273,7 +2281,7 @@ export class GanttPanel {
     } else {
       minDate = new Date(Math.min(...dates.map((d) => new Date(d).getTime())));
       maxDate = new Date(Math.max(...dates.map((d) => new Date(d).getTime())));
-      activeWindowEndMs = Math.max(maxDate.getTime(), todayUTC.getTime());
+      activeWindowEndMs = maxDate.getTime();
       // Add padding based on zoom level for breathing room
       const paddingDays = { day: 1, week: 7, month: 30, quarter: 90, year: 365 }[this._zoomLevel] || 7;
       minDate.setUTCDate(minDate.getUTCDate() - paddingDays);
@@ -3149,12 +3157,15 @@ export class GanttPanel {
 
     const weekendGroup = `<g class="weekend-layer">${weekendBackgrounds.join("")}</g>`;
 
-    // Dim the header outside the active window: everything before the current
-    // period (past) and after the last scheduled task (future), so the active
-    // development window stands out. Overlays paint last (on top of labels).
+    // Dim the header outside the active window: before the current period
+    // (past) and after the active window's end (future), so the active
+    // development window stands out. The future boundary is the later of
+    // today's period end and the day after the last scheduled task, so
+    // today's period and the last task's own cell stay bright. Overlays
+    // paint last (on top of labels).
     const dim = computeHeaderDimRects(
       periodStart.getTime(),
-      windowEndMs,
+      computeFutureDimStartMs(windowEndMs, periodStart.getTime(), periodDays),
       minDate.getTime(),
       maxDate.getTime(),
       svgWidth
