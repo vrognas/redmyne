@@ -1916,7 +1916,11 @@ button:focus {
 
 .today-header-bg {
   fill: var(--today-color);
-  fill-opacity: 0.2;
+  fill-opacity: 0.12;
+}
+
+.today-header-underline {
+  fill: var(--today-color);
 }
 
 .today-day-label {

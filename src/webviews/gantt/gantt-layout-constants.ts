@@ -18,10 +18,10 @@ export const GANTT_LAYOUT = {
   headerHeight: 40,
   barHeight: 22, // VS Code native tree row height
   idColumnWidth: 50,
-  startDateColumnWidth: 58, // Fixed: "MMM DD" format
-  statusColumnWidth: 50, // Colored dot + header text
-  dueDateColumnWidth: 58, // Fixed: "MMM DD" format
-  assigneeColumnWidth: 40, // Fixed for avatar circles
+  startDateColumnWidth: 68, // "MMM DD" + horizontal breathing room
+  statusColumnWidth: 58, // Colored dot + header text
+  dueDateColumnWidth: 68, // "MMM DD" + horizontal breathing room
+  assigneeColumnWidth: 50, // Avatar circle / short name
   resizeHandleWidth: 10,
 } as const;
 

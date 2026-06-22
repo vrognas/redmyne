@@ -2273,11 +2273,16 @@ export class GanttPanel {
     } else {
       minDate = new Date(Math.min(...dates.map((d) => new Date(d).getTime())));
       maxDate = new Date(Math.max(...dates.map((d) => new Date(d).getTime())));
-      activeWindowEndMs = maxDate.getTime();
+      activeWindowEndMs = Math.max(maxDate.getTime(), todayUTC.getTime());
       // Add padding based on zoom level for breathing room
       const paddingDays = { day: 1, week: 7, month: 30, quarter: 90, year: 365 }[this._zoomLevel] || 7;
       minDate.setUTCDate(minDate.getUTCDate() - paddingDays);
       maxDate.setUTCDate(maxDate.getUTCDate() + paddingDays);
+      // Guarantee a minimum future horizon (today + 4 weeks) so the road
+      // ahead is always visible even when nothing is scheduled past today.
+      const minFuture = new Date(todayUTC);
+      minFuture.setUTCDate(minFuture.getUTCDate() + 28);
+      if (maxDate < minFuture) maxDate = minFuture;
       // The lookback selector clamps the AXIS too, not just the data
       // fetch — one ancient still-open issue otherwise stretches the
       // timeline years into the past.
@@ -3127,6 +3132,7 @@ export class GanttPanel {
         // Header highlight for current period
         currentPeriodHighlight = `
           <rect x="${x}" y="0" width="${highlightWidth}" height="40" class="today-header-bg"/>
+          <rect x="${x}" y="37" width="${highlightWidth}" height="3" class="today-header-underline"/>
         `;
       }
 

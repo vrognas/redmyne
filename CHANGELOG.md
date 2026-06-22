@@ -11,13 +11,14 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
-- **Gantt: 3-month and 6-month lookback ranges.** The data-range selector now offers **3 Months** and **6 Months** alongside the year options — a focused near-term window.
+- **Gantt: 3-month and 6-month lookback ranges.** The data-range selector offers **3 Months** and **6 Months** alongside the year options. Lookback bounds how far *back* the timeline reaches (leaner history); the right edge still extends to your furthest scheduled task.
 - **Assignee in issue tooltips.** Hovering an issue — in the Gantt (bar or sidebar label) or the Issues pane — now shows its assignee, or **None** when unassigned.
 
 ### Changed
 
 - **The Gantt opens at Day resolution** by default instead of Month, for a detailed near-term view out of the box.
 - **Gantt readability.** The active development window now stands out: the timeline header dims past and post-deadline periods; task names and the in-bar progress split are brighter/sharper; and the sidebar nesting guides are more visible (and lean in on hover).
+- **More Gantt polish.** The Start/Status/Due/Who columns get breathing room; the "today" header marker is softened (lighter fill + a crisp bottom accent); and the timeline always extends at least 4 weeks ahead, even when nothing is scheduled past today.
 
 ### Fixed
 
