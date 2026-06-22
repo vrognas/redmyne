@@ -85,6 +85,17 @@ describe("kanban-tree-provider", () => {
     vi.clearAllMocks();
   });
 
+  it("renders empty status headers without a chevron", () => {
+    const provider = new KanbanTreeProvider(
+      createController([]) as unknown as KanbanController
+    );
+    for (const status of ["todo", "doing", "done"] as const) {
+      const header = provider.getTreeItem({ type: "status-header", status });
+      expect(header.label).toContain("(0)");
+      expect(header.collapsibleState).toBe(vscode.TreeItemCollapsibleState.None);
+    }
+  });
+
   it("restores and persists filter/sort state", () => {
     const controller = createController([]);
     const globalState = createMemento({

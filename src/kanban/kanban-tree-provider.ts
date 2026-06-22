@@ -183,10 +183,13 @@ export class KanbanTreeProvider
     if (element.type === "status-header") {
       const tasks = this.getTasksForStatus(element.status!);
       const label = this.getStatusLabel(element.status!);
+      // No chevron for an empty column — nothing to expand (drag-drop still works).
       const collapsed =
-        element.status === "done"
-          ? vscode.TreeItemCollapsibleState.Collapsed
-          : vscode.TreeItemCollapsibleState.Expanded;
+        tasks.length === 0
+          ? vscode.TreeItemCollapsibleState.None
+          : element.status === "done"
+            ? vscode.TreeItemCollapsibleState.Collapsed
+            : vscode.TreeItemCollapsibleState.Expanded;
 
       const item = new vscode.TreeItem(`${label} (${tasks.length})`, collapsed);
       item.id = `kanban-header-${element.status}`; // Stable ID preserves collapse state
