@@ -427,6 +427,18 @@ export function registerTimeEntryCommands(
     })
   );
 
+  // Jump from a time entry to its issue in the Gantt. Thin proxy: extract the
+  // issue id from the node and delegate to openIssueInGantt, which single-sources
+  // the reveal (bootstrap panel, switch project, scroll to the bar).
+  context.subscriptions.push(
+    vscode.commands.registerCommand("redmyne.openTimeEntryInGantt", async (node: TimeEntryNode | undefined) => {
+      const issueId = node?._entry?.issue_id ?? node?._entry?.issue?.id;
+      const resolvedIssueId = getIssueIdOrShowError({ id: issueId });
+      if (!resolvedIssueId) return;
+      await vscode.commands.executeCommand("redmyne.openIssueInGantt", { id: resolvedIssueId });
+    })
+  );
+
   // Edit time entry
   context.subscriptions.push(
     vscode.commands.registerCommand("redmyne.editTimeEntry", async (node: TimeEntryNode) => {

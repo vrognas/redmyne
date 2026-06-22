@@ -7,6 +7,16 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.39.0]
+
+### Added
+
+- **Time Entries: jump to the Gantt.** A logged time entry now has a **Show in Gantt** hover icon (and right-click action) that opens its issue in the Gantt timeline — closing the loop from past time back to where it sits on the schedule.
+
+### Fixed
+
+- **Empty Kanban columns no longer show a useless expand chevron.** A column with nothing in it (e.g. nothing "Done") rendered with a collapse arrow that expanded to nothing — it's now a flat header. Drag-and-drop into the column still works. Mirrors the same fix in the Issues pane.
+
 ## [4.38.0]
 
 ### Fixed

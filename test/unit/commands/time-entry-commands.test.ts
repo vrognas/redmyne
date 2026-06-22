@@ -117,6 +117,43 @@ describe("registerTimeEntryCommands", () => {
     expect(vscode.env.openExternal).not.toHaveBeenCalled();
   });
 
+  it("opens the time entry's issue in Gantt via openIssueInGantt", async () => {
+    const executeSpy = vi.spyOn(vscode.commands, "executeCommand");
+    registerCommands();
+
+    await handlers.get("redmyne.openTimeEntryInGantt")?.({
+      _entry: { issue: { id: 9, subject: "Task" }, hours: 1, comments: "" },
+    });
+
+    expect(executeSpy).toHaveBeenCalledWith("redmyne.openIssueInGantt", { id: 9 });
+  });
+
+  it("falls back to issue_id when the entry has no issue object", async () => {
+    const executeSpy = vi.spyOn(vscode.commands, "executeCommand");
+    registerCommands();
+
+    await handlers.get("redmyne.openTimeEntryInGantt")?.({
+      _entry: { issue_id: 55, hours: 1, comments: "" },
+    });
+
+    expect(executeSpy).toHaveBeenCalledWith("redmyne.openIssueInGantt", { id: 55 });
+  });
+
+  it("shows an error and does not open Gantt when the node has no issue id", async () => {
+    const executeSpy = vi.spyOn(vscode.commands, "executeCommand");
+    registerCommands();
+
+    await handlers.get("redmyne.openTimeEntryInGantt")?.({});
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      "Could not determine issue ID"
+    );
+    expect(executeSpy).not.toHaveBeenCalledWith(
+      "redmyne.openIssueInGantt",
+      expect.anything()
+    );
+  });
+
   it("shows no-time-entry error when editing without entry node", async () => {
     registerCommands();
 

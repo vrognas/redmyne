@@ -50,7 +50,7 @@ Logged time grouped by **Today**, **This Week**, **This Month**.
 
 - **Filters:** My Time / All Users; **show / hide 0% days** (zero-utilization days hidden by default)
 - **Sort:** by #ID, Subject, Comment, or User
-- **Right-click:** Edit, Delete, Open in Browser; on a date → Add Entry
+- **Right-click / hover:** Edit, Delete, Open in Browser, Show in Gantt (jump to the issue on the timeline); on a date → Add Entry
 - **Copy / paste** single entries, whole days, or weeks across dates
 - Required + optional custom fields are prompted when logging time
 

@@ -2,7 +2,7 @@
   "name": "redmyne",
   "displayName": "Redmyne",
   "description": "Personal workload management for Redmine - track your issues, log time, visualize capacity",
-  "version": "4.38.0",
+  "version": "4.39.0",
   "publisher": "vrognas",
   "license": "MIT",
   "icon": "logo.png",
@@ -236,6 +236,11 @@
       },
       {
         "command": "redmyne.openIssueInGantt",
+        "title": "Show in Gantt",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "redmyne.openTimeEntryInGantt",
         "title": "Show in Gantt",
         "icon": "$(graph)"
       },
@@ -1479,6 +1484,11 @@
           "group": "2_navigation@1"
         },
         {
+          "command": "redmyne.openTimeEntryInGantt",
+          "when": "view == 'redmyne-explorer-my-time-entries' && viewItem =~ /^time-entry/",
+          "group": "2_navigation@2"
+        },
+        {
           "command": "redmyne.contributeToIssue",
           "when": "view == 'redmyne-explorer-my-time-entries' && viewItem == 'time-entry-adhoc'",
           "group": "3_adhoc@1"
@@ -1529,14 +1539,19 @@
           "group": "inline@2"
         },
         {
+          "command": "redmyne.openTimeEntryInGantt",
+          "when": "view == 'redmyne-explorer-my-time-entries' && viewItem =~ /^time-entry/",
+          "group": "inline@1"
+        },
+        {
           "command": "redmyne.copyTimeEntry",
           "when": "view == 'redmyne-explorer-my-time-entries' && viewItem =~ /^time-entry/ && viewItem != 'time-entry-draft'",
-          "group": "inline@1"
+          "group": "inline@2"
         },
         {
           "command": "redmyne.deleteTimeEntry",
           "when": "view == 'redmyne-explorer-my-time-entries' && viewItem =~ /^time-entry/",
-          "group": "inline@2"
+          "group": "inline@3"
         },
         {
           "command": "redmyne.openIssueInBrowser",
