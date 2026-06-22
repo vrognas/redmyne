@@ -785,7 +785,7 @@
     "viewsWelcome": [
       {
         "view": "redmyne-explorer-kanban",
-        "contents": "No kanban tasks yet.\n[Add Task](command:redmyne.kanban.add)\n\n---\n\n**Tips:**\n- Right-click tasks for actions\n- Drag tasks between columns\n- Link tasks to Redmine issues",
+        "contents": "No kanban tasks yet. Stage work here before you time it.\n\n[Add Task](command:redmyne.kanban.add)\n\nRight-click for actions, drag between columns, or link a task to a Redmine issue.",
         "when": "redmyne:configured"
       },
       {
