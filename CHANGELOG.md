@@ -7,6 +7,17 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.38.0]
+
+### Fixed
+
+- **The Issues and Time Entries side panes no longer flash "There is no data provider registered that can provide view data" at startup.** The tree views now register on the first line of activation — before the awaited namespace migration and draft-mode init (which touch the keychain and filesystem) — so the panes show their own loading state instead.
+- **The Kanban pane's empty-state message rendered raw Markdown** (`**Tips:**`, `---`, `-`). It's now clean prose plus the Add Task button — the welcome view only renders plain text and links.
+
+### Internal
+
+- The lookback selector's options are a single source of truth shared by the dropdown and the validator; extracted a tested `addUtcDays` date helper for the repeated UTC date-shift idiom; the README was rewritten leaner with full feature coverage.
+
 ## [4.37.0]
 
 ### Added
