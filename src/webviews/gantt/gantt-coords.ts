@@ -27,6 +27,18 @@ export function dateToX(
 }
 
 /**
+ * Return a copy of `date` shifted by `days` UTC days (negative = backward).
+ * Does NOT mutate the input. Whole-day UTC arithmetic, no DST drift — the
+ * shared idiom behind the axis padding, lookback horizon, and end-exclusive
+ * bar edges.
+ */
+export function addUtcDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result;
+}
+
+/**
  * Like dateToX but adds 1 UTC day to the input date first (exclusive end),
  * matching the `endPlusOne = new Date(end); endPlusOne.setUTCDate(+1)` pattern.
  * The input Date is NOT mutated.
@@ -42,9 +54,7 @@ export function endExclusiveX(
   maxDateMs: number,
   timelineWidth: number
 ): number {
-  const clone = new Date(endDate);
-  clone.setUTCDate(clone.getUTCDate() + 1);
-  return dateToX(clone.getTime(), minDateMs, maxDateMs, timelineWidth);
+  return dateToX(addUtcDays(endDate, 1).getTime(), minDateMs, maxDateMs, timelineWidth);
 }
 
 /**
@@ -101,7 +111,6 @@ export function clampMinDateToLookback(
   lookbackDays: number | null
 ): Date {
   if (lookbackDays === null) return minDate;
-  const horizon = new Date(todayUTC);
-  horizon.setUTCDate(horizon.getUTCDate() - lookbackDays);
+  const horizon = addUtcDays(todayUTC, -lookbackDays);
   return minDate < horizon && horizon < maxDate ? horizon : minDate;
 }

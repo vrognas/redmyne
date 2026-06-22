@@ -40,7 +40,7 @@ import { generateHeader, type GanttToolbarContext } from "./gantt/gantt-toolbar-
 import { deriveAssigneeState, filterIssuesForView, isLateIssue } from "./gantt-view-filter";
 import { remainingHours } from "../utilities/remaining-work";
 import { deriveTaskTypes, filterIssuesByTaskType } from "../utilities/issue-task-type-filter";
-import { dateToX, endExclusiveX, clampMinDateToLookback } from "./gantt/gantt-coords";
+import { dateToX, endExclusiveX, clampMinDateToLookback, addUtcDays } from "./gantt/gantt-coords";
 import { computeHeaderDimRects, computeFutureDimStartMs } from "./gantt/header-dim";
 import { GANTT_LAYOUT, computeStickyLeftWidth } from "./gantt/gantt-layout-constants";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
@@ -933,6 +933,9 @@ export class GanttPanel {
         fromDate = startDates[0] || todayStr;
       } else {
         // Limited: use lookback period from today
+        // LOCAL frame (today = getLocalToday + formatLocalDate); the axis
+        // uses the UTC equivalent via clampMinDateToLookback — keep the
+        // day-count in sync between the two.
         const lookbackDate = new Date(today);
         lookbackDate.setDate(lookbackDate.getDate() - this._lookbackDays);
         fromDate = formatLocalDate(lookbackDate);
@@ -2274,22 +2277,20 @@ export class GanttPanel {
       // No visible issues - use default range centered on today.
       // Anchor on the UTC-frame today + setUTCDate so this fallback matches
       // the dates-present branch (which uses new Date(d) + setUTCDate).
-      minDate = new Date(todayUTC);
-      minDate.setUTCDate(minDate.getUTCDate() - 7);
-      maxDate = new Date(todayUTC);
-      maxDate.setUTCDate(maxDate.getUTCDate() + 30);
+      minDate = addUtcDays(todayUTC, -7);
+      maxDate = addUtcDays(todayUTC, 30);
     } else {
-      minDate = new Date(Math.min(...dates.map((d) => new Date(d).getTime())));
-      maxDate = new Date(Math.max(...dates.map((d) => new Date(d).getTime())));
+      const times = dates.map((d) => new Date(d).getTime());
+      minDate = new Date(Math.min(...times));
+      maxDate = new Date(Math.max(...times));
       activeWindowEndMs = maxDate.getTime();
       // Add padding based on zoom level for breathing room
       const paddingDays = { day: 1, week: 7, month: 30, quarter: 90, year: 365 }[this._zoomLevel] || 7;
-      minDate.setUTCDate(minDate.getUTCDate() - paddingDays);
-      maxDate.setUTCDate(maxDate.getUTCDate() + paddingDays);
+      minDate = addUtcDays(minDate, -paddingDays);
+      maxDate = addUtcDays(maxDate, paddingDays);
       // Guarantee a minimum future horizon (today + 4 weeks) so the road
       // ahead is always visible even when nothing is scheduled past today.
-      const minFuture = new Date(todayUTC);
-      minFuture.setUTCDate(minFuture.getUTCDate() + 28);
+      const minFuture = addUtcDays(todayUTC, 28);
       if (maxDate < minFuture) maxDate = minFuture;
       // The lookback selector clamps the AXIS too, not just the data
       // fetch — one ancient still-open issue otherwise stretches the

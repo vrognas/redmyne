@@ -4,6 +4,7 @@ import {
   endExclusiveX,
   barXRange,
   clampMinDateToLookback,
+  addUtcDays,
 } from "../../../src/webviews/gantt/gantt-coords";
 
 describe("dateToX", () => {
@@ -70,6 +71,15 @@ describe("barXRange", () => {
     expect(oneDay.endX).toBe(endExclusiveX(new Date("2026-01-03"), minMs, maxMs, width));
     // both dates absent → null (caller emits an empty group)
     expect(barXRange(null, null, minMs, maxMs, width)).toBeNull();
+  });
+});
+
+describe("addUtcDays", () => {
+  it("shifts a date forward/backward by whole UTC days without mutating", () => {
+    const base = new Date("2026-06-11T00:00:00Z");
+    expect(addUtcDays(base, 28).toISOString().slice(0, 10)).toBe("2026-07-09");
+    expect(addUtcDays(base, -28).toISOString().slice(0, 10)).toBe("2026-05-14");
+    expect(base.toISOString().slice(0, 10)).toBe("2026-06-11");
   });
 });
 

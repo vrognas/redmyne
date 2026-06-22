@@ -5,6 +5,7 @@
 
 import { escapeAttr, escapeHtml } from "../gantt-html-escape";
 import type { IssueFilter } from "../../redmine/models/common";
+import { LOOKBACK_OPTIONS } from "../gantt-webview-messages";
 
 type ZoomLevel = "day" | "week" | "month" | "quarter" | "year";
 
@@ -156,14 +157,10 @@ export function generateToolbar(ctx: GanttToolbarContext): string {
       <div class="toolbar-separator"></div>
       <!-- Lookback period -->
       <select id="lookbackSelect" class="toolbar-select" data-toolbar-tooltip="Data lookback period">
-        <option value="14"${ctx.lookbackDays === 14 ? " selected" : ""}>2 Weeks</option>
-        <option value="28"${ctx.lookbackDays === 28 ? " selected" : ""}>4 Weeks</option>
-        <option value="90"${ctx.lookbackDays === 90 ? " selected" : ""}>3 Months</option>
-        <option value="180"${ctx.lookbackDays === 180 ? " selected" : ""}>6 Months</option>
-        <option value="730"${ctx.lookbackDays === 730 ? " selected" : ""}>2 Years</option>
-        <option value="1825"${ctx.lookbackDays === 1825 ? " selected" : ""}>5 Years</option>
-        <option value="3650"${ctx.lookbackDays === 3650 ? " selected" : ""}>10 Years</option>
-        <option value=""${ctx.lookbackDays === null ? " selected" : ""}>All Time</option>
+        ${LOOKBACK_OPTIONS.map((o) => {
+          const days = o.value === "" ? null : parseInt(o.value, 10);
+          return `<option value="${o.value}"${ctx.lookbackDays === days ? " selected" : ""}>${escapeHtml(o.label)}</option>`;
+        }).join("")}
       </select>
       <!-- Zoom -->
       <select id="zoomSelect" class="toolbar-select" data-toolbar-tooltip="Zoom level">

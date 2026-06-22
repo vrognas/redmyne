@@ -47,9 +47,29 @@ export type GanttWebviewMessage =
   | { command: "showStatus"; message?: string }
   | { command: "requestProjectMembers"; projectId?: number };
 
-// Lookback horizon in days: 14/28 = 2/4 weeks, 90/180 = 3/6 months,
-// 730/1825/3650 = 2/5/10 years, "" = unlimited.
-const LOOKBACK_VALUES = new Set(["14", "28", "90", "180", "730", "1825", "3650", ""]);
+/**
+ * The lookback selector's options — the single source of truth shared by the
+ * toolbar dropdown and parseLookbackDays validation. Days as strings; "" =
+ * All Time (null). Add an entry here and both the menu and the validator stay
+ * in sync. 14/28 = 2/4 weeks, 90/180 = 3/6 months, 730/1825/3650 = 2/5/10y.
+ */
+export interface LookbackOption {
+  value: string;
+  label: string;
+}
+
+export const LOOKBACK_OPTIONS: readonly LookbackOption[] = [
+  { value: "14", label: "2 Weeks" },
+  { value: "28", label: "4 Weeks" },
+  { value: "90", label: "3 Months" },
+  { value: "180", label: "6 Months" },
+  { value: "730", label: "2 Years" },
+  { value: "1825", label: "5 Years" },
+  { value: "3650", label: "10 Years" },
+  { value: "", label: "All Time" },
+];
+
+const LOOKBACK_VALUES = new Set(LOOKBACK_OPTIONS.map((o) => o.value));
 
 export function parseLookbackDays(
   value: string | undefined,
