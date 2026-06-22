@@ -183,7 +183,7 @@ When server configured or refresh clicked:
 
 ```bash
 # Measure startup time
-code --disable-extensions && code --install-extension ./positron-redmine-*.vsix
+code --disable-extensions && code --install-extension ./redmyne-*.vsix
 
 # Profile network calls
 # Enable: redmyne.logging.enabled = true

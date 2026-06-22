@@ -8,7 +8,7 @@ body:
       value: |
         **Security Issues**: Do NOT report security bugs here. Email github@rozpuszczalny.com instead.
 
-        **Feature Requests**: Use [Discussions](https://github.com/vrognas/positron-redmine/discussions) instead.
+        **Feature Requests**: Use [Discussions](https://github.com/vrognas/vrognas-redmyne/discussions) instead.
 
   - type: textarea
     id: description

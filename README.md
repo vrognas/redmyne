@@ -201,7 +201,7 @@ Queue write operations locally before sending to Redmine.
 |---------|-------------|---------|
 | `redmyne.serverUrl` | Redmine server URL (HTTPS required) | — |
 | `redmyne.logging.enabled` | Log API requests to output channel for debugging | `true` |
-| `redmyne.maxConcurrentRequests` | Maximum concurrent API requests | `2` |
+| `redmyne.maxConcurrentRequests` | Maximum concurrent API requests | `4` |
 
 API keys stored via `Redmyne: Set API Key` command (encrypted keychain).
 
@@ -258,7 +258,7 @@ API keys stored via `Redmyne: Set API Key` command (encrypted keychain).
 
 ## Requirements
 
-- VS Code 1.105+ or Positron 2025.12.0+
+- VS Code 1.109+ or Positron 2026.04+
 - Redmine with REST API enabled (`/settings` → API tab)
 - API key from My Account → API access key
 

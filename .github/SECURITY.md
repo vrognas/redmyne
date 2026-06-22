@@ -13,7 +13,7 @@
 
 **DO NOT** open public issues for security vulnerabilities.
 
-**Preferred**: Use [GitHub Security Advisory](https://github.com/vrognas/positron-redmine/security/advisories/new) for private reporting.
+**Preferred**: Use [GitHub Security Advisory](https://github.com/vrognas/vrognas-redmyne/security/advisories/new) for private reporting.
 
 **Alternative**: Email maintainers through GitHub profile.
 

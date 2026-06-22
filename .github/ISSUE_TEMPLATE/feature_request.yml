@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        **Preferred**: Use [Discussions](https://github.com/vrognas/positron-redmine/discussions) for feature requests.
+        **Preferred**: Use [Discussions](https://github.com/vrognas/vrognas-redmyne/discussions) for feature requests.
 
         This form is for tracking approved features only. New ideas should be discussed first.
 
