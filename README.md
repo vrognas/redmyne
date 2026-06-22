@@ -6,17 +6,17 @@
 
 **Personal workload management for Redmine** — log time, track capacity, stay in flow.
 
+Redmine's web UI answers *"How is the project doing?"* Redmyne answers *"How is **my** workload doing?"* — what's assigned to me, am I overbooked, how much did I log today — without leaving your IDE.
+
 > [!NOTE]
-> This extension is currently in active development.
-> While stable for daily use, expect occasional breaking changes.
-> Please report any issues to help improve the extension.
+> Actively developed and stable for daily use; expect the occasional breaking change. Please report issues.
 
 ## Quick Start
 
 ```
-1. Install extension
+1. Install the extension
 2. Ctrl+Shift+P → "Redmyne: Set API Key"
-3. Enter URL + API key
+3. Enter your Redmine URL + API key
 ```
 
 Your issues appear in the sidebar. Start logging time.
@@ -25,282 +25,143 @@ Your issues appear in the sidebar. Start logging time.
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+Y Ctrl+Y` | Quick log time |
-| `Ctrl+Y Ctrl+N` | Quick create issue |
-| `Ctrl+Y Ctrl+T` | Toggle timer |
-| `Ctrl+C` / `Ctrl+V` | Copy / paste in Time Entries pane (focused entry, day, or week) |
+| `Ctrl+Y Ctrl+Y` | Quick log time — pick issue → hours (`2h`, `1:30`, `1.5`) |
+| `Ctrl+Y Ctrl+N` | Quick create issue — project → tracker → subject |
+| `Ctrl+Y Ctrl+T` | Toggle Pomodoro timer |
+| `Ctrl+C` / `Ctrl+V` | Copy / paste in the Time Entries pane |
+| `Ctrl+Z` / `Ctrl+Shift+Z` | Undo / redo (Gantt, Time Sheet) |
 
-*(Mac: use `Cmd` instead of `Ctrl`)*
+*(Mac: `Cmd` instead of `Ctrl`.)* Most other actions live on right-click in each view.
 
 ## Features
 
-### Issues View
+### Issues
 
-Browse your assigned issues grouped by project.
+Your assigned issues, grouped by project — Tree (hierarchy) or List (flat).
 
-**Filters:**
-- My Open Issues *(default)*
-- All Open Issues
-- My Closed Issues
-- All Issues
+- **Filters:** My Open *(default)*, All Open, My Closed, My Issues, All Issues; **by Task Type** (a custom field); **show / hide empty projects**
+- **Sort:** by #ID, Subject, or Assignee
+- **Health colors:** 🔴 overbooked · 🟡 at risk · 🟢 on track (hours left vs. due date)
+- **Right-click:** Quick Update (status + assignee + comment in one step), Log Time, Set % Done, Set Internal Estimate, Toggle Ad-Hoc Budget (then Contribute / Remove to route its hours to another issue), Create Sub-Issue, Create Version / Milestone, Show in Gantt, Add to Kanban, Open in Browser, Copy URL
 
-**Sorting:** By #ID, Subject, or Assignee (click to toggle direction)
+### Time Entries
 
-**View modes:** Tree (hierarchy) or List (flat)
+Logged time grouped by **Today**, **This Week**, **This Month**.
 
-**Actions (right-click):**
-- Quick Update (status + assignee + comment in one step)
-- Log Time
-- Set % Done (or Clear → track logged time)
-- Set Internal Estimate (hours remaining, overrides the budget heuristic)
-- Toggle Ad-Hoc Budget (time on it can contribute hours to other issues)
-- Create Sub-Issue
-- Show in Gantt
-- Open in Browser
-- Copy URL
+- **Filters:** My Time / All Users; **show / hide 0% days** (zero-utilization days hidden by default)
+- **Sort:** by #ID, Subject, Comment, or User
+- **Right-click:** Edit, Delete, Open in Browser; on a date → Add Entry
+- **Copy / paste** single entries, whole days, or weeks across dates
+- Required + optional custom fields are prompted when logging time
 
-**Colors:**
-- 🔴 Overbooked — not enough hours before due date
-- 🟡 At risk — tight schedule
-- 🟢 On track — comfortable buffer
+### Time Sheet
 
-### Time Entries View
+Spreadsheet-style week editing in a webview (table icon in the Time Entries header).
 
-See logged time grouped by **Today**, **This Week**, **This Month**.
-
-**Filters:** My Time, All Users
-
-**Sorting:** By #ID, Subject, Comment, or User
-
-**Actions (right-click):**
-- Edit Time Entry
-- Delete Time Entry
-- Open in Browser
-
-**Add entries:** Right-click any date → Add Time Entry
-
-**Copy/paste:** Copy single entries, days, or weeks → paste to other dates. Right-click or `Ctrl+C` / `Ctrl+V` on the focused row
-
-**Custom fields:** Required and optional custom fields prompted when logging time
+- Cascading **Client → Project → Task → Activity** dropdowns
+- Daily hours with dirty tracking, draft mode, undo / redo
+- Sortable columns, searchable issue picker, copy / paste / duplicate rows, custom fields
 
 ### Gantt Chart
 
 Interactive timeline for workload visualization.
 
-**Editing:**
-- Drag bar edges → adjust start or due date
-- Drag bar body → move both dates together
-- Right-click bar → Update issue dialog
-
-**Selection:** (row-based — bars aren't selectable)
-- Click row → select; Ctrl+click → toggle; Shift+click → range; Ctrl+A → all
-- Click a bar → pin its highlight (bar + dependency arrows stay lit); Escape clears
-- Drag selected → bulk move
-
-**Navigation:**
-- Arrow keys → move focus
-- Home/End → first/last issue
-- Enter → open issue actions
-- Minimap (bottom) → click/drag to navigate
-
-**Color language** (all theme-aware):
-- **Bar fill = schedule health:** blue = done, green = on track, yellow = at risk, red = overbooked (>100% shows the real over-budget percent)
-- **Bar border = state:** red = overdue, orange pulse = projected late, purple dotted = ad-hoc, dashed = external
-- **Ghost bar** → translucent red extension to the projected finish when a task runs past today or past its due date (hover for details)
-- **Dependency arrows:** green = source on schedule, red = late or projected late
-
-**Visualization:**
-- Zoom: Day *(default)* / Week / Month / Quarter / Year
-- Late chip → count of late issues; click to filter to just those
-- Highlight my issues → theme-blue labels (on by default, toggle in menu)
-- Intensity / critical path / capacity ribbon toggles
-- Progress and flexibility shown on hover
-- Sort by due date (earliest first) by default; lookback selector (2 weeks → 10 years, default 6 months) clamps how far *back* the axis reaches — the right edge follows your furthest scheduled task
-- Project filter → checkboxes to show/hide
-
-**Dependencies:**
-- Drag from circle → create relation
-- Right-click arrow → remove relation
-- Relation types: blocks, precedes, follows, relates, duplicates, copied
-
-**Actions (right-click bar):** Update issue, Set Status / Priority, Set % Done (or Clear), Set Internal Estimate, Toggle Ad-Hoc Budget, Log Time, Add to Kanban
-
-**Other:**
-- Undo/redo for all edits
-- Project bars show aggregate dates
-
-### Time Sheet
-
-Week-by-week time entry editing in a spreadsheet-style webview.
-
-- Open via table icon in Time Entries pane header
-- Cascading dropdowns: Client → Project → Task → Activity
-- Daily hours input with dirty tracking and draft mode
-- Undo/redo (`Ctrl+Z` / `Ctrl+Shift+Z`)
-- Sortable columns, searchable issue picker
-- Copy/paste rows, duplicate entries
-- Custom fields support (required + optional)
-
-### Timer (Pomodoro)
-
-Structured work sessions with auto-logging.
-
-1. `Ctrl+Y Ctrl+T` → choose number of units
-2. Assign issues/activities to each unit
-3. Work 45min → break 15min → repeat
-4. Time auto-logged when unit completes
-
-**Features:**
-- Status bar countdown with progress bar
-- Sound notification
-- State persists across restarts
-- Add/remove/reorder units
-- Skip break option
+- **Edit:** drag bar edges (start / due), drag the body (move both), right-click → Update dialog; full undo / redo
+- **Select:** click rows (Ctrl / Shift / Ctrl+A for multi); click a bar to pin its highlight + dependency arrows; drag a selection to bulk-move
+- **Navigate:** arrow keys, Home / End, Enter to act, minimap to jump
+- **Colors** (theme-aware): bar **fill** = schedule health (done / on-track / at-risk / overbooked), **border** = state (overdue / projected-late / ad-hoc / external), **ghost bar** = projected finish past the due date. Hover any bar for the full breakdown.
+- **View:** zoom Day *(default)* / Week / Month / Quarter / Year; lookback selector (2 Weeks → 10 Years, **default 6 Months**) bounds how far *back* the axis reaches — the right edge follows your furthest scheduled task; filters for task type and empty projects, plus toggles for intensity, critical path, capacity ribbon, late issues, and highlight-my-issues
+- **Dependencies:** drag from a bar's circle to create a relation; right-click an arrow to remove (blocks, precedes, follows, relates, duplicates, copied)
+- **Tooltips:** progress, flexibility, assignee, and an opt-in calculated priority score (due-date urgency + downstream dependencies)
 
 ### Kanban Board
 
 Stage tasks before timing them.
 
-- Add standalone tasks or link to Redmine issues
-- Priority levels: High / Medium / Low
-- Status: Todo → In Progress → Done
-- Tasks grouped by client/project hierarchy
-- Add to Today's Plan when ready
+- Standalone tasks or linked to Redmine issues; High / Medium / Low priority
+- Todo → In Progress → Done, grouped by client / project; add to today's plan when ready
+
+### Timer (Pomodoro)
+
+Structured work sessions with auto-logging (`Ctrl+Y Ctrl+T`).
+
+- Assign issues / activities to each unit; work 45 / break 15; time auto-logged when a unit completes
+- Status-bar countdown + progress, sound notification, persists across restarts, skip-break option
 
 ### Draft Mode
 
 Queue write operations locally before sending to Redmine.
 
-- Toggle via command palette or status bar
-- Review panel to inspect, apply, or discard pending drafts
-- Per-draft or bulk apply/discard
-- Server identity validation
-- Persists across restarts
+- Toggle via the command palette or status bar
+- Review panel to inspect, apply, or discard pending drafts (per-draft or bulk)
+- Server-identity validation; persists across restarts
 
-### Quick Actions
+### Auto-tracking helpers
 
-| Action | How |
-|--------|-----|
-| Log time | `Ctrl+Y Ctrl+Y` → pick issue → enter hours (`2h`, `1:30`, `1.5`) |
-| Create issue | `Ctrl+Y Ctrl+N` → project → tracker → subject → done |
-| Create sub-issue | Right-click issue → Create Sub-Issue |
-| Quick update | Right-click issue → Quick Update (batch changes) |
-| View history | Right-click issue → View History |
+- **Auto-update % Done** — opt-in per issue; advances %Done from spent / estimated as you log (caps at 99%)
+- **Ad-hoc budget pools** — tag an issue as a pool, then route its logged hours to other issues
 
-### Status Bar
+## Status Bar
 
-**Timer:** Shows countdown, issue number, progress (e.g., `32:15 #1234 [Dev] (3/6)`)
-
-**Workload:** Enable to see `25h left, +8h buffer` *(opt-in)*
-
-## All Settings
-
-### Connection
-
-| Setting | Description | Default |
-|---------|-------------|---------|
-| `redmyne.serverUrl` | Redmine server URL (HTTPS required) | — |
-| `redmyne.logging.enabled` | Log API requests to output channel for debugging | `true` |
-| `redmyne.maxConcurrentRequests` | Maximum concurrent API requests | `4` |
-
-API keys stored via `Redmyne: Set API Key` command (encrypted keychain).
-
-### Working Hours
-
-| Setting | Description | Default |
-|---------|-------------|---------|
-| `redmyne.workingHours.weeklySchedule` | Hours per day for capacity calculations | 8h Mon-Fri |
-
-```json
-"redmyne.workingHours.weeklySchedule": {
-  "Mon": 8, "Tue": 8, "Wed": 8, "Thu": 8, "Fri": 8,
-  "Sat": 0, "Sun": 0
-}
-```
-
-**Monthly overrides:** `Redmyne: Edit Monthly Working Hours` for varying FTE per month.
-
-### Status Bar
-
-| Setting | Description | Default |
-|---------|-------------|---------|
-| `redmyne.statusBar.showWorkload` | Show workload summary ("25h left, +8h buffer") | `false` |
-
-### Behavior
-
-| Setting | Description | Default |
-|---------|-------------|---------|
-| `redmyne.autoUpdateDonePercent` | Auto-update % Done when logging time (caps at 99%) | `false` |
-| `redmyne.showCalculatedPriority` | Show calculated priority score in Gantt tooltips | `false` |
-| `redmyne.gantt.visibleRelationTypes` | Relation types shown as dependency arrows in Gantt | `["blocks","precedes"]` |
-| `redmyne.gantt.perfDebug` | Enable performance debug logging for Gantt | `false` |
-
-### Tooltips & Display
-
-| Setting | Description | Default |
-|---------|-------------|---------|
-| `redmyne.showProjectMembers` | Show project members in tooltips (Issues tree + Gantt) | `true` |
-| `redmyne.hideProjectMembersFor` | Project IDs to exclude from member display | `[]` |
-
-### Issue Tracking
-
-| Setting | Description | Default |
-|---------|-------------|---------|
-| `redmyne.autoUpdateIssues` | Issue IDs that auto-update %done when logging time | `[]` |
-| `redmyne.adHocBudgetIssues` | Issue IDs tagged as ad-hoc budget pools | `[]` |
-| `redmyne.precedenceIssues` | Issue IDs scheduled before all others in Gantt | `[]` |
-
-### Advanced
-
-| Setting | Description | Default |
-|---------|-------------|---------|
-| `redmyne.caFile` | Custom CA certificate file path (PEM/CRT) for TLS validation | — |
+- **Timer:** countdown, issue, progress (e.g. `32:15 #1234 [Dev] (3/6)`)
+- **Workload** *(opt-in):* `25h left, +8h buffer`
 
 ## Requirements
 
 - VS Code 1.109+ or Positron 2026.04+
-- Redmine with REST API enabled (`/settings` → API tab)
+- Redmine with the REST API enabled (`/settings` → API tab)
 - API key from My Account → API access key
 
 ## Security
 
-- API keys stored in encrypted system keychain (Windows Credential Manager / macOS Keychain / Linux libsecret)
-- HTTPS required — HTTP connections rejected
+- API keys stored in the encrypted system keychain (Windows Credential Manager / macOS Keychain / Linux libsecret) and never synced
+- HTTPS required — HTTP connections are rejected
 - Sensitive data redacted in API logs
 
----
+<details>
+<summary>Settings</summary>
 
-## Why This Extension?
+Most are easiest to set in the VS Code Settings UI (search "Redmyne").
 
-Redmine's web UI is for project managers: *"How is the project doing?"*
+| Setting | Purpose | Default |
+|---------|---------|---------|
+| `redmyne.serverUrl` | Redmine server URL (HTTPS) | — |
+| `redmyne.logging.enabled` | Log API requests to the output channel | `true` |
+| `redmyne.maxConcurrentRequests` | Max concurrent API requests | `4` |
+| `redmyne.taskTypeField` | Custom field name backing the Task Type filter | `Task Type` |
+| `redmyne.workingHours.weeklySchedule` | Hours per day for capacity (e.g. 8h Mon–Fri) | 8h Mon–Fri |
+| `redmyne.statusBar.showWorkload` | Show the workload summary | `false` |
+| `redmyne.autoUpdateDonePercent` | Auto-advance %Done when logging time | `false` |
+| `redmyne.autoUpdateIssues` | Issue IDs that auto-update %Done | `[]` |
+| `redmyne.showCalculatedPriority` | Calculated priority score in Gantt tooltips | `false` |
+| `redmyne.adHocBudgetIssues` | Issue IDs tagged as ad-hoc budget pools | `[]` |
+| `redmyne.precedenceIssues` | Issue IDs scheduled before all others in Gantt | `[]` |
+| `redmyne.gantt.visibleRelationTypes` | Relation types shown as Gantt arrows | `["blocks","precedes"]` |
+| `redmyne.showProjectMembers` | Show project members in tooltips | `true` |
+| `redmyne.hideProjectMembersFor` | Project IDs to exclude from member display | `[]` |
+| `redmyne.caFile` | Custom CA certificate (PEM/CRT) for TLS | — |
+| `redmyne.gantt.perfDebug` | Gantt performance debug logging | `false` |
 
-This extension is for developers: *"How is MY workload doing?"*
+Monthly hour overrides: `Redmyne: Edit Monthly Working Hours`.
 
-- What's assigned to me?
-- Am I overbooked?
-- How much did I log today?
-
-Stay in your IDE. Stay in flow.
-
----
+</details>
 
 <details>
-<summary>Commands Reference</summary>
+<summary>Commands</summary>
 
 | Command | Description |
 |---------|-------------|
 | `Redmyne: Set API Key` | Configure server URL and API key |
-| `Log Time` | Log time with keyboard (Ctrl+Y Ctrl+Y) |
-| `Create Issue` | Create issue wizard (Ctrl+Y Ctrl+N) |
-| `Toggle Timer` | Start/stop timer (Ctrl+Y Ctrl+T) |
-| `Show Gantt` | Open Gantt chart |
-| `Time Sheet` | Open week-by-week time entry editor |
+| `Log Time` | Log time (`Ctrl+Y Ctrl+Y`) |
+| `Create Issue` | Create-issue wizard (`Ctrl+Y Ctrl+N`) |
+| `Toggle Timer` | Start / stop the Pomodoro timer (`Ctrl+Y Ctrl+T`) |
+| `Show Gantt` | Open the Gantt chart |
+| `Time Sheet` | Open the week-by-week editor |
 | `Redmyne: Edit Monthly Working Hours` | Configure FTE per month |
-| `Redmyne: Show API Output` | View API request/response log |
-| `Redmyne: Toggle API Logging` | Enable/disable request logging |
+| `Redmyne: Show API Output` | View the API request / response log |
+| `Redmyne: Toggle API Logging` | Enable / disable request logging |
 | `Redmyne: Review Drafts` | Review pending draft operations |
-| `Redmyne: Apply All Drafts` | Send all queued drafts to Redmine |
-| `Redmyne: Discard All Drafts` | Discard all pending drafts |
+| `Redmyne: Apply All Drafts` / `Discard All Drafts` | Send / discard all queued drafts |
 
 </details>
 
@@ -310,22 +171,18 @@ Stay in your IDE. Stay in flow.
 ```bash
 npm install        # deps + git hooks
 npm run compile    # build
-npm test           # tests
+npm test           # tests (run via bash on Windows)
 npm run ci         # lint + typecheck + test
 ```
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md)
+See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 </details>
 
 <details>
 <summary>Attributions</summary>
 
-Fork of [vscode-redmine](https://github.com/rozpuszczalny/vscode-redmine) by Tomasz Domański (MIT).
-
-Contributors: Doğan Özdoğan (tree view), Markus Amshove (quick update).
-
-Logo remixed from Redmine Logo © 2009 Martin Herr ([CC BY-SA 2.5](http://creativecommons.org/licenses/by-sa/2.5/)).
+Fork of [vscode-redmine](https://github.com/rozpuszczalny/vscode-redmine) by Tomasz Domański (MIT). Contributors: Doğan Özdoğan (tree view), Markus Amshove (quick update). Logo remixed from the Redmine logo © 2009 Martin Herr ([CC BY-SA 2.5](http://creativecommons.org/licenses/by-sa/2.5/)).
 
 </details>
 
