@@ -26,7 +26,7 @@ export interface GanttToolbarContext {
   projects: ToolbarProject[];
 
   // Settings
-  lookbackYears: number | null;
+  lookbackDays: number | null;
   zoomLevel: ZoomLevel;
   currentFilter: IssueFilter;
 
@@ -156,12 +156,14 @@ export function generateToolbar(ctx: GanttToolbarContext): string {
       <div class="toolbar-separator"></div>
       <!-- Lookback period -->
       <select id="lookbackSelect" class="toolbar-select" data-toolbar-tooltip="Data lookback period">
-        <option value="0.25"${ctx.lookbackYears === 0.25 ? " selected" : ""}>3 Months</option>
-        <option value="0.5"${ctx.lookbackYears === 0.5 ? " selected" : ""}>6 Months</option>
-        <option value="2"${ctx.lookbackYears === 2 ? " selected" : ""}>2 Years</option>
-        <option value="5"${ctx.lookbackYears === 5 ? " selected" : ""}>5 Years</option>
-        <option value="10"${ctx.lookbackYears === 10 ? " selected" : ""}>10 Years</option>
-        <option value=""${ctx.lookbackYears === null ? " selected" : ""}>All Time</option>
+        <option value="14"${ctx.lookbackDays === 14 ? " selected" : ""}>2 Weeks</option>
+        <option value="28"${ctx.lookbackDays === 28 ? " selected" : ""}>4 Weeks</option>
+        <option value="90"${ctx.lookbackDays === 90 ? " selected" : ""}>3 Months</option>
+        <option value="180"${ctx.lookbackDays === 180 ? " selected" : ""}>6 Months</option>
+        <option value="730"${ctx.lookbackDays === 730 ? " selected" : ""}>2 Years</option>
+        <option value="1825"${ctx.lookbackDays === 1825 ? " selected" : ""}>5 Years</option>
+        <option value="3650"${ctx.lookbackDays === 3650 ? " selected" : ""}>10 Years</option>
+        <option value=""${ctx.lookbackDays === null ? " selected" : ""}>All Time</option>
       </select>
       <!-- Zoom -->
       <select id="zoomSelect" class="toolbar-select" data-toolbar-tooltip="Zoom level">

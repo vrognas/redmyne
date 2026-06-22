@@ -13,7 +13,7 @@ const baseContext: GanttToolbarContext = {
   currentUserName: "Viktor Rognås",
   uniqueAssignees: ["Viktor Rognås", "Alice Smith"],
   projects: [],
-  lookbackYears: 2,
+  lookbackDays: 730,
   zoomLevel: "month",
   currentFilter: { assignee: "me", status: "open" },
   taskTypeValues: [],

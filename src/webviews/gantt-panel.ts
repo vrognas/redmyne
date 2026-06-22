@@ -31,7 +31,7 @@ import { IssueFilter, DEFAULT_ISSUE_FILTER, GanttViewMode, CustomField } from ".
 import { formatCustomFieldValue } from "../utilities/custom-field-formatter";
 import { parseLocalDate, getLocalToday, formatLocalDate } from "../utilities/date-utils";
 import { getNonce } from "../utilities/webview-nonce";
-import { GanttWebviewMessage, parseLookbackYears } from "./gantt-webview-messages";
+import { GanttWebviewMessage, parseLookbackDays } from "./gantt-webview-messages";
 import { escapeAttr, escapeHtml } from "./gantt-html-escape";
 import { CreatableRelationType, GanttRow, nodeToGanttRow } from "./gantt-model";
 import { buildRowsPayload, buildArrowsPayload } from "./gantt/gantt-html-generator";
@@ -187,7 +187,7 @@ const SHOW_EMPTY_PROJECTS_KEY = "redmyne.gantt.showEmptyProjects";
 const SORT_BY_KEY = "redmyne.gantt.sortBy";
 const SORT_ORDER_KEY = "redmyne.gantt.sortOrder";
 const HIGHLIGHT_MINE_KEY = "redmyne.gantt.highlightMyIssues";
-const LOOKBACK_YEARS_KEY = "redmyne.gantt.lookbackYears";
+const LOOKBACK_DAYS_KEY = "redmyne.gantt.lookbackDays";
 
 export class GanttPanel {
   public static currentPanel: GanttPanel | undefined;
@@ -271,7 +271,7 @@ export class GanttPanel {
   private _sortBy: "id" | "assignee" | "start" | "due" | "status" | null = "due";
   private _sortOrder: "asc" | "desc" = "asc";
   // Lookback period for filtering old data (in years)
-  private _lookbackYears: number | null = 2; // years; fractional ok (0.25=3mo, 0.5=6mo); null = no limit
+  private _lookbackDays: number | null = 730; // days (730 = 2 years); null = no limit
   // Actual time entries for past-day intensity (issueId -> date -> hours)
   private _actualTimeEntries: ActualTimeEntries = new Map();
   // Current user for special highlighting
@@ -322,7 +322,7 @@ export class GanttPanel {
       this._sortBy = GanttPanel._globalState.get<"id" | "assignee" | "start" | "due" | "status" | null>(SORT_BY_KEY, "due");
       this._sortOrder = GanttPanel._globalState.get<"asc" | "desc">(SORT_ORDER_KEY, "asc");
       this._highlightMyIssues = GanttPanel._globalState.get<boolean>(HIGHLIGHT_MINE_KEY, true);
-      this._lookbackYears = GanttPanel._globalState.get<number | null>(LOOKBACK_YEARS_KEY, 2);
+      this._lookbackDays = GanttPanel._globalState.get<number | null>(LOOKBACK_DAYS_KEY, 730);
     }
 
     // Subscribe to draft mode and queue changes
@@ -915,7 +915,7 @@ export class GanttPanel {
 
       // Apply lookback limit (default 2 years, can be 5, 10, or null for unlimited)
       let fromDate: string;
-      if (this._lookbackYears === null) {
+      if (this._lookbackDays === null) {
         // Unlimited: use earliest non-ad-hoc issue start date
         const startDates = this._issues
           .filter(i => !adHocIssueIds.has(i.id))
@@ -926,7 +926,7 @@ export class GanttPanel {
       } else {
         // Limited: use lookback period from today
         const lookbackDate = new Date(today);
-        lookbackDate.setMonth(lookbackDate.getMonth() - Math.round(this._lookbackYears * 12));
+        lookbackDate.setDate(lookbackDate.getDate() - this._lookbackDays);
         fromDate = formatLocalDate(lookbackDate);
       }
 
@@ -1343,8 +1343,8 @@ export class GanttPanel {
         }
         break;
       case "setLookback":
-        this._lookbackYears = parseLookbackYears(message.years, this._lookbackYears);
-        GanttPanel._globalState?.update(LOOKBACK_YEARS_KEY, this._lookbackYears);
+        this._lookbackDays = parseLookbackDays(message.days, this._lookbackDays);
+        GanttPanel._globalState?.update(LOOKBACK_DAYS_KEY, this._lookbackDays);
         // Re-fetch contributions with the new lookback window.
         // Do NOT force-clear _contributionsLoading here: _refreshSupplementalData
         // bumps _supplementalLoadId, which invalidates any in-flight load at its
@@ -2286,7 +2286,7 @@ export class GanttPanel {
       // The lookback selector clamps the AXIS too, not just the data
       // fetch — one ancient still-open issue otherwise stretches the
       // timeline years into the past.
-      minDate = clampMinDateToLookback(minDate, maxDate, todayUTC, this._lookbackYears);
+      minDate = clampMinDateToLookback(minDate, maxDate, todayUTC, this._lookbackDays);
     }
 
     // String format for open-ended bars (issues with start but no due date)
@@ -2670,7 +2670,7 @@ export class GanttPanel {
       currentUserName: this._currentUserName,
       uniqueAssignees: this._uniqueAssignees,
       projects: this._projects,
-      lookbackYears: this._lookbackYears,
+      lookbackDays: this._lookbackDays,
       zoomLevel: this._zoomLevel,
       currentFilter: this._currentFilter,
       taskTypeValues: taskTypeField ? deriveTaskTypes(this._issues, taskTypeField) : [],

@@ -174,7 +174,7 @@ describe("gantt panel private coverage", () => {
       createIssue({ id: 2, assigneeId: 8, assigneeName: "Bob", start_date: "2025-11-01", spent_hours: 4 }),
     ];
     panel._supplementalLoadId = 11;
-    panel._lookbackYears = null;
+    panel._lookbackDays = null;
     panel._viewFocus = "person";
     panel._selectedAssignee = "Alice";
     panel._currentUserId = 999;
@@ -738,7 +738,7 @@ describe("gantt panel private coverage", () => {
         if (key === "redmyne.gantt.selectedAssignee") return "Alice";
         if (key === "redmyne.gantt.filterAssignee") return "me";
         if (key === "redmyne.gantt.filterStatus") return "open";
-        if (key === "redmyne.gantt.lookbackYears") return 5;
+        if (key === "redmyne.gantt.lookbackDays") return 1825;
         return fallback;
       }),
       update: vi.fn().mockResolvedValue(undefined),
@@ -800,7 +800,7 @@ describe("gantt panel private coverage", () => {
     const payload = panel._getRenderPayload();
     expect(payload.html).toContain("ganttTimeline");
     expect(panel._viewMode).toBe("mywork");
-    expect(panel._lookbackYears).toBe(5);
+    expect(panel._lookbackDays).toBe(1825);
     expect(logSpy).toHaveBeenCalled();
   });
 
@@ -893,7 +893,7 @@ describe("gantt panel private coverage", () => {
     );
     const panel = GanttPanel.currentPanel as any;
     panel._viewFocus = "person";
-    panel._lookbackYears = 2;
+    panel._lookbackDays = 730;
     panel._refreshSupplementalData = vi.fn().mockResolvedValue(undefined);
 
     const issues = [
@@ -940,7 +940,7 @@ describe("gantt panel private coverage", () => {
     );
     const panel = GanttPanel.currentPanel as any;
     panel._viewFocus = "project";
-    panel._lookbackYears = null;
+    panel._lookbackDays = null;
     panel._currentUserId = 999;
     // Pre-seed so updateIssues skips its status/current-user cold-start fetches
     // (project focus also skips the person-view time-entry fetch).
@@ -1004,7 +1004,7 @@ describe("gantt panel private coverage", () => {
     );
     const panel = GanttPanel.currentPanel as any;
     panel._viewFocus = "project";
-    panel._lookbackYears = null;
+    panel._lookbackDays = null;
     panel._currentUserId = 999;
     panel._issues = [
       createIssue({ id: 1, assigneeId: 7, assigneeName: "Alice", start_date: "2025-12-01", spent_hours: 3 }),

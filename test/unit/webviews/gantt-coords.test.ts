@@ -77,21 +77,21 @@ describe("clampMinDateToLookback", () => {
   const todayUTC = new Date("2026-06-11T00:00:00Z");
   const maxDate = new Date("2026-12-01T00:00:00Z");
 
-  it("clamps an ancient minDate to today minus lookback years", () => {
+  it("clamps an ancient minDate to today minus the lookback (730 days = 2 years)", () => {
     const ancient = new Date("2016-03-01T00:00:00Z");
-    const clamped = clampMinDateToLookback(ancient, maxDate, todayUTC, 2);
+    const clamped = clampMinDateToLookback(ancient, maxDate, todayUTC, 730);
     expect(clamped.toISOString().slice(0, 10)).toBe("2024-06-11");
   });
 
-  it("clamps to a sub-year horizon for fractional lookback (0.5 = 6 months)", () => {
+  it("clamps to a short horizon (28 days = 4 weeks)", () => {
     const ancient = new Date("2016-03-01T00:00:00Z");
-    const clamped = clampMinDateToLookback(ancient, maxDate, todayUTC, 0.5);
-    expect(clamped.toISOString().slice(0, 10)).toBe("2025-12-11");
+    const clamped = clampMinDateToLookback(ancient, maxDate, todayUTC, 28);
+    expect(clamped.toISOString().slice(0, 10)).toBe("2026-05-14");
   });
 
   it("leaves minDate alone when within the horizon or unlimited", () => {
     const recent = new Date("2026-01-01T00:00:00Z");
-    expect(clampMinDateToLookback(recent, maxDate, todayUTC, 2)).toBe(recent);
+    expect(clampMinDateToLookback(recent, maxDate, todayUTC, 730)).toBe(recent);
 
     const ancient = new Date("2016-03-01T00:00:00Z");
     expect(clampMinDateToLookback(ancient, maxDate, todayUTC, null)).toBe(ancient);
@@ -100,6 +100,6 @@ describe("clampMinDateToLookback", () => {
   it("never inverts the range when the whole board predates the horizon", () => {
     const oldMin = new Date("2015-01-01T00:00:00Z");
     const oldMax = new Date("2016-01-01T00:00:00Z");
-    expect(clampMinDateToLookback(oldMin, oldMax, todayUTC, 2)).toBe(oldMin);
+    expect(clampMinDateToLookback(oldMin, oldMax, todayUTC, 730)).toBe(oldMin);
   });
 });

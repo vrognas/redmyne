@@ -8,7 +8,7 @@ export type GanttWebviewMessage =
   | { command: "updateDates"; issueId: number; startDate: string | null; dueDate: string | null }
   | { command: "removeDraft"; issueId: number; startDate?: string | null; dueDate?: string | null }
   | { command: "setZoom"; zoomLevel: GanttZoomLevel }
-  | { command: "setLookback"; years?: string }
+  | { command: "setLookback"; days?: string }
   | { command: "setTaskTypeFilter"; taskType?: string }
   | { command: "toggleLateFilter" }
   | { command: "toggleEmptyProjects" }
@@ -47,15 +47,16 @@ export type GanttWebviewMessage =
   | { command: "showStatus"; message?: string }
   | { command: "requestProjectMembers"; projectId?: number };
 
-// Fractional years express sub-year ranges: 0.25 = 3 months, 0.5 = 6 months.
-const LOOKBACK_VALUES = new Set(["0.25", "0.5", "2", "5", "10", ""]);
+// Lookback horizon in days: 14/28 = 2/4 weeks, 90/180 = 3/6 months,
+// 730/1825/3650 = 2/5/10 years, "" = unlimited.
+const LOOKBACK_VALUES = new Set(["14", "28", "90", "180", "730", "1825", "3650", ""]);
 
-export function parseLookbackYears(
+export function parseLookbackDays(
   value: string | undefined,
   fallback: number | null
 ): number | null {
   if (value === undefined) return fallback;
   if (!LOOKBACK_VALUES.has(value)) return fallback;
   if (value === "") return null;
-  return parseFloat(value);
+  return parseInt(value, 10);
 }

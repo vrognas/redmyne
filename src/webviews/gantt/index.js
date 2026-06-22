@@ -767,7 +767,7 @@ function initializeGantt(state, rowWindow) {
 
     // Lookback period select handler
     document.getElementById('lookbackSelect')?.addEventListener('change', (e) => {
-      vscode.postMessage({ command: 'setLookback', years: e.target.value });
+      vscode.postMessage({ command: 'setLookback', days: e.target.value });
     });
 
     // Zoom select handler

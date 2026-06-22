@@ -88,7 +88,7 @@ export function barXRange(
 
 /**
  * Clamp the timeline's left edge to the lookback horizon (today minus
- * lookbackYears). One ancient still-open issue must not stretch the axis
+ * lookbackDays). One ancient still-open issue must not stretch the axis
  * years into the past — bars starting before the horizon simply render
  * clipped at the left edge. No-ops when lookback is unlimited (null) or
  * when the whole board lies before the horizon (clamping would invert
@@ -98,12 +98,10 @@ export function clampMinDateToLookback(
   minDate: Date,
   maxDate: Date,
   todayUTC: Date,
-  lookbackYears: number | null
+  lookbackDays: number | null
 ): Date {
-  if (lookbackYears === null) return minDate;
+  if (lookbackDays === null) return minDate;
   const horizon = new Date(todayUTC);
-  // Step back in whole months so fractional years (0.25 = 3mo, 0.5 = 6mo)
-  // resolve exactly; setUTCFullYear can't express sub-year horizons.
-  horizon.setUTCMonth(horizon.getUTCMonth() - Math.round(lookbackYears * 12));
+  horizon.setUTCDate(horizon.getUTCDate() - lookbackDays);
   return minDate < horizon && horizon < maxDate ? horizon : minDate;
 }
