@@ -68,9 +68,10 @@ Commit messages are validated locally by a `commit-msg` hook and in CI
 - **Blank line** between subject and body
 - **Body lines**: max 72 characters each
 
-Use lowercase [Conventional Commits](https://www.conventionalcommits.org)
-`type: description` format. Types: `feat`, `fix`, `refactor`, `docs`,
-`test`, `chore`, `perf`, `ci`, `revert`.
+The hook checks only those three. As a **project convention** (not
+enforced), also use lowercase [Conventional Commits](https://www.conventionalcommits.org)
+`type: description` — types: `feat`, `fix`, `refactor`, `docs`, `test`,
+`chore`, `perf`, `ci`, `revert`.
 
 **Examples:**
 ```
