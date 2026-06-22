@@ -110,12 +110,12 @@ Interactive timeline for workload visualization.
 - **Dependency arrows:** green = source on schedule, red = late or projected late
 
 **Visualization:**
-- Zoom: Day / Week / Month / Quarter / Year
+- Zoom: Day *(default)* / Week / Month / Quarter / Year
 - Late chip → count of late issues; click to filter to just those
 - Highlight my issues → theme-blue labels (on by default, toggle in menu)
 - Intensity / critical path / capacity ribbon toggles
 - Progress and flexibility shown on hover
-- Sort by due date (earliest first) by default; lookback selector clamps the axis
+- Sort by due date (earliest first) by default; lookback selector (2 weeks → 10 years, default 6 months) clamps how far *back* the axis reaches — the right edge follows your furthest scheduled task
 - Project filter → checkboxes to show/hide
 
 **Dependencies:**
