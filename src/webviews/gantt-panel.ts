@@ -189,7 +189,7 @@ const SORT_ORDER_KEY = "redmyne.gantt.sortOrder";
 const HIGHLIGHT_MINE_KEY = "redmyne.gantt.highlightMyIssues";
 const LOOKBACK_DAYS_KEY = "redmyne.gantt.lookbackDays";
 const LOOKBACK_YEARS_KEY = "redmyne.gantt.lookbackYears"; // legacy (pre-4.37), migrated to days
-const DEFAULT_LOOKBACK_DAYS = 730; // 2 years
+const DEFAULT_LOOKBACK_DAYS = 180; // 6 months
 
 export class GanttPanel {
   public static currentPanel: GanttPanel | undefined;
@@ -273,7 +273,7 @@ export class GanttPanel {
   private _sortBy: "id" | "assignee" | "start" | "due" | "status" | null = "due";
   private _sortOrder: "asc" | "desc" = "asc";
   // Lookback period for filtering old data (in days)
-  private _lookbackDays: number | null = DEFAULT_LOOKBACK_DAYS; // 2 years; null = no limit
+  private _lookbackDays: number | null = DEFAULT_LOOKBACK_DAYS; // 6 months; null = no limit
   // Actual time entries for past-day intensity (issueId -> date -> hours)
   private _actualTimeEntries: ActualTimeEntries = new Map();
   // Current user for special highlighting

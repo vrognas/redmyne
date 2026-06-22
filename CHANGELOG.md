@@ -11,7 +11,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Added
 
-- **Gantt: short lookback ranges.** The data-range selector now offers **2 Weeks / 4 Weeks / 3 Months / 6 Months** alongside the year options, for a leaner, snappier near-term view. Lookback bounds how far *back* the timeline reaches; the right edge still extends to your furthest scheduled task.
+- **Gantt: short lookback ranges.** The data-range selector now offers **2 Weeks / 4 Weeks / 3 Months / 6 Months** alongside the year options, for a leaner, snappier near-term view. Lookback bounds how far *back* the timeline reaches (now defaulting to **6 months**); the right edge still extends to your furthest scheduled task.
 - **Assignee in issue tooltips.** Hovering an issue — in the Gantt (bar or sidebar label) or the Issues pane — now shows its assignee, or **None** when unassigned.
 
 ### Changed
