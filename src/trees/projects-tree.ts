@@ -183,17 +183,27 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
   private createProjectTreeItem(node: ProjectNode): vscode.TreeItem {
     const { project, totalIssuesWithSubprojects } = node;
 
+    // Count direct subprojects and direct issues (O(1) via parent map)
+    const subprojectCount = (this.projectsByParent.get(project.id) ?? []).length;
+    const directIssueCount = (this.issuesByProject.get(project.id) || []).length;
+
+    // Only show an expand chevron when expanding yields children: the
+    // project's own issues, or (tree view) its subprojects. Empty leaf
+    // projects would otherwise show a chevron that expands to nothing.
+    const showsSubprojects =
+      this.viewStyle === ProjectsViewStyle.TREE && subprojectCount > 0;
+    const hasExpandableChildren = directIssueCount > 0 || showsSubprojects;
+
     const treeItem = new vscode.TreeItem(
       project.toQuickPickItem().label,
-      vscode.TreeItemCollapsibleState.Collapsed
+      hasExpandableChildren
+        ? vscode.TreeItemCollapsibleState.Collapsed
+        : vscode.TreeItemCollapsibleState.None
     );
 
     // Set id for tree item persistence across refreshes
     treeItem.id = `project-${project.id}`;
 
-    // Count direct subprojects and direct issues (O(1) via parent map)
-    const subprojectCount = (this.projectsByParent.get(project.id) ?? []).length;
-    const directIssueCount = (this.issuesByProject.get(project.id) || []).length;
     const hasAnyIssues = totalIssuesWithSubprojects > 0;
 
     if (hasAnyIssues) {

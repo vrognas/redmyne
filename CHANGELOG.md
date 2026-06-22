@@ -7,6 +7,12 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [4.36.1]
+
+### Fixed
+
+- **Empty projects in the Issues pane no longer show a useless expand chevron.** A project with no issues and no subprojects rendered with a collapse arrow that expanded to nothing — it's now a flat leaf. Projects that still have subprojects (tree view) or issues keep their chevron.
+
 ## [4.36.0]
 
 ### Added

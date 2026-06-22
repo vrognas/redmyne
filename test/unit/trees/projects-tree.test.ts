@@ -77,7 +77,7 @@ describe("ProjectsTree", () => {
   });
 
   describe("project formatting", () => {
-    it("should format project with collapsible state", () => {
+    it("empty project with no children has no expand chevron", () => {
       const tree = new ProjectsTree();
       const project = new RedmineProject({
         id: 1,
@@ -86,16 +86,61 @@ describe("ProjectsTree", () => {
         description: "A test project",
       });
 
-      // ProjectsTree now wraps projects in ProjectNode
       const projectNode = {
         project,
         assignedIssues: [],
         hasAssignedIssues: false,
+        totalIssuesWithSubprojects: 0,
       };
 
       const treeItem = tree.getTreeItem(projectNode);
 
       expect(treeItem.label).toBe("Test Project");
+      expect(treeItem.collapsibleState).toBe(0); // None — nothing to expand
+    });
+
+    it("empty project keeps its chevron when it has a subproject (tree view)", () => {
+      const tree = new ProjectsTree();
+      tree.viewStyle = ProjectsViewStyle.TREE;
+      const parent = new RedmineProject({ id: 1, name: "Parent", identifier: "parent" });
+      const child = new RedmineProject({ id: 2, name: "Child", identifier: "child" });
+      (tree as unknown as { projectsByParent: Map<number, RedmineProject[]> }).projectsByParent =
+        new Map([[1, [child]]]);
+
+      const node = {
+        project: parent,
+        assignedIssues: [],
+        hasAssignedIssues: false,
+        totalIssuesWithSubprojects: 0,
+      };
+
+      const treeItem = tree.getTreeItem(node);
+
+      expect(treeItem.collapsibleState).toBe(1); // Collapsed — subproject to expand
+    });
+
+    it("project with direct issues is collapsible", () => {
+      const tree = new ProjectsTree();
+      const project = new RedmineProject({ id: 1, name: "P", identifier: "p" });
+      const issue = createIssue({
+        id: 9,
+        subject: "I",
+        tracker: { id: 1, name: "Bug" },
+        status: { id: 1, name: "Open" },
+        project: { id: 1, name: "P" },
+      });
+      (tree as unknown as { issuesByProject: Map<number, Issue[]> }).issuesByProject =
+        new Map([[1, [issue]]]);
+
+      const node = {
+        project,
+        assignedIssues: [issue],
+        hasAssignedIssues: true,
+        totalIssuesWithSubprojects: 1,
+      };
+
+      const treeItem = tree.getTreeItem(node);
+
       expect(treeItem.collapsibleState).toBe(1); // Collapsed
     });
 
