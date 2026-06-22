@@ -16,8 +16,22 @@
     "node": ">=20.0.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "Visualization"
   ],
+  "keywords": [
+    "redmine",
+    "time tracking",
+    "gantt",
+    "kanban",
+    "pomodoro",
+    "timesheet",
+    "project management"
+  ],
+  "galleryBanner": {
+    "color": "#7a1e2b",
+    "theme": "dark"
+  },
   "activationEvents": [
     "onStartupFinished"
   ],
