@@ -376,7 +376,9 @@ export class KanbanTreeProvider
     // No children for other elements
     if (element) return [];
 
-    // Root level - always show all 3 columns for drag-drop targets
+    // Root level - always show all 3 columns for drag-drop targets.
+    // Ordered To Do → Doing → Done (future → present → past) to mirror the
+    // sidebar's Issues → Kanban → Time Entries flow.
     const items: TaskTreeItem[] = [];
 
     // Show break status if on break
@@ -388,9 +390,9 @@ export class KanbanTreeProvider
     }
 
     items.push(
-      { type: "status-header", status: "done" },
-      { type: "status-header", status: "doing" },
       { type: "status-header", status: "todo" },
+      { type: "status-header", status: "doing" },
+      { type: "status-header", status: "done" },
     );
 
     return items;

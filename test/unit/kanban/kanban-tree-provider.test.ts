@@ -180,14 +180,14 @@ describe("kanban-tree-provider", () => {
       "status-header",
       "status-header",
     ]);
-    expect(root[1]).toMatchObject({ type: "status-header", status: "done" });
+    expect(root[1]).toMatchObject({ type: "status-header", status: "todo" });
     expect(root[2]).toMatchObject({ type: "status-header", status: "doing" });
-    expect(root[3]).toMatchObject({ type: "status-header", status: "todo" });
+    expect(root[3]).toMatchObject({ type: "status-header", status: "done" });
 
     const doingChildren = provider.getChildren(root[2]);
     expect(doingChildren.map((item) => item.task?.id)).toEqual(["doing-high", "doing-low"]);
 
-    const todoChildren = provider.getChildren(root[3]);
+    const todoChildren = provider.getChildren(root[1]);
     expect(todoChildren).toHaveLength(2);
     expect(todoChildren[0]).toMatchObject({
       type: "client-folder",

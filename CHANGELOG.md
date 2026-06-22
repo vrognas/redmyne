@@ -13,6 +13,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - **Time Entries: jump to the Gantt.** A logged time entry now has a **Show in Gantt** hover icon (and right-click action) that opens its issue in the Gantt timeline — closing the loop from past time back to where it sits on the schedule.
 
+### Changed
+
+- **The side panes now read as a timeline.** Ordered top→bottom **Issues → Kanban → Time Entries** (future → present → past) — the whole sidebar is one vertical Kanban: Issues is the backlog, Kanban is the active set, Time Entries is the ledger.
+- **Kanban columns flow To Do → Doing → Done** (top→bottom), matching the same future→present→past direction.
+
 ### Fixed
 
 - **Empty Kanban columns no longer show a useless expand chevron.** A column with nothing in it (e.g. nothing "Done") rendered with a collapse arrow that expanded to nothing — it's now a flat header. Drag-and-drop into the column still works. Mirrors the same fix in the Issues pane.

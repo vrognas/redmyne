@@ -772,13 +772,13 @@
     "views": {
       "redmyne-explorer": [
         {
+          "id": "redmyne-explorer-projects",
+          "name": "Issues"
+        },
+        {
           "id": "redmyne-explorer-kanban",
           "name": "Kanban",
           "when": "redmyne:configured"
-        },
-        {
-          "id": "redmyne-explorer-projects",
-          "name": "Issues"
         },
         {
           "id": "redmyne-explorer-my-time-entries",
