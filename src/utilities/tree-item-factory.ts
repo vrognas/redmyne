@@ -152,6 +152,7 @@ function createIssueTooltip(
   // Core metadata (tight spacing with soft breaks)
   md.appendMarkdown(`**Tracker:** ${escapeMarkdown(issue.tracker?.name?.trim() ?? "Unknown")}  \n`);
   md.appendMarkdown(`**Priority:** ${escapeMarkdown(issue.priority?.name?.trim() ?? "Unknown")}  \n`);
+  md.appendMarkdown(`**Assignee:** ${escapeMarkdown(issue.assigned_to?.name?.trim() || "None")}  \n`);
   if (flexibility) {
     md.appendMarkdown(`**Status:** ${STATUS_TEXT[flexibility.status]}  \n`);
   } else {

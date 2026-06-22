@@ -795,9 +795,26 @@ body {
   background: var(--vscode-sideBarSectionHeader-background, var(--vscode-editor-background));
 }
 
+/* Dim the header outside the active development window (before today's period
+   and after the last scheduled task) so the active window stands out. The
+   overlay rects are emitted by _generateDateMarkers / computeHeaderDimRects. */
+.header-dim {
+  fill: var(--vscode-editor-background);
+  opacity: 0.45;
+}
+
 .gantt-labels svg {
   display: block;
   min-width: 100%;
+}
+
+.indent-guide-line {
+  transition: opacity 0.12s ease;
+}
+
+/* Lean the nesting guides in while tracing structure in the sidebar. */
+.gantt-labels:hover .indent-guide-line {
+  opacity: 0.9;
 }
 
 .gantt-labels {
@@ -1168,7 +1185,7 @@ svg {
 
 .status-badge {
   pointer-events: all;
-  font-weight: 500;
+  font-weight: 700;
 }
 
 .flex-badge-bg,

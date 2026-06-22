@@ -41,6 +41,7 @@ import { deriveAssigneeState, filterIssuesForView, isLateIssue } from "./gantt-v
 import { remainingHours } from "../utilities/remaining-work";
 import { deriveTaskTypes, filterIssuesByTaskType } from "../utilities/issue-task-type-filter";
 import { dateToX, endExclusiveX, clampMinDateToLookback } from "./gantt/gantt-coords";
+import { computeHeaderDimRects } from "./gantt/header-dim";
 import { GANTT_LAYOUT, computeStickyLeftWidth } from "./gantt/gantt-layout-constants";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
 import { DRAFT_COMMAND_SOURCE } from "../draft-mode/draft-change-sources";
@@ -219,7 +220,7 @@ export class GanttPanel {
   private get _draftModeManager(): DraftModeManager | undefined {
     return this._getDraftModeManagerFn?.();
   }
-  private _zoomLevel: ZoomLevel = "month";
+  private _zoomLevel: ZoomLevel = "day";
   private _schedule: WeeklySchedule = DEFAULT_WEEKLY_SCHEDULE;
   private _showDependencies: boolean = true;
   private _showBadges: boolean = true;
@@ -270,7 +271,7 @@ export class GanttPanel {
   private _sortBy: "id" | "assignee" | "start" | "due" | "status" | null = "due";
   private _sortOrder: "asc" | "desc" = "asc";
   // Lookback period for filtering old data (in years)
-  private _lookbackYears: 2 | 5 | 10 | null = 2; // null = no limit
+  private _lookbackYears: number | null = 2; // years; fractional ok (0.25=3mo, 0.5=6mo); null = no limit
   // Actual time entries for past-day intensity (issueId -> date -> hours)
   private _actualTimeEntries: ActualTimeEntries = new Map();
   // Current user for special highlighting
@@ -321,7 +322,7 @@ export class GanttPanel {
       this._sortBy = GanttPanel._globalState.get<"id" | "assignee" | "start" | "due" | "status" | null>(SORT_BY_KEY, "due");
       this._sortOrder = GanttPanel._globalState.get<"asc" | "desc">(SORT_ORDER_KEY, "asc");
       this._highlightMyIssues = GanttPanel._globalState.get<boolean>(HIGHLIGHT_MINE_KEY, true);
-      this._lookbackYears = GanttPanel._globalState.get<2 | 5 | 10 | null>(LOOKBACK_YEARS_KEY, 2);
+      this._lookbackYears = GanttPanel._globalState.get<number | null>(LOOKBACK_YEARS_KEY, 2);
     }
 
     // Subscribe to draft mode and queue changes
@@ -925,7 +926,7 @@ export class GanttPanel {
       } else {
         // Limited: use lookback period from today
         const lookbackDate = new Date(today);
-        lookbackDate.setFullYear(lookbackDate.getFullYear() - this._lookbackYears);
+        lookbackDate.setMonth(lookbackDate.getMonth() - Math.round(this._lookbackYears * 12));
         fromDate = formatLocalDate(lookbackDate);
       }
 
@@ -2257,6 +2258,9 @@ export class GanttPanel {
     // When no visible dates, use today +/- 30 days as default range
     let minDate: Date;
     let maxDate: Date;
+    // Un-padded last scheduled task date — feeds the header "future" dim so
+    // the active window ends at the real work, not the padded axis edge.
+    let activeWindowEndMs: number | null = null;
 
     if (dates.length === 0) {
       // No visible issues - use default range centered on today.
@@ -2269,6 +2273,7 @@ export class GanttPanel {
     } else {
       minDate = new Date(Math.min(...dates.map((d) => new Date(d).getTime())));
       maxDate = new Date(Math.max(...dates.map((d) => new Date(d).getTime())));
+      activeWindowEndMs = maxDate.getTime();
       // Add padding based on zoom level for breathing room
       const paddingDays = { day: 1, week: 7, month: 30, quarter: 90, year: 365 }[this._zoomLevel] || 7;
       minDate.setUTCDate(minDate.getUTCDate() - paddingDays);
@@ -2640,7 +2645,8 @@ export class GanttPanel {
       minDate,
       maxDate,
       timelineWidth,
-      this._zoomLevel
+      this._zoomLevel,
+      activeWindowEndMs
     );
     perfEnd("_generateDateMarkers");
 
@@ -2917,7 +2923,8 @@ export class GanttPanel {
     minDate: Date,
     maxDate: Date,
     svgWidth: number,
-    zoomLevel: ZoomLevel = "day"
+    zoomLevel: ZoomLevel = "day",
+    windowEndMs: number | null = null
   ): { header: string; body: string; todayMarker: string } {
     const headerContent: string[] = [];
     const weekendBackgrounds: string[] = [];
@@ -3136,8 +3143,22 @@ export class GanttPanel {
 
     const weekendGroup = `<g class="weekend-layer">${weekendBackgrounds.join("")}</g>`;
 
+    // Dim the header outside the active window: everything before the current
+    // period (past) and after the last scheduled task (future), so the active
+    // development window stands out. Overlays paint last (on top of labels).
+    const dim = computeHeaderDimRects(
+      periodStart.getTime(),
+      windowEndMs,
+      minDate.getTime(),
+      maxDate.getTime(),
+      svgWidth
+    );
+    const dimOverlay =
+      (dim.past ? `<rect class="header-dim" x="${dim.past.x}" y="0" width="${dim.past.width}" height="100%" pointer-events="none"/>` : "") +
+      (dim.future ? `<rect class="header-dim" x="${dim.future.x}" y="0" width="${dim.future.width}" height="100%" pointer-events="none"/>` : "");
+
     return {
-      header: currentPeriodHighlight + headerContent.join(""),
+      header: currentPeriodHighlight + headerContent.join("") + dimOverlay,
       body: weekendGroup + bodyGridLines.join(""),
       todayMarker: todayMarkerSvg,
     };

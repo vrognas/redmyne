@@ -102,6 +102,8 @@ export function clampMinDateToLookback(
 ): Date {
   if (lookbackYears === null) return minDate;
   const horizon = new Date(todayUTC);
-  horizon.setUTCFullYear(horizon.getUTCFullYear() - lookbackYears);
+  // Step back in whole months so fractional years (0.25 = 3mo, 0.5 = 6mo)
+  // resolve exactly; setUTCFullYear can't express sub-year horizons.
+  horizon.setUTCMonth(horizon.getUTCMonth() - Math.round(lookbackYears * 12));
   return minDate < horizon && horizon < maxDate ? horizon : minDate;
 }

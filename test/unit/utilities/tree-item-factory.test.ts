@@ -70,6 +70,15 @@ describe("createEnhancedIssueTreeItem", () => {
     }
   });
 
+  it("shows the assignee in the tooltip, or None when unassigned", () => {
+    const assigned = createEnhancedIssueTreeItem(mockIssue, null, undefined, "test.command");
+    expect((assigned.tooltip as { value: string }).value).toContain("**Assignee:** Assignee");
+
+    const unassigned = { ...mockIssue, assigned_to: undefined } as unknown as Issue;
+    const item = createEnhancedIssueTreeItem(unassigned, null, undefined, "test.command");
+    expect((item.tooltip as { value: string }).value).toContain("**Assignee:** None");
+  });
+
   // New format tests: label has ID+subject, description has hours+days only
   it("includes issue ID and subject in label", () => {
     const treeItem = createEnhancedIssueTreeItem(

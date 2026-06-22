@@ -16,4 +16,9 @@ describe("parseLookbackYears", () => {
     expect(parseLookbackYears("5", null)).toBe(5);
     expect(parseLookbackYears("10", null)).toBe(10);
   });
+
+  it("parses fractional (sub-year) lookback values", () => {
+    expect(parseLookbackYears("0.25", null)).toBe(0.25);
+    expect(parseLookbackYears("0.5", null)).toBe(0.5);
+  });
 });

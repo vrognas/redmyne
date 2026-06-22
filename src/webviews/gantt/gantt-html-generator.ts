@@ -226,7 +226,7 @@ export function generateIssueLabel(
     leftStatusDesc,
     `#${issue.id} ${escapedSubject}`,
     `Project: ${escapedProject}`,
-    issue.isExternal ? `Assigned to: ${issue.assignee ?? "Unassigned"}` : null,
+    `Assigned to: ${issue.assignee || "None"}`,
     `Start: ${formatDateWithWeekday(issue.start_date)}`,
     `Due: ${formatDateWithWeekday(issue.due_date)}`,
     `Progress: ${issue.done_ratio ?? 0}%`,
@@ -754,7 +754,7 @@ function generateRegularBar(
     statusDesc,
     `#${issue.id} ${escapedSubject}`,
     `Project: ${escapedProject}`,
-    issue.isExternal ? `Assigned to: ${issue.assignee ?? "Unassigned"}` : null,
+    `Assigned to: ${issue.assignee || "None"}`,
     `Start: ${formatDateWithWeekday(issue.start_date)}`,
     `Due: ${hasOnlyStart ? "(no due date)" : formatDateWithWeekday(issue.due_date)}`,
     `───`,
@@ -871,8 +871,8 @@ function generateRegularBar(
     // Clear the approach zone: arrows land at startX-2 with ~12px of
     // stub/corner, and the link anchor sits on the bar edge — same 16px+
     // clearance the waiting badge keeps.
-    const blockerOffset = issue.blockedBy.length > 0 && !issue.isClosed ? 44 : 10;
-    return `<text class="bar-subject" x="${startX - blockerOffset}" y="${barY + ctx.barContentHeight / 2 + 3}" text-anchor="end" fill="var(--vscode-foreground)" font-size="10" font-weight="500" opacity="0.9" pointer-events="none">${escapeHtml(displaySubject)}</text>`;
+    const blockerOffset = issue.blockedBy.length > 0 && !issue.isClosed ? 44 : 12;
+    return `<text class="bar-subject" x="${startX - blockerOffset}" y="${barY + ctx.barContentHeight / 2 + 3}" text-anchor="end" fill="var(--vscode-foreground)" font-size="10" font-weight="500" opacity="1" pointer-events="none">${escapeHtml(displaySubject)}</text>`;
   })();
 
   // Generate badges (daysLate > 0 swaps the flexibility pill for "Nd late").
@@ -908,7 +908,7 @@ function generateRegularBar(
         `}
         ${hasPastPortion ? `<rect class="past-overlay" x="${startX}" y="${barY}" width="${pastWidth}" height="${ctx.barContentHeight}" fill="url(#past-stripes)"/>` : ""}
         ${fillRatio > 0 && fillRatio < 100 ? `
-          <rect class="progress-unfilled" x="${startX + doneWidth}" y="${barY}" width="${width - doneWidth}" height="${ctx.barContentHeight}" fill="var(--vscode-editor-background)" opacity="0.35"/>
+          <rect class="progress-unfilled" x="${startX + doneWidth}" y="${barY}" width="${width - doneWidth}" height="${ctx.barContentHeight}" fill="var(--vscode-editor-background)" opacity="0.5"/>
           <line class="progress-divider" x1="${startX + doneWidth}" y1="${barY + 1}" x2="${startX + doneWidth}" y2="${barY + ctx.barContentHeight - 1}" stroke="var(--vscode-editor-background)" stroke-width="2" opacity="0.8"/>
         ` : ""}
       </g>
@@ -1076,7 +1076,7 @@ function generateBarBadges(
             fill="${progressBg}" opacity="${progressBgOpacity}"/>
       <rect x="${progressX}" y="${barY + ctx.barContentHeight / 2 - 6}" width="${progressBadgeW}" height="12" fill="transparent"/>
       <text class="status-badge" x="${progressCenterX}" y="${ctx.barHeight / 2 + 4}"
-            text-anchor="middle" fill="${progressColor}" font-size="10"${isOverBudget ? ' font-weight="600"' : ""}${isFallbackProgress ? ' font-style="italic"' : ""}>${visualDoneRatio}%</text>
+            text-anchor="middle" fill="${progressColor}" font-size="10"${isFallbackProgress ? ' font-style="italic"' : ""}>${visualDoneRatio}%</text>
     </g>` : ""}
     ${showFlexSlot ? `<g class="flex-badge-group">
       <title>${escapeAttr(flexTooltip)}</title>

@@ -183,7 +183,7 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
     layerEls.indentLayer.innerHTML = computeIndentSpans(visibleList)
       .map((s) => {
         const x = 8 + s.depth * indentSize;
-        return `<line class="indent-guide-line" x1="${x}" y1="${s.startIdx * barHeight}" x2="${x}" y2="${(s.endIdx + 1) * barHeight}" stroke="var(--vscode-tree-indentGuidesStroke)" stroke-width="1" opacity="0.4"/>`;
+        return `<line class="indent-guide-line" x1="${x}" y1="${s.startIdx * barHeight}" x2="${x}" y2="${(s.endIdx + 1) * barHeight}" stroke="var(--vscode-tree-indentGuidesStroke)" stroke-width="1" opacity="0.7"/>`;
       })
       .join('');
   }

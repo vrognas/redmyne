@@ -83,6 +83,12 @@ describe("clampMinDateToLookback", () => {
     expect(clamped.toISOString().slice(0, 10)).toBe("2024-06-11");
   });
 
+  it("clamps to a sub-year horizon for fractional lookback (0.5 = 6 months)", () => {
+    const ancient = new Date("2016-03-01T00:00:00Z");
+    const clamped = clampMinDateToLookback(ancient, maxDate, todayUTC, 0.5);
+    expect(clamped.toISOString().slice(0, 10)).toBe("2025-12-11");
+  });
+
   it("leaves minDate alone when within the horizon or unlimited", () => {
     const recent = new Date("2026-01-01T00:00:00Z");
     expect(clampMinDateToLookback(recent, maxDate, todayUTC, 2)).toBe(recent);

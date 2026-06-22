@@ -47,14 +47,15 @@ export type GanttWebviewMessage =
   | { command: "showStatus"; message?: string }
   | { command: "requestProjectMembers"; projectId?: number };
 
-const LOOKBACK_VALUES = new Set(["2", "5", "10", ""]);
+// Fractional years express sub-year ranges: 0.25 = 3 months, 0.5 = 6 months.
+const LOOKBACK_VALUES = new Set(["0.25", "0.5", "2", "5", "10", ""]);
 
 export function parseLookbackYears(
   value: string | undefined,
-  fallback: 2 | 5 | 10 | null
-): 2 | 5 | 10 | null {
+  fallback: number | null
+): number | null {
   if (value === undefined) return fallback;
   if (!LOOKBACK_VALUES.has(value)) return fallback;
   if (value === "") return null;
-  return parseInt(value, 10) as 2 | 5 | 10;
+  return parseFloat(value);
 }
