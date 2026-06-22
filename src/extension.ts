@@ -81,6 +81,26 @@ let cleanupResources: {
 } = {};
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  // Register the tree views FIRST — before the awaited migration and
+  // draft-mode init below (which touch the keychain and filesystem) — so the
+  // Issues / Time Entries panes show their own (empty, then skeleton) state
+  // instead of VS Code's "no data provider registered" message at startup.
+  // getChildren guards the unwired state (no server -> []), so this is safe.
+  const projectsTree = new ProjectsTree(context.globalState);
+  const myTimeEntriesTree = new MyTimeEntriesTreeDataProvider(context.globalState);
+  cleanupResources.projectsTree = projectsTree;
+  cleanupResources.myTimeEntriesTree = myTimeEntriesTree;
+  cleanupResources.projectsTreeView = vscode.window.createTreeView("redmyne-explorer-projects", {
+    treeDataProvider: projectsTree,
+    showCollapseAll: true,
+  });
+  projectsTree.setTreeView(cleanupResources.projectsTreeView);
+  cleanupResources.myTimeEntriesTreeView = vscode.window.createTreeView("redmyne-explorer-my-time-entries", {
+    treeDataProvider: myTimeEntriesTree,
+    showCollapseAll: true,
+  });
+  myTimeEntriesTree.setTreeView(cleanupResources.myTimeEntriesTreeView as vscode.TreeView<import("./trees/my-time-entries-tree").TimeEntryNode>);
+
   // Run migration from redmine.* to redmyne.* namespace (one-time on upgrade)
   await runMigration(context);
 
@@ -147,19 +167,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     return new RedmineServer(serverOptions);
   };
 
-  const projectsTree = new ProjectsTree(context.globalState);
-  const myTimeEntriesTree = new MyTimeEntriesTreeDataProvider(context.globalState);
-  cleanupResources.projectsTree = projectsTree;
-  cleanupResources.myTimeEntriesTree = myTimeEntriesTree;
-
   // Initialize GanttPanel with globalState for persistence
   GanttPanel.initialize(context.globalState);
-
-  cleanupResources.projectsTreeView = vscode.window.createTreeView("redmyne-explorer-projects", {
-    treeDataProvider: projectsTree,
-    showCollapseAll: true,
-  });
-  projectsTree.setTreeView(cleanupResources.projectsTreeView);
   // Sync collapse state between Issues pane and Gantt
   const getCollapseKey = (element: unknown): string | null => {
     if (!element || typeof element !== "object") return null;
@@ -183,11 +192,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (key) collapseState.collapse(key);
   });
 
-  cleanupResources.myTimeEntriesTreeView = vscode.window.createTreeView("redmyne-explorer-my-time-entries", {
-    treeDataProvider: myTimeEntriesTree,
-    showCollapseAll: true,
-  });
-  myTimeEntriesTree.setTreeView(cleanupResources.myTimeEntriesTreeView as vscode.TreeView<import("./trees/my-time-entries-tree").TimeEntryNode>);
   myTimeEntriesTree.setMonthlySchedules(cleanupResources.monthlySchedules ?? {});
   myTimeEntriesTree.setDraftQueue(draftQueue);
 
