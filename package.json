@@ -1624,7 +1624,7 @@
         },
         {
           "command": "redmyne.addIssueToKanban",
-          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue/",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue-active/",
           "group": "6_integrations@1"
         },
         {
@@ -1634,7 +1634,7 @@
         },
         {
           "command": "redmyne.addIssueToKanban",
-          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue/",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue-active/",
           "group": "inline@2"
         },
         {
