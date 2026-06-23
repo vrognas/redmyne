@@ -1,4 +1,5 @@
 import { escapeHtml } from '../gantt-html-escape';
+import { formatHoursAsHHMM } from '../../utilities/time-input';
 
 (() => {
   // Get VS Code API
@@ -330,14 +331,6 @@ import { escapeHtml } from '../gantt-html-escape';
     if (hours === 0) return "";
     if (hours === Math.floor(hours)) return hours.toString();
     return String(Number(hours.toFixed(2)));
-  }
-
-  // Format decimal hours as H:MM (e.g., 1.5 → "1:30", 0.75 → "0:45")
-  function formatHoursAsHHMM(hours) {
-    const totalMinutes = Math.round(hours * 60);
-    const h = Math.floor(totalMinutes / 60);
-    const m = totalMinutes % 60;
-    return `${h}:${m.toString().padStart(2, "0")}`;
   }
 
   // Parse hours input
