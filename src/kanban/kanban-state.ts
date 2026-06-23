@@ -23,6 +23,7 @@ export interface KanbanTask {
   // Time tracking
   estimatedHours?: number;
   loggedHours: number; // Accumulated from logging
+  pendingSeconds?: number; // Un-logged accrued time (work units + keep-working breaks), awaiting Log it / Transfer
 
   // Timer state (embedded from former Today's Plan)
   timerSecondsLeft?: number;

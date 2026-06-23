@@ -38,6 +38,8 @@ export class KanbanController {
   private breakDurationSeconds: number;
   private breakSecondsLeft: number = 0;
   private deferredMinutes: number = 0;
+  // Card whose timer auto-resumes when the current "keep working" break ends.
+  private keepWorkingId?: string;
 
   // Data-mutation event (task added/moved/edited/etc). Heavy subscribers
   // (tree provider, context sync) listen here.
@@ -108,6 +110,13 @@ export class KanbanController {
    */
   getWorkDurationSeconds(): number {
     return this.workDurationSeconds;
+  }
+
+  /**
+   * Get configured break duration in seconds
+   */
+  getBreakDurationSeconds(): number {
+    return this.breakDurationSeconds;
   }
 
   /**
@@ -262,6 +271,28 @@ export class KanbanController {
   async addLoggedHours(id: string, hours: number): Promise<void> {
     if (hours <= 0) return; // Reject non-positive hours
     await this.patchTask(id, (task) => ({ loggedHours: task.loggedHours + hours }));
+  }
+
+  /**
+   * Bank un-logged seconds onto a card's pending accumulator (work units +
+   * keep-working breaks). The single record of un-logged work until Log it /
+   * Transfer flushes it — persisted with the task.
+   */
+  async accruePending(id: string, seconds: number): Promise<void> {
+    if (seconds <= 0) return;
+    await this.patchTask(id, (task) => ({
+      pendingSeconds: (task.pendingSeconds ?? 0) + seconds,
+    }));
+  }
+
+  /**
+   * Read and clear a card's pending seconds (called when its accrued time is
+   * logged). Returns the amount cleared.
+   */
+  async consumePending(id: string): Promise<number> {
+    const pending = this.getTaskById(id)?.pendingSeconds ?? 0;
+    if (pending > 0) await this.patchTask(id, { pendingSeconds: 0 });
+    return pending;
   }
 
   // --- Bulk Operations ---
@@ -525,6 +556,17 @@ export class KanbanController {
   // --- Break Timer ---
 
   /**
+   * "Keep working": after a finished work unit, take the break and roll straight
+   * into the next unit. The work interval is stopped here; when the break ends,
+   * its elapsed time is banked on the card and the timer auto-resumes.
+   */
+  keepWorking(id: string): void {
+    this.stopInterval();
+    this.keepWorkingId = id;
+    this.startBreak();
+  }
+
+  /**
    * Start break timer after work session
    */
   startBreak(): void {
@@ -535,13 +577,10 @@ export class KanbanController {
   }
 
   /**
-   * Skip remaining break time
+   * Skip remaining break time (banks only the portion actually elapsed)
    */
   skipBreak(): void {
-    this.stopBreakInterval();
-    this.breakSecondsLeft = 0;
-    this._onBreakComplete.fire();
-    this._onTasksChange.fire();
+    this.endBreak();
   }
 
   private stopBreakInterval(): void {
@@ -555,16 +594,47 @@ export class KanbanController {
     if (this.disposed) return;
 
     if (this.breakSecondsLeft <= 1) {
-      this.breakSecondsLeft = 0;
-      this.stopBreakInterval();
-      this._onBreakComplete.fire();
-      // Break end transitions state for tree/context subscribers too.
-      this._onTasksChange.fire();
+      this.breakSecondsLeft = 0; // full break elapsed
+      this.endBreak();
     } else {
       this.breakSecondsLeft--;
       // Countdown only — only the status bar needs to repaint.
       this._onTimerTick.fire();
     }
+  }
+
+  /**
+   * End the break (natural completion or skip). Banks the elapsed break onto the
+   * keep-working card and auto-resumes its timer for the next unit. Direct task
+   * mutation (mirrors {@link tick}) so it is synchronous and testable.
+   */
+  private endBreak(): void {
+    const elapsed = Math.max(0, this.breakDurationSeconds - this.breakSecondsLeft);
+    this.breakSecondsLeft = 0;
+    this.stopBreakInterval();
+
+    const resumeId = this.keepWorkingId;
+    this.keepWorkingId = undefined;
+    if (resumeId) {
+      const idx = this.tasks.findIndex((t) => t.id === resumeId);
+      const task = this.tasks[idx];
+      if (task) {
+        this.tasks[idx] = {
+          ...task,
+          pendingSeconds: (task.pendingSeconds ?? 0) + elapsed,
+          timerPhase: "working",
+          timerSecondsLeft: this.workDurationSeconds,
+          lastActiveAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        this.startInterval();
+        void this.persist();
+      }
+    }
+
+    this._onBreakComplete.fire();
+    // Break end transitions state for tree/context subscribers too.
+    this._onTasksChange.fire();
   }
 
   // --- Persistence ---

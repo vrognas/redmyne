@@ -1,9 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as vscode from "vscode";
 import { registerKanbanTimerHandlers } from "../../../src/kanban/kanban-timer-handlers";
-import { formatHoursAsHHMM } from "../../../src/utilities/time-input";
 import { playCompletionSound } from "../../../src/utilities/completion-sound";
-import { showStatusBarMessage } from "../../../src/utilities/status-bar";
 import { promptForRequiredCustomFields } from "../../../src/utilities/custom-field-picker";
 import { confirmLogTimeOnClosedIssue } from "../../../src/utilities/closed-issue-guard";
 
@@ -42,12 +40,13 @@ describe("registerKanbanTimerHandlers", () => {
     onTimerComplete: ReturnType<typeof vi.fn>;
     onBreakComplete: ReturnType<typeof vi.fn>;
     getWorkDurationSeconds: ReturnType<typeof vi.fn>;
-    getDeferredMinutes: ReturnType<typeof vi.fn>;
-    consumeDeferredMinutes: ReturnType<typeof vi.fn>;
+    getBreakDurationSeconds: ReturnType<typeof vi.fn>;
+    getTaskById: ReturnType<typeof vi.fn>;
+    accruePending: ReturnType<typeof vi.fn>;
+    consumePending: ReturnType<typeof vi.fn>;
+    keepWorking: ReturnType<typeof vi.fn>;
     addLoggedHours: ReturnType<typeof vi.fn>;
     markDone: ReturnType<typeof vi.fn>;
-    resetTimer: ReturnType<typeof vi.fn>;
-    startBreak: ReturnType<typeof vi.fn>;
   };
 
   let server: {
@@ -73,12 +72,13 @@ describe("registerKanbanTimerHandlers", () => {
         return { dispose: vi.fn() } as unknown as vscode.Disposable;
       }),
       getWorkDurationSeconds: vi.fn(() => 45 * 60),
-      getDeferredMinutes: vi.fn(() => 0),
-      consumeDeferredMinutes: vi.fn(() => 0),
+      getBreakDurationSeconds: vi.fn(() => 15 * 60),
+      getTaskById: vi.fn(() => ({ id: "task-1", pendingSeconds: 45 * 60 })),
+      accruePending: vi.fn().mockResolvedValue(undefined),
+      consumePending: vi.fn().mockResolvedValue(45 * 60),
+      keepWorking: vi.fn(),
       addLoggedHours: vi.fn().mockResolvedValue(undefined),
       markDone: vi.fn().mockResolvedValue(undefined),
-      resetTimer: vi.fn().mockResolvedValue(undefined),
-      startBreak: vi.fn(),
     };
 
     server = {
@@ -97,7 +97,7 @@ describe("registerKanbanTimerHandlers", () => {
       values: [],
     });
     vi.mocked(confirmLogTimeOnClosedIssue).mockResolvedValue(true);
-    vi.mocked(vscode.window.showWarningMessage).mockResolvedValue("Log & complete");
+    vi.mocked(vscode.window.showWarningMessage).mockResolvedValue("Log it");
   });
 
   it("registers timer-complete and break-complete listeners", () => {
@@ -113,7 +113,10 @@ describe("registerKanbanTimerHandlers", () => {
     expect(controller.onBreakComplete).toHaveBeenCalledTimes(1);
   });
 
-  it("logs and marks done when user chooses 'Log & complete'", async () => {
+  it("logs the accrued time plus a full break and marks done on 'Log it'", async () => {
+    // Card has one 45-min work unit banked; Log it adds a full 15-min break.
+    controller.getTaskById.mockReturnValue({ id: "task-1", pendingSeconds: 45 * 60 });
+
     registerKanbanTimerHandlers({
       controller,
       getServer: () => server as never,
@@ -128,70 +131,27 @@ describe("registerKanbanTimerHandlers", () => {
       activityId: 9,
     });
 
-    expect(playCompletionSound).toHaveBeenCalledTimes(1);
-    expect(formatHoursAsHHMM).toHaveBeenCalledWith(0.75);
-    expect(promptForRequiredCustomFields).toHaveBeenCalledTimes(1);
-    expect(confirmLogTimeOnClosedIssue).toHaveBeenCalledWith(
-      server,
-      123
-    );
+    // Banks the finished work unit before offering the modal.
+    expect(controller.accruePending).toHaveBeenCalledWith("task-1", 45 * 60);
+    // 45 work (pending) + 15 break = 60 min = 1h.
     expect(server.addTimeEntry).toHaveBeenCalledWith(
       123,
       9,
-      "0.75",
+      "1",
       "Finish docs",
       undefined,
       []
     );
-    expect(controller.addLoggedHours).toHaveBeenCalledWith("task-1", 0.75);
+    expect(controller.addLoggedHours).toHaveBeenCalledWith("task-1", 1);
+    expect(controller.consumePending).toHaveBeenCalledWith("task-1");
     expect(controller.markDone).toHaveBeenCalledWith("task-1");
-    expect(controller.resetTimer).not.toHaveBeenCalled();
-    expect(showStatusBarMessage).toHaveBeenCalledWith(
-      "$(check) Logged 00:45 to #123",
-      2000
-    );
+    expect(controller.keepWorking).not.toHaveBeenCalled();
     expect(refreshAfterTimeLog).toHaveBeenCalledTimes(1);
-    expect(controller.startBreak).toHaveBeenCalledTimes(1);
   });
 
-  it("includes and consumes deferred minutes on natural completion", async () => {
-    controller.getWorkDurationSeconds.mockReturnValue(60 * 60); // 1h work
-    controller.getDeferredMinutes.mockReturnValue(30); // +0.5h deferred
-
-    registerKanbanTimerHandlers({
-      controller,
-      getServer: () => server as never,
-      globalState,
-      refreshAfterTimeLog,
-    });
-
-    await timerHandler?.({
-      id: "task-defer",
-      title: "Deferred carryover",
-      linkedIssueId: 555,
-      activityId: 4,
-    });
-
-    // 1h work + 0.5h deferred = 1.5h
-    expect(server.addTimeEntry).toHaveBeenCalledWith(
-      555,
-      4,
-      "1.5",
-      "Deferred carryover",
-      undefined,
-      []
-    );
-    expect(controller.addLoggedHours).toHaveBeenCalledWith("task-defer", 1.5);
-    expect(controller.consumeDeferredMinutes).toHaveBeenCalledTimes(1);
-    expect(showStatusBarMessage).toHaveBeenCalledWith(
-      expect.stringContaining("30 min deferred included"),
-      2000
-    );
-  });
-
-  it("logs and resets timer when user chooses 'Log & continue'", async () => {
+  it("defers via 'Keep working' — starts the cycle, no log", async () => {
     vi.mocked(vscode.window.showWarningMessage).mockResolvedValue(
-      "Log & continue"
+      "Keep working" as never
     );
 
     registerKanbanTimerHandlers({
@@ -203,25 +163,14 @@ describe("registerKanbanTimerHandlers", () => {
 
     await timerHandler?.({
       id: "task-2",
-      title: "Continue work",
+      title: "Keep going",
       linkedIssueId: 321,
     });
 
-    expect(server.addTimeEntry).toHaveBeenCalledWith(
-      321,
-      0,
-      "0.75",
-      "Continue work",
-      undefined,
-      []
-    );
-    expect(controller.addLoggedHours).toHaveBeenCalledWith("task-2", 0.75);
-    expect(controller.resetTimer).toHaveBeenCalledWith("task-2");
+    expect(controller.accruePending).toHaveBeenCalledWith("task-2", 45 * 60);
+    expect(controller.keepWorking).toHaveBeenCalledWith("task-2");
+    expect(server.addTimeEntry).not.toHaveBeenCalled();
     expect(controller.markDone).not.toHaveBeenCalled();
-    expect(showStatusBarMessage).toHaveBeenCalledWith(
-      "$(check) Logged 00:45, timer reset",
-      2000
-    );
   });
 
   it("does nothing when no server is available", async () => {
@@ -255,7 +204,7 @@ describe("registerKanbanTimerHandlers", () => {
 
     expect(playCompletionSound).toHaveBeenCalledTimes(1);
     expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
-      "Break over! Ready to start next task."
+      "Break over! Back to work."
     );
   });
 });

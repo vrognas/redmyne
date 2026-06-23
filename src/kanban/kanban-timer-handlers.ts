@@ -17,12 +17,13 @@ type TimerController = {
     listener: () => void | Promise<void>
   ) => vscode.Disposable;
   getWorkDurationSeconds: () => number;
-  getDeferredMinutes: () => number;
-  consumeDeferredMinutes: () => number;
+  getBreakDurationSeconds: () => number;
+  getTaskById: (taskId: string) => KanbanTask | undefined;
+  accruePending: (taskId: string, seconds: number) => Promise<void>;
+  consumePending: (taskId: string) => Promise<number>;
+  keepWorking: (taskId: string) => void;
   addLoggedHours: (taskId: string, hours: number) => Promise<void>;
   markDone: (taskId: string) => Promise<void>;
-  resetTimer: (taskId: string) => Promise<void>;
-  startBreak: () => void;
 };
 
 export interface KanbanTimerHandlerDeps {
@@ -39,6 +40,13 @@ export function registerKanbanTimerHandlers(
     const server = deps.getServer();
     if (!server) return;
 
+    // Bank the finished work unit on the card immediately — never lost,
+    // whatever the user chooses next.
+    await deps.controller.accruePending(
+      task.id,
+      deps.controller.getWorkDurationSeconds()
+    );
+
     const soundEnabled = deps.globalState.get<boolean>(
       "redmyne.timer.soundEnabled",
       true
@@ -47,21 +55,34 @@ export function registerKanbanTimerHandlers(
       playCompletionSound();
     }
 
-    // Include any deferred minutes carried over from prior tasks.
-    const deferredMinutes = deps.controller.getDeferredMinutes();
-    const baseMinutes = deps.controller.getWorkDurationSeconds() / 60;
-    const totalHours =
-      Math.round((baseMinutes / 60 + deferredMinutes / 60) * 100) / 100;
+    const action = await vscode.window.showWarningMessage(
+      `Timer complete: ${task.title}`,
+      { modal: true },
+      "Log it",
+      "Keep working"
+    );
+
+    // Keep working: take the break, then auto-resume the next unit (the break's
+    // elapsed time is banked by the controller). No log.
+    if (action === "Keep working") {
+      deps.controller.keepWorking(task.id);
+      showStatusBarMessage(`$(coffee) Break started — still on ${task.title}`, 2000);
+      return;
+    }
+
+    // Dismissed: leave the accrued time on the Doing card for a later Log it / Transfer.
+    if (action !== "Log it") return;
+
+    // Log it bills the card's accrued time plus a full break for this final block.
+    const pendingSeconds = deps.controller.getTaskById(task.id)?.pendingSeconds ?? 0;
+    const totalSeconds = pendingSeconds + deps.controller.getBreakDurationSeconds();
+    const totalHours = Math.round((totalSeconds / 3600) * 100) / 100;
     const formattedTime = formatHoursAsHHMM(totalHours);
-    const deferredNote =
-      deferredMinutes > 0 ? ` (${deferredMinutes} min deferred included)` : "";
 
     const customFieldResult = await promptForRequiredCustomFields(() =>
       server.getTimeEntryCustomFields()
     );
-    if (customFieldResult.cancelled) {
-      return;
-    }
+    if (customFieldResult.cancelled) return; // nothing consumed yet — safe to abort
 
     const closedConfirmed = await confirmLogTimeOnClosedIssue(
       server,
@@ -69,48 +90,26 @@ export function registerKanbanTimerHandlers(
     );
     if (!closedConfirmed) return;
 
-    const action = await vscode.window.showWarningMessage(
-      `Timer complete: ${task.title} (${formattedTime})`,
-      { modal: true },
-      "Log & complete",
-      "Log & continue"
-    );
-
-    // Both timer-completion choices log identically, differing only in the
-    // post-log controller action (complete vs reset) and the status message.
-    const logAndFinalize = async (finalize: () => Promise<void>, doneMsg: string) => {
-      try {
-        await server.addTimeEntry(
-          task.linkedIssueId,
-          task.activityId ?? 0,
-          totalHours.toString(),
-          task.title,
-          undefined,
-          customFieldResult.values
-        );
-        await deps.controller.addLoggedHours(task.id, totalHours);
-        deps.controller.consumeDeferredMinutes();
-        await finalize();
-        showStatusBarMessage(doneMsg, 2000);
-        deps.refreshAfterTimeLog();
-        deps.controller.startBreak();
-      } catch (error) {
-        vscode.window.showErrorMessage(`Failed to log time: ${error}`);
-      }
-    };
-
-    if (action === "Log & complete") {
-      await logAndFinalize(
-        () => deps.controller.markDone(task.id),
-        `$(check) Logged ${formattedTime} to #${task.linkedIssueId}${deferredNote}`
+    try {
+      await server.addTimeEntry(
+        task.linkedIssueId,
+        task.activityId ?? 0,
+        totalHours.toString(),
+        task.title,
+        undefined,
+        customFieldResult.values
       );
-    } else if (action === "Log & continue") {
-      await logAndFinalize(
-        () => deps.controller.resetTimer(task.id),
-        `$(check) Logged ${formattedTime}, timer reset${deferredNote}`
+      await deps.controller.addLoggedHours(task.id, totalHours);
+      await deps.controller.consumePending(task.id); // clear now that it's logged
+      await deps.controller.markDone(task.id);
+      showStatusBarMessage(
+        `$(check) Logged ${formattedTime} to #${task.linkedIssueId}`,
+        2000
       );
+      deps.refreshAfterTimeLog();
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to log time: ${error}`);
     }
-    // Cancel/close: do nothing, timer stays completed.
   });
 
   const breakCompletion = deps.controller.onBreakComplete(async () => {
@@ -121,9 +120,7 @@ export function registerKanbanTimerHandlers(
     if (soundEnabled) {
       playCompletionSound();
     }
-    vscode.window.showInformationMessage(
-      "Break over! Ready to start next task."
-    );
+    vscode.window.showInformationMessage("Break over! Back to work.");
   });
 
   return [timerCompletion, breakCompletion];

@@ -198,6 +198,26 @@ describe("KanbanController Timer", () => {
     });
   });
 
+  describe("keep working", () => {
+    it("accrues the break and auto-resumes the next unit", async () => {
+      controller.setBreakDurationSeconds(4);
+      const task = await controller.addTask("T", 1, "I", 1, "P");
+      await controller.startTimer(task.id, 3, "Dev");
+      // Handler banks the finished work unit before offering the modal.
+      await controller.accruePending(task.id, 10);
+      controller.keepWorking(task.id);
+      expect(controller.isOnBreak()).toBe(true);
+
+      vi.advanceTimersByTime(4000); // break completes -> auto-resume
+
+      const updated = controller.getTaskById(task.id);
+      expect(updated?.pendingSeconds).toBe(14); // 10 work + 4 break
+      expect(updated?.timerPhase).toBe("working"); // resumed
+      expect(updated?.timerSecondsLeft).toBe(10); // reset to full work
+      expect(controller.isOnBreak()).toBe(false);
+    });
+  });
+
   describe("session recovery", () => {
     it("calculates elapsed time from lastActiveAt on restore", async () => {
       // Simulate previous session: timer was working with 100 seconds left, 30 seconds ago
