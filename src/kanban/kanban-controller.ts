@@ -8,7 +8,6 @@ import {
 } from "./kanban-state";
 
 const STORAGE_KEY = "redmyne.kanban";
-const DEFERRED_MINUTES_KEY = "redmyne.kanban.deferredMinutes";
 
 /**
  * Interface for globalState-like storage
@@ -37,7 +36,6 @@ export class KanbanController {
   private workDurationSeconds: number;
   private breakDurationSeconds: number;
   private breakSecondsLeft: number = 0;
-  private deferredMinutes: number = 0;
   // Card whose timer auto-resumes when the current "keep working" break ends.
   private keepWorkingId?: string;
 
@@ -131,34 +129,6 @@ export class KanbanController {
    */
   setBreakDurationSeconds(seconds: number): void {
     this.breakDurationSeconds = seconds;
-  }
-
-  /**
-   * Get deferred minutes (accumulated from previous tasks)
-   */
-  getDeferredMinutes(): number {
-    return this.deferredMinutes;
-  }
-
-  /**
-   * Add deferred minutes (called when deferring a task).
-   * Persisted: deferred time is the ONLY record of that work until it is
-   * logged — losing it on reload silently drops billable time.
-   */
-  addDeferredMinutes(minutes: number): void {
-    this.deferredMinutes += minutes;
-    void this.globalState.update(DEFERRED_MINUTES_KEY, this.deferredMinutes);
-    this._onTasksChange.fire();
-  }
-
-  /**
-   * Consume deferred minutes (called when logging - returns total and resets)
-   */
-  consumeDeferredMinutes(): number {
-    const deferred = this.deferredMinutes;
-    this.deferredMinutes = 0;
-    void this.globalState.update(DEFERRED_MINUTES_KEY, 0);
-    return deferred;
   }
 
   // --- CRUD ---
@@ -646,9 +616,6 @@ export class KanbanController {
   private restore(): void {
     const stored = this.globalState.get<unknown[]>(STORAGE_KEY, []);
     this.tasks = this.validateAndFilter(stored);
-
-    const deferred = this.globalState.get<number>(DEFERRED_MINUTES_KEY, 0);
-    this.deferredMinutes = typeof deferred === "number" && deferred > 0 ? deferred : 0;
 
     // Session recovery: adjust timer for elapsed time since last active
     const now = Date.now();

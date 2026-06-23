@@ -51,9 +51,8 @@ function createController(tasks: KanbanTask[] = []) {
     skipBreak: vi.fn(),
     getWorkDurationSeconds: vi.fn(() => 3600),
     addLoggedHours: vi.fn(),
-    addDeferredMinutes: vi.fn(),
-    getDeferredMinutes: vi.fn(() => 0),
-    consumeDeferredMinutes: vi.fn(),
+    accruePending: vi.fn(),
+    consumePending: vi.fn(() => Promise.resolve(0)),
     setWorkDurationSeconds: vi.fn(),
     setBreakDurationSeconds: vi.fn(),
     moveUp: vi.fn(),
@@ -500,13 +499,14 @@ describe("registerKanbanCommands", () => {
     expect(controller.resumeTimer).not.toHaveBeenCalled();
   });
 
-  it("logEarly includes deferred minutes and consumes them", async () => {
+  it("logEarly includes banked pending time and consumes it", async () => {
     const task = createTask({
-      id: "task-defer-log",
+      id: "task-pending-log",
       linkedIssueId: 80,
       timerPhase: "working",
       timerSecondsLeft: 2700, // 15 min elapsed of 1h
       activityId: 14,
+      pendingSeconds: 1800, // +30 min banked
     });
     const server = createServer({
       addTimeEntry: vi.fn().mockResolvedValue(undefined),
@@ -514,16 +514,15 @@ describe("registerKanbanCommands", () => {
     });
     const { controller } = registerCommands({ server, tasks: [task] });
     controller.getWorkDurationSeconds.mockReturnValue(3600);
-    controller.getDeferredMinutes.mockReturnValue(30); // +0.5h deferred
     vi.mocked(vscode.window.showWarningMessage).mockResolvedValue("Log" as never);
 
     await handlers.get("redmyne.kanban.logEarly")?.({ task });
 
-    // 0.25h elapsed + 0.5h deferred = 0.75h
-    expect(controller.addLoggedHours).toHaveBeenCalledWith("task-defer-log", 0.75);
-    expect(controller.consumeDeferredMinutes).toHaveBeenCalledTimes(1);
+    // 0.25h elapsed + 0.5h banked = 0.75h
+    expect(controller.addLoggedHours).toHaveBeenCalledWith("task-pending-log", 0.75);
+    expect(controller.consumePending).toHaveBeenCalledWith("task-pending-log");
     expect(vscode.window.showWarningMessage).toHaveBeenCalledWith(
-      expect.stringContaining("30 min deferred included"),
+      expect.stringContaining("30 min banked included"),
       expect.anything(),
       "Log"
     );
@@ -594,7 +593,7 @@ describe("registerKanbanCommands", () => {
     );
   });
 
-  it("shared log-time flow calls addTimeEntry -> addLoggedHours -> consumeDeferredMinutes in order and surfaces errors", async () => {
+  it("shared log-time flow calls addTimeEntry -> addLoggedHours -> consumePending in order and surfaces errors", async () => {
     const order: string[] = [];
     const task = createTask({
       id: "task-flow",
@@ -618,9 +617,9 @@ describe("registerKanbanCommands", () => {
       order.push("addLoggedHours");
       return Promise.resolve(undefined);
     });
-    controller.consumeDeferredMinutes.mockImplementation(() => {
-      order.push("consumeDeferredMinutes");
-      return 0;
+    controller.consumePending.mockImplementation(() => {
+      order.push("consumePending");
+      return Promise.resolve(0);
     });
     vi.mocked(vscode.window.showWarningMessage).mockResolvedValue("Log" as never);
 
@@ -638,7 +637,7 @@ describe("registerKanbanCommands", () => {
     expect(order).toEqual([
       "addTimeEntry",
       "addLoggedHours",
-      "consumeDeferredMinutes",
+      "consumePending",
     ]);
     expect(controller.stopTimer).toHaveBeenCalledWith("task-flow");
 
@@ -661,7 +660,7 @@ describe("registerKanbanCommands", () => {
       expect.stringContaining("Failed to log time")
     );
     expect(controller.addLoggedHours).not.toHaveBeenCalled();
-    expect(controller.consumeDeferredMinutes).not.toHaveBeenCalled();
+    expect(controller.consumePending).not.toHaveBeenCalled();
   });
 
   it("logAndContinue no-ops when target is not the active task", async () => {
@@ -770,11 +769,11 @@ describe("registerKanbanCommands", () => {
     controller.getWorkDurationSeconds.mockReturnValue(3600);
 
     await handlers.get("redmyne.kanban.deferTime")?.({ task: createTask() });
-    expect(vscode.window.showInformationMessage).toHaveBeenCalledWith("No active timer to defer");
+    expect(vscode.window.showInformationMessage).toHaveBeenCalledWith("No active timer to bank");
 
     await handlers.get("redmyne.kanban.deferTime")?.({ task });
     expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
-      "Not enough time elapsed to defer"
+      "Not enough time elapsed to bank"
     );
 
     // Elapsed is read fresh from controller state, so update the stored task.
@@ -782,11 +781,11 @@ describe("registerKanbanCommands", () => {
     task.timerSecondsLeft = 6600;
     vi.mocked(vscode.window.showWarningMessage).mockResolvedValueOnce("Cancel" as never);
     await handlers.get("redmyne.kanban.deferTime")?.({ task });
-    expect(controller.addDeferredMinutes).not.toHaveBeenCalled();
+    expect(controller.accruePending).not.toHaveBeenCalled();
 
-    vi.mocked(vscode.window.showWarningMessage).mockResolvedValueOnce("Defer" as never);
+    vi.mocked(vscode.window.showWarningMessage).mockResolvedValueOnce("Bank" as never);
     await handlers.get("redmyne.kanban.deferTime")?.({ task });
-    expect(controller.addDeferredMinutes).toHaveBeenCalledWith(10);
+    expect(controller.accruePending).toHaveBeenCalledWith("defer-1", 600);
     expect(controller.stopTimer).toHaveBeenCalledWith("defer-1");
   });
 
@@ -806,7 +805,7 @@ describe("registerKanbanCommands", () => {
 
     expect(controller.pauseTimer).toHaveBeenCalledWith("defer-pause");
     expect(controller.resumeTimer).toHaveBeenCalledWith("defer-pause");
-    expect(controller.addDeferredMinutes).not.toHaveBeenCalled();
+    expect(controller.accruePending).not.toHaveBeenCalled();
     expect(controller.stopTimer).not.toHaveBeenCalled();
   });
 

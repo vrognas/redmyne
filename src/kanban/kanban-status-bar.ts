@@ -43,7 +43,6 @@ export class KanbanStatusBar {
     const activeTask = this.controller.getActiveTask();
     const isOnBreak = this.controller.isOnBreak();
     const breakSecondsLeft = this.controller.getBreakSecondsLeft();
-    const deferredMinutes = this.controller.getDeferredMinutes();
 
     // Count tasks by status
     let doingCount = 0;
@@ -74,9 +73,8 @@ export class KanbanStatusBar {
       const totalSeconds = this.controller.getWorkDurationSeconds();
       const timeStr = formatSecondsAsMMSS(secondsLeft);
       const progressBar = this.buildProgressBar(secondsLeft, totalSeconds);
-      const deferredStr = deferredMinutes > 0 ? ` +${deferredMinutes}m` : "";
       const pendingStr = totalPendingSeconds > 0 ? ` (+${formatHoursAsHHMM(totalPendingSeconds / 3600)})` : "";
-      this.statusBarItem.text = `$(pulse) ${timeStr} ${progressBar} ${this.truncate(activeTask.title, 100)}${pendingStr}${deferredStr}`;
+      this.statusBarItem.text = `$(pulse) ${timeStr} ${progressBar} ${this.truncate(activeTask.title, 100)}${pendingStr}`;
       this.statusBarItem.tooltip = this.buildWorkingTooltip(activeTask, doneCount, tasks.length, totalLoggedHours, totalPendingSeconds);
       this.statusBarItem.command = "redmyne.kanban.toggleTimer";
     } else if (pausedTask) {

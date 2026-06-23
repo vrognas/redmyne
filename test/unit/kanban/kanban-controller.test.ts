@@ -94,16 +94,6 @@ describe("KanbanController", () => {
       expect(controller.getBreakSecondsLeft()).toBe(10 * 60);
       controller.skipBreak();
     });
-
-    it("persists deferred minutes across reloads", async () => {
-      controller.addDeferredMinutes(12);
-      const reloaded = new KanbanController(mockState);
-      expect(reloaded.getDeferredMinutes()).toBe(12);
-
-      expect(reloaded.consumeDeferredMinutes()).toBe(12);
-      const reloadedAgain = new KanbanController(mockState);
-      expect(reloadedAgain.getDeferredMinutes()).toBe(0);
-    });
   });
 
   describe("CRUD operations", () => {
@@ -359,27 +349,6 @@ describe("KanbanController", () => {
       await controller.startTimer(task.id, 10, "Dev", true);
 
       expect(controller.getTaskById(task.id)?.timerSecondsLeft).toBe(fullDuration);
-    });
-  });
-
-  describe("deferred minutes", () => {
-    it("tracks deferred minutes", () => {
-      expect(controller.getDeferredMinutes()).toBe(0);
-
-      controller.addDeferredMinutes(15);
-      expect(controller.getDeferredMinutes()).toBe(15);
-
-      controller.addDeferredMinutes(10);
-      expect(controller.getDeferredMinutes()).toBe(25);
-    });
-
-    it("consumes deferred minutes", () => {
-      controller.addDeferredMinutes(20);
-
-      const consumed = controller.consumeDeferredMinutes();
-
-      expect(consumed).toBe(20);
-      expect(controller.getDeferredMinutes()).toBe(0);
     });
   });
 

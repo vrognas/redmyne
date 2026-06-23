@@ -8,7 +8,6 @@ function createMockController(overrides: Partial<{
   activeTask: KanbanTask | undefined;
   isOnBreak: boolean;
   breakSecondsLeft: number;
-  deferredMinutes: number;
   workDurationSeconds: number;
 }> = {}) {
   const defaults = {
@@ -16,7 +15,6 @@ function createMockController(overrides: Partial<{
     activeTask: undefined,
     isOnBreak: false,
     breakSecondsLeft: 0,
-    deferredMinutes: 0,
     workDurationSeconds: 2700, // 45 minutes
   };
   const config = { ...defaults, ...overrides };
@@ -29,7 +27,6 @@ function createMockController(overrides: Partial<{
     getActiveTask: vi.fn(() => config.activeTask),
     isOnBreak: vi.fn(() => config.isOnBreak),
     getBreakSecondsLeft: vi.fn(() => config.breakSecondsLeft),
-    getDeferredMinutes: vi.fn(() => config.deferredMinutes),
     getWorkDurationSeconds: vi.fn(() => config.workDurationSeconds),
     onTasksChange: vi.fn((listener: () => void) => {
       listeners.push(listener);
@@ -236,26 +233,6 @@ describe("KanbanStatusBar", () => {
 
       // getTasks should be called again
       expect(controller.getTasks).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe("deferred minutes", () => {
-    it("includes deferred time in display", () => {
-      const activeTask = createTask({
-        timerPhase: "working",
-        timerSecondsLeft: 2400,
-        loggedHours: 0,
-      });
-      const controller = createMockController({
-        tasks: [activeTask],
-        activeTask,
-        deferredMinutes: 15,
-      });
-      const globalState = createMockGlobalState();
-
-      new KanbanStatusBar(controller, globalState);
-
-      expect(controller.getDeferredMinutes).toHaveBeenCalled();
     });
   });
 

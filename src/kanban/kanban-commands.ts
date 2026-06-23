@@ -57,12 +57,12 @@ interface LogTimeFlowArgs {
  *
  * Owns the common sequence: required-custom-field prompt -> closed-issue
  * confirmation -> optional confirm -> addTimeEntry -> addLoggedHours ->
- * consumeDeferredMinutes -> caller side effect -> success message, plus the
+ * consumePending -> caller side effect -> success message, plus the
  * custom-field-aware error handling. Callers supply the per-site hours, confirm
  * step, post-log side effect, and success message.
  *
- * Deferred-minute consumption ordering is preserved exactly: minutes are
- * consumed only after a successful addTimeEntry + addLoggedHours.
+ * Pending consumption ordering is preserved exactly: the card's banked seconds
+ * are cleared only after a successful addTimeEntry + addLoggedHours.
  *
  * @returns true if the time entry was written, false if the flow was aborted
  *          (cancelled prompt, declined confirmation) or failed.
@@ -97,7 +97,7 @@ async function logTimeFlow({
       customFieldValues
     );
     await controller.addLoggedHours(task.id, roundedHours);
-    controller.consumeDeferredMinutes();
+    await controller.consumePending(task.id); // clear banked time now that it's logged
     await onLogged();
     vscode.window.showInformationMessage(successMessage);
     return true;
@@ -564,12 +564,12 @@ export function registerKanbanCommands(
           return;
         }
 
-        // Calculate elapsed time, including any deferred minutes from prior tasks
-        const deferredMinutes = controller.getDeferredMinutes();
+        // Elapsed in the current unit plus any time already banked on this card.
         const workDuration = controller.getWorkDurationSeconds();
         const elapsedSeconds =
           workDuration - getFreshTimerSecondsLeft(controller, task);
-        const hours = elapsedSeconds / 3600 + deferredMinutes / 60;
+        const pendingSeconds = controller.getTaskById(task.id)?.pendingSeconds ?? 0;
+        const hours = (elapsedSeconds + pendingSeconds) / 3600;
 
         if (hours < 0.01) {
           vscode.window.showInformationMessage("Not enough time elapsed to log");
@@ -577,7 +577,7 @@ export function registerKanbanCommands(
         }
 
         const roundedHours = Math.round(hours * 100) / 100;
-        const deferredNote = deferredMinutes > 0 ? ` (${deferredMinutes} min deferred included)` : "";
+        const pendingNote = pendingSeconds > 0 ? ` (${Math.round(pendingSeconds / 60)} min banked included)` : "";
 
         // Pause so the controller interval cannot complete the timer and fire
         // onTimerComplete (a second, full-duration log flow) while these dialogs
@@ -590,7 +590,7 @@ export function registerKanbanCommands(
           roundedHours,
           confirm: async () => {
             const choice = await vscode.window.showWarningMessage(
-              `Log ${roundedHours}h for #${task.linkedIssueId}?${deferredNote}`,
+              `Log ${roundedHours}h for #${task.linkedIssueId}?${pendingNote}`,
               { modal: true },
               "Log"
             );
@@ -607,7 +607,7 @@ export function registerKanbanCommands(
     )
   );
 
-  // Defer Time (stop timer, carry time to next task)
+  // Bank Time (stop timer, bank elapsed onto this card for a later Log it / Transfer)
   disposables.push(
     vscode.commands.registerCommand(
       "redmyne.kanban.deferTime",
@@ -616,7 +616,7 @@ export function registerKanbanCommands(
 
         const task = item.task;
         if (!task.timerPhase || task.timerSecondsLeft === undefined) {
-          vscode.window.showInformationMessage("No active timer to defer");
+          vscode.window.showInformationMessage("No active timer to bank");
           return;
         }
 
@@ -627,7 +627,7 @@ export function registerKanbanCommands(
         const elapsedMinutes = Math.round(elapsedSeconds / 60);
 
         if (elapsedMinutes < 1) {
-          vscode.window.showInformationMessage("Not enough time elapsed to defer");
+          vscode.window.showInformationMessage("Not enough time elapsed to bank");
           return;
         }
 
@@ -635,18 +635,18 @@ export function registerKanbanCommands(
         // confirm dialog is open; resume if the user cancels.
         await controller.pauseTimer(task.id);
         const confirm = await vscode.window.showWarningMessage(
-          `Defer ${elapsedMinutes}min to next task?`,
+          `Bank ${elapsedMinutes}min on this card?`,
           { modal: true },
-          "Defer"
+          "Bank"
         );
-        if (confirm !== "Defer") {
+        if (confirm !== "Bank") {
           await controller.resumeTimer(task.id);
           return;
         }
 
-        controller.addDeferredMinutes(elapsedMinutes);
+        await controller.accruePending(task.id, elapsedSeconds);
         await controller.stopTimer(task.id);
-        vscode.window.showInformationMessage(`Deferred ${elapsedMinutes}min to next task`);
+        vscode.window.showInformationMessage(`Banked ${elapsedMinutes}min on this card`);
       }
     )
   );
@@ -677,12 +677,12 @@ export function registerKanbanCommands(
           return;
         }
 
-        // Log full work duration plus any deferred minutes from prior tasks
-        const deferredMinutes = controller.getDeferredMinutes();
+        // Log the full work unit plus any time already banked on this card.
         const workDuration = controller.getWorkDurationSeconds();
-        const hours = workDuration / 3600 + deferredMinutes / 60;
+        const pendingSeconds = controller.getTaskById(task.id)?.pendingSeconds ?? 0;
+        const hours = (workDuration + pendingSeconds) / 3600;
         const roundedHours = Math.round(hours * 100) / 100;
-        const deferredNote = deferredMinutes > 0 ? ` (${deferredMinutes} min deferred included)` : "";
+        const pendingNote = pendingSeconds > 0 ? ` (${Math.round(pendingSeconds / 60)} min banked included)` : "";
 
         await logTimeFlow({
           server,
@@ -692,7 +692,7 @@ export function registerKanbanCommands(
           // Reset timer to full duration and keep running
           onLogged: () =>
             controller.startTimer(task.id, task.activityId ?? 0, task.activityName ?? "", true),
-          successMessage: `Logged ${roundedHours}h, timer restarted${deferredNote}`,
+          successMessage: `Logged ${roundedHours}h, timer restarted${pendingNote}`,
         });
       }
     )

@@ -492,7 +492,7 @@
       },
       {
         "command": "redmyne.kanban.deferTime",
-        "title": "Defer Time",
+        "title": "Bank Time",
         "icon": "$(arrow-right)"
       },
       {
