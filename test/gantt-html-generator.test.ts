@@ -129,6 +129,12 @@ describe("gantt-html-generator", () => {
       // assigneeId 1 === ctx.currentUserId 1 → tagged for the blue highlight
       expect(svg).toContain("my-issue");
 
+      // Tooltip leads with the (bold-able) title, then assignee, then status.
+      const tip = svg.match(/data-tooltip="([\s\S]*?)"/)![1];
+      expect(tip.indexOf("#123 Test Issue")).toBe(0);
+      expect(tip.indexOf("#123 Test Issue")).toBeLessThan(tip.indexOf("Assigned to:"));
+      expect(tip.indexOf("Assigned to:")).toBeLessThan(tip.indexOf("On track"));
+
       const othersRow = {
         ...row,
         issue: { ...(row.issue as object), assigneeId: 2 },
@@ -237,6 +243,14 @@ describe("gantt-html-generator", () => {
       expect(svg).toContain("bar-main"); // solid bar
       expect(svg).toContain("drag-handle"); // resize handles
       expect(svg).not.toContain("ghost-projection"); // not overdue
+
+      // Bar tooltip leads with the title, then assignee (mirrors the panes).
+      const mainTitle = [...svg.matchAll(/<title>([\s\S]*?)<\/title>/g)]
+        .map((m) => m[1])
+        .find((t) => t.includes("Assigned to:"))!;
+      expect(mainTitle.startsWith("#456 Bar Test")).toBe(true);
+      expect(mainTitle.indexOf("#456 Bar Test")).toBeLessThan(mainTitle.indexOf("Assigned to:"));
+      expect(mainTitle.indexOf("Assigned to:")).toBeLessThan(mainTitle.indexOf("On track"));
     });
 
     it("overdue bars get a days-late badge and a ghost projection from today", () => {

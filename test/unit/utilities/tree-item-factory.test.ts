@@ -79,6 +79,17 @@ describe("createEnhancedIssueTreeItem", () => {
     expect((item.tooltip as { value: string }).value).toContain("**Assignee:** None");
   });
 
+  it("places assignee directly under the title, above tracker/priority", () => {
+    const v = (createEnhancedIssueTreeItem(mockIssue, null, undefined, "test.command")
+      .tooltip as { value: string }).value;
+    const titleIdx = v.indexOf("**#7392: Test Issue**");
+    const assigneeIdx = v.indexOf("**Assignee:**");
+    const trackerIdx = v.indexOf("**Tracker:**");
+    expect(titleIdx).toBeGreaterThanOrEqual(0);
+    expect(titleIdx).toBeLessThan(assigneeIdx);
+    expect(assigneeIdx).toBeLessThan(trackerIdx);
+  });
+
   // New format tests: label has ID+subject, description has hours+days only
   it("includes issue ID and subject in label", () => {
     const treeItem = createEnhancedIssueTreeItem(

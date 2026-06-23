@@ -149,10 +149,11 @@ function createIssueTooltip(
   // Title
   md.appendMarkdown(`**#${issue.id}: ${subject}**\n\n`);
 
-  // Core metadata (tight spacing with soft breaks)
+  // Core metadata (tight spacing with soft breaks). Assignee leads, directly
+  // under the title, mirroring the Gantt hover tooltip.
+  md.appendMarkdown(`**Assignee:** ${escapeMarkdown(issue.assigned_to?.name?.trim() || "None")}  \n`);
   md.appendMarkdown(`**Tracker:** ${escapeMarkdown(issue.tracker?.name?.trim() ?? "Unknown")}  \n`);
   md.appendMarkdown(`**Priority:** ${escapeMarkdown(issue.priority?.name?.trim() ?? "Unknown")}  \n`);
-  md.appendMarkdown(`**Assignee:** ${escapeMarkdown(issue.assigned_to?.name?.trim() || "None")}  \n`);
   if (flexibility) {
     md.appendMarkdown(`**Status:** ${STATUS_TEXT[flexibility.status]}  \n`);
   } else {

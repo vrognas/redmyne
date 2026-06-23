@@ -221,12 +221,12 @@ export function generateIssueLabel(
   const leftFlexText = flexibilityLine(issue.flexibilityPercent);
 
   const tooltipLines = [
+    `#${issue.id} ${escapedSubject}`,
+    `Assigned to: ${issue.assignee?.trim() || "None"}`,
     issue.isAdHoc ? "🎲 AD-HOC BUDGET POOL" : null,
     issue.isExternal ? "⚡ EXTERNAL DEPENDENCY" : null,
     leftStatusDesc,
-    `#${issue.id} ${escapedSubject}`,
     `Project: ${escapedProject}`,
-    `Assigned to: ${issue.assignee?.trim() || "None"}`,
     `Start: ${formatDateWithWeekday(issue.start_date)}`,
     `Due: ${formatDateWithWeekday(issue.due_date)}`,
     `Progress: ${issue.done_ratio ?? 0}%`,
@@ -747,14 +747,14 @@ function generateRegularBar(
 
   // Build bar tooltip with full details
   const barTooltip = [
+    `#${issue.id} ${escapedSubject}`,
+    `Assigned to: ${issue.assignee?.trim() || "None"}`,
     issuePrecedence ? "⏫ PRECEDENCE PRIORITY" : null,
     issue.isAdHoc ? "🎲 AD-HOC BUDGET POOL" : null,
     issue.isExternal ? "⚡ EXTERNAL DEPENDENCY" : null,
     isCriticalPath ? "🔶 PROJECTED LATE — no schedule buffer left" : null,
     statusDesc,
-    `#${issue.id} ${escapedSubject}`,
     `Project: ${escapedProject}`,
-    `Assigned to: ${issue.assignee?.trim() || "None"}`,
     `Start: ${formatDateWithWeekday(issue.start_date)}`,
     `Due: ${hasOnlyStart ? "(no due date)" : formatDateWithWeekday(issue.due_date)}`,
     `───`,
