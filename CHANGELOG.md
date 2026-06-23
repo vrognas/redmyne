@@ -25,6 +25,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - **Add to Kanban is hidden on closed issues.** A completed issue no longer shows the Add-to-Kanban button or context action — there's nothing to start.
 - **Gantt week shading is uniform in day zoom.** The current week no longer rendered with a mismatched shade against its neighbours.
+- **Press Esc to clear a Gantt dependency highlight.** Clicking a blocks/blocker badge highlights its dependency arrows; **Escape** now dismisses that highlight (it previously only cleared the focus-chain).
 
 ### Internal
 
