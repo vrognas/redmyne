@@ -65,7 +65,8 @@
       },
       {
         "command": "redmyne.quickLogTime",
-        "title": "Log Time"
+        "title": "Log Time",
+        "icon": "$(watch)"
       },
       {
         "command": "redmyne.refreshIssues",
@@ -1618,9 +1619,14 @@
           "group": "6_integrations@1"
         },
         {
+          "command": "redmyne.quickLogTime",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue-active/",
+          "group": "inline@1"
+        },
+        {
           "command": "redmyne.addIssueToKanban",
           "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue/",
-          "group": "inline"
+          "group": "inline@2"
         },
         {
           "command": "redmyne.copyIssueUrl",
