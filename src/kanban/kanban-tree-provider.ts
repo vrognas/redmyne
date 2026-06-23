@@ -582,7 +582,7 @@ export class KanbanTreeProvider
           new vscode.ThemeColor("charts.blue")
         );
       case "todo":
-        return new vscode.ThemeIcon("circle-outline");
+        return new vscode.ThemeIcon("list-unordered");
       case "done":
         // "check" to match the Mark Done button.
         return new vscode.ThemeIcon(

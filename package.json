@@ -349,12 +349,12 @@
       {
         "command": "redmyne.showGantt",
         "title": "Show Gantt",
-        "icon": "$(calendar)"
+        "icon": "$(code-oss)"
       },
       {
         "command": "redmyne.showTimeSheet",
         "title": "Time Sheet",
-        "icon": "$(table)"
+        "icon": "$(calendar)"
       },
       {
         "command": "redmyne.openProjectInBrowser",
@@ -393,7 +393,7 @@
       {
         "command": "redmyne.addIssueToKanban",
         "title": "Add to Kanban",
-        "icon": "$(checklist)"
+        "icon": "$(list-unordered)"
       },
       {
         "command": "redmyne.kanban.add",
@@ -434,7 +434,7 @@
       {
         "command": "redmyne.kanban.clearDone",
         "title": "Clear Done Tasks",
-        "icon": "$(trash)"
+        "icon": "$(eraser)"
       },
       {
         "command": "redmyne.kanban.refreshParentProjects",
@@ -1431,6 +1431,11 @@
           "group": "navigation@3"
         },
         {
+          "command": "redmyne.kanban.configureTimer",
+          "when": "view == 'redmyne-explorer-kanban' && redmyne:configured",
+          "group": "navigation@4"
+        },
+        {
           "command": "redmyne.refreshIssues",
           "when": "view == 'redmyne-explorer-projects'",
           "group": "navigation@1"
@@ -1820,11 +1825,6 @@
         {
           "command": "redmyne.kanban.add",
           "when": "view == 'redmyne-explorer-kanban' && viewItem == 'status-header-todo'",
-          "group": "inline"
-        },
-        {
-          "command": "redmyne.kanban.configureTimer",
-          "when": "view == 'redmyne-explorer-kanban' && viewItem == 'status-header-doing'",
           "group": "inline"
         }
       ],
