@@ -238,12 +238,12 @@
       {
         "command": "redmyne.openIssueInGantt",
         "title": "Show in Gantt",
-        "icon": "$(graph)"
+        "icon": "$(code-oss)"
       },
       {
         "command": "redmyne.openTimeEntryInGantt",
         "title": "Show in Gantt",
-        "icon": "$(graph)"
+        "icon": "$(code-oss)"
       },
       {
         "command": "redmyne.setInternalEstimate",
@@ -364,7 +364,7 @@
       {
         "command": "redmyne.showProjectInGantt",
         "title": "Show in Gantt",
-        "icon": "$(graph)"
+        "icon": "$(code-oss)"
       },
       {
         "command": "redmyne.createTestIssues",
@@ -504,7 +504,7 @@
       {
         "command": "redmyne.kanban.showInGantt",
         "title": "Show in Gantt",
-        "icon": "$(graph)"
+        "icon": "$(code-oss)"
       },
       {
         "command": "redmyne.kanban.moveUp",
