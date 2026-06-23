@@ -1618,6 +1618,11 @@
           "group": "6_integrations@1"
         },
         {
+          "command": "redmyne.addIssueToKanban",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue/",
+          "group": "inline"
+        },
+        {
           "command": "redmyne.copyIssueUrl",
           "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue/",
           "group": "9_clipboard@1"
