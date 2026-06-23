@@ -1276,4 +1276,37 @@ describe("buildEntryTooltip", () => {
     expect(draft.value).not.toContain("**Entry ID:**");
     expect(draft.value).not.toContain("redmyne.openTimeEntryInBrowser");
   });
+
+  it("shows the issue's estimated and spent hours when provided", () => {
+    const tip = buildEntryTooltip({
+      entry: baseEntry,
+      issueId: 123,
+      issueSubject: "Fix login",
+      projectName: "Web",
+      clientName: "Acme",
+      isDraft: false,
+      isDraftModified: false,
+      showUser: false,
+      estimatedHours: 8,
+      spentHours: 5.5,
+    });
+    expect(tip.value).toContain("**Estimated:** 8:00");
+    expect(tip.value).toContain("**Spent:** 5:30");
+    expect(tip.value).toContain("69%"); // 5.5 / 8
+  });
+
+  it("omits the issue hours line when no estimate/spent is known", () => {
+    const tip = buildEntryTooltip({
+      entry: baseEntry,
+      issueId: 123,
+      issueSubject: "Fix login",
+      projectName: "Web",
+      clientName: "Acme",
+      isDraft: false,
+      isDraftModified: false,
+      showUser: false,
+    });
+    expect(tip.value).not.toContain("**Estimated:**");
+    expect(tip.value).not.toContain("**Spent:**");
+  });
 });

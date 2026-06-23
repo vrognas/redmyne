@@ -155,6 +155,9 @@ export interface EntryTooltipInfo {
   isDraft: boolean;
   isDraftModified: boolean;
   showUser: boolean;
+  /** Issue-level totals (from the issue cache), shown like the Issues tooltip. */
+  estimatedHours?: number;
+  spentHours?: number;
 }
 
 /**
@@ -170,9 +173,23 @@ export function buildEntryTooltip(info: EntryTooltipInfo): vscode.MarkdownString
   const draftLine = isDraft ? `**⚠️ DRAFT** - Not yet saved to server\n\n` :
     isDraftModified ? `**✏️ MODIFIED** - Changes pending save\n\n` : "";
   const entryIdLine = isDraft ? "" : `**Entry ID:** ${entry.id}\n\n`;
+
+  // Issue-level totals (estimated / spent), matching the Issues-pane tooltip, so
+  // a hovered entry shows where its issue stands overall — not just this entry.
+  const est = info.estimatedHours;
+  const spent = info.spentHours;
+  const hoursParts: string[] = [];
+  if (est && est > 0) hoursParts.push(`**Estimated:** ${formatHoursAsHHMM(est)}`);
+  if (spent !== undefined) {
+    const pct = est && est > 0 ? ` (${Math.round((spent / est) * 100)}%)` : "";
+    hoursParts.push(`**Spent:** ${formatHoursAsHHMM(spent)}${pct}`);
+  }
+  const issueHoursLine = hoursParts.length > 0 ? hoursParts.join(" · ") + "\n\n" : "";
+
   const tooltip = new vscode.MarkdownString(
     draftLine +
     `**Issue:** #${issueId} ${escapeMarkdown(issueSubject)}\n\n` +
+      issueHoursLine +
       userLine +
       (clientName ? `**Client:** ${escapeMarkdown(clientName)}\n\n` : "") +
       (projectName ? `**Project:** ${escapeMarkdown(projectName)}\n\n` : "") +
@@ -209,7 +226,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   // just-cleared caches.
   private loadToken = 0;
   server?: IRedmineServer;
-  private issueCache = new Map<number, { id: number; subject: string; projectId?: number; project: string; client?: string }>();
+  private issueCache = new Map<number, { id: number; subject: string; projectId?: number; project: string; client?: string; estimatedHours?: number; spentHours?: number }>();
   private expandedIds = new Set<string>();
   private treeView?: vscode.TreeView<TimeEntryNode>;
   private monthlySchedules: MonthlyScheduleOverrides = {};
@@ -950,6 +967,8 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
           subject: issue.subject,
           projectId: issue.project?.id,
           project: issue.project?.name || "",
+          estimatedHours: issue.estimated_hours ?? undefined,
+          spentHours: issue.spent_hours,
         });
       }
       // Mark unfound issues as "Unknown" to avoid retry
@@ -995,6 +1014,8 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         isDraft,
         isDraftModified,
         showUser: this.showAllUsers,
+        estimatedHours: cached?.estimatedHours,
+        spentHours: cached?.spentHours,
       });
 
       // Format: "#1234 comment" with "HH:MM [activity] issue_subject [user]" as description

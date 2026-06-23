@@ -10,6 +10,8 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Added
 
 - **Live "now" anchor across the panes.** While a Kanban timer runs, its linked issue's bar **pulses green** on the Gantt, and a provisional **running-timer row** is pinned at the top of the Time Entries pane showing the time about to be logged — so the active task is visible wherever you're looking, not just in the status bar.
+- **Log Time inline on issues.** Issues-pane rows now have an inline **Log Time** hover button (next to Add to Kanban) — log straight from an issue without the right-click menu.
+- **Issue totals on a time-entry hover.** Hovering a time entry now shows its issue's **Estimated** and **Spent** hours (with %), matching the Issues-pane tooltip.
 
 ## [4.39.0]
 
