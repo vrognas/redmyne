@@ -73,15 +73,25 @@ export function registerGanttCommands(
       }
       const panel = bootstrapPanel(issues);
 
-      // Find the issue's project and switch to it so the issue is visible
-      const targetIssue = issues.find(i => i.id === issueId);
-      const projectId = issue?.project?.id ?? targetIssue?.project?.id;
-      if (projectId) {
-        panel.showProject(projectId);
+      // Reveal in place when the issue already passes the current filters;
+      // otherwise broaden to the all-projects by-project view first, then
+      // reveal. bootstrapPanel set _issues synchronously, so the check is
+      // valid now even though the render is still in flight.
+      if (panel.isIssueInCurrentFilter(issueId)) {
+        setTimeout(() => panel.revealIssue(issueId), 150);
+      } else {
+        panel.broadenViewForReveal();
+        void panel.updateIssues(
+          issues,
+          deps.getFlexibilityCache(),
+          deps.getProjects(),
+          getSchedule(),
+          deps.getFilter(),
+          deps.getDependencyIssues(),
+          deps.getServer
+        );
+        setTimeout(() => panel.revealIssue(issueId), 250);
       }
-
-      // Wait for webview to render, then scroll to issue
-      setTimeout(() => panel.scrollToIssue(issueId), 150);
     })
   );
 }

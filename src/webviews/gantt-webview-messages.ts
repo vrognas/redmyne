@@ -11,6 +11,7 @@ export type GanttWebviewMessage =
   | { command: "setLookback"; days?: string }
   | { command: "setTaskTypeFilter"; taskType?: string }
   | { command: "toggleLateFilter" }
+  | { command: "resetView" }
   | { command: "toggleEmptyProjects" }
   | { command: "toggleMyIssuesHighlight" }
   | { command: "setViewMode"; viewMode: GanttViewMode }

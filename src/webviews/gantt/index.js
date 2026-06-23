@@ -795,6 +795,13 @@ function initializeGantt(state, rowWindow) {
         // Reveal + focus + highlight an issue. centerBar centers the bar in
         // the visible timeline; scrollToKey mounts the (likely-unmounted) row.
         scrollToAndHighlight(message.issueId, { centerBar: true, focusLabel: true, duration: 2000 });
+      } else if (message.command === 'revealIssue') {
+        // Like scrollToIssue, but also PIN-selects the bar (persists until Esc)
+        // so the revealed issue stays emphasized. scrollToAndHighlight mounts
+        // the row first, so the pin can find the bar to highlight.
+        scrollToAndHighlight(message.issueId, { centerBar: true, focusLabel: true, duration: 2000 });
+        pinnedIssueId = message.issueId;
+        applyPinnedHighlight();
       } else if (message.command === 'setActiveIssue') {
         // Pulse the running-timer issue's bar + label (null clears it).
         activeIssueId = message.issueId;
@@ -1673,6 +1680,7 @@ function initializeGantt(state, rowWindow) {
 
     // Today button handler (user-initiated → announce if out of range)
     document.getElementById('todayBtn')?.addEventListener('click', () => scrollToToday());
+    document.getElementById('resetViewBtn')?.addEventListener('click', () => vscode.postMessage({ command: 'resetView' }));
 
     // Column resize handling
     const resizeHandle = document.getElementById('resizeHandle');

@@ -140,7 +140,7 @@ describe("registerGanttCommands", () => {
     expect(fetchIssuesIfNeeded).not.toHaveBeenCalled();
   });
 
-  it("opens issue in gantt, shows project, and scrolls to issue", async () => {
+  it("reveals the issue in place when it passes the current filter", async () => {
     vi.useFakeTimers();
     try {
       const fetchIssuesIfNeeded = vi.fn().mockResolvedValue([
@@ -153,30 +153,30 @@ describe("registerGanttCommands", () => {
         setFilterChangeCallback: vi.fn((cb: (filter: unknown) => void) => {
           filterCallback = cb;
         }),
-        showProject: vi.fn(),
-        scrollToIssue: vi.fn(),
+        isIssueInCurrentFilter: vi.fn(() => true),
+        broadenViewForReveal: vi.fn(),
+        revealIssue: vi.fn(),
       };
       vi.spyOn(GanttPanel, "createOrShow").mockReturnValue(panel as never);
 
       await handlers.get("redmyne.openIssueInGantt")?.({ id: 42 });
       filterCallback?.({ mode: "done" });
 
-      expect(fetchIssuesIfNeeded).toHaveBeenCalled();
       expect(GanttPanel.createOrShow).toHaveBeenCalled();
-      expect(panel.updateIssues).toHaveBeenCalled();
-      expect(panel.setFilterChangeCallback).toHaveBeenCalled();
+      expect(panel.updateIssues).toHaveBeenCalledTimes(1);
       expect(deps.setFilter).toHaveBeenCalledWith({ mode: "done" });
-      expect(panel.showProject).toHaveBeenCalledWith(7);
-      expect(panel.scrollToIssue).not.toHaveBeenCalled();
+      // Visible → no broadening, just reveal.
+      expect(panel.broadenViewForReveal).not.toHaveBeenCalled();
+      expect(panel.revealIssue).not.toHaveBeenCalled();
 
       vi.advanceTimersByTime(150);
-      expect(panel.scrollToIssue).toHaveBeenCalledWith(42);
+      expect(panel.revealIssue).toHaveBeenCalledWith(42);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("openIssueInGantt skips showProject when no project exists", async () => {
+  it("broadens the view then reveals when the issue is filtered out", async () => {
     vi.useFakeTimers();
     try {
       const fetchIssuesIfNeeded = vi.fn().mockResolvedValue([{ id: 42 }]);
@@ -184,16 +184,21 @@ describe("registerGanttCommands", () => {
       const panel = {
         updateIssues: vi.fn(),
         setFilterChangeCallback: vi.fn(),
-        showProject: vi.fn(),
-        scrollToIssue: vi.fn(),
+        isIssueInCurrentFilter: vi.fn(() => false),
+        broadenViewForReveal: vi.fn(),
+        revealIssue: vi.fn(),
       };
       vi.spyOn(GanttPanel, "createOrShow").mockReturnValue(panel as never);
 
       await handlers.get("redmyne.openIssueInGantt")?.({ id: 42 });
-      vi.advanceTimersByTime(150);
 
-      expect(panel.showProject).not.toHaveBeenCalled();
-      expect(panel.scrollToIssue).toHaveBeenCalledWith(42);
+      expect(panel.broadenViewForReveal).toHaveBeenCalled();
+      // bootstrap render + the broadened re-render.
+      expect(panel.updateIssues).toHaveBeenCalledTimes(2);
+      expect(panel.revealIssue).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(250);
+      expect(panel.revealIssue).toHaveBeenCalledWith(42);
     } finally {
       vi.useRealTimers();
     }

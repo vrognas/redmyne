@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { deriveAssigneeState, filterIssuesForView, isLateIssue } from "../../../src/webviews/gantt-view-filter";
+import { deriveAssigneeState, filterIssuesForView, isLateIssue, isIssueVisibleInGanttView } from "../../../src/webviews/gantt-view-filter";
 import { RedmineProject } from "../../../src/redmine/redmine-project";
 import { Issue } from "../../../src/redmine/models/issue";
 
@@ -35,6 +35,45 @@ describe("deriveAssigneeState", () => {
 
     expect(state.currentUserName).toBe("Alex");
     expect(state.uniqueAssignees).toEqual(["Alex", "Zoe"]);
+  });
+});
+
+describe("isIssueVisibleInGanttView", () => {
+  const baseState = {
+    viewFocus: "project" as const,
+    selectedAssignee: null,
+    selectedProjectId: null,
+    taskTypeField: null,
+    taskTypeFilter: "any",
+    lateOnly: false,
+    currentFilter: { assignee: "any" as const, status: "any" as const },
+  };
+  const call = (issueId: number, issues: Issue[], stateOverrides: Partial<typeof baseState> = {}) =>
+    isIssueVisibleInGanttView({
+      issueId,
+      issues,
+      projects: [],
+      state: { ...baseState, ...stateOverrides },
+      currentUserId: null,
+      currentUserName: null,
+      internalEstimates: new Map(),
+      todayStr: "2024-06-01",
+      contributedHoursFor: () => 0,
+    });
+
+  it("is visible under the broad by-project view", () => {
+    const issues = [createIssue({ id: 7 })];
+    expect(call(7, issues)).toBe(true);
+  });
+
+  it("is hidden when a task-type filter excludes it", () => {
+    const issues = [createIssue({ id: 7 })];
+    expect(call(7, issues, { taskTypeField: "Task Type", taskTypeFilter: "Bug" })).toBe(false);
+  });
+
+  it("is hidden by late-only when the issue isn't late", () => {
+    const issues = [createIssue({ id: 7, due_date: "2099-01-01" })];
+    expect(call(7, issues, { lateOnly: true })).toBe(false);
   });
 });
 

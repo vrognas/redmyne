@@ -37,7 +37,7 @@ import { CreatableRelationType, GanttRow, nodeToGanttRow } from "./gantt-model";
 import { buildRowsPayload, buildArrowsPayload } from "./gantt/gantt-html-generator";
 import type { GanttRenderContext, GanttRowPayload, GanttArrowPayload } from "./gantt/gantt-render-types";
 import { generateHeader, type GanttToolbarContext } from "./gantt/gantt-toolbar-generator";
-import { deriveAssigneeState, filterIssuesForView, isLateIssue } from "./gantt-view-filter";
+import { deriveAssigneeState, filterIssuesForView, isLateIssue, isIssueVisibleInGanttView } from "./gantt-view-filter";
 import { remainingHours } from "../utilities/remaining-work";
 import { deriveTaskTypes, filterIssuesByTaskType } from "../utilities/issue-task-type-filter";
 import { dateToX, endExclusiveX, clampMinDateToLookback, addUtcDays } from "./gantt/gantt-coords";
@@ -1169,6 +1169,78 @@ export class GanttPanel {
     });
   }
 
+  /**
+   * Whether `issueId` currently passes the Gantt's view filters — so "Show in
+   * Gantt" can reveal it in place vs. reset to the broad view first. Safe to
+   * call right after updateIssues (it sets _issues/_projects synchronously).
+   */
+  public isIssueInCurrentFilter(issueId: number): boolean {
+    const internalEstimates = GanttPanel._globalState
+      ? getInternalEstimates(GanttPanel._globalState)
+      : new Map();
+    return isIssueVisibleInGanttView({
+      issueId,
+      issues: [...this._issues, ...this._unscheduledIssues],
+      projects: this._projects,
+      state: {
+        viewFocus: this._viewFocus,
+        selectedAssignee: this._selectedAssignee,
+        selectedProjectId: this._selectedProjectId,
+        taskTypeField: this._taskTypeFieldName() ?? null,
+        taskTypeFilter: this._taskTypeFilter,
+        lateOnly: this._lateOnly,
+        currentFilter: this._currentFilter,
+      },
+      currentUserId: this._currentUserId,
+      currentUserName: this._currentUserName,
+      internalEstimates,
+      todayStr: getTodayStr(),
+      contributedHoursFor: (id) =>
+        this._contributionSources?.get(id)?.reduce((s, c) => s + c.hours, 0) ?? 0,
+    });
+  }
+
+  /** Reset the gantt-local view filters to the broadest by-project view. */
+  private _clearViewFilters(): void {
+    this._viewFocus = "project";
+    this._selectedProjectId = null;
+    this._selectedAssignee = null;
+    this._taskTypeFilter = "any";
+    this._lateOnly = false;
+    GanttPanel._globalState?.update(VIEW_FOCUS_KEY, this._viewFocus);
+    GanttPanel._globalState?.update(SELECTED_PROJECT_KEY, null);
+    GanttPanel._globalState?.update(SELECTED_ASSIGNEE_KEY, null);
+    GanttPanel._globalState?.update(FILTER_TASK_TYPE_KEY, "any");
+    GanttPanel._globalState?.update(FILTER_LATE_KEY, false);
+    this._cachedHierarchy = undefined;
+    this._bumpRevision();
+  }
+
+  /**
+   * Broaden to the all-projects by-project view and expand so a reveal target
+   * shows. Does NOT render — the caller's updateIssues renders next.
+   */
+  public broadenViewForReveal(): void {
+    this._clearViewFilters();
+    this._expandAllOnNextRender = "any";
+  }
+
+  /** Reset filters (toolbar button): broad by-project view, all collapsed. */
+  public resetView(): void {
+    this._clearViewFilters();
+    this._collapseState.collapseAll();
+    this._expandAllOnNextRender = false;
+    this._updateContent();
+  }
+
+  /** Reveal an issue: scroll to + pin-select its bar (expanding its group). */
+  public revealIssue(issueId: number): void {
+    this._panel.webview.postMessage({
+      command: "revealIssue",
+      issueId,
+    });
+  }
+
   /** Issue with a running Kanban timer — pulsed as the "now" anchor (null = none). */
   private _activeIssueId: number | null = null;
 
@@ -1638,6 +1710,9 @@ export class GanttPanel {
         GanttPanel._globalState?.update(FILTER_LATE_KEY, this._lateOnly);
         this._bumpRevision(); // invalidate hierarchy/capacity caches
         this._updateContent();
+        break;
+      case "resetView":
+        this.resetView();
         break;
       case "toggleEmptyProjects":
         this._showEmptyProjects = !this._showEmptyProjects;

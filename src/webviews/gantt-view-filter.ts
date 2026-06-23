@@ -4,6 +4,7 @@ import { RedmineProject } from "../redmine/redmine-project";
 import { isIssueClosed } from "../utilities/issue-status";
 import { remainingHours } from "../utilities/remaining-work";
 import type { InternalEstimates } from "../utilities/internal-estimates";
+import { filterIssuesByTaskType } from "../utilities/issue-task-type-filter";
 
 /**
  * Whether an issue counts as LATE: past due, open, unfinished, with real
@@ -123,6 +124,59 @@ export function filterIssuesForView(options: {
     selectedAssignee: options.selectedAssignee,
     selectedProjectId: nextSelectedProjectId,
   };
+}
+
+/** The gantt-local view filters that decide whether an issue is on screen. */
+export interface GanttViewFilterState {
+  viewFocus: "project" | "person";
+  selectedAssignee: string | null;
+  selectedProjectId: number | null;
+  taskTypeField: string | null;
+  taskTypeFilter: string;
+  lateOnly: boolean;
+  currentFilter: IssueFilter;
+}
+
+/**
+ * Whether `issueId` would render under the current Gantt view filters (view
+ * focus, selected project/assignee, task-type, late-only). Mirrors the render
+ * pipeline's filter chain so "Show in Gantt" can decide whether to reveal in
+ * place or reset to the broad view first.
+ */
+export function isIssueVisibleInGanttView(args: {
+  issueId: number;
+  issues: Issue[];
+  projects: RedmineProject[];
+  state: GanttViewFilterState;
+  currentUserId: number | null;
+  currentUserName: string | null;
+  internalEstimates: InternalEstimates;
+  todayStr: string;
+  contributedHoursFor: (id: number) => number;
+}): boolean {
+  const { state } = args;
+  const assignee = deriveAssigneeState(args.issues, args.currentUserId, args.currentUserName);
+  const view = filterIssuesForView({
+    issues: args.issues,
+    projects: args.projects,
+    viewFocus: state.viewFocus,
+    selectedAssignee: state.selectedAssignee,
+    currentUserName: assignee.currentUserName,
+    uniqueAssignees: assignee.uniqueAssignees,
+    selectedProjectId: state.selectedProjectId,
+    currentFilter: state.currentFilter,
+    currentUserId: args.currentUserId,
+  });
+  let candidates = view.filteredIssues;
+  if (state.taskTypeField && state.taskTypeFilter !== "any") {
+    candidates = filterIssuesByTaskType(candidates, state.taskTypeField, state.taskTypeFilter);
+  }
+  const target = candidates.find((i) => i.id === args.issueId);
+  if (!target) return false;
+  if (state.lateOnly && !isLateIssue(target, args.internalEstimates, args.todayStr, args.contributedHoursFor(args.issueId))) {
+    return false;
+  }
+  return true;
 }
 
 // Parent→children lookup is identical across renders for the same projects
