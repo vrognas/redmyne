@@ -81,7 +81,13 @@ describe("gantt-html-generator", () => {
       chevronWidth: 10,
       currentUserId: 1,
       viewFocus: "project" as const,
+      today: new Date("2025-01-10"),
+      maxDate: new Date("2025-12-31"),
+      schedule: { Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0, Sun: 0 },
       getStatusDescription: () => "On track",
+      getInternalEstimate: () => null,
+      isAutoUpdateEnabled: () => true,
+      hasPrecedence: () => false,
     };
 
     it("generateIssueLabel creates issue row SVG", () => {
@@ -132,8 +138,8 @@ describe("gantt-html-generator", () => {
       // Tooltip leads with the (bold-able) title, then assignee, then status.
       const tip = svg.match(/data-tooltip="([\s\S]*?)"/)![1];
       expect(tip.indexOf("#123 Test Issue")).toBe(0);
-      expect(tip.indexOf("#123 Test Issue")).toBeLessThan(tip.indexOf("Assigned to:"));
-      expect(tip.indexOf("Assigned to:")).toBeLessThan(tip.indexOf("On track"));
+      expect(tip.indexOf("#123 Test Issue")).toBeLessThan(tip.indexOf("Assignee:"));
+      expect(tip.indexOf("Assignee:")).toBeLessThan(tip.indexOf("Status: On track"));
 
       const othersRow = {
         ...row,
@@ -247,10 +253,10 @@ describe("gantt-html-generator", () => {
       // Bar tooltip leads with the title, then assignee (mirrors the panes).
       const mainTitle = [...svg.matchAll(/<title>([\s\S]*?)<\/title>/g)]
         .map((m) => m[1])
-        .find((t) => t.includes("Assigned to:"))!;
+        .find((t) => t.includes("Assignee:"))!;
       expect(mainTitle.startsWith("#456 Bar Test")).toBe(true);
-      expect(mainTitle.indexOf("#456 Bar Test")).toBeLessThan(mainTitle.indexOf("Assigned to:"));
-      expect(mainTitle.indexOf("Assigned to:")).toBeLessThan(mainTitle.indexOf("On track"));
+      expect(mainTitle.indexOf("#456 Bar Test")).toBeLessThan(mainTitle.indexOf("Assignee:"));
+      expect(mainTitle.indexOf("Assignee:")).toBeLessThan(mainTitle.indexOf("Status: On track"));
     });
 
     it("bar and progress-badge tooltips share the hours block with per-surface wording", () => {
@@ -312,8 +318,8 @@ describe("gantt-html-generator", () => {
 
       const svg = generateIssueBar(row, mockContext as any);
       const titles = [...svg.matchAll(/<title>([\s\S]*?)<\/title>/g)].map((m) => m[1]);
-      const barTitle = titles.find((t) => t.includes("Assigned to:"))!;
-      const badgeTitle = titles.find((t) => t.includes("Progress:") && !t.includes("Assigned to:"))!;
+      const barTitle = titles.find((t) => t.includes("Assignee:"))!;
+      const badgeTitle = titles.find((t) => t.includes("Progress:") && !t.includes("Assignee:"))!;
 
       // Bar: Remaining "(internal estimate)" + Spent shows the "= effective" total.
       expect(barTitle).toContain("Remaining: 3:00 (internal estimate)");
@@ -389,8 +395,10 @@ describe("gantt-html-generator", () => {
 
       const svg = generateIssueBar(row, mockContext as any);
       const titles = [...svg.matchAll(/<title>([\s\S]*?)<\/title>/g)].map((m) => m[1]);
-      const blocks = titles.find((t) => t.includes("Blocking"))!;
-      const blockers = titles.find((t) => t.includes("Waiting on"))!;
+      // The dependency BADGE tooltips (lists + click-hint footer), not the
+      // compact "⛔ Blocking N · ⏳ Waiting on M" summary in the main tooltip.
+      const blocks = titles.find((t) => t.includes("Click to highlight dependencies"))!;
+      const blockers = titles.find((t) => t.includes("Click to highlight and jump"))!;
 
       // Blocks: header with count, assignee suffix, "(not in view)" for bare
       // "#id" subjects, top-5 cap with overflow, and the highlight footer.
@@ -403,6 +411,73 @@ describe("gantt-html-generator", () => {
       expect(blockers).toContain("⏳ Waiting on 1:");
       expect(blockers).toContain("#20 Upstream (Bob)");
       expect(blockers).toContain("Click to highlight and jump");
+    });
+
+    it("task-column label tooltip is identical to the bar tooltip", () => {
+      const issue = {
+        id: 555,
+        subject: "Shared Tooltip",
+        project: "Project",
+        projectId: 1,
+        parentId: null,
+        start_date: "2025-01-10",
+        due_date: "2025-01-20",
+        done_ratio: 40,
+        estimated_hours: 10,
+        spent_hours: 4,
+        status: "on-track",
+        statusName: "In Progress",
+        isClosed: false,
+        isExternal: false,
+        isAdHoc: false,
+        assignee: "Viktor",
+        assigneeId: 1,
+        flexibilityPercent: 15,
+        relations: [],
+        blocks: [{ id: 1, subject: "Down", assignee: null }],
+        blockedBy: [],
+      };
+      const row: GanttRow = {
+        type: "issue",
+        id: 555,
+        label: "Shared Tooltip",
+        depth: 0,
+        collapseKey: "issue-555",
+        parentKey: "",
+        isVisible: true,
+        isExpanded: false,
+        hasChildren: false,
+        issue,
+      };
+      const ctx = {
+        barHeight: 22,
+        barPadding: 3,
+        barContentHeight: 16,
+        indentSize: 8,
+        chevronWidth: 10,
+        timelineWidth: 1000,
+        minDate: new Date("2025-01-01"),
+        maxDate: new Date("2025-01-31"),
+        today: new Date("2025-01-15"),
+        viewFocus: "project" as const,
+        currentUserId: 1,
+        schedule: { Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0, Sun: 0 },
+        issueScheduleMap: new Map(),
+        getStatusColor: () => "var(--vscode-charts-blue)",
+        getStatusTextColor: () => "white",
+        getStatusOpacity: () => 0.6,
+        getStatusDescription: () => "On track",
+        getInternalEstimate: () => null,
+        hasPrecedence: () => false,
+        isAutoUpdateEnabled: () => true,
+      };
+
+      const labelTip = generateIssueLabel(row, ctx as any).match(/data-tooltip="([\s\S]*?)"/)![1];
+      const barTip = [...generateIssueBar(row, ctx as any).matchAll(/<title>([\s\S]*?)<\/title>/g)]
+        .map((m) => m[1])
+        .find((t) => t.includes("Assignee:"));
+      expect(barTip).toBeDefined();
+      expect(labelTip).toBe(barTip);
     });
 
     it("overdue bars get a days-late badge and a ghost projection from today", () => {

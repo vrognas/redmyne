@@ -256,6 +256,151 @@ function getScheduledIntensity(
 // ============================================================================
 
 /** Generate SVG for issue label row */
+/**
+ * Derived per-issue state shared by the bar rendering, the badges, and the
+ * unified hover tooltip — computed once so the badge ("5d late") and the
+ * tooltip can never disagree.
+ */
+interface IssueProjection {
+  doneRatio: number;
+  contributedHours: number;
+  effectiveSpentHours: number;
+  isOverBudget: boolean;
+  visualDoneRatio: number;
+  isFallbackProgress: boolean;
+  statusDesc: string;
+  flexPct: number | null;
+  isCriticalPath: boolean;
+  issueInternalEstimate: { hoursRemaining: number } | null;
+  isManualDone: boolean;
+  issuePrecedence: boolean;
+  ghostHours: number;
+  ghostDays: number;
+  projectedEndMs: number;
+  daysLate: number;
+  overrunDays: number;
+}
+
+/** True if an issue is past its (effective) due date and not yet done. */
+function isIssueOverdue(issue: GanttIssue, ctx: GanttRenderContext, isParent: boolean): boolean {
+  if (isParent || issue.isClosed || issue.done_ratio >= 100) return false;
+  if (!issue.start_date && !issue.due_date) return false;
+  const hasOnlyStart = Boolean(issue.start_date && !issue.due_date);
+  const maxDateStr = ctx.maxDate.toISOString().slice(0, 10);
+  const dueDate = issue.due_date ?? (hasOnlyStart ? maxDateStr : issue.start_date!);
+  return new Date(dueDate) < ctx.today;
+}
+
+/** Compute the derived projection (progress, ghost, lateness, flags). */
+function computeIssueProjection(issue: GanttIssue, ctx: GanttRenderContext, isOverdue: boolean): IssueProjection {
+  const doneRatio = issue.done_ratio;
+  const contributedHours = ctx.contributionSources?.get(issue.id)?.reduce((sum, c) => sum + c.hours, 0) ?? 0;
+  const effectiveSpentHours = (issue.spent_hours ?? 0) + contributedHours;
+  const timeRatio = issue.estimated_hours && issue.estimated_hours > 0 && effectiveSpentHours > 0
+    ? Math.round((effectiveSpentHours / issue.estimated_hours) * 100)
+    : null;
+  const isOverBudget = timeRatio !== null && timeRatio > 100;
+  let visualDoneRatio = doneRatio;
+  let isFallbackProgress = false;
+  if (timeRatio !== null && (doneRatio === 0 || isOverBudget) && timeRatio > doneRatio) {
+    visualDoneRatio = timeRatio;
+    isFallbackProgress = true;
+  }
+  const effectiveStatus = issue.isClosed ? "completed" : (issue.status ?? "unknown");
+  const statusDesc = ctx.getStatusDescription(effectiveStatus);
+  const flexPct = issue.flexibilityPercent;
+  // "Projected late": no remaining buffer but not yet past due.
+  const isCriticalPath = flexPct !== null && flexPct <= 0 && !issue.isClosed && !isOverdue;
+  const issueInternalEstimate = ctx.getInternalEstimate(issue.id);
+  const isManualDone = !ctx.isAutoUpdateEnabled(issue.id);
+  const issuePrecedence = ctx.hasPrecedence(issue.id);
+
+  const dueMs = new Date(issue.due_date ?? issue.start_date!).getTime();
+  let ghostHours = 0;
+  let effectivelyDone = false;
+  if (!issue.isClosed && doneRatio < 100) {
+    const remaining = remainingHours({
+      estimatedHours: issue.estimated_hours,
+      spentHours: effectiveSpentHours,
+      doneRatio,
+      internalHoursRemaining: issueInternalEstimate?.hoursRemaining,
+    });
+    ghostHours = remaining ?? 0;
+    effectivelyDone = remaining !== null && remaining <= 0;
+  }
+  const daysLate = isOverdue && !effectivelyDone
+    ? Math.max(1, Math.round((ctx.today.getTime() - dueMs) / 86400000))
+    : 0;
+  const ghostDays = ghostHours > 0 ? projectDaysForHours(ctx.today, ghostHours, ctx.schedule) : 0;
+  const projectedEndMs = ghostDays > 0 ? ctx.today.getTime() + ghostDays * 86400000 : 0;
+  const overrunDays = ghostDays > 0 && !isOverdue && issue.due_date
+    ? Math.max(0, Math.round((projectedEndMs - (dueMs + 86400000)) / 86400000))
+    : 0;
+
+  return {
+    doneRatio, contributedHours, effectiveSpentHours, isOverBudget, visualDoneRatio,
+    isFallbackProgress, statusDesc, flexPct, isCriticalPath, issueInternalEstimate,
+    isManualDone, issuePrecedence, ghostHours, ghostDays, projectedEndMs, daysLate, overrunDays,
+  };
+}
+
+/**
+ * The unified issue hover tooltip — rendered for BOTH the timeline bar
+ * (<title>) and the task-column row label (data-tooltip), so the two always
+ * match. Grouped like the Markdown pane tooltips: bold title, then assignee,
+ * then "---" dividers between identity / schedule / progress / dependency
+ * sections. The webview renderer bolds the "Label:" prefixes.
+ */
+function buildIssueTooltip(issue: GanttIssue, proj: IssueProjection, hasOnlyStart: boolean): string {
+  const tail = proj.daysLate > 0
+    ? `⏰ Overdue ${proj.daysLate}d${proj.ghostDays > 0 ? ` — ~${formatHoursAsTime(proj.ghostHours)} left needs ${proj.ghostDays} day${proj.ghostDays === 1 ? "" : "s"} from today` : ""}`
+    : proj.overrunDays > 0
+      ? `⚠ Projected ${proj.overrunDays}d past due — ~${formatHoursAsTime(proj.ghostHours)} left needs ${proj.ghostDays} day${proj.ghostDays === 1 ? "" : "s"} from today`
+      : flexibilityLine(proj.flexPct);
+
+  const depParts: string[] = [];
+  if (issue.blocks.length > 0) depParts.push(`⛔ Blocking ${issue.blocks.length}`);
+  if (issue.blockedBy.length > 0) depParts.push(`⏳ Waiting on ${issue.blockedBy.length}`);
+
+  const lines: (string | null)[] = [
+    // Identity
+    `#${issue.id} ${escapeHtml(issue.subject)}`,
+    "",
+    `Assignee: ${issue.assignee?.trim() || "None"}`,
+    `Status: ${proj.statusDesc}`,
+    `Project: ${escapeHtml(issue.project)}`,
+    proj.issuePrecedence ? "⏫ PRECEDENCE PRIORITY" : null,
+    issue.isAdHoc ? "🎲 AD-HOC BUDGET POOL" : null,
+    issue.isExternal ? "⚡ EXTERNAL DEPENDENCY" : null,
+    proj.isCriticalPath ? "🔶 PROJECTED LATE — no schedule buffer left" : null,
+    // Schedule
+    "---",
+    `Start: ${formatDateWithWeekday(issue.start_date)}`,
+    `Due: ${hasOnlyStart ? "(no due date)" : formatDateWithWeekday(issue.due_date)}`,
+    // Progress / hours
+    "---",
+    ...buildHoursProgressLines({
+      estimatedHours: issue.estimated_hours,
+      spentHours: issue.spent_hours,
+      doneRatio: proj.doneRatio,
+      isFallbackProgress: proj.isFallbackProgress,
+      visualDoneRatio: proj.visualDoneRatio,
+      isManualDone: proj.isManualDone,
+      internalHoursRemaining: proj.issueInternalEstimate ? proj.issueInternalEstimate.hoursRemaining : null,
+      contributedHours: proj.contributedHours,
+      effectiveSpentHours: proj.effectiveSpentHours,
+      remainingLabel: "internal estimate",
+      spentVariant: "effective",
+    }),
+    tail,
+    // Dependencies
+    depParts.length > 0 ? "---" : null,
+    depParts.length > 0 ? depParts.join(" · ") : null,
+  ];
+  // Keep deliberate "" spacers; drop only null (incl. the optional Remaining).
+  return lines.filter((l) => l != null).join("\n");
+}
+
 export function generateIssueLabel(
   row: GanttRow,
   ctx: GanttRenderContext
@@ -269,36 +414,13 @@ export function generateIssueLabel(
     : "";
 
   const escapedSubject = escapeHtml(issue.subject);
-  const escapedProject = escapeHtml(issue.project);
 
-  // Build tooltip (flexibilityLine: hover-only, self-explanatory wording)
-  const leftEffectiveStatus = issue.isClosed ? "completed" : (issue.status ?? "unknown");
-  const leftStatusDesc = ctx.getStatusDescription(leftEffectiveStatus);
-  const leftFlexText = flexibilityLine(issue.flexibilityPercent);
-
-  const tooltipLines = [
-    `#${issue.id} ${escapedSubject}`,
-    `Assigned to: ${issue.assignee?.trim() || "None"}`,
-    issue.isAdHoc ? "🎲 AD-HOC BUDGET POOL" : null,
-    issue.isExternal ? "⚡ EXTERNAL DEPENDENCY" : null,
-    leftStatusDesc,
-    `Project: ${escapedProject}`,
-    `Start: ${formatDateWithWeekday(issue.start_date)}`,
-    `Due: ${formatDateWithWeekday(issue.due_date)}`,
-    `Progress: ${issue.done_ratio ?? 0}%`,
-    `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
-    `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
-  ];
-
-  if (leftFlexText) tooltipLines.push(leftFlexText);
-  if (issue.blocks.length > 0) {
-    tooltipLines.push(`🚧 BLOCKS ${issue.blocks.length} TASK${issue.blocks.length > 1 ? "S" : ""}`);
-  }
-  if (issue.blockedBy.length > 0) {
-    tooltipLines.push(`⛔ BLOCKED BY ${issue.blockedBy.length}`);
-  }
-
-  const tooltip = tooltipLines.filter(Boolean).join("\n");
+  // The task-column hover uses the SAME builder as the timeline bar so the
+  // two tooltips are always identical (regular issue rows; aggregates differ).
+  const isOverdue = isIssueOverdue(issue, ctx, row.isParent ?? false);
+  const hasOnlyStart = Boolean(issue.start_date && !issue.due_date);
+  const proj = computeIssueProjection(issue, ctx, isOverdue);
+  const tooltip = buildIssueTooltip(issue, proj, hasOnlyStart);
 
   const projectBadge = ctx.viewFocus === "person" && row.projectName
     ? `<tspan fill="var(--vscode-descriptionForeground)" font-size="10">[${escapeHtml(row.projectName)}]</tspan> `
@@ -572,7 +694,7 @@ export function generateIssueBar(
   const fillOpacity = isParent ? 0.5 : ctx.getStatusOpacity(effectiveStatus);
 
   const isPast = end < ctx.today;
-  const isOverdue = !isParent && !issue.isClosed && issue.done_ratio < 100 && end < ctx.today;
+  const isOverdue = isIssueOverdue(issue, ctx, isParent);
 
   const barY = ctx.barPadding;
 
@@ -716,24 +838,13 @@ function generateRegularBar(
   ctx: GanttRenderContext
 ): string {
   const escapedSubject = escapeHtml(issue.subject);
-  const escapedProject = escapeHtml(issue.project);
-  const doneRatio = issue.done_ratio;
 
-  // Calculate visual progress. Over budget (spent > estimate) is a "the
-  // timeline may need to shift" signal: show the REAL time-derived ratio
-  // (113%, not clamped to 100) and let the badge render it red.
-  const contributedHours = ctx.contributionSources?.get(issue.id)?.reduce((sum, c) => sum + c.hours, 0) ?? 0;
-  const effectiveSpentHours = (issue.spent_hours ?? 0) + contributedHours;
-  const timeRatio = issue.estimated_hours && issue.estimated_hours > 0 && effectiveSpentHours > 0
-    ? Math.round((effectiveSpentHours / issue.estimated_hours) * 100)
-    : null;
-  const isOverBudget = timeRatio !== null && timeRatio > 100;
-  let visualDoneRatio = doneRatio;
-  let isFallbackProgress = false;
-  if (timeRatio !== null && (doneRatio === 0 || isOverBudget) && timeRatio > doneRatio) {
-    visualDoneRatio = timeRatio;
-    isFallbackProgress = true;
-  }
+  const proj = computeIssueProjection(issue, ctx, isOverdue);
+  const {
+    doneRatio, contributedHours, effectiveSpentHours, isOverBudget,
+    visualDoneRatio, isFallbackProgress, isManualDone, issueInternalEstimate,
+    flexPct, ghostDays, projectedEndMs, daysLate, isCriticalPath,
+  } = proj;
 
   // Bar fill uses the maintained done_ratio when present (an over-budget
   // 40%-done task must not render fully filled just because its time
@@ -749,90 +860,9 @@ function generateRegularBar(
   const pastWidth = Math.max(0, pastEndX - startX);
   const hasPastPortion = start < ctx.today && pastWidth > 0;
 
-  // Status/tooltip
-  const effectiveStatus = issue.isClosed ? "completed" : (issue.status ?? "unknown");
-  const statusDesc = ctx.getStatusDescription(effectiveStatus);
-  const flexPct = issue.flexibilityPercent;
-  // "Projected late": no remaining buffer but not yet past due — once
-  // overdue, the red border/ghost own the signal (every overdue task has
-  // remaining flex -100, so without the gate the whole board pulses).
-  const isCriticalPath = flexPct !== null && flexPct <= 0 && !issue.isClosed && !isOverdue;
-
-  // Context-sensitive info from callbacks
-  const issueInternalEstimate = ctx.getInternalEstimate(issue.id);
-  const isManualDone = !ctx.isAutoUpdateEnabled(issue.id);
-  const issuePrecedence = ctx.hasPrecedence(issue.id);
-
-  // Spillover projection: re-plant the remaining effort at today and see
-  // where it actually ends under the schedule. Overdue tasks get a ghost
-  // from today; tasks with negative flexibility (due in the future but
-  // remaining work doesn't fit) get a ghost extending past their due date.
-  // A consumed budget with done_ratio 0 (not maintained) counts as done —
-  // same heuristic as the visual ~100% progress fallback — so an
-  // "essentially finished, just not closed" task gets no late badge/ghost.
-  const dueMs = new Date(issue.due_date ?? issue.start_date!).getTime();
-  let ghostHours = 0;
-  let effectivelyDone = false;
-  if (!issue.isClosed && doneRatio < 100) {
-    // Shared owner of the heuristic; effective spent includes ad-hoc
-    // contributions (the over-budget badge above uses the same figure).
-    // null = unknowable (no estimate): NOT effectively done — the task is
-    // still late, there's just nothing to project a ghost from. (The old
-    // `!== null` check met getInternalEstimate's `undefined` and silently
-    // marked every unestimated overdue task done.)
-    const remaining = remainingHours({
-      estimatedHours: issue.estimated_hours,
-      spentHours: effectiveSpentHours,
-      doneRatio,
-      internalHoursRemaining: issueInternalEstimate?.hoursRemaining,
-    });
-    ghostHours = remaining ?? 0;
-    effectivelyDone = remaining !== null && remaining <= 0;
-  }
-  const daysLate = isOverdue && !effectivelyDone
-    ? Math.max(1, Math.round((ctx.today.getTime() - dueMs) / 86400000))
-    : 0;
-  const ghostDays = ghostHours > 0 ? projectDaysForHours(ctx.today, ghostHours, ctx.schedule) : 0;
-  const projectedEndMs = ghostDays > 0 ? ctx.today.getTime() + ghostDays * 86400000 : 0;
-  // Days the projection runs past the (exclusive) end of the due date —
-  // only meaningful when a real due date exists and the task isn't
-  // already overdue (overdue has its own line).
-  const overrunDays = ghostDays > 0 && !isOverdue && issue.due_date
-    ? Math.max(0, Math.round((projectedEndMs - (dueMs + 86400000)) / 86400000))
-    : 0;
-
-  // Build bar tooltip with full details
-  const barTooltip = [
-    `#${issue.id} ${escapedSubject}`,
-    `Assigned to: ${issue.assignee?.trim() || "None"}`,
-    issuePrecedence ? "⏫ PRECEDENCE PRIORITY" : null,
-    issue.isAdHoc ? "🎲 AD-HOC BUDGET POOL" : null,
-    issue.isExternal ? "⚡ EXTERNAL DEPENDENCY" : null,
-    isCriticalPath ? "🔶 PROJECTED LATE — no schedule buffer left" : null,
-    statusDesc,
-    `Project: ${escapedProject}`,
-    `Start: ${formatDateWithWeekday(issue.start_date)}`,
-    `Due: ${hasOnlyStart ? "(no due date)" : formatDateWithWeekday(issue.due_date)}`,
-    `───`,
-    ...buildHoursProgressLines({
-      estimatedHours: issue.estimated_hours,
-      spentHours: issue.spent_hours,
-      doneRatio,
-      isFallbackProgress,
-      visualDoneRatio,
-      isManualDone,
-      internalHoursRemaining: issueInternalEstimate ? issueInternalEstimate.hoursRemaining : null,
-      contributedHours,
-      effectiveSpentHours,
-      remainingLabel: "internal estimate",
-      spentVariant: "effective",
-    }),
-    daysLate > 0
-      ? `⏰ Overdue ${daysLate}d${ghostDays > 0 ? ` — ~${formatHoursAsTime(ghostHours)} left needs ${ghostDays} day${ghostDays === 1 ? "" : "s"} from today` : ""}`
-      : overrunDays > 0
-        ? `⚠ Projected ${overrunDays}d past due — ~${formatHoursAsTime(ghostHours)} left needs ${ghostDays} day${ghostDays === 1 ? "" : "s"} from today`
-        : flexibilityLine(flexPct),
-  ].filter(Boolean).join("\n");
+  // Unified issue tooltip — the task-column row label (generateIssueLabel)
+  // renders this exact same string, so bar and label hovers always match.
+  const barTooltip = buildIssueTooltip(issue, proj, hasOnlyStart);
 
   // Progress badge tooltip (carries flexibility too — hover-only signal)
   const progressTooltip = [
