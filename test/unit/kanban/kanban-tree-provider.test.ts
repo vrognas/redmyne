@@ -117,6 +117,19 @@ describe("kanban-tree-provider", () => {
     expect(unlogged.contextValue).toBe("task-done-unlogged");
   });
 
+  it("renders the task title bold even when it ends in a space", () => {
+    const provider = new KanbanTreeProvider(
+      createController([]) as unknown as KanbanController
+    );
+    const item = provider.getTreeItem({
+      type: "task",
+      task: createTask({ title: "Wrap up " }), // trailing space breaks **...**
+    });
+    const value = (item.tooltip as vscode.MarkdownString).value;
+    expect(value).toContain("**Wrap up**");
+    expect(value).not.toContain("**Wrap up **");
+  });
+
   it("restores and persists filter/sort state", () => {
     const controller = createController([]);
     const globalState = createMemento({

@@ -1277,6 +1277,21 @@ describe("buildEntryTooltip", () => {
     expect(draft.value).not.toContain("redmyne.openTimeEntryInBrowser");
   });
 
+  it("renders the issue title in bold, not as an 'Issue:' label", () => {
+    const tip = buildEntryTooltip({
+      entry: baseEntry,
+      issueId: 123,
+      issueSubject: "Fix login ", // trailing space must not break the bold
+      projectName: "Web",
+      clientName: "Acme",
+      isDraft: false,
+      isDraftModified: false,
+      showUser: false,
+    });
+    expect(tip.value).toContain("**#123 Fix login**");
+    expect(tip.value).not.toContain("**Issue:**");
+  });
+
   it("shows the issue's estimated and spent hours when provided", () => {
     const tip = buildEntryTooltip({
       entry: baseEntry,

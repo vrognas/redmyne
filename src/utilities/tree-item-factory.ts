@@ -164,14 +164,13 @@ function createIssueTooltip(
     d && d.trim() ? d : "_Not set_";
   md.appendMarkdown(`**Start:** ${dateOrMissing(issue.start_date)}  \n`);
   md.appendMarkdown(`**Due:** ${dateOrMissing(issue.due_date)}  \n`);
-  if (flexibility) {
-    const progress = estHours > 0 ? Math.round((spentHours / estHours) * 100) : 0;
-    md.appendMarkdown(`**Progress:** ${formatHoursAsHHMM(spentHours)} / ${formatHoursAsHHMM(estHours)} (${progress}%)`);
-    if (flexibility.status !== "completed") {
-      md.appendMarkdown(`  \n**Remaining:** ${flexibility.daysRemaining}d · ${formatHoursAsHHMM(flexibility.hoursRemaining)}h`);
-    }
-  } else if (estHours > 0 || spentHours > 0) {
-    md.appendMarkdown(`**Hours:** ${formatHoursAsHHMM(spentHours)} / ${formatHoursAsHHMM(estHours)}`);
+  // Estimated · Spent (%) — same format as the Time Entries / Kanban tooltips.
+  if (estHours > 0 || spentHours > 0) {
+    const pct = estHours > 0 ? ` (${Math.round((spentHours / estHours) * 100)}%)` : "";
+    md.appendMarkdown(`**Estimated:** ${formatHoursAsHHMM(estHours)} · **Spent:** ${formatHoursAsHHMM(spentHours)}${pct}`);
+  }
+  if (flexibility && flexibility.status !== "completed") {
+    md.appendMarkdown(`  \n**Remaining:** ${flexibility.daysRemaining}d · ${formatHoursAsHHMM(flexibility.hoursRemaining)}h`);
   }
   md.appendMarkdown("\n\n");
 

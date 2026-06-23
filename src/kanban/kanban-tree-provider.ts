@@ -9,6 +9,7 @@ import {
 } from "./kanban-state";
 import { formatHoursAsHHMM, formatSecondsAsMMSS } from "../utilities/time-input";
 import { formatLocalDate } from "../utilities/date-utils";
+import { escapeMarkdown } from "../utilities/markdown-escape";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
 
 // Filter/sort persistence keys
@@ -300,7 +301,7 @@ export class KanbanTreeProvider
     // Tooltip
     const md = new vscode.MarkdownString();
     md.supportThemeIcons = true;
-    md.appendMarkdown(`**${task.title}**\n\n`);
+    md.appendMarkdown(`**${escapeMarkdown(task.title.trim())}**\n\n`);
     md.appendMarkdown(
       `Linked to: #${task.linkedIssueId} ${task.linkedIssueSubject}\n\n`
     );

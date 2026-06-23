@@ -188,14 +188,17 @@ export function buildEntryTooltip(info: EntryTooltipInfo): vscode.MarkdownString
 
   const tooltip = new vscode.MarkdownString(
     draftLine +
-    `**Issue:** #${issueId} ${escapeMarkdown(issueSubject)}\n\n` +
+    // Bold issue title (trimmed so a trailing space can't break the bold),
+    // then issue facts -> location -> this-entry facts -> link, to mirror the
+    // Issues / Kanban / Gantt tooltips.
+    `**#${issueId} ${escapeMarkdown(issueSubject.trim())}**\n\n` +
       issueHoursLine +
-      userLine +
       (clientName ? `**Client:** ${escapeMarkdown(clientName)}\n\n` : "") +
       (projectName ? `**Project:** ${escapeMarkdown(projectName)}\n\n` : "") +
       `**Hours:** ${formatHoursAsHHMM(entry.hours)}\n\n` +
       `**Activity:** ${escapeMarkdown(entry.activity?.name || "Unknown")}\n\n` +
       `**Date:** ${entry.spent_on}\n\n` +
+      userLine +
       `**Comments:** ${escapeMarkdown(entry.comments || "(none)")}\n\n` +
       entryIdLine +
       (isDraft ? "" : `---\n\n[Open Issue in Browser](command:redmyne.openTimeEntryInBrowser?${commandArgs})`)
