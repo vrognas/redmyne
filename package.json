@@ -1630,7 +1630,7 @@
         {
           "command": "redmyne.quickLogTime",
           "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue-active/",
-          "group": "inline@1"
+          "group": "inline@3"
         },
         {
           "command": "redmyne.addIssueToKanban",
@@ -1640,7 +1640,7 @@
         {
           "command": "redmyne.openIssueInGantt",
           "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue/",
-          "group": "inline@3"
+          "group": "inline@1"
         },
         {
           "command": "redmyne.copyIssueUrl",
@@ -1690,7 +1690,7 @@
         {
           "command": "redmyne.kanban.startTimer",
           "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-(todo|doing-initialized)$/",
-          "group": "inline"
+          "group": "inline@2"
         },
         {
           "command": "redmyne.kanban.pauseTimer",
@@ -1700,7 +1700,7 @@
         {
           "command": "redmyne.kanban.pauseTimer",
           "when": "view == 'redmyne-explorer-kanban' && viewItem == 'task-doing-working'",
-          "group": "inline"
+          "group": "inline@2"
         },
         {
           "command": "redmyne.kanban.resumeTimer",
@@ -1710,7 +1710,7 @@
         {
           "command": "redmyne.kanban.resumeTimer",
           "when": "view == 'redmyne-explorer-kanban' && viewItem == 'task-doing-paused'",
-          "group": "inline"
+          "group": "inline@2"
         },
         {
           "command": "redmyne.kanban.stopTimer",
@@ -1745,7 +1745,7 @@
         {
           "command": "redmyne.kanban.markDone",
           "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-(todo|doing)/",
-          "group": "inline"
+          "group": "inline@3"
         },
         {
           "command": "redmyne.kanban.transferToTimeEntries",
@@ -1755,7 +1755,7 @@
         {
           "command": "redmyne.kanban.transferToTimeEntries",
           "when": "view == 'redmyne-explorer-kanban' && viewItem == 'task-done-unlogged'",
-          "group": "inline"
+          "group": "inline@3"
         },
         {
           "command": "redmyne.kanban.reopen",
@@ -1805,7 +1805,7 @@
         {
           "command": "redmyne.kanban.showInGantt",
           "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-/",
-          "group": "inline"
+          "group": "inline@1"
         },
         {
           "command": "redmyne.kanban.copySubject",
