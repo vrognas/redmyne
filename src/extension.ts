@@ -213,6 +213,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   cleanupResources.kanbanTreeProvider = kanbanTreeProvider;
   cleanupResources.kanbanTreeView = kanbanTreeView;
 
+  // Live "now" anchor: pulse the running Kanban timer's issue on the Gantt.
+  // Debounced — only push when the active issue id actually changes, not every
+  // per-second tick (onTasksChange fires on timer phase transitions).
+  let lastActiveIssueId: number | null = null;
+  context.subscriptions.push(
+    kanbanController.onTasksChange(() => {
+      const activeIssueId = kanbanController.getActiveTask()?.linkedIssueId ?? null;
+      if (activeIssueId !== lastActiveIssueId) {
+        lastActiveIssueId = activeIssueId;
+        GanttPanel.currentPanel?.setActiveIssue(activeIssueId);
+      }
+    })
+  );
+
   // Register time entry commands
   registerTimeEntryCommands(context, {
     getServer: () => projectsTree.server,

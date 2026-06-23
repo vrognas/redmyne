@@ -1306,6 +1306,33 @@ svg {
   animation: highlight-pulse 0.5s ease-in-out 4;
 }
 
+/* Live "now" anchor: the issue with a running Kanban timer pulses indefinitely
+   (green = actively working), distinct from the transient focus highlight. */
+@keyframes pulse-now {
+
+  0%,
+  100% {
+    filter: drop-shadow(0 0 4px var(--vscode-charts-green));
+  }
+
+  50% {
+    filter: drop-shadow(0 0 10px var(--vscode-charts-green));
+  }
+}
+
+.issue-bar.pulse-active {
+  animation: pulse-now 1.2s ease-in-out infinite;
+}
+
+.issue-bar.pulse-active .bar-outline {
+  stroke: var(--vscode-charts-green);
+  stroke-width: 2.5;
+}
+
+.issue-label.pulse-active {
+  animation: pulse-now 1.2s ease-in-out infinite;
+}
+
 .temp-link-arrow {
   pointer-events: none;
 }

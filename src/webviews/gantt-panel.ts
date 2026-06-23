@@ -1169,6 +1169,31 @@ export class GanttPanel {
     });
   }
 
+  /** Issue with a running Kanban timer — pulsed as the "now" anchor (null = none). */
+  private _activeIssueId: number | null = null;
+
+  /**
+   * Pulse the active issue's bar (the running-timer "now" anchor). Pass null to
+   * clear. Stored so it can be re-applied after a re-render (see _reapplyNow).
+   */
+  public setActiveIssue(issueId: number | null): void {
+    this._activeIssueId = issueId;
+    this._panel.webview.postMessage({
+      command: "setActiveIssue",
+      issueId,
+    });
+  }
+
+  /** Re-send the active-issue pulse after a render, so a reopened Gantt keeps it. */
+  private _reapplyNow(): void {
+    if (this._activeIssueId !== null) {
+      this._panel.webview.postMessage({
+        command: "setActiveIssue",
+        issueId: this._activeIssueId,
+      });
+    }
+  }
+
   /**
    * Set callback for when filter changes in Gantt UI
    */
@@ -1293,6 +1318,7 @@ export class GanttPanel {
           this._pendingRender = undefined;
           void this._panel.webview.postMessage({ command: "render", payload });
         }
+        this._reapplyNow();
         break;
       case "openIssue":
         if (message.issueId && this._server) {

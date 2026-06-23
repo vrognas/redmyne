@@ -124,6 +124,38 @@ describe("gantt panel private coverage", () => {
     );
   });
 
+  it("setActiveIssue posts the active issue id to the webview", () => {
+    const mock = createMockPanel();
+    const extensionUri = vscode.Uri.parse("file:///ext");
+    const server = { options: { address: "https://redmine.example" } };
+    const draftModeManager = {
+      isEnabled: false,
+      queue: { count: 0, getAll: vi.fn(() => []), onDidChange: vi.fn(() => ({ dispose: vi.fn() })) },
+      onDidChangeEnabled: vi.fn(() => ({ dispose: vi.fn() })),
+      onDidQueueChange: vi.fn(() => ({ dispose: vi.fn() })),
+    };
+
+    GanttPanel.restore(
+      mock.panel,
+      extensionUri,
+      () => server as never,
+      () => draftModeManager as never
+    );
+    const panel = GanttPanel.currentPanel as any;
+
+    panel.setActiveIssue(123);
+    expect(mock.webview.postMessage).toHaveBeenCalledWith({
+      command: "setActiveIssue",
+      issueId: 123,
+    });
+
+    panel.setActiveIssue(null);
+    expect(mock.webview.postMessage).toHaveBeenCalledWith({
+      command: "setActiveIssue",
+      issueId: null,
+    });
+  });
+
   it("covers supplemental loaders and refresh branch gating", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-02-04T12:00:00Z"));

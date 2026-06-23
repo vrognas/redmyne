@@ -707,6 +707,21 @@ function initializeGantt(state, rowWindow) {
       if (menu) menu.classList.toggle('active', enabled);
     }
 
+    // The issue with a running Kanban timer — pulsed as the live "now" anchor.
+    // Persistent (unlike the transient .highlighted flash); re-applied on every
+    // row-window refresh so it survives windowed row recycling.
+    let activeIssueId = null;
+    function applyPulse() {
+      document.querySelectorAll('.pulse-active').forEach((el) => el.classList.remove('pulse-active'));
+      if (activeIssueId != null) {
+        document
+          .querySelectorAll(
+            '.issue-bar[data-issue-id="' + activeIssueId + '"], .issue-label[data-issue-id="' + activeIssueId + '"]'
+          )
+          .forEach((el) => el.classList.add('pulse-active'));
+      }
+    }
+
     window.__ganttHandleExtensionMessage = (message) => {
       const toggleCfg = viewToggleTable[message.command];
       if (toggleCfg) {
@@ -762,6 +777,10 @@ function initializeGantt(state, rowWindow) {
         // Reveal + focus + highlight an issue. centerBar centers the bar in
         // the visible timeline; scrollToKey mounts the (likely-unmounted) row.
         scrollToAndHighlight(message.issueId, { centerBar: true, focusLabel: true, duration: 2000 });
+      } else if (message.command === 'setActiveIssue') {
+        // Pulse the running-timer issue's bar + label (null clears it).
+        activeIssueId = message.issueId;
+        applyPulse();
       }
     };
 
@@ -1205,6 +1224,7 @@ function initializeGantt(state, rowWindow) {
       updateSelectionUI();
       applyFocusClasses();
       applyPinnedHighlight();
+      applyPulse();
       // A hovered element that unmounts never gets its mouseleave — drop the
       // hover state; the next pointer move re-applies it
       clearHoverHighlight();

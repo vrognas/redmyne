@@ -36,6 +36,8 @@ const hoisted = vi.hoisted(() => {
   };
   const kanbanController = {
     dispose: vi.fn(),
+    onTasksChange: vi.fn(() => ({ dispose: vi.fn() })),
+    getActiveTask: vi.fn(() => undefined),
   };
   const kanbanStatusBar = {
     dispose: vi.fn(),
