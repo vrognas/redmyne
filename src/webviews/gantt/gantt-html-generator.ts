@@ -102,6 +102,40 @@ function buildDependencyTooltip(
   return `${header} ${deps.length}:\n${lines}${overflow}\n\n${footer}`;
 }
 
+/**
+ * The Progress / Estimated / Remaining / Spent lines shared by the issue-bar
+ * tooltip and the progress-badge tooltip. Two surfaces, two wording knobs:
+ * `remainingLabel` ("internal estimate" vs "internal") and `spentVariant`
+ * ("effective" appends the "= total"; "contributed" omits it). Flexibility and
+ * overdue tails are NOT emitted here — each caller owns its own trailing line.
+ * Remaining is null (and filtered out) when there's no internal estimate.
+ */
+function buildHoursProgressLines(args: {
+  estimatedHours: number | null;
+  spentHours: number | null;
+  doneRatio: number;
+  isFallbackProgress: boolean;
+  visualDoneRatio: number;
+  isManualDone: boolean;
+  internalHoursRemaining: number | null;
+  contributedHours: number;
+  effectiveSpentHours: number;
+  remainingLabel: string;
+  spentVariant: "effective" | "contributed";
+}): (string | null)[] {
+  const { estimatedHours, spentHours, doneRatio, isFallbackProgress, visualDoneRatio, isManualDone, internalHoursRemaining, contributedHours, effectiveSpentHours, remainingLabel, spentVariant } = args;
+  return [
+    `Progress: ${doneRatio}%${isFallbackProgress ? ` (~${visualDoneRatio}% from time)` : ""}${isManualDone && doneRatio > 0 ? " (manual)" : ""}`,
+    `Estimated: ${formatHoursAsTime(estimatedHours)}`,
+    internalHoursRemaining !== null
+      ? `Remaining: ${formatHoursAsTime(internalHoursRemaining)} (${remainingLabel})`
+      : null,
+    contributedHours > 0
+      ? `Spent: ${formatHoursAsTime(spentHours)} + ${formatHoursAsTime(contributedHours)} contributed${spentVariant === "effective" ? ` = ${formatHoursAsTime(effectiveSpentHours)}` : ""}`
+      : `Spent: ${formatHoursAsTime(spentHours)}`,
+  ];
+}
+
 const DAY_KEYS: (keyof WeeklySchedule)[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /** Get day name key for WeeklySchedule lookup (local calendar frame) */
@@ -780,12 +814,19 @@ function generateRegularBar(
     `Start: ${formatDateWithWeekday(issue.start_date)}`,
     `Due: ${hasOnlyStart ? "(no due date)" : formatDateWithWeekday(issue.due_date)}`,
     `───`,
-    `Progress: ${doneRatio}%${isFallbackProgress ? ` (~${visualDoneRatio}% from time)` : ""}${isManualDone && doneRatio > 0 ? " (manual)" : ""}`,
-    `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
-    issueInternalEstimate ? `Remaining: ${formatHoursAsTime(issueInternalEstimate.hoursRemaining)} (internal estimate)` : null,
-    contributedHours > 0
-      ? `Spent: ${formatHoursAsTime(issue.spent_hours)} + ${formatHoursAsTime(contributedHours)} contributed = ${formatHoursAsTime(effectiveSpentHours)}`
-      : `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
+    ...buildHoursProgressLines({
+      estimatedHours: issue.estimated_hours,
+      spentHours: issue.spent_hours,
+      doneRatio,
+      isFallbackProgress,
+      visualDoneRatio,
+      isManualDone,
+      internalHoursRemaining: issueInternalEstimate ? issueInternalEstimate.hoursRemaining : null,
+      contributedHours,
+      effectiveSpentHours,
+      remainingLabel: "internal estimate",
+      spentVariant: "effective",
+    }),
     daysLate > 0
       ? `⏰ Overdue ${daysLate}d${ghostDays > 0 ? ` — ~${formatHoursAsTime(ghostHours)} left needs ${ghostDays} day${ghostDays === 1 ? "" : "s"} from today` : ""}`
       : overrunDays > 0
@@ -795,12 +836,19 @@ function generateRegularBar(
 
   // Progress badge tooltip (carries flexibility too — hover-only signal)
   const progressTooltip = [
-    `Progress: ${doneRatio}%${isFallbackProgress ? ` (~${visualDoneRatio}% from time)` : ""}${isManualDone && doneRatio > 0 ? " (manual)" : ""}`,
-    `Estimated: ${formatHoursAsTime(issue.estimated_hours)}`,
-    issueInternalEstimate ? `Remaining: ${formatHoursAsTime(issueInternalEstimate.hoursRemaining)} (internal)` : null,
-    contributedHours > 0
-      ? `Spent: ${formatHoursAsTime(issue.spent_hours)} + ${formatHoursAsTime(contributedHours)} contributed`
-      : `Spent: ${formatHoursAsTime(issue.spent_hours)}`,
+    ...buildHoursProgressLines({
+      estimatedHours: issue.estimated_hours,
+      spentHours: issue.spent_hours,
+      doneRatio,
+      isFallbackProgress,
+      visualDoneRatio,
+      isManualDone,
+      internalHoursRemaining: issueInternalEstimate ? issueInternalEstimate.hoursRemaining : null,
+      contributedHours,
+      effectiveSpentHours,
+      remainingLabel: "internal",
+      spentVariant: "contributed",
+    }),
     flexibilityLine(flexPct),
   ].filter(Boolean).join("\n");
 

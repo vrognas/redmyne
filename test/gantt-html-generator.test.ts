@@ -253,6 +253,77 @@ describe("gantt-html-generator", () => {
       expect(mainTitle.indexOf("Assigned to:")).toBeLessThan(mainTitle.indexOf("On track"));
     });
 
+    it("bar and progress-badge tooltips share the hours block with per-surface wording", () => {
+      const row: GanttRow = {
+        type: "issue",
+        id: 900,
+        label: "Hours Test",
+        depth: 0,
+        collapseKey: "issue-900",
+        parentKey: "",
+        isVisible: true,
+        isExpanded: false,
+        hasChildren: false,
+        issue: {
+          id: 900,
+          subject: "Hours Test",
+          project: "Project",
+          projectId: 1,
+          parentId: null,
+          start_date: "2025-01-10",
+          due_date: "2025-01-20",
+          done_ratio: 30,
+          estimated_hours: 16,
+          spent_hours: 5,
+          status: "on-track",
+          statusName: "In Progress",
+          isClosed: false,
+          isExternal: false,
+          isAdHoc: false,
+          assignee: null,
+          assigneeId: null,
+          flexibilityPercent: 10,
+          relations: [],
+          blocks: [],
+          blockedBy: [],
+        },
+      };
+      const mockContext = {
+        barHeight: 22,
+        barPadding: 3,
+        barContentHeight: 16,
+        timelineWidth: 1000,
+        minDate: new Date("2025-01-01"),
+        maxDate: new Date("2025-01-31"),
+        today: new Date("2025-01-15"),
+        viewFocus: "project" as const,
+        currentUserId: null,
+        schedule: { Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0, Sun: 0 },
+        issueScheduleMap: new Map(),
+        contributionSources: new Map([[900, [{ hours: 2 }]]]),
+        getStatusColor: () => "var(--vscode-charts-blue)",
+        getStatusTextColor: () => "white",
+        getStatusOpacity: () => 0.6,
+        getStatusDescription: () => "On track",
+        getInternalEstimate: () => ({ hoursRemaining: 3 }),
+        hasPrecedence: () => false,
+        isAutoUpdateEnabled: () => true,
+      };
+
+      const svg = generateIssueBar(row, mockContext as any);
+      const titles = [...svg.matchAll(/<title>([\s\S]*?)<\/title>/g)].map((m) => m[1]);
+      const barTitle = titles.find((t) => t.includes("Assigned to:"))!;
+      const badgeTitle = titles.find((t) => t.includes("Progress:") && !t.includes("Assigned to:"))!;
+
+      // Bar: Remaining "(internal estimate)" + Spent shows the "= effective" total.
+      expect(barTitle).toContain("Remaining: 3:00 (internal estimate)");
+      expect(barTitle).toContain("Spent: 5:00 + 2:00 contributed = 7:00");
+      // Badge: shorter "(internal)" + Spent with no total.
+      expect(badgeTitle).toContain("Remaining: 3:00 (internal)");
+      expect(badgeTitle).toContain("Spent: 5:00 + 2:00 contributed");
+      expect(badgeTitle).not.toContain("contributed = ");
+    });
+
     it("dependency badge tooltips render blocks and blockers consistently", () => {
       const row: GanttRow = {
         type: "issue",
