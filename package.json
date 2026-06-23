@@ -496,6 +496,11 @@
         "icon": "$(arrow-right)"
       },
       {
+        "command": "redmyne.kanban.transferToTimeEntries",
+        "title": "Transfer to Time Entries",
+        "icon": "$(export)"
+      },
+      {
         "command": "redmyne.kanban.moveUp",
         "title": "Move Up",
         "icon": "$(arrow-up)"
@@ -1216,6 +1221,10 @@
           "when": "false"
         },
         {
+          "command": "redmyne.kanban.transferToTimeEntries",
+          "when": "false"
+        },
+        {
           "command": "redmyne.kanban.moveUp",
           "when": "false"
         },
@@ -1711,6 +1720,16 @@
         {
           "command": "redmyne.kanban.markDone",
           "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-(todo|doing)/",
+          "group": "inline"
+        },
+        {
+          "command": "redmyne.kanban.transferToTimeEntries",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem == 'task-done-unlogged'",
+          "group": "kanban@1"
+        },
+        {
+          "command": "redmyne.kanban.transferToTimeEntries",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem == 'task-done-unlogged'",
           "group": "inline"
         },
         {

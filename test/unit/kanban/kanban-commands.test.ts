@@ -10,6 +10,7 @@ import * as errorFeedback from "../../../src/utilities/error-feedback";
 import * as customFieldPicker from "../../../src/utilities/custom-field-picker";
 import * as closedIssueGuard from "../../../src/utilities/closed-issue-guard";
 import * as statusBar from "../../../src/utilities/status-bar";
+import { formatLocalDate } from "../../../src/utilities/date-utils";
 
 type RegisteredHandler = (...args: unknown[]) => unknown;
 type ControllerMock = ReturnType<typeof createController>;
@@ -807,6 +808,55 @@ describe("registerKanbanCommands", () => {
     expect(controller.resumeTimer).toHaveBeenCalledWith("defer-pause");
     expect(controller.accruePending).not.toHaveBeenCalled();
     expect(controller.stopTimer).not.toHaveBeenCalled();
+  });
+
+  it("transfers an unlogged Done card: creates a time entry and deletes the card", async () => {
+    const task = createTask({
+      id: "done-x",
+      linkedIssueId: 90,
+      title: "Wrap up",
+      completedAt: "2026-02-07T12:00:00.000Z",
+      loggedHours: 0,
+      pendingSeconds: 3600, // 1h banked
+      activityId: 7,
+    });
+    const server = createServer({
+      addTimeEntry: vi.fn().mockResolvedValue(undefined),
+      getTimeEntryCustomFields: vi.fn().mockResolvedValue([]),
+    });
+    const { controller } = registerCommands({ server, tasks: [task] });
+    vi.mocked(vscode.window.showWarningMessage).mockResolvedValue("Transfer" as never);
+
+    await handlers.get("redmyne.kanban.transferToTimeEntries")?.({ task });
+
+    const expectedDate = formatLocalDate(new Date("2026-02-07T12:00:00.000Z"));
+    expect(server.addTimeEntry).toHaveBeenCalledWith(
+      90,
+      7,
+      "1",
+      "Wrap up",
+      expectedDate,
+      undefined
+    );
+    expect(controller.deleteTask).toHaveBeenCalledWith("done-x");
+  });
+
+  it("refuses to transfer a Done card that is already logged", async () => {
+    const task = createTask({
+      id: "done-logged",
+      completedAt: "2026-02-07T12:00:00.000Z",
+      loggedHours: 1.5,
+    });
+    const server = createServer({ addTimeEntry: vi.fn() });
+    const { controller } = registerCommands({ server, tasks: [task] });
+
+    await handlers.get("redmyne.kanban.transferToTimeEntries")?.({ task });
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      "Time already logged on this card"
+    );
+    expect(server.addTimeEntry).not.toHaveBeenCalled();
+    expect(controller.deleteTask).not.toHaveBeenCalled();
   });
 
   it("covers configure timer progress bar and unit duration branches", async () => {

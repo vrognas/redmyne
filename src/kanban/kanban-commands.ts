@@ -8,6 +8,8 @@ import { showActionableError } from "../utilities/error-feedback";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { promptForRequiredCustomFields } from "../utilities/custom-field-picker";
 import { confirmLogTimeOnClosedIssue } from "../utilities/closed-issue-guard";
+import { parseTimeInput, validateTimeInput } from "../utilities/time-input";
+import { formatLocalDate } from "../utilities/date-utils";
 import { KanbanTreeProvider } from "./kanban-tree-provider";
 
 interface TaskTreeItem {
@@ -39,8 +41,10 @@ interface LogTimeFlowArgs {
   server: IRedmineServer;
   controller: KanbanController;
   task: KanbanTask;
-  /** Pre-rounded hours to log (already includes any deferred minutes). */
+  /** Pre-rounded hours to log. */
   roundedHours: number;
+  /** Optional YYYY-MM-DD date for the entry; defaults to today when omitted. */
+  spentOn?: string;
   /**
    * Optional confirmation prompt shown after custom-field/closed-issue checks
    * but before writing the time entry. Return false to abort silently.
@@ -72,6 +76,7 @@ async function logTimeFlow({
   controller,
   task,
   roundedHours,
+  spentOn,
   confirm,
   onLogged,
   successMessage,
@@ -93,7 +98,7 @@ async function logTimeFlow({
       task.activityId ?? 0,
       roundedHours.toString(),
       task.title,
-      undefined,
+      spentOn,
       customFieldValues
     );
     await controller.addLoggedHours(task.id, roundedHours);
@@ -693,6 +698,87 @@ export function registerKanbanCommands(
           onLogged: () =>
             controller.startTimer(task.id, task.activityId ?? 0, task.activityName ?? "", true),
           successMessage: `Logged ${roundedHours}h, timer restarted${pendingNote}`,
+        });
+      }
+    )
+  );
+
+  // Transfer an unlogged Done card to Time Entries (creates the entry, clears the card)
+  disposables.push(
+    vscode.commands.registerCommand(
+      "redmyne.kanban.transferToTimeEntries",
+      async (item: TaskTreeItem) => {
+        const task = item?.task;
+        if (!task) return;
+        if (getTaskStatus(task) !== "done") {
+          vscode.window.showErrorMessage("Only Done cards can be transferred");
+          return;
+        }
+        if (task.loggedHours > 0) {
+          vscode.window.showErrorMessage("Time already logged on this card");
+          return;
+        }
+
+        const server = getServer();
+        if (!server) {
+          void showActionableError("Redmyne not configured", [
+            { title: "Configure", command: "redmyne.configure" },
+          ]);
+          return;
+        }
+
+        // Activity: the card's, or pick one when it was never timed.
+        let activityId = task.activityId;
+        if (!activityId) {
+          const picked = await pickActivityForProject(
+            server,
+            task.linkedProjectId,
+            "Transfer to Time Entries",
+            `#${task.linkedIssueId}`
+          );
+          if (!picked) return;
+          activityId = picked.activityId;
+        }
+
+        // Hours: banked pending, or prompt when nothing was banked.
+        const pendingSeconds = task.pendingSeconds ?? 0;
+        let roundedHours: number;
+        if (pendingSeconds > 0) {
+          roundedHours = Math.round((pendingSeconds / 3600) * 100) / 100;
+        } else {
+          const input = await vscode.window.showInputBox({
+            title: "Transfer to Time Entries",
+            prompt: `Hours for #${task.linkedIssueId}`,
+            placeHolder: "e.g. 1.5, 1:30, 1h 30min",
+            validateInput: (v) => validateTimeInput(v),
+          });
+          if (input === undefined) return;
+          const parsed = parseTimeInput(input);
+          if (parsed === null) return;
+          roundedHours = Math.round(parsed * 100) / 100;
+        }
+
+        // Date: the day the card was finished.
+        const spentOn = task.completedAt
+          ? formatLocalDate(new Date(task.completedAt))
+          : formatLocalDate(new Date());
+
+        await logTimeFlow({
+          server,
+          controller,
+          task: { ...task, activityId },
+          roundedHours,
+          spentOn,
+          confirm: async () => {
+            const choice = await vscode.window.showWarningMessage(
+              `Transfer ${roundedHours}h to #${task.linkedIssueId} on ${spentOn}?`,
+              { modal: true },
+              "Transfer"
+            );
+            return choice === "Transfer";
+          },
+          onLogged: () => controller.deleteTask(task.id),
+          successMessage: `Transferred ${roundedHours}h to #${task.linkedIssueId}`,
         });
       }
     )
