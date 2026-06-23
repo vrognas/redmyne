@@ -145,6 +145,21 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     expect(nodes.some((n) => n.contextValue === "running-timer")).toBe(false);
   });
 
+  it("reuses the running-row node for targeted per-minute refresh", async () => {
+    mockServer.getTimeEntries.mockResolvedValue({ time_entries: [] });
+    let accrued = 3600;
+    provider.setActiveTimer(() => ({ issueId: 7, subject: "X", accruedSeconds: accrued }));
+
+    const first = (await provider.getChildren())[0];
+    const second = (await provider.getChildren())[0];
+    expect(second).toBe(first); // stable reference -> VS Code can target-refresh it
+    expect(first.label).toContain("1:00");
+
+    accrued = 7200;
+    provider.refreshRunningRowTime();
+    expect(first.label).toContain("2:00"); // updated in place, no full-tree rebuild
+  });
+
   it("returns loading state on first call then actual data", async () => {
     const todayEntries: TimeEntry[] = [
       {

@@ -229,6 +229,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   private static readonly HIDE_ZERO_DAYS_KEY = "redmyne.timeEntries.hideZeroDays";
   private globalState: vscode.Memento;
   private getActiveTimer?: () => ActiveTimerInfo | undefined;
+  private runningNode: TimeEntryNode | null = null; // cached so the row can be target-refreshed
 
   constructor(globalState: vscode.Memento) {
     super();
@@ -528,23 +529,51 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     this._onDidChangeTreeData.fire(undefined);
   }
 
+  /** Compact "now" row label: "#7311 · 0:42 ⏱". */
+  private runningRowLabel(active: ActiveTimerInfo): string {
+    return `#${active.issueId} · ${formatHoursAsHHMM(active.accruedSeconds / 3600)} ⏱`;
+  }
+
   /**
    * Provisional live "now" row pinned at the top of the pane while a Kanban
    * timer runs. Inert (contextValue "running-timer" matches no menu, no _entry),
-   * so it can't be edited/deleted/copied — it isn't a real entry yet.
+   * so it can't be edited/deleted/copied — it isn't a real entry yet. The node
+   * object is cached and mutated in place so {@link refreshRunningRowTime} can
+   * target-refresh just this row instead of rebuilding the whole tree.
    */
   private buildRunningNode(): TimeEntryNode | null {
     const active = this.getActiveTimer?.();
-    if (!active) return null;
-    return {
-      id: "running-timer",
-      label: `#${active.issueId} · ${formatHoursAsHHMM(active.accruedSeconds / 3600)} ⏱`,
-      description: active.subject,
-      iconPath: new vscode.ThemeIcon("loading~spin"),
-      collapsibleState: vscode.TreeItemCollapsibleState.None,
-      type: "running",
-      contextValue: "running-timer",
-    };
+    if (!active) {
+      this.runningNode = null;
+      return null;
+    }
+    if (this.runningNode) {
+      this.runningNode.label = this.runningRowLabel(active);
+      this.runningNode.description = active.subject;
+    } else {
+      this.runningNode = {
+        id: "running-timer",
+        label: this.runningRowLabel(active),
+        description: active.subject,
+        iconPath: new vscode.ThemeIcon("loading~spin"),
+        collapsibleState: vscode.TreeItemCollapsibleState.None,
+        type: "running",
+        contextValue: "running-timer",
+      };
+    }
+    return this.runningNode;
+  }
+
+  /**
+   * Re-render ONLY the running row (its accruing time, once per minute) — a
+   * targeted fire that skips the full-tree rebuild {@link notifyNowChanged}
+   * does. No-op when the row isn't present.
+   */
+  refreshRunningRowTime(): void {
+    const active = this.getActiveTimer?.();
+    if (!active || !this.runningNode) return;
+    this.runningNode.label = this.runningRowLabel(active);
+    this._onDidChangeTreeData.fire(this.runningNode);
   }
 
   async getChildren(element?: TimeEntryNode): Promise<TimeEntryNode[]> {

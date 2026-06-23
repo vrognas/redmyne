@@ -29,6 +29,7 @@ const hoisted = vi.hoisted(() => {
     setDraftQueue: vi.fn(),
     setActiveTimer: vi.fn(),
     notifyNowChanged: vi.fn(),
+    refreshRunningRowTime: vi.fn(),
   };
   const kanbanTreeView = {
     dispose: vi.fn(),
@@ -241,6 +242,7 @@ vi.mock("../../../src/trees/my-time-entries-tree", () => ({
     setDraftQueue = hoisted.myTimeEntriesTree.setDraftQueue;
     setActiveTimer = hoisted.myTimeEntriesTree.setActiveTimer;
     notifyNowChanged = hoisted.myTimeEntriesTree.notifyNowChanged;
+    refreshRunningRowTime = hoisted.myTimeEntriesTree.refreshRunningRowTime;
   },
 }));
 

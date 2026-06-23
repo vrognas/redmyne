@@ -243,7 +243,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const minute = info ? Math.floor(info.accruedSeconds / 60) : -1;
       if (minute !== lastShownMinute) {
         lastShownMinute = minute;
-        myTimeEntriesTree.notifyNowChanged();
+        myTimeEntriesTree.refreshRunningRowTime();
       }
     })
   );

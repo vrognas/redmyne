@@ -711,14 +711,20 @@ function initializeGantt(state, rowWindow) {
     // Persistent (unlike the transient .highlighted flash); re-applied on every
     // row-window refresh so it survives windowed row recycling.
     let activeIssueId = null;
+    let pulseApplied = false; // whether any .pulse-active is currently set
     function applyPulse() {
+      // onRefresh fires on every scroll; when there's no running timer and nothing
+      // is pulsed, skip the DOM scan entirely (the common case). While a timer IS
+      // active we must re-apply each refresh — windowing remounts the rows.
+      if (activeIssueId == null && !pulseApplied) return;
       document.querySelectorAll('.pulse-active').forEach((el) => el.classList.remove('pulse-active'));
+      pulseApplied = false;
       if (activeIssueId != null) {
-        document
-          .querySelectorAll(
-            '.issue-bar[data-issue-id="' + activeIssueId + '"], .issue-label[data-issue-id="' + activeIssueId + '"]'
-          )
-          .forEach((el) => el.classList.add('pulse-active'));
+        const els = document.querySelectorAll(
+          '.issue-bar[data-issue-id="' + activeIssueId + '"], .issue-label[data-issue-id="' + activeIssueId + '"]'
+        );
+        els.forEach((el) => el.classList.add('pulse-active'));
+        pulseApplied = els.length > 0;
       }
     }
 
