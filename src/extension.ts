@@ -213,27 +213,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   cleanupResources.kanbanTreeProvider = kanbanTreeProvider;
   cleanupResources.kanbanTreeView = kanbanTreeView;
 
-  // Feed the Time Entries "now" row from the active Kanban task.
-  myTimeEntriesTree.setActiveTimer(() => {
-    const t = kanbanController.getActiveTask();
-    if (!t) return undefined;
-    const workDur = kanbanController.getWorkDurationSeconds();
-    return {
-      issueId: t.linkedIssueId,
-      subject: t.linkedIssueSubject,
-      accruedSeconds: (t.pendingSeconds ?? 0) + (workDur - (t.timerSecondsLeft ?? workDur)),
-    };
-  });
+  // Feed the Time Entries "now" row from the active Kanban timer. getActiveTimerInfo
+  // is undefined when idle or on a keep-working break, and never double-counts a
+  // just-finished unit — see KanbanController.getActiveTimerInfo.
+  myTimeEntriesTree.setActiveTimer(() => kanbanController.getActiveTimerInfo());
 
-  // Live "now" anchor across views. On an active-issue change (start/stop/switch)
-  // pulse the Gantt bar (debounced — only on id-change, not per tick) and refresh
-  // the Time Entries running row's presence.
+  // Live "now" anchor across views. On an active-issue change (start/stop/switch/
+  // break) pulse the Gantt bar (debounced — only on id-change, not per tick) and
+  // refresh the Time Entries running row's presence.
   let lastActiveIssueId: number | null = null;
+  let lastShownMinute = -1;
   context.subscriptions.push(
     kanbanController.onTasksChange(() => {
-      const activeIssueId = kanbanController.getActiveTask()?.linkedIssueId ?? null;
+      const activeIssueId = kanbanController.getActiveTimerInfo()?.issueId ?? null;
       if (activeIssueId !== lastActiveIssueId) {
         lastActiveIssueId = activeIssueId;
+        lastShownMinute = -1; // a new task's first minute boundary must refresh
         GanttPanel.currentPanel?.setActiveIssue(activeIssueId);
         myTimeEntriesTree.notifyNowChanged();
       }
@@ -242,13 +237,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Tick the running row's accrued time once per minute (the status bar keeps the
   // per-second view; a per-second tree refresh would be too heavy).
-  let lastShownMinute = -1;
   context.subscriptions.push(
     kanbanController.onTimerTick(() => {
-      const t = kanbanController.getActiveTask();
-      const workDur = kanbanController.getWorkDurationSeconds();
-      const accrued = t ? (t.pendingSeconds ?? 0) + (workDur - (t.timerSecondsLeft ?? workDur)) : -1;
-      const minute = Math.floor(accrued / 60);
+      const info = kanbanController.getActiveTimerInfo();
+      const minute = info ? Math.floor(info.accruedSeconds / 60) : -1;
       if (minute !== lastShownMinute) {
         lastShownMinute = minute;
         myTimeEntriesTree.notifyNowChanged();

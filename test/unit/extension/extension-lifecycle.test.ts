@@ -40,8 +40,7 @@ const hoisted = vi.hoisted(() => {
     dispose: vi.fn(),
     onTasksChange: vi.fn(() => ({ dispose: vi.fn() })),
     onTimerTick: vi.fn(() => ({ dispose: vi.fn() })),
-    getActiveTask: vi.fn(() => undefined),
-    getWorkDurationSeconds: vi.fn(() => 2700),
+    getActiveTimerInfo: vi.fn(() => undefined),
   };
   const kanbanStatusBar = {
     dispose: vi.fn(),

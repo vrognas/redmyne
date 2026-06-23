@@ -218,6 +218,44 @@ describe("KanbanController Timer", () => {
     });
   });
 
+  describe("getActiveTimerInfo", () => {
+    it("reports pending plus the current unit's elapsed while running", async () => {
+      const task = await controller.addTask("T", 5, "Sub", 1, "P");
+      await controller.startTimer(task.id, 3, "Dev");
+      await controller.accruePending(task.id, 30);
+
+      vi.advanceTimersByTime(4000); // 4s elapsed of the 10s unit
+
+      expect(controller.getActiveTimerInfo()).toEqual({
+        issueId: 5,
+        subject: "Sub",
+        accruedSeconds: 34, // 30 banked + (10 - 6) elapsed
+      });
+    });
+
+    it("does not double-count a finished unit (timerSecondsLeft 0)", async () => {
+      const task = await controller.addTask("T", 5, "Sub", 1, "P");
+      await controller.startTimer(task.id, 3, "Dev");
+      await controller.accruePending(task.id, 10); // the completed unit, banked by the handler
+
+      vi.advanceTimersByTime(10000); // run to completion -> timerSecondsLeft 0
+
+      expect(controller.getActiveTimerInfo()?.accruedSeconds).toBe(10); // pending only, not 20
+    });
+
+    it("is undefined during a keep-working break", async () => {
+      controller.setBreakDurationSeconds(4);
+      const task = await controller.addTask("T", 5, "Sub", 1, "P");
+      await controller.startTimer(task.id, 3, "Dev");
+      await controller.accruePending(task.id, 10);
+
+      controller.keepWorking(task.id);
+
+      expect(controller.isOnBreak()).toBe(true);
+      expect(controller.getActiveTimerInfo()).toBeUndefined();
+    });
+  });
+
   describe("session recovery", () => {
     it("calculates elapsed time from lastActiveAt on restore", async () => {
       // Simulate previous session: timer was working with 100 seconds left, 30 seconds ago

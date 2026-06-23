@@ -344,6 +344,26 @@ export class KanbanController {
   }
 
   /**
+   * The running timer for the "now" anchor (Gantt pulse + Time Entries row):
+   * the working task with its accrued (to-be-logged) seconds. Returns undefined
+   * when idle or on a keep-working break — the just-finished unit is already in
+   * pendingSeconds, so a finished unit (timerSecondsLeft 0) contributes no extra
+   * elapsed, and break time isn't shown as live work here.
+   */
+  getActiveTimerInfo(): { issueId: number; subject: string; accruedSeconds: number } | undefined {
+    if (this.isOnBreak()) return undefined;
+    const task = this.getActiveTask();
+    if (!task) return undefined;
+    const left = task.timerSecondsLeft ?? this.workDurationSeconds;
+    const currentElapsed = left > 0 ? this.workDurationSeconds - left : 0;
+    return {
+      issueId: task.linkedIssueId,
+      subject: task.linkedIssueSubject,
+      accruedSeconds: (task.pendingSeconds ?? 0) + currentElapsed,
+    };
+  }
+
+  /**
    * Start timer for a task.
    * @param reset if true, force seconds back to full workDurationSeconds; otherwise
    *   preserve any existing timerSecondsLeft (e.g. set by moveToDoing).
