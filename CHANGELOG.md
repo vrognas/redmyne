@@ -17,6 +17,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 - **The side panes now read as a timeline.** Ordered top→bottom **Issues → Kanban → Time Entries** (future → present → past) — the whole sidebar is one vertical Kanban: Issues is the backlog, Kanban is the active set, Time Entries is the ledger.
 - **Kanban columns flow To Do → Doing → Done** (top→bottom), matching the same future→present→past direction.
+- **Kanban timer: Log it / Keep working.** When a work unit finishes you now choose **Log it** (bills the accrued time plus a full break and marks the card done) or **Keep working** (takes the break and rolls into the next unit). Time accumulates per-card until you log it, and the status bar shows banked-but-unlogged time. The old "Log & complete / continue" prompt and the global deferred-minutes pool are gone; **Defer Time** is now **Bank Time** — it banks elapsed time onto the current card for a later log.
 
 ### Fixed
 
