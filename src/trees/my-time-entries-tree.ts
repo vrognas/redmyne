@@ -169,39 +169,36 @@ export interface EntryTooltipInfo {
 export function buildEntryTooltip(info: EntryTooltipInfo): vscode.MarkdownString {
   const { entry, issueId, issueSubject, projectName, clientName, isDraft, isDraftModified, showUser } = info;
   const commandArgs = encodeURIComponent(JSON.stringify([issueId]));
-  const userLine = showUser && entry.user?.name ? `**User:** ${escapeMarkdown(entry.user.name)}\n\n` : "";
-  const draftLine = isDraft ? `**⚠️ DRAFT** - Not yet saved to server\n\n` :
+  const draftBanner = isDraft ? `**⚠️ DRAFT** - Not yet saved to server\n\n` :
     isDraftModified ? `**✏️ MODIFIED** - Changes pending save\n\n` : "";
-  const entryIdLine = isDraft ? "" : `**Entry ID:** ${entry.id}\n\n`;
 
-  // Issue-level totals (estimated / spent), matching the Issues-pane tooltip, so
-  // a hovered entry shows where its issue stands overall — not just this entry.
+  // One tight metadata block joined with soft breaks ("  \n"), matching the
+  // Issues-pane tooltip spacing: issue facts -> location -> this-entry facts.
   const est = info.estimatedHours;
   const spent = info.spentHours;
+  const lines: string[] = [];
   const hoursParts: string[] = [];
   if (est && est > 0) hoursParts.push(`**Estimated:** ${formatHoursAsHHMM(est)}`);
   if (spent !== undefined) {
     const pct = est && est > 0 ? ` (${Math.round((spent / est) * 100)}%)` : "";
     hoursParts.push(`**Spent:** ${formatHoursAsHHMM(spent)}${pct}`);
   }
-  const issueHoursLine = hoursParts.length > 0 ? hoursParts.join(" · ") + "\n\n" : "";
+  if (hoursParts.length > 0) lines.push(hoursParts.join(" · "));
+  if (clientName) lines.push(`**Client:** ${escapeMarkdown(clientName)}`);
+  if (projectName) lines.push(`**Project:** ${escapeMarkdown(projectName)}`);
+  lines.push(`**Hours:** ${formatHoursAsHHMM(entry.hours)}`);
+  lines.push(`**Activity:** ${escapeMarkdown(entry.activity?.name || "Unknown")}`);
+  lines.push(`**Date:** ${entry.spent_on}`);
+  if (showUser && entry.user?.name) lines.push(`**User:** ${escapeMarkdown(entry.user.name)}`);
+  lines.push(`**Comments:** ${escapeMarkdown(entry.comments || "(none)")}`);
+  if (!isDraft) lines.push(`**Entry ID:** ${entry.id}`);
 
   const tooltip = new vscode.MarkdownString(
-    draftLine +
-    // Bold issue title (trimmed so a trailing space can't break the bold),
-    // then issue facts -> location -> this-entry facts -> link, to mirror the
-    // Issues / Kanban / Gantt tooltips.
-    `**#${issueId} ${escapeMarkdown(issueSubject.trim())}**\n\n` +
-      issueHoursLine +
-      (clientName ? `**Client:** ${escapeMarkdown(clientName)}\n\n` : "") +
-      (projectName ? `**Project:** ${escapeMarkdown(projectName)}\n\n` : "") +
-      `**Hours:** ${formatHoursAsHHMM(entry.hours)}\n\n` +
-      `**Activity:** ${escapeMarkdown(entry.activity?.name || "Unknown")}\n\n` +
-      `**Date:** ${entry.spent_on}\n\n` +
-      userLine +
-      `**Comments:** ${escapeMarkdown(entry.comments || "(none)")}\n\n` +
-      entryIdLine +
-      (isDraft ? "" : `---\n\n[Open Issue in Browser](command:redmyne.openTimeEntryInBrowser?${commandArgs})`)
+    draftBanner +
+      // Bold issue title (trimmed so a trailing space can't break the bold).
+      `**#${issueId} ${escapeMarkdown(issueSubject.trim())}**\n\n` +
+      lines.join("  \n") +
+      (isDraft ? "" : `\n\n---\n\n[Open Issue in Browser](command:redmyne.openTimeEntryInBrowser?${commandArgs})`)
   );
   // Trust ONLY our own browser-link command: server text (comments,
   // subjects) is interpolated above, and blanket trust would let a
