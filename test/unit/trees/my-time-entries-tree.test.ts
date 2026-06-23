@@ -1277,6 +1277,25 @@ describe("buildEntryTooltip", () => {
     expect(draft.value).not.toContain("redmyne.openTimeEntryInBrowser");
   });
 
+  it("leads with Entry ID + Activity and trails Comments in its own section", () => {
+    const tip = buildEntryTooltip({
+      entry: baseEntry,
+      issueId: 123,
+      issueSubject: "Fix login",
+      projectName: "Web",
+      clientName: "Acme",
+      isDraft: false,
+      isDraftModified: false,
+      showUser: false,
+    });
+    const v = tip.value;
+    expect(v.indexOf("**Entry ID:**")).toBeLessThan(v.indexOf("**Hours:**"));
+    expect(v.indexOf("**Activity:**")).toBeLessThan(v.indexOf("**Hours:**"));
+    // Comments trail after a separator, not mid-block.
+    expect(v).toMatch(/---\n\n\*\*Comments:\*\*/);
+    expect(v.indexOf("**Comments:**")).toBeGreaterThan(v.indexOf("**Entry ID:**"));
+  });
+
   it("renders the issue title in bold, not as an 'Issue:' label", () => {
     const tip = buildEntryTooltip({
       entry: baseEntry,

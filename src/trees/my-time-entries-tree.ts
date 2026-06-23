@@ -172,11 +172,16 @@ export function buildEntryTooltip(info: EntryTooltipInfo): vscode.MarkdownString
   const draftBanner = isDraft ? `**⚠️ DRAFT** - Not yet saved to server\n\n` :
     isDraftModified ? `**✏️ MODIFIED** - Changes pending save\n\n` : "";
 
-  // One tight metadata block joined with soft breaks ("  \n"), matching the
-  // Issues-pane tooltip spacing: issue facts -> location -> this-entry facts.
+  // Mirror the Issues-pane tooltip: bold title -> tight metadata block (soft
+  // breaks) -> Comments in a trailing section -> browser link. Entry ID +
+  // Activity lead the block.
   const est = info.estimatedHours;
   const spent = info.spentHours;
   const lines: string[] = [];
+  if (!isDraft) lines.push(`**Entry ID:** ${entry.id}`);
+  lines.push(`**Activity:** ${escapeMarkdown(entry.activity?.name || "Unknown")}`);
+  lines.push(`**Hours:** ${formatHoursAsHHMM(entry.hours)}`);
+  lines.push(`**Date:** ${entry.spent_on}`);
   const hoursParts: string[] = [];
   if (est && est > 0) hoursParts.push(`**Estimated:** ${formatHoursAsHHMM(est)}`);
   if (spent !== undefined) {
@@ -186,19 +191,21 @@ export function buildEntryTooltip(info: EntryTooltipInfo): vscode.MarkdownString
   if (hoursParts.length > 0) lines.push(hoursParts.join(" · "));
   if (clientName) lines.push(`**Client:** ${escapeMarkdown(clientName)}`);
   if (projectName) lines.push(`**Project:** ${escapeMarkdown(projectName)}`);
-  lines.push(`**Hours:** ${formatHoursAsHHMM(entry.hours)}`);
-  lines.push(`**Activity:** ${escapeMarkdown(entry.activity?.name || "Unknown")}`);
-  lines.push(`**Date:** ${entry.spent_on}`);
   if (showUser && entry.user?.name) lines.push(`**User:** ${escapeMarkdown(entry.user.name)}`);
-  lines.push(`**Comments:** ${escapeMarkdown(entry.comments || "(none)")}`);
-  if (!isDraft) lines.push(`**Entry ID:** ${entry.id}`);
+
+  const comment = entry.comments?.trim();
+  const commentSection = comment ? `\n\n---\n\n**Comments:** ${escapeMarkdown(comment)}` : "";
+  const browserLink = isDraft
+    ? ""
+    : `\n\n[Open Issue in Browser](command:redmyne.openTimeEntryInBrowser?${commandArgs})`;
 
   const tooltip = new vscode.MarkdownString(
     draftBanner +
       // Bold issue title (trimmed so a trailing space can't break the bold).
       `**#${issueId} ${escapeMarkdown(issueSubject.trim())}**\n\n` +
       lines.join("  \n") +
-      (isDraft ? "" : `\n\n---\n\n[Open Issue in Browser](command:redmyne.openTimeEntryInBrowser?${commandArgs})`)
+      commentSection +
+      browserLink
   );
   // Trust ONLY our own browser-link command: server text (comments,
   // subjects) is interpolated above, and blanket trust would let a
