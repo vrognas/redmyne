@@ -13,6 +13,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - **Log Time inline on issues.** Issues-pane rows now have an inline **Log Time** hover button (next to Add to Kanban) — log straight from an issue without the right-click menu.
 - **Issue totals on a time-entry hover.** Hovering a time entry now shows its issue's **Estimated** and **Spent** hours (with %), matching the Issues-pane tooltip.
 - **Show in Gantt from Issues and Kanban.** Issues-pane rows and Kanban cards now have an inline **Show in Gantt** icon that opens the issue on the timeline — the same jump that time entries already had.
+- **Reset the Gantt view.** A new **⤺ Reset** toolbar button returns the Gantt to its broadest state — all issues, all projects, grouped by project, everything collapsed — in one click.
 
 ### Changed
 
@@ -20,6 +21,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - **Kanban column icons match their actions.** To Do is a **pin**, Doing a **play**, and Done a **checkmark** — mirroring the Start Timer / Mark Done buttons.
 - **Toolbar icons refreshed.** Kanban **Timer Settings** moved off the Doing column header into the view title bar (next to Collapse All); **Clear Done** is now an eraser; **Add to Kanban** a pin; the Time Entries **Time Sheet** button a calendar; and the Issues **Show Gantt** button the VS Code icon.
 - **Consistent issue hover tooltips.** Issues, Kanban, Time Entries, and the Gantt lead with the **bold issue title** then the **assignee**, with bold field labels and matching order. In the Gantt, the timeline **bar and the task-column now show the same** tooltip — one grouped layout (identity / schedule / progress / dependencies) with bold `Label:` prefixes, mirroring the side-pane tooltips.
+- **Show in Gantt is visibility-aware.** If the issue already passes the current Gantt filters it's revealed **in place** (scroll, focus, and pin-select its bar — press Esc to clear); if it's filtered out, the Gantt first broadens to all-projects/by-project, then reveals it. No more silently jumping you to a different project when you didn't need it.
 
 ### Fixed
 
