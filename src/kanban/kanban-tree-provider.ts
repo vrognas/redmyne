@@ -298,36 +298,32 @@ export class KanbanTreeProvider
       item.contextValue = `task-${status}`;
     }
 
-    // Tooltip
+    // Tooltip — one tight metadata block joined with soft breaks, bold labels,
+    // matching the Issues / Time Entries tooltips; description trails after ---.
     const md = new vscode.MarkdownString();
     md.supportThemeIcons = true;
-    md.appendMarkdown(`**${escapeMarkdown(task.title.trim())}**\n\n`);
-    md.appendMarkdown(
-      `Linked to: #${task.linkedIssueId} ${task.linkedIssueSubject}\n\n`
-    );
-    md.appendMarkdown(`Project: ${task.linkedProjectName}\n\n`);
-    md.appendMarkdown(`Priority: ${task.priority}\n\n`);
+    const lines: string[] = [
+      `**Linked to:** #${task.linkedIssueId} ${escapeMarkdown(task.linkedIssueSubject)}`,
+      `**Project:** ${escapeMarkdown(task.linkedProjectName)}`,
+      `**Priority:** ${task.priority}`,
+    ];
     if (task.timerPhase && task.timerSecondsLeft !== undefined) {
-      const timeStr = formatSecondsAsMMSS(task.timerSecondsLeft);
-      md.appendMarkdown(`Timer: ${timeStr} (${task.timerPhase})\n\n`);
+      lines.push(`**Timer:** ${formatSecondsAsMMSS(task.timerSecondsLeft)} (${task.timerPhase})`);
     }
-    if (task.activityName) {
-      md.appendMarkdown(`Activity: ${task.activityName}\n\n`);
-    }
-    if (task.description) {
-      md.appendMarkdown(`---\n\n${task.description}\n\n`);
-    }
-    if (task.estimatedHours) {
-      md.appendMarkdown(`Estimated: ${formatHoursAsHHMM(task.estimatedHours)}\n\n`);
-    }
-    if (task.loggedHours > 0) {
-      md.appendMarkdown(`Logged: ${formatHoursAsHHMM(task.loggedHours)}\n\n`);
-    }
+    if (task.activityName) lines.push(`**Activity:** ${escapeMarkdown(task.activityName)}`);
+    if (task.estimatedHours) lines.push(`**Estimated:** ${formatHoursAsHHMM(task.estimatedHours)}`);
+    if (task.loggedHours > 0) lines.push(`**Logged:** ${formatHoursAsHHMM(task.loggedHours)}`);
     if ((task.pendingSeconds ?? 0) > 0) {
-      md.appendMarkdown(`Pending: ${formatHoursAsHHMM((task.pendingSeconds ?? 0) / 3600)}\n\n`);
+      lines.push(`**Pending:** ${formatHoursAsHHMM((task.pendingSeconds ?? 0) / 3600)}`);
     }
     if (status === "done" && task.completedAt) {
-      md.appendMarkdown(`Completed: ${formatLocalDate(new Date(task.completedAt))}\n\n`);
+      lines.push(`**Completed:** ${formatLocalDate(new Date(task.completedAt))}`);
+    }
+
+    md.appendMarkdown(`**${escapeMarkdown(task.title.trim())}**\n\n`);
+    md.appendMarkdown(lines.join("  \n"));
+    if (task.description?.trim()) {
+      md.appendMarkdown(`\n\n---\n\n${escapeMarkdown(task.description.trim())}`);
     }
     item.tooltip = md;
 
