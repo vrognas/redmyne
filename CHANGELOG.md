@@ -12,6 +12,22 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - **Live "now" anchor across the panes.** While a Kanban timer runs, its linked issue's bar **pulses green** on the Gantt, and a provisional **running-timer row** is pinned at the top of the Time Entries pane showing the time about to be logged — so the active task is visible wherever you're looking, not just in the status bar.
 - **Log Time inline on issues.** Issues-pane rows now have an inline **Log Time** hover button (next to Add to Kanban) — log straight from an issue without the right-click menu.
 - **Issue totals on a time-entry hover.** Hovering a time entry now shows its issue's **Estimated** and **Spent** hours (with %), matching the Issues-pane tooltip.
+- **Show in Gantt from Issues and Kanban.** Issues-pane rows and Kanban cards now have an inline **Show in Gantt** icon that opens the issue on the timeline — the same jump that time entries already had.
+
+### Changed
+
+- **Inline hover buttons follow the workflow order.** Issues rows read **Gantt → Add to Kanban → Log Time**; Kanban cards read **Gantt → Start (Doing) → Mark Done**, left to right.
+- **Kanban column icons match their actions.** Doing now uses a **play** icon and Done a **checkmark**, mirroring the Start Timer / Mark Done buttons.
+- **Consistent issue hover tooltips.** Issues, Kanban, Time Entries, and the Gantt now lead with the **bold issue title** then the **assignee**, with matching field order and spacing across every surface.
+
+### Fixed
+
+- **Add to Kanban is hidden on closed issues.** A completed issue no longer shows the Add-to-Kanban button or context action — there's nothing to start.
+- **Gantt week shading is uniform in day zoom.** The current week no longer rendered with a mismatched shade against its neighbours.
+
+### Internal
+
+- Deduplicated tooltip code: removed a byte-identical hours formatter in the timesheet webview, and collapsed the Gantt dependency-list and hours/progress tooltip twins into shared builders (behaviour unchanged, pinned by characterization tests).
 
 ## [4.39.0]
 
