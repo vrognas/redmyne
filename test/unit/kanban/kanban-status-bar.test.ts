@@ -296,4 +296,29 @@ describe("KanbanStatusBar", () => {
       expect(text).not.toContain("-");
     });
   });
+
+  describe("pending time", () => {
+    function lastStatusBarText(): string {
+      const create = vscodeMock.window.createStatusBarItem as unknown as {
+        mock: { results: Array<{ value: { text: string } }> };
+      };
+      const results = create.mock.results;
+      return results[results.length - 1].value.text;
+    }
+
+    it("shows banked pending time alongside the active timer", () => {
+      const activeTask = createTask({
+        timerPhase: "working",
+        timerSecondsLeft: 1800, // 30:00 countdown
+        loggedHours: 0,
+        pendingSeconds: 2700, // 45 min banked
+      });
+      const controller = createMockController({ tasks: [activeTask], activeTask });
+      const globalState = createMockGlobalState();
+
+      new KanbanStatusBar(controller, globalState);
+
+      expect(lastStatusBarText()).toMatch(/\(\+\d+:\d\d\)/);
+    });
+  });
 });

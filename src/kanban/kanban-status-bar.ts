@@ -49,12 +49,14 @@ export class KanbanStatusBar {
     let doingCount = 0;
     let doneCount = 0;
     let totalLoggedHours = 0;
+    let totalPendingSeconds = 0;
 
     for (const task of tasks) {
       const status = getTaskStatus(task);
       if (status === "doing") doingCount++;
       if (status === "done") doneCount++;
       totalLoggedHours += task.loggedHours;
+      totalPendingSeconds += task.pendingSeconds ?? 0;
     }
 
     // Find paused task
@@ -73,8 +75,9 @@ export class KanbanStatusBar {
       const timeStr = formatSecondsAsMMSS(secondsLeft);
       const progressBar = this.buildProgressBar(secondsLeft, totalSeconds);
       const deferredStr = deferredMinutes > 0 ? ` +${deferredMinutes}m` : "";
-      this.statusBarItem.text = `$(pulse) ${timeStr} ${progressBar} ${this.truncate(activeTask.title, 100)}${deferredStr}`;
-      this.statusBarItem.tooltip = this.buildWorkingTooltip(activeTask, doneCount, tasks.length, totalLoggedHours);
+      const pendingStr = totalPendingSeconds > 0 ? ` (+${formatHoursAsHHMM(totalPendingSeconds / 3600)})` : "";
+      this.statusBarItem.text = `$(pulse) ${timeStr} ${progressBar} ${this.truncate(activeTask.title, 100)}${pendingStr}${deferredStr}`;
+      this.statusBarItem.tooltip = this.buildWorkingTooltip(activeTask, doneCount, tasks.length, totalLoggedHours, totalPendingSeconds);
       this.statusBarItem.command = "redmyne.kanban.toggleTimer";
     } else if (pausedTask) {
       // Show paused timer with progress bar
@@ -145,7 +148,8 @@ export class KanbanStatusBar {
     task: { linkedIssueId: number; linkedIssueSubject: string; activityName?: string; timerSecondsLeft?: number },
     done: number,
     total: number,
-    hours: number
+    hours: number,
+    pendingSeconds = 0
   ): vscode.MarkdownString {
     const md = new vscode.MarkdownString();
     md.supportThemeIcons = true;
@@ -156,7 +160,8 @@ export class KanbanStatusBar {
     }
     md.appendMarkdown("---\n\n");
     md.appendMarkdown(`Progress: ${done}/${total} tasks\n\n`);
-    md.appendMarkdown(`Logged: ${formatHoursAsHHMM(hours)}\n\n`);
+    const pendingNote = pendingSeconds > 0 ? ` (+${formatHoursAsHHMM(pendingSeconds / 3600)} pending)` : "";
+    md.appendMarkdown(`Logged: ${formatHoursAsHHMM(hours)}${pendingNote}\n\n`);
     md.appendMarkdown("*Click to pause*");
     return md;
   }
