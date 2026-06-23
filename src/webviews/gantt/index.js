@@ -1436,14 +1436,20 @@ function initializeGantt(state, rowWindow) {
         announce(`Selected relation from #${fromId} to #${toId}`);
       });
 
-      // Helper to clear all arrow selections (single or multi-select)
-      // Uses tracked elements instead of DOM queries for O(1) clear
+      // Canonical clear for ANY dependency-arrow highlight. Sweeps the DOM
+      // rather than only our tracked elements: the badge-click highlight
+      // (gantt-drag.js highlightArrows) shares these classes but tracks its
+      // own elements, so a tracked-only clear left badge selections bold when
+      // Escape/click-away routed through here first (this handler is detected
+      // via the .selected DOM check below and runs before gantt-drag's).
       function clearArrowSelection() {
-        selectedArrowElements.forEach(a => a.classList.remove('selected'));
+        document.querySelectorAll('.dependency-arrow.selected')
+          .forEach(a => a.classList.remove('selected'));
+        document.querySelectorAll('.arrow-connected')
+          .forEach(el => el.classList.remove('arrow-connected'));
         selectedArrowElements.length = 0;
-        document.body.classList.remove('arrow-selection-mode');
-        arrowConnectedElements.forEach(el => el.classList.remove('arrow-connected'));
         arrowConnectedElements.length = 0;
+        document.body.classList.remove('arrow-selection-mode');
         selectedArrow = null;
       }
 
