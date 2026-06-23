@@ -277,6 +277,18 @@ export function registerKanbanCommands(
     )
   );
 
+  // Show the card's linked issue in the Gantt (delegates to the shared reveal).
+  disposables.push(
+    vscode.commands.registerCommand(
+      "redmyne.kanban.showInGantt",
+      async (item: TaskTreeItem) => {
+        const issueId = item?.task?.linkedIssueId;
+        if (!issueId) return;
+        await vscode.commands.executeCommand("redmyne.openIssueInGantt", { id: issueId });
+      }
+    )
+  );
+
   // Clear Done
   disposables.push(
     vscode.commands.registerCommand("redmyne.kanban.clearDone", async () => {

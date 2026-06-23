@@ -502,6 +502,11 @@
         "icon": "$(export)"
       },
       {
+        "command": "redmyne.kanban.showInGantt",
+        "title": "Show in Gantt",
+        "icon": "$(graph)"
+      },
+      {
         "command": "redmyne.kanban.moveUp",
         "title": "Move Up",
         "icon": "$(arrow-up)"
@@ -1174,6 +1179,10 @@
           "when": "false"
         },
         {
+          "command": "redmyne.kanban.showInGantt",
+          "when": "false"
+        },
+        {
           "command": "redmyne.kanban.clearDone",
           "when": "false"
         },
@@ -1629,6 +1638,11 @@
           "group": "inline@2"
         },
         {
+          "command": "redmyne.openIssueInGantt",
+          "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue/",
+          "group": "inline@3"
+        },
+        {
           "command": "redmyne.copyIssueUrl",
           "when": "view == 'redmyne-explorer-projects' && viewItem =~ /^issue/",
           "group": "9_clipboard@1"
@@ -1782,6 +1796,16 @@
           "command": "redmyne.kanban.openInBrowser",
           "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-/",
           "group": "navigation@1"
+        },
+        {
+          "command": "redmyne.kanban.showInGantt",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-/",
+          "group": "navigation@2"
+        },
+        {
+          "command": "redmyne.kanban.showInGantt",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-/",
+          "group": "inline"
         },
         {
           "command": "redmyne.kanban.copySubject",

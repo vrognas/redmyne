@@ -859,6 +859,15 @@ describe("registerKanbanCommands", () => {
     expect(controller.deleteTask).not.toHaveBeenCalled();
   });
 
+  it("shows a card's linked issue in the Gantt", async () => {
+    const executeSpy = vi.spyOn(vscode.commands, "executeCommand");
+    registerCommands();
+
+    await handlers.get("redmyne.kanban.showInGantt")?.({ task: createTask({ linkedIssueId: 88 }) });
+
+    expect(executeSpy).toHaveBeenCalledWith("redmyne.openIssueInGantt", { id: 88 });
+  });
+
   it("covers configure timer progress bar and unit duration branches", async () => {
     const { context, controller } = registerCommands({
       contextValues: {
