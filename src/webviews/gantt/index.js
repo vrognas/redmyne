@@ -188,7 +188,19 @@ function setupTooltips({ addDocListener, addWinListener }) {
         link.rel = 'noopener noreferrer';
         lineEl.appendChild(link);
       } else {
-        lineEl.textContent = line;
+        // Bold the "Label:" prefix on field lines (Assignee:, Start:, ...) so
+        // gantt tooltips read like the Markdown pane tooltips. Skips the title
+        // line and emoji/symbol-led lines (markers, overdue, dependencies).
+        const fieldMatch = index !== headerIndex && trimmed.match(/^([A-Za-z][\w ]*?):\s+(.+)$/);
+        if (fieldMatch) {
+          const keyEl = document.createElement('span');
+          keyEl.className = 'gantt-tooltip-key';
+          keyEl.textContent = `${fieldMatch[1]}: `;
+          lineEl.appendChild(keyEl);
+          lineEl.appendChild(document.createTextNode(fieldMatch[2]));
+        } else {
+          lineEl.textContent = line;
+        }
       }
 
       tooltipContent.appendChild(lineEl);
