@@ -96,6 +96,27 @@ describe("kanban-tree-provider", () => {
     }
   });
 
+  it("splits Done contextValue into logged vs unlogged", () => {
+    const provider = new KanbanTreeProvider(
+      createController([]) as unknown as KanbanController
+    );
+    const logged = provider.getTreeItem({
+      type: "task",
+      task: createTask({ id: "d1", completedAt: "2026-02-07T02:00:00.000Z", loggedHours: 1.5 }),
+    });
+    const unlogged = provider.getTreeItem({
+      type: "task",
+      task: createTask({
+        id: "d2",
+        completedAt: "2026-02-07T02:00:00.000Z",
+        loggedHours: 0,
+        pendingSeconds: 2700,
+      }),
+    });
+    expect(logged.contextValue).toBe("task-done-logged");
+    expect(unlogged.contextValue).toBe("task-done-unlogged");
+  });
+
   it("restores and persists filter/sort state", () => {
     const controller = createController([]);
     const globalState = createMemento({
@@ -312,7 +333,7 @@ describe("kanban-tree-provider", () => {
     expect(readyItem.description).toContain("(ready)");
 
     const doneItem = provider.getTreeItem({ type: "task", task: doneTask });
-    expect(doneItem.contextValue).toBe("task-done");
+    expect(doneItem.contextValue).toBe("task-done-logged");
     expect(doneItem.command).toBeUndefined();
 
     const lowItem = provider.getTreeItem({ type: "task", task: lowTask });

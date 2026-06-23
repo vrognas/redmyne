@@ -1715,7 +1715,7 @@
         },
         {
           "command": "redmyne.kanban.reopen",
-          "when": "view == 'redmyne-explorer-kanban' && viewItem == 'task-done'",
+          "when": "view == 'redmyne-explorer-kanban' && viewItem =~ /^task-done/",
           "group": "kanban@2"
         },
         {

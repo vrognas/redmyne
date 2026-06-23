@@ -8,6 +8,7 @@ import {
   sortTasksByPriority,
 } from "./kanban-state";
 import { formatHoursAsHHMM, formatSecondsAsMMSS } from "../utilities/time-input";
+import { formatLocalDate } from "../utilities/date-utils";
 import { BaseTreeProvider } from "../shared/base-tree-provider";
 
 // Filter/sort persistence keys
@@ -277,12 +278,18 @@ export class KanbanTreeProvider
       const parts: string[] = [];
       if (task.estimatedHours) parts.push(`${formatHoursAsHHMM(task.estimatedHours)}est`);
       if (task.loggedHours > 0) parts.push(`${formatHoursAsHHMM(task.loggedHours)}log`);
+      if ((task.pendingSeconds ?? 0) > 0) parts.push(`${Math.round((task.pendingSeconds ?? 0) / 60)}min banked`);
       const hoursStr = parts.length > 0 ? ` (${parts.join(" / ")})` : "";
-      item.description = `#${task.linkedIssueId} ${task.linkedIssueSubject}${hoursStr}`;
+      const doneStr =
+        status === "done" && task.completedAt ? ` ✓ ${formatLocalDate(new Date(task.completedAt))}` : "";
+      item.description = `#${task.linkedIssueId} ${task.linkedIssueSubject}${hoursStr}${doneStr}`;
     }
 
-    // Context value for menus: task-{status}-{timerPhase?}
-    if (task.timerPhase) {
+    // Context value for menus: task-{status}-{timerPhase?}, with Done split into
+    // logged (synced to Redmine) vs unlogged (eligible for Transfer).
+    if (status === "done") {
+      item.contextValue = task.loggedHours > 0 ? "task-done-logged" : "task-done-unlogged";
+    } else if (task.timerPhase) {
       item.contextValue = `task-${status}-${task.timerPhase}`;
     } else if (task.timerSecondsLeft !== undefined && task.timerSecondsLeft > 0) {
       item.contextValue = `task-${status}-initialized`;
@@ -314,6 +321,12 @@ export class KanbanTreeProvider
     }
     if (task.loggedHours > 0) {
       md.appendMarkdown(`Logged: ${formatHoursAsHHMM(task.loggedHours)}\n\n`);
+    }
+    if ((task.pendingSeconds ?? 0) > 0) {
+      md.appendMarkdown(`Pending: ${formatHoursAsHHMM((task.pendingSeconds ?? 0) / 3600)}\n\n`);
+    }
+    if (status === "done" && task.completedAt) {
+      md.appendMarkdown(`Completed: ${formatLocalDate(new Date(task.completedAt))}\n\n`);
     }
     item.tooltip = md;
 
