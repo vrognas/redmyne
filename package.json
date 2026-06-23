@@ -393,7 +393,7 @@
       {
         "command": "redmyne.addIssueToKanban",
         "title": "Add to Kanban",
-        "icon": "$(list-unordered)"
+        "icon": "$(pinned)"
       },
       {
         "command": "redmyne.kanban.add",

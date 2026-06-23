@@ -17,8 +17,8 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Changed
 
 - **Inline hover buttons follow the workflow order.** Issues rows read **Gantt → Add to Kanban → Log Time**; Kanban cards read **Gantt → Start (Doing) → Mark Done**, left to right.
-- **Kanban column icons match their actions.** To Do is a **list**, Doing a **play**, and Done a **checkmark** — mirroring the Start Timer / Mark Done buttons.
-- **Toolbar icons refreshed.** Kanban **Timer Settings** moved off the Doing column header into the view title bar (next to Collapse All); **Clear Done** is now an eraser; **Add to Kanban** a list; the Time Entries **Time Sheet** button a calendar; and the Issues **Show Gantt** button the VS Code icon.
+- **Kanban column icons match their actions.** To Do is a **pin**, Doing a **play**, and Done a **checkmark** — mirroring the Start Timer / Mark Done buttons.
+- **Toolbar icons refreshed.** Kanban **Timer Settings** moved off the Doing column header into the view title bar (next to Collapse All); **Clear Done** is now an eraser; **Add to Kanban** a pin; the Time Entries **Time Sheet** button a calendar; and the Issues **Show Gantt** button the VS Code icon.
 - **Consistent issue hover tooltips.** Issues, Kanban, Time Entries, and the Gantt now lead with the **bold issue title** then the **assignee**, with matching field order and spacing across every surface.
 
 ### Fixed
