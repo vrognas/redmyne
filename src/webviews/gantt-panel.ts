@@ -2988,11 +2988,11 @@ export class GanttPanel {
     let periodDays: number;
     switch (zoomLevel) {
       case "day":
-        periodStart = new Date(todayUTC);
-        periodDays = 1;
-        break;
       case "week": {
-        // Start of week (Monday)
+        // Highlight the whole current week (Monday–Sunday). In Day zoom this
+        // keeps the current week one uniform shade instead of splitting it
+        // (past-dim before today, today bright, future-dim after); the
+        // today-marker still points at today.
         periodStart = new Date(todayUTC);
         const daysFromMonday = todayDayOfWeek === 0 ? 6 : todayDayOfWeek - 1;
         periodStart.setUTCDate(periodStart.getUTCDate() - daysFromMonday);
