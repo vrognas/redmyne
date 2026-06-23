@@ -7,6 +7,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- **Live "now" anchor across the panes.** While a Kanban timer runs, its linked issue's bar **pulses green** on the Gantt, and a provisional **running-timer row** is pinned at the top of the Time Entries pane showing the time about to be logged — so the active task is visible wherever you're looking, not just in the status bar.
+
 ## [4.39.0]
 
 ### Added
