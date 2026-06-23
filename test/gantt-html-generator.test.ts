@@ -253,6 +253,87 @@ describe("gantt-html-generator", () => {
       expect(mainTitle.indexOf("Assigned to:")).toBeLessThan(mainTitle.indexOf("On track"));
     });
 
+    it("dependency badge tooltips render blocks and blockers consistently", () => {
+      const row: GanttRow = {
+        type: "issue",
+        id: 800,
+        label: "Dep Test",
+        depth: 0,
+        collapseKey: "issue-800",
+        parentKey: "",
+        isVisible: true,
+        isExpanded: false,
+        hasChildren: false,
+        issue: {
+          id: 800,
+          subject: "Dep Test",
+          project: "Project",
+          projectId: 1,
+          parentId: null,
+          start_date: "2025-01-10",
+          due_date: "2025-01-20",
+          done_ratio: 30,
+          estimated_hours: 16,
+          spent_hours: 5,
+          status: "on-track",
+          statusName: "In Progress",
+          isClosed: false,
+          isExternal: false,
+          isAdHoc: false,
+          assignee: null,
+          assigneeId: null,
+          flexibilityPercent: 10,
+          relations: [],
+          blocks: [
+            { id: 11, subject: "First downstream", assignee: "Alice" },
+            { id: 12, subject: "Second", assignee: null },
+            { id: 13, subject: "#13", assignee: null },
+            { id: 14, subject: "Four", assignee: null },
+            { id: 15, subject: "Five", assignee: null },
+            { id: 16, subject: "Six", assignee: null },
+          ],
+          blockedBy: [{ id: 20, subject: "Upstream", assignee: "Bob" }],
+        },
+      };
+      const mockContext = {
+        barHeight: 22,
+        barPadding: 3,
+        barContentHeight: 16,
+        timelineWidth: 1000,
+        minDate: new Date("2025-01-01"),
+        maxDate: new Date("2025-01-31"),
+        today: new Date("2025-01-15"),
+        viewFocus: "project" as const,
+        currentUserId: null,
+        schedule: { Mon: 8, Tue: 8, Wed: 8, Thu: 8, Fri: 8, Sat: 0, Sun: 0 },
+        issueScheduleMap: new Map(),
+        getStatusColor: () => "var(--vscode-charts-blue)",
+        getStatusTextColor: () => "white",
+        getStatusOpacity: () => 0.6,
+        getStatusDescription: () => "On track",
+        getInternalEstimate: () => null,
+        hasPrecedence: () => false,
+        isAutoUpdateEnabled: () => true,
+      };
+
+      const svg = generateIssueBar(row, mockContext as any);
+      const titles = [...svg.matchAll(/<title>([\s\S]*?)<\/title>/g)].map((m) => m[1]);
+      const blocks = titles.find((t) => t.includes("Blocking"))!;
+      const blockers = titles.find((t) => t.includes("Waiting on"))!;
+
+      // Blocks: header with count, assignee suffix, "(not in view)" for bare
+      // "#id" subjects, top-5 cap with overflow, and the highlight footer.
+      expect(blocks).toContain("⛔ Blocking 6:");
+      expect(blocks).toContain("#11 First downstream (Alice)");
+      expect(blocks).toContain("#13 (not in view)");
+      expect(blocks).toContain("... and 1 more");
+      expect(blocks).toContain("Click to highlight dependencies");
+      // Blockers: same shape, different header + footer.
+      expect(blockers).toContain("⏳ Waiting on 1:");
+      expect(blockers).toContain("#20 Upstream (Bob)");
+      expect(blockers).toContain("Click to highlight and jump");
+    });
+
     it("overdue bars get a days-late badge and a ghost projection from today", () => {
       const row: GanttRow = {
         type: "issue",

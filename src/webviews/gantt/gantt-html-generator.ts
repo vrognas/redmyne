@@ -80,6 +80,28 @@ function flexibilityLine(flexPct: number | null): string | null {
   return `Flexibility: ${flexPct}% — remaining work exceeds time left`;
 }
 
+/**
+ * Dependency-list tooltip shared by the blocks (downstream) and blocker
+ * (upstream) badges — identical shape, only the header verb and click-hint
+ * footer differ. `header` is the lead-in without count/colon (e.g.
+ * "⛔ Blocking"); the count and ":" are appended here. Empty list → "".
+ */
+function buildDependencyTooltip(
+  deps: Array<{ id: number; subject: string; assignee: string | null }>,
+  header: string,
+  footer: string
+): string {
+  if (deps.length === 0) return "";
+  const lines = deps.slice(0, 5).map(b => {
+    const assigneeText = b.assignee ? ` (${b.assignee})` : "";
+    const noMetadata = b.subject === `#${b.id}`;
+    const subjectText = noMetadata ? "(not in view)" : (b.subject.length > 30 ? b.subject.substring(0, 29) + "…" : b.subject);
+    return `#${b.id} ${subjectText}${assigneeText}`;
+  }).join("\n");
+  const overflow = deps.length > 5 ? `\n... and ${deps.length - 5} more` : "";
+  return `${header} ${deps.length}:\n${lines}${overflow}\n\n${footer}`;
+}
+
 const DAY_KEYS: (keyof WeeklySchedule)[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /** Get day name key for WeeklySchedule lookup (local calendar frame) */
@@ -783,24 +805,18 @@ function generateRegularBar(
   ].filter(Boolean).join("\n");
 
   // Blocks tooltip (issues blocked by this one)
-  const blocksTooltip = issue.blocks.length > 0
-    ? `⛔ Blocking ${issue.blocks.length}:\n` + issue.blocks.slice(0, 5).map(b => {
-        const assigneeText = b.assignee ? ` (${b.assignee})` : "";
-        const noMetadata = b.subject === `#${b.id}`;
-        const subjectText = noMetadata ? "(not in view)" : (b.subject.length > 30 ? b.subject.substring(0, 29) + "…" : b.subject);
-        return `#${b.id} ${subjectText}${assigneeText}`;
-      }).join("\n") + (issue.blocks.length > 5 ? `\n... and ${issue.blocks.length - 5} more` : "") + "\n\nClick to highlight dependencies"
-    : "";
+  const blocksTooltip = buildDependencyTooltip(
+    issue.blocks,
+    "⛔ Blocking",
+    "Click to highlight dependencies"
+  );
 
   // Blockers tooltip (issues this one is waiting on)
-  const blockerTooltip = issue.blockedBy.length > 0
-    ? `⏳ Waiting on ${issue.blockedBy.length}:\n` + issue.blockedBy.slice(0, 5).map(b => {
-        const assigneeText = b.assignee ? ` (${b.assignee})` : "";
-        const noMetadata = b.subject === `#${b.id}`;
-        const subjectText = noMetadata ? "(not in view)" : (b.subject.length > 30 ? b.subject.substring(0, 29) + "…" : b.subject);
-        return `#${b.id} ${subjectText}${assigneeText}`;
-      }).join("\n") + (issue.blockedBy.length > 5 ? `\n... and ${issue.blockedBy.length - 5} more` : "") + "\n\nClick to highlight and jump"
-    : "";
+  const blockerTooltip = buildDependencyTooltip(
+    issue.blockedBy,
+    "⏳ Waiting on",
+    "Click to highlight and jump"
+  );
 
   // Intensity data
   const canShowIntensity = ctx.viewFocus === "person";
