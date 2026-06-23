@@ -576,15 +576,17 @@ export class KanbanTreeProvider
   private getStatusIcon(status: TaskStatus): vscode.ThemeIcon {
     switch (status) {
       case "doing":
+        // "play" to match the Start Timer button.
         return new vscode.ThemeIcon(
-          "pulse",
+          "play",
           new vscode.ThemeColor("charts.blue")
         );
       case "todo":
         return new vscode.ThemeIcon("circle-outline");
       case "done":
+        // "check" to match the Mark Done button.
         return new vscode.ThemeIcon(
-          "checklist",
+          "check",
           new vscode.ThemeColor("testing.iconPassed")
         );
     }
