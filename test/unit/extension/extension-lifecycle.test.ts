@@ -27,6 +27,8 @@ const hoisted = vi.hoisted(() => {
     setTreeView: vi.fn(),
     setMonthlySchedules: vi.fn(),
     setDraftQueue: vi.fn(),
+    setActiveTimer: vi.fn(),
+    notifyNowChanged: vi.fn(),
   };
   const kanbanTreeView = {
     dispose: vi.fn(),
@@ -37,7 +39,9 @@ const hoisted = vi.hoisted(() => {
   const kanbanController = {
     dispose: vi.fn(),
     onTasksChange: vi.fn(() => ({ dispose: vi.fn() })),
+    onTimerTick: vi.fn(() => ({ dispose: vi.fn() })),
     getActiveTask: vi.fn(() => undefined),
+    getWorkDurationSeconds: vi.fn(() => 2700),
   };
   const kanbanStatusBar = {
     dispose: vi.fn(),
@@ -236,6 +240,8 @@ vi.mock("../../../src/trees/my-time-entries-tree", () => ({
     setTreeView = hoisted.myTimeEntriesTree.setTreeView;
     setMonthlySchedules = hoisted.myTimeEntriesTree.setMonthlySchedules;
     setDraftQueue = hoisted.myTimeEntriesTree.setDraftQueue;
+    setActiveTimer = hoisted.myTimeEntriesTree.setActiveTimer;
+    notifyNowChanged = hoisted.myTimeEntriesTree.notifyNowChanged;
   },
 }));
 

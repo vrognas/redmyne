@@ -34,7 +34,7 @@ export interface TimeEntryNode {
   iconPath?: vscode.ThemeIcon;
   collapsibleState: vscode.TreeItemCollapsibleState;
   contextValue?: string;
-  type: "loading" | "group" | "week-group" | "day-group" | "month-group" | "week-subgroup" | "entry" | "load-earlier";
+  type: "loading" | "group" | "week-group" | "day-group" | "month-group" | "week-subgroup" | "entry" | "load-earlier" | "running";
   _cachedEntries?: TimeEntry[];
   _entry?: TimeEntry;
   _dateRange?: { start: string; end: string }; // For filling empty working days
@@ -192,6 +192,13 @@ export function buildEntryTooltip(info: EntryTooltipInfo): vscode.MarkdownString
   return tooltip;
 }
 
+/** Live running-timer info for the provisional "now" row (Phase 3). */
+export interface ActiveTimerInfo {
+  issueId: number;
+  subject: string;
+  accruedSeconds: number;
+}
+
 export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNode> {
   private static readonly INITIAL_MONTHS = 3;
   private static readonly LOAD_BATCH_SIZE = 3;
@@ -221,6 +228,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
 
   private static readonly HIDE_ZERO_DAYS_KEY = "redmyne.timeEntries.hideZeroDays";
   private globalState: vscode.Memento;
+  private getActiveTimer?: () => ActiveTimerInfo | undefined;
 
   constructor(globalState: vscode.Memento) {
     super();
@@ -510,6 +518,35 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     };
   }
 
+  /** Wire the running-timer "now" row to a source of the active Kanban task. */
+  setActiveTimer(getter: () => ActiveTimerInfo | undefined): void {
+    this.getActiveTimer = getter;
+  }
+
+  /** Re-render so the running-timer row appears / updates / clears. */
+  notifyNowChanged(): void {
+    this._onDidChangeTreeData.fire(undefined);
+  }
+
+  /**
+   * Provisional live "now" row pinned at the top of the pane while a Kanban
+   * timer runs. Inert (contextValue "running-timer" matches no menu, no _entry),
+   * so it can't be edited/deleted/copied — it isn't a real entry yet.
+   */
+  private buildRunningNode(): TimeEntryNode | null {
+    const active = this.getActiveTimer?.();
+    if (!active) return null;
+    return {
+      id: "running-timer",
+      label: `#${active.issueId} · ${formatHoursAsHHMM(active.accruedSeconds / 3600)} ⏱`,
+      description: active.subject,
+      iconPath: new vscode.ThemeIcon("loading~spin"),
+      collapsibleState: vscode.TreeItemCollapsibleState.None,
+      type: "running",
+      contextValue: "running-timer",
+    };
+  }
+
   async getChildren(element?: TimeEntryNode): Promise<TimeEntryNode[]> {
     // No server configured - return empty
     if (!this.server) {
@@ -518,6 +555,11 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
 
     // Root level - Today, This Week, month nodes, Load Earlier
     if (!element) {
+      // Live "now" row pinned at the very top (when a Kanban timer is running).
+      const runningNode = this.buildRunningNode();
+      const withRunning = (nodes: TimeEntryNode[]) =>
+        runningNode ? [runningNode, ...nodes] : nodes;
+
       // If today/week not loaded yet, trigger load
       if (this.todayEntries === undefined && !this.isLoading) {
         this.isLoading = true;
@@ -526,7 +568,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
 
       // Show spinner only when no data at all (first load)
       if (this.todayEntries === undefined) {
-        return [this.loadingNode()];
+        return withRunning([this.loadingNode()]);
       }
 
       const today = formatLocalDate(new Date());
@@ -609,7 +651,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
         contextValue: "load-earlier",
       });
 
-      return nodes;
+      return withRunning(nodes);
     }
 
     // Week group - return day groups

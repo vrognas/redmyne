@@ -125,6 +125,26 @@ describe("MyTimeEntriesTreeDataProvider", () => {
     vi.useRealTimers();
   });
 
+  it("prepends a running-timer row when a Kanban timer is active", async () => {
+    mockServer.getTimeEntries.mockResolvedValue({ time_entries: [] });
+    provider.setActiveTimer(() => ({ issueId: 77, subject: "Live work", accruedSeconds: 2700 }));
+
+    const nodes = await provider.getChildren();
+
+    expect(nodes[0].contextValue).toBe("running-timer");
+    expect(nodes[0].label).toContain("#77");
+    expect(nodes[0].label).toContain("⏱");
+  });
+
+  it("omits the running-timer row when no Kanban timer is active", async () => {
+    mockServer.getTimeEntries.mockResolvedValue({ time_entries: [] });
+    provider.setActiveTimer(() => undefined);
+
+    const nodes = await provider.getChildren();
+
+    expect(nodes.some((n) => n.contextValue === "running-timer")).toBe(false);
+  });
+
   it("returns loading state on first call then actual data", async () => {
     const todayEntries: TimeEntry[] = [
       {
