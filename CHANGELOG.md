@@ -12,6 +12,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ### Added
 
 - **Time Entries: jump to the Gantt.** A logged time entry now has a **Show in Gantt** hover icon (and right-click action) that opens its issue in the Gantt timeline — closing the loop from past time back to where it sits on the schedule.
+- **Kanban Done → Time Entries (Transfer).** A Done card you never logged now shows a **Transfer** button — it creates a Redmine time entry (dated to the day you finished it, hours from the card's banked time or a quick prompt) and clears the card. Done cards are split into "logged" (already synced, left alone) and "unlogged" (eligible for Transfer), and each shows its done-date and banked time. An inline **Add to Kanban** button on Issues rows plus the existing inline **Start** on To Do cards make the Issues → Kanban → Time Entries hand-offs one click each.
 
 ### Changed
 
