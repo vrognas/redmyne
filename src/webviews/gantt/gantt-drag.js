@@ -37,21 +37,28 @@ export function setupDrag(ctx) {
     let highlightedArrows = [];
     let highlightedConnected = [];
 
+    // Clear the badge-click arrow highlight (selected arrows + their connected
+    // bars/labels). The arrow-selection-mode body class is shared with the
+    // index.js arrow-click selection, so only drop it when no arrow remains
+    // selected by either system.
+    function clearArrowHighlight() {
+      if (highlightedArrows.length === 0 && highlightedConnected.length === 0) return;
+      highlightedArrows.forEach(a => a.classList.remove('selected'));
+      highlightedArrows = [];
+      highlightedConnected.forEach(el => el.classList.remove('arrow-connected'));
+      highlightedConnected = [];
+      if (!document.querySelector('.dependency-arrow.selected')) {
+        document.body.classList.remove('arrow-selection-mode');
+      }
+    }
+
     // Collapse/expand refreshes rebuild the dependency layer, destroying the
     // badge-highlighted arrow elements — drop the highlight rather than leave
     // arrow-selection-mode dimming everything with nothing selected. (Scroll
     // remounts keep the layer intact and don't clear.)
     rowWindow?.onRefresh(({ layersRebuilt } = {}) => {
-      if (!layersRebuilt || highlightedArrows.length === 0) return;
-      highlightedArrows.forEach(a => a.classList.remove('selected'));
-      highlightedArrows = [];
-      highlightedConnected.forEach(el => el.classList.remove('arrow-connected'));
-      highlightedConnected = [];
-      // The arrow-click selection (index.js) shares this body class and may
-      // have just re-applied its own .selected — only clear when none remains
-      if (!document.querySelector('.dependency-arrow.selected')) {
-        document.body.classList.remove('arrow-selection-mode');
-      }
+      if (!layersRebuilt) return;
+      clearArrowHighlight();
     });
     function showIssueContextMenu(x, y, issueId) {
       document.querySelector('.relation-picker')?.remove();
@@ -748,11 +755,8 @@ export function setupDrag(ctx) {
 
     // Helper to highlight multiple arrows and their connected issues
     function highlightArrows(arrows, issueId) {
-      // Clear any previous arrow selection (use tracked elements, avoid DOM queries)
-      highlightedArrows.forEach(a => a.classList.remove('selected'));
-      highlightedArrows = [];
-      highlightedConnected.forEach(el => el.classList.remove('arrow-connected'));
-      highlightedConnected = [];
+      // Clear any previous arrow selection before re-applying.
+      clearArrowHighlight();
 
       if (arrows.length === 0) return;
 
@@ -916,6 +920,12 @@ export function setupDrag(ctx) {
         if (linkingState) {
           e.stopImmediatePropagation();
           cancelLinking();
+          return;
+        }
+        if (highlightedArrows.length > 0) {
+          e.stopImmediatePropagation();
+          clearArrowHighlight();
+          announce('Dependency highlight cleared');
           return;
         }
         if (getFocusedIssueId()) {
