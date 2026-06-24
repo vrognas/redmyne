@@ -16,7 +16,12 @@ import { Version } from "./models/version";
 import { IssueStatus as RedmineIssueStatus, IssuePriority } from "./models/common";
 import { Membership as RedmineMembership } from "./models/membership";
 import { CustomFieldDefinition, TimeEntryCustomFieldValue } from "./models/custom-field-definition";
-import type { IRedmineServer } from "./redmine-server-interface";
+import type {
+  IRedmineServer,
+  RedmineServerConnectionOptions,
+  RedmineUser,
+  RedmineCustomFieldValue,
+} from "./redmine-server-interface";
 import { ChangeAwareCache, CHANGE_CACHE_TTL_MS, MIN_PROBE_INTERVAL_MS, extractMaxUpdatedOn } from "./change-aware-cache";
 import { errorToString } from "../utilities/error-feedback";
 
@@ -25,37 +30,10 @@ type HttpMethods = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 const REDMINE_API_KEY_HEADER_NAME = "X-Redmine-API-Key";
 const REQUEST_TIMEOUT_MS = 30000;
 
-export interface RedmineServerConnectionOptions {
-  /**
-   * HTTPS URL to Redmine server. HTTP is not allowed.
-   * @example https://example.com
-   * @example https://example.com:8443/redmine
-   */
-  address: string;
-  /**
-   * @example 7215ee9c7d9dc229d2921a40e899ec5f
-   */
-  key: string;
-  /**
-   * @example { "Authorization": "Basic YTph" }
-   */
-  additionalHeaders?: { [key: string]: string };
-  /**
-   * Optional custom request function for testing
-   * @internal
-   */
-  requestFn?: typeof http.request;
-  /**
-   * Maximum concurrent API requests (default: 4)
-   * Prevents server overload by queuing excess requests
-   */
-  maxConcurrentRequests?: number;
-  /**
-   * Path to a PEM/CRT file for custom CA trust.
-   * Advanced fallback when the OS/container trust store lacks the issuing CA.
-   */
-  caFile?: string;
-}
+// RedmineServerConnectionOptions now lives in redmine-server-interface.ts (the
+// dependency seam) to break the interface<->class import cycle. Re-exported here
+// for back-compat with existing `from "./redmine-server"` importers.
+export type { RedmineServerConnectionOptions } from "./redmine-server-interface";
 
 interface RedmineServerOptions extends RedmineServerConnectionOptions {
   url: URL;
@@ -85,16 +63,7 @@ export class RedmineServer implements IRedmineServer {
   private timeEntryActivities: TimeEntryActivity[] | null = null;
   private timeEntryCustomFieldsCache: CustomFieldDefinition[] | null = null;
   private cachedProjects: RedmineProject[] | null = null;
-  private cachedCurrentUser: {
-    id: number;
-    login: string;
-    firstname: string;
-    lastname: string;
-    mail: string;
-    created_on: string;
-    last_login_on?: string;
-    custom_fields?: { id: number; name: string; value: string }[];
-  } | null = null;
+  private cachedCurrentUser: RedmineUser | null = null;
   private issueCache = new Map<number, IssueCacheEntry>();
   private lastIssueCachePruneMs = 0;
   private cachedCaBuffer: Buffer | undefined;
@@ -556,6 +525,24 @@ export class RedmineServer implements IRedmineServer {
    */
   private encodeJson<T>(data: T): Buffer {
     return Buffer.from(JSON.stringify(data), "utf8");
+  }
+
+  /**
+   * PUT a partial issue update and invalidate that issue's cache. Single owner
+   * of the `/issues/{id}.json` PUT + cache-invalidate shape — every field-update
+   * method delegates here so the endpoint and invalidation live in one place.
+   */
+  private async patchIssue(
+    issueId: number,
+    fields: Record<string, unknown>
+  ): Promise<unknown> {
+    const result = await this.doRequest(
+      `/issues/${issueId}.json`,
+      "PUT",
+      this.encodeJson({ issue: fields })
+    );
+    this.invalidateIssueCache(issueId);
+    return result;
   }
 
   /**
@@ -1087,20 +1074,7 @@ export class RedmineServer implements IRedmineServer {
    * Returns promise, that resolves, when issue status is set
    */
   async setIssueStatus(issue: Pick<Issue, "id">, statusId: number): Promise<unknown> {
-    const result = await this.doRequest<{ issue: Issue }>(
-      `/issues/${issue.id}.json`,
-      "PUT",
-      Buffer.from(
-        JSON.stringify({
-          issue: {
-            status_id: statusId,
-          },
-        }),
-        "utf8"
-      )
-    );
-    this.invalidateIssueCache(issue.id);
-    return result;
+    return this.patchIssue(issue.id, { status_id: statusId });
   }
 
   /**
@@ -1118,26 +1092,14 @@ export class RedmineServer implements IRedmineServer {
     if (dueDate !== null) {
       issueUpdate.due_date = dueDate;
     }
-    const result = await this.doRequest(
-      `/issues/${issueId}.json`,
-      "PUT",
-      this.encodeJson({ issue: issueUpdate })
-    );
-    this.invalidateIssueCache(issueId);
-    return result;
+    return this.patchIssue(issueId, issueUpdate);
   }
 
   /**
    * Update done_ratio (% Done) for an issue
    */
   async updateDoneRatio(issueId: number, doneRatio: number): Promise<unknown> {
-    const result = await this.doRequest(
-      `/issues/${issueId}.json`,
-      "PUT",
-      this.encodeJson({ issue: { done_ratio: doneRatio } })
-    );
-    this.invalidateIssueCache(issueId);
-    return result;
+    return this.patchIssue(issueId, { done_ratio: doneRatio });
   }
 
   /**
@@ -1171,7 +1133,7 @@ export class RedmineServer implements IRedmineServer {
     }>(
       `/issues/${issueId}/relations.json`,
       "POST",
-      Buffer.from(JSON.stringify({ relation: relationData }), "utf8")
+      this.encodeJson({ relation: relationData })
     );
     this.invalidateIssueCache(issueId);
     this.invalidateIssueCache(targetIssueId);
@@ -1210,34 +1172,17 @@ export class RedmineServer implements IRedmineServer {
    * Get current user info including custom fields (e.g., FTE)
    * Cached for session duration (user doesn't change)
    */
-  async getCurrentUser(): Promise<{
-    id: number;
-    login: string;
-    firstname: string;
-    lastname: string;
-    mail: string;
-    created_on: string;
-    last_login_on?: string;
-    custom_fields?: { id: number; name: string; value: string }[];
-  } | undefined> {
+  async getCurrentUser(): Promise<RedmineUser | undefined> {
     // Return cached user if available
     if (this.cachedCurrentUser) {
       return this.cachedCurrentUser;
     }
 
     try {
-      const response = await this.doRequest<{
-        user: {
-          id: number;
-          login: string;
-          firstname: string;
-          lastname: string;
-          mail: string;
-          created_on: string;
-          last_login_on?: string;
-          custom_fields?: { id: number; name: string; value: string }[];
-        };
-      }>("/users/current.json", "GET");
+      const response = await this.doRequest<{ user: RedmineUser }>(
+        "/users/current.json",
+        "GET"
+      );
       this.cachedCurrentUser = response?.user ?? null;
       return response?.user;
     } catch {
@@ -1278,10 +1223,7 @@ export class RedmineServer implements IRedmineServer {
 
     try {
       const response = await this.doRequest<{
-        user: {
-          id: number;
-          custom_fields?: { id: number; name: string; value: string }[];
-        };
+        user: { id: number; custom_fields?: RedmineCustomFieldValue[] };
       }>(`/users/${userId}.json`, "GET");
 
       const fteField = response?.user?.custom_fields?.find(
@@ -1425,12 +1367,7 @@ export class RedmineServer implements IRedmineServer {
    * Set issue priority
    */
   async setIssuePriority(issueId: number, priorityId: number): Promise<void> {
-    await this.doRequest(
-      `/issues/${issueId}.json`,
-      "PUT",
-      this.encodeJson({ issue: { priority_id: priorityId } })
-    );
-    this.invalidateIssueCache(issueId);
+    await this.patchIssue(issueId, { priority_id: priorityId });
   }
 
   private membershipsCache = new Map<number, Membership[]>();
@@ -1493,13 +1430,7 @@ export class RedmineServer implements IRedmineServer {
     }
 
     // PUT returns 204 No Content on success (null response)
-    await this.doRequest<null>(
-      `/issues/${quickUpdate.issueId}.json`,
-      "PUT",
-      this.encodeJson({ issue: issuePayload })
-    );
-
-    this.invalidateIssueCache(quickUpdate.issueId);
+    await this.patchIssue(quickUpdate.issueId, issuePayload);
 
     // Fetch updated issue to verify changes
     const { issue } = await this.getIssueById(quickUpdate.issueId);
@@ -1616,16 +1547,16 @@ export class RedmineServer implements IRedmineServer {
   }
 
   /**
-   * Returns promise, that resolves to list of issues assigned to api key owner
-   * @deprecated Use getFilteredIssues({ assignee: 'me', status: 'open' })
+   * Returns promise, that resolves to list of issues assigned to api key owner.
+   * Supported convenience wrapper over getFilteredIssues({ assignee: 'me', status: 'open' }).
    */
   async getIssuesAssignedToMe(): Promise<{ issues: Issue[] }> {
     return this.getFilteredIssues({ assignee: "me", status: "open" });
   }
 
   /**
-   * Get all open issues (not filtered by assignee)
-   * @deprecated Use getFilteredIssues({ assignee: 'any', status: 'open' })
+   * Get all open issues (not filtered by assignee).
+   * Supported convenience wrapper over getFilteredIssues({ assignee: 'any', status: 'open' }).
    */
   async getAllOpenIssues(): Promise<{ issues: Issue[] }> {
     return this.getFilteredIssues({ assignee: "any", status: "open" });

@@ -4,8 +4,8 @@
  * Consumers should depend on this interface, not the concrete class.
  */
 
+import type * as http from "http";
 import type { RedmineProject } from "./redmine-project";
-import type { RedmineServerConnectionOptions } from "./redmine-server";
 import type {
   Membership,
   QuickUpdate,
@@ -17,6 +17,61 @@ import type { TimeEntry, TimeEntryWrite } from "./models/time-entry";
 import type { Issue } from "./models/issue";
 import type { Version } from "./models/version";
 import type { CustomFieldDefinition, TimeEntryCustomFieldValue } from "./models/custom-field-definition";
+
+/**
+ * Connection options for a Redmine server. Lives here (the dependency seam)
+ * so the interface has no dependency on the concrete RedmineServer class.
+ */
+export interface RedmineServerConnectionOptions {
+  /**
+   * HTTPS URL to Redmine server. HTTP is not allowed.
+   * @example https://example.com
+   * @example https://example.com:8443/redmine
+   */
+  address: string;
+  /**
+   * @example 7215ee9c7d9dc229d2921a40e899ec5f
+   */
+  key: string;
+  /**
+   * @example { "Authorization": "Basic YTph" }
+   */
+  additionalHeaders?: { [key: string]: string };
+  /**
+   * Optional custom request function for testing
+   * @internal
+   */
+  requestFn?: typeof http.request;
+  /**
+   * Maximum concurrent API requests (default: 4)
+   * Prevents server overload by queuing excess requests
+   */
+  maxConcurrentRequests?: number;
+  /**
+   * Path to a PEM/CRT file for custom CA trust.
+   * Advanced fallback when the OS/container trust store lacks the issuing CA.
+   */
+  caFile?: string;
+}
+
+/** A Redmine custom field value as returned by the API. */
+export interface RedmineCustomFieldValue {
+  id: number;
+  name: string;
+  value: string;
+}
+
+/** Current/queried Redmine user shape (subset the extension consumes). */
+export interface RedmineUser {
+  id: number;
+  login: string;
+  firstname: string;
+  lastname: string;
+  mail: string;
+  created_on: string;
+  last_login_on?: string;
+  custom_fields?: RedmineCustomFieldValue[];
+}
 
 export interface IRedmineServer {
   readonly options: RedmineServerConnectionOptions & { url: URL };
@@ -146,19 +201,7 @@ export interface IRedmineServer {
 
   // ============ Users ============
 
-  getCurrentUser(): Promise<
-    | {
-        id: number;
-        login: string;
-        firstname: string;
-        lastname: string;
-        mail: string;
-        created_on: string;
-        last_login_on?: string;
-        custom_fields?: { id: number; name: string; value: string }[];
-      }
-    | undefined
-  >;
+  getCurrentUser(): Promise<RedmineUser | undefined>;
   getUserFte(userId: number): Promise<number>;
   getUserFteBatch(userIds: number[]): Promise<Map<number, number>>;
 

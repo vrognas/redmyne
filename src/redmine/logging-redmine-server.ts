@@ -85,17 +85,18 @@ export class LoggingRedmineServer extends RedmineServer {
     this.pendingByPath.get(pathKey)!.push({ startTime, displayId });
   }
 
-  protected override onResponseSuccess(
-    statusCode: number | undefined,
-    _statusMessage: string | undefined,
-    path: string,
+  /**
+   * Lazily correlate a response/error callback back to its request metadata:
+   * guard on logging + symbol id, shift the matching request off the per-path
+   * queue if not yet bound, then look up, consume (delete), and return it.
+   * Shared by onResponseSuccess/onResponseError — only the logger call differs.
+   */
+  private resolveMetadata(
+    requestId: unknown,
     method: HttpMethods,
-    _requestBody?: Buffer,
-    responseBody?: Buffer,
-    contentType?: string,
-    requestId?: unknown
-  ): void {
-    if (!this.loggingConfig.enabled || typeof requestId !== 'symbol') return;
+    path: string
+  ): { startTime: number; displayId: number } | undefined {
+    if (!this.loggingConfig.enabled || typeof requestId !== 'symbol') return undefined;
 
     if (!this.pendingBySymbol.has(requestId)) {
       const pathKey = `${method}:${path}`;
@@ -111,10 +112,26 @@ export class LoggingRedmineServer extends RedmineServer {
 
     const metadata = this.pendingBySymbol.get(requestId);
     if (metadata) {
+      this.pendingBySymbol.delete(requestId);
+    }
+    return metadata;
+  }
+
+  protected override onResponseSuccess(
+    statusCode: number | undefined,
+    _statusMessage: string | undefined,
+    path: string,
+    method: HttpMethods,
+    _requestBody?: Buffer,
+    responseBody?: Buffer,
+    contentType?: string,
+    requestId?: unknown
+  ): void {
+    const metadata = this.resolveMetadata(requestId, method, path);
+    if (metadata) {
       const duration = Date.now() - metadata.startTime;
       const responseSize = responseBody?.length;
       this.logger.logResponse(metadata.displayId, statusCode ?? 200, duration, responseSize, contentType);
-      this.pendingBySymbol.delete(requestId);
     }
   }
 
@@ -129,25 +146,10 @@ export class LoggingRedmineServer extends RedmineServer {
     _contentType?: string,
     requestId?: unknown
   ): void {
-    if (!this.loggingConfig.enabled || typeof requestId !== 'symbol') return;
-
-    if (!this.pendingBySymbol.has(requestId)) {
-      const pathKey = `${method}:${path}`;
-      const queue = this.pendingByPath.get(pathKey);
-      if (queue && queue.length > 0) {
-        const metadata = queue.shift()!;
-        this.pendingBySymbol.set(requestId, metadata);
-        if (queue.length === 0) {
-          this.pendingByPath.delete(pathKey);
-        }
-      }
-    }
-
-    const metadata = this.pendingBySymbol.get(requestId);
+    const metadata = this.resolveMetadata(requestId, method, path);
     if (metadata) {
       const duration = Date.now() - metadata.startTime;
       this.logger.logError(metadata.displayId, error, duration, statusCode, responseBody);
-      this.pendingBySymbol.delete(requestId);
     }
   }
 }
