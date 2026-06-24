@@ -427,9 +427,9 @@ export function registerTimeEntryCommands(
     })
   );
 
-  // Jump from a time entry to its issue in the Gantt. Thin proxy: extract the
-  // issue id from the node and delegate to openIssueInGantt, which single-sources
-  // the reveal (bootstrap panel, switch project, scroll to the bar).
+  // Reveal a time entry's issue in the Gantt. Thin proxy mirroring the Kanban
+  // one: validate the id, then delegate to openIssueInGantt — the single source
+  // of the reveal.
   context.subscriptions.push(
     vscode.commands.registerCommand("redmyne.openTimeEntryInGantt", async (node: TimeEntryNode | undefined) => {
       const issueId = node?._entry?.issue_id ?? node?._entry?.issue?.id;

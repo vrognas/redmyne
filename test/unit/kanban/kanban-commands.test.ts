@@ -868,6 +868,16 @@ describe("registerKanbanCommands", () => {
     expect(executeSpy).toHaveBeenCalledWith("redmyne.openIssueInGantt", { id: 88 });
   });
 
+  it("shows an error and does not delegate when the card has no linked issue", async () => {
+    const executeSpy = vi.spyOn(vscode.commands, "executeCommand");
+    registerCommands();
+
+    await handlers.get("redmyne.kanban.showInGantt")?.({});
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Could not determine issue ID");
+    expect(executeSpy).not.toHaveBeenCalledWith("redmyne.openIssueInGantt", expect.anything());
+  });
+
   it("covers configure timer progress bar and unit duration branches", async () => {
     const { context, controller } = registerCommands({
       contextValues: {

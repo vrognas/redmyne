@@ -11,6 +11,7 @@ import { confirmLogTimeOnClosedIssue } from "../utilities/closed-issue-guard";
 import { parseTimeInput, validateTimeInput } from "../utilities/time-input";
 import { formatLocalDate } from "../utilities/date-utils";
 import { KanbanTreeProvider } from "./kanban-tree-provider";
+import { getIssueIdOrShowError } from "../commands/command-guards";
 
 interface TaskTreeItem {
   task?: KanbanTask;
@@ -277,12 +278,14 @@ export function registerKanbanCommands(
     )
   );
 
-  // Show the card's linked issue in the Gantt (delegates to the shared reveal).
+  // Reveal the card's linked issue in the Gantt. Thin proxy mirroring the
+  // Time Entries one: validate the id, then delegate to openIssueInGantt — the
+  // single source of the reveal.
   disposables.push(
     vscode.commands.registerCommand(
       "redmyne.kanban.showInGantt",
       async (item: TaskTreeItem) => {
-        const issueId = item?.task?.linkedIssueId;
+        const issueId = getIssueIdOrShowError({ id: item?.task?.linkedIssueId });
         if (!issueId) return;
         await vscode.commands.executeCommand("redmyne.openIssueInGantt", { id: issueId });
       }
