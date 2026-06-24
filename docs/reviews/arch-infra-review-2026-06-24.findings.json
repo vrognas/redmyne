@@ -1,0 +1,1051 @@
+[
+  {
+    "title": "capacity-calculator reimplements the single-owner remaining-work heuristic, and the copy has drifted",
+    "dimension": "dry-cross-cutting",
+    "category": "dry",
+    "severity": "medium",
+    "effort": "small",
+    "files": [
+      "src/utilities/capacity-calculator.ts",
+      "src/utilities/remaining-work.ts",
+      "src/utilities/flexibility-calculator.ts"
+    ],
+    "evidence": "remaining-work.ts:1-16 declares itself the 'Single owner of the \"how much work is left\" heuristic ... Four hand-mirrored copies of this rule had already drifted before it was extracted.' Its logic (lines 24-35): internal wins (clamp 0); est<=0 -> null; done>=100 -> 0; if spent>=est -> (done>0 ? est*(1-done/100) : 0); else est-spent. capacity-calculator.ts:253-274 `calculateRemainingWork` is a parallel copy: internal wins (clamp 0); then `if (doneRatio>0 || spent===0) return Math.max(0, estimated*(1-doneRatio/100)); return Math.max(0, estimated-spent)`. These DIVERGE: for done_ratio=50, spent=0, est=10 the owner returns est-spent=10 while the copy returns est*0.5=5. flexibility-calculator.ts:101 and gantt-html-generator.ts:12,326,389,876 correctly call the shared owner, so capacity is the lone holdout — the 5th copy the consolidation missed.",
+    "impact": "Capacity ribbon / scheduled-load forecasting can disagree with flexibility scores and gantt ghosts for the same issue. Future tweaks to the heuristic will be applied in remaining-work.ts and silently not reflected in capacity, reintroducing exactly the drift the extraction was meant to kill.",
+    "recommendation": "Replace calculateRemainingWork's body with a call to remainingHours({estimatedHours, spentHours, doneRatio, internalHoursRemaining: internal?.hoursRemaining}) and coalesce the null (unknown-estimate) case to 0 for the scheduler. Delete the local arithmetic.",
+    "confidence": "high"
+  },
+  {
+    "title": "Weekday key array duplicated 4x across 3 files (twice in one file), plus identical day-name helper",
+    "dimension": "dry-cross-cutting",
+    "category": "dry",
+    "severity": "medium",
+    "effort": "small",
+    "files": [
+      "src/utilities/flexibility-calculator.ts",
+      "src/utilities/capacity-calculator.ts",
+      "src/webviews/gantt/gantt-html-generator.ts"
+    ],
+    "evidence": "The array [\"Sun\",\"Mon\",\"Tue\",\"Wed\",\"Thu\",\"Fri\",\"Sat\"] is defined at flexibility-calculator.ts:159 (DAY_KEYS), capacity-calculator.ts:65 (DAY_KEYS), gantt-html-generator.ts:19 (WEEKDAYS) AND AGAIN gantt-html-generator.ts:139 (DAY_KEYS) — two copies in the same file. The day-name lookup is also duplicated: flexibility-calculator.ts:264 `getDayName(date){return DAY_KEYS[date.getDay()]!}` vs gantt-html-generator.ts:142 `getDayKey(date){return DAY_KEYS[date.getDay()]!}` — byte-identical logic. gantt-html-generator already imports WeeklySchedule from flexibility-calculator (line 10) but not the exported getDayName.",
+    "impact": "A schedule-key change (e.g. localization, reordering) must be made in 4 spots; gantt-html-generator already carries two desynchronized copies. New contributors won't know getDayName is already exported.",
+    "recommendation": "Export DAY_KEYS (or keep getDayName as the only public accessor) from one module (date-utils or flexibility-calculator) and import it everywhere; delete the WEEKDAYS const, the second DAY_KEYS in gantt-html-generator, and getDayKey in favor of the shared getDayName.",
+    "confidence": "high"
+  },
+  {
+    "title": "Per-day 'walk dates and sum schedule hours' loop copy-pasted across schedule/gantt/capacity modules",
+    "dimension": "dry-cross-cutting",
+    "category": "dry",
+    "severity": "medium",
+    "effort": "medium",
+    "files": [
+      "src/webviews/gantt/gantt-html-generator.ts",
+      "src/utilities/capacity-calculator.ts",
+      "src/utilities/monthly-schedule.ts",
+      "src/utilities/flexibility-calculator.ts"
+    ],
+    "evidence": "The pattern `const current=new Date(start); while(current<=end){ total += schedule[dayKey(current)]; current.setDate(current.getDate()+1) }` recurs: gantt-html-generator.ts:197-201 and :214-220 (intensity), capacity-calculator.ts:491-497 (available75 overplan calc) and the day loops at :140-167 and :544-647, monthly-schedule.ts:86-101 (countAvailableHoursMonthly) and :135-139 (calculateMonthlyTotal). flexibility-calculator.ts:217-259 (countAvailableHours) is the O(1) closed-form version of the SAME computation. So the same 'available hours between two dates under a schedule' exists both as a shared optimized function AND as 4+ ad-hoc day-by-day reimplementations that don't call it.",
+    "impact": "Inclusive/exclusive bounds, UTC-vs-local day handling, and zero-schedule edge cases are re-decided per copy (capacity uses getUTCDay at :142 but getDay at :547; gantt uses getDay/getUTCDay inconsistently at :199 vs :164) — a fertile source of off-by-one and timezone bugs. Maintainers can't tell which is canonical.",
+    "recommendation": "Funnel the simple 'sum scheduled hours over [start,end]' cases through flexibility-calculator's countAvailableHours; where per-day breakdown is genuinely needed (capacity simulation), extract a shared `eachWorkingDay(start,end,schedule,cb)` iterator with a single documented bound/timezone convention and reuse it in gantt intensity, monthly-schedule, and the overplan calc.",
+    "confidence": "high"
+  },
+  {
+    "title": "vscode config reads scattered across ~20 sites with no typed accessor layer",
+    "dimension": "dry-cross-cutting",
+    "category": "dry",
+    "severity": "low",
+    "effort": "medium",
+    "files": [
+      "src/webviews/gantt-panel.ts",
+      "src/commands/view-commands.ts",
+      "src/utilities/flexibility-calculator.ts",
+      "src/commands/monthly-schedule-commands.ts",
+      "src/commands/command-guards.ts",
+      "src/commands/context-proxy-commands.ts"
+    ],
+    "evidence": "`vscode.workspace.getConfiguration(\"redmyne\")` appears at 20 sites (redmine-server.ts:862, gantt-panel.ts:696/1818/2209/3013, extension.ts:155, view-commands.ts:65/126, configured-context-updater.ts:52, migration.ts:129, time-entry-commands.ts:595, context-proxy-commands.ts:176, command-guards.ts:70, projects-tree.ts:158/392/471, configured-command-registrar.ts:105, configure-command.ts:21, plus config-id-set-tracker.ts:53/75). Specific keys are re-read by literal string in multiple places: serverUrl (gantt-panel.ts:696 & 3013 identical `normalizeServerUrl(getConfiguration(\"redmyne\").get<string>(\"serverUrl\")||\"\")`, command-guards.ts:70, context-proxy-commands.ts:176); taskTypeField default 'Task Type' (gantt-panel.ts:2209 & view-commands.ts:126). getWeeklySchedule() is centralized (flexibility-calculator.ts:368) yet monthly-schedule-commands.ts:51-52 reimplements the exact `getConfiguration(\"redmyne.workingHours\").get(\"weeklySchedule\", DEFAULT_WEEKLY_SCHEDULE)` inline.",
+    "impact": "Config keys and their defaults are duplicated string literals; renaming a setting or changing a default means hunting every call site, and the taskTypeField/serverUrl defaults can silently diverge. No single place documents the config surface.",
+    "recommendation": "Introduce a thin typed config module (e.g. config.ts) exposing getServerUrl(), getTaskTypeField(), getWeeklySchedule() (move existing here), etc., each owning its key+default once; replace the inline reads. Reuse getWeeklySchedule in monthly-schedule-commands.",
+    "confidence": "high"
+  },
+  {
+    "title": "No shared BaseWebviewPanel: panel lifecycle boilerplate duplicated across both panels",
+    "dimension": "webview-duplication",
+    "category": "dry",
+    "severity": "medium",
+    "effort": "large",
+    "files": [
+      "src/webviews/gantt-panel.ts",
+      "src/webviews/timesheet-panel.ts",
+      "src/shared/base-tree-provider.ts"
+    ],
+    "evidence": "Both panels reimplement the same singleton-panel lifecycle. (1) dispose is byte-for-byte the same logic: gantt-panel.ts:2196 `public dispose(){ if(this._disposed)return; this._disposed=true; GanttPanel.currentPanel=undefined; this._panel.dispose(); while(this._disposables.length){...x.dispose()} }` vs timesheet-panel.ts:438 `private _dispose(){ if(this._disposed)return; this._disposed=true; TimeSheetPanel.currentPanel=undefined; this._panel.dispose(); for(const d of this._disposables)d.dispose(); ... }`. (2) createWebviewPanel options are identical: gantt-panel.ts:406-410 and timesheet-panel.ts:292-296 both `{enableScripts:true, retainContextWhenHidden:true, localResourceRoots:[vscode.Uri.joinPath(extensionUri,\"media\")]}`. (3) constructor wiring identical: gantt-panel.ts:303-308 / timesheet-panel.ts:381-392 both `_panel.onDidDispose(...dispose,null,_disposables)` + `_panel.webview.onDidReceiveMessage(...,null,_disposables)`. (4) createOrShow has the same reveal-or-create skeleton (gantt:379-416, timesheet:273-308). A `shared/base-tree-provider.ts` (abstract BaseTreeProvider<T>, line 7) ALREADY establishes this exact base-class precedent for the two tree providers — but the two panels, which share more, have no `shared/base-webview-panel.ts`.",
+    "impact": "Lifecycle invariants (disposal re-entry guard, currentPanel reset ordering, disposables drain, panel options) must be kept in sync by hand in two 2.5K-3.5K-LOC files. A new contributor changing one (e.g. adding a localResourceRoot) will silently miss the other; the divergence already happened (see _postMessage guard finding).",
+    "recommendation": "Extract `shared/base-webview-panel.ts` mirroring BaseTreeProvider: hold `_panel`, `_extensionUri`, `_disposables`, `_disposed`; provide a final dispose() with the guard+drain, a protected createOrShow helper (reveal-or-create), the shared webview options, and abstract `getHtml()` / `handleMessage()` hooks. Have both panels extend it.",
+    "confidence": "high"
+  },
+  {
+    "title": "getNonce + CSP + HTML scaffold reimplemented per panel instead of a shared content helper",
+    "dimension": "webview-duplication",
+    "category": "webview",
+    "severity": "medium",
+    "effort": "medium",
+    "files": [
+      "src/webviews/gantt-panel.ts",
+      "src/webviews/timesheet-panel.ts",
+      "src/utilities/webview-nonce.ts"
+    ],
+    "evidence": "Both `_getBaseHtml`/`_getHtml` repeat the same scaffold: getNonce() (gantt-panel.ts:640, timesheet-panel.ts:2495), asWebviewUri for media/webview-common.css (gantt:642, timesheet:2477-2479), a per-panel css+js asWebviewUri, and a hand-built CSP meta. The CSP strings have drifted: gantt-panel.ts:645-650 builds `default-src 'none'; img-src ${cspSource} data:; style-src ${cspSource} 'unsafe-inline'; script-src ${cspSource} 'nonce-${nonce}'` via an array join, while timesheet-panel.ts:2502 inlines `default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';` (no img-src, script-src lacks cspSource). The `<!DOCTYPE html>…<meta charset><meta viewport><meta CSP>…<link common.css>` boilerplate is otherwise the same.",
+    "impact": "CSP rules — security-sensitive — live in two places and have already diverged with no documented reason, so it is unclear which directives are intentional vs copy-rot. New webviews would copy whichever they find.",
+    "recommendation": "Add a `utilities/webview-html.ts` (or method on the base panel) that takes {webview, extensionUri, nonce, styleHrefs, scriptSrc, bodyHtml, cspExtras} and returns the document, centralizing the CSP policy and the common.css link. Reconcile the img-src/script-src cspSource difference explicitly.",
+    "confidence": "high"
+  },
+  {
+    "title": "Divergent message-protocol envelope: gantt uses {command}, timesheet uses {type}",
+    "dimension": "webview-duplication",
+    "category": "webview",
+    "severity": "low",
+    "effort": "large",
+    "files": [
+      "src/webviews/gantt-webview-messages.ts",
+      "src/webviews/timesheet-webview-messages.ts",
+      "src/webviews/gantt/index.js",
+      "src/webviews/timesheet/index.js"
+    ],
+    "evidence": "Two unrelated message conventions for the same extension<->webview RPC pattern. Gantt discriminates on `command`: gantt-webview-messages.ts:5-49 `GanttWebviewMessage = {command:\"webviewReady\"} | {command:\"openIssue\";issueId} | ...`; dispatched at gantt-panel.ts:1460 `switch(message.command)`; client posts `vscode.postMessage({command:'webviewReady'})` (gantt/index.js:471). Timesheet discriminates on `type`: timesheet-webview-messages.ts:418-445 `WebviewToExtensionMessage = WebviewReadyMessage{type:'webviewReady'} | ...`; dispatched at timesheet-panel.ts:450 `switch(message.type)`; client posts `vscode.postMessage({type:'webviewReady'})` (timesheet/index.js:2255). Even the identical 'webviewReady' handshake is spelled two ways.",
+    "impact": "There is no shared message-bus contract; each webview is its own dialect. A contributor moving between the two must relearn the envelope, and shared tooling (logging, a typed postMessage wrapper) can't be built once.",
+    "recommendation": "Standardize on one discriminant key (recommend `type` to match timesheet's richer separation of Extension->Webview vs Webview->Extension unions) and define a tiny shared `WebviewMessage` envelope type. Migrate gantt's `command` over time; at minimum document the two conventions and the rationale.",
+    "confidence": "high"
+  },
+  {
+    "title": "Gantt posts to webview via 22 raw postMessage calls; timesheet centralizes through one guarded _postMessage",
+    "dimension": "webview-duplication",
+    "category": "webview",
+    "severity": "low",
+    "effort": "small",
+    "files": [
+      "src/webviews/gantt-panel.ts",
+      "src/webviews/timesheet-panel.ts"
+    ],
+    "evidence": "Timesheet routes every outbound message through one helper with a disposal guard: timesheet-panel.ts:605 `private _postMessage(message:ExtensionToWebviewMessage){ if(this._disposed)return; this._panel.webview.postMessage(message); }`. Gantt has no such helper — it calls `this._panel.webview.postMessage(...)` directly 22 times (grep count), e.g. setDraftModeState at gantt-panel.ts:350-354, setDraftQueueCount at 362-365, render at 466 and 684. Of these only the `_queueRender` path (684) is `_disposed`-guarded (gantt-panel.ts:680); the draft-subscription posts at 350/362 fire from event callbacks with no disposal guard.",
+    "impact": "Inconsistent across the two panels for the same concern, and the ungated gantt posts can fire after dispose() during async/event callbacks (the very race timesheet's _postMessage guards against). Outbound typing is also unenforced on the gantt side.",
+    "recommendation": "Give gantt a typed, _disposed-guarded `_postMessage(msg:{command:...})` (ideally on the shared base panel) and route all 22 sites through it.",
+    "confidence": "high"
+  },
+  {
+    "title": "Serializer registration wired inconsistently: gantt inline in extension.ts, timesheet in a commands module",
+    "dimension": "webview-duplication",
+    "category": "layering",
+    "severity": "low",
+    "effort": "medium",
+    "files": [
+      "src/extension.ts",
+      "src/commands/timesheet-commands.ts"
+    ],
+    "evidence": "Both panels expose a static restore() and need a registerWebviewPanelSerializer, but the registrations live in different layers. Gantt: extension.ts:295-322 registers `\"redmyneGantt\"` inline in activate(), with data-fetch logic baked into the deserialize callback. Timesheet: timesheet-commands.ts:47-61 registers `\"redmyneTimeSheet\"` inside registerTimeSheetCommands(). So the gantt panel has no commands module, and its serializer + restore plumbing is embedded in the composition root while timesheet's is encapsulated.",
+    "impact": "No single place to learn 'how panels get registered'; a contributor adding a third webview has two conflicting templates. The gantt deserialize callback also mixes fetch/render policy into extension.ts, bloating the composition root.",
+    "recommendation": "Pick one location convention — preferably a `gantt-commands.ts` mirroring timesheet-commands.ts that owns the gantt show command + serializer — and move the gantt serializer out of extension.ts.",
+    "confidence": "high"
+  },
+  {
+    "title": "Client-side HTML escaper re-inlined in gantt-drag.js despite shared gantt-html-escape module",
+    "dimension": "webview-duplication",
+    "category": "dry",
+    "severity": "low",
+    "effort": "trivial",
+    "files": [
+      "src/webviews/gantt/gantt-drag.js",
+      "src/webviews/gantt-html-escape.ts",
+      "src/webviews/gantt/arrow-svg.js"
+    ],
+    "evidence": "`gantt-html-escape.ts` exports escapeHtml/escapeAttr and is already shared correctly: imported by arrow-svg.js:12 (`import { escapeAttr }`) and by timesheet/index.js:1 (`import { escapeHtml }`). But gantt-drag.js:110 re-inlines a partial escaper: `const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');` — a strict subset of the shared escapeHtml (which additionally escapes ', \\, `, $).",
+    "impact": "A second, weaker escaper in the same module family; if the shared one is hardened the inline copy silently lags, a latent XSS-consistency gap on user-controlled issue text in drag tooltips.",
+    "recommendation": "Import escapeHtml from ../gantt-html-escape in gantt-drag.js and delete the local `esc`.",
+    "confidence": "high"
+  },
+  {
+    "title": "ARCHITECTURE.md omits timesheet-panel.ts and the entire webview support layer",
+    "dimension": "webview-duplication",
+    "category": "docs",
+    "severity": "low",
+    "effort": "small",
+    "files": [
+      "docs/ARCHITECTURE.md",
+      "src/webviews/timesheet-panel.ts"
+    ],
+    "evidence": "The directory tree in ARCHITECTURE.md:25-26 lists `webviews/` with a single child: `gantt-panel.ts # SVG timeline, dependencies, heatmap`. A grep for 'timesheet' across the whole doc returns nothing (exit 1). timesheet-panel.ts is the 2nd-largest file in the repo (2595 LOC). The doc's Key Components section (lines 49-82) documents only GanttPanel and its gantt/ submodules; no mention of timesheet, kanban/, or the shared webview pieces (webview-nonce, gantt-html-escape, the *-webview-messages contracts).",
+    "impact": "The architecture doc misrepresents the webview layer as gantt-only, so a new contributor won't discover the timesheet panel, its message protocol, or the (intended) symmetry between the two panels — the exact context needed to land a BaseWebviewPanel refactor.",
+    "recommendation": "Update the tree to list timesheet-panel.ts + the webviews/{gantt,timesheet} subfolders, add a TimeSheetPanel Key Component entry, and note the shared webview-nonce/html-escape helpers (and the lack of a shared base panel as a known gap).",
+    "confidence": "high"
+  },
+  {
+    "title": "GanttPanel._getRenderPayload is an ~836-LOC method mixing view-state mutation, schedule/intensity map building, and date geometry",
+    "dimension": "god-files",
+    "category": "structure",
+    "severity": "medium",
+    "effort": "large",
+    "files": [
+      "src/webviews/gantt-panel.ts"
+    ],
+    "evidence": "_getRenderPayload spans lines 2212-3048 (~836 LOC). Within it: view-state mutation (2218 this._visibleRelationTypes=, 2233-2234 this._uniqueAssignees/_currentUserName=, 2247-2248 this._selectedAssignee/_selectedProjectId=), late/risk computation (2261-2295), inline sort (2298-2318), hierarchy orchestration (2322-2372), then a large inline build of issueScheduleMap + dayScheduleMap from calculateScheduledCapacity breakdown (2492-2539+). The filtering/hierarchy/capacity primitives are ALREADY extracted (filterIssuesForView/deriveAssigneeState in src/webviews/gantt-view-filter.ts:41,73; buildResourceHierarchy/attachUnscheduledGroups in src/utilities/hierarchy-builder.ts:660,772; calculateScheduledCapacity), so this method is pure orchestration glue that grew unchecked.",
+    "impact": "The single most-edited render path is unreviewable as a unit; any change to intensity, capacity, late-filtering, or sorting forces reading 800+ lines and risks touching unrelated this._ field mutations. The method both READS and WRITES ~10 instance fields mid-computation, making it impossible to unit-test in isolation.",
+    "recommendation": "Extract a pure src/webviews/gantt/gantt-render-payload.ts with buildRenderPayload(state, deps) that takes a plain snapshot of GanttPanel's view state and returns {payload, derived:{selectedAssignee, selectedProjectId, uniqueAssignees}} — pushing the this._x = mutations back into the caller. Pull the issueScheduleMap/dayScheduleMap construction (2492-2560) into buildScheduleMaps(scheduledDays, issueMap) and the late/risk loop (2261-2295) into computeRiskSets(issues, estimates, flexibilityCache). This mirrors the existing gantt-view-filter.ts pattern and lets the maps be tested without a webview.",
+    "confidence": "high"
+  },
+  {
+    "title": "GanttPanel._generateDateMarkers (~248 LOC) and tooltip builders are presentation helpers wedged into the panel class",
+    "dimension": "god-files",
+    "category": "structure",
+    "severity": "medium",
+    "effort": "medium",
+    "files": [
+      "src/webviews/gantt-panel.ts"
+    ],
+    "evidence": "_generateDateMarkers spans 3116-3364 (~248 LOC) with per-zoom switch logic (case \"day\"/\"week\"/\"month\"/\"quarter\"/\"year\" at 3144-3168). Tooltip/label helpers normalizeTooltipText (3365), getProjectCustomFieldLines (3372), buildProjectTooltip (3390), formatHealthTooltip (3437), formatProjectTooltip (3460) run 3365-3489 — none read mutable panel state beyond their args. Status color/opacity helpers _getStatusColor/_getStatusTextColor/_getStatusOpacity/_getStatusDescription (3072-3115) are likewise pure lookups.",
+    "impact": "Date-axis geometry and tooltip formatting are conceptually part of the gantt-html-generator.ts / gantt-toolbar-generator.ts presentation layer (which already exists at src/webviews/gantt/), but living in the panel they inflate the god-file and can't be reused or snapshot-tested.",
+    "recommendation": "Move _generateDateMarkers into src/webviews/gantt/gantt-date-markers.ts as generateDateMarkers(zoom, minDate, maxDate, today, ...) and relocate the pure tooltip/status helpers into the existing gantt-html-generator.ts (alongside buildIssueTooltip which already lives there at line 354). They take only primitive args, so this is a near-mechanical cut.",
+    "confidence": "high"
+  },
+  {
+    "title": "GanttPanel relation CRUD (~310 LOC) is a self-contained collaborator embedded in the panel",
+    "dimension": "god-files",
+    "category": "coupling",
+    "severity": "medium",
+    "effort": "medium",
+    "files": [
+      "src/webviews/gantt-panel.ts"
+    ],
+    "evidence": "_updateIssueDates (1842), _deleteRelation (1883), _updateRelationDelay (1941), _createRelation (2046), _handleUndoRelation (2116), _handleRedoRelation (2156) span 1842-2196 (~354 LOC). Each follows the same shape: guard this._server, call server.{create,delete}Relation, postMessage a pushUndoAction (e.g. 1911-1922), mutate local this._issues relations, re-render. The local-mutation helpers _addRelationLocally (1123) and _removeRelationLocally (1148) are already separate but only used here.",
+    "impact": "Relation editing + undo/redo is a cohesive feature interleaved with rendering and message dispatch; touching undo semantics means navigating around _getRenderPayload and _handleMessage. The server-call + undo-action + local-mutate triad is repeated 6x with subtle variations.",
+    "recommendation": "Extract a GanttRelationController (src/webviews/gantt/gantt-relation-controller.ts) constructed with {getServer, postMessage, mutateIssues, requestRender}. Move the six methods plus _addRelationLocally/_removeRelationLocally into it. GanttPanel._handleMessage then delegates the create/delete/updateDelay/undo/redo cases to the controller, shrinking both the class field count and the dispatcher.",
+    "confidence": "medium"
+  },
+  {
+    "title": "RedmineServer fuses HTTP transport/concurrency/caching core with ~50 domain API methods in one 1788-LOC class",
+    "dimension": "god-files",
+    "category": "layering",
+    "severity": "medium",
+    "effort": "large",
+    "files": [
+      "src/redmine/redmine-server.ts"
+    ],
+    "evidence": "Transport core: acquireSlot/releaseSlot (177-195), onRequestStart/onResponseSuccess/onResponseError (205-248), doRequest/executeRequest (249-436), paginate (438-490), hasChanges (498), getChangeAwareCached (524), encodeJson (557), deduplicateById (564). Domain methods then number ~50: getProjects, getTimeEntries, getIssueById, createIssue, getMemberships, getUserFteBatch, searchViaSearchApi/searchViaSubjectFilter (1658,1679), etc. Per-domain caches are scattered as instance state across the same class (clearProjectsCache 615, invalidateVersionCacheFor 670, invalidateIssueCache 1081, maybePruneIssueCache 1058, setUserFteCache 1251).",
+    "impact": "Two unrelated reasons to change live together: tuning HTTP concurrency/retry/pagination vs adding/altering a Redmine endpoint. The cache-invalidation logic for issues, versions, projects, and FTE is interleaved with the endpoints that populate them, so a new contributor adding an endpoint must understand the whole transport+cache machine.",
+    "recommendation": "Extract the transport into a RedmineHttpClient base (or composed member) owning maxConcurrentRequests/acquireSlot/releaseSlot/doRequest/executeRequest/paginate/encodeJson and the on*Request hooks. Then split domain methods into focused modules that take the client, e.g. issue-endpoints.ts, time-entry-endpoints.ts, version-endpoints.ts, project-membership-endpoints.ts — each owning its own cache. RedmineServer becomes a thin facade implementing IRedmineServer by delegation, preserving the single-injection-point contract.",
+    "confidence": "high"
+  },
+  {
+    "title": "kanban-commands.ts is a single 900-LOC registration function spanning four distinct command families",
+    "dimension": "god-files",
+    "category": "structure",
+    "severity": "medium",
+    "effort": "medium",
+    "files": [
+      "src/kanban/kanban-commands.ts"
+    ],
+    "evidence": "registerKanbanCommands (144) runs to ~1040 as one function. The bodies fall into clear families flagged by comments: task CRUD (// Add Task 152, Edit 182, Delete 197, Mark Done 216, Reopen 227, Set Priority 238), timer control (// Start Timer 448, Pause 487, Resume 500, Stop 513, Toggle 535, Skip Break 555, Log Early 566, Bank Time 630, Log and Continue 674, Transfer 721), config (// Configure Timer Settings 874 — a ~120-LOC multi-prompt block 874-996 using createIntegerRangeValidator), and filter/sort (1002-1040, gated on treeProvider). logTimeFlow (75) and getFreshTimerSecondsLeft (33) are timer helpers already pulled out.",
+    "impact": "Adding or changing one command family means scrolling a 900-LOC closure; the four families share only the disposables array and getServer, so the coupling is incidental. The configureTimer prompt block is its own mini-wizard buried mid-function.",
+    "recommendation": "Split into registerKanbanTaskCommands, registerKanbanTimerCommands, registerKanbanConfigCommands, registerKanbanFilterSortCommands (each (context, controller, getServer, treeProvider?) => Disposable[]), with registerKanbanCommands composing their results. Co-locate getFreshTimerSecondsLeft/logTimeFlow with the timer group and createIntegerRangeValidator with the config group.",
+    "confidence": "high"
+  },
+  {
+    "title": "ProjectsTree is a de-facto service locator; 52 callbacks in activate() mostly re-expose its internals",
+    "dimension": "layering-coupling",
+    "category": "coupling",
+    "severity": "medium",
+    "effort": "large",
+    "files": [
+      "src/extension.ts",
+      "src/commands/gantt-commands.ts",
+      "src/trees/projects-tree.ts"
+    ],
+    "evidence": "extension.ts threads 52 closure props through register*/setup calls (counted). `getServer:` appears 6 times, all `() => projectsTree.server` (extension.ts:208,253,270,284,313-314,478) or `myTimeEntriesTree.server` (478). GanttCommandDeps (gantt-commands.ts:16-26) has 9 callbacks; 8 are thin delegations to projectsTree: fetchIssuesIfNeeded, getDependencyIssues, getFlexibilityCache, getProjects, clearProjects, getFilter, setFilter, getServer (extension.ts:269-279). projectsTree is referenced via 14 distinct members across 33 sites in extension.ts (getProjects, getFilter, getFlexibilityCache, getDependencyIssues, getAssignedIssues, getProjectNodeById, server, setFilter, clearProjects, fetchIssuesIfNeeded, refresh, ...). The tree (a View) is simultaneously the data cache and the canonical server holder for the whole app.",
+    "impact": "A new contributor adding a command must hand-assemble a bespoke deps object and discover that 'the data' lives on a tree-view provider, not a service. Each feature re-derives the same 6-8 lambdas. Changing a ProjectsTree method signature ripples into every register* deps interface. The View layer cannot be tested or reused without dragging issue-cache + filter + flexibility + server state with it.",
+    "recommendation": "Introduce a small AppContext/container object holding { getServer, draftModeManager, draftQueue, monthlySchedules, workloadStatusBar } plus an IssueDataService (extract fetchIssuesIfNeeded/getProjects/getFilter/getFlexibilityCache/getDependencyIssues off ProjectsTree into a service the tree also consumes). Pass the container (or narrow slices of it) to register* functions instead of 8-10 individual lambdas each. ProjectsTree then becomes a pure View over the service.",
+    "confidence": "high"
+  },
+  {
+    "title": "ARCHITECTURE.md's MVC claim is aspirational: controllers/ is nearly empty; commands call RedmineServer directly",
+    "dimension": "layering-coupling",
+    "category": "layering",
+    "severity": "medium",
+    "effort": "medium",
+    "files": [
+      "src/controllers/issue-controller.ts",
+      "src/controllers/domain.ts",
+      "src/commands/issue-context-commands.ts",
+      "src/commands/draft-mode-commands.ts",
+      "docs/ARCHITECTURE.md"
+    ],
+    "evidence": "ARCHITECTURE.md:9 states 'MVC-like: Tree Providers (View) -> Controllers (Logic) -> RedmineServer (Model/API)'. Reality: controllers/ contains only issue-controller.ts (468 LOC) used at exactly 3 call sites (commands/list-open-issues-assigned-to-me.ts:45, commands/commons/open-actions-for-issue-id.ts:61) and domain.ts (52 LOC, just types + groupMembersByRole). Meanwhile `server.<verb>` is called directly from 15 command files (76 occurrences), e.g. issue-context-commands.ts:85,147,160,185,230 (updateDoneRatio/setIssueStatus), draft-mode-commands.ts:412-516 (~20 direct server writes), create-test-issues.ts:43-230. So commands ARE the controller layer for everything except the open-actions flow.",
+    "impact": "The documented layering misleads contributors into looking for orchestration logic in controllers/ that lives in commands/. The single IssueController is an inconsistent outlier — half the issue-mutation logic goes through it, half doesn't.",
+    "recommendation": "Either (a) drop the MVC framing from ARCHITECTURE.md and document the actual pattern (commands orchestrate the IRedmineServer directly; controllers/ is a single legacy orchestrator), or (b) commit to the layer and migrate the issue-mutation commands (issue-context-commands, draft-mode bypass writes) behind IssueController/a service. Pick one; the current half-state is the worst of both.",
+    "confidence": "high"
+  },
+  {
+    "title": "Import cycle: redmine-server.ts <-> redmine-server-interface.ts (RedmineServerConnectionOptions lives on the wrong side)",
+    "dimension": "layering-coupling",
+    "category": "structure",
+    "severity": "medium",
+    "effort": "small",
+    "files": [
+      "src/redmine/redmine-server.ts",
+      "src/redmine/redmine-server-interface.ts"
+    ],
+    "evidence": "madge reports exactly 1 circular dependency: redmine-server-interface.ts > redmine-server.ts. redmine-server.ts:19 `import type { IRedmineServer } from \"./redmine-server-interface\"` while redmine-server-interface.ts:8 `import type { RedmineServerConnectionOptions } from \"./redmine-server\"`. The interface (meant to be the dependency seam — its own header says 'Consumers should depend on this interface, not the concrete class') imports a type back from the concrete class.",
+    "impact": "The abstraction depends on its implementation, defeating the point of the interface. Type-only so harmless at runtime, but it blocks moving the interface to a leaf module and is a smell a new contributor will copy.",
+    "recommendation": "Move RedmineServerConnectionOptions (and any other shared option/value types) into redmine-server-interface.ts (or a new redmine/types.ts), and have redmine-server.ts import them from there. The interface file then has zero dependency on the concrete class.",
+    "confidence": "high"
+  },
+  {
+    "title": "Two server-construction config-reading sites duplicate the options assembly; createServer factory splits responsibility",
+    "dimension": "layering-coupling",
+    "category": "dry",
+    "severity": "medium",
+    "effort": "small",
+    "files": [
+      "src/commands/configured-command-registrar.ts",
+      "src/utilities/configured-context-updater.ts",
+      "src/extension.ts"
+    ],
+    "evidence": "Identical options block built twice: configured-command-registrar.ts:122-127 `deps.createServer({ address: url, key: apiKey, additionalHeaders: config.get(\"additionalHeaders\"), caFile: config.get<string>(\"caFile\") })` and configured-context-updater.ts:68-73 `deps.createServer({ address: serverUrl!, key: apiKey!, additionalHeaders: config.get(\"additionalHeaders\"), caFile: config.get<string>(\"caFile\") })`. Both then go through extension.ts:152-168 createServer which ALSO reads config (logging.enabled, maxConcurrentRequests). So building one RedmineServerConnectionOptions requires reading config keys in two layers, and the address/key/headers/caFile read is copy-pasted.",
+    "impact": "Adding a new connection setting (e.g. a timeout or proxy) means editing both call sites or it silently applies on one path (commands) but not the other (tree wiring). The two paths can drift — exactly the kind of bug that produces 'works in the Gantt but not in quick-log'.",
+    "recommendation": "Centralize: a single `buildServerOptionsFromConfig(url, apiKey)` helper (or fold the address/key/headers/caFile reads into the extension.ts createServer factory so callers pass only url+apiKey). One place reads redmyne.* connection config.",
+    "confidence": "high"
+  },
+  {
+    "title": "Layering inversion: utilities/ imports trees/ + draft-mode/ (configured-context-updater is an orchestrator misfiled as a utility)",
+    "dimension": "layering-coupling",
+    "category": "layering",
+    "severity": "medium",
+    "effort": "medium",
+    "files": [
+      "src/utilities/configured-context-updater.ts",
+      "src/utilities/tree-item-factory.ts"
+    ],
+    "evidence": "utilities/ is the leaf helper layer (redmine-server.ts:13,21 and logging-redmine-server.ts:6 import from it). But configured-context-updater.ts:6-12 imports DraftModeServer, DraftQueue, DraftModeManager (draft-mode/), ProjectsTree and MyTimeEntriesTreeDataProvider (trees/) — and its body constructs servers, wraps them in DraftModeServer, calls projectsTree.setServer/refresh, prewarms the picker (config-context-updater.ts:81-123). That is composition-root orchestration, not a utility. Separately tree-item-factory.ts:12-13 imports configuredCommandArgs and ActionProperties from commands/, so a utility reaches up into the commands layer too.",
+    "impact": "'utilities/' (60+ files) is supposed to be safe leaf code anyone can import; two files there actually sit above trees/draft-mode/commands. A contributor importing from utilities can unknowingly pull in the whole app graph, and the orchestrator is hidden where nobody looks for wiring logic.",
+    "recommendation": "Move configured-context-updater.ts out of utilities/ to a composition/ or controllers/ (app-setup) location alongside the kanban-setup pattern. For tree-item-factory, invert the dependency: have commands/ supply the configuredCommandArgs builder via the factory's params rather than the factory importing from commands/.",
+    "confidence": "high"
+  },
+  {
+    "title": "ProjectsTree.server / MyTimeEntriesTree.server are public mutable fields read app-wide as the active-server source of truth",
+    "dimension": "layering-coupling",
+    "category": "coupling",
+    "severity": "medium",
+    "effort": "medium",
+    "files": [
+      "src/trees/projects-tree.ts",
+      "src/trees/my-time-entries-tree.ts",
+      "src/extension.ts"
+    ],
+    "evidence": "projects-tree.ts:66 `server?: IRedmineServer;` (public, no access modifier) with setServer at :605; my-time-entries-tree.ts:235 `server?: IRedmineServer;` + setServer at :320. extension.ts reads these back as the canonical server everywhere via `() => projectsTree.server` (lines 208,253,270,284,313,478) and `() => myTimeEntriesTree.server` (478). The active connection thus lives on two View objects, set by configured-context-updater (setServer on both), with no single owner.",
+    "impact": "The 'current server' has two homes that must be kept in sync (configured-context-updater.ts:117-118 sets both; :152-153 clears both — easy to forget one). Any caller can mutate tree.server directly, bypassing setServer. There is no one place to ask 'what server am I talking to?'.",
+    "recommendation": "Make the field private behind setServer (already exists) and introduce a single ServerProvider/AppContext that owns the active IRedmineServer; trees subscribe to it rather than each holding their own copy. getServer callbacks then read the provider, not a tree.",
+    "confidence": "high"
+  },
+  {
+    "title": "ARCHITECTURE.md doc drift: stale version, nonexistent timer/ directory, wrong coverage figure",
+    "dimension": "layering-coupling",
+    "category": "docs",
+    "severity": "low",
+    "effort": "trivial",
+    "files": [
+      "docs/ARCHITECTURE.md"
+    ],
+    "evidence": "ARCHITECTURE.md:5 '**v4.19.1**' but package.json version is 4.40.0 (~21 minor releases stale). ARCHITECTURE.md:30 and :88-91 document `src/timer/` as a directory with an 'idle -> working -> paused -> logging -> break' state machine, but `ls src/timer/` => 'No such file or directory' (timer logic now lives in kanban/). ARCHITECTURE.md:130 'Vitest, 60% coverage target' but vitest.config.ts thresholds are lines:88 functions:78 branches:72 statements:88.",
+    "impact": "New contributors will look for a timer/ module that doesn't exist and trust a coverage bar 28 points below the enforced one. The version stamp signals the doc is generally unmaintained, reducing trust in the parts that ARE accurate (e.g. the detailed Gantt windowing notes).",
+    "recommendation": "Drop the version stamp from the doc (it duplicates package.json and will always rot) or wire it to a release step; remove/relocate the timer/ section to reflect kanban-owned timer logic; update the coverage line to match vitest.config.ts (or just say 'see vitest.config.ts thresholds').",
+    "confidence": "high"
+  },
+  {
+    "title": "Gantt domain logic (~2,041 LOC) lives in generic utilities/ but has a single Gantt consumer",
+    "dimension": "utilities-cohesion",
+    "category": "structure",
+    "severity": "low",
+    "effort": "medium",
+    "files": [
+      "src/utilities/capacity-calculator.ts",
+      "src/utilities/hierarchy-builder.ts",
+      "src/utilities/dependency-graph.ts",
+      "src/utilities/project-health.ts",
+      "src/webviews/gantt/"
+    ],
+    "evidence": "capacity-calculator.ts (734 LOC) imported ONLY by webviews/gantt-panel.ts:25. hierarchy-builder.ts (825 LOC) imported ONLY by webviews/gantt-model.ts and gantt-panel.ts. dependency-graph.ts (234 LOC) imported ONLY by gantt-model.ts and gantt-panel.ts. project-health.ts imported by hierarchy-builder, gantt-model, gantt-panel only. Total ~2,041 LOC. Meanwhile a real gantt/ feature folder already exists at src/webviews/gantt/ holding gantt-coords.ts, gantt-layout-constants.ts, gantt-render-types.ts etc. — so the home exists; the domain calculators were just put in utilities/ instead.",
+    "impact": "A contributor searching for Gantt scheduling/capacity math will not look in a folder named 'utilities' (which signals 'generic, reusable'). The split obscures that these modules are gantt-private, not cross-cutting helpers, and makes the gantt feature appear smaller/more contained than it is.",
+    "recommendation": "Move the gantt-only domain modules (capacity-calculator, hierarchy-builder, dependency-graph, project-health) into src/webviews/gantt/ (or a sibling src/gantt/domain/) alongside the existing gantt-* files. Leave flexibility-calculator OUT of this move — see the separate finding; it is genuinely shared.",
+    "confidence": "medium"
+  },
+  {
+    "title": "ARCHITECTURE.md describes the 48-file utilities/ folder as one undifferentiated 'Helpers' bucket",
+    "dimension": "utilities-cohesion",
+    "category": "docs",
+    "severity": "low",
+    "effort": "trivial",
+    "files": [
+      "docs/ARCHITECTURE.md"
+    ],
+    "evidence": "docs/ARCHITECTURE.md:32 is the ONLY structural mention of the folder: 'utilities/  # Helpers (secrets, flexibility calc, etc.)'. The folder actually contains 48 files / ~7,500 LOC spanning four unrelated concerns (generic helpers, gantt domain logic, VS Code UI pickers, config-state trackers). The doc's one-line gloss gives no map of what belongs where or any naming/placement convention.",
+    "impact": "The doc actively endorses the dumping-ground pattern — it offers no guidance on whether new domain logic should go in a feature folder vs utilities/, so the folder will keep growing without curation.",
+    "recommendation": "After (or alongside) any sub-structuring, replace the one-liner with a short subsection listing the sub-groups (generic, ui/, trackers, etc.) and a one-sentence rule: feature-specific logic lives in the feature folder; utilities/ is for genuinely cross-feature helpers only.",
+    "confidence": "high"
+  },
+  {
+    "title": "Single-field issue PUT + cache-invalidate pattern copy-pasted across 5+ methods",
+    "dimension": "redmine-api-layer",
+    "category": "dry",
+    "severity": "medium",
+    "effort": "small",
+    "files": [
+      "src/redmine/redmine-server.ts"
+    ],
+    "evidence": "setIssueStatus (1089-1104), updateIssueDates (1109-1128), updateDoneRatio (1133-1141), setIssuePriority (1427-1434), and the issue half of applyQuickUpdate (1496-1502) all repeat the same shape: doRequest(`/issues/${id}.json`, \"PUT\", encodeJson({ issue: {<field>} })) followed by this.invalidateIssueCache(id). e.g. updateDoneRatio: `await this.doRequest(`/issues/${issueId}.json`, \"PUT\", this.encodeJson({ issue: { done_ratio: doneRatio } })); this.invalidateIssueCache(issueId);` vs setIssuePriority: `...this.encodeJson({ issue: { priority_id: priorityId } })); this.invalidateIssueCache(issueId);`. Every one re-states the endpoint template and the invalidate call.",
+    "impact": "Each new issue-field mutation re-derives the same boilerplate; easy to forget the invalidateIssueCache call (a correctness footgun already proven by the inconsistency — createIssue at 1379 only invalidates the prefix, not the per-id entry). A new contributor adding e.g. updateSubject must know to copy both lines.",
+    "recommendation": "Add a private helper `private async patchIssue(issueId: number, fields: Record<string, unknown>): Promise<unknown>` that does the PUT + invalidateIssueCache once, and have the five public methods delegate to it. Keeps the endpoint string and invalidation in one place.",
+    "confidence": "high"
+  },
+  {
+    "title": "URL-length comma-batching loop duplicated between getTimeEntriesForIssues and getIssuesByIds",
+    "dimension": "redmine-api-layer",
+    "category": "dry",
+    "severity": "medium",
+    "effort": "medium",
+    "files": [
+      "src/redmine/redmine-server.ts"
+    ],
+    "evidence": "getTimeEntriesForIssues (957-1002) and getIssuesByIds (1524-1554) both implement the identical 'accumulate ids into currentBatch, test joined URL length against MAX_URL_LEN=1800, on overflow pop+flush+restart batch, flush remainder' algorithm. Both declare `const MAX_URL_LEN = 1800;`, both build `baseUrl`, both loop `for (const id of ...) { currentBatch.push(id); const testUrl = ...; if (testUrl.length > MAX_URL_LEN ...) { currentBatch.pop(); ... } }` then a trailing flush. The comment in getIssuesByIds even says 'mirroring getTimeEntriesForIssues' (1530), acknowledging the copy.",
+    "impact": "The non-trivial batching invariant lives in two places; a fix to the length heuristic or an off-by-one (note getTimeEntriesForIssues guards `batch.length === 1` vs getIssuesByIds guards `currentBatch.length > 1` — a subtle divergence already) must be made twice and the two have already drifted.",
+    "recommendation": "Extract `private async fetchByIdBatches<T>(ids: number[], buildUrl: (idsCsv: string) => string, responseKey: string): Promise<T[]>` (or a generic `chunkIdsByUrlLength(ids, buildUrl): string[]` that returns batch URLs) and have both callers feed their own buildUrl/responseKey. Resolves the divergence as a side effect.",
+    "confidence": "high"
+  },
+  {
+    "title": "Current-user object shape typed inline 5 times instead of one named interface",
+    "dimension": "redmine-api-layer",
+    "category": "types",
+    "severity": "low",
+    "effort": "small",
+    "files": [
+      "src/redmine/redmine-server.ts",
+      "src/redmine/redmine-server-interface.ts"
+    ],
+    "evidence": "The `{ id; login; firstname; lastname; mail; created_on; last_login_on?; custom_fields?: {id;name;value}[] }` shape is written out longhand at: redmine-server.ts cachedCurrentUser field (88-97), getCurrentUser return type (1213-1222), getCurrentUser doRequest generic (1230-1239); redmine-server-interface.ts getCurrentUser return (149-161); plus the `{ id; name; value }[]` custom_fields fragment recurs again in getUserFte's doRequest generic (1282-1284). Grep for `custom_fields?: { id: number; name: string; value: string }[]` hits 5 lines.",
+    "impact": "Adding/renaming a user field (or the FTE custom-field shape) requires editing 4-5 disjoint inline literals that must stay byte-identical or the interface and impl silently diverge; the interface return type is a hand-maintained copy of the impl's.",
+    "recommendation": "Define `interface RedmineUser { ... }` (and reuse the existing `CustomField`-like `{id;name;value}` as a named type) in models/, then reference it from the field, both doRequest generics, the method return types, and the interface.",
+    "confidence": "high"
+  },
+  {
+    "title": "Two mutation methods bypass the encodeJson helper with raw Buffer.from(JSON.stringify())",
+    "dimension": "redmine-api-layer",
+    "category": "dry",
+    "severity": "low",
+    "effort": "trivial",
+    "files": [
+      "src/redmine/redmine-server.ts"
+    ],
+    "evidence": "A private `encodeJson<T>(data): Buffer` helper exists (557-559) and is used by ~10 methods, but setIssueStatus (1092-1100) and createRelation (1174) still inline `Buffer.from(JSON.stringify({...}), \"utf8\")`. e.g. setIssueStatus: `Buffer.from(JSON.stringify({ issue: { status_id: statusId } }), \"utf8\")` where every sibling uses `this.encodeJson({ issue: {...} })`.",
+    "impact": "Inconsistent encoding path; if encodeJson ever needs to change (e.g. add charset handling, payload-size guard, or logging), these two silently skip it. Reads as two methods the refactor missed.",
+    "recommendation": "Replace both raw Buffer.from(JSON.stringify(...)) calls with this.encodeJson(...).",
+    "confidence": "high"
+  },
+  {
+    "title": "LoggingRedmineServer onResponseSuccess and onResponseError bodies are ~95% identical",
+    "dimension": "redmine-api-layer",
+    "category": "dry",
+    "severity": "low",
+    "effort": "small",
+    "files": [
+      "src/redmine/logging-redmine-server.ts"
+    ],
+    "evidence": "onResponseSuccess (88-119) and onResponseError (121-152) share the identical lazy-correlation block verbatim: the `if (!this.loggingConfig.enabled || typeof requestId !== 'symbol') return;` guard, then the `if (!this.pendingBySymbol.has(requestId)) { const pathKey = `${method}:${path}`; const queue = this.pendingByPath.get(pathKey); if (queue && queue.length > 0) { const metadata = queue.shift()!; this.pendingBySymbol.set(requestId, metadata); if (queue.length === 0) this.pendingByPath.delete(pathKey); } }` shift-from-queue block, then `const metadata = this.pendingBySymbol.get(requestId); if (metadata) { const duration = Date.now() - metadata.startTime; ...; this.pendingBySymbol.delete(requestId); }`. Only the final `logger.logResponse(...)` vs `logger.logError(...)` call differs.",
+    "impact": "The fragile symbol/path correlation bookkeeping is maintained twice; a bug fix to the dedup logic (the comment in redmine-server.ts:289-291 shows this correlation is already subtle) must be applied in both places.",
+    "recommendation": "Extract `private resolveMetadata(requestId, method, path): {startTime; displayId} | undefined` that does the guard + queue-shift + lookup + delete, and have both hooks call it then invoke their respective logger method on the result.",
+    "confidence": "high"
+  },
+  {
+    "title": "ARCHITECTURE.md RedmineServer description is stale (pagination + caching strategy)",
+    "dimension": "redmine-api-layer",
+    "category": "docs",
+    "severity": "low",
+    "effort": "trivial",
+    "files": [
+      "docs/ARCHITECTURE.md",
+      "src/redmine/redmine-server.ts",
+      "src/redmine/change-aware-cache.ts"
+    ],
+    "evidence": "ARCHITECTURE.md:37-41 says 'Recursive pagination for large datasets' and 'Instance-level caching (statuses, activities)'. Actual paginate() (redmine-server.ts:438-490) is NOT recursive — it fetches page 1 for total_count then computes remaining offsets and fetches them in concurrency-limited batches. Caching is far richer than 'statuses, activities': there is a whole ChangeAwareCache (change-aware.ts) with TTL + updated_on probes + exponential backoff driving getProjects/getTimeEntries/getFilteredIssues (524-552), plus per-issue TTL cache, versions/memberships/FTE Maps, in-flight membership dedup. None of this is documented.",
+    "impact": "A contributor reading the architecture doc gets the wrong mental model of both how paging works and how invalidation/freshness is achieved — the single most subtle part of this layer is undocumented, while a non-existent 'recursive' approach is advertised.",
+    "recommendation": "Update the RedmineServer section: describe batched (not recursive) pagination and the change-aware caching layer (probe + TTL + backoff) plus the prefix-invalidation contract (invalidatePrefix('issues:'/'time_entries:')).",
+    "confidence": "high"
+  },
+  {
+    "title": "redmine-server.ts (1788 LOC) co-locates HTTP transport, pagination, six caching strategies, and all endpoint methods in one class",
+    "dimension": "redmine-api-layer",
+    "category": "structure",
+    "severity": "low",
+    "effort": "large",
+    "files": [
+      "src/redmine/redmine-server.ts"
+    ],
+    "evidence": "The single RedmineServer class mixes: HTTP transport + slot queue (108-432), pagination (438-490), change-aware cache orchestration (498-552), and SIX separate ad-hoc cache mechanisms as private fields — issueCache+prune (98-99,1058-1069), versionsCache (667), membershipsCache+membershipsFetchMap in-flight dedup (1436-1472), userFteCache with manual LRU (1249-1264), cachedCurrentUser (88), timeEntryActivities/timeEntryCustomFieldsCache/issueStatuses/issuePriorities singletons — interleaved with ~40 endpoint methods. Caching strategy is therefore coherent per-method but spread across the file rather than owned by one component.",
+    "impact": "This is the root cause of the file's size and of the duplication above. Each cache reinvents store/lookup/invalidate; the simple-singleton caches (activities, statuses, priorities, customFields) repeat the same `if (this.x) return this.x; const r = await doRequest(...); if (r?.k) this.x = r; return ...` shape ~5 times (e.g. 625-641, 648-665, 1389-1407, 1412-1422).",
+    "recommendation": "Lower priority than the targeted dedups above. Over time, consolidate the simple read-through singleton caches behind one small helper (e.g. `private cachedFetch<T>(slot, fetcher)`) and consider moving the LRU/in-flight-dedup Maps into small cache classes alongside ChangeAwareCache, shrinking RedmineServer toward pure endpoint orchestration. Do this incrementally; do not rewrite the transport.",
+    "confidence": "medium"
+  },
+  {
+    "title": "5 esbuild contexts duplicate identical option blocks (not data-driven)",
+    "dimension": "build-bundling",
+    "category": "build",
+    "severity": "low",
+    "effort": "small",
+    "files": [
+      "esbuild.cjs"
+    ],
+    "evidence": "esbuild.cjs defines 5 near-identical context objects (extensionCtx L8-20, ganttJsCtx L22-33, timesheetJsCtx L35-46, ganttCssCtx L51-58, timesheetCssCtx L60-67). Every block repeats `minify: production`, `logLevel: \"silent\"`, `plugins: [esbuildProblemMatcherPlugin]`; the two JS-webview blocks (gantt/timesheet) are byte-for-byte identical except entryPoints/outfile; the two CSS blocks likewise. `sourcesContent: false` is repeated in the 3 JS blocks. The whole thing is `await esbuild.context(...)` x5 then collected into `contexts` (L69).",
+    "impact": "Adding/changing a flag (e.g. a new define, target, or banner) means editing up to 5 places; the gantt and timesheet JS/CSS targets can silently drift apart. A new contributor adding a third webview must hand-copy ~12 lines.",
+    "recommendation": "Extract a `baseOpts` object and a small factory, e.g. `const jsTarget = (entry, out) => ({...base, format:'iife', platform:'browser', sourcesContent:false, sourcemap: production?false:'external', entryPoints:[entry], outfile:out})`, then map a `[{entry,out}]` table for the 2 JS + 2 CSS webview targets. Cuts ~50 lines to a table.",
+    "confidence": "high"
+  },
+  {
+    "title": ".vscodeignore lists nonexistent esbuild.js alongside the real esbuild.cjs",
+    "dimension": "build-bundling",
+    "category": "manifest",
+    "severity": "low",
+    "effort": "trivial",
+    "files": [
+      ".vscodeignore"
+    ],
+    "evidence": ".vscodeignore L10-11 are `esbuild.js` then `esbuild.cjs`. Only `esbuild.cjs` exists at repo root (`ls esbuild.js` → No such file). The `esbuild.js` line is dead — a leftover from a pre-CJS-rename.",
+    "impact": "Harmless today (src/** already excludes most build files), but the stale entry misleads anyone auditing what ships and signals the file wasn't updated during the .cjs migration.",
+    "recommendation": "Delete the `esbuild.js` line.",
+    "confidence": "high"
+  },
+  {
+    "title": "@vscode/vsce used via npx but absent from devDependencies (unpinned, re-downloaded)",
+    "dimension": "build-bundling",
+    "category": "build",
+    "severity": "medium",
+    "effort": "trivial",
+    "files": [
+      "package.json",
+      ".github/workflows/ci.yml",
+      ".github/workflows/release.yml"
+    ],
+    "evidence": "package.json L2332 `\"package\": \"npx @vscode/vsce package\"`; ci.yml L33 `npx @vscode/vsce ls --no-yarn`; release.yml L94 `npm run package`. devDependencies (package.json L2341-2353) lists esbuild, eslint, vitest, etc. but NOT @vscode/vsce. So the packaging/manifest-validation tool is resolved on the fly by npx with no version pin.",
+    "impact": "Every `npm run package` / CI run can fetch a different vsce version → non-reproducible packaging and possible surprise behavior changes in the size-gated VSIX; also a cold-download cost on each CI job. The tool that produces the shipped artifact is the one dependency left unpinned.",
+    "recommendation": "Add `@vscode/vsce` to devDependencies (pinned), keep `npm ci` installing it, and change scripts to call it directly (`vsce package`). npx then resolves the local pinned copy.",
+    "confidence": "high"
+  },
+  {
+    "title": "11 hand-written browser .js webview source files are excluded from BOTH eslint and tsc",
+    "dimension": "build-bundling",
+    "category": "build",
+    "severity": "medium",
+    "effort": "large",
+    "files": [
+      "eslint.config.mjs",
+      "tsconfig.json",
+      "src/webviews/gantt/index.js",
+      "src/webviews/timesheet/index.js"
+    ],
+    "evidence": "src/webviews has 11 hand-written .js files (gantt/index.js, gantt-drag.js, gantt-keyboard.js, gantt-minimap.js, gantt-row-interaction.js, lookup-maps.js, row-window.js, row-window-utils.js, selection-utils.js, arrow-svg.js, timesheet/index.js — index.js alone is ~69KB). eslint.config.mjs L13 ignores `\"src/webviews/gantt/\", \"src/webviews/timesheet/\", \"*.js\"`. tsconfig.json has no `allowJs`/`checkJs` (L1-18), so tsc `--noEmit` skips them. These files are bundled by esbuild into the shipped gantt.js/timesheet.js but receive zero lint or type checking.",
+    "impact": "A large, shipped portion of the codebase (the entire webview runtime) has no static safety net — typos, unused vars, floating promises, undefined refs all slip through to runtime in the webview. This is the biggest maintainability gap in the build setup. Contrast: the gantt/*.ts files (gantt-coords, html-generator, etc.) compiled into the *extension* bundle ARE checked.",
+    "recommendation": "Either (a) lint them with a JS-flavored eslint block (drop the blanket `*.js`/dir ignores, add a browser-globals config for src/webviews/**/*.js), and/or (b) migrate the .js webview files to .ts so esbuild + tsc cover them. Even just enabling eslint on these files would catch the common classes of bug.",
+    "confidence": "high"
+  },
+  {
+    "title": "CLAUDE.md build note (F5 spawns esbuild --watch) is stale vs launch.json",
+    "dimension": "build-bundling",
+    "category": "docs",
+    "severity": "low",
+    "effort": "small",
+    "files": [
+      "CLAUDE.md",
+      ".vscode/launch.json"
+    ],
+    "evidence": "CLAUDE.md (Webview bundles section) states: \"An F5 dev session spawns `esbuild --watch` (dev profile, unminified) that overwrites these files\". launch.json's \"Launch Extension\" config (L5-37) has NO preLaunchTask and no watch reference; only \"Launch Tests\" has `preLaunchTask: \"build\"` (L50), which runs the one-shot PRODUCTION compile (tasks.json L8 → `build` → `compile` → `--production`). So F5 neither spawns a watch nor builds unminified; it relies on a pre-existing out/ + media/.",
+    "impact": "A contributor following CLAUDE.md expects live rebuilds on F5 and unminified bundles; instead they get stale artifacts unless they manually run `npm run watch`. The documented dev-watch-clobber rationale for gitignoring media/ no longer maps to the actual launch config.",
+    "recommendation": "Either restore a watch preLaunchTask on the Launch Extension config (background esbuild --watch task) or update CLAUDE.md to state that F5 uses existing build output and `npm run watch` must be run separately.",
+    "confidence": "high"
+  },
+  {
+    "title": "ARCHITECTURE.md build/bundling coverage is a single line — doc drift",
+    "dimension": "build-bundling",
+    "category": "docs",
+    "severity": "low",
+    "effort": "small",
+    "files": [
+      "docs/ARCHITECTURE.md"
+    ],
+    "evidence": "grep for esbuild|bundle|media/|prepublish|vscodeignore|size gate|allowJs across docs/ARCHITECTURE.md returns exactly one hit: L129 `- **Bundler**: esbuild → CJS (external: vscode)`. Nothing documents the 5-target build, the media generated-vs-vendored split, the .ts(extension)/.js(webview) duality, vscode:prepublish, or the 250KB gate — all non-obvious and load-bearing.",
+    "impact": "The most surprising parts of the build (why media/ is gitignored, why gantt has both .ts and .js files, what prepublish guarantees) are undocumented in the architecture doc; the knowledge lives only in CLAUDE.md and tribal memory, increasing onboarding friction.",
+    "recommendation": "Add a short Build/Bundling section to ARCHITECTURE.md: the 5 esbuild targets, extension(.ts→CJS) vs webview(.js→IIFE) split, media generated-vs-vendored, prepublish→compile, and the CI size gate.",
+    "confidence": "high"
+  },
+  {
+    "title": "Duplicated checkout+setup-node+npm ci across 4 job definitions",
+    "dimension": "ci-release",
+    "category": "ci",
+    "severity": "low",
+    "effort": "small",
+    "files": [
+      "C:/Users/viktor.rognas/git_repos/vrognas-redmyne/.github/workflows/ci.yml",
+      "C:/Users/viktor.rognas/git_repos/vrognas-redmyne/.github/workflows/release.yml"
+    ],
+    "evidence": "The block actions/checkout@v6 + actions/setup-node@v6 (node-version 22, cache npm) + `npm ci` is repeated in ci.yml lint-check (lines 15-24), ci.yml test (55-73), ci.yml build (96-105), and release.yml (25-58) — 4 near-identical copies.",
+    "impact": "Bumping node, the cache strategy, or the checkout action means editing 4 places; easy to miss one (already happened with node-version drift, see separate finding).",
+    "recommendation": "Extract a composite action (e.g. .github/actions/setup/action.yml doing checkout+setup-node+npm ci) and reference it from each job, or consolidate the gate into a single reusable workflow. The three CI jobs could even share one setup step if collapsed.",
+    "confidence": "low"
+  },
+  {
+    "title": "Node version hardcoded in 4 places and drifts from package.json engines",
+    "dimension": "ci-release",
+    "category": "ci",
+    "severity": "low",
+    "effort": "trivial",
+    "files": [
+      "C:/Users/viktor.rognas/git_repos/vrognas-redmyne/.github/workflows/ci.yml",
+      "C:/Users/viktor.rognas/git_repos/vrognas-redmyne/.github/workflows/release.yml",
+      "C:/Users/viktor.rognas/git_repos/vrognas-redmyne/package.json"
+    ],
+    "evidence": "node-version: \"22\" appears at ci.yml:20, ci.yml:69, ci.yml:100 and release.yml:31. package.json:16 declares `\"node\": \">=20.0.0\"`. CI/release exercise only node 22; the >=20 floor in engines is never tested.",
+    "impact": "Either the engines floor is a lie (no node-20 CI coverage to back it) or the pinned 22 is arbitrary. Single source of truth missing — a node bump must touch 4 workflow lines.",
+    "recommendation": "Define the version once (composite action input, or a matrix var / env at workflow top) and reference it. Decide whether to test the engines floor (add node 20 to the test matrix) or raise engines to >=22 to match what is actually validated.",
+    "confidence": "high"
+  },
+  {
+    "title": "No concurrency cancellation on either workflow",
+    "dimension": "ci-release",
+    "category": "ci",
+    "severity": "low",
+    "effort": "trivial",
+    "files": [
+      "C:/Users/viktor.rognas/git_repos/vrognas-redmyne/.github/workflows/ci.yml",
+      "C:/Users/viktor.rognas/git_repos/vrognas-redmyne/.github/workflows/release.yml"
+    ],
+    "evidence": "Neither file declares a top-level `concurrency:` block (ci.yml header lines 1-8, release.yml header 1-12). Rapid pushes to a PR branch or main run the full cross-platform matrix in parallel for every commit.",
+    "impact": "Wasted CI minutes on superseded runs; on PRs with fast iteration the matrix (3 OSes) stacks up. Release has no guard against two tag pushes publishing concurrently.",
+    "recommendation": "Add `concurrency: { group: ${{ github.workflow }}-${{ github.ref }}, cancel-in-progress: true }` to ci.yml. For release.yml use a per-tag group with cancel-in-progress:false (don't cancel a half-done publish).",
+    "confidence": "medium"
+  },
+  {
+    "title": "250KB VSIX size gate enforced in CI but not in release publish",
+    "dimension": "ci-release",
+    "category": "ci",
+    "severity": "low",
+    "effort": "small",
+    "files": [
+      "C:/Users/viktor.rognas/git_repos/vrognas-redmyne/.github/workflows/ci.yml",
+      "C:/Users/viktor.rognas/git_repos/vrognas-redmyne/.github/workflows/release.yml"
+    ],
+    "evidence": "ci.yml build job runs a size check failing >250KB (lines 110-120). release.yml packages (line 94: `npm run package`) and immediately publishes to both stores (96-108) with no equivalent size assertion.",
+    "impact": "The size gate is the project's stated invariant (CLAUDE.md / size gate). Because release.yml builds its own VSIX from a fresh `npm ci` rather than reusing CI's artifact, an oversized bundle (e.g. an accidentally-tracked media asset) would be rejected by CI yet still published by release — the gate has a hole exactly where it matters most.",
+    "recommendation": "Either reuse the CI-produced VSIX artifact in release (download-artifact) instead of rebuilding, or duplicate the size check before the publish steps. Reusing the artifact also removes the redundant rebuild and guarantees byte-identical published output.",
+    "confidence": "high"
+  },
+  {
+    "title": "CI/release workflows undocumented in ARCHITECTURE.md; AGENTS.md commit convention contradicts actual format",
+    "dimension": "ci-release",
+    "category": "docs",
+    "severity": "low",
+    "effort": "small",
+    "files": [
+      "C:/Users/viktor.rognas/git_repos/vrognas-redmyne/docs/ARCHITECTURE.md",
+      "C:/Users/viktor.rognas/git_repos/vrognas-redmyne/AGENTS.md"
+    ],
+    "evidence": "ARCHITECTURE.md 'Build & Test' (lines 127-133) lists bundler/tests/scripts but never mentions ci.yml, release.yml, the two-store tag-triggered publish, or the 250KB gate — a grep for ci.yml/release.yml/VSIX/size gate/concurrency in ARCHITECTURE.md returns nothing. Separately, AGENTS.md:39 documents commit types as `Type: description` with `Add/Fix/Feat/Chore/Docs/Test/Refactor/Revert`, but the actual repo and CLAUDE.md use conventional commits (`feat:`, `fix:`, `chore:` — see git log: 'chore: release v4.40.0', 'fix: reliable Show in Gantt reveal').",
+    "impact": "A new contributor learns the build stack from ARCHITECTURE.md but nothing about how releases happen (tag → publish), and AGENTS.md actively teaches the wrong commit format. The commit-msg hook only enforces length, not type, so the bad convention isn't caught automatically.",
+    "recommendation": "Add a short 'CI/CD & Release' subsection to ARCHITECTURE.md (two workflows, tag-triggered dual-store publish, 250KB gate, tag==package.json version rule). Fix AGENTS.md:39 to state conventional-commits types matching CLAUDE.md and the git-workflow rule.",
+    "confidence": "high"
+  },
+  {
+    "title": "Commit-message length rules duplicated between hook and PR validator",
+    "dimension": "ci-release",
+    "category": "ci",
+    "severity": "low",
+    "effort": "small",
+    "files": [
+      "C:/Users/viktor.rognas/git_repos/vrognas-redmyne/scripts/commit-msg",
+      "C:/Users/viktor.rognas/git_repos/vrognas-redmyne/scripts/validate-commits.sh"
+    ],
+    "evidence": "Both scripts independently encode the same rules: subject ≤50 (commit-msg:27 `-gt 50`; validate-commits.sh:30 `-gt 50`) and body ≤72 (commit-msg:52 `-gt 72`; validate-commits.sh:41 `-gt 72`). The two implementations also diverge: commit-msg additionally checks the blank-line-after-subject rule (lines 37-44) which validate-commits.sh does not, so a PR can pass CI yet would have been blocked by the local hook.",
+    "impact": "Two encodings of the same policy drift apart (already have re: blank-line rule). Changing the 50/72 limits requires editing both; contributors who skip the local hook get a weaker CI check.",
+    "recommendation": "Extract a single shared validator script that both the commit-msg hook and validate-commits.sh call per-message (hook passes the file, CI loops over commits and pipes each message in), so the rule set lives in one place and the blank-line check is consistent.",
+    "confidence": "high"
+  },
+  {
+    "title": "Stale coverage exclusion: src/timer/** no longer exists",
+    "dimension": "test-infra",
+    "category": "test",
+    "severity": "low",
+    "effort": "trivial",
+    "files": [
+      "vitest.config.ts"
+    ],
+    "evidence": "vitest.config.ts:23 `\"src/timer/**/*.ts\", // VS Code UI heavy + audio`. Verified `ls -d src/timer` returns \"No such file or directory\". The directory does not exist anywhere under src/. (All other exclusions verified present: src/commands/commons/ exists, src/utilities/completion-sound.ts exists, src/commands/open-actions-*.ts exist.)",
+    "impact": "A dead exclude entry is silent rot: it suggests a src/timer module that a new contributor will search for and not find, and it masks the fact that coverage config drifts from the actual tree. If a future src/timer/ is added it would be silently excluded by surprise.",
+    "recommendation": "Delete line 23 from vitest.config.ts. Add a CI guard (or a one-line script test) that fails if any coverage `exclude` glob matches zero files, so the next stale entry is caught automatically.",
+    "confidence": "high"
+  },
+  {
+    "title": "ARCHITECTURE.md misstates coverage target (60%) and isolate setting (false)",
+    "dimension": "test-infra",
+    "category": "docs",
+    "severity": "low",
+    "effort": "trivial",
+    "files": [
+      "docs/ARCHITECTURE.md",
+      "vitest.config.ts"
+    ],
+    "evidence": "docs/ARCHITECTURE.md:130 `- **Tests**: Vitest, 60% coverage target` but vitest.config.ts:29-33 enforces `lines: 88, functions: 78, branches: 72, statements: 88`. docs/ARCHITECTURE.md:131 `- **Test isolation**: \\`isolate: false\\` + parallel files` but vitest.config.ts:8 is `isolate: true`.",
+    "impact": "Both claims are flatly contradicted by the config. A contributor reading the docs would assume a 60% bar (and write less-covered code that then fails CI's 88% gate), and would assume cross-file singleton mocks are risky under isolate:false when they are actually isolated. Doc-as-source-of-truth is broken for the test section specifically.",
+    "recommendation": "Update ARCHITECTURE.md line 130 to the real thresholds (88/78/72/88 lines/functions/branches/statements) and line 131 to `isolate: true`. Consider linking the doc to the config rather than restating numbers that drift.",
+    "confidence": "high"
+  },
+  {
+    "title": "Dead shared HTTP-mock fixture while 3 redmine tests hand-roll the same scaffolding",
+    "dimension": "test-infra",
+    "category": "dry",
+    "severity": "low",
+    "effort": "small",
+    "files": [
+      "test/fixtures/redmine-api.ts",
+      "test/unit/redmine/redmine-server.test.ts",
+      "test/unit/redmine/redmine-server-priority.test.ts",
+      "test/unit/redmine/update-issue-dates.test.ts"
+    ],
+    "evidence": "test/fixtures/redmine-api.ts (71 LOC) exports `createMockResponse` and `mockHttpRequest` — exactly an HTTP request/response mock — but `grep -rn fixtures/redmine-api test/ src/` returns ZERO imports; it is dead. Meanwhile each of redmine-server.test.ts:15, redmine-server-priority.test.ts:7, update-issue-dates.test.ts:9 defines its own local `const createMockRequest = () => vi.fn((options, callback) => { const request = new EventEmitter()... request.end = function(){ ... statusCode/statusMessage ... } })`. The opening ~18 lines of all three builders are character-for-character identical (options:{path,method}, callback signature, EventEmitter request, request.end); update-issue-dates additionally adds setTimeout/body capture.",
+    "impact": "The exact reusable helper that would eliminate this duplication already exists but is orphaned, so three files each carry and must maintain the same EventEmitter HTTP plumbing. A change to the mock contract (e.g. new request method) means editing 3+ spots, and the dead fixture misleads readers into thinking a shared path exists.",
+    "recommendation": "Either delete test/fixtures/redmine-api.ts as dead, or (preferred) promote it: have the three redmine tests import a single parameterized `createMockRequest`/`mockHttpRequest` helper (with options for setTimeout + body capture) from test/fixtures/ and drop their local copies.",
+    "confidence": "high"
+  },
+  {
+    "title": "Duplicated inline vi.mock(\"vscode\") config-stub across 4 tracker tests",
+    "dimension": "test-infra",
+    "category": "dry",
+    "severity": "low",
+    "effort": "small",
+    "files": [
+      "test/unit/utilities/adhoc-tracker.test.ts",
+      "test/unit/utilities/config-id-set-tracker.test.ts",
+      "test/unit/utilities/precedence-tracker.test.ts",
+      "test/unit/utilities/auto-update-tracker.test.ts"
+    ],
+    "evidence": "All four files repeat the same block: `vi.mock(\"vscode\", () => ({ workspace: { getConfiguration: vi.fn(() => ({ get: vi.fn((_key, def) => stored.length > 0 ? [...stored] : def), update: vi.fn(async (_key, value) => { stored = value; }) })), ... }, ConfigurationTarget: { Global: 1 } }))` over a module-level `let stored: number[] = []`. adhoc-tracker.test.ts:6-15 and config-id-set-tracker.test.ts:5-14 are byte-identical apart from one `onDidChangeConfiguration` line; precedence-tracker and auto-update-tracker drop only the onDidChangeConfiguration line.",
+    "impact": "These four are the only files that bypass the shared alias mock (test/mocks/vscode.ts) with their own inline vi.mock, and they all reimplement a stateful settings-array stub. The duplication is small but exactly the kind a helper should own; the divergence (one keeps onDidChangeConfiguration, others don't) is incidental, not intentional.",
+    "recommendation": "Extract a `mockStatefulSettingsArray()` helper (returns the vscode factory + a getter/setter for `stored`) into test/mocks/ or a helper file, and have the four tracker tests call it. Keeps the stateful-config pattern in one place.",
+    "confidence": "high"
+  },
+  {
+    "title": "vscode mock QuickPick simulator is over-clever and brittle",
+    "dimension": "test-infra",
+    "category": "test",
+    "severity": "low",
+    "effort": "medium",
+    "files": [
+      "test/mocks/vscode.ts"
+    ],
+    "evidence": "test/mocks/vscode.ts:51-79 the `show()` simulator reaches back into vitest internals to mutate prior return values: `(window.createQuickPick as ReturnType<typeof vi.fn>).mock.results[...mock.results.length - 1].value.selectedItems = ...`. It indexes the last mock result, mutates it in place, and branches on `typeof value === \"symbol\"` to simulate a Back button.",
+    "impact": "This is the one part of an otherwise clean, declarative mock that encodes test behavior (auto-accept, Back navigation) inside the mock via mock.results introspection. It is fragile to vitest internals and couples the global mock to one feature's flow (wizardInput); a refactor of QuickPick consumers or a vitest upgrade could break it opaquely.",
+    "recommendation": "Leave as-is if churn is low, but if these QuickPick wizard tests are touched again, move the accept/Back simulation into a small test-local driver and keep test/mocks/vscode.ts a passive structural stub. Flagged so the next editor doesn't expand this pattern into other widgets.",
+    "confidence": "high"
+  },
+  {
+    "title": "ARCHITECTURE.md documents deleted src/timer/ directory",
+    "dimension": "docs-drift",
+    "category": "docs",
+    "severity": "medium",
+    "effort": "trivial",
+    "files": [
+      "docs/ARCHITECTURE.md"
+    ],
+    "evidence": "docs/ARCHITECTURE.md line 28 dir tree `├── timer/   # Pomodoro-style work units` and lines 88-91 `### Timer (`src/timer/`)` with a state-machine description. `ls src/timer` => 'No such file or directory'. Timer logic actually lives in src/kanban/kanban-timer-handlers.ts (the only timer file under src/). The whole `### Timer` section describes a module layout that no longer exists.",
+    "impact": "A new contributor follows the doc to a non-existent directory; the single most misleading drift since the path is simply gone, not just renumbered.",
+    "recommendation": "Delete the `├── timer/` tree entry and the `### Timer (src/timer/)` section; either drop timer docs or relocate them under the Kanban section pointing at src/kanban/kanban-timer-handlers.ts.",
+    "confidence": "high"
+  },
+  {
+    "title": "ARCHITECTURE.md version header stale: v4.19.1 / VS Code >=1.105.0",
+    "dimension": "docs-drift",
+    "category": "docs",
+    "severity": "low",
+    "effort": "trivial",
+    "files": [
+      "docs/ARCHITECTURE.md",
+      "package.json"
+    ],
+    "evidence": "docs/ARCHITECTURE.md line 5: `**v4.19.1** | VS Code ≥1.105.0 | Node ≥20`. package.json line 5 `\"version\": \"4.40.0\"` and lines 13-16 `\"vscode\": \"^1.109.0\"`, `\"node\": \">=20.0.0\"`. Version is 21 minor releases behind; engine floor wrong (1.105 vs 1.109). (Node >=20 still matches; TypeScript 5.9+ on line 3 also still matches package.json ^5.9.3 — not drift.)",
+    "impact": "Header implies the architecture snapshot predates ~21 releases of feature work; engine claim contradicts the real minimum VS Code version.",
+    "recommendation": "Update to `**v4.40.0** | VS Code ≥1.109.0 | Node ≥20`, or drop the pinned version line and derive engine reqs from package.json.",
+    "confidence": "high"
+  },
+  {
+    "title": "ARCHITECTURE.md test config wrong: 60% target and isolate:false",
+    "dimension": "docs-drift",
+    "category": "docs",
+    "severity": "medium",
+    "effort": "trivial",
+    "files": [
+      "docs/ARCHITECTURE.md",
+      "vitest.config.ts"
+    ],
+    "evidence": "docs/ARCHITECTURE.md line 130 `- **Tests**: Vitest, 60% coverage target` and line 131 `- **Test isolation**: `isolate: false` + parallel files`. vitest.config.ts line 8 `isolate: true`, lines 29-34 thresholds `lines: 88, functions: 78, branches: 72, statements: 88`. Both the coverage number (60 vs 88) and the isolation mode (false vs true) are inverted from source-of-truth.",
+    "impact": "Contributors mis-set coverage expectations by 28 points and may write tests assuming shared module state (isolate:false) that no longer holds, risking flaky cross-file singleton interference the doc warns against.",
+    "recommendation": "Change line 130 to ~88% lines/statements (cite the four threshold numbers) and line 131 to `isolate: true`; reconcile the cross-file-mock warning with the now-isolated config.",
+    "confidence": "high"
+  },
+  {
+    "title": "AGENTS.md lists deleted src/timer/ as a feature area",
+    "dimension": "docs-drift",
+    "category": "docs",
+    "severity": "low",
+    "effort": "trivial",
+    "files": [
+      "AGENTS.md"
+    ],
+    "evidence": "AGENTS.md line 5: `...with feature areas under `src/commands/`, `src/redmine/`, `src/kanban/`, `src/timer/`, and `src/webviews/`.` src/timer/ does not exist (`ls src/timer` fails); timer code is in src/kanban/kanban-timer-handlers.ts. Same dead-directory drift as ARCHITECTURE.md.",
+    "impact": "Second authoritative agent/contributor guide points at a non-existent directory.",
+    "recommendation": "Remove `src/timer/` from the feature-area list (it folds into src/kanban/); consider adding src/controllers/ and src/draft-mode/ which exist but are unlisted.",
+    "confidence": "high"
+  },
+  {
+    "title": "AESTHETIC_USABILITY_ANALYSIS.md cites three deleted src/timer/ files",
+    "dimension": "docs-drift",
+    "category": "docs",
+    "severity": "low",
+    "effort": "small",
+    "files": [
+      "docs/AESTHETIC_USABILITY_ANALYSIS.md"
+    ],
+    "evidence": "docs/AESTHETIC_USABILITY_ANALYSIS.md line 499 `| `src/timer/timer-dialogs.ts` |`, line 730 `| `src/timer/timer-status-bar.ts` |`, line 731 `| `src/timer/timer-tree-provider.ts` |`. None of these files/dir exist (timer merged into src/kanban/). Doc is also dated Mar 23 and largely an aspirational analysis.",
+    "impact": "Action tables reference files that cannot be opened; low impact since this is an analysis doc, not a primary contributor guide.",
+    "recommendation": "Either remap the three rows to src/kanban/ equivalents or archive this analysis (move to docs/archive/) given its age and stale file map.",
+    "confidence": "high"
+  },
+  {
+    "title": "ARCHITECTURE.md omits timesheet webview (2nd-largest file)",
+    "dimension": "docs-drift",
+    "category": "docs",
+    "severity": "medium",
+    "effort": "small",
+    "files": [
+      "docs/ARCHITECTURE.md",
+      "src/webviews/timesheet-panel.ts"
+    ],
+    "evidence": "docs/ARCHITECTURE.md webviews tree (lines 25-26) lists only `└── gantt-panel.ts`; the entire Key Components webview discussion (lines 49-86) covers only Gantt. But src/webviews/ contains timesheet-panel.ts (2595 LOC, 2nd-largest source file) plus a timesheet/ subdir and timesheet-webview-messages.ts. The Time Sheet is a top-level documented feature in README.md (lines 57-63) yet absent from the architecture map.",
+    "impact": "The architecture doc gives no map of the second-biggest subsystem; a contributor touching the time sheet has no architectural orientation despite it being a headline feature.",
+    "recommendation": "Add timesheet-panel.ts + timesheet/ to the webviews tree and a short `### TimeSheetPanel` Key-Components entry mirroring the Gantt one.",
+    "confidence": "high"
+  },
+  {
+    "title": "docs/plan.md is a stale v3.6.0 'Phase 2' artifact",
+    "dimension": "docs-drift",
+    "category": "docs",
+    "severity": "low",
+    "effort": "trivial",
+    "files": [
+      "docs/plan.md"
+    ],
+    "evidence": "docs/plan.md lines 3-5: `**Date**: 2025-11-25`, `**Status**: Ready for implementation`, `**Previous**: Phase 1 complete (MVP-1 through MVP-4, v3.6.0)`. Current shipped version is 4.40.0 (package.json). The 22KB plan describes work for a version ~34 minor releases old and is marked still 'ready for implementation'.",
+    "impact": "A 'ready for implementation' planning doc 34 releases out of date misleads anyone scanning docs/ for current direction; clutters the docs root.",
+    "recommendation": "Move docs/plan.md to docs/archive/ (a docs/archive/ dir already exists) or mark it clearly as historical/superseded.",
+    "confidence": "high"
+  },
+  {
+    "title": "36 context-only commands leak into the global command palette (missing when:false)",
+    "dimension": "manifest",
+    "category": "manifest",
+    "severity": "medium",
+    "effort": "small",
+    "files": [
+      "package.json"
+    ],
+    "evidence": "contributes.menus.commandPalette has 107 entries, 102 of them `when:\"false\"` to hide context-menu commands. But 36 context-only commands are NOT in that hide-list and so default to VISIBLE in the palette with bare/broken titles: redmyne.setDoneRatio0..100 + setDoneRatioCustom (titles '0%','10%',...,'Custom...'), the gantt.setDoneRatio0..100 twins (same titles), redmyne.copyIssueId ('Copy Issue ID'), copyProjectId, copyProjectUrl, openProjectInBrowser ('Open in Browser'), openTimeEntryInGantt ('Show in Gantt'), showProjectInGantt ('Show in Gantt'), setStatus ('Set Status'), setIssuePriority ('Set Priority'), updateIssue. Inconsistency is provable: redmyne.copyIssueUrl IS hidden (in commandPalette list, when:false) but redmyne.copyIssueId is NOT. Invoking these from the palette runs them with no tree/webview context (the forwarders guard `if(!hasIssueId(ctx)) return;`) so they silently no-op.",
+    "impact": "Palette pollution: ~36 confusing entries ('0%','50%','Custom...','Set Status') appear in the global Command Palette with no category, no context, and do nothing when run. Poor UX and a maintenance landmine — every new context command silently leaks unless someone remembers the parallel when:false entry.",
+    "recommendation": "Add `{ \"command\": ..., \"when\": \"false\" }` commandPalette entries for the 36 leaking ids (or migrate to enablement/when on the command and stop relying on the 102-entry hide-list). Longer term, consider generating the when:false palette block from the command list at build time to eliminate the manual parallel maintenance.",
+    "confidence": "high"
+  },
+  {
+    "title": "Config key `redmyne.additionalHeaders` read by code but not declared in contributes.configuration",
+    "dimension": "manifest",
+    "category": "manifest",
+    "severity": "low",
+    "effort": "trivial",
+    "files": [
+      "package.json",
+      "src/commands/configured-command-registrar.ts",
+      "src/utilities/configured-context-updater.ts",
+      "src/utilities/config-change.ts"
+    ],
+    "evidence": "Code reads config.get(\"additionalHeaders\") in configured-command-registrar.ts:125 and configured-context-updater.ts:71, and even watches it: config-change.ts:22 `event.affectsConfiguration(\"redmyne.additionalHeaders\")`. config-change.ts:14 documents it as a recognized setting. But contributes.configuration declares only 16 keys and `additionalHeaders` is not among them (grep 'additionalHeaders' package.json => empty). Contrast: peer keys caFile, maxConcurrentRequests, serverUrl ARE declared.",
+    "impact": "The setting is invisible in the VS Code Settings UI, gets no JSON schema / autocomplete / type validation, and is undiscoverable to users — yet code depends on it. A contributor reading package.json would not know it exists.",
+    "recommendation": "Add a `redmyne.additionalHeaders` property to contributes.configuration (type object, additionalProperties string) matching the RedmineConfig.additionalHeaders shape in src/definitions/redmine-config.ts:17.",
+    "confidence": "high"
+  },
+  {
+    "title": "Gantt/sidebar command-twin duplication doubles manifest command + submenu blocks",
+    "dimension": "manifest",
+    "category": "dry",
+    "severity": "medium",
+    "effort": "medium",
+    "files": [
+      "package.json",
+      "src/commands/context-proxy-commands.ts"
+    ],
+    "evidence": "redmyne.doneRatioMenu (13 entries: setDoneRatio0..100, Custom, clear) and redmyne.gantt.doneRatioMenu (13 entries: gantt.setDoneRatio0..100, Custom, clear) are structurally identical modulo the 'gantt.' prefix (verified equal). Same for redmyne.internalEstimateMenu vs redmyne.gantt.internalEstimateMenu. At the command level, 25 redmyne.gantt.* commands have an identical-suffix sidebar twin. The twins exist for a legitimate reason — context-proxy-commands.ts forwardIssueIdPayload (L50-60) adapts webview {issueId} payloads to the sidebar {id} shape — but the manifest must hand-declare both halves: 2x commands, 2x menu entries, 2x submenu entries (26 done-ratio submenu items for one concept), which is the chief driver of the 70KB size.",
+    "impact": "Every change to a done-ratio/status/estimate action must be made in two parallel manifest places and kept in sync; easy to update one and miss the gantt twin. Inflates the manifest and the 250KB package size gate.",
+    "recommendation": "Keep the code-level forwarders (correct adapter pattern) but reduce manifest duplication: e.g. have a single set of done-ratio/internal-estimate commands accept either {id} or {issueId} (the forwarder already normalizes), so one submenu can be reused in both the tree and webview contexts via different `when` clauses, halving the doneRatioMenu/internalEstimateMenu declarations.",
+    "confidence": "high"
+  },
+  {
+    "title": "Command category applied to only 2 of 160 commands",
+    "dimension": "manifest",
+    "category": "manifest",
+    "severity": "low",
+    "effort": "small",
+    "files": [
+      "package.json"
+    ],
+    "evidence": "Only redmyne.kanban.add (L401) and redmyne.kanban.toggleTimer (L477) carry \"category\": \"Redmyne\"; the other 158 have none. Palette-visible top-level commands are consequently inconsistent: redmyne.kanban.add shows as 'Redmyne: Add Kanban Task' (title 'Add Kanban Task' + category) while peers embed the prefix in the title instead (redmyne.reviewDrafts title 'Redmyne: Review Drafts', redmyne.configure title 'Configure Redmine Server' with no prefix at all).",
+    "impact": "Inconsistent palette grouping and naming; users can't reliably type 'Redmyne' to filter all commands. Cosmetic but trips contributors deciding how to name a new command.",
+    "recommendation": "Pick one convention: add `\"category\": \"Redmyne\"` to all palette-visible commands and strip the redundant 'Redmyne:' prefix from their titles, OR keep prefix-in-title and drop the 2 stray categories. Standardize across the manifest.",
+    "confidence": "high"
+  },
+  {
+    "title": "ARCHITECTURE.md understates where commands are actually registered",
+    "dimension": "manifest",
+    "category": "docs",
+    "severity": "low",
+    "effort": "trivial",
+    "files": [
+      "docs/ARCHITECTURE.md"
+    ],
+    "evidence": "ARCHITECTURE.md:15-16 and :137 say commands are registered in extension.ts ('Add to src/commands/, register in extension.ts, add to package.json'). In reality extension.ts registers only a handful directly (listOpenIssuesAssignedToMe, openActionsForIssue, newIssue, setApiKey); the bulk are registered across registrar modules — context-proxy-commands.ts (forwarders, ~50 cmds), issue-context-commands.ts, quick-issue-commands.ts, view-commands.ts, kanban/kanban-commands.ts. The doc also doesn't mention the gantt/sidebar forwarder-twin pattern or the commandPalette when:false hiding convention, both load-bearing for anyone editing the manifest.",
+    "impact": "A new contributor following ARCHITECTURE.md will look in the wrong file and won't learn the twin/when:false conventions, perpetuating the leak (finding #2) and orphan (finding #1) patterns.",
+    "recommendation": "Update ARCHITECTURE.md to describe the command-registrar modules, the webview->sidebar forwarder-twin pattern (context-proxy-commands.ts), and the requirement to add a commandPalette when:false entry for every context-only command.",
+    "confidence": "high"
+  },
+  {
+    "title": "Relation-type label map duplicated across 3 files and has drifted",
+    "dimension": "gaps",
+    "category": "dry",
+    "severity": "low",
+    "effort": "small",
+    "files": [
+      "src/utilities/tree-item-factory.ts",
+      "src/webviews/gantt-panel.ts",
+      "src/webviews/gantt/gantt-drag.js"
+    ],
+    "evidence": "Three independent relation_type -> human-label maps, all divergent: tree-item-factory.ts:215-225 `typeLabels` covers 9 types incl. blocked/duplicated/copied_from with verbose passive labels ('Blocked by','Duplicated by'); gantt-panel.ts:2054-2061 `labels: Record<CreatableRelationType,string>` covers only the 6 creatable types ('Related to','Duplicates','Blocks','Precedes','Follows','Copied to'); gantt-drag.js:625,631 inlines a third set with emoji prefixes ('➡️ Precedes','📄 Copied to'). Same domain concept, three drifted spellings/orderings.",
+    "impact": "Adding/renaming a relation type requires editing 3 files in 3 styles; users see 'Precedes' in one surface and '➡️ Precedes' in another. New contributor will miss at least one site.",
+    "recommendation": "Define one canonical RELATION_TYPE_LABELS (and ordering) in a shared module (e.g. redmine/models/issue.ts or a relations util); have the TS sites import it, and pass the labels into the gantt webview payload rather than re-listing them in gantt-drag.js.",
+    "confidence": "high"
+  },
+  {
+    "title": "Kanban persists state under a stale `redmyne.timer.*` namespace with scattered string-literal keys and repeated defaults",
+    "dimension": "gaps",
+    "category": "structure",
+    "severity": "medium",
+    "effort": "small",
+    "files": [
+      "src/kanban/kanban-commands.ts",
+      "src/kanban/kanban-setup.ts",
+      "src/kanban/kanban-status-bar.ts",
+      "src/kanban/kanban-timer-handlers.ts"
+    ],
+    "evidence": "The deleted `src/timer/` feature's globalState namespace lives on: `redmyne.timer.workDuration|unitDuration|soundEnabled|progressBarWidth` are now read/written EXCLUSIVELY by kanban modules — kanban-commands.ts:875-990 (8 sites), kanban-setup.ts:26,32, kanban-status-bar.ts:122, kanban-timer-handlers.ts:51,117 — all as bare string literals with no shared constant. Default values are also re-typed per call site and inconsistent risk: workDuration default `45` appears at kanban-setup.ts:32, kanban-commands.ts:876; progressBarWidth default `45` at kanban-status-bar.ts:122 and kanban-commands.ts:879; unitDuration `60` at kanban-setup.ts:27 & kanban-commands.ts:875.",
+    "impact": "A typo in any of the ~14 literal keys silently splits state (read returns default). The `timer` name misleads readers into thinking the removed timer feature still exists (compounds the ARCHITECTURE/AGENTS timer-drift findings). Default drift is a latent bug.",
+    "recommendation": "Centralize keys + defaults in kanban-state.ts as `const KANBAN_KEYS = {...}` / `KANBAN_DEFAULTS`; import everywhere. Optionally add a migration mapping old `redmyne.timer.*` -> `redmyne.kanban.*` (the migration.ts table already does redmine->redmyne, so the pattern exists).",
+    "confidence": "high"
+  },
+  {
+    "title": "Month-key ('YYYY-MM') formatter reimplemented 3 times despite a canonical getMonthKey()",
+    "dimension": "gaps",
+    "category": "dry",
+    "severity": "low",
+    "effort": "trivial",
+    "files": [
+      "src/utilities/monthly-schedule.ts",
+      "src/trees/my-time-entries-tree.ts",
+      "src/utilities/capacity-calculator.ts"
+    ],
+    "evidence": "monthly-schedule.ts:25-29 exports canonical `getMonthKey(date): 'YYYY-MM'` = `${year}-${String(date.getMonth()+1).padStart(2,'0')}`. my-time-entries-tree.ts:413-415 defines a private `getMonthKey(year, month)` = `${year}-${String(month+1).padStart(2,'0')}` (same format string). capacity-calculator.ts:187 inlines the identical `${year}-${String(month + 1).padStart(2, \"0\")}`. (Distinct from the already-flagged weekday-name duplication.)",
+    "impact": "Three copies of the same key format must stay byte-identical or month-keyed lookups (schedules/capacity/time-entry grouping) silently mismatch. Low because the format is simple, but it spans 3 modules.",
+    "recommendation": "Reuse monthly-schedule's getMonthKey (add a `(year, month)` overload or call it with `new Date(year, month, 1)`); delete the tree's private copy and capacity-calculator's inline.",
+    "confidence": "high"
+  },
+  {
+    "title": "Live-search QuickPick scaffolding duplicated between issue-picker and kanban-dialogs",
+    "dimension": "gaps",
+    "category": "dry",
+    "severity": "medium",
+    "effort": "medium",
+    "files": [
+      "src/utilities/issue-picker.ts",
+      "src/kanban/kanban-dialogs.ts"
+    ],
+    "evidence": "Both build the same debounced live-search QuickPick by hand: monotonic race-guard `let searchVersion=0; const thisSearchVersion=++searchVersion; ... if (thisSearchVersion!==searchVersion) return`, `quickPick.busy=true`, ID-vs-text detection via `query.replace(/^#/,'')`+`parseInt`+`!isNaN`, and mine/closed ranking. issue-picker.ts:416-454 (and a 2nd copy at issue-picker.ts:834) extracted the SEARCH core into `searchIssuesWithFuzzy`, but kanban-dialogs.ts:235-309 reimplements the whole scaffold inline (incl. its own parallel search/rank at :260-308) instead of reusing it. Even the debounce constant drifted: issue-picker SEARCH_DEBOUNCE_MS=250 (line 11) vs kanban-dialogs SEARCH_DEBOUNCE_MS=300 (line 10).",
+    "impact": "A 3rd issue-search surface means the next race-guard/busy/ID-parse fix must be made in 3 places; the debounce inconsistency already makes the two pickers feel different. High duplication-surface for a subtle async-cancellation pattern.",
+    "recommendation": "Extract a `pickIssueViaLiveSearch(...)` (or at least the searchVersion/busy/ID-detect scaffold) into a shared util and have kanban-dialogs delegate to it / to searchIssuesWithFuzzy; unify the debounce constant.",
+    "confidence": "high"
+  },
+  {
+    "title": "Client-side escapeHtml re-inlined inside draft-review-panel webview (no shared client escaper)",
+    "dimension": "gaps",
+    "category": "webview",
+    "severity": "low",
+    "effort": "small",
+    "files": [
+      "src/draft-mode/draft-review-panel.ts",
+      "src/webviews/gantt-html-escape.ts"
+    ],
+    "evidence": "draft-review-panel.ts:701-708 embeds `function escapeHtml(unsafe){ return unsafe.replace(/&/.. ).replace(/</..)... }` inside its webview <script> template literal — a 4th hand-rolled HTML escaper. The TS-side owner webviews/gantt-html-escape.ts:5-16 exists but can't be imported into a browser <script> string, and its char set differs (it also escapes \\ ` $ for template-literal safety; draft's does not). This is a distinct location from the already-noted gantt-drag.js re-inline.",
+    "impact": "Two webviews (gantt, draft-review) each carry their own client escaper with different char coverage; an XSS-hardening change (e.g. escaping backticks) won't propagate. Reinforces 'no shared client-side webview helper layer'.",
+    "recommendation": "Ship one canonical escaper string to all webviews — e.g. emit the gantt-html-escape body once into a shared <script> snippet injected by the (proposed) shared webview content helper, instead of each panel defining its own.",
+    "confidence": "high"
+  },
+  {
+    "title": "Three status-bar classes duplicate lifecycle boilerplate with no shared base; one omits Disposable",
+    "dimension": "gaps",
+    "category": "structure",
+    "severity": "low",
+    "effort": "small",
+    "files": [
+      "src/kanban/kanban-status-bar.ts",
+      "src/draft-mode/draft-mode-status-bar.ts",
+      "src/status-bars/workload-status-bar.ts"
+    ],
+    "evidence": "Three near-identical owners each re-implement: a StatusBarItem field, a `disposables: vscode.Disposable[]` array (kanban-status-bar.ts:12, draft-mode-status-bar.ts:14), subscribe-in-constructor, and a `dispose(){ statusBar.dispose(); disposables.forEach(d=>d.dispose()) }`. They are also inconsistent: DraftModeStatusBar (`implements vscode.Disposable`, line 10) and WorkloadStatusBar (`implements vscode.Disposable`, line 19) declare it, but KanbanStatusBar (class at line 10) does NOT implement Disposable despite having dispose(); WorkloadStatusBar uses `private disposed` + nullable bar while the others don't. Plus utilities/status-bar.ts is a 4th, separate transient-message status bar.",
+    "impact": "No single place defines status-bar lifecycle; the Disposable-interface inconsistency means a caller can't treat them uniformly, and the per-class disposables array is copy-paste. New status bar = re-derive the boilerplate.",
+    "recommendation": "Add a small BaseStatusBar in shared/ (StatusBarItem + disposables + dispose(), all `implements vscode.Disposable`) mirroring BaseTreeProvider; have the three classes extend it and standardize on `implements vscode.Disposable`.",
+    "confidence": "medium"
+  },
+  {
+    "title": "Org-specific role names hardcoded in controllers/domain.ts ROLE_ORDER",
+    "dimension": "gaps",
+    "category": "other",
+    "severity": "low",
+    "effort": "trivial",
+    "files": [
+      "src/controllers/domain.ts"
+    ],
+    "evidence": "domain.ts:10 `const ROLE_ORDER = [\"Project Leader\", \"Analyst\", \"Peer Reviewer\"];` — installation-specific Redmine role names baked into source, used by groupMembersByRole (line 22) to pin those roles to the top of project-member tooltips. Any other Redmine instance's roles fall through to the alphabetical bucket; the chosen three are clearly the author's own org.",
+    "impact": "A maintainability/portability smell: business-specific config compiled into a generic domain helper. Not configurable, undocumented, and surprising to a new contributor reading 'domain'.",
+    "recommendation": "Either document it as a deliberate cosmetic default with a comment, or lift it to a (hidden) setting like redmyne.roleDisplayOrder; at minimum move it out of the otherwise-generic domain.ts.",
+    "confidence": "high"
+  },
+  {
+    "title": "@deprecated tags on getIssuesAssignedToMe/getAllOpenIssues mislabel the live API",
+    "dimension": "gaps",
+    "category": "docs",
+    "severity": "low",
+    "effort": "trivial",
+    "files": [
+      "src/redmine/redmine-server.ts",
+      "src/utilities/issue-picker.ts",
+      "src/commands/list-open-issues-assigned-to-me.ts"
+    ],
+    "evidence": "redmine-server.ts:1620,1628 tag both methods `@deprecated Use getFilteredIssues(...)`, yet they are the active API: issue-picker.ts:705 and list-open-issues-assigned-to-me.ts:30 still call getIssuesAssignedToMe(), and both are part of the IRedmineServer interface (redmine-server-interface.ts:42-43) + draft-mode proxy list (draft-mode-server.ts:38-39). They are thin one-line wrappers over getFilteredIssues, not legacy paths.",
+    "impact": "@deprecated normally signals 'do not use / will be removed'; here it's firing IDE strikethrough on calls that are the intended usage, training contributors to ignore deprecation warnings or to churn callers needlessly.",
+    "recommendation": "Either complete the migration (repoint the ~2 src callers to getFilteredIssues and delete the wrappers) or drop the @deprecated tags and keep them as the supported convenience API.",
+    "confidence": "high"
+  }
+]
