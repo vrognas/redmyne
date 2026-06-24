@@ -1,9 +1,10 @@
 #!/bin/bash
 set -e
 
-# Validate commit messages in PR
-# - Subject line <= 50 chars
-# - Body lines <= 72 chars
+# Validate every commit message in a PR range by delegating to the commit-msg
+# hook — the single owner of the rules (subject <= 50, body lines <= 72, blank
+# line between subject/body, merge/revert exceptions). Keeps CI and the local
+# hook from drifting.
 
 if [ -z "$1" ] || [ -z "$2" ]; then
   echo "Usage: $0 <base-sha> <head-sha>"
@@ -12,6 +13,7 @@ fi
 
 BASE_SHA="$1"
 HEAD_SHA="$2"
+HOOK="$(dirname "$0")/commit-msg"
 
 echo "Validating commit messages from $BASE_SHA to $HEAD_SHA"
 
@@ -21,37 +23,24 @@ FAILED=0
 while read -r commit; do
   echo "Checking commit: $commit"
 
-  # Get commit message
-  SUBJECT=$(git log --format=%s -n 1 "$commit")
-  BODY=$(git log --format=%b -n 1 "$commit")
-
-  # Check subject line length
-  SUBJECT_LEN=${#SUBJECT}
-  if [ "$SUBJECT_LEN" -gt 50 ]; then
-    echo "❌ Subject line too long ($SUBJECT_LEN > 50 chars): $SUBJECT"
-    FAILED=1
+  msg_file=$(mktemp)
+  git log --format="%B" -n 1 "$commit" > "$msg_file"
+  if bash "$HOOK" "$msg_file"; then
+    echo "✅ $commit OK"
   else
-    echo "✅ Subject line OK ($SUBJECT_LEN chars)"
+    echo "❌ $commit failed validation"
+    FAILED=1
   fi
-
-  # Check body line lengths (if body exists)
-  if [ -n "$BODY" ]; then
-    while IFS= read -r line; do
-      LINE_LEN=${#line}
-      if [ "$LINE_LEN" -gt 72 ]; then
-        echo "❌ Body line too long ($LINE_LEN > 72 chars): $line"
-        FAILED=1
-      fi
-    done <<< "$BODY"
-  fi
+  rm -f "$msg_file"
 done < <(git log --format="%H" "$BASE_SHA..$HEAD_SHA")
 
 if [ "$FAILED" -eq 1 ]; then
   echo ""
   echo "Commit message validation failed!"
-  echo "Rules:"
+  echo "Rules (see scripts/commit-msg):"
   echo "  - Subject line: max 50 chars"
   echo "  - Body lines: max 72 chars"
+  echo "  - Blank line between subject and body"
   exit 1
 fi
 
