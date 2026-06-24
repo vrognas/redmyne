@@ -4,6 +4,7 @@ import type { RedmineServerConnectionOptions } from "../redmine/redmine-server";
 import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { getConfiguredServerUrlOrShowError } from "./command-guards";
 import { errorToString } from "../utilities/error-feedback";
+import { buildServerOptionsFromConfig } from "../utilities/server-config";
 
 export interface RegisterConfiguredCommandDeps {
   context: vscode.ExtensionContext;
@@ -119,12 +120,9 @@ export function createConfiguredCommandRegistrar(
       return { props: undefined, args: [] };
     }
 
-    const redmineServer = deps.createServer({
-      address: url,
-      key: apiKey,
-      additionalHeaders: config.get("additionalHeaders"),
-      caFile: config.get<string>("caFile"),
-    });
+    const redmineServer = deps.createServer(
+      buildServerOptionsFromConfig(url, apiKey)
+    );
 
     const fromBucket = deps.bucket.servers.find((server) =>
       server.compare(redmineServer)
