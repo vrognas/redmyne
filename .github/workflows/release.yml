@@ -11,6 +11,14 @@ on:
         required: true
         type: string
 
+# Never cancel an in-flight publish (it writes to two marketplaces + a release).
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -28,7 +36,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: "22"
+          node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
 
       - name: Get version from tag
@@ -92,6 +100,18 @@ jobs:
 
       - name: Package extension
         run: npm run package
+
+      # Same 250KB gate as CI — enforce it on the artifact we actually publish.
+      - name: Check VSIX size
+        run: |
+          VSIX_FILE=$(ls *.vsix | head -1)
+          SIZE_KB=$(($(stat -c %s "$VSIX_FILE") / 1024))
+          echo "📦 VSIX size: ${SIZE_KB}KB"
+          if [ $SIZE_KB -gt 250 ]; then
+            echo "❌ VSIX size (${SIZE_KB}KB) exceeds 250KB threshold"
+            exit 1
+          fi
+          echo "✅ Size check passed: ${SIZE_KB}KB / 250KB"
 
       - name: Publish to Open VSX Registry
         uses: HaaLeo/publish-vscode-extension@v2
