@@ -31,7 +31,7 @@ import { IssueFilter, DEFAULT_ISSUE_FILTER, GanttViewMode, CustomField } from ".
 import { formatCustomFieldValue } from "../utilities/custom-field-formatter";
 import { parseLocalDate, getLocalToday, formatLocalDate } from "../utilities/date-utils";
 import { getNonce } from "../utilities/webview-nonce";
-import { GanttWebviewMessage, parseLookbackDays, resolveLookbackDays } from "./gantt-webview-messages";
+import { GanttWebviewMessage, parseLookbackDays, resolveLookbackDays, lookbackDaysCovering } from "./gantt-webview-messages";
 import { escapeAttr, escapeHtml } from "./gantt-html-escape";
 import { CreatableRelationType, GanttRow, nodeToGanttRow } from "./gantt-model";
 import { buildRowsPayload, buildArrowsPayload } from "./gantt/gantt-html-generator";
@@ -1216,15 +1216,6 @@ export class GanttPanel {
     this._bumpRevision();
   }
 
-  /**
-   * Broaden to the all-projects by-project view and expand so a reveal target
-   * shows. Does NOT render — the caller's updateIssues renders next.
-   */
-  public broadenViewForReveal(): void {
-    this._clearViewFilters();
-    this._expandAllOnNextRender = "any";
-  }
-
   /** Reset filters (toolbar button): broad by-project view, all collapsed. */
   public resetView(): void {
     this._clearViewFilters();
@@ -1233,12 +1224,93 @@ export class GanttPanel {
     this._updateContent();
   }
 
-  /** Reveal an issue: scroll to + pin-select its bar (expanding its group). */
+  /** Full row set (incl. collapse-hidden) from the last render — for reveal. */
+  private _lastFlatRows: GanttRow[] = [];
+  // Active reveal target: re-emitted to the webview on every render within the
+  // window so it survives the cold-open render gate and supplemental renders.
+  private _pendingReveal: { id: number; deadline: number } | null = null;
+
+  /**
+   * Reveal an issue in the Gantt: widen the lookback if it starts before the
+   * window, expand its collapsed ancestors (or broaden the whole view if it's
+   * filtered out), render if any of that changed, then scroll to + center +
+   * pin-select its bar. Robust to the cold-open render handshake — the reveal
+   * is queued and flushed once the webview is ready (and after each re-render).
+   * Call AFTER updateIssues so _issues/_currentUserId/_lastFlatRows are set.
+   */
   public revealIssue(issueId: number): void {
-    this._panel.webview.postMessage({
-      command: "revealIssue",
-      issueId,
-    });
+    const target = this._issueById.get(issueId)
+      ?? this._issues.find((i) => i.id === issueId)
+      ?? this._unscheduledIssues.find((i) => i.id === issueId)
+      ?? null;
+
+    let changed = this._ensureLookbackIncludes(target?.start_date ?? null);
+    if (this.isIssueInCurrentFilter(issueId)) {
+      changed = this._expandToIssue(issueId) || changed;
+    } else {
+      this._clearViewFilters();
+      this._expandAllOnNextRender = "any";
+      changed = true;
+    }
+    if (changed) this._updateContent();
+
+    this._pendingReveal = { id: issueId, deadline: Date.now() + 4000 };
+    this._flushReveal();
+  }
+
+  /** Post the queued reveal once the webview is ready; expires after its window. */
+  private _flushReveal(): void {
+    const pending = this._pendingReveal;
+    if (!pending) return;
+    if (Date.now() > pending.deadline) {
+      this._pendingReveal = null;
+      return;
+    }
+    if (!this._webviewReady) return; // re-flushed by the webviewReady handler
+    this._panel.webview.postMessage({ command: "revealIssue", issueId: pending.id });
+  }
+
+  /**
+   * Widen the lookback so `startDate` falls inside the window, rounding up to
+   * the nearest discrete option (so the toolbar value stays valid). A null
+   * start (dateless issue, unaffected by the lookback) makes no change.
+   * Returns whether the lookback changed.
+   */
+  private _ensureLookbackIncludes(startDate: string | null): boolean {
+    if (this._lookbackDays === null) return false; // All Time already covers it
+    if (!startDate) return false; // dateless: lookback is irrelevant
+    const days = Math.ceil(
+      (getLocalToday().getTime() - parseLocalDate(startDate).getTime()) / 86400000
+    );
+    if (days <= this._lookbackDays) return false; // already within the window
+    const next = lookbackDaysCovering(days + 7); // +7d margin off the left edge
+    if (next === this._lookbackDays) return false;
+    this._lookbackDays = next;
+    GanttPanel._globalState?.update(LOOKBACK_DAYS_KEY, this._lookbackDays);
+    this._cachedHierarchy = undefined;
+    this._bumpRevision();
+    return true;
+  }
+
+  /**
+   * Expand every collapsed ancestor of `issueId` (walking the cached row set's
+   * parentKey chain) so its row mounts. Idempotent — returns whether anything
+   * was actually expanded (so the caller can skip a needless re-render).
+   */
+  private _expandToIssue(issueId: number): boolean {
+    const byKey = new Map(this._lastFlatRows.map((r) => [r.collapseKey, r]));
+    let parentKey = byKey.get(`issue-${issueId}`)?.parentKey ?? null;
+    let changed = false;
+    const seen = new Set<string>();
+    while (parentKey && !seen.has(parentKey)) {
+      seen.add(parentKey);
+      if (!this._collapseState.isExpanded(parentKey)) {
+        this._collapseState.expand(parentKey);
+        changed = true;
+      }
+      parentKey = byKey.get(parentKey)?.parentKey ?? null;
+    }
+    return changed;
   }
 
   /** Issue with a running Kanban timer — pulsed as the "now" anchor (null = none). */
@@ -1371,6 +1443,9 @@ export class GanttPanel {
     payload.state.draftQueueCount = this._draftModeManager?.queue?.count ?? 0;
     this._queueRender(payload);
     this._isRefreshing = false; // Reset after render
+    // Re-emit an active reveal so it survives the cold-open gate + supplemental
+    // re-renders (which dispose/recreate the row window, losing scroll/pin).
+    this._flushReveal();
     perfEnd("_updateContent");
   }
 
@@ -1391,6 +1466,7 @@ export class GanttPanel {
           void this._panel.webview.postMessage({ command: "render", payload });
         }
         this._reapplyNow();
+        this._flushReveal();
         break;
       case "openIssue":
         if (message.issueId && this._server) {
@@ -2331,6 +2407,9 @@ export class GanttPanel {
     const depGraph = buildDependencyGraph(sortedIssues);
     const issueMap = new Map(sortedIssues.map(i => [i.id, i]));
     const allRows = flatNodes.map((node) => nodeToGanttRow(node, this._flexibilityCache, this._closedStatusIds, depGraph, issueMap, this._issueById));
+    // Cache the full row set (incl. collapse-hidden rows) so a reveal can walk
+    // an issue's parentKey chain and expand only its collapsed ancestors.
+    this._lastFlatRows = allRows;
 
     // Extract issue IDs that are actually displayed as rows
     const issueIdsInRows = new Set<number>();

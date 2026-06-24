@@ -71,27 +71,24 @@ export function registerGanttCommands(
         );
         return;
       }
-      const panel = bootstrapPanel(issues);
-
-      // Reveal in place when the issue already passes the current filters;
-      // otherwise broaden to the all-projects by-project view first, then
-      // reveal. bootstrapPanel set _issues synchronously, so the check is
-      // valid now even though the render is still in flight.
-      if (panel.isIssueInCurrentFilter(issueId)) {
-        setTimeout(() => panel.revealIssue(issueId), 150);
-      } else {
-        panel.broadenViewForReveal();
-        void panel.updateIssues(
-          issues,
-          deps.getFlexibilityCache(),
-          deps.getProjects(),
-          getSchedule(),
-          deps.getFilter(),
-          deps.getDependencyIssues(),
-          deps.getServer
-        );
-        setTimeout(() => panel.revealIssue(issueId), 250);
-      }
+      const panel = GanttPanel.createOrShow(context.extensionUri, deps.getServer, deps.getDraftModeManager);
+      panel.setFilterChangeCallback((filter) => deps.setFilter(filter));
+      // Await the render so _issues / _currentUserId / _lastFlatRows are
+      // populated before revealIssue decides visibility, lookback, and which
+      // collapsed ancestors to expand. revealIssue owns the rest: it widens
+      // the lookback for past issues, expands or broadens as needed, re-renders
+      // if anything changed, and queues the scroll/center/pin until the webview
+      // is ready (no fragile fixed-delay timers).
+      await panel.updateIssues(
+        issues,
+        deps.getFlexibilityCache(),
+        deps.getProjects(),
+        getSchedule(),
+        deps.getFilter(),
+        deps.getDependencyIssues(),
+        deps.getServer
+      );
+      panel.revealIssue(issueId);
     })
   );
 }

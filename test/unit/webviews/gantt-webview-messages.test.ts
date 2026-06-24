@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { parseLookbackDays, resolveLookbackDays } from "../../../src/webviews/gantt-webview-messages";
+import { parseLookbackDays, resolveLookbackDays, lookbackDaysCovering } from "../../../src/webviews/gantt-webview-messages";
+
+describe("lookbackDaysCovering", () => {
+  it("rounds up to the nearest discrete option that reaches the date", () => {
+    expect(lookbackDaysCovering(10)).toBe(14);
+    expect(lookbackDaysCovering(180)).toBe(180);
+    expect(lookbackDaysCovering(200)).toBe(730); // past 6 months -> 2 years
+  });
+
+  it("returns null (All Time) when older than every finite option", () => {
+    expect(lookbackDaysCovering(5000)).toBeNull();
+  });
+});
 
 describe("parseLookbackDays", () => {
   it("returns fallback for undefined and invalid inputs", () => {

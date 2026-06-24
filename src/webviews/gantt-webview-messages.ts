@@ -72,6 +72,21 @@ export const LOOKBACK_OPTIONS: readonly LookbackOption[] = [
 
 const LOOKBACK_VALUES = new Set(LOOKBACK_OPTIONS.map((o) => o.value));
 
+/**
+ * Smallest discrete lookback (in days) whose window reaches at least `days`
+ * back, or null (All Time) when older than every finite option. Used to widen
+ * the lookback to reveal a past issue while keeping the toolbar dropdown's
+ * value valid (an arbitrary day count wouldn't match any option).
+ */
+export function lookbackDaysCovering(days: number): number | null {
+  for (const opt of LOOKBACK_OPTIONS) {
+    if (opt.value === "") continue;
+    const n = parseInt(opt.value, 10);
+    if (n >= days) return n;
+  }
+  return null; // older than the largest finite option -> All Time
+}
+
 export function parseLookbackDays(
   value: string | undefined,
   fallback: number | null
