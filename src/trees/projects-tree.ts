@@ -247,7 +247,7 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
     // them instead so VS Code's re-query after debouncedRefresh paints
     // incremental progress.
     if (this.isLoadingProjects && this.projectNodes.length === 0) {
-      return createSkeletonPlaceholders(5);
+      return createSkeletonPlaceholders(1);
     }
     if (!this.projects) await this.loadRoot();
     return this.sortProjectNodes(this.projectNodes);

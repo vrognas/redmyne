@@ -2,6 +2,7 @@ import { beforeEach, describe, it, expect, vi } from "vitest";
 import { ProjectsTree, ProjectsViewStyle } from "../../../src/trees/projects-tree";
 import { Issue } from "../../../src/redmine/models/issue";
 import { RedmineProject } from "../../../src/redmine/redmine-project";
+import { isLoadingPlaceholder } from "../../../src/shared/loading-placeholder";
 
 function createIssue(overrides: Partial<Issue> = {}): Issue {
   return {
@@ -381,9 +382,25 @@ describe("ProjectsTree", () => {
 
       const result = await tree.getChildren();
 
-      // Should return the 1 populated node, not the 5 skeleton placeholders.
+      // Should return the populated node, not a skeleton placeholder.
       expect(result).toHaveLength(1);
       expect(result[0]).toBe(node);
+    });
+
+    it("shows a single loading skeleton before any project node arrives", async () => {
+      const tree = new ProjectsTree();
+      tree.setServer({ clearProjectsCache: vi.fn() } as never);
+      const internals = tree as unknown as {
+        isLoadingProjects: boolean;
+        projectNodes: unknown[];
+      };
+      internals.isLoadingProjects = true;
+      internals.projectNodes = [];
+
+      const result = await tree.getChildren();
+
+      expect(result).toHaveLength(1);
+      expect(isLoadingPlaceholder(result[0])).toBe(true);
     });
 
     it("ignores stale onProgress and result after clearProjects() bumps loadToken", async () => {
