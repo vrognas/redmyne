@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calculateRemainingWork } from "../../../src/utilities/capacity-calculator";
+import { calculateRemainingWork } from "../../../src/webviews/gantt/capacity-calculator";
 import { remainingHours } from "../../../src/utilities/remaining-work";
 import type { Issue } from "../../../src/redmine/models/issue";
 import type { InternalEstimates } from "../../../src/utilities/internal-estimates";

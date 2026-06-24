@@ -1,10 +1,10 @@
-import { Issue } from "../redmine/models/issue";
-import { RedmineProject } from "../redmine/redmine-project";
-import { CustomField } from "../redmine/models/common";
-import { FlexibilityScore } from "./flexibility-calculator";
-import { sortIssuesByRisk } from "./issue-sorting";
-import { groupBy } from "./collection-utils";
-import { formatLocalDate } from "./date-utils";
+import { Issue } from "../../redmine/models/issue";
+import { RedmineProject } from "../../redmine/redmine-project";
+import { CustomField } from "../../redmine/models/common";
+import { FlexibilityScore } from "../../utilities/flexibility-calculator";
+import { sortIssuesByRisk } from "../../utilities/issue-sorting";
+import { groupBy } from "../../utilities/collection-utils";
+import { formatLocalDate } from "../../utilities/date-utils";
 import { endOfISOWeek } from "date-fns";
 import { calculateProjectHealth, ProjectHealth } from "./project-health";
 

@@ -2,14 +2,14 @@ import { Issue } from "../redmine/models/issue";
 import { CustomField } from "../redmine/models/common";
 import { FlexibilityScore } from "../utilities/flexibility-calculator";
 import { adHocTracker } from "../utilities/adhoc-tracker";
-import { ProjectHealth } from "../utilities/project-health";
+import { ProjectHealth } from "./gantt/project-health";
 import {
   DependencyGraph,
   countDownstream,
   getDownstream,
   getBlockers,
-} from "../utilities/dependency-graph";
-import { FlatNodeWithVisibility } from "../utilities/hierarchy-builder";
+} from "./gantt/dependency-graph";
+import { FlatNodeWithVisibility } from "./gantt/hierarchy-builder";
 
 // Redmine relation types (creatable via API)
 export type CreatableRelationType =

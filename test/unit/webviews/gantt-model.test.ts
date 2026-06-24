@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toGanttIssue, nodeToGanttRow } from "../../../src/webviews/gantt-model";
 import { adHocTracker } from "../../../src/utilities/adhoc-tracker";
-import * as dependencyGraph from "../../../src/utilities/dependency-graph";
+import * as dependencyGraph from "../../../src/webviews/gantt/dependency-graph";
 
 function createIssue(overrides: Record<string, unknown> = {}) {
   return {
