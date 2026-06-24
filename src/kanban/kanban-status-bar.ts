@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { BaseStatusBar } from "../shared/base-status-bar";
 import { KanbanController } from "./kanban-controller";
 import { getTaskStatus } from "./kanban-state";
 import { formatHoursAsHHMM, formatSecondsAsMMSS } from "../utilities/time-input";
@@ -7,20 +8,14 @@ import { formatHoursAsHHMM, formatSecondsAsMMSS } from "../utilities/time-input"
  * Status bar display for Kanban progress and timer
  * Priority 49 (left of workload bar at 50)
  */
-export class KanbanStatusBar {
-  private statusBarItem: vscode.StatusBarItem;
-  private disposables: vscode.Disposable[] = [];
-
+export class KanbanStatusBar extends BaseStatusBar {
   constructor(
     private controller: KanbanController,
     private globalState: vscode.Memento
   ) {
-    this.statusBarItem = vscode.window.createStatusBarItem(
-      vscode.StatusBarAlignment.Left,
-      0
-    );
-    this.statusBarItem.name = "Redmyne Kanban Timer";
-    this.statusBarItem.command = "redmyne.kanban.toggleTimer";
+    super(vscode.StatusBarAlignment.Left, 0);
+    this.item.name = "Redmyne Kanban Timer";
+    this.item.command = "redmyne.kanban.toggleTimer";
 
     // Subscribe to both data mutations and per-second timer ticks.
     this.disposables.push(
@@ -30,12 +25,7 @@ export class KanbanStatusBar {
 
     // Initial render
     this.update();
-    this.statusBarItem.show();
-  }
-
-  dispose(): void {
-    this.statusBarItem.dispose();
-    this.disposables.forEach((d) => d.dispose());
+    this.item.show();
   }
 
   private update(): void {
@@ -64,9 +54,9 @@ export class KanbanStatusBar {
     if (isOnBreak) {
       // Show break countdown
       const timeStr = formatSecondsAsMMSS(breakSecondsLeft);
-      this.statusBarItem.text = `$(coffee) ${timeStr} break`;
-      this.statusBarItem.tooltip = this.buildBreakTooltip(doneCount, tasks.length, totalLoggedHours);
-      this.statusBarItem.command = "redmyne.kanban.skipBreak";
+      this.item.text = `$(coffee) ${timeStr} break`;
+      this.item.tooltip = this.buildBreakTooltip(doneCount, tasks.length, totalLoggedHours);
+      this.item.command = "redmyne.kanban.skipBreak";
     } else if (activeTask) {
       // Show active timer with progress bar
       const secondsLeft = activeTask.timerSecondsLeft ?? 0;
@@ -74,43 +64,43 @@ export class KanbanStatusBar {
       const timeStr = formatSecondsAsMMSS(secondsLeft);
       const progressBar = this.buildProgressBar(secondsLeft, totalSeconds);
       const pendingStr = totalPendingSeconds > 0 ? ` (+${formatHoursAsHHMM(totalPendingSeconds / 3600)})` : "";
-      this.statusBarItem.text = `$(pulse) ${timeStr} ${progressBar} ${this.truncate(activeTask.title, 100)}${pendingStr}`;
-      this.statusBarItem.tooltip = this.buildWorkingTooltip(activeTask, doneCount, tasks.length, totalLoggedHours, totalPendingSeconds);
-      this.statusBarItem.command = "redmyne.kanban.toggleTimer";
+      this.item.text = `$(pulse) ${timeStr} ${progressBar} ${this.truncate(activeTask.title, 100)}${pendingStr}`;
+      this.item.tooltip = this.buildWorkingTooltip(activeTask, doneCount, tasks.length, totalLoggedHours, totalPendingSeconds);
+      this.item.command = "redmyne.kanban.toggleTimer";
     } else if (pausedTask) {
       // Show paused timer with progress bar
       const secondsLeft = pausedTask.timerSecondsLeft ?? 0;
       const totalSeconds = this.controller.getWorkDurationSeconds();
       const timeStr = formatSecondsAsMMSS(secondsLeft);
       const progressBar = this.buildProgressBar(secondsLeft, totalSeconds);
-      this.statusBarItem.text = `$(debug-pause) ${timeStr} ${progressBar} ${this.truncate(pausedTask.title, 100)}`;
-      this.statusBarItem.tooltip = this.buildPausedTooltip(pausedTask, doneCount, tasks.length, totalLoggedHours);
-      this.statusBarItem.command = "redmyne.kanban.toggleTimer";
+      this.item.text = `$(debug-pause) ${timeStr} ${progressBar} ${this.truncate(pausedTask.title, 100)}`;
+      this.item.tooltip = this.buildPausedTooltip(pausedTask, doneCount, tasks.length, totalLoggedHours);
+      this.item.command = "redmyne.kanban.toggleTimer";
     } else if (doingCount > 0) {
       // Show "ready to start" with first doing task
       const doingTask = tasks.find((t) => getTaskStatus(t) === "doing");
       const totalSeconds = this.controller.getWorkDurationSeconds();
       const timeStr = formatSecondsAsMMSS(totalSeconds);
       const progressBar = this.buildProgressBar(totalSeconds, totalSeconds); // Full time left = empty bar
-      this.statusBarItem.text = doingTask
+      this.item.text = doingTask
         ? `$(play) ${timeStr} ${progressBar} ${this.truncate(doingTask.title, 100)}`
         : `$(play) Ready (${doneCount}/${tasks.length})`;
-      this.statusBarItem.tooltip = this.buildIdleTooltip(doingTask, doneCount, tasks.length, totalLoggedHours);
-      this.statusBarItem.command = doingTask ? {
+      this.item.tooltip = this.buildIdleTooltip(doingTask, doneCount, tasks.length, totalLoggedHours);
+      this.item.command = doingTask ? {
         title: "Start Timer",
         command: "redmyne.kanban.startTimer",
         arguments: [doingTask.id],
       } : undefined;
     } else if (tasks.length > 0) {
       // All done or only todo tasks
-      this.statusBarItem.text = `$(check) ${doneCount}/${tasks.length} done`;
-      this.statusBarItem.tooltip = this.buildDoneTooltip(doneCount, tasks.length, totalLoggedHours);
-      this.statusBarItem.command = "redmyne.kanban.add";
+      this.item.text = `$(check) ${doneCount}/${tasks.length} done`;
+      this.item.tooltip = this.buildDoneTooltip(doneCount, tasks.length, totalLoggedHours);
+      this.item.command = "redmyne.kanban.add";
     } else {
       // No tasks
-      this.statusBarItem.text = "$(plus) Add task";
-      this.statusBarItem.tooltip = "Click to add a Kanban task";
-      this.statusBarItem.command = "redmyne.kanban.add";
+      this.item.text = "$(plus) Add task";
+      this.item.tooltip = "Click to add a Kanban task";
+      this.item.command = "redmyne.kanban.add";
     }
   }
 

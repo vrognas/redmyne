@@ -7,7 +7,7 @@ import type { GanttRenderContext, AvatarColors, GanttRowPayload, GanttArrowPaylo
 import type { GanttRow, GanttIssue } from "../gantt-model";
 import { escapeAttr, escapeHtml } from "../gantt-html-escape";
 import { parseLocalDate, formatLocalDate } from "../../utilities/date-utils";
-import type { WeeklySchedule } from "../../utilities/flexibility-calculator";
+import { type WeeklySchedule, DAY_KEYS, getDayName } from "../../utilities/flexibility-calculator";
 import { dateToX, barXRange } from "./gantt-coords";
 import { remainingHours } from "../../utilities/remaining-work";
 import { formatHoursAsHHMM } from "../../utilities/time-input";
@@ -16,7 +16,6 @@ import { formatHoursAsHHMM } from "../../utilities/time-input";
 // Helper Functions (exported for testing)
 // ============================================================================
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const AVATAR_COLOR_COUNT = 12;
 
 /** Extract initials from full name (e.g., "Viktor Rognås" → "VR") */
@@ -65,7 +64,7 @@ export function formatShortName(name: string): string {
 function formatDateWithWeekday(dateStr: string | null): string {
   if (!dateStr) return "—";
   const d = new Date(dateStr);
-  return `${dateStr} (${WEEKDAYS[d.getUTCDay()]})`;
+  return `${dateStr} (${DAY_KEYS[d.getUTCDay()]})`;
 }
 
 /**
@@ -136,13 +135,6 @@ function buildHoursProgressLines(args: {
   ];
 }
 
-const DAY_KEYS: (keyof WeeklySchedule)[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-/** Get day name key for WeeklySchedule lookup (local calendar frame) */
-function getDayKey(date: Date): keyof WeeklySchedule {
-  return DAY_KEYS[date.getDay()]!;
-}
-
 /**
  * Calendar days needed from `from` (inclusive) to fit `hours` of work
  * under the weekly schedule. Drives the overdue ghost projection. Capped
@@ -176,7 +168,7 @@ export function projectDaysForHours(
  * Calculate daily intensity for an issue (uniform distribution).
  *
  * Dates are local-midnight (parseLocalDate) and the weekday is read with
- * local getDay() (getDayKey), so the day walk steps in the SAME local frame
+ * local getDay() (getDayName), so the day walk steps in the SAME local frame
  * (setDate, like the sibling getScheduledIntensity). UTC stepping here drifted
  * the weekday/segment count by a day for bars spanning a DST transition.
  * Exported for tests.
@@ -196,7 +188,7 @@ export function calculateDailyIntensity(
   let totalAvailable = 0;
   const current = new Date(start);
   while (current <= end) {
-    totalAvailable += schedule[getDayKey(current)];
+    totalAvailable += schedule[getDayName(current)];
     current.setDate(current.getDate() + 1);
   }
 
@@ -212,7 +204,7 @@ export function calculateDailyIntensity(
   current.setTime(start.getTime());
   let dayOffset = 0;
   while (current <= end) {
-    const dayHours = schedule[getDayKey(current)];
+    const dayHours = schedule[getDayName(current)];
     const intensity = dayHours > 0 ? hoursPerAvailableHour : 0;
     result.push({ dayOffset, intensity: Math.min(intensity, 1.5) });
     current.setDate(current.getDate() + 1);
@@ -240,7 +232,7 @@ function getScheduledIntensity(
   let dayOffset = 0;
   while (current <= end) {
     const dateStr = formatLocalDate(current);
-    const dayCapacity = schedule[getDayKey(current)];
+    const dayCapacity = schedule[getDayName(current)];
     const scheduledHours = issueHoursMap?.get(dateStr) ?? 0;
     const intensity = dayCapacity > 0 ? scheduledHours / dayCapacity : 0;
     result.push({ dayOffset, intensity: Math.min(intensity, 1.5) });

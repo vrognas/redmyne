@@ -4,30 +4,26 @@
  */
 
 import * as vscode from "vscode";
+import { BaseStatusBar } from "../shared/base-status-bar";
 import type { DraftQueue } from "./draft-queue";
 import type { DraftModeManager } from "./draft-mode-manager";
 
-export class DraftModeStatusBar implements vscode.Disposable {
-  private statusBar: vscode.StatusBarItem;
+export class DraftModeStatusBar extends BaseStatusBar {
   private queue: DraftQueue;
   private manager: DraftModeManager;
-  private disposables: vscode.Disposable[] = [];
 
   constructor(queue: DraftQueue, manager: DraftModeManager) {
+    super(vscode.StatusBarAlignment.Left, 100);
     this.queue = queue;
     this.manager = manager;
 
-    this.statusBar = vscode.window.createStatusBarItem(
-      vscode.StatusBarAlignment.Left,
-      100
-    );
-    this.statusBar.command = "redmyne.reviewDrafts";
-    this.statusBar.name = "Redmyne Draft Mode";
-    this.statusBar.text = "$(edit) Redmine Draft Mode";
-    this.statusBar.backgroundColor = new vscode.ThemeColor(
+    this.item.command = "redmyne.reviewDrafts";
+    this.item.name = "Redmyne Draft Mode";
+    this.item.text = "$(edit) Redmine Draft Mode";
+    this.item.backgroundColor = new vscode.ThemeColor(
       "statusBarItem.warningBackground"
     );
-    this.statusBar.color = new vscode.ThemeColor(
+    this.item.color = new vscode.ThemeColor(
       "statusBarItem.warningForeground"
     );
 
@@ -41,7 +37,7 @@ export class DraftModeStatusBar implements vscode.Disposable {
 
   update(): void {
     if (!this.manager.isEnabled) {
-      this.statusBar.hide();
+      this.item.hide();
       return;
     }
 
@@ -54,7 +50,7 @@ export class DraftModeStatusBar implements vscode.Disposable {
         "_Click to review_"
       );
       md.supportThemeIcons = true;
-      this.statusBar.tooltip = md;
+      this.item.tooltip = md;
     } else {
       const md = new vscode.MarkdownString(
         `**Draft Mode Active**\n\n` +
@@ -62,16 +58,9 @@ export class DraftModeStatusBar implements vscode.Disposable {
         `_Click to review and apply_`
       );
       md.supportThemeIcons = true;
-      this.statusBar.tooltip = md;
+      this.item.tooltip = md;
     }
 
-    this.statusBar.show();
-  }
-
-  dispose(): void {
-    this.statusBar.dispose();
-    for (const d of this.disposables) {
-      d.dispose();
-    }
+    this.item.show();
   }
 }

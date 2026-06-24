@@ -155,8 +155,8 @@ function calculateFlexibilityPercent(
   return (available / needed - 1) * 100;
 }
 
-// Day index to schedule key mapping (0=Sun, 1=Mon, ..., 6=Sat)
-const DAY_KEYS: (keyof WeeklySchedule)[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+/** Day index to schedule key mapping (0=Sun..6=Sat). Single owner — import this. */
+export const DAY_KEYS: (keyof WeeklySchedule)[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /**
  * Count working days between two dates (inclusive)

@@ -8,7 +8,7 @@
 
 import { Issue } from "../redmine/models/issue";
 import { isIssueClosed } from "./issue-status";
-import { WeeklySchedule, countWorkingDays } from "./flexibility-calculator";
+import { WeeklySchedule, countWorkingDays, DAY_KEYS } from "./flexibility-calculator";
 import { parseLocalDate, getISOWeekNumber, getISOWeekYear, formatLocalDate } from "./date-utils";
 import { DependencyGraph, countDownstream } from "./dependency-graph";
 import { remainingHours } from "./remaining-work";
@@ -62,9 +62,6 @@ export interface ScheduledDailyCapacity extends DailyCapacity {
   /** Breakdown of scheduled hours per issue */
   breakdown: IssueScheduleEntry[];
 }
-
-/** Day keys for WeeklySchedule lookup */
-const DAY_KEYS: (keyof WeeklySchedule)[] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /**
  * Get hours/day that an issue contributes over its duration.
