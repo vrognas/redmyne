@@ -7,6 +7,10 @@ export class Membership {
   ) {}
 }
 
+// Cosmetic default: pin these roles to the top of project-member tooltips.
+// Installation-specific (the maintainer's Redmine roles); any other instance's
+// roles simply fall through to the alphabetical bucket below. Not a setting yet
+// because it only affects tooltip ordering — see finding #67.
 const ROLE_ORDER = ["Project Leader", "Analyst", "Peer Reviewer"];
 
 export function groupMembersByRole(members: Membership[]): Map<string, string[]> {
