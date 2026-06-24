@@ -11,6 +11,7 @@ import {
   MonthlyScheduleOverrides,
   countAvailableHoursMonthly,
   getHoursForDateMonthly,
+  formatMonthKey,
 } from "../utilities/monthly-schedule";
 import { clearFlexibilityCache, getWeeklySchedule } from "../utilities/flexibility-calculator";
 import {
@@ -402,16 +403,12 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
     if (!this.server) return;
     const toPreload = this.visibleMonths.slice(0, MyTimeEntriesTreeDataProvider.PRELOAD_MONTHS);
     for (const { year, month } of toPreload) {
-      const monthKey = this.getMonthKey(year, month);
+      const monthKey = formatMonthKey(year, month);
       if (this.loadedMonthEntries.has(monthKey) || this.loadingMonths.has(monthKey)) continue;
       this.loadMonthEntries({ year, month }).then(() => {
         this._onDidChangeTreeData.fire(undefined);
       }).catch(() => {});
     }
-  }
-
-  private getMonthKey(year: number, month: number): string {
-    return `${year}-${String(month + 1).padStart(2, "0")}`;
   }
 
   private getMonthDateRange(monthYear: { year: number; month: number }): { start: string; end: string } {
@@ -429,7 +426,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   }
 
   private createMonthNode(year: number, month: number): TimeEntryNode {
-    const monthKey = this.getMonthKey(year, month);
+    const monthKey = formatMonthKey(year, month);
     const nodeId = `month-${monthKey}`;
     const date = new Date(year, month, 1);
     const monthName = date.toLocaleDateString("en-US", { month: "long" });
@@ -489,7 +486,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
   private async loadMonthEntries(monthYear: { year: number; month: number }): Promise<TimeEntry[]> {
     if (!this.server) return [];
 
-    const monthKey = this.getMonthKey(monthYear.year, monthYear.month);
+    const monthKey = formatMonthKey(monthYear.year, monthYear.month);
 
     // Return cached if already loaded
     if (this.loadedMonthEntries.has(monthKey)) {
@@ -714,7 +711,7 @@ export class MyTimeEntriesTreeDataProvider extends BaseTreeProvider<TimeEntryNod
 
     // Month group - lazy load entries
     if (element.type === "month-group" && element._monthYear) {
-      const monthKey = this.getMonthKey(element._monthYear.year, element._monthYear.month);
+      const monthKey = formatMonthKey(element._monthYear.year, element._monthYear.month);
 
       // Check if currently loading
       if (this.loadingMonths.has(monthKey)) {

@@ -11,6 +11,8 @@ import { isIssueClosed } from "./issue-status";
 import { WeeklySchedule, countWorkingDays } from "./flexibility-calculator";
 import { parseLocalDate, getISOWeekNumber, getISOWeekYear, formatLocalDate } from "./date-utils";
 import { DependencyGraph, countDownstream } from "./dependency-graph";
+import { remainingHours } from "./remaining-work";
+import { formatMonthKey } from "./monthly-schedule";
 import type { InternalEstimates } from "./internal-estimates";
 
 // Re-export for convenience
@@ -184,7 +186,7 @@ function getPeriodKey(date: Date, zoomLevel: CapacityZoomLevel): string {
       // Use ISO week year to handle year boundaries correctly
       return `${getISOWeekYear(date)}-W${String(getISOWeekNumber(date)).padStart(2, "0")}`;
     case "month":
-      return `${year}-${String(month + 1).padStart(2, "0")}`;
+      return formatMonthKey(year, month);
     case "quarter": {
       const quarter = Math.floor(month / 3) + 1;
       return `${year}-Q${quarter}`;
@@ -247,30 +249,24 @@ const SMALL_TASK_BONUS = 150; // Quick wins: tasks < 1 working day get priority
 const SMALL_TASK_THRESHOLD = 8; // Hours threshold for "small task" (1 working day)
 
 /**
- * Calculate remaining work for an issue
- * Priority: internal estimate > done_ratio > spent_hours fallback
+ * Calculate remaining work for an issue.
+ * Delegates to the single-owner `remainingHours()` heuristic so the scheduler
+ * never drifts from the lateness/flexibility/gantt surfaces. The unknown-estimate
+ * (null) case is coalesced to 0 — the scheduler needs a concrete number.
  */
-function calculateRemainingWork(
+export function calculateRemainingWork(
   issue: Issue,
   internalEstimates: InternalEstimates
 ): number {
-  // 1. Internal estimate takes highest priority
   const internal = internalEstimates.get(issue.id);
-  if (internal) {
-    return Math.max(0, internal.hoursRemaining);
-  }
-
-  const estimated = issue.estimated_hours ?? 0;
-  const doneRatio = issue.done_ratio ?? 0;
-  const spent = issue.spent_hours ?? 0;
-
-  // 2. Use done_ratio if > 0, or if no spent hours
-  if (doneRatio > 0 || spent === 0) {
-    return Math.max(0, estimated * (1 - doneRatio / 100));
-  }
-
-  // 3. Fallback: use spent_hours when done_ratio=0 but spent>0
-  return Math.max(0, estimated - spent);
+  return (
+    remainingHours({
+      estimatedHours: issue.estimated_hours,
+      spentHours: issue.spent_hours,
+      doneRatio: issue.done_ratio,
+      internalHoursRemaining: internal?.hoursRemaining,
+    }) ?? 0
+  );
 }
 
 /**
