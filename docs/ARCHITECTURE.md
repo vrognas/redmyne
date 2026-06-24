@@ -28,17 +28,28 @@ src/
 ├── kanban/               # Personal task management (incl. work timer)
 ├── draft-mode/           # Offline write queueing
 ├── status-bars/          # Workload status bar
-├── shared/               # Base classes (BaseTreeProvider)
-└── utilities/            # Helpers (secrets, flexibility calc, etc.)
+├── shared/               # Base classes (BaseTreeProvider, BaseStatusBar)
+└── utilities/            # Helpers — see grouping below
 ```
+
+`utilities/` (~48 files) groups loosely by theme:
+- **Scheduling/calc**: `flexibility-calculator` (kernel), `capacity-calculator`,
+  `workload-calculator`, `contribution-calculator`, `remaining-work`, `monthly-schedule`, `date-utils`
+- **Issue domain**: `issue-*` (label/status/sorting/search/picker), `hierarchy-builder`, `dependency-graph`
+- **Config/state trackers**: `config-id-set-tracker` + the ad-hoc/auto-update/precedence trackers, `config-change`, `migration`
+- **Secrets/UI plumbing**: `secret-manager`, `server-url`, `webview-nonce`, `status-bar`, pickers, `wizard`
+- Some scheduling files are Gantt-specific (single consumer) and are candidates to move under `webviews/gantt/`.
 
 ## Key Components
 
 ### RedmineServer (`src/redmine/redmine-server.ts`)
-- HTTPS-only HTTP client with 30s timeout
-- Recursive pagination for large datasets
-- Instance-level caching (statuses, activities)
-- DI support via `requestFn` for testing
+- HTTPS-only HTTP client with 30s timeout, bounded concurrency (`maxConcurrentRequests`)
+- Offset/limit pagination (`paginate`), plus URL-length id-batching for bulk fetches
+- Caching: per-instance memoization (statuses, activities, projects, current user,
+  per-issue TTL) and a change-aware cache (`change-aware-cache.ts`) that probes
+  `updated_on` to serve stale data when nothing changed
+- Implements `IRedmineServer` (the dependency seam); decorated by `LoggingRedmineServer`
+  and wrapped by `DraftModeServer`. DI via `requestFn` for testing — no module mocks
 
 ### ProjectsTree (`src/trees/projects-tree.ts`)
 - Issues grouped by project with flexibility scoring
@@ -126,19 +137,45 @@ Commands execute actions → API calls → refresh trees
 | Draft queue | globalStorageUri (file) |
 | Config | VS Code settings |
 
-## Build & Test
+## Build & Bundling
 
-- **Bundler**: esbuild → CJS (external: vscode)
-- **Tests**: Vitest, 88% line-coverage threshold (functions 78 / branches 72 / statements 88)
-- **Test isolation**: `isolate: true` + parallel files; avoid brittle cross-file singleton module mocks
-- **HTTP mocking**: DI via `requestFn` (no module mocks)
-- **Scripts**: `npm run compile`, `test`, `lint`, `ci`
+`esbuild.cjs` builds 5 data-driven targets (one `baseOpts` + per-target overrides):
+- `src/extension.ts` → `out/extension.js` (CJS, node, external: `vscode`)
+- `src/webviews/{gantt,timesheet}/index.js` → `media/{gantt,timesheet}.js` (IIFE, browser)
+- `src/webviews/{gantt,timesheet}/styles.css` → `media/{gantt,timesheet}.css`
+
+Production builds minify; `--watch` (dev) emits unminified + sourcemaps. The
+`media/*` bundles are **generated and gitignored** (only vendored assets like
+`flatpickr*` / `webview-common.css` are tracked); `vscode:prepublish` runs
+`npm run compile` so the shipped bundle is always rebuilt. A 250KB VSIX size
+gate runs in both CI and release.
+
+## CI/CD
+
+- **`ci.yml`** (push to main/develop + PRs): lint + typecheck + manifest validate
+  + `npm audit`; cross-platform test matrix (ubuntu/windows/macos, coverage on
+  ubuntu → Codecov); build + 250KB size gate. Concurrency cancels superseded PR runs.
+- **`release.yml`** (tag `vX.Y.Z` or manual): verifies `package.json` matches the
+  tag, re-runs tests/lint/compile, packages, size-gates, publishes to Open VSX +
+  VS Code Marketplace, and creates the GitHub release. Never cancels in-flight.
+- Node version is a single `NODE_VERSION` env per workflow; `package.json` engines
+  is the supported floor. Commit messages validated by `scripts/commit-msg`
+  (mirrored in CI via `scripts/validate-commits.sh`).
+
+## Test
+
+- **Vitest**, 88% line-coverage threshold (functions 78 / branches 72 / statements 88)
+- **Isolation**: `isolate: true` + parallel files; avoid brittle cross-file singleton module mocks
+- **HTTP mocking**: DI via `requestFn` (no module mocks); `vscode` aliased to `test/mocks/vscode.ts`
 
 ## Extension Points
 
-- **Commands**: Add to `src/commands/`, register in `extension.ts`, add to `package.json`
+- **Commands**: add to `src/commands/`, register in `extension.ts` (often via a
+  `register*Commands` registrar module), declare in `package.json` (`commands` +
+  `menus`; use `when: false` for context-only commands so they don't leak into the palette)
 - **Tree views**: Extend `BaseTreeProvider`, register via `createTreeView()`
-- **API methods**: Add to `RedmineServer`, use `doRequest<T>()`
+- **Status bars**: Extend `shared/base-status-bar.ts` (`BaseStatusBar`)
+- **API methods**: Add to `RedmineServer`, use `doRequest<T>()`; mirror the signature in `IRedmineServer`
 - **Config**: Update `package.json` → `contributes.configuration`
 
 ## Security

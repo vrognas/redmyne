@@ -34,8 +34,8 @@
 
 ## Commit & Pull Request Guidelines
 
-- Commit history favors short, imperative subjects (e.g., “Add …”, “Fix …”, “Move …”), no trailing period.
-- Commit messages are validated: subject ≤ 50 chars, body lines ≤ 72 chars, blank line between subject/body.
+- Commits follow Conventional Commits: `type: description` with an imperative, no-trailing-period subject (e.g., `feat: …`, `fix: …`, `refactor: …`, `docs: …`, `test: …`, `chore: …`).
+- Commit messages are validated by `scripts/commit-msg` (mirrored in CI by `scripts/validate-commits.sh`): subject ≤ 50 chars, body lines ≤ 72 chars, blank line between subject/body.
 - CONTRIBUTING expects `Type: description` with types like `Add`, `Fix`, `Feat`, `Chore`, `Docs`, `Test`, `Refactor`, `Revert`.
 - PRs should be small and focused; add a `[Unreleased]` entry to `CHANGELOG.md` for user-facing changes and discuss new features in GitHub Discussions first.
 
