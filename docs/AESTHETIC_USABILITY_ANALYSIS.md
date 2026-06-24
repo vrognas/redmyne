@@ -496,7 +496,7 @@ const optionalInput = await vscode.window.showInputBox({
 |------|---------|
 | `src/commands/quick-create-issue.ts` | Refactor to wizard state machine |
 | `src/commands/quick-log-time.ts` | Apply same pattern |
-| `src/timer/timer-dialogs.ts` | Apply to Plan Day wizard |
+| `src/kanban/kanban-dialogs.ts` | Apply to Plan Day wizard |
 | `src/utilities/wizard.ts` | New: shared wizard infrastructure |
 
 #### Testing
@@ -727,8 +727,8 @@ Available actions:
 
 | File | Changes |
 |------|---------|
-| `src/timer/timer-status-bar.ts` | Enhanced tooltips |
-| `src/timer/timer-tree-provider.ts` | Phase-aware titles |
+| `src/kanban/kanban-status-bar.ts` | Enhanced tooltips |
+| `src/kanban/kanban-tree-provider.ts` | Phase-aware titles |
 
 #### Effort: ~2 hours
 

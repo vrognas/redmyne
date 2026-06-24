@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-- `src/` contains the extension source (TypeScript). Entry point is `src/extension.ts`, with feature areas under `src/commands/`, `src/redmine/`, `src/kanban/`, `src/timer/`, and `src/webviews/`.
+- `src/` contains the extension source (TypeScript). Entry point is `src/extension.ts`, with feature areas under `src/commands/`, `src/controllers/`, `src/redmine/`, `src/trees/`, `src/kanban/`, `src/draft-mode/`, and `src/webviews/`.
 - `test/` hosts Vitest suites: unit tests in `test/unit/`, integration tests in `test/integration/`, and supporting fixtures/mocks in `test/fixtures/` and `test/mocks/`.
 - `media/` holds walkthrough content and assets used by the extension UI.
 - `docs/` contains architecture notes, API references, and performance guidance.
