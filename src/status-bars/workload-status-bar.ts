@@ -4,6 +4,7 @@
  */
 
 import * as vscode from "vscode";
+import { redmyneConfig } from "../utilities/redmyne-config";
 import { Issue } from "../redmine/models/issue";
 import { getWeeklySchedule } from "../utilities/flexibility-calculator";
 import { MonthlyScheduleOverrides, getMonthKey, formatMonthKeyDisplay, calculateWeeklyTotal } from "../utilities/monthly-schedule";
@@ -27,8 +28,7 @@ export class WorkloadStatusBar implements vscode.Disposable {
   }
 
   private initialize(): void {
-    const config = vscode.workspace.getConfiguration("redmyne.statusBar");
-    const showWorkload = config.get<boolean>("showWorkload", false);
+    const showWorkload = redmyneConfig.showWorkload();
 
     if (!showWorkload) {
       this.disposeStatusBar();
