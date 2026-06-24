@@ -2,7 +2,7 @@
 
 VS Code/Positron extension for Redmine workload management. TypeScript 5.9+.
 
-**v4.19.1** | VS Code ≥1.105.0 | Node ≥20
+**v4.40.0** | VS Code ≥1.109.0 | Node ≥20
 
 ## Core Pattern
 
@@ -23,9 +23,9 @@ src/
 │   ├── projects-tree.ts          # Issues by project, filters, sorting
 │   └── my-time-entries-tree.ts   # Time entries by period
 ├── webviews/
-│   └── gantt-panel.ts    # SVG timeline, dependencies, heatmap
-├── timer/                # Pomodoro-style work units
-├── kanban/               # Personal task management
+│   ├── gantt-panel.ts    # SVG timeline, dependencies, heatmap
+│   └── timesheet-panel.ts # Weekly timesheet grid editor
+├── kanban/               # Personal task management (incl. work timer)
 ├── draft-mode/           # Offline write queueing
 ├── status-bars/          # Workload status bar
 ├── shared/               # Base classes (BaseTreeProvider)
@@ -85,14 +85,16 @@ src/
   `src/utilities/remaining-work.ts` — the single owner of the
   internal-estimate-first / consumed-budget heuristic. Never inline a copy.
 
-### Timer (`src/timer/`)
-- State machine: idle → working → paused → logging → break
-- Per-unit work sessions with customizable durations
-- Persists to globalState across sessions
+### TimesheetPanel (`src/webviews/timesheet-panel.ts`)
+- Weekly grid editor for time entries (rows = issues, columns = days)
+- Inline hour editing, paste, and draft-mode-aware writes
+- Shares CSP/nonce + message-passing patterns with GanttPanel
 
 ### Kanban (`src/kanban/`)
 - Local task management (todo/in-progress/done)
 - Links to Redmine issues, priority levels
+- Work timer (idle → working → paused → break), persisted to globalState
+  (formerly the standalone `src/timer/`, now folded in — see `kanban-timer-handlers.ts`)
 
 ### Draft Mode (`src/draft-mode/`)
 - Intercepts write operations when enabled
@@ -127,8 +129,8 @@ Commands execute actions → API calls → refresh trees
 ## Build & Test
 
 - **Bundler**: esbuild → CJS (external: vscode)
-- **Tests**: Vitest, 60% coverage target
-- **Test isolation**: `isolate: false` + parallel files; avoid brittle cross-file singleton module mocks
+- **Tests**: Vitest, 88% line-coverage threshold (functions 78 / branches 72 / statements 88)
+- **Test isolation**: `isolate: true` + parallel files; avoid brittle cross-file singleton module mocks
 - **HTTP mocking**: DI via `requestFn` (no module mocks)
 - **Scripts**: `npm run compile`, `test`, `lint`, `ci`
 
