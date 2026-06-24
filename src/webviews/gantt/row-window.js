@@ -237,7 +237,7 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
     refresh();
   }
 
-  function scrollToKey(key) {
+  function scrollToKey(key, opts = {}) {
     const idx = indexByKey.get(key);
     if (idx === undefined || !scrollEl) return;
     // Rows do NOT start at scroll-content y=0: the sticky-but-in-flow header
@@ -249,6 +249,14 @@ export function createRowWindow({ perfLog = () => {} } = {}) {
       ? bodyEl.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top + scrollEl.scrollTop
       : headerH;
     const y = bodyTop + idx * barHeight; // row top in scroll-content space
+    if (opts.center) {
+      // Center the row in the visible (below-sticky-header) region. The
+      // browser clamps near the top/bottom edges, so it's centered "if
+      // possible" and otherwise as close as the content allows.
+      scrollEl.scrollTop = Math.max(0, y + barHeight / 2 - (bodyTop + scrollEl.clientHeight) / 2);
+      remountWindow();
+      return;
+    }
     const viewTop = scrollEl.scrollTop;
     const viewBottom = viewTop + scrollEl.clientHeight;
     if (y < viewTop + bodyTop) {

@@ -796,10 +796,10 @@ function initializeGantt(state, rowWindow) {
         // the visible timeline; scrollToKey mounts the (likely-unmounted) row.
         scrollToAndHighlight(message.issueId, { centerBar: true, focusLabel: true, duration: 2000 });
       } else if (message.command === 'revealIssue') {
-        // Like scrollToIssue, but also PIN-selects the bar (persists until Esc)
-        // so the revealed issue stays emphasized. scrollToAndHighlight mounts
-        // the row first, so the pin can find the bar to highlight.
-        scrollToAndHighlight(message.issueId, { centerBar: true, focusLabel: true, duration: 2000 });
+        // Like scrollToIssue, but centers the bar vertically AND pin-selects it
+        // (persists until Esc) so the revealed issue stays emphasized.
+        // scrollToAndHighlight mounts the row first, so the pin can find it.
+        scrollToAndHighlight(message.issueId, { centerBar: true, centerRow: true, focusLabel: true, duration: 2000 });
         pinnedIssueId = message.issueId;
         applyPinnedHighlight();
       } else if (message.command === 'setActiveIssue') {
@@ -1600,7 +1600,7 @@ function initializeGantt(state, rowWindow) {
       if (!issueId) return;
       const ms = opts.duration ?? 1500;
       const meta = rowWindow?.getRowMetaByIssueId(issueId);
-      if (meta) rowWindow.scrollToKey(meta.key);
+      if (meta) rowWindow.scrollToKey(meta.key, { center: opts.centerRow });
       const label = document.querySelector('.issue-label[data-issue-id="' + issueId + '"]');
       const bar = document.querySelector('.issue-bar[data-issue-id="' + issueId + '"]');
       if (label) {
