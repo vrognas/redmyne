@@ -198,7 +198,7 @@ export function generateToolbar(ctx: GanttToolbarContext): string {
       <!-- Primary actions -->
       <button id="refreshBtn" class="toggle-btn text-btn" data-toolbar-tooltip="Refresh (R)">↻</button>
       <button id="todayBtn" class="toggle-btn text-btn" data-toolbar-tooltip="${ctx.todayInRange ? "Today (T)" : "Today is outside timeline range"}"${ctx.todayInRange ? "" : " disabled"}>T</button>
-      <button id="resetViewBtn" class="toggle-btn text-btn" data-toolbar-tooltip="Reset filters — all issues, all projects, by project, collapsed">⤺</button>
+      <button id="resetViewBtn" class="toggle-btn text-btn" data-toolbar-tooltip="Reset filters">⤺</button>
       <!-- Overflow menu -->
       <div class="toolbar-dropdown">
         <button class="toggle-btn text-btn">⋮</button>
