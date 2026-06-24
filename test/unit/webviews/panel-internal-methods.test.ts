@@ -7,6 +7,7 @@ vi.mock("../../../src/utilities/webview-nonce", () => ({
 
 import { GanttPanel } from "../../../src/webviews/gantt-panel";
 import { TimeSheetPanel } from "../../../src/webviews/timesheet-panel";
+import { generateDateMarkers } from "../../../src/webviews/gantt/gantt-date-markers";
 import {
   buildWeekInfo,
   OTHERS_PARENT_ID,
@@ -93,12 +94,6 @@ function createContext(): vscode.ExtensionContext {
 interface GanttInternals {
   _getBaseHtml: () => string;
   _getEmptyPayload: () => { html: string; state: { timelineWidth: number; stickyLeftWidth: number } };
-  _generateDateMarkers: (
-    minDate: Date,
-    maxDate: Date,
-    svgWidth: number,
-    zoomLevel?: "day" | "week" | "month" | "quarter" | "year"
-  ) => { header: string; body: string; todayMarker: string };
   _getStatusColor: (status: string | null) => string;
   _getStatusTextColor: (status: string | null) => string;
   _getStatusOpacity: (status: string | null) => number;
@@ -187,13 +182,7 @@ describe("webview panel internal methods", () => {
   });
 
   it("covers gantt date marker generation for key zoom paths", () => {
-    const mock = createMockPanel();
-    const extensionUri = vscode.Uri.parse("file:///ext");
-
-    GanttPanel.restore(mock.panel, extensionUri, () => undefined);
-    const panel = GanttPanel.currentPanel as unknown as GanttInternals;
-
-    const dayMarkers = panel._generateDateMarkers(
+    const dayMarkers = generateDateMarkers(
       new Date(Date.UTC(2026, 0, 1)),
       new Date(Date.UTC(2026, 0, 15)),
       700,
@@ -203,7 +192,7 @@ describe("webview panel internal methods", () => {
     expect(dayMarkers.body).toContain('class="weekend-layer"');
     expect(dayMarkers.body).toContain('class="day-grid"');
 
-    const quarterMarkers = panel._generateDateMarkers(
+    const quarterMarkers = generateDateMarkers(
       new Date(Date.UTC(2026, 0, 1)),
       new Date(Date.UTC(2026, 5, 30)),
       900,
@@ -217,7 +206,7 @@ describe("webview panel internal methods", () => {
     rangeStart.setDate(rangeStart.getDate() - 1);
     const rangeEnd = new Date(today);
     rangeEnd.setDate(rangeEnd.getDate() + 1);
-    const todayMarkers = panel._generateDateMarkers(rangeStart, rangeEnd, 300, "day");
+    const todayMarkers = generateDateMarkers(rangeStart, rangeEnd, 300, "day");
     expect(todayMarkers.todayMarker).toContain("today-marker");
   });
 
