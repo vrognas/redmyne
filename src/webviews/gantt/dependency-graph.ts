@@ -1,5 +1,5 @@
-import type { Issue } from "../redmine/models/issue";
-import { isIssueClosed } from "./issue-status";
+import type { Issue } from "../../redmine/models/issue";
+import { isIssueClosed } from "../../utilities/issue-status";
 
 /**
  * Dependency graph node with upstream (blockers) and downstream (dependents)

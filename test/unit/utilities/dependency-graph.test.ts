@@ -3,7 +3,7 @@ import {
   buildDependencyGraph,
   countDownstream,
   getBlockers,
-} from "../../../src/utilities/dependency-graph";
+} from "../../../src/webviews/gantt/dependency-graph";
 import type { Issue } from "../../../src/redmine/models/issue";
 
 function createMockIssue(overrides: Partial<Issue> & { id: number }): Issue {

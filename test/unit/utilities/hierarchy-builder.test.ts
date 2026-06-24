@@ -8,7 +8,7 @@ import {
   flattenHierarchy,
   makeIssueNode,
   HierarchyNode,
-} from "../../../src/utilities/hierarchy-builder";
+} from "../../../src/webviews/gantt/hierarchy-builder";
 import { RedmineProject } from "../../../src/redmine/redmine-project";
 import type { Issue } from "../../../src/redmine/models/issue";
 import type { FlexibilityScore } from "../../../src/utilities/flexibility-calculator";

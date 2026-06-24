@@ -4,10 +4,10 @@ import {
   calculateScheduledCapacity,
   aggregateScheduledByZoom,
   type ScheduledDailyCapacity,
-} from "../../../src/utilities/capacity-calculator";
+} from "../../../src/webviews/gantt/capacity-calculator";
 import { Issue } from "../../../src/redmine/models/issue";
 import { WeeklySchedule, DEFAULT_WEEKLY_SCHEDULE } from "../../../src/utilities/flexibility-calculator";
-import { buildDependencyGraph, DependencyGraph } from "../../../src/utilities/dependency-graph";
+import { buildDependencyGraph, DependencyGraph } from "../../../src/webviews/gantt/dependency-graph";
 import type { InternalEstimates } from "../../../src/utilities/internal-estimates";
 
 function createMockIssue(overrides: Partial<Issue> & { id: number }): Issue {

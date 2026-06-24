@@ -1,6 +1,6 @@
-import type { Issue } from "../redmine/models/issue";
-import { isIssueClosed } from "./issue-status";
-import { formatLocalDate } from "./date-utils";
+import type { Issue } from "../../redmine/models/issue";
+import { isIssueClosed } from "../../utilities/issue-status";
+import { formatLocalDate } from "../../utilities/date-utils";
 
 /**
  * Project health status

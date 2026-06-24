@@ -11,9 +11,9 @@ import { adHocTracker } from "../utilities/adhoc-tracker";
 import { showStatusBarMessage } from "../utilities/status-bar";
 import { normalizeServerUrl } from "../utilities/server-url";
 import { errorToString } from "../utilities/error-feedback";
-import { buildProjectHierarchy, buildResourceHierarchy, flattenHierarchyAll, attachUnscheduledGroups, selectProjectsForHierarchy, pruneEmptyProjectRoots, HierarchyNode } from "../utilities/hierarchy-builder";
-import { ProjectHealth } from "../utilities/project-health";
-import { buildDependencyGraph, resetDownstreamCountCache } from "../utilities/dependency-graph";
+import { buildProjectHierarchy, buildResourceHierarchy, flattenHierarchyAll, attachUnscheduledGroups, selectProjectsForHierarchy, pruneEmptyProjectRoots, HierarchyNode } from "./gantt/hierarchy-builder";
+import { ProjectHealth } from "./gantt/project-health";
+import { buildDependencyGraph, resetDownstreamCountCache } from "./gantt/dependency-graph";
 import {
   aggregateScheduledByZoom,
   calculateScheduledCapacity,
@@ -23,7 +23,7 @@ import {
   type InternalEstimates,
   type ScheduledDailyCapacity,
   type ActualTimeEntries,
-} from "../utilities/capacity-calculator";
+} from "./gantt/capacity-calculator";
 import { getInternalEstimates, getInternalEstimate } from "../utilities/internal-estimates";
 import { getPrecedenceIssues, hasPrecedence, togglePrecedence } from "../utilities/precedence-tracker";
 import { autoUpdateTracker } from "../utilities/auto-update-tracker";

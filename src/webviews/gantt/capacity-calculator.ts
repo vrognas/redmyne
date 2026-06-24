@@ -6,17 +6,17 @@
  * Supports aggregation by zoom level (day, week, month, quarter, year).
  */
 
-import { Issue } from "../redmine/models/issue";
-import { isIssueClosed } from "./issue-status";
-import { WeeklySchedule, countWorkingDays, DAY_KEYS } from "./flexibility-calculator";
-import { parseLocalDate, getISOWeekNumber, getISOWeekYear, formatLocalDate } from "./date-utils";
+import { Issue } from "../../redmine/models/issue";
+import { isIssueClosed } from "../../utilities/issue-status";
+import { WeeklySchedule, countWorkingDays, DAY_KEYS } from "../../utilities/flexibility-calculator";
+import { parseLocalDate, getISOWeekNumber, getISOWeekYear, formatLocalDate } from "../../utilities/date-utils";
 import { DependencyGraph, countDownstream } from "./dependency-graph";
-import { remainingHours } from "./remaining-work";
-import { formatMonthKey } from "./monthly-schedule";
-import type { InternalEstimates } from "./internal-estimates";
+import { remainingHours } from "../../utilities/remaining-work";
+import { formatMonthKey } from "../../utilities/monthly-schedule";
+import type { InternalEstimates } from "../../utilities/internal-estimates";
 
 // Re-export for convenience
-export type { InternalEstimates } from "./internal-estimates";
+export type { InternalEstimates } from "../../utilities/internal-estimates";
 
 export type CapacityStatus = "available" | "busy" | "overloaded";
 export type CapacityZoomLevel = "day" | "week" | "month" | "quarter" | "year";
