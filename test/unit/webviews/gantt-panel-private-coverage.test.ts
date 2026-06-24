@@ -156,6 +156,81 @@ describe("gantt panel private coverage", () => {
     });
   });
 
+  // Shared builder for the Show-in-Gantt reveal tests below.
+  function makeRevealPanel() {
+    const mock = createMockPanel();
+    const extensionUri = vscode.Uri.parse("file:///ext");
+    const server = { options: { address: "https://redmine.example" } };
+    const draftModeManager = {
+      isEnabled: false,
+      queue: { count: 0, getAll: vi.fn(() => []), onDidChange: vi.fn(() => ({ dispose: vi.fn() })) },
+      onDidChangeEnabled: vi.fn(() => ({ dispose: vi.fn() })),
+      onDidQueueChange: vi.fn(() => ({ dispose: vi.fn() })),
+    };
+    GanttPanel.restore(mock.panel, extensionUri, () => server as never, () => draftModeManager as never);
+    return { panel: GanttPanel.currentPanel as any, webview: mock.webview };
+  }
+
+  it("_ensureLookbackIncludes widens the lookback for a past-start issue", () => {
+    const { panel } = makeRevealPanel();
+    panel._lookbackDays = 180;
+    const longAgo = new Date();
+    longAgo.setDate(longAgo.getDate() - 400);
+    const dateStr = longAgo.toISOString().slice(0, 10);
+
+    expect(panel._ensureLookbackIncludes(dateStr)).toBe(true);
+    expect(panel._lookbackDays).toBe(730); // nearest discrete option past 400 days
+
+    // Dateless (null) and an already-covered window make no change.
+    expect(panel._ensureLookbackIncludes(null)).toBe(false);
+    expect(panel._lookbackDays).toBe(730);
+  });
+
+  it("_ensureLookbackIncludes is a no-op when the lookback is All Time", () => {
+    const { panel } = makeRevealPanel();
+    panel._lookbackDays = null;
+    expect(panel._ensureLookbackIncludes("2000-01-01")).toBe(false);
+    expect(panel._lookbackDays).toBeNull();
+  });
+
+  it("_expandToIssue expands only the target's collapsed ancestors", () => {
+    const { panel } = makeRevealPanel();
+    panel._lastFlatRows = [
+      { collapseKey: "issue-5", parentKey: "project-10" },
+      { collapseKey: "project-10", parentKey: null },
+    ];
+    expect(panel._collapseState.isExpanded("project-10")).toBe(false);
+
+    expect(panel._expandToIssue(5)).toBe(true);
+    expect(panel._collapseState.isExpanded("project-10")).toBe(true);
+
+    // Already expanded -> no change (so the caller can skip a re-render).
+    expect(panel._expandToIssue(5)).toBe(false);
+  });
+
+  it("_flushReveal queues the reveal until the webview is ready", () => {
+    const { panel, webview } = makeRevealPanel();
+    panel._pendingReveal = { id: 5, deadline: Date.now() + 4000 };
+    panel._webviewReady = false;
+
+    panel._flushReveal();
+    expect(webview.postMessage).not.toHaveBeenCalledWith({ command: "revealIssue", issueId: 5 });
+
+    panel._webviewReady = true;
+    panel._flushReveal();
+    expect(webview.postMessage).toHaveBeenCalledWith({ command: "revealIssue", issueId: 5 });
+  });
+
+  it("_flushReveal drops a reveal whose window has expired", () => {
+    const { panel, webview } = makeRevealPanel();
+    panel._webviewReady = true;
+    panel._pendingReveal = { id: 9, deadline: Date.now() - 1 };
+
+    panel._flushReveal();
+    expect(panel._pendingReveal).toBeNull();
+    expect(webview.postMessage).not.toHaveBeenCalledWith({ command: "revealIssue", issueId: 9 });
+  });
+
   it("covers supplemental loaders and refresh branch gating", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-02-04T12:00:00Z"));
