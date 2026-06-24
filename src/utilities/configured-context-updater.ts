@@ -8,6 +8,7 @@ import { hashString } from "../draft-mode/draft-operation";
 import type { DraftQueue } from "../draft-mode/draft-queue";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
 import { prewarmIssuePicker } from "./issue-picker";
+import { buildServerOptionsFromConfig } from "./server-config";
 import type { ProjectsTree } from "../trees/projects-tree";
 import type { MyTimeEntriesTreeDataProvider } from "../trees/my-time-entries-tree";
 
@@ -65,12 +66,9 @@ export function createConfiguredContextUpdater(
     // If configured, initialize server for trees.
     if (isConfigured) {
       try {
-        const innerServer = deps.createServer({
-          address: serverUrl!,
-          key: apiKey!,
-          additionalHeaders: config.get("additionalHeaders"),
-          caFile: config.get<string>("caFile"),
-        });
+        const innerServer = deps.createServer(
+          buildServerOptionsFromConfig(serverUrl!, apiKey!)
+        );
 
         // Dispose the prior inner server (e.g. LoggingRedmineServer's cleanup
         // timer) now that its replacement exists.
