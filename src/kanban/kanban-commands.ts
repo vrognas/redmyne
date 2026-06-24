@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { KanbanController } from "./kanban-controller";
-import { KanbanTask, TaskPriority, getTaskStatus } from "./kanban-state";
+import { KanbanTask, TaskPriority, getTaskStatus, KANBAN_TIMER_KEYS, KANBAN_TIMER_DEFAULTS } from "./kanban-state";
 import { showCreateTaskDialog, showEditTaskDialog } from "./kanban-dialogs";
 import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { pickActivityForProject } from "../utilities/issue-picker";
@@ -872,11 +872,11 @@ export function registerKanbanCommands(
   // Configure Timer Settings
   disposables.push(
     vscode.commands.registerCommand("redmyne.kanban.configureTimer", async () => {
-      const currentUnit = context.globalState.get<number>("redmyne.timer.unitDuration", 60);
-      const currentWork = context.globalState.get<number>("redmyne.timer.workDuration", 45);
+      const currentUnit = context.globalState.get<number>(KANBAN_TIMER_KEYS.unitDuration, KANBAN_TIMER_DEFAULTS.unitDuration);
+      const currentWork = context.globalState.get<number>(KANBAN_TIMER_KEYS.workDuration, KANBAN_TIMER_DEFAULTS.workDuration);
       const currentBreak = currentUnit - currentWork;
-      const currentSound = context.globalState.get<boolean>("redmyne.timer.soundEnabled", true);
-      const currentBarWidth = context.globalState.get<number>("redmyne.timer.progressBarWidth", 45);
+      const currentSound = context.globalState.get<boolean>(KANBAN_TIMER_KEYS.soundEnabled, KANBAN_TIMER_DEFAULTS.soundEnabled);
+      const currentBarWidth = context.globalState.get<number>(KANBAN_TIMER_KEYS.progressBarWidth, KANBAN_TIMER_DEFAULTS.progressBarWidth);
 
       const choice = await vscode.window.showQuickPick(
         [
@@ -912,7 +912,7 @@ export function registerKanbanCommands(
       if (!choice) return;
 
       if (choice.setting === "sound") {
-        await context.globalState.update("redmyne.timer.soundEnabled", !currentSound);
+        await context.globalState.update(KANBAN_TIMER_KEYS.soundEnabled, !currentSound);
         showStatusBarMessage(`$(check) Sound ${!currentSound ? "enabled" : "disabled"}`, 2000);
         return;
       }
@@ -930,7 +930,7 @@ export function registerKanbanCommands(
         });
         if (!input) return;
         const value = parseInt(input, 10);
-        await context.globalState.update("redmyne.timer.progressBarWidth", value);
+        await context.globalState.update(KANBAN_TIMER_KEYS.progressBarWidth, value);
         showStatusBarMessage(`$(check) Progress bar set to ${value} segments`, 2000);
         return;
       }
@@ -950,7 +950,7 @@ export function registerKanbanCommands(
         if (!input) return;
         const newBreak = parseInt(input, 10);
         const newWork = currentUnit - newBreak;
-        await context.globalState.update("redmyne.timer.workDuration", newWork);
+        await context.globalState.update(KANBAN_TIMER_KEYS.workDuration, newWork);
         controller.setWorkDurationSeconds(newWork * 60);
         controller.setBreakDurationSeconds(newBreak * 60);
         showStatusBarMessage(`$(check) Break set to ${newBreak}min (work: ${newWork}min)`, 2000);
@@ -977,17 +977,17 @@ export function registerKanbanCommands(
 
       const value = parseInt(input, 10);
       if (choice.setting === "unitDuration") {
-        await context.globalState.update("redmyne.timer.unitDuration", value);
+        await context.globalState.update(KANBAN_TIMER_KEYS.unitDuration, value);
         // Adjust work duration if needed
         const effectiveWork = Math.min(currentWork, value);
         if (currentWork > value) {
-          await context.globalState.update("redmyne.timer.workDuration", value);
+          await context.globalState.update(KANBAN_TIMER_KEYS.workDuration, value);
           controller.setWorkDurationSeconds(value * 60);
         }
         controller.setBreakDurationSeconds((value - effectiveWork) * 60);
         showStatusBarMessage(`$(check) Unit duration set to ${value}min`, 2000);
       } else {
-        await context.globalState.update("redmyne.timer.workDuration", value);
+        await context.globalState.update(KANBAN_TIMER_KEYS.workDuration, value);
         controller.setWorkDurationSeconds(value * 60);
         controller.setBreakDurationSeconds((currentUnit - value) * 60);
         showStatusBarMessage(`$(check) Work duration set to ${value}min`, 2000);
