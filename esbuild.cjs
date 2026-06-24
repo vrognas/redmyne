@@ -4,78 +4,6 @@ const esbuild = require("esbuild");
 const production = process.argv.includes("--production");
 const watch = process.argv.includes("--watch");
 
-async function main() {
-  const extensionCtx = await esbuild.context({
-    entryPoints: ["src/extension.ts"],
-    bundle: true,
-    format: "cjs",
-    minify: production,
-    sourcemap: !production,
-    sourcesContent: false,
-    platform: "node",
-    outfile: "out/extension.js",
-    external: ["vscode"],
-    logLevel: "silent",
-    plugins: [esbuildProblemMatcherPlugin],
-  });
-
-  const ganttJsCtx = await esbuild.context({
-    entryPoints: ["src/webviews/gantt/index.js"],
-    bundle: true,
-    format: "iife",
-    minify: production,
-    sourcemap: production ? false : "external",
-    sourcesContent: false,
-    platform: "browser",
-    outfile: "media/gantt.js",
-    logLevel: "silent",
-    plugins: [esbuildProblemMatcherPlugin],
-  });
-
-  const timesheetJsCtx = await esbuild.context({
-    entryPoints: ["src/webviews/timesheet/index.js"],
-    bundle: true,
-    format: "iife",
-    minify: production,
-    sourcemap: production ? false : "external",
-    sourcesContent: false,
-    platform: "browser",
-    outfile: "media/timesheet.js",
-    logLevel: "silent",
-    plugins: [esbuildProblemMatcherPlugin],
-  });
-
-  // CSS is a first-class esbuild target; minification strips comments and
-  // whitespace and shortens color/length values. No bundling needed since
-  // these files have no @import edges.
-  const ganttCssCtx = await esbuild.context({
-    entryPoints: ["src/webviews/gantt/styles.css"],
-    minify: production,
-    sourcemap: false,
-    outfile: "media/gantt.css",
-    logLevel: "silent",
-    plugins: [esbuildProblemMatcherPlugin],
-  });
-
-  const timesheetCssCtx = await esbuild.context({
-    entryPoints: ["src/webviews/timesheet/styles.css"],
-    minify: production,
-    sourcemap: false,
-    outfile: "media/timesheet.css",
-    logLevel: "silent",
-    plugins: [esbuildProblemMatcherPlugin],
-  });
-
-  const contexts = [extensionCtx, ganttJsCtx, timesheetJsCtx, ganttCssCtx, timesheetCssCtx];
-
-  if (watch) {
-    await Promise.all(contexts.map((c) => c.watch()));
-  } else {
-    await Promise.all(contexts.map((c) => c.rebuild()));
-    await Promise.all(contexts.map((c) => c.dispose()));
-  }
-}
-
 /**
  * @type {import('esbuild').Plugin}
  */
@@ -98,6 +26,60 @@ const esbuildProblemMatcherPlugin = {
     });
   },
 };
+
+// Options shared by every build target. Per-target entries override/extend these.
+const baseOpts = {
+  minify: production,
+  sourcesContent: false,
+  logLevel: "silent",
+  plugins: [esbuildProblemMatcherPlugin],
+};
+
+// JS bundles + the two CSS targets (CSS is a first-class esbuild target;
+// minification strips comments/whitespace and shortens values — no bundling
+// needed since these files have no @import edges).
+const targets = [
+  {
+    entryPoints: ["src/extension.ts"],
+    outfile: "out/extension.js",
+    bundle: true,
+    format: "cjs",
+    platform: "node",
+    external: ["vscode"],
+    sourcemap: !production,
+  },
+  {
+    entryPoints: ["src/webviews/gantt/index.js"],
+    outfile: "media/gantt.js",
+    bundle: true,
+    format: "iife",
+    platform: "browser",
+    sourcemap: production ? false : "external",
+  },
+  {
+    entryPoints: ["src/webviews/timesheet/index.js"],
+    outfile: "media/timesheet.js",
+    bundle: true,
+    format: "iife",
+    platform: "browser",
+    sourcemap: production ? false : "external",
+  },
+  { entryPoints: ["src/webviews/gantt/styles.css"], outfile: "media/gantt.css", sourcemap: false },
+  { entryPoints: ["src/webviews/timesheet/styles.css"], outfile: "media/timesheet.css", sourcemap: false },
+];
+
+async function main() {
+  const contexts = await Promise.all(
+    targets.map((t) => esbuild.context({ ...baseOpts, ...t }))
+  );
+
+  if (watch) {
+    await Promise.all(contexts.map((c) => c.watch()));
+  } else {
+    await Promise.all(contexts.map((c) => c.rebuild()));
+    await Promise.all(contexts.map((c) => c.dispose()));
+  }
+}
 
 main().catch((e) => {
   console.error(e);
