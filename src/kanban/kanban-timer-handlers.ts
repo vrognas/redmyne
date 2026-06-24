@@ -6,6 +6,7 @@ import { promptForRequiredCustomFields } from "../utilities/custom-field-picker"
 import { confirmLogTimeOnClosedIssue } from "../utilities/closed-issue-guard";
 import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import type { KanbanTask } from "./kanban-state";
+import { KANBAN_TIMER_KEYS, KANBAN_TIMER_DEFAULTS } from "./kanban-state";
 
 type TimerCompletionTask = Pick<KanbanTask, "id" | "title" | "linkedIssueId" | "activityId">;
 
@@ -48,8 +49,8 @@ export function registerKanbanTimerHandlers(
     );
 
     const soundEnabled = deps.globalState.get<boolean>(
-      "redmyne.timer.soundEnabled",
-      true
+      KANBAN_TIMER_KEYS.soundEnabled,
+      KANBAN_TIMER_DEFAULTS.soundEnabled
     );
     if (soundEnabled) {
       playCompletionSound();
@@ -114,8 +115,8 @@ export function registerKanbanTimerHandlers(
 
   const breakCompletion = deps.controller.onBreakComplete(async () => {
     const soundEnabled = deps.globalState.get<boolean>(
-      "redmyne.timer.soundEnabled",
-      true
+      KANBAN_TIMER_KEYS.soundEnabled,
+      KANBAN_TIMER_DEFAULTS.soundEnabled
     );
     if (soundEnabled) {
       playCompletionSound();

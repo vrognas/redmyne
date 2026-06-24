@@ -7,6 +7,7 @@ import { registerKanbanCommands } from "./kanban-commands";
 import { registerKanbanTimerHandlers } from "./kanban-timer-handlers";
 import { registerKanbanDoneTasksContext } from "./kanban-context-sync";
 import { createKanbanTreeSetup } from "./kanban-tree-setup";
+import { KANBAN_TIMER_KEYS, KANBAN_TIMER_DEFAULTS } from "./kanban-state";
 
 export interface KanbanSetupDeps {
   context: vscode.ExtensionContext;
@@ -23,13 +24,13 @@ export interface KanbanSetupResult {
 
 export function setupKanban(deps: KanbanSetupDeps): KanbanSetupResult {
   const unitDuration = deps.context.globalState.get<number>(
-    "redmyne.timer.unitDuration",
-    60
+    KANBAN_TIMER_KEYS.unitDuration,
+    KANBAN_TIMER_DEFAULTS.unitDuration
   );
   const workDuration = Math.max(
     1,
     Math.min(
-      deps.context.globalState.get<number>("redmyne.timer.workDuration", 45),
+      deps.context.globalState.get<number>(KANBAN_TIMER_KEYS.workDuration, KANBAN_TIMER_DEFAULTS.workDuration),
       unitDuration
     )
   );

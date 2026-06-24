@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { BaseStatusBar } from "../shared/base-status-bar";
 import { KanbanController } from "./kanban-controller";
-import { getTaskStatus } from "./kanban-state";
+import { getTaskStatus, KANBAN_TIMER_KEYS, KANBAN_TIMER_DEFAULTS } from "./kanban-state";
 import { formatHoursAsHHMM, formatSecondsAsMMSS } from "../utilities/time-input";
 
 /**
@@ -109,7 +109,7 @@ export class KanbanStatusBar extends BaseStatusBar {
   }
 
   private buildProgressBar(secondsLeft: number, totalSeconds: number): string {
-    const width = this.globalState.get<number>("redmyne.timer.progressBarWidth", 45);
+    const width = this.globalState.get<number>(KANBAN_TIMER_KEYS.progressBarWidth, KANBAN_TIMER_DEFAULTS.progressBarWidth);
     const clampedWidth = Math.max(3, Math.min(100, width));
     const elapsed = totalSeconds - secondsLeft;
     const progress = Math.max(0, Math.min(1, elapsed / totalSeconds));

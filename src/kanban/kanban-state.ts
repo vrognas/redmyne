@@ -4,6 +4,27 @@
 export type TimerPhase = "pending" | "working" | "paused" | "completed";
 
 /**
+ * globalState keys for the kanban work-timer settings. Single owner — import
+ * these instead of re-typing the literals. The `redmyne.timer.*` namespace is
+ * legacy (the timer feature predates the kanban folder); kept as-is to avoid a
+ * data migration for existing users. See finding #62.
+ */
+export const KANBAN_TIMER_KEYS = {
+  unitDuration: "redmyne.timer.unitDuration",
+  workDuration: "redmyne.timer.workDuration",
+  soundEnabled: "redmyne.timer.soundEnabled",
+  progressBarWidth: "redmyne.timer.progressBarWidth",
+} as const;
+
+/** Default values paired with KANBAN_TIMER_KEYS (minutes / boolean / px). */
+export const KANBAN_TIMER_DEFAULTS = {
+  unitDuration: 60,
+  workDuration: 45,
+  soundEnabled: true,
+  progressBarWidth: 45,
+} as const;
+
+/**
  * Kanban task (local subtask under a Redmine issue)
  */
 export interface KanbanTask {
