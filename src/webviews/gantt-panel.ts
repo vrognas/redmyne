@@ -347,7 +347,7 @@ export class GanttPanel {
       this._draftModeManager.onDidChangeEnabled(() => {
         // Toolbar HTML embeds draft-mode state; the enabled flag is part of
         // the payload memo's version key, so cached payloads self-invalidate.
-        this._panel.webview.postMessage({
+        this._postMessage({
           command: "setDraftModeState",
           enabled: this._draftModeManager?.isEnabled ?? false,
           queueCount: this._draftModeManager?.queue?.count ?? 0,
@@ -359,7 +359,7 @@ export class GanttPanel {
         // Command-driven bulk changes trigger a single explicit refresh at command end.
         if (source === DRAFT_COMMAND_SOURCE) return;
         // External change (e.g., Draft Review discard) - refresh to sync
-        this._panel.webview.postMessage({
+        this._postMessage({
           command: "setDraftQueueCount",
           count: this._draftModeManager?.queue?.count ?? 0,
         });
@@ -389,7 +389,7 @@ export class GanttPanel {
         // Send current state to webview (subscriptions only fire on changes)
         const mgr = GanttPanel.currentPanel._draftModeManager;
         if (mgr) {
-          GanttPanel.currentPanel._panel.webview.postMessage({
+          GanttPanel.currentPanel._postMessage({
             command: "setDraftModeState",
             enabled: mgr.isEnabled,
             queueCount: mgr.queue?.count ?? 0,
@@ -676,12 +676,21 @@ export class GanttPanel {
     this._webviewReady = false;
   }
 
+  /**
+   * Single guarded channel for extension→webview messages. No-op once the panel
+   * is disposed (late async completions). Mirrors TimeSheetPanel._postMessage.
+   */
+  private _postMessage(message: Record<string, unknown>): void {
+    if (this._disposed) return;
+    void this._panel.webview.postMessage(message);
+  }
+
   private _queueRender(payload: GanttRenderPayload): void {
     if (this._disposed) return; // Skip if panel was disposed
     this._ensureWebviewHtml();
     if (this._webviewReady) {
       this._pendingRender = undefined;
-      void this._panel.webview.postMessage({ command: "render", payload });
+      this._postMessage({ command: "render", payload });
     } else {
       this._pendingRender = payload;
     }
@@ -1163,7 +1172,7 @@ export class GanttPanel {
    * Scroll to and highlight a specific issue in the Gantt chart
    */
   public scrollToIssue(issueId: number): void {
-    this._panel.webview.postMessage({
+    this._postMessage({
       command: "scrollToIssue",
       issueId,
     });
@@ -1267,7 +1276,7 @@ export class GanttPanel {
       return;
     }
     if (!this._webviewReady) return; // re-flushed by the webviewReady handler
-    this._panel.webview.postMessage({ command: "revealIssue", issueId: pending.id });
+    this._postMessage({ command: "revealIssue", issueId: pending.id });
   }
 
   /**
@@ -1322,7 +1331,7 @@ export class GanttPanel {
    */
   public setActiveIssue(issueId: number | null): void {
     this._activeIssueId = issueId;
-    this._panel.webview.postMessage({
+    this._postMessage({
       command: "setActiveIssue",
       issueId,
     });
@@ -1331,7 +1340,7 @@ export class GanttPanel {
   /** Re-send the active-issue pulse after a render, so a reopened Gantt keeps it. */
   private _reapplyNow(): void {
     if (this._activeIssueId !== null) {
-      this._panel.webview.postMessage({
+      this._postMessage({
         command: "setActiveIssue",
         issueId: this._activeIssueId,
       });
@@ -1463,7 +1472,7 @@ export class GanttPanel {
         if (this._pendingRender) {
           const payload = this._pendingRender;
           this._pendingRender = undefined;
-          void this._panel.webview.postMessage({ command: "render", payload });
+          this._postMessage({ command: "render", payload });
         }
         this._reapplyNow();
         this._flushReveal();
@@ -1503,7 +1512,7 @@ export class GanttPanel {
             this._bumpRevision();
             this._updateContent();
             // Update badge count
-            this._panel.webview.postMessage({
+            this._postMessage({
               command: "setDraftQueueCount",
               count: this._draftModeManager?.queue?.count ?? 0,
             });
@@ -1513,7 +1522,7 @@ export class GanttPanel {
             // the webview believes the draft was undone while the queue still
             // holds it. Surface the error and re-sync the badge count.
             vscode.window.showErrorMessage(`Failed to remove draft: ${errorToString(e)}`);
-            this._panel.webview.postMessage({
+            this._postMessage({
               command: "setDraftQueueCount",
               count: this._draftModeManager?.queue?.count ?? 0,
             });
@@ -1589,21 +1598,21 @@ export class GanttPanel {
         // Display flags are baked into rendered html, but they're part of the
         // payload memo's version key — cached payloads self-invalidate.
         this._showDependencies = !this._showDependencies;
-        this._panel.webview.postMessage({
+        this._postMessage({
           command: "setDependenciesState",
           enabled: this._showDependencies,
         });
         break;
       case "toggleBadges":
         this._showBadges = !this._showBadges;
-        this._panel.webview.postMessage({
+        this._postMessage({
           command: "setBadgesState",
           enabled: this._showBadges,
         });
         break;
       case "toggleCapacityRibbon":
         this._showCapacityRibbon = !this._showCapacityRibbon;
-        this._panel.webview.postMessage({
+        this._postMessage({
           command: "setCapacityRibbonState",
           enabled: this._showCapacityRibbon,
         });
@@ -1611,7 +1620,7 @@ export class GanttPanel {
       case "toggleIntensity":
         this._showIntensity = !this._showIntensity;
         // CSS-only toggle: send message to webview to flip classes (no re-render)
-        this._panel.webview.postMessage({
+        this._postMessage({
           command: "setIntensityState",
           enabled: this._showIntensity,
         });
@@ -1629,7 +1638,7 @@ export class GanttPanel {
       case "toggleDraftMode":
         vscode.commands.executeCommand("redmyne.toggleDraftMode").then(() => {
           // Explicitly send state update after toggle (subscription may not be set up)
-          this._panel.webview.postMessage({
+          this._postMessage({
             command: "setDraftModeState",
             enabled: this._draftModeManager?.isEnabled ?? false,
             queueCount: this._draftModeManager?.queue?.count ?? 0,
@@ -1776,7 +1785,7 @@ export class GanttPanel {
         // CSS-only: webview flips .hide-my-issues on the container
         this._highlightMyIssues = !this._highlightMyIssues;
         GanttPanel._globalState?.update(HIGHLIGHT_MINE_KEY, this._highlightMyIssues);
-        this._panel.webview.postMessage({
+        this._postMessage({
           command: "setMyIssuesHighlightState",
           enabled: this._highlightMyIssues,
         });
@@ -1831,7 +1840,7 @@ export class GanttPanel {
               for (const [role, names] of byRole) {
                 lines.push(`cf:${role}:${names.join(", ")}`);
               }
-              this._panel.webview.postMessage({ command: "appendProjectMembers", projectId: pid, memberLines: lines });
+              this._postMessage({ command: "appendProjectMembers", projectId: pid, memberLines: lines });
             }).catch(() => { /* ignore */ });
           }
         }
@@ -1861,7 +1870,7 @@ export class GanttPanel {
       this._updateContent();
       // Update badge count if in draft mode
       if (this._draftModeManager?.isEnabled) {
-        this._panel.webview.postMessage({
+        this._postMessage({
           command: "setDraftQueueCount",
           count: this._draftModeManager.queue?.count ?? 0,
         });
@@ -1908,7 +1917,7 @@ export class GanttPanel {
 
       // Send undo action to webview (before local state update)
       if (relationInfo) {
-        this._panel.webview.postMessage({
+        this._postMessage({
           command: "pushUndoAction",
           action: {
             type: "relation",
@@ -2076,7 +2085,7 @@ export class GanttPanel {
       showStatusBarMessage(`$(check) ${labels[relationType]} relation created`, 2000);
 
       // Send undo action to webview
-      this._panel.webview.postMessage({
+      this._postMessage({
         command: "pushUndoAction",
         action: {
           type: "relation",
@@ -2138,7 +2147,7 @@ export class GanttPanel {
           message.delay
         );
         // Send new relationId to update redo stack
-        this._panel.webview.postMessage({
+        this._postMessage({
           command: "updateRelationId",
           stack: "redo",
           newRelationId: response.relation.id,
@@ -2173,7 +2182,7 @@ export class GanttPanel {
           message.delay
         );
         // Send new relationId to update undo stack
-        this._panel.webview.postMessage({
+        this._postMessage({
           command: "updateRelationId",
           stack: "undo",
           newRelationId: response.relation.id,
