@@ -19,13 +19,20 @@ export type MonthKey = string;
 export type MonthlyScheduleOverrides = Record<MonthKey, WeeklySchedule>;
 
 /**
- * Get month key from a Date object
+ * Format a month key ("YYYY-MM") from numeric parts. Single owner of the
+ * format string — see getMonthKey for the Date overload.
+ * @param month 0-based (Jan = 0), matching Date.getMonth()
+ */
+export function formatMonthKey(year: number, month: number): MonthKey {
+  return `${year}-${String(month + 1).padStart(2, "0")}`;
+}
+
+/**
+ * Get month key from a Date object (local time).
  * @returns "YYYY-MM" format
  */
 export function getMonthKey(date: Date): MonthKey {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${year}-${month}`;
+  return formatMonthKey(date.getFullYear(), date.getMonth());
 }
 
 /**
