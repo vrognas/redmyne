@@ -397,8 +397,7 @@
       },
       {
         "command": "redmyne.kanban.add",
-        "title": "Add Kanban Task",
-        "category": "Redmyne",
+        "title": "Redmyne: Add Kanban Task",
         "icon": "$(add)"
       },
       {
@@ -473,8 +472,7 @@
       },
       {
         "command": "redmyne.kanban.toggleTimer",
-        "title": "Toggle Timer",
-        "category": "Redmyne"
+        "title": "Redmyne: Toggle Timer"
       },
       {
         "command": "redmyne.kanban.skipBreak",
@@ -986,6 +984,138 @@
         }
       ],
       "commandPalette": [
+        {
+          "command": "redmyne.openTimeEntryInGantt",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.setStatus",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.setIssuePriority",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.updateIssue",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.copyIssueId",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.copyProjectId",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.copyProjectUrl",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.openProjectInBrowser",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.showProjectInGantt",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.setDoneRatio0",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.setDoneRatio10",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.setDoneRatio20",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.setDoneRatio30",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.setDoneRatio40",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.setDoneRatio50",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.setDoneRatio60",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.setDoneRatio70",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.setDoneRatio80",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.setDoneRatio90",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.setDoneRatio100",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.setDoneRatioCustom",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.gantt.setDoneRatio0",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.gantt.setDoneRatio10",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.gantt.setDoneRatio20",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.gantt.setDoneRatio30",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.gantt.setDoneRatio40",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.gantt.setDoneRatio50",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.gantt.setDoneRatio60",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.gantt.setDoneRatio70",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.gantt.setDoneRatio80",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.gantt.setDoneRatio90",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.gantt.setDoneRatio100",
+          "when": "false"
+        },
+        {
+          "command": "redmyne.gantt.setDoneRatioCustom",
+          "when": "false"
+        },
         {
           "command": "redmyne.refreshIssues",
           "when": "false"
