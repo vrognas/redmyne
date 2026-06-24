@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { redmyneConfig } from "../utilities/redmyne-config";
 import { Issue, IssueRelation } from "../redmine/models/issue";
 import { Version } from "../redmine/models/version";
 import type { IRedmineServer } from "../redmine/redmine-server-interface";
@@ -2203,7 +2204,7 @@ export class GanttPanel {
 
   /** Name of the custom field used as the "task type" filter ("" disables it). */
   private _taskTypeFieldName(): string {
-    return vscode.workspace.getConfiguration("redmyne").get<string>("taskTypeField", "Task Type");
+    return redmyneConfig.taskTypeField();
   }
 
   private _getRenderPayload(): GanttRenderPayload {

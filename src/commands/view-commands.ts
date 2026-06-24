@@ -4,6 +4,7 @@
  */
 
 import * as vscode from "vscode";
+import { redmyneConfig } from "../utilities/redmyne-config";
 import { ProjectsTree, ProjectsViewStyle } from "../trees/projects-tree";
 import { MyTimeEntriesTreeDataProvider } from "../trees/my-time-entries-tree";
 import { showStatusBarMessage } from "../utilities/status-bar";
@@ -63,7 +64,7 @@ export function registerViewCommands(
 
     vscode.commands.registerCommand("redmyne.toggleApiLogging", async () => {
       const config = vscode.workspace.getConfiguration("redmyne");
-      const currentValue = config.get<boolean>("logging.enabled") || false;
+      const currentValue = redmyneConfig.loggingEnabled();
       await config.update(
         "logging.enabled",
         !currentValue,
@@ -123,7 +124,7 @@ export function registerViewCommands(
     vscode.commands.registerCommand("redmyne.filterByTaskType", async () => {
       const taskTypes = deps.projectsTree.getAvailableTaskTypes();
       if (taskTypes.length === 0) {
-        const field = vscode.workspace.getConfiguration("redmyne").get<string>("taskTypeField", "Task Type");
+        const field = redmyneConfig.taskTypeField();
         showStatusBarMessage(`$(info) No "${field}" values in the loaded issues`, 3000);
         return;
       }

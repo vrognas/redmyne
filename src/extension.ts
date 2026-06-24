@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { redmyneConfig } from "./utilities/redmyne-config";
 import {
   RedmineServer,
   RedmineServerConnectionOptions,
@@ -152,9 +153,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const createServer = (
     options: RedmineServerConnectionOptions
   ): RedmineServer => {
-    const config = vscode.workspace.getConfiguration("redmyne");
-    const loggingEnabled = config.get<boolean>("logging.enabled") || false;
-    const maxConcurrentRequests = config.get<number>("maxConcurrentRequests") || 4;
+    const loggingEnabled = redmyneConfig.loggingEnabled();
+    const maxConcurrentRequests = redmyneConfig.maxConcurrentRequests();
 
     const serverOptions = { ...options, maxConcurrentRequests };
 

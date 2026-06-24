@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { redmyneConfig } from "../utilities/redmyne-config";
 import type { IRedmineServer } from "../redmine/redmine-server-interface";
 import { RedmineProject } from "../redmine/redmine-project";
 import { Issue } from "../redmine/models/issue";
@@ -155,9 +156,8 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
 
   async resolveTreeItem(item: vscode.TreeItem, element: TreeItem): Promise<vscode.TreeItem> {
     if (isProjectNode(element) && this.server) {
-      const config = vscode.workspace.getConfiguration("redmyne");
-      const showMembers = config.get<boolean>("showProjectMembers", true);
-      const excludeIds = config.get<number[]>("hideProjectMembersFor", []);
+      const showMembers = redmyneConfig.showProjectMembers();
+      const excludeIds = redmyneConfig.hideProjectMembersFor();
       const shouldFetch = showMembers && !excludeIds.includes(element.project.id);
       // Use cached members first (instant), fetch if not cached
       const cached = shouldFetch ? this.server.getCachedMemberships(element.project.id) : undefined;
@@ -468,10 +468,9 @@ export class ProjectsTree extends BaseTreeProvider<TreeItem> {
 
   private async preloadMemberships(projects: RedmineProject[]): Promise<void> {
     if (!this.server) return;
-    const config = vscode.workspace.getConfiguration("redmyne");
-    const showMembers = config.get<boolean>("showProjectMembers", true);
+    const showMembers = redmyneConfig.showProjectMembers();
     if (!showMembers) return;
-    const excludeIds = config.get<number[]>("hideProjectMembersFor", []);
+    const excludeIds = redmyneConfig.hideProjectMembersFor();
 
     const toPreload = projects.filter(p =>
       !excludeIds.includes(p.id) &&
