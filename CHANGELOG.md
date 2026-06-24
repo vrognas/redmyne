@@ -21,13 +21,15 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - **Kanban column icons match their actions.** To Do is a **pin**, Doing a **play**, and Done a **checkmark** — mirroring the Start Timer / Mark Done buttons.
 - **Toolbar icons refreshed.** Kanban **Timer Settings** moved off the Doing column header into the view title bar (next to Collapse All); **Clear Done** is now an eraser; **Add to Kanban** a pin; the Time Entries **Time Sheet** button a calendar; and the Issues **Show Gantt** button the VS Code icon.
 - **Consistent issue hover tooltips.** Issues, Kanban, Time Entries, and the Gantt lead with the **bold issue title** then the **assignee**, with bold field labels and matching order. In the Gantt, the timeline **bar and the task-column now show the same** tooltip — one grouped layout (identity / schedule / progress / dependencies) with bold `Label:` prefixes, mirroring the side-pane tooltips.
-- **Show in Gantt is visibility-aware.** If the issue already passes the current Gantt filters it's revealed **in place** (scroll, focus, and pin-select its bar — press Esc to clear); if it's filtered out, the Gantt first broadens to all-projects/by-project, then reveals it. No more silently jumping you to a different project when you didn't need it.
+- **Show in Gantt is visibility-aware.** If the issue already passes the current Gantt filters it's revealed **in place** — the bar **centered vertically**, scrolled into view, focused, and pin-selected (press Esc to clear). If it's filtered out, the Gantt first broadens to all-projects/by-project; if it starts before the current **lookback** window, the lookback widens to include it; if its group is collapsed, just that issue's ancestors expand. No more silently jumping you to a different project when you didn't need it.
 
 ### Fixed
 
 - **Add to Kanban is hidden on closed issues.** A completed issue no longer shows the Add-to-Kanban button or context action — there's nothing to start.
 - **Gantt week shading is uniform in day zoom.** The current week no longer rendered with a mismatched shade against its neighbours.
 - **Dismiss a Gantt dependency highlight.** Clicking a blocks/blocker badge highlights its dependency arrows; pressing **Escape** or clicking elsewhere now clears that highlight (previously the badge highlight stayed stuck).
+- **Show in Gantt is reliable on a freshly-opened Gantt.** The reveal used to be dropped (silent no-op) when the Gantt was opening for the first time, because it raced the initial render. It now waits for the view to be ready, and survives the follow-up data refresh, so the issue is always revealed.
+- **Issues pane shows one loading row.** While loading it rendered five spinning "Loading…" skeleton rows; now it shows a single one.
 
 ### Internal
 
