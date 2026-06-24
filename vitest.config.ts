@@ -20,7 +20,6 @@ export default defineConfig({
         "src/commands/open-actions-for-issue-under-cursor.ts", // VS Code UI heavy
         "src/commands/commons/**/*.ts", // VS Code UI heavy
         "src/commands/action-properties.ts", // Type-only interface
-        "src/timer/**/*.ts", // VS Code UI heavy + audio
         "src/utilities/issue-picker.ts", // VS Code QuickPick
         "src/utilities/completion-sound.ts", // Platform-specific audio
         "src/redmine/models/**/*.ts", // Type definitions only

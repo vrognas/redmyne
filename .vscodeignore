@@ -7,7 +7,6 @@ src/**
 node_modules/**
 .gitignore
 tsconfig.json
-esbuild.js
 esbuild.cjs
 vitest.config.ts
 vsc-extension-quickstart.md

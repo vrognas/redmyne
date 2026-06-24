@@ -2259,6 +2259,15 @@
           "default": [],
           "markdownDescription": "**Precedence priority issues**\n\nIssue IDs scheduled before all others in the Gantt view.\n\nExample: `[7, 15]`"
         },
+        "redmyne.additionalHeaders": {
+          "type": "object",
+          "scope": "application",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "markdownDescription": "**Advanced: Extra HTTP headers**\n\nKey/value pairs sent with every Redmine API request (e.g. a reverse-proxy auth header).\n\nExample: `{ \"X-Proxy-Token\": \"abc123\" }`\n\n**Security note:** stored in plain settings — do not put your Redmine API key here (use the secure key store instead)."
+        },
         "redmyne.caFile": {
           "type": "string",
           "scope": "machine",
@@ -2329,7 +2338,7 @@
     "typecheck": "tsc --noEmit",
     "clean": "node -e \"require('node:fs').rmSync('out',{recursive:true,force:true});require('node:fs').rmSync('coverage',{recursive:true,force:true});\"",
     "lint": "eslint .",
-    "package": "npx @vscode/vsce package",
+    "package": "vsce package",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -2343,6 +2352,7 @@
     "@types/node": "^25.3.5",
     "@types/vscode": "~1.109.0",
     "@vitest/coverage-v8": "^4.1.6",
+    "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.27.2",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
