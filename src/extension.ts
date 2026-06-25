@@ -18,7 +18,6 @@ import { RedmineSecretManager } from "./utilities/secret-manager";
 import { setApiKey } from "./commands/set-api-key";
 import { MonthlyScheduleOverrides, loadMonthlySchedules } from "./utilities/monthly-schedule";
 import { disposeStatusBar } from "./utilities/status-bar";
-import { errorToString } from "./utilities/error-feedback";
 import type { KanbanController } from "./kanban/kanban-controller";
 import type { KanbanStatusBar } from "./kanban/kanban-status-bar";
 import type { KanbanTreeProvider } from "./kanban/kanban-tree-provider";
@@ -34,7 +33,6 @@ import { registerNavigationClipboardCommands } from "./commands/navigation-clipb
 import { registerQuickIssueCommands } from "./commands/quick-issue-commands";
 import { createConfiguredCommandRegistrar } from "./commands/configured-command-registrar";
 import { GanttPanel } from "./webviews/gantt-panel";
-import { getWeeklySchedule } from "./utilities/flexibility-calculator";
 import { registerConfigureCommand } from "./commands/configure-command";
 import { registerViewCommands } from "./commands/view-commands";
 import { registerContextProxyCommands } from "./commands/context-proxy-commands";
@@ -45,7 +43,7 @@ import { runMigration } from "./utilities/migration";
 import { initRecentIssues } from "./utilities/recent-issues";
 import { initAdHocTracker } from "./utilities/adhoc-tracker";
 import { isClientStateOnlyConfigChange } from "./utilities/config-change";
-import { createConfiguredContextUpdater } from "./utilities/configured-context-updater";
+import { createConfiguredContextUpdater } from "./composition/configured-context-updater";
 import { DraftQueue } from "./draft-mode/draft-queue";
 import { DraftModeManager } from "./draft-mode/draft-mode-manager";
 import type { DraftModeServer } from "./draft-mode/draft-mode-server";
@@ -291,35 +289,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Register internal estimate commands
   registerInternalEstimateCommands(context);
 
-  // Register Gantt panel serializer for window reload persistence
-  vscode.window.registerWebviewPanelSerializer("redmyneGantt", {
-    async deserializeWebviewPanel(panel: vscode.WebviewPanel) {
-      // Restore panel with loading skeleton (use getter function for late binding)
-      const ganttPanel = GanttPanel.restore(panel, context.extensionUri, () => projectsTree.server, () => draftModeManager);
-      // Always wire the filter callback so webview filter changes reach the tree,
-      // even when the fetch yields zero issues.
-      ganttPanel.setFilterChangeCallback((filter) => projectsTree.setFilter(filter));
-      try {
-        // Fetch and populate data. Pass the (possibly empty) array so the panel
-        // renders its empty state instead of being stuck on the loading skeleton.
-        const issues = await projectsTree.fetchIssuesIfNeeded();
-        const schedule = getWeeklySchedule();
-        await ganttPanel.updateIssues(
-          issues,
-          projectsTree.getFlexibilityCache(),
-          projectsTree.getProjects(),
-          schedule,
-          projectsTree.getFilter(),
-          projectsTree.getDependencyIssues(),
-          () => projectsTree.server
-        );
-      } catch (error) {
-        // Don't let a fetch/render rejection escape deserializeWebviewPanel and
-        // leave the panel silently stuck on the skeleton.
-        void vscode.window.showErrorMessage(errorToString(error));
-      }
-    },
-  });
+  // (The Gantt panel serializer is registered inside registerGanttCommands.)
 
   // Register Draft Review panel serializer for window reload persistence
   vscode.window.registerWebviewPanelSerializer("redmyneDraftReview", {
