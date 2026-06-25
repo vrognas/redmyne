@@ -6,6 +6,7 @@ import { vi } from "vitest";
  */
 let _nextQuickPickValue: string | undefined | symbol;
 export const window = {
+  registerWebviewPanelSerializer: vi.fn(() => ({ dispose: vi.fn() })),
   showQuickPick: vi.fn(),
   showInputBox: vi.fn(),
   showInformationMessage: vi.fn(),

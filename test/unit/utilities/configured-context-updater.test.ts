@@ -24,7 +24,7 @@ vi.mock("../../../src/draft-mode/draft-mode-server", () => ({
   },
 }));
 
-import { createConfiguredContextUpdater } from "../../../src/utilities/configured-context-updater";
+import { createConfiguredContextUpdater } from "../../../src/composition/configured-context-updater";
 
 function makeConfig(values: Record<string, unknown>): vscode.WorkspaceConfiguration {
   return {

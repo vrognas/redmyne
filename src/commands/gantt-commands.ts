@@ -12,6 +12,7 @@ import { RedmineProject } from "../redmine/redmine-project";
 import { IssueFilter } from "../redmine/models/common";
 import type { DraftModeManager } from "../draft-mode/draft-mode-manager";
 import { getIssueIdOrShowError } from "./command-guards";
+import { errorToString } from "../utilities/error-feedback";
 
 export interface GanttCommandDeps {
   getServer: () => IRedmineServer | undefined;
@@ -37,6 +38,33 @@ export function registerGanttCommands(
     panel.setFilterChangeCallback((filter) => deps.setFilter(filter));
     return panel;
   }
+
+  // Serializer for window-reload persistence: restore the panel with a loading
+  // skeleton, then refetch + populate (passing the possibly-empty array so it
+  // shows its empty state instead of a stuck skeleton). Lives here with the rest
+  // of the Gantt wiring rather than inline in extension.ts.
+  vscode.window.registerWebviewPanelSerializer("redmyneGantt", {
+    async deserializeWebviewPanel(panel: vscode.WebviewPanel) {
+      const ganttPanel = GanttPanel.restore(panel, context.extensionUri, deps.getServer, deps.getDraftModeManager);
+      // Wire the filter callback even when the fetch yields zero issues.
+      ganttPanel.setFilterChangeCallback((filter) => deps.setFilter(filter));
+      try {
+        const issues = await deps.fetchIssuesIfNeeded();
+        await ganttPanel.updateIssues(
+          issues,
+          deps.getFlexibilityCache(),
+          deps.getProjects(),
+          getSchedule(),
+          deps.getFilter(),
+          deps.getDependencyIssues(),
+          deps.getServer
+        );
+      } catch (error) {
+        // Don't let a fetch/render rejection leave the panel stuck on the skeleton.
+        void vscode.window.showErrorMessage(errorToString(error));
+      }
+    },
+  });
 
   context.subscriptions.push(
     // Gantt timeline command

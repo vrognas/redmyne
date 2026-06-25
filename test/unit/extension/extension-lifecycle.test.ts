@@ -370,7 +370,7 @@ vi.mock("../../../src/utilities/migration", () => ({
 vi.mock("../../../src/utilities/recent-issues", () => ({
   initRecentIssues: hoisted.initRecentIssues,
 }));
-vi.mock("../../../src/utilities/configured-context-updater", () => ({
+vi.mock("../../../src/composition/configured-context-updater", () => ({
   createConfiguredContextUpdater: hoisted.createConfiguredContextUpdater,
 }));
 
