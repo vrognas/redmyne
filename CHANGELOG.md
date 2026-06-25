@@ -5,6 +5,29 @@ All notable changes to Redmyne are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
+## [4.41.0]
+
+### Changed
+
+- **Command palette decluttered.** ~33 context-only commands (the done-% setters, Set Status / Set Priority, Copy Issue/Project ID, Show/Open in Gantt, Update Issue) no longer appear in the Command Palette (Ctrl+Shift+P) — they stay on the right-click menus where they apply. Only genuine palette commands remain.
+- **Kanban commands carry the "Redmyne:" prefix** in the palette, matching every other command.
+
+### Added
+
+- **`redmyne.additionalHeaders` is now a documented setting.** Extra HTTP headers sent with every Redmine request (e.g. a reverse-proxy token) are exposed in the Settings UI. Previously the extension read this setting but never declared it.
+
+### Fixed
+
+- **Capacity scheduling matches the rest of the app.** The "remaining work" used by the Gantt capacity ribbon followed a drifted formula: for an issue with progress recorded but its time budget not yet consumed (`% Done > 0`, `spent < estimate`) it scaled by `% Done` instead of using `estimate − spent`. It now goes through the single shared heuristic used by lateness, flexibility scoring, and the bars. Capacity numbers for such issues may shift accordingly.
+
+### Internal
+
+- Large architecture & infrastructure cleanup acting on the deep review (`docs/reviews/arch-infra-review-2026-06-24.md`) — no behaviour change beyond the items above:
+  - Split the Redmine API client: HTTP transport (validation, TLS/CA, concurrency queue, request lifecycle, pagination) extracted into a `RedmineHttpClient` base; the 1046-LOC kanban-commands into four family modules; the Gantt date-marker generator into its own module; the Gantt-only calculators co-located under `webviews/gantt/`.
+  - Deduplication & single-owners: a typed `redmyneConfig` accessor, `patchIssue`/`RedmineUser`/`encodeJson` in the client, `DAY_KEYS`/`getDayName`, `BaseStatusBar`, `formatMonthKey`, `buildServerOptionsFromConfig`, a guarded gantt `_postMessage`; broke the redmine interface↔class import cycle (madge clean).
+  - Build/CI: data-driven esbuild targets, single `NODE_VERSION`, workflow concurrency, the 250 KB VSIX size gate now enforced on release too, commit-validator reuses the hook, pinned `@vscode/vsce`.
+  - Docs refreshed (ARCHITECTURE/AGENTS/CLAUDE), dead `src/timer/` references purged. 1457 tests pass; zero circular dependencies.
+
 ## [4.40.0]
 
 ### Added
